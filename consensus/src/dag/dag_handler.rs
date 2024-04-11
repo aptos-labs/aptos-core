@@ -11,7 +11,7 @@ use crate::{
             DAGError, DAGRpcError, DagDriverError, FetchRequestHandleError,
             NodeBroadcastHandleError,
         },
-        observability::counters::INCOMING_MSG_PROCESSING,
+        observability::counters::{INCOMING_MSG_PROCESSING, RPC_PROCESS_DURATION},
         rb_handler::NodeBroadcastHandler,
         types::{DAGMessage, DAGRpcResult},
         CertifiedNode, Node, Vote,
@@ -29,7 +29,11 @@ use aptos_logger::{
 };
 use aptos_types::epoch_state::EpochState;
 use futures::{stream::FuturesUnordered, FutureExt, StreamExt};
-use std::{collections::BTreeMap, sync::Arc, time::Duration};
+use std::{
+    collections::BTreeMap,
+    sync::Arc,
+    time::{Duration, Instant},
+};
 use tokio::{runtime::Handle, select, task::JoinHandle};
 
 pub(crate) struct NetworkHandler {
@@ -116,7 +120,13 @@ impl NetworkHandler {
                         )?;
                         Ok(dag_message)
                     });
-                (result, epoch, rpc_request.sender, rpc_request.responder)
+                (
+                    result,
+                    epoch,
+                    rpc_request.sender,
+                    rpc_request.responder,
+                    rpc_request.start,
+                )
             });
 
         let dag_driver_clone = dag_driver.clone();
@@ -172,11 +182,11 @@ impl NetworkHandler {
         let executor = BoundedExecutor::new(200, Handle::current());
         loop {
             select! {
-                Some((msg, epoch, author, responder)) = verified_msg_stream.next() => {
+                Some((msg, epoch, author, responder, start)) = verified_msg_stream.next() => {
                     let verified_msg_processor = verified_msg_processor.clone();
                     let f = executor.spawn(async move {
                         monitor!("dag_on_verified_msg", {
-                            match verified_msg_processor.process_verified_message(msg, epoch, author, responder).await {
+                            match verified_msg_processor.process_verified_message(msg, epoch, author, responder, start).await {
                                 Ok(sync_status) => {
                                     if matches!(
                                         sync_status,
@@ -254,6 +264,7 @@ impl VerifiedMessageProcessor {
         epoch: u64,
         author: Author,
         responder: RpcResponder,
+        start: Instant,
     ) -> anyhow::Result<SyncOutcome> {
         let response: Result<DAGMessage, DAGError> = {
             match dag_message_result {
@@ -344,6 +355,7 @@ impl VerifiedMessageProcessor {
             .map_err(|e| DAGRpcError::new(self.epoch_state.epoch, e))
             .into();
         responder.respond(response)?;
+        RPC_PROCESS_DURATION.observe(start.elapsed().as_secs_f64());
 
         Ok(SyncOutcome::Synced(None))
     }

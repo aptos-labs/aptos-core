@@ -54,7 +54,7 @@ use serde::{de::DeserializeOwned, Serialize};
 use std::{
     mem::{discriminant, Discriminant},
     sync::Arc,
-    time::Duration,
+    time::{Duration, Instant},
 };
 use tokio::time::timeout;
 
@@ -110,6 +110,7 @@ pub struct IncomingDAGRequest {
     pub req: DAGNetworkMessage,
     pub sender: Author,
     pub responder: RpcResponder,
+    pub start: Instant,
 }
 
 #[derive(Debug)]
@@ -818,6 +819,7 @@ impl NetworkTask {
                                     protocol,
                                     response_sender: callback,
                                 },
+                                start: Instant::now(),
                             })
                         },
                         ConsensusMsg::CommitMessage(req) => {

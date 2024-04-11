@@ -39,7 +39,7 @@ use futures::{
 };
 use futures_channel::mpsc::UnboundedReceiver;
 use maplit::hashmap;
-use std::sync::Arc;
+use std::{sync::Arc, time::Instant};
 use tokio::task::JoinHandle;
 
 struct DagBootstrapUnit {
@@ -121,6 +121,7 @@ impl DagBootstrapUnit {
                                 protocol,
                                 response_sender,
                             },
+                            start: Instant::now(),
                         })
                     },
                     _ => unreachable!("expected only DAG-related messages"),

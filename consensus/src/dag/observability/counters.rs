@@ -124,3 +124,11 @@ pub static TIMEOUT_WAIT_VOTING_POWER_COUNT: Lazy<IntCounter> = Lazy::new(|| {
     )
     .unwrap()
 });
+
+pub static RPC_PROCESS_DURATION: Lazy<Histogram> = Lazy::new(|| {
+    register_histogram!(
+        "aptos_consensus_dag_rpc_process_duration",
+        "dag incoming message processing"
+    )
+    .unwrap()
+});
