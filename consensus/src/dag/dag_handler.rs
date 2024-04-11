@@ -118,20 +118,18 @@ impl NetworkHandler {
         let node_receiver_clone = node_receiver.clone();
         let handle = tokio::spawn(async move {
             while let Some(new_round) = new_round_event.recv().await {
+                let driver = dag_driver_clone.clone();
+                tokio::task::spawn_blocking(move || {
+                    monitor!("dag_sort_peers", {
+                        driver.peers_by_latency.write().sort();
+                    })
+                });
                 monitor!("dag_on_new_round_event", {
                     dag_driver_clone.enter_new_round(new_round).await;
                 });
                 monitor!("dag_node_receiver_gc", {
                     node_receiver_clone.gc();
                 });
-                if new_round % 2 == 0 {
-                    let driver = dag_driver_clone.clone();
-                    tokio::task::spawn_blocking(move || {
-                        monitor!("dag_sort_peers", {
-                            driver.peers_by_latency.write().sort();
-                        })
-                    });
-                }
             }
         });
         defer!(handle.abort());
