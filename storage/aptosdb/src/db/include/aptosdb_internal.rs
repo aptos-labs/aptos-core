@@ -144,7 +144,7 @@ impl AptosDB {
         Ok(())
     }
 
-    #[cfg(any(test, feature = "fuzzing"))]
+    #[cfg(any(test, feature = "fuzzing", feature = "consensus-only-perf-test"))]
     fn new_without_pruner<P: AsRef<Path> + Clone>(
         db_root_path: P,
         readonly: bool,

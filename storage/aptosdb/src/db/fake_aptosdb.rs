@@ -50,14 +50,13 @@ use aptos_types::{
     },
     write_set::WriteSet,
 };
-use arc_swap::ArcSwapOption;
 use dashmap::DashMap;
 use itertools::zip_eq;
 use move_core_types::move_resource::MoveStructType;
 use std::{
     borrow::Borrow,
     sync::{
-        atomic::{AtomicPtr, AtomicU64, Ordering},
+        atomic::{AtomicU64, Ordering},
         Arc,
     },
 };
