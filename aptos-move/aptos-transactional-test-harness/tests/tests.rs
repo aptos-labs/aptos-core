@@ -3,6 +3,7 @@
 // SPDX-License-Identifier: Apache-2.0
 
 use aptos_transactional_test_harness::run_aptos_test_with_config;
+use move_model::metadata::LanguageVersion;
 use move_transactional_test_runner::vm_test_harness::TestRunConfig;
 use std::path::Path;
 
@@ -13,6 +14,7 @@ fn runner(path: &Path) -> anyhow::Result<(), Box<dyn std::error::Error>> {
         // TODO: we may later want to change this to comparison testing. For now we are mostly
         //    interested in debugging v2 bytecode.
         run_aptos_test_with_config(path, TestRunConfig::CompilerV2 {
+            language_version: LanguageVersion::default(),
             v2_experiments: vec![],
         })
     } else {

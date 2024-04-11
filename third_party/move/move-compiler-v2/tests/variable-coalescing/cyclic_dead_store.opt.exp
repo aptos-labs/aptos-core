@@ -50,6 +50,57 @@ public fun m::test2($t0: u64, $t1: u64) {
  15: return ()
 }
 
+============ after DeadStoreElimination: ================
+
+[variant baseline]
+public fun m::test1($t0: u64, $t1: u64, $t2: u64) {
+     var $t3: u64
+     var $t4: bool
+     var $t5: u64
+     var $t6: u64
+  0: $t3 := 0
+  1: label L0
+  2: $t4 := <($t3, $t0)
+  3: if ($t4) goto 4 else goto 11
+  4: label L2
+  5: $t1 := move($t2)
+  6: $t2 := move($t1)
+  7: $t6 := 1
+  8: $t5 := +($t3, $t6)
+  9: $t3 := move($t5)
+ 10: goto 13
+ 11: label L3
+ 12: goto 15
+ 13: label L4
+ 14: goto 1
+ 15: label L1
+ 16: return ()
+}
+
+
+[variant baseline]
+public fun m::test2($t0: u64, $t1: u64) {
+     var $t2: u64
+     var $t3: bool
+     var $t4: u64
+     var $t5: u64
+  0: $t2 := 0
+  1: label L0
+  2: $t3 := <($t2, $t0)
+  3: if ($t3) goto 4 else goto 9
+  4: label L2
+  5: $t5 := 1
+  6: $t4 := +($t2, $t5)
+  7: $t2 := move($t4)
+  8: goto 11
+  9: label L3
+ 10: goto 13
+ 11: label L4
+ 12: goto 1
+ 13: label L1
+ 14: return ()
+}
+
 ============ after VariableCoalescingAnnotator: ================
 
 [variant baseline]
@@ -199,6 +250,57 @@ public fun m::test2($t0: u64, $t1: u64) {
  14: return ()
 }
 
+============ after DeadStoreElimination: ================
+
+[variant baseline]
+public fun m::test1($t0: u64, $t1: u64, $t2: u64) {
+     var $t3: u64
+     var $t4: bool
+     var $t5: u64 [unused]
+     var $t6: u64 [unused]
+  0: $t3 := 0
+  1: label L0
+  2: $t4 := <($t3, $t0)
+  3: if ($t4) goto 4 else goto 11
+  4: label L2
+  5: $t1 := move($t2)
+  6: $t2 := move($t1)
+  7: $t1 := 1
+  8: $t1 := +($t3, $t1)
+  9: $t3 := move($t1)
+ 10: goto 13
+ 11: label L3
+ 12: goto 15
+ 13: label L4
+ 14: goto 1
+ 15: label L1
+ 16: return ()
+}
+
+
+[variant baseline]
+public fun m::test2($t0: u64, $t1: u64) {
+     var $t2: u64 [unused]
+     var $t3: bool
+     var $t4: u64 [unused]
+     var $t5: u64
+  0: $t1 := 0
+  1: label L0
+  2: $t3 := <($t1, $t0)
+  3: if ($t3) goto 4 else goto 9
+  4: label L2
+  5: $t5 := 1
+  6: $t5 := +($t1, $t5)
+  7: $t1 := move($t5)
+  8: goto 11
+  9: label L3
+ 10: goto 13
+ 11: label L4
+ 12: goto 1
+ 13: label L1
+ 14: return ()
+}
+
 
 ============ disassembled file-format ==================
 // Move bytecode v7
@@ -223,7 +325,7 @@ B2:
 	10: LdU64(1)
 	11: StLoc[1](Arg1: u64)
 	12: MoveLoc[3](loc0: u64)
-	13: CopyLoc[1](Arg1: u64)
+	13: MoveLoc[1](Arg1: u64)
 	14: Add
 	15: StLoc[3](loc0: u64)
 	16: Branch(18)
@@ -248,7 +350,7 @@ B2:
 	6: LdU64(1)
 	7: StLoc[2](loc0: u64)
 	8: MoveLoc[1](Arg1: u64)
-	9: CopyLoc[2](loc0: u64)
+	9: MoveLoc[2](loc0: u64)
 	10: Add
 	11: StLoc[1](Arg1: u64)
 	12: Branch(14)

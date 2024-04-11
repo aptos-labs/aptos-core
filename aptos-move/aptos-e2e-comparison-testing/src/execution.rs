@@ -21,7 +21,7 @@ use aptos_vm::data_cache::AsMoveResolver;
 use clap::ValueEnum;
 use itertools::Itertools;
 use move_core_types::{account_address::AccountAddress, language_storage::ModuleId};
-use move_package::CompilerVersion;
+use move_model::metadata::CompilerVersion;
 use std::{cmp, collections::HashMap, path::PathBuf, sync::Arc};
 
 fn load_packages_to_executor(
@@ -222,7 +222,7 @@ impl Execution {
                 v2_failed = true;
             } else {
                 let compiled_res_v2 =
-                    compile_package(package_dir, &package_info, Some(CompilerVersion::V2));
+                    compile_package(package_dir, &package_info, Some(CompilerVersion::V2_0));
                 if let Ok(compiled_res) = compiled_res_v2 {
                     generate_compiled_blob(
                         &package_info,

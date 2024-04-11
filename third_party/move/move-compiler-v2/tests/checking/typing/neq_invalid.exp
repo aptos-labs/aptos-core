@@ -58,6 +58,14 @@ error: unable to infer instantiation of type `G2<_>` (consider providing type ar
 28 │         G2{} != G2{};
    │         ^^^^
 
+error: tuple type `()` is not allowed as a type argument (type was inferred)
+   ┌─ tests/checking/typing/neq_invalid.move:32:12
+   │
+32 │         () != ();
+   │            ^^
+   │
+   = required by instantiating type parameter `T` of function `!=`
+
 error: tuple type `(integer, integer)` is not allowed as a type argument (type was inferred)
    ┌─ tests/checking/typing/neq_invalid.move:33:16
    │

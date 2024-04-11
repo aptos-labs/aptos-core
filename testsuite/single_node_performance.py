@@ -136,10 +136,10 @@ TESTS = [
     RunGroupConfig(expected_tps=1300, key=RunGroupKey("token-v1nft-mint-and-transfer-parallel"), included_in=Flow(0)),
     RunGroupConfig(expected_tps=5300, key=RunGroupKey("token-v1nft-mint-and-transfer-parallel", module_working_set_size=20), included_in=Flow(0)),
 
-    RunGroupConfig(expected_tps=13800, key=RunGroupKey("coin-init-and-mint", module_working_set_size=1), included_in=LAND_BLOCKING_AND_C),
-    RunGroupConfig(expected_tps=11400, key=RunGroupKey("coin-init-and-mint", module_working_set_size=20), included_in=Flow.CONTINUOUS),
-    RunGroupConfig(expected_tps=1500, key=RunGroupKey("fungible-asset-mint", module_working_set_size=1), included_in=LAND_BLOCKING_AND_C),
-    RunGroupConfig(expected_tps=7500, key=RunGroupKey("fungible-asset-mint", module_working_set_size=20), included_in=Flow.CONTINUOUS),
+    RunGroupConfig(expected_tps=14500, key=RunGroupKey("coin-init-and-mint", module_working_set_size=1), included_in=LAND_BLOCKING_AND_C),
+    RunGroupConfig(expected_tps=12000, key=RunGroupKey("coin-init-and-mint", module_working_set_size=20), included_in=Flow.CONTINUOUS),
+    RunGroupConfig(expected_tps=1590, key=RunGroupKey("fungible-asset-mint", module_working_set_size=1), included_in=LAND_BLOCKING_AND_C),
+    RunGroupConfig(expected_tps=7900, key=RunGroupKey("fungible-asset-mint", module_working_set_size=20), included_in=Flow.CONTINUOUS),
 
     # RunGroupConfig(expected_tps=1000, key=RunGroupKey("token-v1ft-mint-and-store"), included_in=Flow(0)),
     # RunGroupConfig(expected_tps=1000, key=RunGroupKey("token-v1nft-mint-and-store-sequential"), included_in=Flow(0)),
@@ -149,6 +149,12 @@ TESTS = [
    
     RunGroupConfig(expected_tps=7006, key=RunGroupKey("token-v2-ambassador-mint"), included_in=LAND_BLOCKING_AND_C | Flow.REPRESENTATIVE),
     RunGroupConfig(expected_tps=6946, key=RunGroupKey("token-v2-ambassador-mint", module_working_set_size=20), included_in=Flow.CONTINUOUS),
+
+    RunGroupConfig(expected_tps=1030, key=RunGroupKey("liquidity-pool-swap"), included_in=LAND_BLOCKING_AND_C | Flow.REPRESENTATIVE),
+    RunGroupConfig(expected_tps=4520, key=RunGroupKey("liquidity-pool-swap", module_working_set_size=20), included_in=Flow.CONTINUOUS),
+
+    RunGroupConfig(expected_tps=970, key=RunGroupKey("liquidity-pool-swap-stable"), included_in=Flow.CONTINUOUS),
+    RunGroupConfig(expected_tps=4350, key=RunGroupKey("liquidity-pool-swap-stable", module_working_set_size=20), included_in=Flow.CONTINUOUS),
 
     # fee payer sequentializes transactions today. in these tests module publisher is the fee payer, so larger number of modules tests throughput with multiple fee payers
     RunGroupConfig(expected_tps=3120, key=RunGroupKey("no-op-fee-payer"), included_in=LAND_BLOCKING_AND_C),

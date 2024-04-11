@@ -319,7 +319,7 @@ move-compiler/tests/move_check/typing/implicit_deref_borrow_field_internal.exp  
 move-compiler/tests/move_check/typing/implicit_deref_borrow_field_missing.exp   move-compiler-v2/tests/checking/typing/implicit_deref_borrow_field_missing.exp
 move-compiler/tests/move_check/typing/implicit_deref_borrow_field_non_ref_non_local_root.exp   move-compiler-v2/tests/checking/typing/implicit_deref_borrow_field_non_ref_non_local_root.exp
 move-compiler/tests/move_check/typing/implicit_deref_borrow_field_non_ref_root.exp   move-compiler-v2/tests/checking/typing/implicit_deref_borrow_field_non_ref_root.exp
-move-compiler/tests/move_check/typing/invalid_type_acquire.exp   move-compiler-v2/tests/acquires-checker/v1-tests/invalid_type_acquire.exp
+move-compiler/tests/move_check/typing/invalid_type_acquire.exp   move-compiler-v2/tests/checking-lang-v1/v1-typing/invalid_type_acquire.exp
 move-compiler/tests/move_check/typing/lambda.exp   move-compiler-v2/tests/checking/typing/lambda.exp
 move-compiler/tests/move_check/typing/large_binop.exp   move-compiler-v2/tests/checking/typing/large_binop.exp
 move-compiler/tests/move_check/typing/loop_body.exp   move-compiler-v2/tests/checking/typing/loop_body.exp
@@ -363,7 +363,11 @@ move-compiler/tests/move_check/typing/pack.exp   move-compiler-v2/tests/checking
 move-compiler/tests/move_check/typing/pack_invalid_argument.exp   move-compiler-v2/tests/checking/typing/pack_invalid_argument.exp
 move-compiler/tests/move_check/typing/pack_missing_field.exp   move-compiler-v2/tests/checking/typing/pack_missing_field.exp
 move-compiler/tests/move_check/typing/pack_multiple.exp   move-compiler-v2/tests/checking/typing/pack_multiple.exp
+move-compiler/tests/move_check/typing/pack_private_with_field.exp   move-compiler-v2/tests/visibility-checker/v1-typing/pack_private_with_field.exp
 move-compiler/tests/move_check/typing/pack_reference.exp   move-compiler-v2/tests/checking/typing/pack_reference.exp
+move-compiler/tests/move_check/typing/pack_unit.exp   move-compiler-v2/tests/checking/typing/pack_unit.exp
+move-compiler/tests/move_check/typing/pack_unpack_private.exp   move-compiler-v2/tests/visibility-checker/v1-typing/pack_unpack_private.exp
+move-compiler/tests/move_check/typing/pack_unpack_private_script.exp   move-compiler-v2/tests/visibility-checker/v1-typing/pack_unpack_private_script.exp
 move-compiler/tests/move_check/typing/phantom_param_op_abilities.exp   move-compiler-v2/tests/checking/abilities/v1/phantom_param_op_abilities.exp
 move-compiler/tests/move_check/typing/phantom_param_op_abilities_invalid.exp   move-compiler-v2/tests/checking/abilities/v1/phantom_param_op_abilities_invalid.exp
 move-compiler/tests/move_check/typing/phantom_params_constraint_abilities.exp   move-compiler-v2/tests/checking/abilities/v1/phantom_params_constraint_abilities.exp

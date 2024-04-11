@@ -1086,10 +1086,17 @@ impl<P: OnChainConfigProvider> EpochManager<P> {
             Ok((rand_config, fast_rand_config)) => (Some(rand_config), fast_rand_config),
             Err(reason) => {
                 if onchain_randomness_config.randomness_enabled() {
-                    error!(
-                        "Failed to get randomness config for new epoch: {:?}",
-                        reason
-                    );
+                    if epoch_state.epoch > 2 {
+                        error!(
+                            "Failed to get randomness config for new epoch [{}]: {:?}",
+                            epoch_state.epoch, reason
+                        );
+                    } else {
+                        warn!(
+                            "Failed to get randomness config for new epoch [{}]: {:?}",
+                            epoch_state.epoch, reason
+                        );
+                    }
                 }
                 (None, None)
             },
