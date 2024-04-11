@@ -36,7 +36,11 @@ pub struct BuildPlan {
     resolution_graph: ResolvedGraph,
 }
 
-pub type CompilerDriverResult = anyhow::Result<(FilesSourceText, Vec<AnnotatedCompiledUnit>)>;
+pub type CompilerDriverResult = anyhow::Result<(
+    FilesSourceText,
+    Vec<AnnotatedCompiledUnit>,
+    Option<model::GlobalEnv>,
+)>;
 
 #[cfg(feature = "evm-backend")]
 fn should_recompile(
@@ -116,7 +120,10 @@ impl BuildPlan {
         self.compile_with_driver(
             writer,
             config,
-            |compiler| compiler.build_and_report(),
+            |compiler| {
+                let (files, units) = compiler.build_and_report()?;
+                Ok((files, units, None))
+            },
             build_and_report_v2_driver,
         )
         .map(|(package, _)| package)
@@ -136,7 +143,7 @@ impl BuildPlan {
                 match units_res {
                     Ok((units, warning_diags)) => {
                         report_warnings(&files, warning_diags);
-                        Ok((files, units))
+                        Ok((files, units, None))
                     },
                     Err(error_diags) => {
                         assert!(!error_diags.is_empty());

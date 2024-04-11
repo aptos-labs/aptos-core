@@ -9,17 +9,18 @@ use codespan_reporting::term::{termcolor, termcolor::StandardStream};
 use move_command_line_common::files::{FileHash, MOVE_COVERAGE_MAP_EXTENSION};
 use move_compiler::{
     diagnostics::{self, codes::Severity},
-    shared::{known_attributes::KnownAttribute, NumberFormat, NumericalAddress, PackagePaths},
+    shared::{NumberFormat, NumericalAddress},
     unit_test::{plan_builder::construct_test_plan, TestPlan},
-    Compiler, Flags, PASS_CFGIR,
+    PASS_CFGIR,
 };
+use move_compiler_v2::plan_builder as plan_builder_v2;
 use move_core_types::effects::ChangeSet;
 use move_coverage::coverage_map::{output_map_to_file, CoverageMap};
-use move_model::PackageInfo;
 use move_package::{
     compilation::{build_plan::BuildPlan, compiled_package::build_and_report_v2_driver},
     BuildConfig,
 };
+// use move_symbol_pool::Symbol;
 use move_unit_test::UnitTestingConfig;
 use move_vm_runtime::tracing::{LOGGING_FILE_WRITER, TRACING_ENABLED};
 use move_vm_test_utils::gas_schedule::CostTable;
@@ -33,6 +34,7 @@ use std::{
     collections::HashMap,
     fs,
     io::Write,
+    ops::Deref,
     path::{Path, PathBuf},
     process::ExitStatus,
 };
@@ -238,52 +240,17 @@ pub fn run_move_unit_tests<W: Write + Send>(
 
             let (units, _) = diagnostics::unwrap_or_report_diagnostics(&files, compilation_result);
             test_plan = Some((built_test_plan, files.clone(), units.clone()));
-            Ok((files, units))
+            Ok((files, units, None))
         },
         |options| {
-            let addrs =
-                move_model::parse_addresses_from_options(options.named_address_mapping.clone())?;
-            let to_package_paths = |PackageInfo {
-                                        sources,
-                                        address_map,
-                                    }| PackagePaths {
-                name: Some(root_package),
-                paths: sources,
-                named_address_map: address_map,
-            };
-            let source = PackageInfo {
-                sources: options.sources.clone(),
-                address_map: addrs.clone(),
-            };
-            let deps = vec![PackageInfo {
-                sources: options.dependencies.clone(),
-                address_map: addrs.clone(),
-            }];
+            let (files, units, opt_env) = build_and_report_v2_driver(options).unwrap();
+            let env = opt_env.expect("v2 driver should return env");
+            let root_package_in_model = env.symbol_pool().make(root_package.deref());
+            let built_test_plan =
+                plan_builder_v2::construct_test_plan(&env, Some(root_package_in_model));
 
-            let known_attributes =
-                if !options.skip_attribute_checks && options.known_attributes.is_empty() {
-                    KnownAttribute::get_all_attribute_names()
-                } else {
-                    &options.known_attributes
-                };
-            let mut flags = Flags::testing();
-            flags = flags.set_skip_attribute_checks(true);
-            let compiler = Compiler::from_package_paths(
-                vec![to_package_paths(source)],
-                deps.into_iter().map(to_package_paths).collect(),
-                flags,
-                known_attributes,
-            );
-            let (files, comments_and_compiler_res) = compiler.run::<PASS_CFGIR>().unwrap();
-            let (_, compiler) =
-                diagnostics::unwrap_or_report_diagnostics(&files, comments_and_compiler_res);
-            let (mut compiler, cfgir) = compiler.into_ast();
-            let compilation_env = compiler.compilation_env();
-            let built_test_plan = construct_test_plan(compilation_env, Some(root_package), &cfgir);
-
-            let (files, units) = build_and_report_v2_driver(options).unwrap();
             test_plan_v2 = Some((built_test_plan, files.clone(), units.clone()));
-            Ok((files, units))
+            Ok((files, units, Some(env)))
         },
     )?;
 

@@ -8,7 +8,8 @@ use itertools::Itertools;
 use log::debug;
 use move_compiler_v2::{
     annotate_units, disassemble_compiled_units, env_pipeline::rewrite_target::RewritingScope,
-    logging, pipeline, run_bytecode_verifier, run_file_format_gen, Experiment, Options,
+    logging, pipeline, plan_builder, run_bytecode_verifier, run_file_format_gen, Experiment,
+    Options,
 };
 use move_model::{metadata::LanguageVersion, model::GlobalEnv};
 use move_prover_test_utils::{baseline_test, extract_test_directives};
@@ -607,6 +608,10 @@ fn run_test(path: &Path, config: TestConfig) -> datatest_stable::Result<()> {
                 ));
             }
         }
+    }
+
+    if options.compile_test_code {
+        plan_builder::construct_test_plan(&env, None);
     }
 
     if ok && config.stop_after > StopAfter::AstPipeline {

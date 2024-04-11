@@ -14,6 +14,17 @@ pub fn is_test_only_attribute_name(s: &str) -> bool {
 }
 
 /// Function identifying the name of an attribute which declares an
+/// item to be a test.
+pub fn is_test_attribute_name(s: &str) -> bool {
+    s == "test"
+}
+
+/// Function identifying the name of an attribute which is related to a test.
+pub fn is_testing_attribute_name(s: &str) -> bool {
+    s == "test" || s == "test_only" || s == "expected_failure"
+}
+
+/// Function identifying the name of an attribute which declares an
 /// item to be part of verification only.
 pub fn is_verify_only_attribute_name(s: &str) -> bool {
     s == "verify_only"
