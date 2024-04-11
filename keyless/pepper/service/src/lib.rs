@@ -14,6 +14,7 @@ use aptos_keyless_pepper_common::{
     vuf::{self, VUF},
     PepperInput, PepperRequest, PepperRequestV1, PepperResponse, PepperResponseV1,
 };
+use aptos_logger::info;
 use aptos_types::{
     keyless::{Configuration, OpenIdSig},
     transaction::authenticator::EphemeralPublicKey,
@@ -22,6 +23,7 @@ use jsonwebtoken::{Algorithm::RS256, Validation};
 use rand::thread_rng;
 use serde::{Deserialize, Serialize};
 use std::time::{SystemTime, UNIX_EPOCH};
+use uuid::Uuid;
 
 pub mod about;
 pub mod account_managers;
@@ -39,6 +41,7 @@ pub enum ProcessingFailure {
 }
 
 pub fn process_v0(request: PepperRequest) -> Result<PepperResponse, ProcessingFailure> {
+    let session_id = Uuid::new_v4();
     let PepperRequest {
         jwt,
         epk,
@@ -46,11 +49,21 @@ pub fn process_v0(request: PepperRequest) -> Result<PepperResponse, ProcessingFa
         epk_blinder,
         uid_key,
     } = request;
-    let pepper = process_common(jwt, epk, exp_date_secs, epk_blinder, uid_key, false, None)?;
+    let pepper = process_common(
+        &session_id,
+        jwt,
+        epk,
+        exp_date_secs,
+        epk_blinder,
+        uid_key,
+        false,
+        None,
+    )?;
     Ok(PepperResponse { signature: pepper })
 }
 
 pub fn process_v1(request: PepperRequestV1) -> Result<PepperResponseV1, ProcessingFailure> {
+    let session_id = Uuid::new_v4();
     let PepperRequestV1 {
         jwt,
         epk,
@@ -59,14 +72,23 @@ pub fn process_v1(request: PepperRequestV1) -> Result<PepperResponseV1, Processi
         uid_key,
         aud,
     } = request;
-    let pepper_encrypted =
-        process_common(jwt, epk, exp_date_secs, epk_blinder, uid_key, true, aud)?;
+    let pepper_encrypted = process_common(
+        &session_id,
+        jwt,
+        epk,
+        exp_date_secs,
+        epk_blinder,
+        uid_key,
+        true,
+        aud,
+    )?;
     Ok(PepperResponseV1 {
         signature_encrypted: pepper_encrypted,
     })
 }
 
 fn process_common(
+    session_id: &Uuid,
     jwt: String,
     epk: EphemeralPublicKey,
     exp_date_secs: u64,

@@ -5,11 +5,14 @@ use aptos_keyless_pepper_common::BadPepperRequestError;
 use aptos_keyless_pepper_service::{
     about::ABOUT_JSON,
     account_managers::ACCOUNT_MANAGERS,
-    jwk, process_v0, process_v1,
+    jwk,
+    metrics::start_metric_server,
+    process_v0, process_v1,
     vuf_keys::{PEPPER_VUF_VERIFICATION_KEY_JSON, VUF_SK},
     ProcessingFailure,
     ProcessingFailure::{BadRequest, InternalError},
 };
+use aptos_logger::info;
 use hyper::{
     header::{
         ACCESS_CONTROL_ALLOW_CREDENTIALS, ACCESS_CONTROL_ALLOW_HEADERS,
@@ -18,7 +21,6 @@ use hyper::{
     service::{make_service_fn, service_fn},
     Body, Method, Request, Response, Server, StatusCode,
 };
-use log::{info, LevelFilter};
 use serde::{de::DeserializeOwned, Serialize};
 use std::{convert::Infallible, fmt::Debug, net::SocketAddr, ops::Deref, time::Duration};
 

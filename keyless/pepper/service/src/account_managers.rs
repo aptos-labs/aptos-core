@@ -1,5 +1,9 @@
 // Copyright © Aptos Foundation
+// SPDX-License-Identifier: Apache-2.0
 
+// Copyright © Aptos Foundation
+
+use aptos_logger::info;
 use once_cell::sync::Lazy;
 use regex::Regex;
 use std::{
@@ -54,7 +58,7 @@ pub static ACCOUNT_MANAGERS: Lazy<HashSet<(String, String)>> = Lazy::new(|| {
             }
         })
         .collect();
-    println!("ACCOUNT_MANAGERS={:?}", ret);
+    info!("ACCOUNT_MANAGERS={:?}", ret);
     ret
 });
 

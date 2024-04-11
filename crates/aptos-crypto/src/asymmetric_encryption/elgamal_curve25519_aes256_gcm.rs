@@ -1,4 +1,7 @@
 // Copyright © Aptos Foundation
+// SPDX-License-Identifier: Apache-2.0
+
+// Copyright © Aptos Foundation
 
 use crate::{
     asymmetric_encryption::AsymmetricEncryption,
@@ -155,8 +158,7 @@ mod tests {
         );
 
         // Empty message should also work.
-        let msg = b""
-            .to_vec();
+        let msg = b"".to_vec();
         let ciphertext =
             ElGamalCurve25519Aes256Gcm::enc(&mut main_rng, &mut aead_rng, &pk, msg.as_slice())
                 .unwrap();
