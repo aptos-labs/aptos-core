@@ -125,6 +125,7 @@ impl FeatureFlag {
             FeatureFlag::MULTISIG_V2_ENHANCEMENT,
             FeatureFlag::DELEGATION_POOL_ALLOWLISTING,
             FeatureFlag::MODULE_EVENT_MIGRATION,
+            FeatureFlag::REJECT_UNSTABLE_BYTECODE,
         ]
     }
 }
