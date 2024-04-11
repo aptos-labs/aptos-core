@@ -688,11 +688,11 @@ impl AccountStateGen {
         let balance_resource = self.balance_resource_gen.materialize();
         vec![
             (
-                StateKey::move_resource::<AccountResource>(address),
+                StateKey::resource_typed::<AccountResource>(address),
                 bcs::to_bytes(&account_resource).unwrap(),
             ),
             (
-                StateKey::move_resource::<CoinStoreResource>(address),
+                StateKey::resource_typed::<CoinStoreResource>(address),
                 bcs::to_bytes(&balance_resource).unwrap(),
             ),
         ]

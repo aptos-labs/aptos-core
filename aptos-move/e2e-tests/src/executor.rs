@@ -39,8 +39,8 @@ use aptos_types::{
     chain_id::ChainId,
     contract_event::ContractEvent,
     on_chain_config::{
-        FeatureFlag, Features, OnChainConfig, TimedFeatureOverride, TimedFeaturesBuilder,
-        ValidatorSet, Version,
+        AptosVersion, FeatureFlag, Features, OnChainConfig, TimedFeatureOverride,
+        TimedFeaturesBuilder, ValidatorSet,
     },
     state_store::{state_key::StateKey, state_value::StateValue, StateView, TStateView},
     transaction::{
@@ -273,8 +273,8 @@ impl FakeExecutor {
         //  - the e2e test outputs a golden file, and
         //  - the environment variable is properly set
         if let Some(env_trace_dir) = env::var_os(ENV_TRACE_DIR) {
-            let aptos_version =
-                Version::fetch_config(&self.data_store.as_move_resolver()).map_or(0, |v| v.major);
+            let aptos_version = AptosVersion::fetch_config(&self.data_store.as_move_resolver())
+                .map_or(0, |v| v.major);
 
             let trace_dir = Path::new(&env_trace_dir).join(file_name);
             if trace_dir.exists() {

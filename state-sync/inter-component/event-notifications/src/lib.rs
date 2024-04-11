@@ -9,13 +9,12 @@ use aptos_id_generator::{IdGenerator, U64IdGenerator};
 use aptos_infallible::RwLock;
 use aptos_storage_interface::{state_view::DbStateViewAtVersion, DbReader, DbReaderWriter};
 use aptos_types::{
-    account_config::CORE_CODE_ADDRESS,
-    account_view::AccountView,
     contract_event::ContractEvent,
     event::EventKey,
     move_resource::MoveStorage,
-    on_chain_config::{OnChainConfig, OnChainConfigPayload, OnChainConfigProvider},
-    state_store::account_with_state_view::AsAccountWithStateView,
+    on_chain_config::{
+        ConfigurationResource, OnChainConfig, OnChainConfigPayload, OnChainConfigProvider,
+    },
     transaction::Version,
 };
 use futures::{channel::mpsc::SendError, stream::FusedStream, Stream};
@@ -294,17 +293,7 @@ impl EventSubscriptionService {
                     error
                 ))
             })?;
-        let aptos_framework_account_view =
-            db_state_view.as_account_with_state_view(&CORE_CODE_ADDRESS);
-
-        let epoch = aptos_framework_account_view
-            .get_configuration_resource()
-            .map_err(|error| {
-                Error::UnexpectedErrorEncountered(format!(
-                    "Failed to fetch Configuration resource {:?}",
-                    error
-                ))
-            })?
+        let epoch = ConfigurationResource::fetch_config(&db_state_view)
             .ok_or_else(|| {
                 Error::UnexpectedErrorEncountered("Configuration resource does not exist!".into())
             })?

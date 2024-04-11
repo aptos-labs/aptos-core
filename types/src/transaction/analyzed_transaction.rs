@@ -157,11 +157,11 @@ impl From<Transaction> for AnalyzedTransaction {
 }
 
 pub fn account_resource_location(address: AccountAddress) -> StorageLocation {
-    StorageLocation::Specific(StateKey::move_resource::<AccountResource>(&address))
+    StorageLocation::Specific(StateKey::resource_typed::<AccountResource>(&address))
 }
 
 pub fn coin_store_location(address: AccountAddress) -> StorageLocation {
-    StorageLocation::Specific(StateKey::move_resource::<CoinStoreResource>(&address))
+    StorageLocation::Specific(StateKey::resource_typed::<CoinStoreResource>(&address))
 }
 
 pub fn current_ts_location() -> StorageLocation {
@@ -173,7 +173,7 @@ pub fn features_location() -> StorageLocation {
 }
 
 pub fn aptos_coin_info_location() -> StorageLocation {
-    StorageLocation::Specific(StateKey::move_resource::<CoinInfoResource>(
+    StorageLocation::Specific(StateKey::resource_typed::<CoinInfoResource>(
         &AccountAddress::ONE,
     ))
 }
