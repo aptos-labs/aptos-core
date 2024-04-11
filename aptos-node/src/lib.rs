@@ -453,12 +453,22 @@ where
         .consensus
         .quorum_store
         .num_workers_for_remote_batches = 1;
-    node_config.consensus.quorum_store_poll_time_ms = 1000;
 
-    if !enable_performance_mode {
+    if enable_performance_mode {
+        // Setting to a pretty conservative concurrency level. It can be tuned locally.
+        node_config.execution.concurrency_level = 4;
+        // Don't constrain the TPS of Quorum Store for this single node.
+        node_config
+            .consensus
+            .quorum_store
+            .back_pressure
+            .dynamic_max_txn_per_s = 10_000;
+    } else {
         node_config.execution.concurrency_level = 1;
         node_config.execution.num_proof_reading_threads = 1;
+        node_config.consensus.quorum_store_poll_time_ms = 1000;
     }
+
     node_config.execution.paranoid_hot_potato_verification = false;
     node_config.execution.paranoid_type_verification = false;
     node_config
