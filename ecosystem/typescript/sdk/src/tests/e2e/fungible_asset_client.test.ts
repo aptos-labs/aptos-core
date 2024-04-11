@@ -27,7 +27,7 @@ if (process.env.NETWORK?.toLowerCase() == "testnet" || process.env.NETWORK?.toLo
 /**
  * Since there is no ready-to-use fungible asset contract/module on an aptos framework address
  * we pre compiled the ../../../aptos-move/move-examples/fungible_asset/managed_fungible_token
- * contract and publish it here to local testnet so we can interact with it to mint a fungible
+ * contract and publish it here to localnet so we can interact with it to mint a fungible
  * asset and then test FungibleAssetClient class
  */
 maybe("fungible asset", () => {
