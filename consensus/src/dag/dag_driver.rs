@@ -170,11 +170,10 @@ impl DagDriver {
 
         self.dag.add_node(node)?;
 
-        self.check_new_round();
         Ok(())
     }
 
-    fn check_new_round(&self) {
+    pub fn check_new_round(&self) {
         let (highest_strong_link_round, strong_links) = self.get_highest_strong_links_round();
 
         debug!(round = highest_strong_link_round, "check new round");

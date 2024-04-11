@@ -251,12 +251,21 @@ impl VerifiedMessageProcessor {
                         ),
                         DAGMessage::CertifiedNodeMsg(certified_node_msg) => {
                             monitor!("dag_on_cert_node_msg", {
-                                match self.state_sync_trigger.check(certified_node_msg).await? {
+                                match monitor!(
+                                    "dag_state_sync_trigger_check",
+                                    self.state_sync_trigger.check(certified_node_msg).await
+                                )? {
                                     SyncOutcome::Synced(Some(certified_node_msg)) => self
                                         .dag_driver
                                         .process(certified_node_msg.certified_node())
                                         .await
-                                        .map(|r| r.into())
+                                        .map(|r| {
+                                            let driver = self.dag_driver.clone();
+                                            tokio::task::spawn_blocking(move || {
+                                                driver.check_new_round();
+                                            });
+                                            r.into()
+                                        })
                                         .map_err(|err| {
                                             err.downcast::<DagDriverError>()
                                                 .map_or(DAGError::Unknown, |err| {
