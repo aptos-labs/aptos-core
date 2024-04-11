@@ -5,6 +5,7 @@ use crate::{
     elgamal,
     elgamal::{curve25519::Curve25519, ElGamalFriendlyGroup},
 };
+//TODO: see if we can reuse crate `ring`.
 use aes_gcm::{
     aead::{
         rand_core::{CryptoRng as AeadCryptoRng, RngCore as AeadRngCore},

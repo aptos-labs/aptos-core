@@ -88,10 +88,6 @@ pub struct PepperResponse {
 pub struct PepperRequestV1 {
     #[serde(rename = "jwt_b64")]
     pub jwt: String,
-    #[serde(
-        serialize_with = "serialize_epk_to_hex",
-        deserialize_with = "deserialize_epk_from_hex"
-    )]
     pub epk: EphemeralPublicKey,
     pub exp_date_secs: u64,
     #[serde(
