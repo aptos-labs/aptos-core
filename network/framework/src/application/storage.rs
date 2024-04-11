@@ -28,7 +28,9 @@ use tokio::sync::mpsc::error::TrySendError;
 
 // notification_backlog is how many ConnectionNotification items can be queued waiting for an app to receive them.
 // Beyond this, new messages will be dropped if the app is not handling them fast enough.
-const NOTIFICATION_BACKLOG: usize = 100;
+// We make this big enough to fit an initial burst of _all_ the connected peers getting notified.
+// Having 100 connected peers is common, 500 not unexpected
+const NOTIFICATION_BACKLOG: usize = 1000;
 
 /// A simple container that tracks all peers and peer metadata for the node.
 /// This container is updated by both the networking code (e.g., for new
@@ -388,6 +390,18 @@ impl PeersAndMetadata {
 
     pub fn subscribe(&self) -> tokio::sync::mpsc::Receiver<ConnectionNotification> {
         let (sender, receiver) = tokio::sync::mpsc::channel(NOTIFICATION_BACKLOG);
+        let peers_and_metadata = self.peers_and_metadata.read();
+        'outer: for (network_id, network_peers_and_metadata) in peers_and_metadata.iter() {
+            for (_addr, peer_metadata) in network_peers_and_metadata.iter() {
+                let event = ConnectionNotification::NewPeer(
+                    peer_metadata.connection_metadata.clone(),
+                    *network_id,
+                );
+                if sender.try_send(event).is_err() {
+                    break 'outer;
+                }
+            }
+        }
         let mut listeners = self.subscribers.write();
         listeners.push(sender);
         receiver
