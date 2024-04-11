@@ -21,7 +21,8 @@ pub use aptos_types::*;
 use aptos_types::{
     event::EventKey,
     keyless::{
-        Claims, Configuration, EphemeralCertificate, IdCommitment, KeylessPublicKey, KeylessSignature, OpenIdSig, Pepper, TransactionAndProof, ZeroKnowledgeSig
+        Claims, Configuration, EphemeralCertificate, IdCommitment, KeylessPublicKey,
+        KeylessSignature, OpenIdSig, Pepper, TransactionAndProof, ZeroKnowledgeSig,
     },
     transaction::authenticator::{AnyPublicKey, EphemeralPublicKey, EphemeralSignature},
 };
@@ -55,7 +56,8 @@ impl LocalAccountAuthenticator {
                 };
 
                 let esk = &keyless_account.ephemeral_key_pair.private_key;
-                let ephemeral_signature = EphemeralSignature::ed25519(esk.sign(&txn_and_zkp).unwrap());
+                let ephemeral_signature =
+                    EphemeralSignature::ed25519(esk.sign(&txn_and_zkp).unwrap());
 
                 let sig = KeylessSignature {
                     cert: EphemeralCertificate::ZeroKnowledgeSig(keyless_account.zk_sig.clone()),
@@ -102,7 +104,11 @@ impl LocalAccount {
         }
     }
 
-    pub fn new_keyless(address: AccountAddress, keyless_account: KeylessAccount, sequence_number: u64) -> Self {
+    pub fn new_keyless(
+        address: AccountAddress,
+        keyless_account: KeylessAccount,
+        sequence_number: u64,
+    ) -> Self {
         Self {
             address,
             auth: LocalAccountAuthenticator::Keyless(keyless_account),
@@ -232,7 +238,9 @@ impl LocalAccount {
     pub fn authentication_key(&self) -> AuthenticationKey {
         match &self.auth {
             LocalAccountAuthenticator::PrivateKey(key) => key.authentication_key(),
-            LocalAccountAuthenticator::Keyless(keyless_account) => keyless_account.authentication_key(),
+            LocalAccountAuthenticator::Keyless(keyless_account) => {
+                keyless_account.authentication_key()
+            },
         }
     }
 
