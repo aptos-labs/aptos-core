@@ -716,6 +716,7 @@ name = "aptos-cargo-cli"
 version = "0.1.0"
 dependencies = [
  "anyhow",
+ "camino",
  "clap 4.4.14",
  "clap-verbosity-flag",
  "determinator",
