@@ -20,11 +20,13 @@ spec:
         {{- include "aptos-fullnode.selectorLabels" . | nindent 8 }}
         app.kubernetes.io/name: fullnode
       annotations:
-        seccomp.security.alpha.kubernetes.io/pod: runtime/default
         prometheus.io/scrape: "true"
         prometheus.io/port: "9101"
     spec:
       terminationGracePeriodSeconds: 0
+      securityContext:
+        seccompProfile:
+          type: RuntimeDefault
       initContainers:
       {{- with .Values.restore }}
       {{- if .enabled }}

@@ -34,3 +34,6 @@ module 0xcafe::vectors {
         }
     }
 } // end 0xcafe::vectors
+
+
+============ bytecode verification succeeded ========

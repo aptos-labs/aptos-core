@@ -29,10 +29,11 @@ spec:
       labels:
         {{- include "backup.selectorLabels" . | nindent 8 }}
         app.kubernetes.io/name: backup
-      annotations:
-        seccomp.security.alpha.kubernetes.io/pod: runtime/default
     spec:
       terminationGracePeriodSeconds: 0
+      securityContext:
+        seccompProfile:
+          type: RuntimeDefault
       containers:
       - name: backup
         {{- if and $backup_statefulset (not $.Values.manageImages) }} # if the statefulset already exists and we do not want helm to simply overwrite the image, use the existing image
