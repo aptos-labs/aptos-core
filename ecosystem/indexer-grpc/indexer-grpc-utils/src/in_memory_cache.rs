@@ -178,7 +178,6 @@ fn spawn_update_task<C>(
 {
     tokio::spawn(async move {
         let mut conn = conn.clone();
-        let mut current_time = std::time::Instant::now();
         loop {
             if cancellation_token.is_cancelled() {
                 tracing::info!("In-memory cache update task is cancelled.");
@@ -198,8 +197,6 @@ fn spawn_update_task<C>(
                 .await;
                 continue;
             }
-            let redis_waiting_duration = current_time.elapsed().as_secs_f64();
-            let start_time = std::time::Instant::now();
             let end_version = std::cmp::min(
                 current_latest_version,
                 in_cache_latest_version + 10 * MAX_REDIS_FETCH_BATCH_SIZE as u64,
@@ -209,7 +206,6 @@ fn spawn_update_task<C>(
                 .await
                 .unwrap();
             // Ensure that transactions are ordered by version.
-            let cache_processing_start_time = std::time::Instant::now();
             let mut newly_added_bytes = 0;
             for (ind, transaction) in transactions.iter().enumerate() {
                 if transaction.version != in_cache_latest_version + ind as u64 {
@@ -220,16 +216,6 @@ fn spawn_update_task<C>(
             for transaction in transactions {
                 cache.insert(transaction.version, Arc::new(transaction));
             }
-            let processing_duration = start_time.elapsed().as_secs_f64();
-            tracing::info!(
-                redis_latest_version = current_latest_version,
-                in_memory_latest_version = in_cache_latest_version,
-                new_in_memory_latest_version = end_version,
-                processing_duration,
-                cache_processing_duration = cache_processing_start_time.elapsed().as_secs_f64(),
-                redis_waiting_duration,
-                "In-memory cache is updated"
-            );
             let mut current_cache_metadata = { *cache_metadata.read().await };
             current_cache_metadata.latest_version = end_version;
             current_cache_metadata.total_size_in_bytes += newly_added_bytes;
@@ -237,7 +223,6 @@ fn spawn_update_task<C>(
             {
                 *cache_metadata.write().await = current_cache_metadata;
             }
-            current_time = std::time::Instant::now();
         }
     });
 }
