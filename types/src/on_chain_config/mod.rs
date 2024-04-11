@@ -39,7 +39,7 @@ pub use self::{
     approved_execution_hashes::ApprovedExecutionHashes,
     aptos_features::*,
     aptos_version::{
-        Version, APTOS_MAX_KNOWN_VERSION, APTOS_VERSION_2, APTOS_VERSION_3, APTOS_VERSION_4,
+        AptosVersion, APTOS_MAX_KNOWN_VERSION, APTOS_VERSION_2, APTOS_VERSION_3, APTOS_VERSION_4,
     },
     commit_history::CommitHistoryResource,
     consensus_config::{
@@ -175,16 +175,11 @@ pub trait OnChainConfig: Send + Sync + DeserializeOwned {
     where
         T: ConfigStorage + ?Sized,
     {
-        match storage
-            .fetch_config_bytes(&StateKey::struct_tag(Self::address(), &Self::struct_tag()))
+        match storage.fetch_config_bytes(&StateKey::resource(Self::address(), &Self::struct_tag()))
         {
             Some(bytes) => Self::deserialize_into_config(&bytes).ok(),
             None => None,
         }
-    }
-
-    fn access_path() -> anyhow::Result<AccessPath> {
-        access_path_for_config(Self::CONFIG_ID)
     }
 
     fn address() -> &'static AccountAddress {

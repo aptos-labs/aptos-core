@@ -140,18 +140,18 @@ impl StateKey {
         Self::new(StateKeyInner::AccessPath(access_path))
     }
 
-    pub fn struct_tag(address: &AccountAddress, struct_tag: &StructTag) -> Self {
+    pub fn resource(address: &AccountAddress, struct_tag: &StructTag) -> Self {
         Self::access_path(
             AccessPath::resource_access_path(*address, struct_tag.to_owned()).unwrap(),
         )
     }
 
-    pub fn move_resource<T: MoveResource>(address: &AccountAddress) -> Self {
-        Self::struct_tag(address, &T::struct_tag())
+    pub fn resource_typed<T: MoveResource>(address: &AccountAddress) -> Self {
+        Self::resource(address, &T::struct_tag())
     }
 
     pub fn on_chain_config<T: OnChainConfig>() -> Self {
-        Self::struct_tag(T::address(), &T::struct_tag())
+        Self::resource(T::address(), &T::struct_tag())
     }
 
     pub fn table_item(handle: TableHandle, key: Vec<u8>) -> Self {
