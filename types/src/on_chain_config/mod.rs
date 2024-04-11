@@ -11,6 +11,7 @@ use crate::{
 use anyhow::{format_err, Result};
 use bytes::Bytes;
 use move_core_types::{
+    account_address::AccountAddress,
     ident_str,
     identifier::{IdentStr, Identifier},
     language_storage::StructTag,
@@ -134,7 +135,7 @@ impl<P: OnChainConfigProvider> OnChainConfigPayload<P> {
 
 /// Trait to be implemented by a storage type from which to read on-chain configs
 pub trait ConfigStorage {
-    fn fetch_config(&self, access_path: AccessPath) -> Option<Bytes>;
+    fn fetch_config_bytes(&self, state_key: &StateKey) -> Option<Bytes>;
 }
 
 /// Trait to be implemented by a Rust struct representation of an on-chain config
@@ -174,8 +175,9 @@ pub trait OnChainConfig: Send + Sync + DeserializeOwned {
     where
         T: ConfigStorage + ?Sized,
     {
-        let access_path = Self::access_path().ok()?;
-        match storage.fetch_config(access_path) {
+        match storage
+            .fetch_config_bytes(&StateKey::struct_tag(Self::address(), &Self::struct_tag()))
+        {
             Some(bytes) => Self::deserialize_into_config(&bytes).ok(),
             None => None,
         }
@@ -185,15 +187,18 @@ pub trait OnChainConfig: Send + Sync + DeserializeOwned {
         access_path_for_config(Self::CONFIG_ID)
     }
 
+    fn address() -> &'static AccountAddress {
+        &CORE_CODE_ADDRESS
+    }
+
     fn struct_tag() -> StructTag {
         struct_tag_for_config(Self::CONFIG_ID)
     }
 }
 
 impl<S: StateView> ConfigStorage for S {
-    fn fetch_config(&self, access_path: AccessPath) -> Option<Bytes> {
-        let state_key = StateKey::access_path(access_path);
-        self.get_state_value(&state_key)
+    fn fetch_config_bytes(&self, state_key: &StateKey) -> Option<Bytes> {
+        self.get_state_value(state_key)
             .ok()?
             .map(|s| s.bytes().clone())
     }
