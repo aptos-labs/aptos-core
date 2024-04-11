@@ -1461,7 +1461,7 @@ fn adverserial_workload_test() -> ForgeConfig {
     let transaction_mix = (0..num_contended_resources)
         .map(|_| {
             (
-                TransactionTypeArg::ModifyGlobalResource.materialize_default(),
+                TransactionTypeArg::LiquidityPoolSwap.materialize_default(),
                 1000,
             )
         })
