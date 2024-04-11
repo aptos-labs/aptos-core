@@ -15,6 +15,7 @@ use std::{
 };
 use walkdir::WalkDir;
 
+// This can be set manually to true when debugging extensions to this tool.
 const DEBUG: bool = false;
 
 #[derive(Parser, Clone, Debug)]
