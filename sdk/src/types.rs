@@ -48,13 +48,13 @@ impl LocalAccountAuthenticator {
                 .expect("Signing a txn can't fail")
                 .into_inner(),
             LocalAccountAuthenticator::Keyless(keyless_account) => {
-                let esk = &keyless_account.ephemeral_key_pair.private_key;
                 let proof = keyless_account.zk_sig.proof;
                 let txn_and_zkp = TransactionAndProof {
                     message: txn.clone(),
                     proof: Some(proof),
                 };
 
+                let esk = &keyless_account.ephemeral_key_pair.private_key;
                 let ephemeral_signature = EphemeralSignature::ed25519(esk.sign(&txn_and_zkp).unwrap());
 
                 let sig = KeylessSignature {
