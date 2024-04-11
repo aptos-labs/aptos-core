@@ -2556,7 +2556,6 @@ dependencies = [
  "aptos-gas-schedule",
  "aptos-logger",
  "aptos-memory-usage-tracker",
- "aptos-resource-viewer",
  "aptos-rest-client",
  "aptos-types",
  "aptos-validator-interface",
@@ -3574,7 +3573,6 @@ dependencies = [
  "bcs 0.1.4",
  "crossbeam-channel",
  "dashmap",
- "move-core-types",
  "once_cell",
  "parking_lot 0.12.1",
  "proptest",
@@ -4006,7 +4004,6 @@ dependencies = [
  "async-trait",
  "bcs 0.1.4",
  "lru 0.7.8",
- "move-binary-format",
  "move-core-types",
  "tokio",
 ]
