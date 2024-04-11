@@ -12,3 +12,6 @@ module 0x42::test {
         Tuple()
     }
 } // end 0x42::test
+
+
+============ bytecode verification succeeded ========

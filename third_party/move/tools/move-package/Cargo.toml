@@ -41,7 +41,7 @@ move-symbol-pool = { path = "../../move-symbol-pool" }
 move-to-yul = { path = "../../evm/move-to-yul", optional = true }
 termcolor = { version = "1.1.2" }
 
-whoami = { version = "1.2.1" }
+whoami = { version = "1.5.0" }
 
 [dev-dependencies]
 datatest-stable = "0.1.1"
