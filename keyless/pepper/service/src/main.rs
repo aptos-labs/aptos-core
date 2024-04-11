@@ -4,6 +4,7 @@
 use aptos_keyless_pepper_common::BadPepperRequestError;
 use aptos_keyless_pepper_service::{
     about::ABOUT_JSON,
+    account_managers::ACCOUNT_MANAGERS,
     jwk, process_v0, process_v1,
     vuf_keys::{PEPPER_VUF_VERIFICATION_KEY_JSON, VUF_SK},
     ProcessingFailure,
@@ -60,6 +61,7 @@ async fn handle_request(req: Request<Body>) -> Result<Response<Body>, Infallible
 async fn main() {
     // Trigger private key loading.
     let _ = VUF_SK.deref();
+    let _ = ACCOUNT_MANAGERS.deref();
 
     aptos_logger::Logger::new().init();
     start_metric_server();

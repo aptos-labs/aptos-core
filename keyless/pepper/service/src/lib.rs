@@ -2,6 +2,7 @@
 // SPDX-License-Identifier: Apache-2.0
 
 use crate::{
+    account_managers::ACCOUNT_MANAGERS,
     vuf_keys::VUF_SK,
     ProcessingFailure::{BadRequest, InternalError},
 };
@@ -23,6 +24,7 @@ use serde::{Deserialize, Serialize};
 use std::time::{SystemTime, UNIX_EPOCH};
 
 pub mod about;
+pub mod account_managers;
 pub mod jwk;
 pub mod metrics;
 pub mod vuf_keys;
@@ -44,7 +46,7 @@ pub fn process_v0(request: PepperRequest) -> Result<PepperResponse, ProcessingFa
         epk_blinder,
         uid_key,
     } = request;
-    let pepper = process_common(jwt, epk, exp_date_secs, epk_blinder, uid_key, false)?;
+    let pepper = process_common(jwt, epk, exp_date_secs, epk_blinder, uid_key, false, None)?;
     Ok(PepperResponse { signature: pepper })
 }
 
@@ -55,9 +57,10 @@ pub fn process_v1(request: PepperRequestV1) -> Result<PepperResponseV1, Processi
         exp_date_secs,
         epk_blinder,
         uid_key,
-        ..
+        aud,
     } = request;
-    let pepper_encrypted = process_common(jwt, epk, exp_date_secs, epk_blinder, uid_key, true)?;
+    let pepper_encrypted =
+        process_common(jwt, epk, exp_date_secs, epk_blinder, uid_key, true, aud)?;
     Ok(PepperResponseV1 {
         signature_encrypted: pepper_encrypted,
     })
@@ -70,6 +73,7 @@ fn process_common(
     epk_blinder: Vec<u8>,
     uid_key: Option<String>,
     encrypts_pepper: bool,
+    aud: Option<String>,
 ) -> Result<Vec<u8>, ProcessingFailure> {
     let config = Configuration::new_for_devnet();
 
@@ -142,11 +146,19 @@ fn process_common(
     ) // Signature verification happens here.
     .map_err(|e| BadRequest(format!("JWT signature verification failed: {e}")))?;
 
+    // If the pepper request is at V1, is from an account manager, and has a target aud specified, compute the pepper for the target aud.
+    let mut final_aud = claims.claims.aud.clone();
+    if ACCOUNT_MANAGERS.contains(&(claims.claims.iss.clone(), claims.claims.aud.clone())) {
+        if let Some(aud) = aud {
+            final_aud = aud;
+        }
+    };
+
     let input = PepperInput {
         iss: claims.claims.iss.clone(),
         uid_key: actual_uid_key.to_string(),
         uid_val,
-        aud: claims.claims.aud.clone(),
+        aud: final_aud,
     };
     info!(
         session_id = session_id,

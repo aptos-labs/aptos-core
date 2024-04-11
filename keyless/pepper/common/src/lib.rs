@@ -101,9 +101,10 @@ pub struct PepperRequestV1 {
     pub epk_blinder: Vec<u8>,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub uid_key: Option<String>,
-    /// If present, the pepper should be computed for `aud_override` instead of for the `aud` specified in `jwt`.
+    /// The `aud` to compute pepper against.
+    /// If not present, default to the `aud` in the given `jwt`.
     #[serde(skip_serializing_if = "Option::is_none")]
-    pub aud_override: Option<String>,
+    pub aud: Option<String>,
 }
 
 /// The response to `PepperRequestV1`, which contains either the pepper encrypted or a processing error.

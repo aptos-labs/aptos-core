@@ -142,13 +142,14 @@ async fn main() {
         Err(_) => jwt_or_path,
     };
 
+    let dummy_aud = "dummy_aud".to_string();
     let pepper_request = PepperRequestV1 {
         jwt: jwt.clone(),
         epk,
         exp_date_secs: epk_expiry_time_secs,
         uid_key: None,
         epk_blinder: blinder.to_vec(),
-        aud_override: None,
+        aud: Some(dummy_aud.clone()),
     };
     println!();
     println!(
@@ -178,12 +179,12 @@ async fn main() {
     println!("pepper={:?}", pepper);
     let claims = jwt::parse(jwt.as_str()).unwrap();
     println!();
-    println!("Verify the pepper against the server's verification key and part of the JWT.");
+    println!("Verify the pepper against the server's verification key, part of the JWT, and the actual aud.");
     let pepper_input = PepperInput {
         iss: claims.claims.iss.clone(),
         uid_key: "sub".to_string(),
         uid_val: claims.claims.sub.clone(),
-        aud: claims.claims.aud.clone(),
+        aud: dummy_aud.clone(),
     };
     let pepper_input_bytes = bcs::to_bytes(&pepper_input).unwrap();
     vuf::bls12381_g1_bls::Bls12381G1Bls::verify(&vuf_pk, &pepper_input_bytes, &pepper, &[])
