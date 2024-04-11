@@ -8,6 +8,7 @@ use std::time::Duration;
 
 #[derive(strum_macros::AsRefStr)]
 pub enum NodeStage {
+    NodeFirstReceived,
     NodeReceived,
     CertAggregated,
     CertifiedNodeReceived,

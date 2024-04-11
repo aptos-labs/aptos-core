@@ -50,6 +50,7 @@ pub(crate) struct NodeBroadcastHandler {
     /// Fine grained concurrency is implemented by the DashSet below.
     votes_by_round_peer: Mutex<BTreeMap<Round, BTreeMap<Author, Vote>>>,
     votes_fine_grained_lock: DashSet<(Round, Author)>,
+    dedup: DashSet<(Round, Author)>,
     signer: Arc<ValidatorSigner>,
     epoch_state: Arc<EpochState>,
     storage: Arc<dyn DAGStorage>,
@@ -88,6 +89,7 @@ impl NodeBroadcastHandler {
             order_rule,
             votes_by_round_peer: Mutex::new(votes_by_round_peer),
             votes_fine_grained_lock: DashSet::with_capacity(epoch_state.verifier.len() * 10),
+            dedup: DashSet::with_capacity(epoch_state.verifier.len() * 10),
             signer,
             epoch_state,
             storage,
@@ -287,6 +289,9 @@ impl RpcHandler for NodeBroadcastHandler {
         defer!({
             assert_some!(self.votes_fine_grained_lock.remove(&key));
         });
+        if self.dedup.insert(key) {
+            observe_node(node.timestamp(), NodeStage::NodeFirstReceived);
+        }
 
         if let Some(ack) = self
             .votes_by_round_peer
