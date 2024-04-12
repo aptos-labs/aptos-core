@@ -4,12 +4,13 @@
 
 use crate::{
     counters,
+    pending_order_votes::{OrderVoteReceptionResult, PendingOrderVotes},
     pending_votes::{PendingVotes, VoteReceptionResult},
     util::time_service::{SendTask, TimeService},
 };
 use aptos_config::config::QcAggregatorType;
 use aptos_consensus_types::{
-    common::Round, delayed_qc_msg::DelayedQcMsg, sync_info::SyncInfo,
+    common::Round, delayed_qc_msg::DelayedQcMsg, order_vote::OrderVote, sync_info::SyncInfo,
     timeout_2chain::TwoChainTimeoutWithPartialSignatures, vote::Vote,
 };
 use aptos_crypto::HashValue;
@@ -157,10 +158,14 @@ pub struct RoundState {
     time_service: Arc<dyn TimeService>,
     // To send local timeout events to the subscriber (e.g., SMR)
     timeout_sender: aptos_channels::Sender<Round>,
-    // Votes received fot the current round.
+    // Votes received for the current round.
     pending_votes: PendingVotes,
+    // OrderVotes received for the previous round.
+    pending_order_votes: PendingOrderVotes,
     // Vote sent locally for the current round.
     vote_sent: Option<Vote>,
+    // OrderVote sent locally for the previous round.
+    order_vote_sent: Option<OrderVote>,
     // The handle to cancel previous timeout task when moving to next round.
     abort_handle: Option<AbortHandle>,
     // Self sender to send delayed QC aggregation events to the round manager.
@@ -209,6 +214,7 @@ impl RoundState {
             qc_aggregator_type.clone(),
         );
 
+        let pending_order_votes = PendingOrderVotes::new();
         Self {
             time_interval,
             highest_committed_round: 0,
@@ -217,7 +223,9 @@ impl RoundState {
             time_service,
             timeout_sender,
             pending_votes,
+            pending_order_votes,
             vote_sent: None,
+            order_vote_sent: None,
             abort_handle: None,
             delayed_qc_tx,
             qc_aggregator_type,
@@ -268,7 +276,9 @@ impl RoundState {
                 self.delayed_qc_tx.clone(),
                 self.qc_aggregator_type.clone(),
             );
+            self.pending_order_votes = PendingOrderVotes::new();
             self.vote_sent = None;
+            self.order_vote_sent = None;
             let timeout = self.setup_timeout(1);
             // The new round reason is QCReady in case both QC.round + 1 == new_round, otherwise
             // it's Timeout and TC.round + 1 == new_round.
@@ -308,6 +318,28 @@ impl RoundState {
     pub fn record_vote(&mut self, vote: Vote) {
         if vote.vote_data().proposed().round() == self.current_round {
             self.vote_sent = Some(vote);
+        }
+    }
+
+    pub fn insert_order_vote(
+        &mut self,
+        order_vote: &OrderVote,
+        verifier: &ValidatorVerifier,
+    ) -> OrderVoteReceptionResult {
+        if order_vote.vote_data().proposed().round() == self.current_round {
+            self.pending_order_votes
+                .insert_order_vote(order_vote, verifier)
+        } else {
+            OrderVoteReceptionResult::UnexpectedRound(
+                order_vote.vote_data().proposed().round(),
+                self.current_round,
+            )
+        }
+    }
+
+    pub fn record_order_vote(&mut self, order_vote: OrderVote) {
+        if order_vote.ledger_info().round() == self.current_round - 1 {
+            self.order_vote_sent = Some(order_vote);
         }
     }
 

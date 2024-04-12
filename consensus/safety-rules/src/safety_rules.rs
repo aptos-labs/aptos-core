@@ -13,6 +13,7 @@ use crate::{
 use aptos_consensus_types::{
     block_data::BlockData,
     common::{Author, Round},
+    order_vote::OrderVote,
     quorum_cert::QuorumCert,
     safety_data::SafetyData,
     timeout_2chain::{TwoChainTimeout, TwoChainTimeoutCertificate},
@@ -250,6 +251,7 @@ impl SafetyRules {
                     0,
                     0,
                     None,
+                    None,
                 ))?;
 
                 info!(SafetyLogSchema::new(LogEntry::Epoch, LogEvent::Update)
@@ -404,6 +406,14 @@ impl TSafetyRules for SafetyRules {
             |log| log.round(round),
             LogEntry::ConstructAndSignVoteTwoChain,
         )
+    }
+
+    fn construct_and_sign_order_vote(
+        &mut self,
+        vote_proposal: &VoteProposal,
+    ) -> Result<OrderVote, Error> {
+        let cb = || self.guarded_construct_and_sign_order_vote(vote_proposal);
+        run_and_log(cb, |log| log, LogEntry::ConstructAndSignOrderVote)
     }
 
     fn sign_commit_vote(

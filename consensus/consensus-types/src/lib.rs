@@ -10,6 +10,7 @@ pub mod block_retrieval;
 pub mod common;
 pub mod delayed_qc_msg;
 pub mod epoch_retrieval;
+pub mod order_vote;
 pub mod pipeline;
 pub mod pipelined_block;
 pub mod proof_of_store;
