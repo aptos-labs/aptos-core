@@ -14,7 +14,7 @@ use aptos_channels::{self, aptos_channel};
 use aptos_types::{network_address::NetworkAddress, PeerId};
 use bytes::Bytes;
 use futures::channel::oneshot;
-use std::time::Duration;
+use std::time::{Duration, Instant};
 
 /// Convenience wrapper which makes it easy to issue communication requests and await the responses
 /// from PeerManager.
@@ -99,6 +99,7 @@ impl PeerManagerRequestSender {
             data: req,
             res_tx,
             timeout,
+            start: Instant::now(),
         };
         self.inner.push(
             (peer_id, protocol_id),
