@@ -69,3 +69,6 @@ fun assign::assign_struct($t0: &mut assign::S) {
   4: write_ref($t0, $t1)
   5: return ()
 }
+
+
+============ bytecode verification succeeded ========

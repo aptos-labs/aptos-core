@@ -134,3 +134,6 @@ fun borrow::mut_param($t0: u64): u64 {
   3: $t1 := read_ref($t2)
   4: return $t1
 }
+
+
+============ bytecode verification succeeded ========

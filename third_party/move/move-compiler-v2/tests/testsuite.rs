@@ -219,11 +219,11 @@ const TEST_CONFIGS: Lazy<BTreeMap<&str, TestConfig>> = Lazy::new(|| {
             exclude: vec![],
             exp_suffix: None,
             options: opts.clone(),
-            // Run the bytecode pipeline as well for double-checking the result
-            stop_after: StopAfter::BytecodeGen,
+            // Run the entire compiler pipeline to double-check the result
+            stop_after: StopAfter::FileFormat,
             dump_ast: DumpLevel::EndStage,
             dump_bytecode: DumpLevel::EndStage,
-            dump_bytecode_filter: None,
+            dump_bytecode_filter: Some(vec![INITIAL_BYTECODE_STAGE]),
         },
         // -- Tests for stages in the bytecode pipeline
         // Live-var tests
