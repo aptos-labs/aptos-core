@@ -188,7 +188,7 @@ module aptos_framework::delegation_pool {
     /// The account is not the operator of the stake pool.
     const ENOT_OPERATOR: u64 = 18;
 
-    /// Chaning beneficiaries for operators is not supported.
+    /// Changing beneficiaries for operators is not supported.
     const EOPERATOR_BENEFICIARY_CHANGE_NOT_SUPPORTED: u64 = 19;
 
     /// Commission percentage increase is too large.
@@ -230,7 +230,7 @@ module aptos_framework::delegation_pool {
     /// Minimum coins to exist on a shares pool at all times.
     /// Enforced per delegator for both active and pending_inactive pools.
     /// This constraint ensures the share price cannot overly increase and lead to
-    /// substantial loses when buying shares (can lose at most 1 share which may
+    /// substantial losses when buying shares (can lose at most 1 share which may
     /// be worth a lot if current share price is high).
     /// This constraint is not enforced on inactive pools as they only allow redeems
     /// (can lose at most 1 coin regardless of current share price).
@@ -282,7 +282,7 @@ module aptos_framework::delegation_pool {
         proposal_id: u64,
     }
 
-    /// Track delgated voter of each delegator.
+    /// Track delegated voter of each delegator.
     struct VoteDelegation has copy, drop, store {
         // The account who can vote on behalf of this delegator.
         voter: address,
@@ -297,7 +297,7 @@ module aptos_framework::delegation_pool {
         last_locked_until_secs: u64,
     }
 
-    /// Track total voteing power of each voter.
+    /// Track total voting power of each voter.
     struct DelegatedVotes has copy, drop, store {
         // The total number of active shares delegated to this voter by all delegators.
         active_shares: u128,
@@ -469,7 +469,7 @@ module aptos_framework::delegation_pool {
     }
 
     #[view]
-    /// Return whether a delegation pool has already enabled partial govnernance voting.
+    /// Return whether a delegation pool has already enabled partial governance voting.
     public fun partial_governance_voting_enabled(pool_address: address): bool {
         exists<GovernanceRecords>(pool_address) && stake::get_delegated_voter(pool_address) == pool_address
     }
@@ -792,7 +792,7 @@ module aptos_framework::delegation_pool {
         // save delegation pool ownership and resource account address (inner stake pool address) on `owner`
         move_to(owner, DelegationPoolOwnership { pool_address });
 
-        // All delegation pool enable partial governace voting by default once the feature flag is enabled.
+        // All delegation pool enable partial governance voting by default once the feature flag is enabled.
         if (features::partial_governance_voting_enabled() && features::delegation_pool_partial_governance_voting_enabled()) {
             enable_partial_governance_voting(pool_address);
         }
@@ -809,7 +809,7 @@ module aptos_framework::delegation_pool {
     }
 
     /// Enable partial governance voting on a stake pool. The voter of this stake pool will be managed by this module.
-    /// THe existing voter will be replaced. The function is permissionless.
+    /// The existing voter will be replaced. The function is permissionless.
     public entry fun enable_partial_governance_voting(
         pool_address: address,
     ) acquires DelegationPool, GovernanceRecords, BeneficiaryForOperator, NextCommissionPercentage {
@@ -1159,7 +1159,7 @@ module aptos_framework::delegation_pool {
     }
 
     /// Allows an operator to change its beneficiary. Any existing unpaid commission rewards will be paid to the new
-    /// beneficiary. To ensures payment to the current beneficiary, one should first call `synchronize_delegation_pool`
+    /// beneficiary. To ensure payment to the current beneficiary, one should first call `synchronize_delegation_pool`
     /// before switching the beneficiary. An operator can set one beneficiary for delegation pools, not a separate
     /// one for each pool.
     public entry fun set_beneficiary_for_operator(operator: &signer, new_beneficiary: address) acquires BeneficiaryForOperator {
