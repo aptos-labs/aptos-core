@@ -346,6 +346,13 @@ where
             let log_context =
                 NetworkSchema::new(&network_context).connection_metadata(&connection_metadata);
             while let Some(message) = stream.next().await {
+                let _timer = counters::NETWORK_PEER_WRITE_DURATION
+                    .with_label_values(&[
+                        network_context.network_id().as_str(),
+                        remote_peer_id.short_str().as_str(),
+                        "write",
+                    ])
+                    .start_timer();
                 if let Err(err) = writer.send(&message).await {
                     warn!(
                         log_context,

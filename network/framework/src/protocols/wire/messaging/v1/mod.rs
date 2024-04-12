@@ -10,7 +10,10 @@
 //! describes in greater detail how these messages are sent and received
 //! over-the-wire.
 
-use crate::protocols::{stream::StreamMessage, wire::handshake::v1::ProtocolId};
+use crate::{
+    counters,
+    protocols::{stream::StreamMessage, wire::handshake::v1::ProtocolId},
+};
 use bytes::Bytes;
 use futures::{
     io::{AsyncRead, AsyncWrite},
@@ -25,6 +28,7 @@ use std::{
     io,
     pin::Pin,
     task::{Context, Poll},
+    time::Instant,
 };
 use thiserror::Error;
 use tokio_util::{
@@ -256,8 +260,12 @@ impl<TWriteSocket: AsyncWrite> Sink<&MultiplexMessage> for MultiplexMessageSink<
     }
 
     fn start_send(self: Pin<&mut Self>, message: &MultiplexMessage) -> Result<(), Self::Error> {
+        let timer = counters::NETWORK_PEER_WRITE_DURATION
+            .with_label_values(&["unknown", "unknown", "serde"])
+            .start_timer();
         let frame = bcs::to_bytes(message).map_err(WriteError::SerializeError)?;
         let frame = Bytes::from(frame);
+        timer.observe_duration();
 
         self.project()
             .framed_write
