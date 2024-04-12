@@ -17535,13 +17535,11 @@ dependencies = [
 
 [[package]]
 name = "x25519-dalek"
-version = "2.0.1"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "c7e468321c81fb07fa7f4c636c3972b9100f0346e5b6a9f2bd0603a52f7ed277"
+version = "1.2.0"
+source = "git+https://github.com/aptos-labs/x25519-dalek?branch=zeroize_v1#762a9501668d213daa4a1864fa1f9db22716b661"
 dependencies = [
- "curve25519-dalek 4.1.2",
- "rand_core 0.6.4",
- "serde",
+ "curve25519-dalek 3.2.0",
+ "rand_core 0.5.1",
  "zeroize",
 ]
 
@@ -17715,8 +17713,3 @@ checksum = "73ab332fe2f6680068f3582b16a24f90ad7096d5d39b974d1c0aff0125116f02"
 dependencies = [
  "simd-adler32",
 ]
-
-[[patch.unused]]
-name = "x25519-dalek"
-version = "1.2.0"
-source = "git+https://github.com/aptos-labs/x25519-dalek?branch=zeroize_v1#762a9501668d213daa4a1864fa1f9db22716b661"
