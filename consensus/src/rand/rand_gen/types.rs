@@ -21,6 +21,7 @@ use aptos_types::{
 use serde::{de::DeserializeOwned, Deserialize, Serialize};
 use sha3::{Digest, Sha3_256};
 use std::{fmt::Debug, sync::Arc};
+use aptos_experimental_runtimes::thread_manager::THREAD_MANAGER;
 
 pub const NUM_THREADS_FOR_WVUF_DERIVATION: usize = 8;
 pub const FUTURE_ROUNDS_TO_ACCEPT: u64 = 200;
@@ -109,15 +110,13 @@ impl TShare for Share {
         }
 
         let proof = WVUF::aggregate_shares(&rand_config.wconfig, &apks_and_proofs);
-        let pool =
-            spawn_rayon_thread_pool("wvuf".to_string(), Some(NUM_THREADS_FOR_WVUF_DERIVATION));
         let eval = WVUF::derive_eval(
             &rand_config.wconfig,
             &rand_config.vuf_pp,
             rand_metadata.to_bytes().as_slice(),
             &rand_config.get_all_certified_apk(),
             &proof,
-            &pool,
+            THREAD_MANAGER.get_exe_cpu_pool(),
         )
         .expect("All APK should exist");
         debug!(
