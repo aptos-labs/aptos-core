@@ -11,8 +11,8 @@ use aptos_storage_interface::{
 };
 use aptos_types::{
     account_address::AccountAddress,
-    account_view::AccountView,
-    state_store::{account_with_state_view::AsAccountWithStateView, StateView},
+    account_config::AccountResource,
+    state_store::{MoveResourceExt, StateView},
     transaction::{SignedTransaction, VMValidatorResult},
 };
 use aptos_vm::{data_cache::AsMoveResolver, AptosVM};
@@ -116,9 +116,7 @@ pub fn get_account_sequence_number(
         ))
     });
 
-    let account_state_view = state_view.as_account_with_state_view(&address);
-
-    match account_state_view.get_account_resource()? {
+    match AccountResource::fetch_move_resource(state_view, &address)? {
         Some(account_resource) => Ok(account_resource.sequence_number()),
         None => Ok(0),
     }
