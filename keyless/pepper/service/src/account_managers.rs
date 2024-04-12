@@ -23,7 +23,7 @@ use std::{
 /// Multiple account managers can be specified, as long as their each have a unique short name.
 ///
 /// Here is an example command.
-/// ```
+/// ```bash
 /// ACCOUNT_MANAGER_1A_ISSUER=https://accounts.google.com \
 /// ACCOUNT_MANAGER_1A_AUD=1234567890 \
 /// ACCOUNT_MANAGER_2B_ISSUER=https://accounts.facebook.com \
