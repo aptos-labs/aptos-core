@@ -18,7 +18,7 @@ module bcs_stream::bcs_stream {
         }
     }
 
-    public fun next_length(stream: &mut BCSStream): u64 {
+    public fun deserialize_uleb128(stream: &mut BCSStream): u64 {
         let res = 0;
         let shift = 0;
 
@@ -48,7 +48,7 @@ module bcs_stream::bcs_stream {
         abort error::out_of_range(EOUT_OF_BYTES)
     }
 
-    public fun next_bool(stream: &mut BCSStream): bool {
+    public fun deserialize_bool(stream: &mut BCSStream): bool {
         assert!(stream.cur < vector::length(&stream.data), error::out_of_range(EOUT_OF_BYTES));
         let byte = *vector::borrow(&stream.data, stream.cur);
         stream.cur = stream.cur + 1;
@@ -61,7 +61,7 @@ module bcs_stream::bcs_stream {
         }
     }
 
-    public fun next_address(stream: &mut BCSStream): address {
+    public fun deserialize_address(stream: &mut BCSStream): address {
         let data = &stream.data;
         let cur = stream.cur;
 
@@ -72,7 +72,7 @@ module bcs_stream::bcs_stream {
         res
     }
 
-    public fun next_u8(stream: &mut BCSStream): u8 {
+    public fun deserialize_u8(stream: &mut BCSStream): u8 {
         let data = &stream.data;
         let cur = stream.cur;
 
@@ -84,7 +84,7 @@ module bcs_stream::bcs_stream {
         res
     }
 
-    public fun next_u16(stream: &mut BCSStream): u16 {
+    public fun deserialize_u16(stream: &mut BCSStream): u16 {
         let data = &stream.data;
         let cur = stream.cur;
 
@@ -98,7 +98,7 @@ module bcs_stream::bcs_stream {
         res
     }
 
-    public fun next_u32(stream: &mut BCSStream): u32 {
+    public fun deserialize_u32(stream: &mut BCSStream): u32 {
         let data = &stream.data;
         let cur = stream.cur;
 
@@ -114,7 +114,7 @@ module bcs_stream::bcs_stream {
         res
     }
 
-    public fun next_u64(stream: &mut BCSStream): u64 {
+    public fun deserialize_u64(stream: &mut BCSStream): u64 {
         let data = &stream.data;
         let cur = stream.cur;
 
@@ -134,7 +134,7 @@ module bcs_stream::bcs_stream {
         res
     }
 
-    public fun next_u128(stream: &mut BCSStream): u128 {
+    public fun deserialize_u128(stream: &mut BCSStream): u128 {
         let data = &stream.data;
         let cur = stream.cur;
 
@@ -162,7 +162,7 @@ module bcs_stream::bcs_stream {
         res
     }
 
-    public fun next_u256(stream: &mut BCSStream): u256 {
+    public fun deserialize_u256(stream: &mut BCSStream): u256 {
         let data = &stream.data;
         let cur = stream.cur;
 
@@ -206,8 +206,8 @@ module bcs_stream::bcs_stream {
         res
     }
 
-    public inline fun next_vector<E>(stream: &mut BCSStream, next_elem: |&mut BCSStream| E): vector<E> {
-        let len = next_length(stream);
+    public inline fun deserialize_vector<E>(stream: &mut BCSStream, next_elem: |&mut BCSStream| E): vector<E> {
+        let len = deserialize_uleb128(stream);
         let v = vector::empty();
 
         let i = 0;
