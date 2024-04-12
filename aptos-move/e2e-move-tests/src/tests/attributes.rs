@@ -128,7 +128,11 @@ fn test_bad_attribute_in_code() {
     let path = builder.write_to_temp().unwrap();
 
     // unknown attributes are not compiled into the code
-    assert_success!(h.publish_package(&account, path.path()));
+    let options = BuildOptions {
+        skip_attribute_checks: true,
+        ..BuildOptions::default()
+    };
+    assert_success!(h.publish_package_with_options(&account, path.path(), options));
 }
 
 #[test]
