@@ -958,6 +958,7 @@ dependencies = [
 name = "aptos-crypto"
 version = "0.0.3"
 dependencies = [
+ "aes-gcm",
  "anyhow",
  "aptos-crypto-derive",
  "ark-bls12-381",
@@ -2343,7 +2344,9 @@ dependencies = [
 name = "aptos-keyless-pepper-service"
 version = "0.1.0"
 dependencies = [
+ "aes-gcm",
  "anyhow",
+ "aptos-crypto",
  "aptos-inspection-service",
  "aptos-keyless-pepper-common",
  "aptos-logger",
@@ -2360,6 +2363,8 @@ dependencies = [
  "jsonwebtoken 8.3.0",
  "jwt",
  "once_cell",
+ "rand 0.7.3",
+ "regex",
  "reqwest",
  "serde",
  "serde_json",
