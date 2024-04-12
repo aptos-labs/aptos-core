@@ -147,8 +147,12 @@ fn test_bad_fun_attribute_in_compiled_module() {
     );
     let path = builder.write_to_temp().unwrap();
 
-    let package = build_package(path.path().to_path_buf(), BuildOptions::default())
-        .expect("building package must succeed");
+    let options = BuildOptions {
+        skip_attribute_checks: true,
+        ..BuildOptions::default()
+    };
+    let package =
+        build_package(path.path().to_path_buf(), options).expect("building package must succeed");
     let code = package.extract_code();
     // There should only be the above module
     assert!(code.len() == 1);
