@@ -2703,7 +2703,6 @@ version = "0.1.0"
 dependencies = [
  "anyhow",
  "aptos-bitvec",
- "aptos-bounded-executor",
  "aptos-channels",
  "aptos-compression",
  "aptos-config",

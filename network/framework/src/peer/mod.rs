@@ -27,14 +27,13 @@ use crate::{
         rpc::{error::RpcError, InboundRpcRequest, InboundRpcs, OutboundRpcRequest, OutboundRpcs},
         stream::{InboundStreamBuffer, OutboundStream, StreamMessage},
         wire::messaging::v1::{
-            DirectSendMsg, ErrorCode, Frame, MultiplexMessage, MultiplexMessageSink,
+            DirectSendMsg, ErrorCode, MultiplexMessage, MultiplexMessageSink,
             MultiplexMessageStream, NetworkMessage, Priority, ReadError, WriteError,
         },
     },
     transport::{self, Connection, ConnectionMetadata},
     ProtocolId,
 };
-use aptos_bounded_executor::ConcurrentStream;
 use aptos_channels::aptos_channel;
 use aptos_config::network_id::NetworkContext;
 use aptos_logger::prelude::*;
@@ -343,13 +342,7 @@ where
 
         // this task ends when the multiplex task ends (by dropping the senders)
         let writer_task = async move {
-            let mut stream = select(
-                msg_rx.concurrent_map_blocking(move |message: MultiplexMessage| {
-                    let frame = bcs::to_bytes(&message).expect("must serialize");
-                    MultiplexMessage::Frame(Frame { frame })
-                }),
-                stream_msg_rx,
-            );
+            let mut stream = select(msg_rx, stream_msg_rx);
             let log_context =
                 NetworkSchema::new(&network_context).connection_metadata(&connection_metadata);
             while let Some(message) = stream.next().await {
@@ -501,15 +494,6 @@ where
         Ok(())
     }
 
-    async fn handle_inbound_frame(&mut self, frame: Frame) -> Result<(), PeerManagerError> {
-        let message = bcs::from_bytes(&frame.frame)?;
-        if let MultiplexMessage::Message(network_message) = message {
-            self.handle_inbound_network_message(network_message).await
-        } else {
-            unreachable!("this is impossible")
-        }
-    }
-
     async fn handle_inbound_message(
         &mut self,
         message: Result<MultiplexMessage, ReadError>,
@@ -551,7 +535,6 @@ where
                 self.handle_inbound_network_message(message).await
             },
             MultiplexMessage::Stream(message) => self.handle_inbound_stream_message(message).await,
-            MultiplexMessage::Frame(frame) => self.handle_inbound_frame(frame).await,
         }
     }
 

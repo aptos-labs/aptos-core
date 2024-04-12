@@ -277,9 +277,6 @@ proptest! {
                             }
                         }
                     }
-                },
-                MultiplexMessage::Frame(frame) => {
-                    recv.push(bcs::from_bytes(&frame.frame).unwrap());
                 }
             }
         }
