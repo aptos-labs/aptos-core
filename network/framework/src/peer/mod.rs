@@ -236,7 +236,7 @@ where
                     .map_err(|e| ReadError::DeserializeError(e.into(), 0, Bytes::new()))?;
                 Ok(message)
             } else {
-                unreachable!()
+                message
             }
         });
 
