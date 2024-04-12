@@ -8,9 +8,7 @@ use crate::{
         BlockReader, BlockRetriever, BlockStore,
     },
     counters::{
-        self, EXECUTED_WITH_ORDER_VOTE_QC, FAILED_ORDER_VOTE_BROADCASTED, ORDER_VOTE_ADDED,
-        ORDER_VOTE_BROADCASTED, ORDER_VOTE_BRODCAST_DIDNT_START, PROPOSED_VTXN_BYTES,
-        PROPOSED_VTXN_COUNT, SUCCESSFUL_EXECUTED_WITH_ORDER_VOTE_QC,
+        self, EXECUTED_WITH_ORDER_VOTE_QC, FAILED_ORDER_VOTE_BROADCASTED, ORDER_VOTE_ADDED, ORDER_VOTE_BROADCASTED, ORDER_VOTE_BRODCAST_DIDNT_START, ORDER_VOTE_OTHER_ERRORS, PROPOSED_VTXN_BYTES, PROPOSED_VTXN_COUNT, SUCCESSFUL_EXECUTED_WITH_ORDER_VOTE_QC
     },
     error::{error_kind, VerifyError},
     liveness::{
@@ -1134,7 +1132,10 @@ impl RoundManager {
                 ORDER_VOTE_ADDED.inc();
                 Ok(())
             },
-            e => Err(anyhow::anyhow!("{:?}", e)),
+            e => {
+                ORDER_VOTE_OTHER_ERRORS.inc();
+                Err(anyhow::anyhow!("{:?}", e))
+            },
         }
     }
 
