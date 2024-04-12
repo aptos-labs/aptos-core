@@ -14,7 +14,7 @@ EXPERIMENTAL
 ## Overview
 
 
-A capability is a unforgeable token which testifies that a signer has authorized a certain operation.
+A capability is an unforgeable token which testifies that a signer has authorized a certain operation.
 The token is valid during the transaction where it is obtained. Since the type <code><a href="capability.md#0x1_capability_Cap">capability::Cap</a></code> has
 no ability to be stored in global memory, capabilities cannot leak out of a transaction. For every function
 called within a transaction which has a capability as a parameter, it is guaranteed that the capability

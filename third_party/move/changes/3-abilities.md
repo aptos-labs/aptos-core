@@ -188,7 +188,7 @@ fun invalid(account: &signer) {
 
 ### Constraining Generics
 
-Abilities can used to constrain generics, meaning that only types with that ability can instantiate that type parameter. This can be used on both function and struct type parameters:
+Abilities can be used to constrain generics, meaning that only types with that ability can instantiate that type parameter. This can be used on both function and struct type parameters:
 
 ```
 fun foo<T: copy>(x: T): (T, T) { (copy x, x) }
