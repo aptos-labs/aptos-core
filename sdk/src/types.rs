@@ -455,8 +455,10 @@ impl From<Ed25519PrivateKey> for AccountKey {
 pub struct EphemeralKeyPair {
     private_key: Ed25519PrivateKey,
     public_key: EphemeralPublicKey,
+    #[allow(dead_code)]
     nonce: String,
     expiry_date_secs: u64,
+    #[allow(dead_code)]
     blinder: Vec<u8>,
 }
 
@@ -488,9 +490,13 @@ impl EphemeralKeyPair {
 pub struct KeylessAccount {
     public_key: KeylessPublicKey,
     ephemeral_key_pair: EphemeralKeyPair,
+    #[allow(dead_code)]
     uid_key: String,
+    #[allow(dead_code)]
     uid_val: String,
+    #[allow(dead_code)]
     aud: String,
+    #[allow(dead_code)]
     pepper: Pepper,
     zk_sig: ZeroKnowledgeSig,
     jwt: String,
