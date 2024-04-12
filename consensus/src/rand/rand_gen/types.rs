@@ -9,8 +9,8 @@ use aptos_dkg::{
     pvss::{Player, WeightedConfig},
     weighted_vuf::traits::WeightedVUF,
 };
+use aptos_experimental_runtimes::thread_manager::THREAD_MANAGER;
 use aptos_logger::debug;
-use aptos_runtimes::spawn_rayon_thread_pool;
 use aptos_types::{
     aggregate_signature::AggregateSignature,
     randomness::{
@@ -21,7 +21,6 @@ use aptos_types::{
 use serde::{de::DeserializeOwned, Deserialize, Serialize};
 use sha3::{Digest, Sha3_256};
 use std::{fmt::Debug, sync::Arc};
-use aptos_experimental_runtimes::thread_manager::THREAD_MANAGER;
 
 pub const NUM_THREADS_FOR_WVUF_DERIVATION: usize = 8;
 pub const FUTURE_ROUNDS_TO_ACCEPT: u64 = 200;
@@ -119,11 +118,7 @@ impl TShare for Share {
             THREAD_MANAGER.get_exe_cpu_pool(),
         )
         .expect("All APK should exist");
-        debug!(
-            "WVUF derivation time: {} ms, number of threads: {}",
-            timer.elapsed().as_millis(),
-            NUM_THREADS_FOR_WVUF_DERIVATION
-        );
+        debug!("WVUF derivation time: {} ms", timer.elapsed().as_millis());
         let eval_bytes = bcs::to_bytes(&eval).unwrap();
         let rand_bytes = Sha3_256::digest(eval_bytes.as_slice()).to_vec();
         Randomness::new(rand_metadata.clone(), rand_bytes)
