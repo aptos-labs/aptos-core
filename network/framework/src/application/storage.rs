@@ -16,6 +16,7 @@ use aptos_config::{
     network_id::{NetworkId, PeerNetworkId},
 };
 use aptos_infallible::RwLock;
+use aptos_logger::{sample, sample::SampleRate, warn};
 use aptos_peer_monitoring_service_types::PeerMonitoringMetadata;
 use aptos_types::{account_address::AccountAddress, PeerId};
 use arc_swap::ArcSwap;
@@ -23,6 +24,7 @@ use std::{
     collections::{hash_map::Entry, HashMap},
     ops::Deref,
     sync::{Arc, RwLockWriteGuard},
+    time::Duration,
 };
 use tokio::sync::mpsc::error::TrySendError;
 
@@ -376,6 +378,10 @@ impl PeersAndMetadata {
                     TrySendError::Full(_) => {
                         // Tried to send to an app, but the app isn't handling its messages fast enough.
                         // Drop message. Maybe increment a metrics counter?
+                        sample!(
+                            SampleRate::Duration(Duration::from_secs(1)),
+                            warn!("PeersAndMetadata.broadcast() failed, some app is slow"),
+                        );
                     },
                     TrySendError::Closed(_) => {
                         to_del.push(i);
@@ -388,6 +394,9 @@ impl PeersAndMetadata {
         }
     }
 
+    /// subscribe() returns a channel for receiving NewPeer/LostPeer events.
+    /// subscribe() immediately sends all* current connections as NewPeer events.
+    /// (* capped at NOTIFICATION_BACKLOG, currently 1000, use get_connected_peers() to be sure)
     pub fn subscribe(&self) -> tokio::sync::mpsc::Receiver<ConnectionNotification> {
         let (sender, receiver) = tokio::sync::mpsc::channel(NOTIFICATION_BACKLOG);
         let peers_and_metadata = self.peers_and_metadata.read();
