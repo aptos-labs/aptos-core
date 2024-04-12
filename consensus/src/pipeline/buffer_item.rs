@@ -21,14 +21,9 @@ use futures::future::BoxFuture;
 use itertools::zip_eq;
 use tokio::time::Instant;
 
-fn generate_commit_ledger_info(
-    commit_info: &BlockInfo,
-    ordered_proof: &LedgerInfoWithSignatures,
-) -> LedgerInfo {
-    LedgerInfo::new(
-        commit_info.clone(),
-        ordered_proof.ledger_info().consensus_data_hash(),
-    )
+fn generate_commit_ledger_info(commit_info: &BlockInfo) -> LedgerInfo {
+    // TODO: Replacing consensus_data_hash with a dummy value could lead to backward incompatibility.
+    LedgerInfo::new(commit_info.clone(), HashValue::zero())
 }
 
 fn verify_signatures(
@@ -61,7 +56,7 @@ fn generate_executed_item_from_ordered(
 ) -> BufferItem {
     debug!("{} advance to executed from ordered", commit_info);
     let partial_commit_proof = LedgerInfoWithPartialSignatures::new(
-        generate_commit_ledger_info(&commit_info, &ordered_proof),
+        generate_commit_ledger_info(&commit_info),
         verified_signatures,
     );
     BufferItem::Executed(Box::new(ExecutedItem {
@@ -189,8 +184,7 @@ impl BufferItem {
                         callback,
                     }))
                 } else {
-                    let commit_ledger_info =
-                        generate_commit_ledger_info(&commit_info, &ordered_proof);
+                    let commit_ledger_info = generate_commit_ledger_info(&commit_info);
 
                     let verified_signatures =
                         verify_signatures(unverified_signatures, validator, &commit_ledger_info);
