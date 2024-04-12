@@ -1599,6 +1599,9 @@ impl<P: OnChainConfigProvider> EpochManager<P> {
                 }
             },
             IncomingRpcRequest::DAGRequest(request) => {
+                crate::dag::observability::counters::RPC_PROCESS_DURATION
+                    .with_label_values(&["epoch_manager_handle"])
+                    .observe(request.start.elapsed().as_secs_f64());
                 if let Some(tx) = &self.dag_rpc_tx {
                     tx.push(peer_id, request)
                 } else {

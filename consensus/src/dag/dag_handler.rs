@@ -107,6 +107,9 @@ impl NetworkHandler {
         // TODO: feed in the executor based on verification Runtime
         let mut verified_msg_stream =
             dag_rpc_rx.concurrent_map_blocking(move |rpc_request: IncomingDAGRequest| {
+                RPC_PROCESS_DURATION
+                    .with_label_values(&["dag_handler"])
+                    .observe(rpc_request.start.elapsed().as_secs_f64());
                 let timer = INCOMING_MSG_PROCESSING.start_timer();
                 defer!({ drop(timer) });
                 let epoch = rpc_request.req.epoch();
@@ -266,6 +269,10 @@ impl VerifiedMessageProcessor {
         responder: RpcResponder,
         start: Instant,
     ) -> anyhow::Result<SyncOutcome> {
+        RPC_PROCESS_DURATION
+            .with_label_values(&["dag_process"])
+            .observe(start.elapsed().as_secs_f64());
+
         let response: Result<DAGMessage, DAGError> = {
             match dag_message_result {
                 Ok(dag_message) => {
@@ -355,7 +362,9 @@ impl VerifiedMessageProcessor {
             .map_err(|e| DAGRpcError::new(self.epoch_state.epoch, e))
             .into();
         responder.respond(response)?;
-        RPC_PROCESS_DURATION.observe(start.elapsed().as_secs_f64());
+        RPC_PROCESS_DURATION
+            .with_label_values(&["dag_reply"])
+            .observe(start.elapsed().as_secs_f64());
 
         Ok(SyncOutcome::Synced(None))
     }
