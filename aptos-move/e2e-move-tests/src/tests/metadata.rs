@@ -277,14 +277,14 @@ fn test_compilation_metadata() {
     );
     // publish compiler v2 code to test
     assert_success!(test_compilation_metadata_internal(
-        false,
         true,
+        false,
         enable_check
     ));
     // publish compiler v1 code to mainnet
     assert_success!(test_compilation_metadata_internal(
-        true,
         false,
+        true,
         enable_check
     ));
     // publish compiler v1 code to test
@@ -300,14 +300,14 @@ fn test_compilation_metadata() {
     assert_success!(test_compilation_metadata_internal(true, true, enable_check));
     // publish compiler v2 code to test
     assert_success!(test_compilation_metadata_internal(
-        false,
         true,
+        false,
         enable_check
     ));
     // publish compiler v1 code to mainnet
     assert_success!(test_compilation_metadata_internal(
-        true,
         false,
+        true,
         enable_check
     ));
     // publish compiler v1 code to test

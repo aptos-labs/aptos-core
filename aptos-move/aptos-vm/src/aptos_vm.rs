@@ -1502,7 +1502,7 @@ impl AptosVM {
                     if metadata.unstable {
                         return Err(PartialVMError::new(StatusCode::UNSTABLE_BYTECODE_REJECTED)
                             .with_message(
-                                "code marked unstable is not published on mainne".to_string(),
+                                "code marked unstable is not published on mainnet".to_string(),
                             )
                             .finish(Location::Undefined));
                     }
