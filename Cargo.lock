@@ -3414,7 +3414,6 @@ dependencies = [
  "base64 0.13.1",
  "bcs 0.1.4",
  "ed25519-dalek-bip32",
- "jsonwebtoken 8.3.0",
  "move-core-types",
  "once_cell",
  "rand 0.7.3",
