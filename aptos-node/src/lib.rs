@@ -6,8 +6,8 @@
 
 mod indexer;
 mod logger;
-mod network;
-pub mod services;
+pub mod network;
+mod services;
 mod state_sync;
 pub mod storage;
 pub mod utils;
