@@ -96,7 +96,6 @@ impl<D: TAugmentedData> AugDataStore<D> {
     }
 
     pub fn add_aug_data(&mut self, data: AugData<D>) -> anyhow::Result<AugDataSignature> {
-        ensure!(self.epoch == data.epoch());
         if let Some(existing_data) = self.data.get(data.author()) {
             ensure!(
                 existing_data == &data,
@@ -115,7 +114,6 @@ impl<D: TAugmentedData> AugDataStore<D> {
         &mut self,
         certified_data: CertifiedAugData<D>,
     ) -> anyhow::Result<CertifiedAugDataAck> {
-        ensure!(self.epoch == certified_data.epoch());
         if self.certified_data.contains_key(certified_data.author()) {
             return Ok(CertifiedAugDataAck::new(self.epoch));
         }
