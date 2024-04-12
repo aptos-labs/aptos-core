@@ -49,21 +49,20 @@ fn used_type_parameters_in_fields(struct_env: &StructEnv) -> BTreeSet<u16> {
         .collect()
 }
 
-/// Returns the indices of type parameters used in the given type.
+/// Returns the indices of type parameters used in the given type. The indices returned have the same scope.
 fn used_type_parameters_in_ty(ty: &Type) -> BTreeSet<u16> {
     match ty {
         Type::Primitive(_) => BTreeSet::new(),
-        Type::Tuple(tys) | Type::Struct(_, _, tys) => {
-            tys.iter().flat_map(used_type_parameters_in_ty).collect()
-        },
+        Type::Struct(_, _, tys) => tys.iter().flat_map(used_type_parameters_in_ty).collect(),
         Type::TypeParameter(i) => BTreeSet::from([*i]),
-        Type::Fun(from, to) => {
-            let mut used_in_from = used_type_parameters_in_ty(from);
-            used_in_from.append(&mut used_type_parameters_in_ty(to));
-            used_in_from
-        },
-        Type::Vector(ty) | Type::Reference(_, ty) => used_type_parameters_in_ty(ty),
-        Type::TypeDomain(_) | Type::ResourceDomain(_, _, _) | Type::Error | Type::Var(_) => {
+        Type::Vector(ty) => used_type_parameters_in_ty(ty),
+        Type::Reference(..)
+        | Type::Fun(..)
+        | Type::Tuple(..)
+        | Type::TypeDomain(..)
+        | Type::ResourceDomain(..)
+        | Type::Error
+        | Type::Var(..) => {
             unreachable!("unexpected type")
         },
     }
