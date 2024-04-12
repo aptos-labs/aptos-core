@@ -186,8 +186,11 @@ impl NetworkHandler {
         loop {
             select! {
                 Some((msg, epoch, author, responder, start)) = verified_msg_stream.next() => {
+                    RPC_PROCESS_DURATION
+                        .with_label_values(&["post_verify_recv"])
+                        .observe(start.elapsed().as_secs_f64());
                     let verified_msg_processor = verified_msg_processor.clone();
-                    let f = executor.spawn(async move {
+                    let f = executor.spawn(monitor.instrument(async move {
                         monitor!("dag_on_verified_msg", {
                             match verified_msg_processor.process_verified_message(msg, epoch, author, responder, start).await {
                                 Ok(sync_status) => {
@@ -204,7 +207,7 @@ impl NetworkHandler {
                             };
                             None
                         })
-                    }).await;
+                    })).await;
                     futures.push(f);
                 },
                 Some(status) = futures.next() => {
