@@ -1,0 +1,16 @@
+error[E06002]: use of unassigned variable
+  ┌─ tests/move_check/v2_tests/bytecode-generator/wildcard8.move:4:23
+  │
+3 │         let x: u64;
+  │             - The variable 'x' does not have a value. The variable must be assigned a value before being used.
+4 │         let (_, _) = (x, x);
+  │                       ^ Invalid usage of unassigned variable 'x'
+
+error[E06002]: use of unassigned variable
+  ┌─ tests/move_check/v2_tests/bytecode-generator/wildcard8.move:4:26
+  │
+3 │         let x: u64;
+  │             - The variable 'x' does not have a value. The variable must be assigned a value before being used.
+4 │         let (_, _) = (x, x);
+  │                          ^ Invalid usage of unassigned variable 'x'
+
