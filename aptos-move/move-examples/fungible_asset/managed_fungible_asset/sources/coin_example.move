@@ -1,6 +1,7 @@
 /// A coin example using managed_fungible_asset to create a fungible "coin" and helper functions to only interact with
 /// primary fungible stores only.
 module example_addr::coin_example {
+    use std::signer;
     use aptos_framework::object;
     use aptos_framework::fungible_asset::{Self, Metadata, FungibleAsset};
     use aptos_framework::object::Object;
@@ -45,6 +46,11 @@ module example_addr::coin_example {
             vector[to],
             vector[amount]
         );
+    }
+
+    public entry fun create_secondary_store(user: &signer) {
+        let cref = object::create_object(signer::address_of(user));
+        fungible_asset::create_store(&cref, get_metadata());
     }
 
     /// Burn fungible assets as the owner of metadata object.
