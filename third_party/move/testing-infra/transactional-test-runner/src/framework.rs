@@ -42,6 +42,7 @@ use move_core_types::{
 };
 use move_disassembler::disassembler::{Disassembler, DisassemblerOptions};
 use move_ir_types::location::Spanned;
+use move_model::metadata::LanguageVersion;
 use move_symbol_pool::Symbol;
 use move_vm_runtime::session::SerializedReturnValues;
 use once_cell::sync::Lazy;
@@ -198,13 +199,20 @@ pub trait MoveTestAdapter<'a>: Sized {
         let state = self.compiled_state();
         let (named_addr_opt, module, warnings_opt) = match (syntax, run_config) {
             // Run the V2 compiler if requested
-            (SyntaxChoice::Source, TestRunConfig::CompilerV2 { v2_experiments }) => {
+            (
+                SyntaxChoice::Source,
+                TestRunConfig::CompilerV2 {
+                    language_version,
+                    v2_experiments,
+                },
+            ) => {
                 let ((module, _), warning_opt) = compile_source_unit_v2(
                     state.pre_compiled_deps,
                     state.named_address_mapping.clone(),
                     &state.source_files().cloned().collect::<Vec<_>>(),
                     data_path.to_owned(),
                     self.known_attributes(),
+                    language_version,
                     v2_experiments,
                 )?;
                 if let Some(module) = module {
@@ -265,13 +273,20 @@ pub trait MoveTestAdapter<'a>: Sized {
         let state = self.compiled_state();
         let (script, warning_opt) = match (syntax, run_config) {
             // Run the V2 compiler if requested.
-            (SyntaxChoice::Source, TestRunConfig::CompilerV2 { v2_experiments }) => {
+            (
+                SyntaxChoice::Source,
+                TestRunConfig::CompilerV2 {
+                    language_version,
+                    v2_experiments,
+                },
+            ) => {
                 let ((_, script), warning_opt) = compile_source_unit_v2(
                     state.pre_compiled_deps,
                     state.named_address_mapping.clone(),
                     &state.source_files().cloned().collect::<Vec<_>>(),
                     data_path.to_owned(),
                     self.known_attributes(),
+                    language_version,
                     v2_experiments,
                 )?;
                 if let Some(script) = script {
@@ -670,6 +685,7 @@ fn compile_source_unit_v2(
     deps: &[String],
     path: String,
     known_attributes: &BTreeSet<String>,
+    language_version: LanguageVersion,
     experiments: Vec<(String, bool)>,
 ) -> Result<(
     (Option<CompiledModule>, Option<CompiledScript>),
@@ -702,6 +718,7 @@ fn compile_source_unit_v2(
             .map(|(alias, addr)| format!("{}={}", alias, addr))
             .collect(),
         known_attributes: known_attributes.clone(),
+        language_version: Some(language_version),
         ..move_compiler_v2::Options::default()
     };
     for (exp, value) in experiments {
@@ -840,17 +857,21 @@ where
     };
 
     // Construct a sequence of compiler runs based on the given config.
-    let (runs, comparison_mode) =
-        if let TestRunConfig::ComparisonV1V2 { v2_experiments } = config.clone() {
-            (
-                vec![TestRunConfig::CompilerV1, TestRunConfig::CompilerV2 {
-                    v2_experiments,
-                }],
-                true,
-            )
-        } else {
-            (vec![config.clone()], false) // either V1 or V2
-        };
+    let (runs, comparison_mode) = if let TestRunConfig::ComparisonV1V2 {
+        language_version,
+        v2_experiments,
+    } = config.clone()
+    {
+        (
+            vec![TestRunConfig::CompilerV1, TestRunConfig::CompilerV2 {
+                language_version,
+                v2_experiments,
+            }],
+            true,
+        )
+    } else {
+        (vec![config.clone()], false) // either V1 or V2
+    };
     let mut last_output = String::new();
     let mut bytecode_print_output = BTreeMap::<TestRunConfig, String>::new();
     for run_config in runs {

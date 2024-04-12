@@ -96,6 +96,7 @@ MOVE_CRATES="\
   -p move-prover-bytecode-pipeline\
   -p move-prover\
   -p move-docgen\
+  -p move-to-yul\
   -p move-transactional-test-runner\
   -p move-vm-runtime\
   -p move-vm-transactional-tests\

@@ -35,12 +35,11 @@ use aptos_types::{
     chain_id::ChainId,
     transaction::{RawTransaction, Script, SignedTransaction, TransactionPayload},
 };
-pub use mock_payload_manager::MockPayloadManager;
 #[cfg(test)]
 pub use mock_state_computer::EmptyStateComputer;
 #[cfg(test)]
 pub use mock_state_computer::RandomComputeResultStateComputer;
-pub use mock_storage::{EmptyStorage, MockStorage};
+pub use mock_storage::EmptyStorage;
 use move_core_types::account_address::AccountAddress;
 
 pub const TEST_TIMEOUT: Duration = Duration::from_secs(60);

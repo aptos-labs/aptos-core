@@ -1,4 +1,6 @@
 // Copyright © Aptos Foundation
+// SPDX-License-Identifier: Apache-2.0
+
 use crate::{
     agg_trx_producer::TAggTranscriptProducer, counters::DKG_STAGE_SECONDS,
     network::IncomingRpcRequest, DKGMessage,
@@ -7,7 +9,7 @@ use anyhow::{anyhow, bail, ensure, Result};
 use aptos_channels::{aptos_channel, message_queues::QueueStyle};
 use aptos_crypto::Uniform;
 use aptos_infallible::duration_since_epoch;
-use aptos_logger::{debug, error, info};
+use aptos_logger::{debug, error, info, warn};
 use aptos_types::{
     dkg::{
         DKGSessionMetadata, DKGSessionState, DKGStartEvent, DKGTrait, DKGTranscript,
@@ -421,10 +423,13 @@ impl<DKG: DKGTrait> DKGManager<DKG> {
             matches!(&self.state, InnerState::NotStarted),
             "[DKG] dkg already started"
         );
-        ensure!(
-            self.epoch_state.epoch == session_metadata.dealer_epoch,
-            "[DKG] event not for current epoch"
-        );
+        if self.epoch_state.epoch != session_metadata.dealer_epoch {
+            warn!(
+                "[DKG] event (from epoch {}) not for current epoch ({}), ignoring",
+                session_metadata.dealer_epoch, self.epoch_state.epoch
+            );
+            return Ok(());
+        }
         self.setup_deal_broadcast(start_time_us, &session_metadata)
             .await
     }

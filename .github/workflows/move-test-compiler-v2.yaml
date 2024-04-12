@@ -24,8 +24,21 @@ concurrency:
   cancel-in-progress: true
 
 jobs:
-  # Run Aptos Move tests.
+  # This job determines which files were changed
+  file_change_determinator:
+    runs-on: ubuntu-latest
+    outputs:
+      move_compiler_v2_changes: ${{ steps.determine_file_changes.outputs.move_compiler_v2_changes }}
+    steps:
+      - uses: actions/checkout@v4
+      - name: Run the file change determinator
+        id: determine_file_changes
+        uses: ./.github/actions/file-change-determinator
+
+  # Run Aptos Move Compiler v2 tests. This is a PR required job.
+  # TODO: fix this so that we skip the tests when appropriate.
   rust-move-tests:
+    needs: file_change_determinator
     runs-on: high-perf-docker
     steps:
       - uses: actions/checkout@v3

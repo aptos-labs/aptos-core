@@ -8,6 +8,15 @@ fun m::dead($t0: u64): u64 {
   2: return $t1
 }
 
+============ after DeadStoreElimination: ================
+
+[variant baseline]
+fun m::dead($t0: u64): u64 {
+     var $t1: u64
+  0: $t1 := move($t0)
+  1: return $t1
+}
+
 ============ after VariableCoalescingAnnotator: ================
 
 [variant baseline]
@@ -30,6 +39,14 @@ fun m::dead($t0: u64): u64 {
   1: return $t0
 }
 
+============ after DeadStoreElimination: ================
+
+[variant baseline]
+fun m::dead($t0: u64): u64 {
+     var $t1: u64 [unused]
+  0: return $t0
+}
+
 
 ============ disassembled file-format ==================
 // Move bytecode v7
@@ -42,3 +59,4 @@ B0:
 	1: Ret
 }
 }
+============ bytecode verification succeeded ========

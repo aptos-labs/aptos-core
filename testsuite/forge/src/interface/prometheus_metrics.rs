@@ -58,6 +58,19 @@ impl SystemMetrics {
     }
 }
 
+pub async fn fetch_error_metrics(swarm: &dyn Swarm) -> anyhow::Result<i64> {
+    let error_query = r#"aptos_error_log_count{role=~"validator"}"#;
+
+    let result = swarm.query_metrics(error_query, None, None).await?;
+    let error_samples = result.as_instant().unwrap_or(&[]);
+
+    Ok(error_samples
+        .iter()
+        .map(|s| s.sample().value().round() as i64)
+        .max()
+        .unwrap_or(0))
+}
+
 pub async fn fetch_system_metrics(
     swarm: &dyn Swarm,
     start_time: i64,

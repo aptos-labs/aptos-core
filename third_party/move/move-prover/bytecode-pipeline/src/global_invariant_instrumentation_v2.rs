@@ -153,7 +153,7 @@ impl Analyzer {
                 let adapter =
                     TypeUnificationAdapter::new_vec(&fun_mem.inst, &inv_mem.inst, true, true);
                 let rel = adapter.unify(
-                    &NoUnificationContext,
+                    &mut NoUnificationContext,
                     Variance::SpecVariance,
                     /* shallow_subst */ false,
                 );
@@ -753,7 +753,7 @@ impl<'a> Instrumenter<'a> {
                     inv.loc.display(self.builder.global_env())
                 );
                 let rel = adapter.unify(
-                    &NoUnificationContext,
+                    &mut NoUnificationContext,
                     Variance::SpecVariance,
                     /* shallow_subst */ false,
                 );

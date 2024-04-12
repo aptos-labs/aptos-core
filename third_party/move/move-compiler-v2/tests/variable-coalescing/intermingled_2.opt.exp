@@ -7,15 +7,31 @@ fun m::test(): u64 {
      var $t2: u64
      var $t3: u64
      var $t4: u64
-     var $t5: u64
-  0: $t2 := 1
-  1: $t1 := infer($t2)
-  2: $t4 := 1
-  3: $t3 := +($t1, $t4)
-  4: $t1 := infer($t3)
-  5: $t5 := 2
-  6: $t0 := +($t5, $t1)
-  7: return $t0
+  0: $t1 := 1
+  1: $t3 := 1
+  2: $t2 := +($t1, $t3)
+  3: $t1 := infer($t2)
+  4: $t4 := 2
+  5: $t0 := +($t4, $t1)
+  6: return $t0
+}
+
+============ after DeadStoreElimination: ================
+
+[variant baseline]
+fun m::test(): u64 {
+     var $t0: u64
+     var $t1: u64
+     var $t2: u64
+     var $t3: u64
+     var $t4: u64
+  0: $t1 := 1
+  1: $t3 := 1
+  2: $t2 := +($t1, $t3)
+  3: $t1 := move($t2)
+  4: $t4 := 2
+  5: $t0 := +($t4, $t1)
+  6: return $t0
 }
 
 ============ after VariableCoalescingAnnotator: ================
@@ -27,31 +43,27 @@ fun m::test(): u64 {
      var $t2: u64
      var $t3: u64
      var $t4: u64
-     var $t5: u64
      # live vars:
-     # events: b:$t2
-  0: $t2 := 1
+     # events: b:$t1
+  0: $t1 := 1
+     # live vars: $t1
+     # events: b:$t3
+  1: $t3 := 1
+     # live vars: $t1, $t3
+     # events: e:$t3, b:$t2
+  2: $t2 := +($t1, $t3)
      # live vars: $t2
-     # events: e:$t2, b:$t1
-  1: $t1 := move($t2)
+     # events: e:$t2
+  3: $t1 := move($t2)
      # live vars: $t1
      # events: b:$t4
-  2: $t4 := 1
+  4: $t4 := 2
      # live vars: $t1, $t4
-     # events: e:$t4, b:$t3
-  3: $t3 := +($t1, $t4)
-     # live vars: $t3
-     # events: e:$t3
-  4: $t1 := move($t3)
-     # live vars: $t1
-     # events: b:$t5
-  5: $t5 := 2
-     # live vars: $t1, $t5
-     # events: e:$t1, e:$t5, b:$t0
-  6: $t0 := +($t5, $t1)
+     # events: e:$t1, e:$t4, b:$t0
+  5: $t0 := +($t4, $t1)
      # live vars: $t0
      # events: e:$t0
-  7: return $t0
+  6: return $t0
 }
 
 ============ after VariableCoalescingTransformer: ================
@@ -59,19 +71,35 @@ fun m::test(): u64 {
 [variant baseline]
 fun m::test(): u64 {
      var $t0: u64 [unused]
-     var $t1: u64 [unused]
-     var $t2: u64
-     var $t3: u64 [unused]
-     var $t4: u64
-     var $t5: u64 [unused]
-  0: $t2 := 1
-  1: $t2 := move($t2)
-  2: $t4 := 1
-  3: $t4 := +($t2, $t4)
-  4: $t2 := move($t4)
-  5: $t4 := 2
-  6: $t2 := +($t4, $t2)
-  7: return $t2
+     var $t1: u64
+     var $t2: u64 [unused]
+     var $t3: u64
+     var $t4: u64 [unused]
+  0: $t1 := 1
+  1: $t3 := 1
+  2: $t3 := +($t1, $t3)
+  3: $t1 := move($t3)
+  4: $t3 := 2
+  5: $t1 := +($t3, $t1)
+  6: return $t1
+}
+
+============ after DeadStoreElimination: ================
+
+[variant baseline]
+fun m::test(): u64 {
+     var $t0: u64 [unused]
+     var $t1: u64
+     var $t2: u64 [unused]
+     var $t3: u64
+     var $t4: u64 [unused]
+  0: $t1 := 1
+  1: $t3 := 1
+  2: $t3 := +($t1, $t3)
+  3: $t1 := move($t3)
+  4: $t3 := 2
+  5: $t1 := +($t3, $t1)
+  6: return $t1
 }
 
 
@@ -82,17 +110,15 @@ module c0ffee.m {
 
 test(): u64 /* def_idx: 0 */ {
 L0:	loc0: u64
-L1:	loc1: u64
 B0:
 	0: LdU64(1)
 	1: LdU64(1)
-	2: StLoc[0](loc0: u64)
-	3: CopyLoc[0](loc0: u64)
-	4: Add
-	5: StLoc[1](loc1: u64)
-	6: LdU64(2)
-	7: CopyLoc[1](loc1: u64)
-	8: Add
-	9: Ret
+	2: Add
+	3: StLoc[0](loc0: u64)
+	4: LdU64(2)
+	5: MoveLoc[0](loc0: u64)
+	6: Add
+	7: Ret
 }
 }
+============ bytecode verification succeeded ========

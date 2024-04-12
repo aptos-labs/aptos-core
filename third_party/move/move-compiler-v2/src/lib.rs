@@ -2,6 +2,7 @@
 // Parts of the project are originally copyright © Meta Platforms, Inc.
 // SPDX-License-Identifier: Apache-2.0
 
+pub mod acquires_checker;
 pub mod ast_simplifier;
 mod bytecode_generator;
 pub mod cyclic_instantiation_checker;
@@ -15,6 +16,7 @@ pub mod logging;
 pub mod options;
 pub mod pipeline;
 pub mod recursive_struct_checker;
+pub mod unused_params_checker;
 
 use crate::{
     env_pipeline::{
@@ -226,6 +228,8 @@ pub fn run_checker(options: Options) -> anyhow::Result<GlobalEnv> {
         } else {
             &options.known_attributes
         },
+        options.language_version.unwrap_or_default(),
+        options.compile_test_code,
     )?;
     // Store address aliases
     let map = addrs
@@ -328,6 +332,12 @@ pub fn check_and_rewrite_pipeline<'a, 'b>(
         });
     }
 
+    if !for_v1_model && options.experiment_on(Experiment::UNUSED_STRUCT_PARAMS_CHECK) {
+        env_pipeline.add("unused struct params check", |env| {
+            unused_params_checker::unused_params_checker(env)
+        });
+    }
+
     if !for_v1_model && options.experiment_on(Experiment::ACCESS_CHECK) {
         env_pipeline.add(
             "access and use check before inlining",
@@ -347,6 +357,12 @@ pub fn check_and_rewrite_pipeline<'a, 'b>(
             "access and use check after inlining",
             |env: &mut GlobalEnv| function_checker::check_access_and_use(env, false),
         );
+    }
+
+    if !for_v1_model && options.experiment_on(Experiment::ACQUIRES_CHECK) {
+        env_pipeline.add("acquires check", |env| {
+            acquires_checker::acquires_checker(env)
+        });
     }
 
     if options.experiment_on(Experiment::AST_SIMPLIFY_FULL) {
@@ -470,10 +486,13 @@ pub fn disassemble_compiled_units(units: &[CompiledUnit]) -> anyhow::Result<Stri
 }
 
 /// Run the bytecode verifier on the given compiled units and add any diagnostics to the global env.
-pub fn run_bytecode_verifier(units: &[AnnotatedCompiledUnit], env: &mut GlobalEnv) {
+pub fn run_bytecode_verifier(units: &[AnnotatedCompiledUnit], env: &mut GlobalEnv) -> bool {
     let diags = verify_units(units);
     if !diags.is_empty() {
         add_move_lang_diagnostics(env, diags);
+        false
+    } else {
+        true
     }
 }
 

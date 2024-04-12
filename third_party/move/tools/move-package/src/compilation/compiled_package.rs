@@ -633,13 +633,17 @@ impl CompiledPackage {
         let mut paths = src_deps;
         paths.push(sources_package_paths.clone());
 
+        let effective_compiler_version = config.compiler_version.unwrap_or_default();
+        let effective_language_version = config.language_version.unwrap_or_default();
+        effective_compiler_version.check_language_support(effective_language_version)?;
+
         let (file_map, all_compiled_units) = match config.compiler_version.unwrap_or_default() {
             CompilerVersion::V1 => {
                 let compiler =
                     Compiler::from_package_paths(paths, bytecode_deps, flags, &known_attributes);
                 compiler_driver_v1(compiler)?
             },
-            CompilerVersion::V2 => {
+            CompilerVersion::V2_0 => {
                 let to_str_vec = |ps: &[Symbol]| {
                     ps.iter()
                         .map(move |s| s.as_str().to_owned())
@@ -677,6 +681,8 @@ impl CompiledPackage {
                         .collect(),
                     skip_attribute_checks,
                     known_attributes: known_attributes.clone(),
+                    language_version: Some(effective_language_version),
+                    compile_test_code: flags.keep_testing_functions(),
                     ..Default::default()
                 };
                 compiler_driver_v2(options)?

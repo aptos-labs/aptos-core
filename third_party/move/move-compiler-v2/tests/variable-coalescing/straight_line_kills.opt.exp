@@ -16,6 +16,23 @@ fun m::copy_kill($t0: u64): u64 {
   6: return $t1
 }
 
+============ after DeadStoreElimination: ================
+
+[variant baseline]
+fun m::copy_kill($t0: u64): u64 {
+     var $t1: u64
+     var $t2: u64
+     var $t3: u64
+     var $t4: u64
+     var $t5: u64
+  0: $t2 := copy($t0)
+  1: $t3 := copy($t2)
+  2: $t5 := 1
+  3: $t4 := +($t0, $t5)
+  4: $t1 := +($t3, $t2)
+  5: return $t1
+}
+
 ============ after VariableCoalescingAnnotator: ================
 
 [variant baseline]
@@ -62,6 +79,23 @@ fun m::copy_kill($t0: u64): u64 {
   5: return $t2
 }
 
+============ after DeadStoreElimination: ================
+
+[variant baseline]
+fun m::copy_kill($t0: u64): u64 {
+     var $t1: u64 [unused]
+     var $t2: u64
+     var $t3: u64
+     var $t4: u64 [unused]
+     var $t5: u64
+  0: $t2 := copy($t0)
+  1: $t3 := copy($t2)
+  2: $t5 := 1
+  3: $t0 := +($t0, $t5)
+  4: $t2 := +($t3, $t2)
+  5: return $t2
+}
+
 
 ============ disassembled file-format ==================
 // Move bytecode v7
@@ -83,7 +117,7 @@ B0:
 	7: MoveLoc[3](loc2: u64)
 	8: Add
 	9: MoveLoc[2](loc1: u64)
-	10: CopyLoc[1](loc0: u64)
+	10: MoveLoc[1](loc0: u64)
 	11: Add
 	12: StLoc[1](loc0: u64)
 	13: Pop
@@ -91,3 +125,4 @@ B0:
 	15: Ret
 }
 }
+============ bytecode verification succeeded ========

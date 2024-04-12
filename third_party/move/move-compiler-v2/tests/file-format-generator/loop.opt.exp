@@ -24,7 +24,7 @@ B2:
 	12: LdU64(1)
 	13: StLoc[1](loc0: u64)
 	14: MoveLoc[0](Arg0: u64)
-	15: CopyLoc[1](loc0: u64)
+	15: MoveLoc[1](loc0: u64)
 	16: Sub
 	17: StLoc[0](Arg0: u64)
 	18: Branch(20)
@@ -34,7 +34,7 @@ B4:
 	20: LdU64(1)
 	21: StLoc[1](loc0: u64)
 	22: MoveLoc[0](Arg0: u64)
-	23: CopyLoc[1](loc0: u64)
+	23: MoveLoc[1](loc0: u64)
 	24: Sub
 	25: StLoc[0](Arg0: u64)
 	26: Branch(0)
@@ -57,7 +57,7 @@ B1:
 	6: LdU64(1)
 	7: StLoc[1](loc0: u64)
 	8: MoveLoc[0](Arg0: u64)
-	9: CopyLoc[1](loc0: u64)
+	9: MoveLoc[1](loc0: u64)
 	10: Sub
 	11: StLoc[0](Arg0: u64)
 	12: Branch(14)
@@ -100,7 +100,7 @@ B5:
 	20: LdU64(1)
 	21: StLoc[1](loc0: u64)
 	22: MoveLoc[0](Arg0: u64)
-	23: CopyLoc[1](loc0: u64)
+	23: MoveLoc[1](loc0: u64)
 	24: Sub
 	25: StLoc[0](Arg0: u64)
 	26: Branch(28)
@@ -113,3 +113,4 @@ B8:
 	30: Ret
 }
 }
+============ bytecode verification succeeded ========

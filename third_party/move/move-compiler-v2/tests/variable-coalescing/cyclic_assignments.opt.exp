@@ -12,6 +12,20 @@ fun m::cyclic($t0: u64): u64 {
   4: return $t1
 }
 
+============ after DeadStoreElimination: ================
+
+[variant baseline]
+fun m::cyclic($t0: u64): u64 {
+     var $t1: u64
+     var $t2: u64
+     var $t3: u64
+  0: $t2 := move($t0)
+  1: $t3 := move($t2)
+  2: $t0 := move($t3)
+  3: $t1 := move($t0)
+  4: return $t1
+}
+
 ============ after VariableCoalescingAnnotator: ================
 
 [variant baseline]
@@ -50,6 +64,18 @@ fun m::cyclic($t0: u64): u64 {
   4: return $t0
 }
 
+============ after DeadStoreElimination: ================
+
+[variant baseline]
+fun m::cyclic($t0: u64): u64 {
+     var $t1: u64 [unused]
+     var $t2: u64
+     var $t3: u64 [unused]
+  0: $t2 := move($t0)
+  1: $t0 := move($t2)
+  2: return $t0
+}
+
 
 ============ disassembled file-format ==================
 // Move bytecode v7
@@ -67,3 +93,4 @@ B0:
 	5: Ret
 }
 }
+============ bytecode verification succeeded ========

@@ -117,7 +117,7 @@ B0:
 	7: MoveLoc[3](loc2: u64)
 	8: Add
 	9: MoveLoc[2](loc1: u64)
-	10: CopyLoc[1](loc0: u64)
+	10: MoveLoc[1](loc0: u64)
 	11: Add
 	12: StLoc[1](loc0: u64)
 	13: Pop
@@ -125,3 +125,4 @@ B0:
 	15: Ret
 }
 }
+============ bytecode verification succeeded ========

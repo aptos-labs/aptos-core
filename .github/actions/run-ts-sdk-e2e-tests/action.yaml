@@ -68,7 +68,6 @@ runs:
         timeout_minutes: 25
         command: cd ./ecosystem/typescript/sdk && pnpm run test:ci
 
-
     # Run the indexer TS SDK tests.
     - uses: nick-fields/retry@7f8f3d9f0f62fe5925341be21c2e8314fd4f7c7c # pin@v2
       name: ts-sdk-indexer-test

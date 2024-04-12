@@ -3,10 +3,7 @@
 // SPDX-License-Identifier: Apache-2.0
 
 use anyhow::{bail, Result};
-use aptos_types::{
-    access_path::AccessPath, account_address::AccountAddress, account_state::AccountState,
-    contract_event::ContractEvent,
-};
+use aptos_types::{access_path::AccessPath, contract_event::ContractEvent};
 use move_core_types::{language_storage::StructTag, resolver::ModuleResolver};
 use move_resource_viewer::MoveValueAnnotator;
 pub use move_resource_viewer::{AnnotatedMoveStruct, AnnotatedMoveValue};
@@ -43,22 +40,6 @@ impl<'a, T: ModuleResolver> AptosValueAnnotator<'a, T> {
 
     pub fn view_contract_event(&self, event: &ContractEvent) -> Result<AnnotatedMoveValue> {
         self.0.view_value(event.type_tag(), event.event_data())
-    }
-
-    pub fn view_account_state(&self, state: &AccountState) -> Result<AnnotatedAccountStateBlob> {
-        let mut output = BTreeMap::new();
-        for (k, v) in state.iter() {
-            let tag = match AccessPath::new(AccountAddress::random(), k.to_vec()).get_struct_tag() {
-                Some(t) => t,
-                None => {
-                    println!("Uncached AccessPath: {:?}", k);
-                    continue;
-                },
-            };
-            let value = self.view_resource(&tag, v)?;
-            output.insert(tag, value);
-        }
-        Ok(AnnotatedAccountStateBlob(output))
     }
 }
 

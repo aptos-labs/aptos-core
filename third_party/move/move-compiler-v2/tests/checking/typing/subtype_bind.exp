@@ -5,22 +5,22 @@ module 0x8675309::M {
     }
     private fun t0() {
         {
-          let x: &u64 = Freeze(Borrow(Mutable)(0));
+          let x: &u64 = Freeze(false)(Borrow(Mutable)(0));
           x;
           Tuple()
         }
     }
     private fun t1() {
         {
-          let (x: &mut u64, y: &u64): (&mut u64, &u64) = Tuple(Borrow(Mutable)(0), Freeze(Borrow(Mutable)(0)));
+          let (x: &mut u64, y: &u64): (&mut u64, &u64) = Tuple(Borrow(Mutable)(0), Freeze(false)(Borrow(Mutable)(0)));
           x;
           y;
           {
-            let (x: &u64, y: &mut u64): (&u64, &mut u64) = Tuple(Freeze(Borrow(Mutable)(0)), Borrow(Mutable)(0));
+            let (x: &u64, y: &mut u64): (&u64, &mut u64) = Tuple(Freeze(false)(Borrow(Mutable)(0)), Borrow(Mutable)(0));
             x;
             y;
             {
-              let (x: &u64, y: &u64): (&u64, &u64) = Tuple(Freeze(Borrow(Mutable)(0)), Freeze(Borrow(Mutable)(0)));
+              let (x: &u64, y: &u64): (&u64, &u64) = Tuple(Freeze(false)(Borrow(Mutable)(0)), Freeze(false)(Borrow(Mutable)(0)));
               x;
               y;
               Tuple()

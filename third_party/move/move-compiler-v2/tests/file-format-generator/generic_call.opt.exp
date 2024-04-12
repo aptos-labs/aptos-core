@@ -6,7 +6,7 @@ module 42.Test {
 
 foo(Arg0: u64): u64 /* def_idx: 0 */ {
 B0:
-	0: CopyLoc[0](Arg0: u64)
+	0: MoveLoc[0](Arg0: u64)
 	1: Call identity<u64>(u64): u64
 	2: Ret
 }
@@ -16,3 +16,4 @@ B0:
 	1: Ret
 }
 }
+============ bytecode verification succeeded ========

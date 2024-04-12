@@ -7,6 +7,15 @@ fun m::test(): u64 {
   1: return $t0
 }
 
+============ after DeadStoreElimination: ================
+
+[variant baseline]
+fun m::test(): u64 {
+     var $t0: u64
+  0: $t0 := 6
+  1: return $t0
+}
+
 ============ after VariableCoalescingAnnotator: ================
 
 [variant baseline]
@@ -29,6 +38,15 @@ fun m::test(): u64 {
   1: return $t0
 }
 
+============ after DeadStoreElimination: ================
+
+[variant baseline]
+fun m::test(): u64 {
+     var $t0: u64
+  0: $t0 := 6
+  1: return $t0
+}
+
 
 ============ disassembled file-format ==================
 // Move bytecode v7
@@ -41,3 +59,4 @@ B0:
 	1: Ret
 }
 }
+============ bytecode verification succeeded ========

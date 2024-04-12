@@ -130,3 +130,6 @@ module 0xcafe::vectors {
         Tuple()
     }
 } // end 0xcafe::vectors
+
+
+============ bytecode verification succeeded ========

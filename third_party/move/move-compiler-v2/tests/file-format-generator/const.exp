@@ -73,51 +73,40 @@ module 42.constant {
 
 
 test_constans() /* def_idx: 0 */ {
-L0:	loc0: bool
-L1:	loc1: bool
-L2:	loc2: u8
-L3:	loc3: u16
-L4:	loc4: u32
-L5:	loc5: u64
-L6:	loc6: u128
-L7:	loc7: u256
-L8:	loc8: address
-L9:	loc9: vector<u64>
-L10:	loc10: vector<u8>
 B0:
 	0: LdTrue
 	1: Call u<bool>(bool): bool
-	2: StLoc[0](loc0: bool)
-	3: LdFalse
-	4: Call u<bool>(bool): bool
-	5: StLoc[1](loc1: bool)
-	6: LdU8(1)
-	7: Call u<u8>(u8): u8
-	8: StLoc[2](loc2: u8)
-	9: LdU16(7086)
-	10: Call u<u16>(u16): u16
-	11: StLoc[3](loc3: u16)
-	12: LdU32(14593408)
-	13: Call u<u32>(u32): u32
-	14: StLoc[4](loc4: u32)
-	15: LdU64(51966)
-	16: Call u<u64>(u64): u64
-	17: StLoc[5](loc5: u64)
-	18: LdU128(3735928559)
-	19: Call u<u128>(u128): u128
-	20: StLoc[6](loc6: u128)
-	21: LdU256(301490978409967)
-	22: Call u<u256>(u256): u256
-	23: StLoc[7](loc7: u256)
-	24: LdConst[0](Address: [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 66])
-	25: Call u<address>(address): address
-	26: StLoc[8](loc8: address)
-	27: LdConst[1](Vector(U64): [3, 1, 0, 0, 0, 0, 0, 0, 0, 2, 0, 0, 0, 0, 0, 0, 0, 3, 0, 0, 0, 0, 0, 0, 0])
-	28: Call u<vector<u64>>(vector<u64>): vector<u64>
-	29: StLoc[9](loc9: vector<u64>)
-	30: LdConst[2](Vector(U8): [7, 72, 101, 108, 108, 111, 33, 10])
-	31: Call u<vector<u8>>(vector<u8>): vector<u8>
-	32: StLoc[10](loc10: vector<u8>)
+	2: LdFalse
+	3: Call u<bool>(bool): bool
+	4: LdU8(1)
+	5: Call u<u8>(u8): u8
+	6: LdU16(7086)
+	7: Call u<u16>(u16): u16
+	8: LdU32(14593408)
+	9: Call u<u32>(u32): u32
+	10: LdU64(51966)
+	11: Call u<u64>(u64): u64
+	12: LdU128(3735928559)
+	13: Call u<u128>(u128): u128
+	14: LdU256(301490978409967)
+	15: Call u<u256>(u256): u256
+	16: LdConst[0](Address: [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 66])
+	17: Call u<address>(address): address
+	18: LdConst[1](Vector(U64): [3, 1, 0, 0, 0, 0, 0, 0, 0, 2, 0, 0, 0, 0, 0, 0, 0, 3, 0, 0, 0, 0, 0, 0, 0])
+	19: Call u<vector<u64>>(vector<u64>): vector<u64>
+	20: LdConst[2](Vector(U8): [7, 72, 101, 108, 108, 111, 33, 10])
+	21: Call u<vector<u8>>(vector<u8>): vector<u8>
+	22: Pop
+	23: Pop
+	24: Pop
+	25: Pop
+	26: Pop
+	27: Pop
+	28: Pop
+	29: Pop
+	30: Pop
+	31: Pop
+	32: Pop
 	33: Ret
 }
 u<Ty0>(Arg0: Ty0): Ty0 /* def_idx: 1 */ {
@@ -129,3 +118,4 @@ B0:
 	3: Ret
 }
 }
+============ bytecode verification succeeded ========

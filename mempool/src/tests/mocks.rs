@@ -43,6 +43,7 @@ use std::{
     sync::Arc,
 };
 use tokio::runtime::Handle;
+use aptos_time_service::TimeService;
 
 /// Mock of a running instance of shared mempool.
 pub struct MockSharedMempool {
@@ -122,11 +123,13 @@ impl MockSharedMempool {
         // let (connection_reqs_tx, _) = aptos_channel::new(QueueStyle::FIFO, 8, None);
         // let (_network_notifs_tx, network_notifs_rx) = aptos_channel::new(QueueStyle::FIFO, 8, None);
         // let (_, conn_notifs_rx) = conn_notifs_channel::new();
+        let time_service = TimeService::mock();
         let peer_senders = Arc::new(OutboundPeerConnections::new());
         let network_sender = NetworkSender::new(
             NetworkId::Validator,
             peer_senders.clone(),
             RoleType::Validator,
+            time_service,
             // PeerManagerRequestSender::new(network_reqs_tx),
             // ConnectionRequestSender::new(connection_reqs_tx),
         );

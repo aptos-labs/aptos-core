@@ -15,6 +15,23 @@ fun m::test($t0: bool, $t1: u64): u64 {
   8: return $t2
 }
 
+============ after DeadStoreElimination: ================
+
+[variant baseline]
+fun m::test($t0: bool, $t1: u64): u64 {
+     var $t2: u64
+     var $t3: u64
+  0: if ($t0) goto 1 else goto 4
+  1: label L0
+  2: $t3 := move($t1)
+  3: goto 6
+  4: label L1
+  5: $t3 := move($t1)
+  6: label L2
+  7: $t2 := move($t3)
+  8: return $t2
+}
+
 ============ after VariableCoalescingAnnotator: ================
 
 [variant baseline]
@@ -63,6 +80,22 @@ fun m::test($t0: bool, $t1: u64): u64 {
   8: return $t3
 }
 
+============ after DeadStoreElimination: ================
+
+[variant baseline]
+fun m::test($t0: bool, $t1: u64): u64 {
+     var $t2: u64 [unused]
+     var $t3: u64
+  0: if ($t0) goto 1 else goto 4
+  1: label L0
+  2: $t3 := move($t1)
+  3: goto 6
+  4: label L1
+  5: $t3 := move($t1)
+  6: label L2
+  7: return $t3
+}
+
 
 ============ disassembled file-format ==================
 // Move bytecode v7
@@ -86,3 +119,4 @@ B3:
 	8: Ret
 }
 }
+============ bytecode verification succeeded ========

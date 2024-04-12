@@ -1,7 +1,8 @@
 // Copyright © Aptos Foundation
+// SPDX-License-Identifier: Apache-2.0
 
+use self::real_dkg::RealDKG;
 use crate::{
-    dkg::real_dkg::RealDKG,
     on_chain_config::{OnChainConfig, OnChainRandomnessConfig, RandomnessConfigMoveStruct},
     validator_verifier::{ValidatorConsensusInfo, ValidatorConsensusInfoMoveStruct},
 };
@@ -177,12 +178,14 @@ pub trait DKGTrait: Debug {
         accumulator: &mut Self::Transcript,
         element: Self::Transcript,
     );
+
     fn decrypt_secret_share_from_transcript(
         pub_params: &Self::PublicParams,
         trx: &Self::Transcript,
         player_idx: u64,
         dk: &Self::NewValidatorDecryptKey,
     ) -> Result<(Self::DealtSecretShare, Self::DealtPubKeyShare)>;
+
     fn reconstruct_secret_from_shares(
         pub_params: &Self::PublicParams,
         player_share_pairs: Vec<(u64, Self::DealtSecretShare)>,

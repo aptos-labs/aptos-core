@@ -67,6 +67,8 @@ pub enum FeatureFlag {
     MAX_OBJECT_NESTING_CHECK = 53,
     KEYLESS_ACCOUNTS_WITH_PASSKEYS = 54,
     MULTISIG_V2_ENHANCEMENT = 55,
+    DELEGATION_POOL_ALLOWLISTING = 56,
+    MODULE_EVENT_MIGRATION = 57,
 }
 
 impl FeatureFlag {
@@ -120,6 +122,8 @@ impl FeatureFlag {
             FeatureFlag::MAX_OBJECT_NESTING_CHECK,
             FeatureFlag::KEYLESS_ACCOUNTS_WITH_PASSKEYS,
             FeatureFlag::MULTISIG_V2_ENHANCEMENT,
+            FeatureFlag::DELEGATION_POOL_ALLOWLISTING,
+            FeatureFlag::MODULE_EVENT_MIGRATION,
         ]
     }
 }

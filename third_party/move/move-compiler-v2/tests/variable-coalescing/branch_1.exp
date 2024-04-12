@@ -138,9 +138,10 @@ B1:
 B2:
 	5: LdU64(1)
 	6: StLoc[2](loc0: u64)
-	7: CopyLoc[1](Arg1: u64)
+	7: MoveLoc[1](Arg1: u64)
 	8: MoveLoc[2](loc0: u64)
 	9: Add
 	10: Ret
 }
 }
+============ bytecode verification succeeded ========

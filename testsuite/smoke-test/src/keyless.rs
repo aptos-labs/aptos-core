@@ -1,4 +1,5 @@
 // Copyright © Aptos Foundation
+// SPDX-License-Identifier: Apache-2.0
 
 use crate::smoke_test_environment::SwarmBuilder;
 use aptos::test::CliTestFramework;
@@ -54,6 +55,31 @@ async fn test_keyless_oidc_txn_verifies() {
     if let Err(e) = result {
         panic!("Error with OpenID TXN verification: {:?}", e)
     }
+}
+
+#[tokio::test]
+async fn test_keyless_secure_test_jwk_initialized_at_genesis() {
+    let (swarm, _cli, _faucet) = SwarmBuilder::new_local(1)
+        .with_aptos()
+        .build_with_cli(0)
+        .await;
+    let client = swarm.validators().next().unwrap().rest_client();
+    swarm
+        .wait_for_all_nodes_to_catchup_to_epoch(2, Duration::from_secs(60))
+        .await
+        .expect("Epoch 2 taking too long to come!");
+
+    let patched_jwks = get_latest_jwkset(&client).await;
+    debug!("patched_jwks={:?}", patched_jwks);
+    let iss = get_sample_iss();
+    let expected_providers_jwks = AllProvidersJWKs {
+        entries: vec![ProviderJWKs {
+            issuer: iss.into_bytes(),
+            version: 0,
+            jwks: vec![JWKMoveStruct::from(RSA_JWK::secure_test_jwk())],
+        }],
+    };
+    assert_eq!(expected_providers_jwks, patched_jwks.jwks);
 }
 
 #[tokio::test]

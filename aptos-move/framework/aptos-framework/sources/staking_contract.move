@@ -66,7 +66,7 @@ module aptos_framework::staking_contract {
     /// Maximum number of distributions a stake pool can support.
     const MAXIMUM_PENDING_DISTRIBUTIONS: u64 = 20;
 
-    #[resource_group(scope=module_)]
+    #[resource_group(scope = module_)]
     struct StakingGroupContainer {}
 
     struct StakingContract has store {
@@ -109,9 +109,92 @@ module aptos_framework::staking_contract {
         new_commission_percentage: u64,
     }
 
+    #[event]
+    struct UpdateCommission has drop, store {
+        staker: address,
+        operator: address,
+        old_commission_percentage: u64,
+        new_commission_percentage: u64,
+    }
+
     #[resource_group_member(group = aptos_framework::staking_contract::StakingGroupContainer)]
     struct StakingGroupUpdateCommissionEvent has key {
         update_commission_events: EventHandle<UpdateCommissionEvent>,
+    }
+
+    #[event]
+    struct CreateStakingContract has drop, store {
+        operator: address,
+        voter: address,
+        pool_address: address,
+        principal: u64,
+        commission_percentage: u64,
+    }
+
+    #[event]
+    struct UpdateVoter has drop, store {
+        operator: address,
+        pool_address: address,
+        old_voter: address,
+        new_voter: address,
+    }
+
+    #[event]
+    struct ResetLockup has drop, store {
+        operator: address,
+        pool_address: address,
+    }
+
+    #[event]
+    struct AddStake has drop, store {
+        operator: address,
+        pool_address: address,
+        amount: u64
+    }
+
+    #[event]
+    struct RequestCommission has drop, store {
+        operator: address,
+        pool_address: address,
+        accumulated_rewards: u64,
+        commission_amount: u64,
+    }
+
+    #[event]
+    struct UnlockStake has drop, store {
+        operator: address,
+        pool_address: address,
+        amount: u64,
+        commission_paid: u64,
+    }
+
+    #[event]
+    struct SwitchOperator has drop, store {
+        old_operator: address,
+        new_operator: address,
+        pool_address: address,
+    }
+
+    #[event]
+    struct AddDistribution has drop, store {
+        operator: address,
+        pool_address: address,
+        amount: u64,
+    }
+
+    #[event]
+    struct Distribute has drop, store {
+        operator: address,
+        pool_address: address,
+        recipient: address,
+        amount: u64,
+    }
+
+    #[event]
+    struct SetBeneficiaryForOperator has drop, store {
+        operator: address,
+        old_beneficiary: address,
+        new_beneficiary: address,
     }
 
     struct CreateStakingContractEvent has drop, store {
@@ -171,13 +254,6 @@ module aptos_framework::staking_contract {
         pool_address: address,
         recipient: address,
         amount: u64,
-    }
-
-    #[event]
-    struct SetBeneficiaryForOperator has drop, store {
-        operator: address,
-        old_beneficiary: address,
-        new_beneficiary: address,
     }
 
     #[view]
@@ -340,6 +416,9 @@ module aptos_framework::staking_contract {
             signer_cap: stake_pool_signer_cap,
         });
 
+        if (std::features::module_event_migration_enabled()) {
+            emit(CreateStakingContract { operator, voter, pool_address, principal, commission_percentage });
+        };
         emit_event(
             &mut store.create_staking_contract_events,
             CreateStakingContractEvent { operator, voter, pool_address, principal, commission_percentage },
@@ -361,6 +440,9 @@ module aptos_framework::staking_contract {
 
         staking_contract.principal = staking_contract.principal + amount;
         let pool_address = staking_contract.pool_address;
+        if (std::features::module_event_migration_enabled()) {
+            emit(AddStake { operator, pool_address, amount });
+        };
         emit_event(
             &mut store.add_stake_events,
             AddStakeEvent { operator, pool_address, amount },
@@ -378,10 +460,14 @@ module aptos_framework::staking_contract {
         let old_voter = stake::get_delegated_voter(pool_address);
         stake::set_delegated_voter_with_cap(&staking_contract.owner_cap, new_voter);
 
+        if (std::features::module_event_migration_enabled()) {
+            emit(UpdateVoter { operator, pool_address, old_voter, new_voter });
+        };
         emit_event(
             &mut store.update_voter_events,
             UpdateVoterEvent { operator, pool_address, old_voter, new_voter },
         );
+
     }
 
     /// Convenient function to allow the staker to reset their stake pool's lockup period to start now.
@@ -394,12 +480,19 @@ module aptos_framework::staking_contract {
         let pool_address = staking_contract.pool_address;
         stake::increase_lockup_with_cap(&staking_contract.owner_cap);
 
+        if (std::features::module_event_migration_enabled()) {
+            emit(ResetLockup { operator, pool_address });
+        };
         emit_event(&mut store.reset_lockup_events, ResetLockupEvent { operator, pool_address });
     }
 
     /// Convenience function to allow a staker to update the commission percentage paid to the operator.
     /// TODO: fix the typo in function name. commision -> commission
-    public entry fun update_commision(staker: &signer, operator: address, new_commission_percentage: u64) acquires Store, StakingGroupUpdateCommissionEvent, BeneficiaryForOperator {
+    public entry fun update_commision(
+        staker: &signer,
+        operator: address,
+        new_commission_percentage: u64
+    ) acquires Store, BeneficiaryForOperator, StakingGroupUpdateCommissionEvent {
         assert!(
             new_commission_percentage >= 0 && new_commission_percentage <= 100,
             error::invalid_argument(EINVALID_COMMISSION_PERCENTAGE),
@@ -420,7 +513,19 @@ module aptos_framework::staking_contract {
         let old_commission_percentage = staking_contract.commission_percentage;
         staking_contract.commission_percentage = new_commission_percentage;
         if (!exists<StakingGroupUpdateCommissionEvent>(staker_address)) {
-            move_to(staker, StakingGroupUpdateCommissionEvent { update_commission_events: account::new_event_handle<UpdateCommissionEvent>(staker)})
+            move_to(
+                staker,
+                StakingGroupUpdateCommissionEvent {
+                    update_commission_events: account::new_event_handle<UpdateCommissionEvent>(
+                        staker
+                    )
+                }
+            )
+        };
+        if (std::features::module_event_migration_enabled()) {
+            emit(
+                UpdateCommission { staker: staker_address, operator, old_commission_percentage, new_commission_percentage }
+            );
         };
         emit_event(
             &mut borrow_global_mut<StakingGroupUpdateCommissionEvent>(staker_address).update_commission_events,
@@ -432,7 +537,11 @@ module aptos_framework::staking_contract {
     /// at the end of the stake pool's lockup period before they can actually can withdraw_commission.
     ///
     /// Only staker, operator or beneficiary can call this.
-    public entry fun request_commission(account: &signer, staker: address, operator: address) acquires Store, BeneficiaryForOperator {
+    public entry fun request_commission(
+        account: &signer,
+        staker: address,
+        operator: address
+    ) acquires Store, BeneficiaryForOperator {
         let account_addr = signer::address_of(account);
         assert!(
             account_addr == staker || account_addr == operator || account_addr == beneficiary_for_operator(operator),
@@ -482,6 +591,9 @@ module aptos_framework::staking_contract {
         stake::unlock_with_cap(commission_amount, &staking_contract.owner_cap);
 
         let pool_address = staking_contract.pool_address;
+        if (std::features::module_event_migration_enabled()) {
+            emit(RequestCommission { operator, pool_address, accumulated_rewards, commission_amount });
+        };
         emit_event(
             request_commission_events,
             RequestCommissionEvent { operator, pool_address, accumulated_rewards, commission_amount },
@@ -492,7 +604,11 @@ module aptos_framework::staking_contract {
 
     /// Staker can call this to request withdrawal of part or all of their staking_contract.
     /// This also triggers paying commission to the operator for accounting simplicity.
-    public entry fun unlock_stake(staker: &signer, operator: address, amount: u64) acquires Store, BeneficiaryForOperator {
+    public entry fun unlock_stake(
+        staker: &signer,
+        operator: address,
+        amount: u64
+    ) acquires Store, BeneficiaryForOperator {
         // Short-circuit if amount is 0.
         if (amount == 0) return;
 
@@ -523,14 +639,16 @@ module aptos_framework::staking_contract {
         staking_contract.principal = staking_contract.principal - amount;
 
         // Record a distribution for the staker.
-        add_distribution(
-            operator, staking_contract, staker_address, amount, &mut store.add_distribution_events);
+        add_distribution(operator, staking_contract, staker_address, amount, &mut store.add_distribution_events);
 
         // Request to unlock the distribution amount from the stake pool.
         // This won't become fully unlocked until the stake pool's lockup expires.
         stake::unlock_with_cap(amount, &staking_contract.owner_cap);
 
         let pool_address = staking_contract.pool_address;
+        if (std::features::module_event_migration_enabled()) {
+            emit(UnlockStake { pool_address, operator, amount, commission_paid });
+        };
         emit_event(
             &mut store.unlock_stake_events,
             UnlockStakeEvent { pool_address, operator, amount, commission_paid },
@@ -598,6 +716,9 @@ module aptos_framework::staking_contract {
 
         let pool_address = staking_contract.pool_address;
         simple_map::add(staking_contracts, new_operator, staking_contract);
+        if (std::features::module_event_migration_enabled()) {
+            emit(SwitchOperator { pool_address, old_operator, new_operator });
+        };
         emit_event(
             &mut store.switch_operator_events,
             SwitchOperatorEvent { pool_address, old_operator, new_operator }
@@ -607,7 +728,10 @@ module aptos_framework::staking_contract {
     /// Allows an operator to change its beneficiary. Any existing unpaid commission rewards will be paid to the new
     /// beneficiary. To ensures payment to the current beneficiary, one should first call `distribute` before switching
     /// the beneficiary. An operator can set one beneficiary for staking contract pools, not a separate one for each pool.
-    public entry fun set_beneficiary_for_operator(operator: &signer, new_beneficiary: address) acquires BeneficiaryForOperator {
+    public entry fun set_beneficiary_for_operator(
+        operator: &signer,
+        new_beneficiary: address
+    ) acquires BeneficiaryForOperator {
         assert!(features::operator_beneficiary_change_enabled(), std::error::invalid_state(
             EOPERATOR_BENEFICIARY_CHANGE_NOT_SUPPORTED
         ));
@@ -670,6 +794,9 @@ module aptos_framework::staking_contract {
             };
             aptos_account::deposit_coins(recipient, coin::extract(&mut coins, amount_to_distribute));
 
+            if (std::features::module_event_migration_enabled()) {
+                emit(Distribute { operator, pool_address, recipient, amount: amount_to_distribute });
+            };
             emit_event(
                 distribute_events,
                 DistributeEvent { operator, pool_address, recipient, amount: amount_to_distribute }
@@ -701,7 +828,7 @@ module aptos_framework::staking_contract {
         staking_contract: &mut StakingContract,
         recipient: address,
         coins_amount: u64,
-        add_distribution_events: &mut EventHandle<AddDistributionEvent>,
+        add_distribution_events: &mut EventHandle<AddDistributionEvent>
     ) {
         let distribution_pool = &mut staking_contract.distribution_pool;
         let (_, _, _, total_distribution_amount) = stake::get_stake(staking_contract.pool_address);
@@ -710,6 +837,9 @@ module aptos_framework::staking_contract {
 
         pool_u64::buy_in(distribution_pool, recipient, coins_amount);
         let pool_address = staking_contract.pool_address;
+        if (std::features::module_event_migration_enabled()) {
+            emit(AddDistribution { operator, pool_address, amount: coins_amount });
+        };
         emit_event(
             add_distribution_events,
             AddDistributionEvent { operator, pool_address, amount: coins_amount }
@@ -840,7 +970,16 @@ module aptos_framework::staking_contract {
     #[test_only]
     public fun setup(aptos_framework: &signer, staker: &signer, operator: &signer, initial_balance: u64) {
         // Reward rate of 0.1% per epoch.
-        stake::initialize_for_test_custom(aptos_framework, INITIAL_BALANCE, MAXIMUM_STAKE, 3600, true, 10, 10000, 1000000);
+        stake::initialize_for_test_custom(
+            aptos_framework,
+            INITIAL_BALANCE,
+            MAXIMUM_STAKE,
+            3600,
+            true,
+            10,
+            10000,
+            1000000
+        );
 
         let staker_address = signer::address_of(staker);
         if (!account::exists_at(staker_address)) {
@@ -871,7 +1010,11 @@ module aptos_framework::staking_contract {
     }
 
     #[test(aptos_framework = @0x1, staker = @0x123, operator = @0x234)]
-    public entry fun test_end_to_end(aptos_framework: &signer, staker: &signer, operator: &signer) acquires Store, BeneficiaryForOperator {
+    public entry fun test_end_to_end(
+        aptos_framework: &signer,
+        staker: &signer,
+        operator: &signer
+    ) acquires Store, BeneficiaryForOperator {
         setup_staking_contract(aptos_framework, staker, operator, INITIAL_BALANCE, 10);
         let staker_address = signer::address_of(staker);
         let operator_address = signer::address_of(operator);
@@ -1405,8 +1548,13 @@ module aptos_framework::staking_contract {
         assert_distribution(staker_address, operator_address, staker_address, withdrawn_stake);
         assert!(last_recorded_principal(staker_address, operator_address) == new_balance, 0);
     }
+
     #[test(aptos_framework = @0x1, staker = @0x123, operator = @0x234)]
-    public entry fun test_update_commission(aptos_framework: &signer, staker: &signer, operator: &signer) acquires Store, StakingGroupUpdateCommissionEvent, BeneficiaryForOperator {
+    public entry fun test_update_commission(
+        aptos_framework: &signer,
+        staker: &signer,
+        operator: &signer
+    ) acquires Store, BeneficiaryForOperator, StakingGroupUpdateCommissionEvent {
         let initial_balance = INITIAL_BALANCE * 2;
         setup_staking_contract(aptos_framework, staker, operator, initial_balance, 10);
         let staker_address = signer::address_of(staker);
@@ -1430,7 +1578,10 @@ module aptos_framework::staking_contract {
         stake::assert_stake_pool(pool_address, balance_2epoch, 0, 0, with_rewards(unpaid_commission));
     }
 
-    #[test(staker = @0xe256f4f4e2986cada739e339895cf5585082ff247464cab8ec56eea726bd2263, operator= @0x9f0a211d218b082987408f1e393afe1ba0c202c6d280f081399788d3360c7f09)]
+    #[test(
+        staker = @0xe256f4f4e2986cada739e339895cf5585082ff247464cab8ec56eea726bd2263,
+        operator = @0x9f0a211d218b082987408f1e393afe1ba0c202c6d280f081399788d3360c7f09
+    )]
     public entry fun test_get_expected_stake_pool_address(staker: address, operator: address) {
         let pool_address = get_expected_stake_pool_address(staker, operator, vector[0x42, 0x42]);
         assert!(pool_address == @0x9d9648031ada367c26f7878eb0b0406ae6a969b1a43090269e5cdfabe1b48f0f, 0);
@@ -1441,7 +1592,10 @@ module aptos_framework::staking_contract {
         staker: address, operator: address, principal: u64, commission_percentage: u64) acquires Store {
         let staking_contract = simple_map::borrow(&borrow_global<Store>(staker).staking_contracts, &operator);
         assert!(staking_contract.principal == principal, staking_contract.principal);
-        assert!(staking_contract.commission_percentage == commission_percentage, staking_contract.commission_percentage);
+        assert!(
+            staking_contract.commission_percentage == commission_percentage,
+            staking_contract.commission_percentage
+        );
     }
 
     #[test_only]

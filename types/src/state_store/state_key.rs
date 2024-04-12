@@ -11,6 +11,7 @@ use aptos_crypto::{
 };
 use aptos_crypto_derive::CryptoHasher;
 use derivative::Derivative;
+use move_core_types::{account_address::AccountAddress, language_storage::StructTag};
 use num_derive::{FromPrimitive, ToPrimitive};
 use num_traits::FromPrimitive;
 use once_cell::sync::OnceCell;
@@ -135,6 +136,10 @@ impl StateKey {
         Self::new(StateKeyInner::AccessPath(access_path))
     }
 
+    pub fn resource(address: AccountAddress, struct_tag: StructTag) -> Self {
+        Self::access_path(AccessPath::resource_access_path(address, struct_tag).unwrap())
+    }
+
     pub fn table_item(handle: TableHandle, key: Vec<u8>) -> Self {
         Self::new(StateKeyInner::TableItem { handle, key })
     }
@@ -156,7 +161,6 @@ impl StateKey {
     }
 
     pub fn is_aptos_code(&self) -> bool {
-        use move_core_types::account_address::AccountAddress;
         match self.inner() {
             StateKeyInner::AccessPath(access_path) => {
                 access_path.is_code()
