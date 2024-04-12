@@ -251,18 +251,18 @@ fn test_get_values_by_key_prefix() {
     let key5 = StateKey::resource_typed::<CoinStoreResource>(&address1);
     let value5_v2 = StateValue::from(String::from("value5_v2").into_bytes());
 
-    let account1_key_prefx = StateKeyPrefix::new(StateKeyTag::AccessPath, address1.to_vec());
+    let account1_key_prefix = StateKeyPrefix::new(StateKeyTag::AccessPath, address1.to_vec());
 
     put_value_set(store, vec![(key5.clone(), value5_v2.clone())], 2, Some(1));
 
     // address1 did not exist in version 0 and 1.
-    let key_value_map = traverse_values(store, &account1_key_prefx, 0);
+    let key_value_map = traverse_values(store, &account1_key_prefix, 0);
     assert_eq!(key_value_map.len(), 0);
 
-    let key_value_map = traverse_values(store, &account1_key_prefx, 1);
+    let key_value_map = traverse_values(store, &account1_key_prefix, 1);
     assert_eq!(key_value_map.len(), 0);
 
-    let key_value_map = traverse_values(store, &account1_key_prefx, 2);
+    let key_value_map = traverse_values(store, &account1_key_prefix, 2);
     assert_eq!(key_value_map.len(), 1);
     assert_eq!(*key_value_map.get(&key5).unwrap(), value5_v2);
 }

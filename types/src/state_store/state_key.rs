@@ -206,8 +206,30 @@ impl Entry {
 
 impl Drop for Entry {
     fn drop(&mut self) {
-        // FIXME(aldehu): implement: remove entry in the registry
-        todo!()
+        use access_path::Path;
+        // FIXME(aldenhu): implement: remove entry in the registry
+        // todo!()
+        match &self.deserialized {
+            StateKeyInner::AccessPath(AccessPath { address, path }) => {
+                // FIXME(aldenhu): maybe hold reference to the map(s)?
+                // FIXME(aldenhu): maybe let Inner carry the deserialized Path?
+                match &bcs::from_bytes::<Path>(path).expect("Failed to deserialize Path.") {
+                    Path::Code(module_id) => GLOBAL_REGISTRY
+                        .module_keys
+                        .lock_and_remove(&module_id.address, &module_id.name),
+                    Path::Resource(struct_tag) => GLOBAL_REGISTRY
+                        .resource_keys
+                        .lock_and_remove(address, struct_tag),
+                    Path::ResourceGroup(struct_tag) => GLOBAL_REGISTRY
+                        .resource_group_keys
+                        .lock_and_remove(address, struct_tag),
+                }
+            },
+            StateKeyInner::TableItem { handle, key } => {
+                GLOBAL_REGISTRY.table_item_keys.lock_and_remove(handle, key)
+            },
+            StateKeyInner::Raw(bytes) => GLOBAL_REGISTRY.raw_keys.lock_and_remove(bytes, &()),
+        }
     }
 }
 
@@ -249,7 +271,9 @@ where
         Q1: Eq + Hash + ToOwned<Owned = Key1> + ?Sized,
         Q2: Eq + Hash + ToOwned<Owned = Key2> + ?Sized,
     {
-        loop {
+        const MAX_TRIES: usize = 100;
+
+        for _ in 0..MAX_TRIES {
             match self
                 .inner
                 .write()
@@ -262,6 +286,7 @@ where
                         // some other thread has added it
                         return key_info;
                     } else {
+                        // FIXME(aldenhu): make sure drop is implemented properly
                         // the key is being dropped, release lock and retry
                         continue;
                     }
@@ -273,6 +298,16 @@ where
                 },
             }
         }
+        unreachable!("Looks like deadlock");
+    }
+
+    fn lock_and_remove(&self, key1: &Key1, key2: &Key2) {
+        // FIXME(aldenhu): remove empty first level entries
+        self.inner
+            .write()
+            .entry(key1.to_owned())
+            .or_default()
+            .remove(key2);
     }
 }
 
@@ -362,23 +397,13 @@ impl StateKey {
         match deserialized {
             StateKeyInner::AccessPath(AccessPath { address, path }) => {
                 match bcs::from_bytes::<Path>(&path).expect("Failed to parse AccessPath") {
-                    Path::Code(_module_id) => {
-                        todo!()
-                    },
-                    Path::Resource(_struct_tag) => {
-                        todo!()
-                    },
-                    Path::ResourceGroup(_struct_tag) => {
-                        todo!()
-                    },
+                    Path::Code(module_id) => Self::module_id(&module_id),
+                    Path::Resource(struct_tag) => Self::resource(&address, &struct_tag),
+                    Path::ResourceGroup(struct_tag) => Self::resource_group(&address, &struct_tag),
                 }
             },
-            StateKeyInner::TableItem { handle, key } => {
-                todo!()
-            },
-            StateKeyInner::Raw(_bytes) => {
-                todo!()
-            },
+            StateKeyInner::TableItem { handle, key } => Self::table_item(&handle, &key),
+            StateKeyInner::Raw(bytes) => Self::raw(&bytes),
         }
     }
 
@@ -480,11 +505,14 @@ impl StateKey {
     }
 
     pub fn encode(&self) -> Result<Vec<u8>> {
-        todo!()
+        // FIXME(aldenhu): maybe use cache?
+        self.inner().encode()
     }
 
     pub fn decode(_val: &[u8]) -> Result<Self, StateKeyDecodeErr> {
-        todo!()
+        // FIXME(aldenhu): maybe check cache?
+        let inner = StateKeyInner::decode(_val)?;
+        Ok(Self::from_deserialized(inner))
     }
 }
 
@@ -497,22 +525,23 @@ impl CryptoHash for StateKey {
 }
 
 impl Serialize for StateKey {
-    fn serialize<S>(&self, _serializer: S) -> Result<S::Ok, S::Error>
+    fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
     where
         S: Serializer,
     {
         // FIXME(aldenhu): write out cased bytes directly; or provide method to access serialized bytes
-        todo!()
+        self.inner().serialize(serializer)
     }
 }
 
 impl<'de> Deserialize<'de> for StateKey {
-    fn deserialize<D>(_deserializer: D) -> Result<Self, D::Error>
+    fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
     where
         D: Deserializer<'de>,
     {
         // FIXME(aldenhu): check cache
-        todo!()
+        let inner = StateKeyInner::deserialize(deserializer)?;
+        Ok(Self::from_deserialized(inner))
     }
 }
 
