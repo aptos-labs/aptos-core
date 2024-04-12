@@ -89,7 +89,7 @@ module bcs_stream::tests {
     }
 
     #[test]
-    #[expected_failure(abort_code = bcs_stream::bcs_stream::EMALFORMED_DATA)]
+    #[expected_failure(abort_code = 0x010001, location = bcs_stream::bcs_stream)]
     fun test_bool_invalid() {
         let data = x"02";
         let stream = bcs_stream::new(data);
@@ -97,7 +97,7 @@ module bcs_stream::tests {
     }
 
     #[test]
-    #[expected_failure(abort_code = bcs_stream::bcs_stream::EOUT_OF_BYTES)]
+    #[expected_failure(abort_code = 0x020002, location = bcs_stream::bcs_stream)]
     fun test_bool_out_of_bytes() {
         let data = vector::empty();
         let stream = bcs_stream::new(data);
@@ -105,7 +105,7 @@ module bcs_stream::tests {
     }
 
     #[test]
-    #[expected_failure(abort_code = bcs_stream::bcs_stream::EOUT_OF_BYTES)]
+    #[expected_failure(abort_code = 0x020002, location = bcs_stream::bcs_stream)]
     fun test_length_no_bytes() {
         let data = vector::empty();
         let stream = bcs_stream::new(data);
@@ -113,7 +113,7 @@ module bcs_stream::tests {
     }
 
     #[test]
-    #[expected_failure(abort_code = bcs_stream::bcs_stream::EOUT_OF_BYTES)]
+    #[expected_failure(abort_code = 0x020002, location = bcs_stream::bcs_stream)]
     fun test_length_no_ending_group() {
         let data = x"808080808080808080";
         let stream = bcs_stream::new(data);
@@ -205,7 +205,7 @@ module bcs_stream::tests {
     }
 
     #[test]
-    #[expected_failure(abort_code = bcs_stream::bcs_stream::EMALFORMED_DATA)]
+    #[expected_failure(abort_code = 0x010001, location = bcs_stream::bcs_stream)]
     fun test_length_2_pow_64() {
         let data = x"80808080808080808002";
         let stream = bcs_stream::new(data);
@@ -233,7 +233,7 @@ module bcs_stream::tests {
     }
 
     #[test]
-    #[expected_failure(abort_code = bcs_stream::bcs_stream::EOUT_OF_BYTES)]
+    #[expected_failure(abort_code = 0x020002, location = bcs_stream::bcs_stream)]
     fun test_vector_not_enough_items() {
         let data = x"FFFFFFFFFFFFFFFFFF01";
         let stream = bcs_stream::new(data);
@@ -261,7 +261,7 @@ module bcs_stream::tests {
     }
 
     #[test]
-    #[expected_failure(abort_code = bcs_stream::bcs_stream::EOUT_OF_BYTES)]
+    #[expected_failure(abort_code = 0x020002, location = bcs_stream::bcs_stream)]
     fun test_u8_out_of_bytes() {
         let data = vector::empty();
         let stream = bcs_stream::new(data);
@@ -288,7 +288,7 @@ module bcs_stream::tests {
     }
 
     #[test]
-    #[expected_failure(abort_code = bcs_stream::bcs_stream::EOUT_OF_BYTES)]
+    #[expected_failure(abort_code = 0x020002, location = bcs_stream::bcs_stream)]
     fun test_u16_out_of_bytes() {
         let data = x"00";
         let stream = bcs_stream::new(data);
@@ -303,7 +303,7 @@ module bcs_stream::tests {
     }
 
     #[test]
-    #[expected_failure(abort_code = bcs_stream::bcs_stream::EOUT_OF_BYTES)]
+    #[expected_failure(abort_code = 0x020002, location = bcs_stream::bcs_stream)]
     fun test_u32_out_of_bytes() {
         let data = x"000000";
         let stream = bcs_stream::new(data);
@@ -318,7 +318,7 @@ module bcs_stream::tests {
     }
 
     #[test]
-    #[expected_failure(abort_code = bcs_stream::bcs_stream::EOUT_OF_BYTES)]
+    #[expected_failure(abort_code = 0x020002, location = bcs_stream::bcs_stream)]
     fun test_u64_out_of_bytes() {
         let data = x"00000000000000";
         let stream = bcs_stream::new(data);
@@ -333,7 +333,7 @@ module bcs_stream::tests {
     }
 
     #[test]
-    #[expected_failure(abort_code = bcs_stream::bcs_stream::EOUT_OF_BYTES)]
+    #[expected_failure(abort_code = 0x020002, location = bcs_stream::bcs_stream)]
     fun test_u128_out_of_bytes() {
         let data = x"000000000000000000000000000000";
         let stream = bcs_stream::new(data);
@@ -348,7 +348,7 @@ module bcs_stream::tests {
     }
 
     #[test]
-    #[expected_failure(abort_code = bcs_stream::bcs_stream::EOUT_OF_BYTES)]
+    #[expected_failure(abort_code = 0x020002, location = bcs_stream::bcs_stream)]
     fun test_u256_out_of_bytes() {
         let data = x"00000000000000000000000000000000000000000000000000000000000000";
         let stream = bcs_stream::new(data);
@@ -363,7 +363,7 @@ module bcs_stream::tests {
     }
 
     #[test]
-    #[expected_failure(abort_code = bcs_stream::bcs_stream::EOUT_OF_BYTES)]
+    #[expected_failure(abort_code = 0x020002, location = bcs_stream::bcs_stream)]
     fun test_address_too_short() {
         let data = x"0123456789ABCDEF0123456789ABCDEF0123456789ABCDEF0123456789ABCD";
         let stream = bcs_stream::new(data);
