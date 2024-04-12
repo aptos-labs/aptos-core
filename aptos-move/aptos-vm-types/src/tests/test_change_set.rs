@@ -18,7 +18,6 @@ use aptos_aggregator::{
     delta_change_set::DeltaWithMax,
 };
 use aptos_types::{
-    access_path::AccessPath,
     delayed_fields::{PanicError, SnapshotToStringFormula},
     state_store::{state_key::StateKey, state_value::StateValueMetadata},
     transaction::ChangeSet as StorageChangeSet,
@@ -376,10 +375,8 @@ fn test_roundtrip_to_storage_change_set() {
     };
     let test_module_id = ModuleId::new(AccountAddress::ONE, ident_str!("bar").into());
 
-    let resource_key = StateKey::access_path(
-        AccessPath::resource_access_path(AccountAddress::ONE, test_struct_tag).unwrap(),
-    );
-    let module_key = StateKey::access_path(AccessPath::code_access_path(test_module_id));
+    let resource_key = StateKey::resource(&AccountAddress::ONE, &test_struct_tag);
+    let module_key = StateKey::module_id(&test_module_id);
     let write_set = WriteSetMut::new(vec![
         (resource_key, WriteOp::legacy_deletion()),
         (module_key, WriteOp::legacy_deletion()),

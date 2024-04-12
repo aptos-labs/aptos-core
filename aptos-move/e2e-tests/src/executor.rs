@@ -27,7 +27,6 @@ use aptos_gas_schedule::{
 use aptos_keygen::KeyGen;
 use aptos_memory_usage_tracker::MemoryTrackedGasMeter;
 use aptos_types::{
-    access_path::AccessPath,
     account_config::{
         new_block_event_key, AccountResource, CoinInfoResource, CoinStoreResource, NewBlockEvent,
         CORE_CODE_ADDRESS,
@@ -390,12 +389,12 @@ impl FakeExecutor {
     }
 
     pub fn read_resource<T: MoveResource>(&self, addr: &AccountAddress) -> Option<T> {
-        let ap =
-            AccessPath::resource_access_path(*addr, T::struct_tag()).expect("access path in test");
-        let data_blob =
-            TStateView::get_state_value_bytes(&self.data_store, &StateKey::access_path(ap))
-                .expect("account must exist in data store")
-                .unwrap_or_else(|| panic!("Can't fetch {} resource for {}", T::STRUCT_NAME, addr));
+        let data_blob = TStateView::get_state_value_bytes(
+            &self.data_store,
+            &StateKey::resource_typed::<T>(addr),
+        )
+        .expect("account must exist in data store")
+        .unwrap_or_else(|| panic!("Can't fetch {} resource for {}", T::STRUCT_NAME, addr));
         bcs::from_bytes(&data_blob).ok()
     }
 

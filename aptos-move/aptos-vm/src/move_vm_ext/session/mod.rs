@@ -3,7 +3,7 @@
 
 use crate::{
     data_cache::get_resource_group_from_metadata,
-    move_vm_ext::{resource_state_key, write_op_converter::WriteOpConverter, AptosMoveResolver},
+    move_vm_ext::{write_op_converter::WriteOpConverter, AptosMoveResolver},
 };
 use aptos_framework::natives::{
     aggregator_natives::{AggregatorChangeSet, AggregatorChangeV1, NativeAggregatorContext},
@@ -11,15 +11,13 @@ use aptos_framework::natives::{
     event::NativeEventContext,
 };
 use aptos_table_natives::{NativeTableContext, TableChangeSet};
-use aptos_types::{
-    access_path::AccessPath, contract_event::ContractEvent, state_store::state_key::StateKey,
-};
+use aptos_types::{contract_event::ContractEvent, state_store::state_key::StateKey};
 use aptos_vm_types::{change_set::VMChangeSet, storage::change_set_configs::ChangeSetConfigs};
 use bytes::Bytes;
 use move_binary_format::errors::{Location, PartialVMError, PartialVMResult, VMResult};
 use move_core_types::{
     effects::{AccountChanges, Changes, Op as MoveStorageOp},
-    language_storage::{ModuleId, StructTag},
+    language_storage::StructTag,
     value::MoveTypeLayout,
     vm_status::StatusCode,
 };
@@ -265,10 +263,7 @@ impl<'r, 'l> SessionExt<'r, 'l> {
                 .map_err(|_| common_error())?;
 
             for (resource_group_tag, resources) in resource_groups {
-                let state_key = StateKey::access_path(AccessPath::resource_group_access_path(
-                    addr,
-                    resource_group_tag,
-                ));
+                let state_key = StateKey::resource_group(&addr, &resource_group_tag);
                 match &mut resource_group_change_set {
                     ResourceGroupChangeSet::V0(v0_changes) => {
                         let source_data = maybe_resource_group_cache
@@ -321,7 +316,7 @@ impl<'r, 'l> SessionExt<'r, 'l> {
         for (addr, account_changeset) in change_set.into_inner() {
             let (modules, resources) = account_changeset.into_inner();
             for (struct_tag, blob_and_layout_op) in resources {
-                let state_key = resource_state_key(addr, struct_tag)?;
+                let state_key = StateKey::resource(&addr, &struct_tag);
                 let op = woc.convert_resource(
                     &state_key,
                     blob_and_layout_op,
@@ -332,7 +327,7 @@ impl<'r, 'l> SessionExt<'r, 'l> {
             }
 
             for (name, blob_op) in modules {
-                let state_key = StateKey::access_path(AccessPath::from(&ModuleId::new(addr, name)));
+                let state_key = StateKey::module(&addr, &name);
                 let op = woc.convert_module(&state_key, blob_op, false)?;
                 module_write_set.insert(state_key, op);
             }

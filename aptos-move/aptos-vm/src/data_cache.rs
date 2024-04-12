@@ -6,8 +6,8 @@
 use crate::{
     gas::get_gas_config_from_storage,
     move_vm_ext::{
-        get_max_binary_format_version, get_max_identifier_size, resource_state_key,
-        AptosMoveResolver, AsExecutorView, AsResourceGroupView, ResourceGroupResolver,
+        get_max_binary_format_version, get_max_identifier_size, AptosMoveResolver, AsExecutorView,
+        AsResourceGroupView, ResourceGroupResolver,
     },
 };
 use aptos_aggregator::{
@@ -17,7 +17,6 @@ use aptos_aggregator::{
 };
 use aptos_table_natives::{TableHandle, TableResolver};
 use aptos_types::{
-    access_path::AccessPath,
     delayed_fields::PanicError,
     on_chain_config::{ConfigStorage, Features, OnChainConfig},
     state_store::{
@@ -124,10 +123,7 @@ impl<'e, E: ExecutorView> StorageAdapter<'e, E> {
     ) -> PartialVMResult<(Option<Bytes>, usize)> {
         let resource_group = get_resource_group_from_metadata(struct_tag, metadata);
         if let Some(resource_group) = resource_group {
-            let key = StateKey::access_path(AccessPath::resource_group_access_path(
-                *address,
-                resource_group.clone(),
-            ));
+            let key = StateKey::resource_group(address, &resource_group);
             let buf =
                 self.resource_group_view
                     .get_resource_from_group(&key, struct_tag, maybe_layout)?;
@@ -142,7 +138,7 @@ impl<'e, E: ExecutorView> StorageAdapter<'e, E> {
             let buf_size = resource_size(&buf);
             Ok((buf, buf_size + group_size as usize))
         } else {
-            let state_key = resource_state_key(*address, struct_tag.clone())?;
+            let state_key = StateKey::resource(address, struct_tag);
             let buf = self
                 .executor_view
                 .get_resource_bytes(&state_key, maybe_layout)?;
@@ -216,9 +212,8 @@ impl<'e, E: ExecutorView> ModuleResolver for StorageAdapter<'e, E> {
     }
 
     fn get_module(&self, module_id: &ModuleId) -> Result<Option<Bytes>, Self::Error> {
-        let access_path = AccessPath::from(module_id);
         self.executor_view
-            .get_module_bytes(&StateKey::access_path(access_path))
+            .get_module_bytes(&StateKey::module_id(module_id))
     }
 }
 

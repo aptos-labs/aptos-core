@@ -13,7 +13,6 @@ use aptos_language_e2e_tests::{
     executor::FakeExecutor,
 };
 use aptos_types::{
-    access_path::AccessPath,
     account_address::AccountAddress,
     account_config::{AccountResource, CoinStoreResource, CORE_CODE_ADDRESS},
     chain_id::ChainId,
@@ -682,9 +681,7 @@ impl MoveHarness {
         addr: &AccountAddress,
         struct_tag: StructTag,
     ) -> Option<Vec<u8>> {
-        let path =
-            AccessPath::resource_access_path(*addr, struct_tag).expect("access path in test");
-        self.read_state_value_bytes(&StateKey::access_path(path))
+        self.read_state_value_bytes(&StateKey::resource(addr, &struct_tag))
     }
 
     /// Reads the resource data `T`.
@@ -706,10 +703,8 @@ impl MoveHarness {
         addr: &AccountAddress,
         struct_tag: StructTag,
     ) -> Option<StateValueMetadata> {
-        self.read_state_value(&StateKey::access_path(
-            AccessPath::resource_access_path(*addr, struct_tag).expect("access path in test"),
-        ))
-        .map(StateValue::into_metadata)
+        self.read_state_value(&StateKey::resource(addr, &struct_tag))
+            .map(StateValue::into_metadata)
     }
 
     pub fn read_resource_group(
@@ -717,8 +712,7 @@ impl MoveHarness {
         addr: &AccountAddress,
         struct_tag: StructTag,
     ) -> Option<BTreeMap<StructTag, Vec<u8>>> {
-        let path = AccessPath::resource_group_access_path(*addr, struct_tag);
-        self.read_state_value_bytes(&StateKey::access_path(path))
+        self.read_state_value_bytes(&StateKey::resource_group(addr, &struct_tag))
             .map(|data| bcs::from_bytes(&data).unwrap())
     }
 
@@ -755,8 +749,7 @@ impl MoveHarness {
         struct_tag: StructTag,
         data: &T,
     ) {
-        let path = AccessPath::resource_access_path(addr, struct_tag).expect("access path in test");
-        let state_key = StateKey::access_path(path);
+        let state_key = StateKey::resource(&addr, &struct_tag);
         self.executor
             .write_state_value(state_key, bcs::to_bytes(data).unwrap());
     }

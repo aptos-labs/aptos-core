@@ -20,6 +20,7 @@ use aptos_infallible::RwLock;
 use bytes::Bytes;
 use move_core_types::{
     account_address::AccountAddress,
+    identifier::{IdentStr, Identifier},
     language_storage::{ModuleId, StructTag},
     move_resource::MoveResource,
 };
@@ -282,7 +283,7 @@ pub struct StateKeyRegistry {
     // FIXME(aldenhu): reverse dimensions to save memory?
     resource_keys: TwoLevelRegistry<AccountAddress, StructTag>,
     resource_group_keys: TwoLevelRegistry<AccountAddress, StructTag>,
-    module_keys: TwoLevelRegistry<AccountAddress, ModuleId>,
+    module_keys: TwoLevelRegistry<AccountAddress, Identifier>,
     table_item_keys: TwoLevelRegistry<TableHandle, Vec<u8>>,
     raw_keys: TwoLevelRegistry<Vec<u8>, ()>, // for tests only
 }
@@ -426,18 +427,25 @@ impl StateKey {
         Self(entry)
     }
 
-    pub fn module(address: &AccountAddress, module_id: &ModuleId) -> Self {
-        if let Some(entry) = GLOBAL_REGISTRY.module_keys.try_get(address, module_id) {
+    pub fn module(address: &AccountAddress, name: &IdentStr) -> Self {
+        if let Some(entry) = GLOBAL_REGISTRY.module_keys.try_get(address, name) {
             return Self(entry);
         }
 
-        let inner = StateKeyInner::AccessPath(AccessPath::code_access_path(module_id.clone()));
+        let inner = StateKeyInner::AccessPath(AccessPath::code_access_path(ModuleId::new(
+            *address,
+            name.to_owned(),
+        )));
         let maybe_add = Entry::from_deserialized(inner);
 
         let entry = GLOBAL_REGISTRY
             .module_keys
-            .lock_and_get_or_add(address, module_id, maybe_add);
+            .lock_and_get_or_add(address, name, maybe_add);
         Self(entry)
+    }
+
+    pub fn module_id(module_id: &ModuleId) -> Self {
+        Self::module(&module_id.address, &module_id.name)
     }
 
     pub fn table_item(handle: &TableHandle, key: &[u8]) -> Self {
@@ -455,11 +463,6 @@ impl StateKey {
             .table_item_keys
             .lock_and_get_or_add(handle, key, maybe_add);
         Self(entry)
-    }
-
-    pub fn access_path(_access_path: AccessPath) -> Self {
-        // FIXME(aldenhu): remove
-        todo!()
     }
 
     pub fn raw(bytes: &[u8]) -> Self {
@@ -558,10 +561,11 @@ impl proptest::arbitrary::Arbitrary for StateKey {
 
 #[cfg(test)]
 mod tests {
-    use crate::state_store::state_key::{AccessPath, StateKey};
+    use crate::state_store::state_key::StateKey;
     use aptos_crypto::hash::CryptoHash;
     use move_core_types::language_storage::ModuleId;
 
+    /* FIXME(aldenhu): re-implement
     #[test]
     fn test_access_path_hash() {
         let key = StateKey::access_path(AccessPath::new("0x1002".parse().unwrap(), vec![7, 2, 3]));
@@ -570,6 +574,7 @@ mod tests {
             .unwrap();
         assert_eq!(CryptoHash::hash(&key), expected_hash);
     }
+     */
 
     #[test]
     fn test_table_item_hash() {
@@ -592,22 +597,19 @@ mod tests {
     #[test]
     fn test_debug() {
         // code
-        let key = StateKey::access_path(AccessPath::code_access_path(ModuleId::new(
+        let key = StateKey::module_id(&ModuleId::new(
             "0xcafe".parse().unwrap(),
             "my_module".parse().unwrap(),
-        )));
+        ));
         assert_eq!(
             &format!("{:?}", key),
             "StateKey { inner: AccessPath { address: 0xcafe, path: \"Code(000000000000000000000000000000000000000000000000000000000000cafe::my_module)\" }, hash: OnceCell(Uninit) }"
         );
 
         // resource
-        let key = StateKey::access_path(
-            AccessPath::resource_access_path(
-                "0xcafe".parse().unwrap(),
-                "0x1::account::Account".parse().unwrap(),
-            )
-            .unwrap(),
+        let key = StateKey::resource(
+            &"0xcafe".parse().unwrap(),
+            &"0x1::account::Account".parse().unwrap(),
         );
         assert_eq!(
             &format!("{:?}", key),

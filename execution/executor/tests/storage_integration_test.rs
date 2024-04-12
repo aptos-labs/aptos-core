@@ -13,7 +13,6 @@ use aptos_executor_test_helpers::{
 use aptos_executor_types::BlockExecutorTrait;
 use aptos_storage_interface::state_view::DbStateViewAtVersion;
 use aptos_types::{
-    access_path::AccessPath,
     account_config::{aptos_test_root_address, AccountResource, CORE_CODE_ADDRESS},
     block_metadata::BlockMetadata,
     on_chain_config::{AptosVersion, OnChainConfig, ValidatorSet},
@@ -26,7 +25,6 @@ use aptos_types::{
     validator_config::ValidatorConfig,
     validator_signer::ValidatorSigner,
 };
-use move_core_types::move_resource::MoveStructType;
 
 #[test]
 fn test_genesis() {
@@ -42,10 +40,7 @@ fn test_genesis() {
     let li = state_proof.latest_ledger_info();
     assert_eq!(li.version(), 0);
 
-    let account_resource_path = StateKey::access_path(AccessPath::new(
-        CORE_CODE_ADDRESS,
-        AccountResource::struct_tag().access_vector(),
-    ));
+    let account_resource_path = StateKey::resource_typed::<AccountResource>(&CORE_CODE_ADDRESS);
     let (aptos_framework_account_resource, state_proof) = db
         .reader
         .get_state_value_with_proof_by_version(&account_resource_path, 0)

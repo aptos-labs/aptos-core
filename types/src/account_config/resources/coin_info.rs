@@ -2,7 +2,6 @@
 // SPDX-License-Identifier: Apache-2.0
 
 use crate::{
-    access_path::AccessPath,
     state_store::{state_key::StateKey, table::TableHandle},
     utility_coin::APTOS_COIN_TYPE,
     write_set::{WriteOp, WriteSet, WriteSetMut},
@@ -110,9 +109,6 @@ impl CoinInfoResource {
     /// Returns a writeset corresponding to the creation of CoinInfo in Move.
     /// This can be passed to data store for testing total supply.
     pub fn to_writeset(&self) -> anyhow::Result<WriteSet> {
-        let ap =
-            AccessPath::resource_access_path(AccountAddress::ONE, CoinInfoResource::struct_tag())?;
-
         let value_state_key = self
             .supply
             .as_ref()
@@ -125,7 +121,7 @@ impl CoinInfoResource {
         // We store CoinInfo and aggregatable value separately.
         let write_set = vec![
             (
-                StateKey::access_path(ap),
+                StateKey::resource_typed::<CoinInfoResource>(&AccountAddress::ONE),
                 WriteOp::legacy_modification(bcs::to_bytes(&self).unwrap().into()),
             ),
             (

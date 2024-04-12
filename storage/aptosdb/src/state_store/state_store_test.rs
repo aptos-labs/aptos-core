@@ -19,7 +19,9 @@ use aptos_storage_interface::{
 };
 use aptos_temppath::TempPath;
 use aptos_types::{
-    access_path::AccessPath, account_address::AccountAddress, nibble::nibble_path::NibblePath,
+    account_address::AccountAddress,
+    account_config::{AccountResource, ChainIdResource, CoinInfoResource, CoinStoreResource},
+    nibble::nibble_path::NibblePath,
     state_store::state_key::StateKeyTag,
 };
 use arr_macro::arr;
@@ -193,13 +195,13 @@ fn test_get_values_by_key_prefix() {
     let store = &db.state_store;
     let address = AccountAddress::new([12u8; AccountAddress::LENGTH]);
 
-    let key1 = StateKey::access_path(AccessPath::new(address, b"state_key1".to_vec()));
-    let key2 = StateKey::access_path(AccessPath::new(address, b"state_key2".to_vec()));
+    let key1 = StateKey::resource_typed::<AccountResource>(&address);
+    let key2 = StateKey::resource_typed::<ChainIdResource>(&address);
 
     let value1_v0 = StateValue::from(String::from("value1_v0").into_bytes());
     let value2_v0 = StateValue::from(String::from("value2_v0").into_bytes());
 
-    let account_key_prefx = StateKeyPrefix::new(StateKeyTag::AccessPath, address.to_vec());
+    let account_key_prefix = StateKeyPrefix::new(StateKeyTag::AccessPath, address.to_vec());
 
     put_value_set(
         store,
@@ -211,12 +213,12 @@ fn test_get_values_by_key_prefix() {
         None,
     );
 
-    let key_value_map = traverse_values(store, &account_key_prefx, 0);
+    let key_value_map = traverse_values(store, &account_key_prefix, 0);
     assert_eq!(key_value_map.len(), 2);
     assert_eq!(*key_value_map.get(&key1).unwrap(), value1_v0);
     assert_eq!(*key_value_map.get(&key2).unwrap(), value2_v0);
 
-    let key4 = StateKey::access_path(AccessPath::new(address, b"state_key4".to_vec()));
+    let key4 = StateKey::resource_typed::<CoinInfoResource>(&address);
 
     let value2_v1 = StateValue::from(String::from("value2_v1").into_bytes());
     let value4_v1 = StateValue::from(String::from("value4_v1").into_bytes());
@@ -232,13 +234,13 @@ fn test_get_values_by_key_prefix() {
     );
 
     // Ensure that we still get only values for key1 and key2 for version 0 after the update
-    let key_value_map = traverse_values(store, &account_key_prefx, 0);
+    let key_value_map = traverse_values(store, &account_key_prefix, 0);
     assert_eq!(key_value_map.len(), 2);
     assert_eq!(*key_value_map.get(&key1).unwrap(), value1_v0);
     assert_eq!(*key_value_map.get(&key2).unwrap(), value2_v0);
 
     // Ensure that key value map for version 1 returns value for key1 at version 0.
-    let key_value_map = traverse_values(store, &account_key_prefx, 1);
+    let key_value_map = traverse_values(store, &account_key_prefix, 1);
     assert_eq!(key_value_map.len(), 3);
     assert_eq!(*key_value_map.get(&key1).unwrap(), value1_v0);
     assert_eq!(*key_value_map.get(&key2).unwrap(), value2_v1);
@@ -246,7 +248,7 @@ fn test_get_values_by_key_prefix() {
 
     // Add values for one more account and verify the state
     let address1 = AccountAddress::new([22u8; AccountAddress::LENGTH]);
-    let key5 = StateKey::access_path(AccessPath::new(address1, b"state_key5".to_vec()));
+    let key5 = StateKey::resource_typed::<CoinStoreResource>(&address1);
     let value5_v2 = StateValue::from(String::from("value5_v2").into_bytes());
 
     let account1_key_prefx = StateKeyPrefix::new(StateKeyTag::AccessPath, address1.to_vec());

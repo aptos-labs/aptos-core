@@ -12,7 +12,6 @@ use aptos_crypto::{
 use aptos_gas_schedule::{InitialGasSchedule, TransactionGasParameters};
 use aptos_language_e2e_tests::data_store::{FakeDataStore, GENESIS_CHANGE_SET_HEAD};
 use aptos_types::{
-    access_path::AccessPath,
     account_config::{aptos_test_root_address, AccountResource, CoinStoreResource},
     block_executor::config::BlockExecutorConfigFromOnchain,
     block_metadata::BlockMetadata,
@@ -372,12 +371,9 @@ impl<'a> AptosTestAdapter<'a> {
     /// Obtain a Rust representation of the account resource from storage, which is used to derive
     /// a few default transaction parameters.
     fn fetch_account_resource(&self, signer_addr: &AccountAddress) -> Result<AccountResource> {
-        let account_access_path =
-            AccessPath::resource_access_path(*signer_addr, AccountResource::struct_tag())
-                .expect("access path in test");
         let account_blob = self
             .storage
-            .get_state_value_bytes(&StateKey::access_path(account_access_path))
+            .get_state_value_bytes(&StateKey::resource_typed::<AccountResource>(signer_addr))
             .unwrap()
             .ok_or_else(|| {
                 format_err!(
@@ -392,13 +388,9 @@ impl<'a> AptosTestAdapter<'a> {
     fn fetch_account_balance(&self, signer_addr: &AccountAddress) -> Result<u64> {
         let aptos_coin_tag = CoinStoreResource::struct_tag();
 
-        let coin_access_path =
-            AccessPath::resource_access_path(*signer_addr, aptos_coin_tag.clone())
-                .expect("access path in test");
-
         let balance_blob = self
             .storage
-            .get_state_value_bytes(&StateKey::access_path(coin_access_path))
+            .get_state_value_bytes(&StateKey::resource(signer_addr, &aptos_coin_tag))
             .unwrap()
             .ok_or_else(|| {
                 format_err!(
