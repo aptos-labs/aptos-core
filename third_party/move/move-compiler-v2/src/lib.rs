@@ -16,6 +16,7 @@ pub mod logging;
 pub mod options;
 pub mod pipeline;
 pub mod recursive_struct_checker;
+pub mod unused_params_checker;
 
 use crate::{
     env_pipeline::{
@@ -328,6 +329,12 @@ pub fn check_and_rewrite_pipeline<'a, 'b>(
         });
         env_pipeline.add("check cyclic type instantiation", |env| {
             cyclic_instantiation_checker::check_cyclic_instantiations(env)
+        });
+    }
+
+    if !for_v1_model && options.experiment_on(Experiment::UNUSED_STRUCT_PARAMS_CHECK) {
+        env_pipeline.add("unused struct params check", |env| {
+            unused_params_checker::unused_params_checker(env)
         });
     }
 
