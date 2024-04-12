@@ -782,6 +782,7 @@ fn run_consensus_only_realistic_env_max_tps() -> ForgeConfig {
         }))
         .with_validator_override_node_config_fn(Arc::new(|config, _| {
             optimize_for_maximum_throughput(config, 20_000, 4_500, 3.0);
+            state_sync_config_execute_transactions(&mut config.state_sync);
         }))
         // TODO(ibalajiarun): tune these success critiera after we have a better idea of the test behavior
         .with_success_criteria(
