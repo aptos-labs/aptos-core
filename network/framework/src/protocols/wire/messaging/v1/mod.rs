@@ -28,7 +28,6 @@ use std::{
     io,
     pin::Pin,
     task::{Context, Poll},
-    time::Instant,
 };
 use thiserror::Error;
 use tokio_util::{
@@ -51,9 +50,17 @@ pub enum NetworkMessage {
 
 #[derive(Clone, Debug, PartialEq, Eq, Deserialize, Serialize)]
 #[cfg_attr(any(test, feature = "fuzzing"), derive(Arbitrary))]
+pub struct Frame {
+    #[serde(with = "serde_bytes")]
+    pub frame: Vec<u8>,
+}
+
+#[derive(Clone, Debug, PartialEq, Eq, Deserialize, Serialize)]
+#[cfg_attr(any(test, feature = "fuzzing"), derive(Arbitrary))]
 pub enum MultiplexMessage {
     Message(NetworkMessage),
     Stream(StreamMessage),
+    Frame(Frame),
 }
 
 impl NetworkMessage {
