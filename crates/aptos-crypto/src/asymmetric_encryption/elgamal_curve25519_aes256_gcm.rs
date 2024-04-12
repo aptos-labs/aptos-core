@@ -1,8 +1,6 @@
 // Copyright © Aptos Foundation
 // SPDX-License-Identifier: Apache-2.0
 
-// Copyright © Aptos Foundation
-
 use crate::{
     asymmetric_encryption::AsymmetricEncryption,
     elgamal,
