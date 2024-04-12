@@ -778,29 +778,28 @@ move-vm-test-utils = { path = "third_party/move/move-vm/test-utils", features = 
 move-vm-types = { path = "third_party/move/move-vm/types" }
 
 [profile.release]
+codegen-units = 1
 debug = true
+lto = "thin"
 overflow-checks = true
 
 # The performance build is not currently recommended
 # for production deployments. It has not been widely tested.
 [profile.performance]
 inherits = "release"
-opt-level = 3
 debug = true
-overflow-checks = true
-lto = "thin"
-codegen-units = 1
 
 [profile.cli]
 inherits = "release"
+lto = false
 debug = false
 opt-level = "z"
-lto = "thin"
 strip = true
-codegen-units = 1
 
 [profile.ci]
 inherits = "release"
+codegen-units = 16
+lto = "off"
 debug = "line-tables-only"
 overflow-checks = true
 debug-assertions = true
