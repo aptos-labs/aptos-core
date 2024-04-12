@@ -96,6 +96,7 @@ impl<D: TAugmentedData> AugDataStore<D> {
     }
 
     pub fn add_aug_data(&mut self, data: AugData<D>) -> anyhow::Result<AugDataSignature> {
+        ensure!(self.epoch == data.epoch());
         if let Some(existing_data) = self.data.get(data.author()) {
             ensure!(
                 existing_data == &data,
