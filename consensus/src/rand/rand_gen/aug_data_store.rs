@@ -114,6 +114,7 @@ impl<D: TAugmentedData> AugDataStore<D> {
         &mut self,
         certified_data: CertifiedAugData<D>,
     ) -> anyhow::Result<CertifiedAugDataAck> {
+        ensure!(self.epoch == certified_data.epoch());
         if self.certified_data.contains_key(certified_data.author()) {
             return Ok(CertifiedAugDataAck::new(self.epoch));
         }
