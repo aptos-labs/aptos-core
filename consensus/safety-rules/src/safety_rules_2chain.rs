@@ -98,7 +98,7 @@ impl SafetyRules {
     ) -> Result<OrderVote, Error> {
         // Exit early if we cannot sign
         self.signer()?;
-        let vote_data = self.verify_proposal(vote_proposal)?;
+        self.verify_proposal(vote_proposal)?;
         let proposed_block = vote_proposal.block();
         let mut safety_data = self.persistent_storage.safety_data()?;
 
@@ -112,10 +112,9 @@ impl SafetyRules {
 
         // Construct and sign order vote
         let author = self.signer()?.author();
-        let ledger_info = self.construct_ledger_info_2chain(proposed_block, vote_data.hash())?;
+        let ledger_info = self.construct_ledger_info_2chain(proposed_block, HashValue::zero())?;
         let signature = self.sign(&ledger_info)?;
-        let order_vote =
-            OrderVote::new_with_signature(vote_data, author, ledger_info.clone(), signature);
+        let order_vote = OrderVote::new_with_signature(author, ledger_info.clone(), signature);
 
         safety_data.last_order_vote = Some(order_vote.clone());
         self.persistent_storage.set_safety_data(safety_data)?;

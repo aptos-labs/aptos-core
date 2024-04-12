@@ -132,6 +132,29 @@ impl BlockStore {
         Ok(())
     }
 
+    pub async fn insert_aggregated_order_vote(
+        &self,
+        ledger_info_with_sig: &LedgerInfoWithSignatures,
+        retriever: &mut BlockRetriever,
+    ) -> anyhow::Result<()> {
+        if self.ordered_root().round() < ledger_info_with_sig.ledger_info().round() {
+            self.send_for_execution(ledger_info_with_sig.clone())
+                .await?;
+            if ledger_info_with_sig.ledger_info().ends_epoch() {
+                retriever
+                    .network
+                    .broadcast_epoch_change(EpochChangeProof::new(
+                        vec![ledger_info_with_sig.clone()],
+                        // TODO: Should more be true/false?
+                        /* more = */
+                        false,
+                    ))
+                    .await;
+            }
+        }
+        Ok(())
+    }
+
     /// Insert the quorum certificate separately from the block, used to split the processing of
     /// updating the consensus state(with qc) and deciding whether to vote(with block)
     /// The missing ancestors are going to be retrieved from the given peer. If a given peer

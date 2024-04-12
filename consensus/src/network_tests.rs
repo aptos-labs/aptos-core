@@ -302,7 +302,9 @@ impl NetworkPlayground {
         match msg {
             ConsensusMsg::ProposalMsg(proposal_msg) => Some(proposal_msg.proposal().round()),
             ConsensusMsg::VoteMsg(vote_msg) => Some(vote_msg.vote().vote_data().proposed().round()),
-            ConsensusMsg::OrderVoteMsg(order_vote_msg) => Some(order_vote_msg.ledger_info().round()),
+            ConsensusMsg::OrderVoteMsg(order_vote_msg) => {
+                Some(order_vote_msg.ledger_info().round())
+            },
             ConsensusMsg::SyncInfo(sync_info) => Some(sync_info.highest_certified_round()),
             ConsensusMsg::CommitVoteMsg(commit_vote) => Some(commit_vote.commit_info().round()),
             _ => None,

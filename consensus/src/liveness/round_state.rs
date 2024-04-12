@@ -160,12 +160,10 @@ pub struct RoundState {
     timeout_sender: aptos_channels::Sender<Round>,
     // Votes received for the current round.
     pending_votes: PendingVotes,
-    // OrderVotes received for the previous round.
+    // OrderVotes received for the last 2 rounds.
     pending_order_votes: PendingOrderVotes,
     // Vote sent locally for the current round.
     vote_sent: Option<Vote>,
-    // OrderVote sent locally for the previous round.
-    order_vote_sent: Option<OrderVote>,
     // The handle to cancel previous timeout task when moving to next round.
     abort_handle: Option<AbortHandle>,
     // Self sender to send delayed QC aggregation events to the round manager.
@@ -225,7 +223,6 @@ impl RoundState {
             pending_votes,
             pending_order_votes,
             vote_sent: None,
-            order_vote_sent: None,
             abort_handle: None,
             delayed_qc_tx,
             qc_aggregator_type,
@@ -276,9 +273,8 @@ impl RoundState {
                 self.delayed_qc_tx.clone(),
                 self.qc_aggregator_type.clone(),
             );
-            self.pending_order_votes = PendingOrderVotes::new();
+            self.pending_order_votes.set_round(self.current_round);
             self.vote_sent = None;
-            self.order_vote_sent = None;
             let timeout = self.setup_timeout(1);
             // The new round reason is QCReady in case both QC.round + 1 == new_round, otherwise
             // it's Timeout and TC.round + 1 == new_round.
@@ -326,20 +322,14 @@ impl RoundState {
         order_vote: &OrderVote,
         verifier: &ValidatorVerifier,
     ) -> OrderVoteReceptionResult {
-        if order_vote.vote_data().proposed().round() == self.current_round {
+        if order_vote.ledger_info().round() >= self.current_round - 1 {
             self.pending_order_votes
                 .insert_order_vote(order_vote, verifier)
         } else {
             OrderVoteReceptionResult::UnexpectedRound(
-                order_vote.vote_data().proposed().round(),
+                order_vote.ledger_info().round(),
                 self.current_round,
             )
-        }
-    }
-
-    pub fn record_order_vote(&mut self, order_vote: OrderVote) {
-        if order_vote.ledger_info().round() == self.current_round - 1 {
-            self.order_vote_sent = Some(order_vote);
         }
     }
 

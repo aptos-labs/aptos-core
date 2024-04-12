@@ -55,6 +55,7 @@ use aptos_safety_rules::ConsensusState;
 use aptos_safety_rules::TSafetyRules;
 use aptos_types::{
     epoch_state::EpochState,
+    ledger_info::LedgerInfoWithSignatures,
     on_chain_config::{
         OnChainConsensusConfig, OnChainJWKConsensusConfig, OnChainRandomnessConfig,
         ValidatorTxnConfig,
@@ -902,7 +903,6 @@ impl RoundManager {
     async fn broadcast_order_vote(&mut self, vote: &Vote) -> anyhow::Result<()> {
         if let Some(proposed_block) = self.block_store.get_block(vote.vote_data().proposed().id()) {
             // Generate an order vote with ledger_info = proposed_block
-            info!("BrodcastOrderVoteBlockFound");
             let vote_proposal = proposed_block.vote_proposal();
             let order_vote_result = self
                 .safety_rules
@@ -923,12 +923,10 @@ impl RoundManager {
                     );
                 }
             }
-            self.round_state.record_order_vote(order_vote.clone());
             info!(self.new_log(LogEvent::SendOrderVote), "{}", order_vote);
             self.network.broadcast_order_vote(order_vote).await;
             ORDER_VOTE_BROADCASTED.inc();
         } else {
-            info!("BrodcastOrderVoteBlockNotFound");
             FAILED_ORDER_VOTE_BROADCASTED.inc();
         }
         Ok(())
@@ -1057,15 +1055,6 @@ impl RoundManager {
         });
         info!(self.new_log(LogEvent::ReceiveOrderVote), "{}", order_vote);
 
-        let block_id = order_vote.vote_data().proposed().id();
-        // Check if the block already had a QC
-        if self
-            .block_store
-            .get_quorum_cert_for_block(block_id)
-            .is_some()
-        {
-            return Ok(());
-        }
         let vote_reception_result = self
             .round_state
             .insert_order_vote(&order_vote, &self.epoch_state.verifier);
@@ -1117,13 +1106,23 @@ impl RoundManager {
         result: OrderVoteReceptionResult,
     ) -> anyhow::Result<()> {
         match result {
-            OrderVoteReceptionResult::NewQuorumCertificate(qc) => {
-                observe_block(
-                    qc.certified_block().timestamp_usecs(),
-                    BlockStage::QC_AGGREGATED,
-                );
+            OrderVoteReceptionResult::NewLedgerInfoWithSignatures(ledger_info_with_signatures) => {
+                if let Some(order_voted_block) = self
+                    .block_store
+                    .get_block(order_vote.ledger_info().consensus_block_id())
+                {
+                    if !order_voted_block.block().is_nil_block() {
+                        observe_block(
+                            order_voted_block.block().timestamp_usecs(),
+                            BlockStage::QC_AGGREGATED,
+                        );
+                    }
+                }
                 let result = self
-                    .new_qc_aggregated(qc.clone(), order_vote.author())
+                    .new_order_vote_aggregated(
+                        ledger_info_with_signatures.clone(),
+                        order_vote.author(),
+                    )
                     .await;
                 EXECUTED_WITH_ORDER_VOTE_QC.inc();
                 if result.is_ok() {
@@ -1151,6 +1150,22 @@ impl RoundManager {
             .context("[RoundManager] Failed to process a newly aggregated QC");
         self.process_certificates().await?;
         result
+    }
+
+    async fn new_order_vote_aggregated(
+        &mut self,
+        ledger_info_with_sig: Arc<LedgerInfoWithSignatures>,
+        preferred_peer: Author,
+    ) -> anyhow::Result<()> {
+        self.block_store
+            .insert_aggregated_order_vote(
+                &ledger_info_with_sig,
+                &mut self.create_block_retriever(preferred_peer),
+            )
+            .await
+            .context("[RoundManager] Failed to process a new OrderVoteAggregate")
+        // TODO: Should we process certificates here?
+        // self.process_certificates().await?;
     }
 
     async fn new_2chain_tc_aggregated(
