@@ -2553,7 +2553,6 @@ impl<'env> ModuleEnv<'env> {
     }
 
     /// Checks whether this item is only used in tests.
-    /// NOTE: THIS IS SURPRISINGLY EXPENSIVE
     pub fn is_test_only(&self) -> bool {
         self.has_attribute(|a| {
             let s = self.symbol_pool().string(a.name());
@@ -2562,7 +2561,6 @@ impl<'env> ModuleEnv<'env> {
     }
 
     /// Checks whether this item is only used in verification.
-    /// NOTE: THIS IS SURPRISINGLY EXPENSIVE
     pub fn is_verify_only(&self) -> bool {
         self.has_attribute(|a| {
             let s = self.symbol_pool().string(a.name());
@@ -3266,7 +3264,6 @@ impl<'env> StructEnv<'env> {
     }
 
     /// Checks whether this item is only used in tests.
-    /// NOTE: THIS IS SURPRISINGLY EXPENSIVE
     pub fn is_test_only(&self) -> bool {
         self.has_attribute(|a| {
             let s = self.symbol_pool().string(a.name());
@@ -3275,7 +3272,6 @@ impl<'env> StructEnv<'env> {
     }
 
     /// Checks whether this item is only used in verification.
-    /// NOTE: THIS IS SURPRISINGLY EXPENSIVE
     pub fn is_verify_only(&self) -> bool {
         self.has_attribute(|a| {
             let s = self.symbol_pool().string(a.name());
@@ -3828,7 +3824,6 @@ impl<'env> FunctionEnv<'env> {
     }
 
     /// Checks whether this item is only used in tests.
-    /// NOTE: THIS IS SURPRISINGLY EXPENSIVE
     pub fn is_test_only(&self) -> bool {
         self.has_attribute(|a| {
             let s = self.symbol_pool().string(a.name());
@@ -3837,7 +3832,6 @@ impl<'env> FunctionEnv<'env> {
     }
 
     /// Checks whether this item is only used in verification.
-    /// NOTE: THIS IS SURPRISINGLY EXPENSIVE
     pub fn is_verify_only(&self) -> bool {
         self.has_attribute(|a| {
             let s = self.symbol_pool().string(a.name());

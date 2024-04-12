@@ -1,6 +1,6 @@
 
 Diagnostics:
-warning: WARNING: passes for an abort from any module.
+warning: Test will pass on an abort from *any* module.
   ┌─ tests/unit_test/test/expected_failure_out_of_range_value.move:6:24
   │
 6 │     #[expected_failure(abort_code=18446744073709551614)]
@@ -8,7 +8,7 @@ warning: WARNING: passes for an abort from any module.
   │                                   │
   │                                   Replace value with constant from expected module or add `location=...` attribute.
 
-warning: WARNING: passes for an abort from any module.
+warning: Test will pass on an abort from *any* module.
    ┌─ tests/unit_test/test/expected_failure_out_of_range_value.move:11:24
    │
 11 │     #[expected_failure(abort_code=18446744073709551615)]

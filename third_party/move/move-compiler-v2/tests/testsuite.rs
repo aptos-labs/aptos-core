@@ -611,7 +611,11 @@ fn run_test(path: &Path, config: TestConfig) -> datatest_stable::Result<()> {
     }
 
     if options.compile_test_code {
+        // Build the test plan here to parse and validate any test-related attributes in the AST.
+        // In real use, this is run outside of the compilation process, but the needed info is
+        // available in `env` once we finish the AST.
         plan_builder::construct_test_plan(&env, None);
+        ok = check_diags(&mut test_output.borrow_mut(), &env);
     }
 
     if ok && config.stop_after > StopAfter::AstPipeline {

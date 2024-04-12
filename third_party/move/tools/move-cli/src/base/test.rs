@@ -20,7 +20,6 @@ use move_package::{
     compilation::{build_plan::BuildPlan, compiled_package::build_and_report_v2_driver},
     BuildConfig,
 };
-// use move_symbol_pool::Symbol;
 use move_unit_test::UnitTestingConfig;
 use move_vm_runtime::tracing::{LOGGING_FILE_WRITER, TRACING_ENABLED};
 use move_vm_test_utils::gas_schedule::CostTable;

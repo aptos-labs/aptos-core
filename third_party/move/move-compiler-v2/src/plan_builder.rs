@@ -1,6 +1,16 @@
+// Copyright (c) Aptos Labs
 // Copyright (c) The Diem Core Contributors
 // Copyright (c) The Move Contributors
 // SPDX-License-Identifier: Apache-2.0
+
+//! Build a vector of module test plans for a Move program compiled with V2.
+//!
+//! This reimplements move-compiler/src/unit_test/plan_builder.rs in terms
+//! of data structures available in V2's `GlobalEnv` structure after AST processing.
+//!
+//! Each module containing any labeled `#[test]` functions gets an item in the output list, which
+//! includes info about each '#[test]' function: name, arguments to provide, and expected failure or
+//! success.
 
 use crate::options::Options;
 use codespan_reporting::diagnostic::Severity;
@@ -135,17 +145,15 @@ fn build_test_info(
 
     // A #[test] function cannot also be annotated #[test_only]
     if let Some(test_only_attribute) = test_only_attribute_opt {
-        const PREVIOUSLY_ANNOTATED_MSG: &str = "Previously annotated here";
-        let invalid_usage = "invalid usage of known attribute";
         let msg = "Function annotated as both #[test(...)] and #[test_only]. You need to declare \
                    it as either one or the other";
         let test_only_id = test_only_attribute.node_id();
         let test_only_loc = env.get_node_loc(test_only_id);
-        env.error_with_labels(&fn_id_loc, invalid_usage, vec![
+        env.error_with_labels(&fn_id_loc, "invalid usage of known attribute", vec![
             (test_only_loc, msg.to_string()),
             (
                 test_attribute_loc.clone(),
-                PREVIOUSLY_ANNOTATED_MSG.to_string(),
+                "Previously annotated here".to_string(),
             ),
         ]);
     }
@@ -236,8 +244,6 @@ fn parse_test_attribute(
     }
 }
 
-const BAD_ABORT_VALUE_WARNING: &str = "WARNING: passes for an abort from any module.";
-
 fn parse_failure_attribute(
     env: &GlobalEnv,
     current_module: &ModuleName,
@@ -316,7 +322,7 @@ fn parse_failure_attribute(
                         env.diag_with_labels(
                             Severity::Warning,
                             &attr_loc,
-                            BAD_ABORT_VALUE_WARNING,
+                            "Test will pass on an abort from *any* module.",
                             vec![(value_loc, tip)],
                         );
                         return Some(ExpectedFailure::ExpectedWithCodeDEPRECATED(u));
@@ -655,22 +661,6 @@ fn convert_model_ast_value_u64(env: &GlobalEnv, loc: Loc, value: &Value) -> Opti
         },
     }
 }
-
-/*
-fn convert_attribute_value_u64(env: &GlobalEnv, value: &AttributeValue) -> Option<(Loc, u64)> {
-    match value {
-        AttributeValue::Value(id, val) => {
-            let loc = env.get_node_loc(*id);
-            convert_model_ast_value_u64(env, loc, val)
-        },
-        AttributeValue::Name(id, _opt_module_name, _sym) => {
-            let loc = env.get_node_loc(*id);
-            env.error(&loc, "Unsupported value in this assignment");
-            None
-        },
-    }
-}
- */
 
 fn convert_attribute_value_to_move_value(
     env: &GlobalEnv,
