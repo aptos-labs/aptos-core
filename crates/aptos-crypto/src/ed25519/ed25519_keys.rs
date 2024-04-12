@@ -24,7 +24,7 @@ pub struct Ed25519PrivateKey(pub(crate) ed25519_dalek::SecretKey);
 #[cfg(feature = "assert-private-keys-not-cloneable")]
 static_assertions::assert_not_impl_any!(Ed25519PrivateKey: Clone);
 
-#[cfg(any(test, feature = "cloneable-private-keys"))]
+//#[cfg(any(test, feature = "cloneable-private-keys"))]
 impl Clone for Ed25519PrivateKey {
     fn clone(&self) -> Self {
         let serialized: &[u8] = &(self.to_bytes());

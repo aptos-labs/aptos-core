@@ -28,6 +28,7 @@ use aptos_network2::{
     },
 };
 use aptos_storage_interface::{mock::MockDbReaderWriter, DbReaderWriter};
+use aptos_time_service::TimeService;
 use aptos_types::{
     mempool_status::MempoolStatusCode,
     on_chain_config::{InMemoryOnChainConfig, OnChainConfigPayload},
@@ -122,11 +123,13 @@ impl MockSharedMempool {
         // let (connection_reqs_tx, _) = aptos_channel::new(QueueStyle::FIFO, 8, None);
         // let (_network_notifs_tx, network_notifs_rx) = aptos_channel::new(QueueStyle::FIFO, 8, None);
         // let (_, conn_notifs_rx) = conn_notifs_channel::new();
+        let time_service = TimeService::real(); // TODO: there's one weird path through api/text-context that wants to use this outside of 'testing' so I can't use TimeService::mock() here
         let peer_senders = Arc::new(OutboundPeerConnections::new());
         let network_sender = NetworkSender::new(
             NetworkId::Validator,
             peer_senders.clone(),
             RoleType::Validator,
+	    time_service,
             // PeerManagerRequestSender::new(network_reqs_tx),
             // ConnectionRequestSender::new(connection_reqs_tx),
         );
