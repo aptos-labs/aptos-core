@@ -213,7 +213,8 @@ where
         let (read_socket, write_socket) =
             tokio::io::split(self.connection.take().unwrap().compat());
 
-        let reader = MultiplexMessageStream::new(read_socket.compat(), self.max_frame_size).fuse();
+        let mut reader =
+            MultiplexMessageStream::new(read_socket.compat(), self.max_frame_size).fuse();
         let writer = MultiplexMessageSink::new(write_socket.compat_write(), self.max_frame_size);
 
         // Start writer "process" as a separate task. We receive two handles to
@@ -229,16 +230,6 @@ where
             self.max_frame_size,
             self.max_message_size,
         );
-
-        let mut reader = reader.concurrent_map_blocking(move |message| {
-            if let Ok(MultiplexMessage::Frame(frame)) = message {
-                let message = bcs::from_bytes(&frame.frame)
-                    .map_err(|e| ReadError::DeserializeError(e.into(), 0, Bytes::new()))?;
-                Ok(message)
-            } else {
-                unreachable!()
-            }
-        });
 
         // Start main Peer event loop.
         let reason = loop {
@@ -510,6 +501,15 @@ where
         Ok(())
     }
 
+    async fn handle_inbound_frame(&mut self, frame: Frame) -> Result<(), PeerManagerError> {
+        let message = bcs::from_bytes(&frame.frame)?;
+        if let MultiplexMessage::Message(network_message) = message {
+            self.handle_inbound_network_message(network_message).await
+        } else {
+            unreachable!("this is impossible")
+        }
+    }
+
     async fn handle_inbound_message(
         &mut self,
         message: Result<MultiplexMessage, ReadError>,
@@ -551,9 +551,7 @@ where
                 self.handle_inbound_network_message(message).await
             },
             MultiplexMessage::Stream(message) => self.handle_inbound_stream_message(message).await,
-            MultiplexMessage::Frame(_) => {
-                unreachable!("frame should already be deserialized to message")
-            },
+            MultiplexMessage::Frame(frame) => self.handle_inbound_frame(frame).await,
         }
     }
 
