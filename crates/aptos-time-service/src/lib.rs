@@ -22,7 +22,7 @@ use std::{
 
 #[cfg(any(test, feature = "async"))]
 pub mod interval;
-#[cfg(any(test, feature = "testing"))]
+#[cfg(any(test, feature = "testing", feature = "fuzzing"))]
 pub mod mock;
 pub mod real;
 #[cfg(any(test, feature = "async"))]
@@ -70,7 +70,7 @@ const ZERO_DURATION: Duration = Duration::from_nanos(0);
 pub enum TimeService {
     RealTimeService(RealTimeService),
 
-    #[cfg(any(test, feature = "testing"))]
+    #[cfg(any(test, feature = "testing", feature = "fuzzing"))]
     MockTimeService(MockTimeService),
 }
 
@@ -87,17 +87,17 @@ impl TimeService {
     /// tasks.
     ///
     /// See [`MockTimeService`].
-    #[cfg(any(test, feature = "testing"))]
+    #[cfg(any(test, feature = "testing", feature = "fuzzing"))]
     pub fn mock() -> Self {
         MockTimeService::new().into()
     }
 
-    #[cfg(any(test, feature = "testing"))]
+    #[cfg(any(test, feature = "testing", feature = "fuzzing"))]
     pub fn from_mock(mock: MockTimeService) -> Self {
         Self::MockTimeService(mock)
     }
 
-    #[cfg(any(test, feature = "testing"))]
+    #[cfg(any(test, feature = "testing", feature = "fuzzing"))]
     pub fn into_mock(self) -> MockTimeService {
         match self {
             TimeService::MockTimeService(inner) => inner,
