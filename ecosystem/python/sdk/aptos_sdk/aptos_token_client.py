@@ -624,7 +624,10 @@ class AptosTokenClient:
         output = await self.client.transaction_by_hash(txn_hash)
         mints = []
         for event in output["events"]:
-            if event["type"] != "0x4::collection::MintEvent":
+            if event["type"] not in (
+                "0x4::collection::MintEvent",
+                "0x4::collection::Mint",
+            ):
                 continue
             mints.append(AccountAddress.from_str_relaxed(event["data"]["token"]))
         return mints
