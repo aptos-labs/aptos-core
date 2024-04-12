@@ -702,7 +702,7 @@ Transfer <code>amount</code> of FA from the primary store of <code>from</code> t
 <td>9</td>
 <td>Only the owner of a primary store can transfer its balance to any recipient's primary store.</td>
 <td>High</td>
-<td>The function transfer fetches sender and recipient's primary stores, if the sender's store is withdraws the assets from the sender's store and then deposits to the recipient's store. The function transfer_with_ref fetches the sender's and recipient's stores and calls the asset to the recipient with the ref.</td>
+<td>The function transfer fetches sender and recipient's primary stores, if the sender's store is withdraws the assets from the sender's store and then deposits to the recipient's store. The function transfer_with_ref fetches the sender's and recipient's stores and calls the the asset to the recipient with the ref.</td>
 <td>Audited the deposit and withdraw (transfer). Audited the deposit_with_ref and withdraw_with_ref (transfer_with_ref). Audited that the store balance of the sender is decreased by the specified amount and its added to the recipients store. (transfer, transfer_with_ref) Audited that the sender's store is not burned (transfer).</td>
 </tr>
 
