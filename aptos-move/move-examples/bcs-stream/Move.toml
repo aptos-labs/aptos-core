@@ -7,4 +7,3 @@ bcs_stream = "_"
 
 [dependencies]
 AptosStdlib = { local = "../../framework/aptos-stdlib" }
-AptosFramework = { local = "../../framework/aptos-framework" }

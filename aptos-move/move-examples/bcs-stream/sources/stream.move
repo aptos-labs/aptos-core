@@ -53,11 +53,9 @@ module bcs_stream::bcs_stream {
         stream.cur = stream.cur + 1;
         if (byte == 0) {
             false
-        }
-        else if (byte == 1) {
+        } else if (byte == 1) {
             true
-        }
-        else {
+        } else {
             abort EMALFORMED_DATA
         }
     }
