@@ -15,7 +15,7 @@ Aptos is a layer 1 blockchain bringing a paradigm shift to Web3 through better t
 
 * [Aptos Foundation](https://aptosfoundation.org/)
 * [Aptos Developer Network](https://aptos.dev)
-* [Guide - Setup Your Environment](https://aptos.dev/category/environment)
+* [Guide - Integrate with the Aptos Blockchain](https://aptos.dev/guides/system-integrators-guide)
 * [Tutorials](https://aptos.dev/tutorials)
 * Follow us on [Twitter](https://twitter.com/aptos_network).
 * Join us on the [Aptos Discord](https://discord.gg/aptosnetwork).

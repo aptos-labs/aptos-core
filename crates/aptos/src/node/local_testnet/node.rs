@@ -37,6 +37,12 @@ pub struct NodeArgs {
     #[clap(long, value_parser, conflicts_with("config_path"))]
     pub test_config_override: Option<PathBuf>,
 
+    /// Optimize the node for higher performance.
+    ///
+    /// Note: This is only useful for e2e performance testing, and should not be used in production.
+    #[clap(long)]
+    pub performance: bool,
+
     /// Random seed for key generation in test mode
     ///
     /// This allows you to have deterministic keys for testing
@@ -101,6 +107,7 @@ impl NodeManager {
             &test_dir,
             false,
             false,
+            args.node_args.performance,
             aptos_cached_packages::head_release_bundle(),
             rng,
         )

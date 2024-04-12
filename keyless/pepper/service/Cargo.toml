@@ -13,7 +13,9 @@ repository = { workspace = true }
 rust-version = { workspace = true }
 
 [dependencies]
+aes-gcm = { workspace = true }
 anyhow = { workspace = true }
+aptos-crypto = { workspace = true }
 aptos-inspection-service = { workspace = true }
 aptos-keyless-pepper-common = { workspace = true }
 aptos-logger = { workspace = true }
@@ -30,6 +32,8 @@ hyper = { workspace = true }
 jsonwebtoken = { workspace = true }
 jwt = { workspace = true }
 once_cell = { workspace = true }
+rand = { workspace = true }
+regex = { workspace = true }
 reqwest = { workspace = true }
 serde = { workspace = true }
 serde_json = { workspace = true }

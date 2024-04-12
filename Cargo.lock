@@ -958,6 +958,7 @@ dependencies = [
 name = "aptos-crypto"
 version = "0.0.3"
 dependencies = [
+ "aes-gcm",
  "anyhow",
  "aptos-crypto-derive",
  "ark-bls12-381",
@@ -2343,7 +2344,9 @@ dependencies = [
 name = "aptos-keyless-pepper-service"
 version = "0.1.0"
 dependencies = [
+ "aes-gcm",
  "anyhow",
+ "aptos-crypto",
  "aptos-inspection-service",
  "aptos-keyless-pepper-common",
  "aptos-logger",
@@ -2360,6 +2363,8 @@ dependencies = [
  "jsonwebtoken 8.3.0",
  "jwt",
  "once_cell",
+ "rand 0.7.3",
+ "regex",
  "reqwest",
  "serde",
  "serde_json",
@@ -3412,12 +3417,14 @@ dependencies = [
  "aptos-ledger",
  "aptos-rest-client",
  "aptos-types",
+ "base64 0.13.1",
  "bcs 0.1.4",
  "ed25519-dalek-bip32",
  "move-core-types",
  "once_cell",
  "rand 0.7.3",
  "rand_core 0.5.1",
+ "serde_json",
  "tiny-bip39",
  "tokio",
  "url",
@@ -8194,7 +8201,7 @@ dependencies = [
  "aho-corasick",
  "bstr 1.9.0",
  "log",
- "regex-automata 0.4.3",
+ "regex-automata 0.4.6",
  "regex-syntax 0.8.2",
 ]
 
@@ -8935,7 +8942,7 @@ dependencies = [
  "globset",
  "log",
  "memchr",
- "regex-automata 0.4.3",
+ "regex-automata 0.4.6",
  "same-file",
  "walkdir",
  "winapi-util",
@@ -13282,13 +13289,13 @@ dependencies = [
 
 [[package]]
 name = "regex"
-version = "1.10.2"
+version = "1.10.4"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "380b951a9c5e80ddfd6136919eef32310721aa4aacd4889a8d39124b026ab343"
+checksum = "c117dbdfde9c8308975b6a18d71f3f385c89461f7b3fb054288ecf2a2058ba4c"
 dependencies = [
  "aho-corasick",
  "memchr",
- "regex-automata 0.4.3",
+ "regex-automata 0.4.6",
  "regex-syntax 0.8.2",
 ]
 
@@ -13303,9 +13310,9 @@ dependencies = [
 
 [[package]]
 name = "regex-automata"
-version = "0.4.3"
+version = "0.4.6"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "5f804c7828047e88b2d32e2d7fe5a105da8ee3264f01902f796c8e067dc2483f"
+checksum = "86b83b8b9847f9bf95ef68afb0b8e6cdb80f498442f5179a29fad448fcc1eaea"
 dependencies = [
  "aho-corasick",
  "memchr",
@@ -15218,6 +15225,7 @@ dependencies = [
  "anyhow",
  "clap 4.4.14",
  "once_cell",
+ "regex",
  "walkdir",
 ]
 

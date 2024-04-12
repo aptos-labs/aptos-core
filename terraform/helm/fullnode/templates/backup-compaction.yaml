@@ -17,11 +17,12 @@ spec:
           labels:
             {{- include "backup.selectorLabels" . | nindent 12 }}
             app.kubernetes.io/name: backup-compaction
-          annotations:
-            seccomp.security.alpha.kubernetes.io/pod: runtime/default
         spec:
           restartPolicy: Never
           terminationGracePeriodSeconds: 0
+          securityContext:
+            seccompProfile:
+              type: RuntimeDefault
           containers:
           - name: backup-compaction
             {{- if and $backup_compaction_cronjob (not $.Values.manageImages) }} # if the statefulset already exists and we do not want helm to simply overwrite the image, use the existing image

@@ -93,6 +93,7 @@ fn test_create_single_node_test_config() {
         &test_dir,
         false,
         false,
+        false,
         aptos_cached_packages::head_release_bundle(),
         rand::rngs::StdRng::from_entropy(),
     )

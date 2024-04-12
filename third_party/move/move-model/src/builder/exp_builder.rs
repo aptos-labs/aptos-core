@@ -481,13 +481,25 @@ impl<'env, 'translator, 'module_translator> ExpTranslator<'env, 'translator, 'mo
         if let Type::TypeParameter(..) = &ty {
             if self.type_params_table.insert(name, ty.clone()).is_some() && report_errors {
                 let param_name = name.display(self.symbol_pool());
-                self.error(
+                let prev_loc = self
+                    .type_params
+                    .iter()
+                    .find_map(
+                        |(prev_name, _ty, _kind, loc)| {
+                            if prev_name == &name {
+                                Some(loc)
+                            } else {
+                                None
+                            }
+                        },
+                    );
+                self.error_with_labels(
                     loc,
-                    &format!(
-                        "duplicate declaration of type parameter `{}`, \
-                        previously found in type parameters",
-                        param_name
-                    ),
+                    &format!("duplicate declaration of type parameter `{}`", param_name),
+                    vec![(
+                        prev_loc.expect("location").clone(),
+                        "previously declared here".to_string(),
+                    )],
                 );
                 return;
             }
