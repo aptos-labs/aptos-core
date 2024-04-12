@@ -3,7 +3,7 @@
 // SPDX-License-Identifier: Apache-2.0
 
 use crate::{
-    counters,
+    counters::{self, ORDER_VOTE_VERY_OLD},
     pending_order_votes::{OrderVoteReceptionResult, PendingOrderVotes},
     pending_votes::{PendingVotes, VoteReceptionResult},
     util::time_service::{SendTask, TimeService},
@@ -322,10 +322,11 @@ impl RoundState {
         order_vote: &OrderVote,
         verifier: &ValidatorVerifier,
     ) -> OrderVoteReceptionResult {
-        if order_vote.ledger_info().round() >= self.current_round - 1 {
+        if order_vote.ledger_info().round() >= self.current_round - 2 {
             self.pending_order_votes
                 .insert_order_vote(order_vote, verifier)
         } else {
+            ORDER_VOTE_VERY_OLD.inc();
             OrderVoteReceptionResult::UnexpectedRound(
                 order_vote.ledger_info().round(),
                 self.current_round,

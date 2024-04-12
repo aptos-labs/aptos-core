@@ -87,6 +87,14 @@ pub static ORDER_VOTE_ADDED: Lazy<IntCounter> = Lazy::new(|| {
     .unwrap()
 });
 
+pub static ORDER_VOTE_VERY_OLD: Lazy<IntCounter> = Lazy::new(|| {
+    register_int_counter!(
+        "aptos_consensus_order_vote_very_old",
+        "Count of the number of order votes that are very old"
+    )
+    .unwrap()
+});
+
 pub static ORDER_VOTE_BROADCASTED: Lazy<IntCounter> = Lazy::new(|| {
     register_int_counter!(
         "aptos_consensus_order_vote_broadcasted",
