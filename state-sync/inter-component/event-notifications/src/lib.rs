@@ -3,7 +3,7 @@
 // SPDX-License-Identifier: Apache-2.0
 
 #![forbid(unsafe_code)]
-use anyhow::Result;
+use anyhow::{anyhow, Result};
 use aptos_channels::{aptos_channel, message_queues::QueueStyle};
 use aptos_id_generator::{IdGenerator, U64IdGenerator};
 use aptos_infallible::RwLock;
@@ -11,10 +11,10 @@ use aptos_storage_interface::{state_view::DbStateViewAtVersion, DbReader, DbRead
 use aptos_types::{
     contract_event::ContractEvent,
     event::EventKey,
-    move_resource::MoveStorage,
     on_chain_config::{
         ConfigurationResource, OnChainConfig, OnChainConfigPayload, OnChainConfigProvider,
     },
+    state_store::state_key::StateKey,
     transaction::Version,
 };
 use futures::{channel::mpsc::SendError, stream::FusedStream, Stream};
@@ -23,7 +23,6 @@ use std::{
     collections::{HashMap, HashSet},
     fmt,
     iter::FromIterator,
-    ops::Deref,
     pin::Pin,
     sync::Arc,
     task::{Context, Poll},
@@ -398,8 +397,16 @@ impl OnChainConfigProvider for DbBackedOnChainConfig {
     fn get<T: OnChainConfig>(&self) -> anyhow::Result<T> {
         let bytes = self
             .reader
-            .deref()
-            .fetch_config_by_version(T::CONFIG_ID, self.version)?;
+            .get_state_value_by_version(&StateKey::on_chain_config::<T>(), self.version)?
+            .ok_or_else(|| {
+                anyhow!(
+                    "no config {} found in aptos root account state",
+                    T::CONFIG_ID
+                )
+            })?
+            .bytes()
+            .clone();
+
         T::deserialize_into_config(&bytes)
     }
 }
