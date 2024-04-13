@@ -34,8 +34,10 @@ pub fn witness_gen(
     fs::write(input_file.path(), body.as_bytes())?;
     println!("0413 - 3");
 
-    let output =
-        get_witness_command(witness_gen_js_path, witness_gen_wasm_path, input_file.path_str()?, witness_file.path_str()?).output()?;
+    let mut cmd =
+        get_witness_command(witness_gen_js_path, witness_gen_wasm_path, input_file.path_str()?, witness_file.path_str()?);
+    println!("0413 - 4");
+    let output = cmd.output()?;
     println!("{:?}", output);
     // Check if the command executed successfully
     if output.status.success() {
