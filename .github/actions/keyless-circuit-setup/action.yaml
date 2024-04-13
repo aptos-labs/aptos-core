@@ -16,7 +16,11 @@ runs:
     - name: Run cargo cache
       uses: Swatinem/rust-cache@359a70e43a0bb8a13953b04a90f76428b4959bb6 # pin@v2.2.0
 
-    - name: install related tools
+    - name: install cargo tools
+      shell: bash
+      run: scripts/dev_setup.sh -b
+
+    - name: install circuit tools
       shell: bash
       run: keyless/circuit-data/install-deps.sh
 
