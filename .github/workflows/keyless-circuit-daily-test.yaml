@@ -28,4 +28,4 @@ jobs:
         with:
           fetch-depth: 0 # get all the history because cargo xtest --change-since origin/main requires it.
       - uses: ./.github/actions/keyless-circuit-setup
-      - run: cargo test -p aptos-keyless-circuit-tests
+      - run: cargo test -p aptos-keyless-circuit-tests -- --nocapture
