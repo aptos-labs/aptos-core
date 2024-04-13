@@ -32,8 +32,8 @@ fn base64_decode_test() {
         .str_input("jwt_payload", jwt_payload)
         .bytes_input("ascii_jwt_payload", &ascii_jwt_payload)
         .pad(&config).unwrap();
-
-    assert!(circuit_handle.gen_witness(circuit_input_signals).is_ok());
+    let result = circuit_handle.gen_witness(circuit_input_signals);
+    assert!(result.is_ok());
 }
 
 #[test]
