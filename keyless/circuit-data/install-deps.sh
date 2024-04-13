@@ -29,13 +29,14 @@ install_circom() {
     else
         echo "no, installing..."
 
+        original_dir=$(pwd)
         cd `mktemp -d`
         git clone http://github.com/iden3/circom
         cd circom
         git switch -d v2.1.7
         cargo build --release
         cargo install --path circom
-        cd ..
+        cd "$original_dir"
     fi
 }
 
