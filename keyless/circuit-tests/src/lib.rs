@@ -12,6 +12,8 @@ use aptos_keyless_common::input_processing::witness_gen::witness_gen;
 
 #[cfg(test)]
 mod base64;
+#[cfg(test)]
+mod sha;
 
 pub struct TestCircuitHandle {
     dir: TempDir,
