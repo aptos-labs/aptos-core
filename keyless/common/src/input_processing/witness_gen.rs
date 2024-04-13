@@ -51,7 +51,6 @@ pub fn witness_gen(
     }
 }
 
-#[cfg(not(target_arch = "x86_64"))]
 fn get_witness_command(
     witness_gen_js_path: &str,
     witness_gen_wasm_path: &str,
@@ -65,16 +64,5 @@ fn get_witness_command(
         String::from(input_file_path),
         String::from(witness_file_path),
     ]);
-    c
-}
-
-#[cfg(target_arch = "x86_64")]
-fn get_witness_command(
-    config: &ProverServiceConfig,
-    input_file_path: &str,
-    witness_file_path: &str,
-) -> Command {
-    let mut c = Command::new(config.witness_gen_binary_path());
-    c.args([input_file_path, witness_file_path]); // Example arguments
     c
 }
