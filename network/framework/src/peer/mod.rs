@@ -362,6 +362,15 @@ where
                         remote_peer_id.short_str(),
                     );
                 }
+                if let Err(err) = writer.flush().await {
+                    warn!(
+                        log_context,
+                        error = %err,
+                        "{} Error flusing writes to peer: {}",
+                        network_context,
+                        remote_peer_id.short_str(),
+                    );
+                }
             }
             info!(
                 log_context,
