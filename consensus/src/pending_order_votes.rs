@@ -150,8 +150,8 @@ impl PendingOrderVotes {
     // Removes votes older than round-1
     pub fn set_round(&mut self, round: u64) {
         self.li_digest_to_votes
-            .retain(|_, (_, li)| li.ledger_info().round() >= round - 2);
+            .retain(|_, (_, li)| li.ledger_info().round() + 2 >= round);
         self.author_to_order_vote
-            .retain(|&(_, r), _| r >= round - 2);
+            .retain(|&(_, r), _| r + 2 >= round);
     }
 }
