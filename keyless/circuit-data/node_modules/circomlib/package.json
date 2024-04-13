@@ -1,0 +1,33 @@
+{
+  "name": "circomlib",
+  "version": "2.0.5",
+  "description": "Basic circuits library for Circom",
+  "main": "index.js",
+  "directories": {
+    "test": "test"
+  },
+  "scripts": {
+    "test": "mocha --max-old-space-size=4000"
+  },
+  "keywords": [
+    "pedersen",
+    "hash",
+    "ethereum",
+    "circuit",
+    "circom",
+    "zksnark"
+  ],
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/iden3/circomlib.git"
+  },
+  "author": "0Kims",
+  "license": "GPL-3.0",
+  "devDependencies": {
+    "blake-hash": "^2.0.0",
+    "chai": "^4.3.4",
+    "circom_tester": "0.0.13",
+    "circomlibjs": "^0.1.4",
+    "mocha": "^9.1.3"
+  }
+}
