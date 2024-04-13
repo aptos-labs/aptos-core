@@ -20,11 +20,11 @@ install_circom() {
 
         cd `mktemp -d`
         git clone http://github.com/iden3/circom
-        pushd circom
+        cd circom
         git switch -d v2.1.7
         cargo build --release
         cargo install --path circom
-        popd
+        cd ..
     fi
 }
 
