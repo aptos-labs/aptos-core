@@ -124,7 +124,6 @@ impl Transport for TcpTransport {
         }
         socket.set_reuseaddr(true)?;
         socket.bind(addr)?;
-        socket.set_nodelay(true)?;
 
         let listener = socket.listen(256)?;
         let listen_addr = NetworkAddress::from(listener.local_addr()?);
