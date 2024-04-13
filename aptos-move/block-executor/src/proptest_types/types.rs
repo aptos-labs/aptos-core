@@ -718,7 +718,7 @@ impl<V: Into<Vec<u8>> + Arbitrary + Clone + Debug + Eq + Sync + Send> Transactio
                 .enumerate()
                 .filter_map(|(idx, size_query_pct)| match size_query_pct {
                     Some(size_query_pct) => {
-                        assert_le!(*size_query_pct, 100, "Must be percetange point (0..100]");
+                        assert_le!(*size_query_pct, 100, "Must be percentage point (0..100]");
                         let indicator = match idx {
                             0 => group_size_query_indicators[behavior_idx].0,
                             1 => group_size_query_indicators[behavior_idx].1,
