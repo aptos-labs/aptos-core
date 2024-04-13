@@ -107,9 +107,9 @@ impl Default for InterRegionNetEmConfig {
     fn default() -> Self {
         Self {
             delay_jitter_ms: 0,
-            delay_correlation_percentage: 50,
-            loss_percentage: 3,
-            loss_correlation_percentage: 50,
+            delay_correlation_percentage: 0,
+            loss_percentage: 0,
+            loss_correlation_percentage: 0,
         }
     }
 }
@@ -162,9 +162,9 @@ impl Default for IntraRegionNetEmConfig {
             bandwidth_rate_mbps: 10 * 1000, // 10 Gbps
             delay_latency_ms: 50,
             delay_jitter_ms: 0,
-            delay_correlation_percentage: 50,
-            loss_percentage: 1,
-            loss_correlation_percentage: 50,
+            delay_correlation_percentage: 0,
+            loss_percentage: 0,
+            loss_correlation_percentage: 0,
         }
     }
 }
