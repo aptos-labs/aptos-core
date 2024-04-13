@@ -3,15 +3,7 @@
 // SPDX-License-Identifier: Apache-2.0
 
 use crate::{
-    block_storage::{BlockReader, BlockStore},
-    epoch_manager::LivenessStorageData,
-    logging::{LogEvent, LogSchema},
-    monitor,
-    network::{IncomingBlockRetrievalRequest, NetworkSender},
-    network_interface::ConsensusMsg,
-    payload_manager::PayloadManager,
-    persistent_liveness_storage::{LedgerRecoveryData, PersistentLivenessStorage, RecoveryData},
-    pipeline::execution_client::TExecutionClient,
+    block_storage::{BlockReader, BlockStore}, counters::{EXECUTED_WITH_ORDER_VOTE_QC, SUCCESSFUL_EXECUTED_WITH_ORDER_VOTE_QC}, epoch_manager::LivenessStorageData, logging::{LogEvent, LogSchema}, monitor, network::{IncomingBlockRetrievalRequest, NetworkSender}, network_interface::ConsensusMsg, payload_manager::PayloadManager, persistent_liveness_storage::{LedgerRecoveryData, PersistentLivenessStorage, RecoveryData}, pipeline::execution_client::TExecutionClient
 };
 use anyhow::{bail, Context};
 use aptos_consensus_types::{
@@ -138,6 +130,7 @@ impl BlockStore {
         retriever: &mut BlockRetriever,
     ) -> anyhow::Result<()> {
         if self.ordered_root().round() < ledger_info_with_sig.ledger_info().round() {
+            SUCCESSFUL_EXECUTED_WITH_ORDER_VOTE_QC.inc();
             self.send_for_execution(ledger_info_with_sig.clone())
                 .await?;
             if ledger_info_with_sig.ledger_info().ends_epoch() {
@@ -151,6 +144,8 @@ impl BlockStore {
                     ))
                     .await;
             }
+        } else {
+            EXECUTED_WITH_ORDER_VOTE_QC.inc();
         }
         Ok(())
     }
