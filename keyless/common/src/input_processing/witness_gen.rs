@@ -26,11 +26,13 @@ pub fn witness_gen(
 ) -> Result<NamedTempFile> {
     let span = info_span!("Generating witness");
     let _enter = span.enter();
-
+    println!("0413 - 1");
     let input_file = NamedTempFile::new()?;
     let witness_file = NamedTempFile::new()?;
+    println!("0413 - 2");
 
     fs::write(input_file.path(), body.as_bytes())?;
+    println!("0413 - 3");
 
     let output =
         get_witness_command(witness_gen_js_path, witness_gen_wasm_path, input_file.path_str()?, witness_file.path_str()?).output()?;
