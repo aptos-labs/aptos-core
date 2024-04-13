@@ -24,6 +24,7 @@ use aptos_logger::prelude::*;
 #[cfg(any(test, feature = "testing", feature = "fuzzing"))]
 use aptos_netcore::transport::memory::MemoryTransport;
 use aptos_netcore::transport::{
+    pooled_tcp::{PooledTcpSocket, PooledTcpTransport},
     tcp::{TCPBufferCfg, TcpSocket, TcpTransport},
     Transport,
 };
@@ -142,11 +143,14 @@ impl PeerManagerContext {
 type MemoryPeerManager =
     PeerManager<AptosNetTransport<MemoryTransport>, NoiseStream<aptos_memsocket::MemorySocket>>;
 type TcpPeerManager = PeerManager<AptosNetTransport<TcpTransport>, NoiseStream<TcpSocket>>;
+type PooledTcpPeerManager =
+    PeerManager<AptosNetTransport<PooledTcpTransport>, NoiseStream<PooledTcpSocket>>;
 
 enum TransportPeerManager {
     #[cfg(any(test, feature = "testing", feature = "fuzzing"))]
     Memory(MemoryPeerManager),
     Tcp(TcpPeerManager),
+    PooledTcp(PooledTcpPeerManager),
 }
 
 pub struct PeerManagerBuilder {
@@ -273,7 +277,7 @@ impl PeerManagerBuilder {
 
         self.peer_manager = match self.listen_address.as_slice() {
             [Ip4(_), Tcp(_)] | [Ip6(_), Tcp(_)] => {
-                Some(TransportPeerManager::Tcp(self.build_with_transport(
+                Some(TransportPeerManager::PooledTcp(self.build_with_transport(
                     AptosNetTransport::new(
                         aptos_tcp_transport,
                         self.network_context,
@@ -376,6 +380,7 @@ impl PeerManagerBuilder {
             #[cfg(any(test, feature = "testing", feature = "fuzzing"))]
             TransportPeerManager::Memory(pm) => self.start_peer_manager(pm, executor),
             TransportPeerManager::Tcp(pm) => self.start_peer_manager(pm, executor),
+            TransportPeerManager::PooledTcp(pm) => self.start_peer_manager(pm, executor),
         }
     }
 

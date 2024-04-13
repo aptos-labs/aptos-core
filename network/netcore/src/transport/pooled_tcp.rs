@@ -2,7 +2,8 @@
 // Parts of the project are originally copyright © Meta Platforms, Inc.
 // SPDX-License-Identifier: Apache-2.0
 
-//! TCP Transport
+//! Pooled TCP Transport
+use super::tcp::{TCPBufferCfg, TcpSocket};
 use crate::transport::Transport;
 use aptos_proxy::Proxy;
 use aptos_types::{
@@ -16,64 +17,44 @@ use futures::{
     stream::Stream,
 };
 use std::{
-    fmt::Debug,
+    collections::{hash_map::Entry, HashMap},
     io,
     net::SocketAddr,
     pin::Pin,
+    sync::{Arc, Mutex},
     task::{Context, Poll},
 };
 use tokio::{
     io::{AsyncReadExt, AsyncWriteExt},
     net::{lookup_host, TcpListener, TcpStream},
 };
-use tokio_util::compat::Compat;
 use url::Url;
 
-#[derive(Debug, Clone, Copy, Default)]
-pub struct TCPBufferCfg {
-    pub inbound_rx_buffer_bytes: Option<u32>,
-    pub inbound_tx_buffer_bytes: Option<u32>,
-    pub outbound_rx_buffer_bytes: Option<u32>,
-    pub outbound_tx_buffer_bytes: Option<u32>,
-}
-
-impl TCPBufferCfg {
-    pub const fn new() -> Self {
-        Self {
-            inbound_rx_buffer_bytes: None,
-            inbound_tx_buffer_bytes: None,
-            outbound_rx_buffer_bytes: None,
-            outbound_tx_buffer_bytes: None,
-        }
-    }
-
-    pub fn new_configs(
-        inbound_rx: Option<u32>,
-        inbound_tx: Option<u32>,
-        outbound_rx: Option<u32>,
-        outbound_tx: Option<u32>,
-    ) -> Self {
-        Self {
-            inbound_rx_buffer_bytes: inbound_rx,
-            inbound_tx_buffer_bytes: inbound_tx,
-            outbound_rx_buffer_bytes: outbound_rx,
-            outbound_tx_buffer_bytes: outbound_tx,
-        }
-    }
-}
-
 /// Transport to build TCP connections
-#[derive(Debug, Clone, Default)]
-pub struct TcpTransport {
+#[derive(Debug, Clone)]
+pub struct PooledTcpTransport {
     /// TTL to set for opened sockets, or `None` to keep default.
     pub ttl: Option<u32>,
     /// `TCP_NODELAY` to set for opened sockets, or `None` to keep default.
     pub nodelay: Option<bool>,
 
     pub tcp_buff_cfg: TCPBufferCfg,
+
+    pub num_connections: usize,
 }
 
-impl TcpTransport {
+impl Default for PooledTcpTransport {
+    fn default() -> Self {
+        Self {
+            ttl: Default::default(),
+            nodelay: Default::default(),
+            tcp_buff_cfg: Default::default(),
+            num_connections: 2,
+        }
+    }
+}
+
+impl PooledTcpTransport {
     fn apply_config(&self, stream: &TcpStream) -> ::std::io::Result<()> {
         if let Some(ttl) = self.ttl {
             stream.set_ttl(ttl)?;
@@ -91,12 +72,12 @@ impl TcpTransport {
     }
 }
 
-impl Transport for TcpTransport {
+impl Transport for PooledTcpTransport {
     type Error = ::std::io::Error;
-    type Inbound = future::Ready<io::Result<TcpSocket>>;
-    type Listener = TcpListenerStream;
-    type Outbound = TcpOutbound;
-    type Output = TcpSocket;
+    type Inbound = future::Ready<io::Result<PooledTcpSocket>>;
+    type Listener = PooledTcpListenerStream;
+    type Outbound = PooledTcpOutbound;
+    type Output = PooledTcpSocket;
 
     fn listen_on(
         &self,
@@ -129,9 +110,10 @@ impl Transport for TcpTransport {
         let listen_addr = NetworkAddress::from(listener.local_addr()?);
 
         Ok((
-            TcpListenerStream {
+            PooledTcpListenerStream {
                 inner: listener,
                 config: self.clone(),
+                socket_pool: HashMap::new(),
             },
             listen_addr,
         ))
@@ -173,13 +155,26 @@ impl Transport for TcpTransport {
                 })
         };
 
-        let f: Pin<Box<dyn Future<Output = io::Result<TcpStream>> + Send + 'static>> =
-            Box::pin(match proxy_addr {
-                Some(proxy_addr) => Either::Left(connect_via_proxy(proxy_addr, addr)),
-                None => Either::Right(resolve_and_connect(addr, self.tcp_buff_cfg)),
+        let num_conn = self.num_connections;
+        let cfg = self.tcp_buff_cfg;
+        let f: Pin<Box<dyn Future<Output = Vec<io::Result<TcpStream>>> + Send + 'static>> =
+            Box::pin(async move {
+                let mut streams = Vec::new();
+                for _ in 0..num_conn {
+                    let result = match proxy_addr.clone() {
+                        Some(proxy_addr) => {
+                            Either::Left(connect_via_proxy(proxy_addr, addr.clone()))
+                        },
+                        None => Either::Right(resolve_and_connect(addr.clone(), cfg.clone())),
+                    }
+                    .await;
+                    println!("POOLED_TCP: connect result {:?}", result);
+                    streams.push(result);
+                }
+                streams
             });
 
-        Ok(TcpOutbound {
+        Ok(PooledTcpOutbound {
             inner: f,
             config: self.clone(),
         })
@@ -315,25 +310,39 @@ fn invalid_addr_error(addr: &NetworkAddress) -> io::Error {
 }
 
 #[must_use = "streams do nothing unless polled"]
-pub struct TcpListenerStream {
+pub struct PooledTcpListenerStream {
     inner: TcpListener,
-    config: TcpTransport,
+    config: PooledTcpTransport,
+    socket_pool: HashMap<NetworkAddress, PooledTcpSocket>,
 }
 
-impl Stream for TcpListenerStream {
-    type Item = io::Result<(future::Ready<io::Result<TcpSocket>>, NetworkAddress)>;
+impl Stream for PooledTcpListenerStream {
+    type Item = io::Result<(future::Ready<io::Result<PooledTcpSocket>>, NetworkAddress)>;
 
-    fn poll_next(self: Pin<&mut Self>, context: &mut Context) -> Poll<Option<Self::Item>> {
+    fn poll_next(mut self: Pin<&mut Self>, context: &mut Context) -> Poll<Option<Self::Item>> {
         match self.inner.poll_accept(context) {
             Poll::Ready(Ok((socket, addr))) => {
                 if let Err(e) = self.config.apply_config(&socket) {
                     return Poll::Ready(Some(Err(e)));
                 }
                 let dialer_addr = NetworkAddress::from(addr);
-                Poll::Ready(Some(Ok((
-                    future::ready(Ok(TcpSocket::new(socket))),
-                    dialer_addr,
-                ))))
+                match self.socket_pool.entry(dialer_addr.clone()) {
+                    Entry::Occupied(mut entry) => {
+                        if entry.get().inner.lock().unwrap().closed {
+                            let socket = PooledTcpSocket::new(socket);
+                            entry.insert(socket.clone());
+                            return Poll::Ready(Some(Ok((future::ready(Ok(socket)), dialer_addr))));
+                        } else {
+                            entry.get().push(socket);
+                        }
+                        Poll::Pending
+                    },
+                    Entry::Vacant(entry) => {
+                        let socket = PooledTcpSocket::new(socket);
+                        entry.insert(socket.clone());
+                        Poll::Ready(Some(Ok((future::ready(Ok(socket)), dialer_addr))))
+                    },
+                }
             },
             Poll::Ready(Err(e)) => Poll::Ready(Some(Err(e))),
             Poll::Pending => Poll::Pending,
@@ -342,18 +351,30 @@ impl Stream for TcpListenerStream {
 }
 
 #[must_use = "futures do nothing unless polled"]
-pub struct TcpOutbound {
-    inner: Pin<Box<dyn Future<Output = io::Result<TcpStream>> + Send + 'static>>,
-    config: TcpTransport,
+pub struct PooledTcpOutbound {
+    inner: Pin<Box<dyn Future<Output = Vec<io::Result<TcpStream>>> + Send + 'static>>,
+    config: PooledTcpTransport,
 }
 
-impl Future for TcpOutbound {
-    type Output = io::Result<TcpSocket>;
+impl Future for PooledTcpOutbound {
+    type Output = io::Result<PooledTcpSocket>;
 
     fn poll(mut self: Pin<&mut Self>, context: &mut Context) -> Poll<Self::Output> {
-        let socket = ready!(Pin::new(&mut self.inner).poll(context))?;
-        self.config.apply_config(&socket)?;
-        Poll::Ready(Ok(TcpSocket::new(socket)))
+        let conn_results = ready!(Pin::new(&mut self.inner).poll(context));
+        let mut sockets = Vec::new();
+        let all_errors = conn_results.iter().all(|r| r.is_err());
+        for conn in conn_results.into_iter() {
+            if all_errors {
+                println!("POOLED_TCP: poll outbound result {:?}", conn);
+                let err = conn.unwrap_err();
+                return Poll::Ready(Err(err));
+            }
+            if let Ok(socket) = conn {
+                self.config.apply_config(&socket)?;
+                sockets.push(socket);
+            }
+        }
+        Poll::Ready(Ok(PooledTcpSocket::new_pool(sockets)))
     }
 }
 
@@ -364,46 +385,102 @@ impl Future for TcpOutbound {
 /// because the "close" method on a TcpStream just performs a no-op instead of actually shutting
 /// down the write side of the TcpStream.
 //TODO Probably should add some tests for this
-#[derive(Debug)]
-pub struct TcpSocket {
-    inner: Compat<TcpStream>,
+#[derive(Debug, Clone)]
+pub struct PooledTcpSocket {
+    inner: Arc<Mutex<PooledTcpSocketInner>>,
 }
 
-impl TcpSocket {
+impl PooledTcpSocket {
     pub fn new(socket: TcpStream) -> Self {
-        use tokio_util::compat::TokioAsyncReadCompatExt;
-
         Self {
-            inner: socket.compat(),
+            inner: Arc::new(Mutex::new(PooledTcpSocketInner::new(vec![TcpSocket::new(
+                socket,
+            )]))),
+        }
+    }
+
+    pub fn new_pool(sockets: Vec<TcpStream>) -> Self {
+        Self {
+            inner: Arc::new(Mutex::new(PooledTcpSocketInner::new(
+                sockets.into_iter().map(TcpSocket::new).collect(),
+            ))),
+        }
+    }
+
+    pub fn push(&self, socket: TcpStream) {
+        self.inner
+            .lock()
+            .unwrap()
+            .sockets
+            .push(TcpSocket::new(socket));
+    }
+}
+
+#[derive(Debug)]
+pub struct PooledTcpSocketInner {
+    sockets: Vec<TcpSocket>,
+    read_idx: usize,
+    write_idx: usize,
+    closed: bool,
+}
+
+impl PooledTcpSocketInner {
+    fn new(sockets: Vec<TcpSocket>) -> Self {
+        Self {
+            sockets,
+            read_idx: 0,
+            write_idx: 0,
+            closed: false,
         }
     }
 }
 
-impl AsyncRead for TcpSocket {
+impl AsyncRead for PooledTcpSocket {
     fn poll_read(
-        mut self: Pin<&mut Self>,
+        self: Pin<&mut Self>,
         context: &mut Context,
         buf: &mut [u8],
     ) -> Poll<io::Result<usize>> {
-        Pin::new(&mut self.inner).poll_read(context, buf)
+        let mut inner = self.inner.lock().unwrap();
+        let read_idx = inner.read_idx;
+        inner.read_idx += 1;
+        if inner.read_idx == inner.sockets.len() {
+            inner.read_idx = 0;
+        }
+        Pin::new(&mut inner.sockets[read_idx]).poll_read(context, buf)
     }
 }
 
-impl AsyncWrite for TcpSocket {
+impl AsyncWrite for PooledTcpSocket {
     fn poll_write(
-        mut self: Pin<&mut Self>,
+        self: Pin<&mut Self>,
         context: &mut Context,
         buf: &[u8],
     ) -> Poll<io::Result<usize>> {
-        Pin::new(&mut self.inner).poll_write(context, buf)
+        let mut inner = self.inner.lock().unwrap();
+        let write_idx = inner.write_idx;
+        inner.write_idx += 1;
+        if inner.write_idx == inner.sockets.len() {
+            inner.write_idx = 0;
+        }
+        Pin::new(&mut inner.sockets[write_idx]).poll_write(context, buf)
     }
 
-    fn poll_flush(mut self: Pin<&mut Self>, context: &mut Context) -> Poll<io::Result<()>> {
-        Pin::new(&mut self.inner).poll_flush(context)
+    fn poll_flush(self: Pin<&mut Self>, context: &mut Context) -> Poll<io::Result<()>> {
+        let mut inner = self.inner.lock().unwrap();
+        for socket in &mut inner.sockets {
+            ready!(Pin::new(socket).poll_flush(context)).ok();
+        }
+        Poll::Ready(io::Result::Ok(()))
     }
 
-    fn poll_close(mut self: Pin<&mut Self>, context: &mut Context) -> Poll<io::Result<()>> {
-        Pin::new(&mut self.inner).poll_close(context)
+    fn poll_close(self: Pin<&mut Self>, context: &mut Context) -> Poll<io::Result<()>> {
+        let mut inner = self.inner.lock().unwrap();
+        for socket in &mut inner.sockets {
+            ready!(Pin::new(socket).poll_close(context)).ok();
+        }
+        inner.closed = true;
+        Poll::Ready(io::Result::Ok(()))
     }
 }
 
@@ -421,7 +498,7 @@ mod test {
 
     #[tokio::test]
     async fn simple_listen_and_dial() -> Result<(), ::std::io::Error> {
-        let t = TcpTransport::default().and_then(|mut out, _addr, origin| async move {
+        let t = PooledTcpTransport::default().and_then(|mut out, _addr, origin| async move {
             match origin {
                 ConnectionOrigin::Inbound => {
                     out.write_all(b"Earth").await?;
@@ -454,7 +531,7 @@ mod test {
 
     #[test]
     fn unsupported_multiaddrs() {
-        let t = TcpTransport::default();
+        let t = PooledTcpTransport::default();
 
         let result = t.listen_on("/memory/0".parse().unwrap());
         assert!(result.is_err());
