@@ -1,5 +1,17 @@
 #!/bin/sh
 
+set -e
+install_node() {
+    curl -o- https://raw.githubusercontent.com/nvm-sh/nvm/v0.39.1/install.sh | bash
+    source ~/.bashrc
+    export NVM_DIR="$HOME/.nvm"
+    [ -s "$NVM_DIR/nvm.sh" ] && \. "$NVM_DIR/nvm.sh"  # This loads nvm
+    [ -s "$NVM_DIR/bash_completion" ] && \. "$NVM_DIR/bash_completion"  # This loads nvm bash_completion
+    nvm install --lts
+    node -v
+    npm -v
+}
+
 install_git_lfs() {
     if which brew > /dev/null; then
         brew install git-lfs
@@ -36,6 +48,7 @@ install_npm_deps() {
     npm install -g snarkjs
 }
 
+install_node
 install_pip3_deps
 install_npm_deps
 install_circom
