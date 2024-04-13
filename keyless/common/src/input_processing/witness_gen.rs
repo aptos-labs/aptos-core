@@ -26,19 +26,12 @@ pub fn witness_gen(
 ) -> Result<NamedTempFile> {
     let span = info_span!("Generating witness");
     let _enter = span.enter();
-    println!("0413 - 1");
     let input_file = NamedTempFile::new()?;
     let witness_file = NamedTempFile::new()?;
-    println!("0413 - 2");
-
     fs::write(input_file.path(), body.as_bytes())?;
-    println!("0413 - 3");
-
     let mut cmd =
         get_witness_command(witness_gen_js_path, witness_gen_wasm_path, input_file.path_str()?, witness_file.path_str()?);
-    println!("0413 - 4, cmd={:?}", cmd);
     let output = cmd.output()?;
-    println!("{:?}", output);
     // Check if the command executed successfully
     if output.status.success() {
         // if config.enable_dangerous_logging {
