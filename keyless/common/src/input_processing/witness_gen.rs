@@ -34,7 +34,7 @@ pub fn witness_gen(
 
     let output =
         get_witness_command(witness_gen_js_path, witness_gen_wasm_path, input_file.path_str()?, witness_file.path_str()?).output()?;
-
+    println!("{:?}", output);
     // Check if the command executed successfully
     if output.status.success() {
         // if config.enable_dangerous_logging {
