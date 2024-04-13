@@ -64,7 +64,7 @@ fn construct_module_test_plan(
     _package_filter: Option<Symbol>,
     module: ModuleEnv,
 ) -> Option<ModuleTestPlan> {
-    // BUGBUG: TODO: what is a package?
+    // TODO (#12885): what is a package?  Do we need this code?
     // if package_filter.is_some() && module.package_name != package_filter {
     // return None;
     // }
