@@ -137,6 +137,7 @@ script {{
 }}
 "#, consensus_config_bytes, target_randomness_status);
     let txn_result = aptos_cli.run_script(root_idx, script.as_str()).await.unwrap();
+    println!("txn_result={:?}", txn_result);
     assert!(txn_result.success.unwrap());
 }
 
