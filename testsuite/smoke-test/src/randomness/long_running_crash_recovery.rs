@@ -136,9 +136,9 @@ script {{
     }}
 }}
 "#, consensus_config_bytes, target_randomness_status);
-    let txn_result = aptos_cli.run_script(root_idx, script.as_str()).await.unwrap();
+    let txn_result = aptos_cli.run_script(root_idx, script.as_str()).await;
     println!("txn_result={:?}", txn_result);
-    assert!(txn_result.success.unwrap());
+    assert!(txn_result.unwrap().success.unwrap());
 }
 
 async fn make_change(validator_power_status_vec: &mut Vec<bool>, rest_cli: &Client, aptos_cli: &CliTestFramework, root_idx: usize, swarm: &mut LocalSwarm) {
