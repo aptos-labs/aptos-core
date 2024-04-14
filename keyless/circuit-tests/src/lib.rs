@@ -1,6 +1,8 @@
 // Copyright © Aptos Foundation
 // SPDX-License-Identifier: Apache-2.0
 
+extern crate core;
+
 use std::{env, fs};
 use std::fs::File;
 use std::path::PathBuf;

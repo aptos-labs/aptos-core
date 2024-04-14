@@ -56,6 +56,11 @@ impl CircuitInputSignals<Unpadded> {
         self
     }
 
+    pub fn bits_input(mut self, signal_name: &str, signal_value: &[bool]) -> Self {
+        let bytes: Vec<u8> = signal_value.iter().map(|&val|val as u8).collect();
+        self.bytes_input(signal_name, bytes.as_slice())
+    }
+
     pub fn str_input(mut self, signal_name: &str, signal_value: &str) -> Self {
         self.signals.insert(
             String::from(signal_name),
