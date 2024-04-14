@@ -371,11 +371,11 @@ where
     TSocket: AsyncRead + Unpin,
 {
     fn poll_read(
-        self: Pin<&mut Self>,
+        mut self: Pin<&mut Self>,
         context: &mut Context,
         buf: &mut [u8],
     ) -> Poll<io::Result<usize>> {
-        self.get_mut().poll_read(context, buf)
+        Pin::new(&mut self.socket).poll_read(context, buf)
     }
 }
 
@@ -384,15 +384,15 @@ where
     TSocket: AsyncWrite + Unpin,
 {
     fn poll_write(
-        self: Pin<&mut Self>,
+        mut self: Pin<&mut Self>,
         context: &mut Context,
         buf: &[u8],
     ) -> Poll<io::Result<usize>> {
-        self.get_mut().poll_write(context, buf)
+        Pin::new(&mut self.socket).poll_write(context, buf)
     }
 
-    fn poll_flush(self: Pin<&mut Self>, context: &mut Context) -> Poll<io::Result<()>> {
-        self.get_mut().poll_flush(context)
+    fn poll_flush(mut self: Pin<&mut Self>, context: &mut Context) -> Poll<io::Result<()>> {
+        Pin::new(&mut self.socket).poll_flush(context)
     }
 
     fn poll_close(mut self: Pin<&mut Self>, context: &mut Context) -> Poll<io::Result<()>> {
