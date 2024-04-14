@@ -1,5 +1,5 @@
-// Copyright © Aptos Foundation
-// Parts of the project are originally copyright © Meta Platforms, Inc.
+// Copyright (c) Aptos Foundation
+// Parts of the project are originally copyright (c) Meta Platforms, Inc.
 // SPDX-License-Identifier: Apache-2.0
 
 pub mod acquires_checker;
@@ -15,7 +15,9 @@ pub mod inliner;
 pub mod logging;
 pub mod options;
 pub mod pipeline;
+pub mod plan_builder;
 pub mod recursive_struct_checker;
+pub mod unused_params_checker;
 
 use crate::{
     env_pipeline::{
@@ -36,7 +38,7 @@ use crate::{
 };
 use anyhow::bail;
 use codespan_reporting::term::termcolor::{ColorChoice, StandardStream, WriteColor};
-pub use experiments::*;
+pub use experiments::Experiment;
 use log::{debug, info, log_enabled, Level};
 use move_binary_format::binary_views::BinaryIndexedView;
 use move_command_line_common::files::FileHash;
@@ -60,7 +62,7 @@ use move_stackless_bytecode::function_target_pipeline::{
     FunctionTargetPipeline, FunctionTargetsHolder, FunctionVariant,
 };
 use move_symbol_pool::Symbol;
-pub use options::*;
+pub use options::Options;
 use std::{collections::BTreeSet, io::Write, path::Path};
 
 /// Run Move compiler and print errors to stderr.
@@ -328,6 +330,12 @@ pub fn check_and_rewrite_pipeline<'a, 'b>(
         });
         env_pipeline.add("check cyclic type instantiation", |env| {
             cyclic_instantiation_checker::check_cyclic_instantiations(env)
+        });
+    }
+
+    if !for_v1_model && options.experiment_on(Experiment::UNUSED_STRUCT_PARAMS_CHECK) {
+        env_pipeline.add("unused struct params check", |env| {
+            unused_params_checker::unused_params_checker(env)
         });
     }
 

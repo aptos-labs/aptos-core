@@ -481,13 +481,25 @@ impl<'env, 'translator, 'module_translator> ExpTranslator<'env, 'translator, 'mo
         if let Type::TypeParameter(..) = &ty {
             if self.type_params_table.insert(name, ty.clone()).is_some() && report_errors {
                 let param_name = name.display(self.symbol_pool());
-                self.error(
+                let prev_loc = self
+                    .type_params
+                    .iter()
+                    .find_map(
+                        |(prev_name, _ty, _kind, loc)| {
+                            if prev_name == &name {
+                                Some(loc)
+                            } else {
+                                None
+                            }
+                        },
+                    );
+                self.error_with_labels(
                     loc,
-                    &format!(
-                        "duplicate declaration of type parameter `{}`, \
-                        previously found in type parameters",
-                        param_name
-                    ),
+                    &format!("duplicate declaration of type parameter `{}`", param_name),
+                    vec![(
+                        prev_loc.expect("location").clone(),
+                        "previously declared here".to_string(),
+                    )],
                 );
                 return;
             }
@@ -2214,7 +2226,7 @@ impl<'env, 'translator, 'module_translator> ExpTranslator<'env, 'translator, 'mo
                     let specialized_expected_type = self.subs.specialize(expected_type);
                     if let Type::Tuple(tys) = specialized_expected_type {
                         if tys.len() != 1 {
-                            self.error(loc, &context.arity_mismatch(false, 1, tys.len()));
+                            self.error(loc, &context.arity_mismatch(false, tys.len(), 1));
                             return self.new_error_pat(loc);
                         }
                     }

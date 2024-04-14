@@ -113,3 +113,6 @@ fun pack_unpack::pack6($t0: u8, $t1: u8, $t2: u8): pack_unpack::S {
   2: $t3 := pack pack_unpack::S($t2, $t5, $t4)
   3: return $t3
 }
+
+
+============ bytecode verification succeeded ========
