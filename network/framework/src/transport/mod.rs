@@ -19,7 +19,7 @@ use aptos_id_generator::{IdGenerator, U32IdGenerator};
 use aptos_logger::prelude::*;
 // Re-exposed for aptos-network-checker
 pub use aptos_netcore::transport::tcp::{resolve_and_connect, TCPBufferCfg, TcpSocket};
-use aptos_netcore::transport::{pooled_tcp, proxy_protocol, tcp, ConnectionOrigin, Transport};
+use aptos_netcore::transport::{proxy_protocol, tcp, ConnectionOrigin, Transport};
 use aptos_short_hex_str::AsShortHexStr;
 use aptos_time_service::{timeout, TimeService, TimeServiceTrait};
 use aptos_types::{
@@ -49,15 +49,13 @@ pub const SUPPORTED_MESSAGING_PROTOCOL: MessagingProtocolVersion = MessagingProt
 static CONNECTION_ID_GENERATOR: ConnectionIdGenerator = ConnectionIdGenerator::new();
 
 /// tcp::Transport with Aptos-specific configuration applied.
-pub const APTOS_TCP_TRANSPORT: pooled_tcp::PooledTcpTransport = pooled_tcp::PooledTcpTransport {
+pub const APTOS_TCP_TRANSPORT: tcp::TcpTransport = tcp::TcpTransport {
     // Use default options.
     ttl: None,
     // Use TCP_NODELAY for Aptos tcp connections.
     nodelay: Some(true),
     // Use default TCP setting, overridden by Network config
     tcp_buff_cfg: tcp::TCPBufferCfg::new(),
-
-    num_connections: 4,
 };
 
 /// A trait alias for "socket-like" things.

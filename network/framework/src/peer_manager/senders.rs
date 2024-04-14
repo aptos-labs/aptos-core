@@ -99,6 +99,7 @@ impl PeerManagerRequestSender {
             data: req,
             res_tx,
             timeout,
+            start: Instant::now(),
         };
         self.inner.push(
             (peer_id, protocol_id),

@@ -31,10 +31,10 @@ use url::Url;
 
 #[derive(Debug, Clone, Copy, Default)]
 pub struct TCPBufferCfg {
-    pub inbound_rx_buffer_bytes: Option<u32>,
-    pub inbound_tx_buffer_bytes: Option<u32>,
-    pub outbound_rx_buffer_bytes: Option<u32>,
-    pub outbound_tx_buffer_bytes: Option<u32>,
+    inbound_rx_buffer_bytes: Option<u32>,
+    inbound_tx_buffer_bytes: Option<u32>,
+    outbound_rx_buffer_bytes: Option<u32>,
+    outbound_tx_buffer_bytes: Option<u32>,
 }
 
 impl TCPBufferCfg {

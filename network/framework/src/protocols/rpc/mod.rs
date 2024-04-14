@@ -147,6 +147,9 @@ pub struct OutboundRpcRequest {
     /// rpc layer will send an [`RpcError::TimedOut`] error over the
     /// `res_tx` channel to the upper client layer.
     pub timeout: Duration,
+
+    #[serde(skip)]
+    pub start: Instant,
 }
 
 impl SerializedRequest for OutboundRpcRequest {
@@ -452,6 +455,7 @@ impl OutboundRpcs {
             data: request_data,
             timeout,
             res_tx: mut application_response_tx,
+            start,
         } = request;
         let req_len = request_data.len() as u64;
 
@@ -503,6 +507,7 @@ impl OutboundRpcs {
             request_id,
             priority: Priority::default(),
             raw_request: Vec::from(request_data.as_ref()),
+            start: Some(start),
         });
         write_reqs_tx.send(message).await?;
 

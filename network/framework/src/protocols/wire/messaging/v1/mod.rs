@@ -119,6 +119,9 @@ pub struct RpcRequest {
     /// Request payload. This will be parsed by the application-level handler.
     #[serde(with = "serde_bytes")]
     pub raw_request: Vec<u8>,
+
+    #[serde(skip)]
+    pub start: Option<Instant>,
 }
 
 #[derive(Clone, Debug, PartialEq, Eq, Deserialize, Serialize)]
@@ -265,7 +268,13 @@ impl<TWriteSocket: AsyncWrite> Sink<&MultiplexMessage> for MultiplexMessageSink<
         self.project()
             .framed_write
             .start_send(frame)
-            .map_err(WriteError::IoError)
+            .map_err(WriteError::IoError)?;
+        if let MultiplexMessage::Message(NetworkMessage::RpcRequest(r)) = message {
+            counters::NETWORK_PEER_WRITE_DURATION
+                .with_label_values(&["unknown", "unknown", "post-send"])
+                .observe(r.start.unwrap().elapsed().as_secs_f64());
+        }
+        Ok(())
     }
 
     fn poll_flush(self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Result<(), Self::Error>> {
