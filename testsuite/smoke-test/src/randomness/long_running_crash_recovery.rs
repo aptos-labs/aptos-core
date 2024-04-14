@@ -45,6 +45,8 @@ async fn long_running_crash_recovery() {
     let mut validator_power_status_vec = vec![true; 4];
     let mut num_iterations = 0;
     loop {
+        let root_balance = rest_cli.get_account_balance(root_addr).await.unwrap().into_inner();
+        println!("root_balance={:?}", root_balance);
         print_current_state(num_iterations, &rest_cli, &validator_power_status_vec).await;
         make_change(&mut validator_power_status_vec, &rest_cli, &aptos_cli, root_idx, &mut swarm).await;
         let sleep_sec = rng.gen_range(5, 30);
@@ -69,6 +71,7 @@ async fn print_current_state(num_iterations: usize, client: &Client, validator_p
     println!("vtxn_enabled={}", consensus_config.is_vtxn_enabled());
     println!("randomness_config={}", randomness_config.variant.type_name);
     println!("validator_power_status_vec={:?}", validator_power_status_vec);
+    client.get_account_balance()
     println!();
 }
 
