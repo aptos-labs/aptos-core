@@ -322,6 +322,7 @@ impl<S: TShare, D: TAugmentedData> RandManager<S, D> {
         };
         let ack_state = Arc::new(CertifiedAugDataAckState::new(validators.into_iter()));
         let task = phase1.then(|certified_data| async move {
+            self.aug_data_store.add_certified_aug_data(certified_data).expect("Add self cert aug data should succeed");
             info!(LogSchema::new(LogEvent::BroadcastCertifiedAugData)
                 .author(*certified_data.author())
                 .epoch(certified_data.epoch()));
