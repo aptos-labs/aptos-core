@@ -216,10 +216,10 @@ impl Drop for Entry {
                         .lock_and_remove(&module_id.address, &module_id.name),
                     Path::Resource(struct_tag) => GLOBAL_REGISTRY
                         .resource_keys
-                        .lock_and_remove(address, struct_tag),
+                        .lock_and_remove(struct_tag, address),
                     Path::ResourceGroup(struct_tag) => GLOBAL_REGISTRY
                         .resource_group_keys
-                        .lock_and_remove(address, struct_tag),
+                        .lock_and_remove(struct_tag, address),
                 }
             },
             StateKeyInner::TableItem { handle, key } => {
@@ -346,8 +346,8 @@ static GLOBAL_REGISTRY: Lazy<StateKeyRegistry> = Lazy::new(StateKeyRegistry::new
 
 pub struct StateKeyRegistry {
     // FIXME(aldenhu): reverse dimensions to save memory?
-    resource_keys: TwoLevelRegistry<AccountAddress, StructTag>,
-    resource_group_keys: TwoLevelRegistry<AccountAddress, StructTag>,
+    resource_keys: TwoLevelRegistry<StructTag, AccountAddress>,
+    resource_group_keys: TwoLevelRegistry<StructTag, AccountAddress>,
     module_keys: TwoLevelRegistry<AccountAddress, Identifier>,
     table_item_keys: TwoLevelRegistry<TableHandle, Vec<u8>>,
     raw_keys: TwoLevelRegistry<Vec<u8>, ()>, // for tests only
@@ -414,7 +414,7 @@ impl StateKey {
     }
 
     pub fn resource(address: &AccountAddress, struct_tag: &StructTag) -> Self {
-        if let Some(entry) = GLOBAL_REGISTRY.resource_keys.try_get(address, struct_tag) {
+        if let Some(entry) = GLOBAL_REGISTRY.resource_keys.try_get(struct_tag, address) {
             return Self(entry);
         }
 
@@ -426,7 +426,7 @@ impl StateKey {
 
         let entry = GLOBAL_REGISTRY
             .resource_keys
-            .lock_and_get_or_add(address, struct_tag, maybe_add);
+            .lock_and_get_or_add(struct_tag, address, maybe_add);
         Self(entry)
     }
 
@@ -441,7 +441,7 @@ impl StateKey {
     pub fn resource_group(address: &AccountAddress, struct_tag: &StructTag) -> Self {
         if let Some(entry) = GLOBAL_REGISTRY
             .resource_group_keys
-            .try_get(address, struct_tag)
+            .try_get(struct_tag, address)
         {
             return Self(entry);
         }
@@ -454,7 +454,7 @@ impl StateKey {
 
         let entry = GLOBAL_REGISTRY
             .resource_group_keys
-            .lock_and_get_or_add(address, struct_tag, maybe_add);
+            .lock_and_get_or_add(struct_tag, address, maybe_add);
         Self(entry)
     }
 
