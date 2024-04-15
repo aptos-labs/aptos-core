@@ -26,3 +26,6 @@ error: invalid attribute
   │       │
   │       Attribute 'expected_failure' is not expected with a constant
   │       Expected to be used with one of the following: function
+
+
+============ bytecode verification succeeded ========

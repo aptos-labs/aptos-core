@@ -3397,7 +3397,7 @@ This address should be deterministic for the same admin and vesting contract cre
 <td>2</td>
 <td>The vesting pool should not exceed a maximum of 30 shareholders.</td>
 <td>Medium</td>
-<td>The maximum number of shareholders a vesting pool can support is stored as a constant in</td>
+<td>The maximum number of shareholders a vesting pool can support is stored as a constant in MAXIMUM_SHAREHOLDERS which is passed to the pool_u64::create function.</td>
 <td>Formally verified via a <a href="#high-level-spec-2">global invariant</a>.</td>
 </tr>
 
@@ -3413,7 +3413,7 @@ This address should be deterministic for the same admin and vesting contract cre
 <td>4</td>
 <td>The shareholders should be able to start vesting only after the vesting cliff and the first vesting period have transpired.</td>
 <td>High</td>
-<td>The end of the vesting cliff is stored under VestingContract.vesting_schedule.start_timestamp_secs. period.</td>
+<td>The end of the vesting cliff is stored under VestingContract.vesting_schedule.start_timestamp_secs. The vest function always checks that timestamp::now_seconds is greater or equal to the end of the vesting cliff period.</td>
 <td>Audited the check for the end of vesting cliff: <a href="https://github.com/aptos-labs/aptos-core/blob/main/aptos-move/framework/aptos-framework/sources/vesting.move#L566">vest</a> module.</td>
 </tr>
 
@@ -3429,7 +3429,7 @@ This address should be deterministic for the same admin and vesting contract cre
 <td>6</td>
 <td>A new vesting schedule should not be allowed to start vesting in the past or to supply an empty schedule or for the period duration to be zero.</td>
 <td>High</td>
-<td>The create_vesting_schedule function ensures that the length of the schedule vector is greater than 0, that the period duration is greater than 0 and that the start_timestamp_secs is greater or equal to</td>
+<td>The create_vesting_schedule function ensures that the length of the schedule vector is greater than 0, that the period duration is greater than 0 and that the start_timestamp_secs is greater or equal to timestamp::now_seconds.</td>
 <td>Formally verified via <a href="#high-level-req-6">create_vesting_schedule</a>.</td>
 </tr>
 
