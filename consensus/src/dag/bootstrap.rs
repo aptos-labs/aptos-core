@@ -831,7 +831,7 @@ pub(super) fn bootstrap_dag_for_test(
         execution_client,
         false,
         ValidatorTxnConfig::default_enabled(),
-        OnChainRandomnessConfig::default_enabled(),
+        OnChainRandomnessConfig::default_disabled(),
         OnChainJWKConsensusConfig::default_enabled(),
         BoundedExecutor::new(2, Handle::current()),
         true,
