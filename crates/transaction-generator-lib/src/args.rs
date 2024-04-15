@@ -69,6 +69,7 @@ pub enum TransactionTypeArg {
     SmartTablePicture1MWith256Change,
     SmartTablePicture1BWith256Change,
     SmartTablePicture1MWith1KChangeExceedsLimit,
+    OnChainDice,
 }
 
 impl TransactionTypeArg {
@@ -432,6 +433,11 @@ impl TransactionTypeArg {
                     num_modules: module_working_set_size,
                     use_account_pool: sender_use_account_pool,
                 }
+            },
+            TransactionTypeArg::OnChainDice => TransactionType::CallCustomModules {
+                entry_point: EntryPoints::OnChainDice,
+                num_modules: module_working_set_size,
+                use_account_pool: sender_use_account_pool,
             },
         }
     }

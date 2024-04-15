@@ -8,8 +8,8 @@ module module_owner::dice {
     }
 
     #[randomness]
-    entry fun roll(account: signer) acquires DiceRollHistory {
-        let addr = address_of(&account);
+    public entry fun roll(account: &signer) acquires DiceRollHistory {
+        let addr = address_of(account);
         let roll_history = if (exists<DiceRollHistory>(addr)) {
             move_from<DiceRollHistory>(addr)
         } else {
@@ -17,6 +17,6 @@ module module_owner::dice {
         };
         let new_roll = randomness::u64_range(0, 6);
         vector::push_back(&mut roll_history.rolls, new_roll);
-        move_to(&account, roll_history);
+        move_to(account, roll_history);
     }
 }

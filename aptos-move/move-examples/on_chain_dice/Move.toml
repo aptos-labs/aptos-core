@@ -3,7 +3,7 @@ name = "OnChainDice"
 version = "0.0.0"
 
 [addresses]
-module_owner = "_"
+module_owner = "0xABCD"
 
 [dependencies]
 AptosFramework = { local = "../../framework/aptos-framework" }

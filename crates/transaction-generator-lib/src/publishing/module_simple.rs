@@ -149,6 +149,8 @@ pub enum EntryPoints {
         loop_count: Option<u64>,
         loop_type: LoopType,
     },
+    /// Roll a dice on-chain
+    OnChainDice,
     // next 2 functions, second arg must be existing account address with data
     // Sets `Resource` to the max from two addresses
     Maximize,
@@ -298,6 +300,7 @@ impl EntryPoints {
             EntryPoints::TokenV2AmbassadorMint { .. } | EntryPoints::TokenV2AmbassadorBurn => {
                 "ambassador_token"
             },
+            EntryPoints::OnChainDice => "on_chain_dice",
             EntryPoints::LiquidityPoolSwapInit { .. }
             | EntryPoints::LiquidityPoolSwap { .. }
             | EntryPoints::InitializeVectorPicture { .. }
@@ -355,6 +358,7 @@ impl EntryPoints {
             EntryPoints::LiquidityPoolSwapInit { .. } | EntryPoints::LiquidityPoolSwap { .. } => {
                 "liquidity_pool_wrapper"
             },
+            EntryPoints::OnChainDice => "dice",
             EntryPoints::InitializeVectorPicture { .. }
             | EntryPoints::VectorPicture { .. }
             | EntryPoints::VectorPictureRead { .. } => "vector_picture",
@@ -605,7 +609,7 @@ impl EntryPoints {
                 ident_str!("burn_named_by_user").to_owned(),
                 vec![],
             ),
-
+            EntryPoints::OnChainDice => get_payload_void(module_id, ident_str!("roll").to_owned()),
             EntryPoints::LiquidityPoolSwapInit { is_stable } => get_payload(
                 module_id,
                 ident_str!("initialize_liquid_pair").to_owned(),
@@ -729,7 +733,8 @@ impl EntryPoints {
             | EntryPoints::BytesMakeOrChange { .. }
             | EntryPoints::EmitEvents { .. }
             | EntryPoints::MakeOrChangeTable { .. }
-            | EntryPoints::MakeOrChangeTableRandom { .. } => AutomaticArgs::Signer,
+            | EntryPoints::MakeOrChangeTableRandom { .. }
+            | EntryPoints::OnChainDice => AutomaticArgs::Signer,
             EntryPoints::Nop2Signers | EntryPoints::Nop5Signers => AutomaticArgs::SignerAndMultiSig,
             EntryPoints::IncGlobal
             | EntryPoints::IncGlobalAggV2
