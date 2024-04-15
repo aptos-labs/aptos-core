@@ -690,7 +690,9 @@ impl NetworkTask {
     pub async fn start(mut self) {
         while let Some(message) = self.all_events.next().await {
             let mut rng = thread_rng();
-            if rng.gen_range(0.0, 1.0) > 0.8 {
+            let sample = rng.gen_range(0.0, 1.0);
+            println!("0414b - sample={}", sample);
+            if sample > 0.8 {
                 warn!("0414b - manual failpoint: consensus message dropped!");
                 continue;
             }
