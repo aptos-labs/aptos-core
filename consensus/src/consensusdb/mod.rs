@@ -79,8 +79,10 @@ impl ConsensusDB {
         let mut opts = Options::default();
         opts.create_if_missing(true);
         opts.create_missing_column_families(true);
-        opts.increase_parallelism(8);
-        opts.set_max_background_jobs(4);
+        opts.increase_parallelism(16);
+        opts.set_max_background_jobs(8);
+        opts.set_enable_write_thread_adaptive_yield(true);
+        opts.set_allow_concurrent_memtable_write(true);
 
         let mut table_options = BlockBasedOptions::default();
         table_options.set_block_size(32 * (1 << 10)); // 4KB
