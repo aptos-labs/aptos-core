@@ -366,7 +366,7 @@ impl<S: TShare, D: TAugmentedData> RandManager<S, D> {
         let mut interval = tokio::time::interval(Duration::from_millis(5000));
         while !self.stop {
             tokio::select! {
-                Some(blocks) = incoming_blocks.next() => {
+                Some(blocks) = incoming_blocks.next(), if self.aug_data_store.my_certified_aug_data_exists() => {
                     self.process_incoming_blocks(blocks);
                 }
                 Some(reset) = reset_rx.next() => {
@@ -448,7 +448,6 @@ impl<S: TShare, D: TAugmentedData> RandManager<S, D> {
                 _ = interval.tick().fuse() => {
                     self.observe_queue();
                 },
-
             }
             let maybe_ready_blocks = self.block_queue.dequeue_rand_ready_prefix();
             if !maybe_ready_blocks.is_empty() {
