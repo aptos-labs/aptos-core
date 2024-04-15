@@ -437,11 +437,6 @@ async fn process_streaming_response(
                     }
                     // Cleanup.
                     tasks_to_run = vec![];
-                    info!(
-                        start_version = start_version,
-                        num_of_transactions = num_of_transactions,
-                        "[Indexer Cache] End signal received for current batch.",
-                    );
                     if current_version != start_version + num_of_transactions {
                         error!(
                             current_version = current_version,

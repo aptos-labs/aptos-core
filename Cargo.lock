@@ -1951,37 +1951,12 @@ dependencies = [
 ]
 
 [[package]]
-name = "aptos-indexer-grpc-data-access"
-version = "1.0.0"
-dependencies = [
- "anyhow",
- "aptos-protos 1.3.0",
- "async-trait",
- "base64 0.13.1",
- "dashmap",
- "enum_dispatch",
- "google-cloud-storage",
- "prost 0.12.3",
- "redis",
- "redis-test",
- "serde",
- "serde_json",
- "tempfile",
- "thiserror",
- "tokio",
- "tokio-util 0.7.10",
- "tracing",
-]
-
-[[package]]
 name = "aptos-indexer-grpc-data-service"
 version = "1.0.0"
 dependencies = [
  "anyhow",
- "aptos-indexer-grpc-data-access",
  "aptos-indexer-grpc-server-framework",
  "aptos-indexer-grpc-utils",
- "aptos-logger",
  "aptos-metrics-core",
  "aptos-moving-average 0.1.0 (git+https://github.com/aptos-labs/aptos-indexer-processors.git?rev=4801acae7aea30d7e96bbfbe5ec5b04056dfa4cf)",
  "aptos-protos 1.3.0",
