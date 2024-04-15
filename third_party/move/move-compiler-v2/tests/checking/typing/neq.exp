@@ -19,16 +19,16 @@ module 0x8675309::M {
         true;
         true;
         Neq<M::S>(Borrow(Immutable)(s), s_ref);
-        Neq<M::S>(Freeze(Borrow(Mutable)(s)), s_ref);
-        Neq<M::S>(Freeze(Borrow(Mutable)(s)), Freeze(s_mut));
-        Neq<M::S>(Borrow(Immutable)(s), Freeze(s_mut));
-        Neq<M::S>(s_ref, Freeze(s_mut));
-        Neq<M::S>(Freeze(s_mut), Freeze(s_mut));
+        Neq<M::S>(Freeze(false)(Borrow(Mutable)(s)), s_ref);
+        Neq<M::S>(Freeze(false)(Borrow(Mutable)(s)), Freeze(false)(s_mut));
+        Neq<M::S>(Borrow(Immutable)(s), Freeze(false)(s_mut));
+        Neq<M::S>(s_ref, Freeze(false)(s_mut));
+        Neq<M::S>(Freeze(false)(s_mut), Freeze(false)(s_mut));
         Neq<M::S>(pack M::S(0), s);
         Neq<M::R>(r, r);
-        Neq<M::R>(Freeze(r_mut), Freeze(r_mut));
-        Neq<M::R>(r, Freeze(r_mut));
-        Neq<M::R>(Freeze(r_mut), r);
+        Neq<M::R>(Freeze(false)(r_mut), Freeze(false)(r_mut));
+        Neq<M::R>(r, Freeze(false)(r_mut));
+        Neq<M::R>(Freeze(false)(r_mut), r);
         Neq<M::G<u64>>(pack M::G<u64>(1), pack M::G<u64>(2));
         Neq<M::G<u64>>(pack M::G<u64>(1), pack M::G<u64>(2));
         Tuple()

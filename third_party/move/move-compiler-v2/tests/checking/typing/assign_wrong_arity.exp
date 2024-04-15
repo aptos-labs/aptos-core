@@ -1,6 +1,6 @@
 
 Diagnostics:
-error: the left-hand side has 3 items but the right-hand side provided 0
+error: the left-hand side has 0 items but the right-hand side provided 3
   ┌─ tests/checking/typing/assign_wrong_arity.move:7:9
   │
 7 │         x = (0, 1, 2);

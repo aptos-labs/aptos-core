@@ -61,6 +61,7 @@ pub trait TExecutionClient: Send + Sync {
         onchain_execution_config: &OnChainExecutionConfig,
         onchain_randomness_config: &OnChainRandomnessConfig,
         rand_config: Option<RandConfig>,
+        fast_rand_config: Option<RandConfig>,
         rand_msg_rx: aptos_channel::Receiver<AccountAddress, IncomingRandGenRequest>,
     );
 
@@ -171,6 +172,7 @@ impl ExecutionProxyClient {
         commit_signer_provider: Arc<dyn CommitSignerProvider>,
         epoch_state: Arc<EpochState>,
         rand_config: Option<RandConfig>,
+        fast_rand_config: Option<RandConfig>,
         rand_msg_rx: aptos_channel::Receiver<AccountAddress, IncomingRandGenRequest>,
     ) {
         let network_sender = NetworkSender::new(
@@ -205,10 +207,12 @@ impl ExecutionProxyClient {
                     epoch_state.clone(),
                     signer,
                     rand_config,
+                    fast_rand_config,
                     rand_ready_block_tx,
                     Arc::new(network_sender.clone()),
                     self.rand_storage.clone(),
                     self.bounded_executor.clone(),
+                    &self.consensus_config.rand_rb_config,
                 );
 
                 tokio::spawn(rand_manager.start(
@@ -273,12 +277,14 @@ impl TExecutionClient for ExecutionProxyClient {
         onchain_execution_config: &OnChainExecutionConfig,
         onchain_randomness_config: &OnChainRandomnessConfig,
         rand_config: Option<RandConfig>,
+        fast_rand_config: Option<RandConfig>,
         rand_msg_rx: aptos_channel::Receiver<AccountAddress, IncomingRandGenRequest>,
     ) {
         let maybe_rand_msg_tx = self.spawn_decoupled_execution(
             commit_signer_provider,
             epoch_state.clone(),
             rand_config,
+            fast_rand_config,
             rand_msg_rx,
         );
 
@@ -450,6 +456,7 @@ impl TExecutionClient for DummyExecutionClient {
         _onchain_execution_config: &OnChainExecutionConfig,
         _onchain_randomness_config: &OnChainRandomnessConfig,
         _rand_config: Option<RandConfig>,
+        _fast_rand_config: Option<RandConfig>,
         _rand_msg_rx: aptos_channel::Receiver<AccountAddress, IncomingRandGenRequest>,
     ) {
     }

@@ -13,6 +13,7 @@ pub mod types;
 use crate::{
     epoch_manager::EpochManager, network::NetworkTask, network_interface::DKGNetworkClient,
 };
+use aptos_config::config::ReliableBroadcastConfig;
 use aptos_event_notifications::{
     DbBackedOnChainConfig, EventNotificationListener, ReconfigNotificationListener,
 };
@@ -31,6 +32,7 @@ pub fn start_dkg_runtime(
     reconfig_events: ReconfigNotificationListener<DbBackedOnChainConfig>,
     dkg_start_events: EventNotificationListener,
     vtxn_pool: VTxnPoolState,
+    rb_config: ReliableBroadcastConfig,
 ) -> Runtime {
     let runtime = aptos_runtimes::spawn_named_runtime("dkg".into(), Some(4));
     let (self_sender, self_receiver) = aptos_channels::new(1_024, &counters::PENDING_SELF_MESSAGES);
@@ -44,6 +46,7 @@ pub fn start_dkg_runtime(
         self_sender,
         dkg_network_client,
         vtxn_pool,
+        rb_config,
     );
     let (network_task, network_receiver) = NetworkTask::new(network_events, self_receiver);
     runtime.spawn(network_task.start());

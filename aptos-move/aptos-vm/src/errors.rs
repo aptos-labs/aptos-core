@@ -51,6 +51,7 @@ const INVALID_ARGUMENT: u8 = 0x1;
 const LIMIT_EXCEEDED: u8 = 0x2;
 const INVALID_STATE: u8 = 0x3;
 const PERMISSION_DENIED: u8 = 0x5;
+const NOT_FOUND: u8 = 0x6;
 
 fn error_split(code: u64) -> (u8, u64) {
     let reason = code & 0xFFFF;
@@ -76,7 +77,7 @@ pub fn convert_prologue_error(
                 // in the Move repo.
                 (INVALID_STATE, EACCOUNT_NOT_MULTISIG) => StatusCode::ACCOUNT_NOT_MULTISIG,
                 (PERMISSION_DENIED, ENOT_MULTISIG_OWNER) => StatusCode::NOT_MULTISIG_OWNER,
-                (INVALID_ARGUMENT, EMULTISIG_TRANSACTION_NOT_FOUND) => {
+                (NOT_FOUND, EMULTISIG_TRANSACTION_NOT_FOUND) => {
                     StatusCode::MULTISIG_TRANSACTION_NOT_FOUND
                 },
                 (INVALID_ARGUMENT, EMULTISIG_NOT_ENOUGH_APPROVALS) => {

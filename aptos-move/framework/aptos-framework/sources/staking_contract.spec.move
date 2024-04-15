@@ -187,7 +187,7 @@ spec aptos_framework::staking_contract {
     /// Staking_contract exists the stacker/operator pair.
     spec add_stake(staker: &signer, operator: address, amount: u64) {
         use aptos_framework::reconfiguration_state;
-        pragma verify_duration_estimate = 120;
+        pragma verify_duration_estimate = 600;
         // TODO: this function times out
         include stake::ResourceRequirement;
         aborts_if reconfiguration_state::spec_is_in_progress();

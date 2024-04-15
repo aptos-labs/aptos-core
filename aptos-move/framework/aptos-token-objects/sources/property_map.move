@@ -9,7 +9,7 @@ module aptos_token_objects::property_map {
     use aptos_std::from_bcs;
     use aptos_std::simple_map::{Self, SimpleMap};
     use aptos_std::type_info;
-    use aptos_framework::object::{Self, ConstructorRef, Object};
+    use aptos_framework::object::{Self, ConstructorRef, Object, ExtendRef, ObjectCore};
 
     // Errors
     /// The property map does not exist
@@ -68,6 +68,11 @@ module aptos_token_objects::property_map {
 
     public fun init(ref: &ConstructorRef, container: PropertyMap) {
         let signer = object::generate_signer(ref);
+        move_to(&signer, container);
+    }
+
+    public fun extend(ref: &ExtendRef, container: PropertyMap) {
+        let signer = object::generate_signer_for_extending(ref);
         move_to(&signer, container);
     }
 
@@ -347,23 +352,7 @@ module aptos_token_objects::property_map {
         init(&constructor_ref, input);
         let mutator = generate_mutator_ref(&constructor_ref);
 
-        assert!(read_bool(&object, &string::utf8(b"bool")), 0);
-        assert!(read_u8(&object, &string::utf8(b"u8")) == 0x12, 1);
-        assert!(read_u16(&object, &string::utf8(b"u16")) == 0x1234, 2);
-        assert!(read_u32(&object, &string::utf8(b"u32")) == 0x12345678, 3);
-        assert!(read_u64(&object, &string::utf8(b"u64")) == 0x1234567812345678, 4);
-        assert!(read_u128(&object, &string::utf8(b"u128")) == 0x12345678123456781234567812345678, 5);
-        assert!(
-            read_u256(
-                &object,
-                &string::utf8(b"u256")
-            ) == 0x1234567812345678123456781234567812345678123456781234567812345678,
-            6
-        );
-        assert!(read_bytes(&object, &string::utf8(b"vector<u8>")) == vector[0x01], 7);
-        assert!(read_string(&object, &string::utf8(b"0x1::string::String")) == string::utf8(b"a"), 8);
-
-        assert!(length(&object) == 9, 9);
+        assert_end_to_end_input(object);
 
         test_end_to_end_update_typed(&mutator, &object);
 
@@ -522,6 +511,16 @@ module aptos_token_objects::property_map {
         assert!(read_string(object, &string::utf8(b"0x1::string::String")) == string::utf8(b"ha"), 29);
     }
 
+    #[test(creator = @0x123)]
+    fun test_extend_property_map(creator: &signer) acquires PropertyMap {
+        let constructor_ref = object::create_named_object(creator, b"");
+        let extend_ref = object::generate_extend_ref(&constructor_ref);
+        extend(&extend_ref, end_to_end_input());
+
+        let object = object::object_from_constructor_ref<ObjectCore>(&constructor_ref);
+        assert_end_to_end_input(object);
+    }
+
     #[test_only]
     fun end_to_end_input(): PropertyMap {
         prepare_input(
@@ -645,5 +644,25 @@ module aptos_token_objects::property_map {
         );
         init(&constructor_ref, input);
         read_u8(&object, &string::utf8(b"bool"));
+    }
+
+    fun assert_end_to_end_input(object: Object<ObjectCore>) acquires PropertyMap {
+        assert!(read_bool(&object, &string::utf8(b"bool")), 0);
+        assert!(read_u8(&object, &string::utf8(b"u8")) == 0x12, 1);
+        assert!(read_u16(&object, &string::utf8(b"u16")) == 0x1234, 2);
+        assert!(read_u32(&object, &string::utf8(b"u32")) == 0x12345678, 3);
+        assert!(read_u64(&object, &string::utf8(b"u64")) == 0x1234567812345678, 4);
+        assert!(read_u128(&object, &string::utf8(b"u128")) == 0x12345678123456781234567812345678, 5);
+        assert!(
+            read_u256(
+                &object,
+                &string::utf8(b"u256")
+            ) == 0x1234567812345678123456781234567812345678123456781234567812345678,
+            6
+        );
+        assert!(read_bytes(&object, &string::utf8(b"vector<u8>")) == vector[0x01], 7);
+        assert!(read_string(&object, &string::utf8(b"0x1::string::String")) == string::utf8(b"a"), 8);
+
+        assert!(length(&object) == 9, 9);
     }
 }

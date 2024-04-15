@@ -224,18 +224,6 @@ impl<'env> Generator<'env> {
         next_idx
     }
 
-    /// Create a new temporary and check whether it has a valid type.
-    fn new_temp_with_valid_type(&mut self, id: NodeId, ty: Type) -> TempIndex {
-        if matches!(ty, Type::Tuple(..)) {
-            self.error(
-                id,
-                format!("cannot assign tuple type `{}` to single variable (use `(a, b, ..) = ..` instead)",
-                        ty.display(&self.func_env.get_type_display_ctx()))
-            )
-        }
-        self.new_temp(ty)
-    }
-
     /// Release a temporary.
     fn release_temp(&mut self, _temp: TempIndex) {
         // Nop for now
@@ -367,13 +355,21 @@ impl<'env> Generator<'env> {
                 let mut scope = BTreeMap::new();
                 for (id, sym) in pat.vars() {
                     let ty = self.get_node_type(id);
-                    let temp = self.new_temp_with_valid_type(id, ty);
+                    let temp = self.new_temp(ty);
                     scope.insert(sym, temp);
                     self.local_names.insert(temp, sym);
                 }
                 // If there is a binding, assign the pattern
                 if let Some(binding) = opt_binding {
-                    self.gen_assign(pat.node_id(), pat, binding, Some(&scope));
+                    if let Pattern::Var(var_id, sym) = pat {
+                        // For the common case `let x = binding; ...` avoid introducing a
+                        // temporary for `binding` and directly pass the temp for `x` into
+                        // translation.
+                        let local = self.find_local_for_pattern(*var_id, *sym, Some(&scope));
+                        self.without_reference_mode(|s| s.gen(vec![local], binding))
+                    } else {
+                        self.gen_assign(pat.node_id(), pat, binding, Some(&scope));
+                    }
                 }
                 // Compile the body
                 self.scopes.push(scope);
@@ -581,7 +577,9 @@ impl<'env> Generator<'env> {
     fn gen_call(&mut self, targets: Vec<TempIndex>, id: NodeId, op: &Operation, args: &[Exp]) {
         match op {
             Operation::Vector => self.gen_op_call(targets, id, BytecodeOperation::Vector, args),
-            Operation::Freeze => self.gen_op_call(targets, id, BytecodeOperation::FreezeRef, args),
+            Operation::Freeze(explicit) => {
+                self.gen_op_call(targets, id, BytecodeOperation::FreezeRef(*explicit), args)
+            },
             Operation::Tuple => {
                 if targets.len() != args.len() {
                     self.internal_error(
@@ -915,7 +913,7 @@ impl<'env> Generator<'env> {
                 .new_node(self.env().get_node_loc(id), expected_ty.clone());
             self.env()
                 .set_node_instantiation(freeze_id, vec![et.as_ref().clone()]);
-            ExpData::Call(freeze_id, Operation::Freeze, vec![exp.clone()]).into_exp()
+            ExpData::Call(freeze_id, Operation::Freeze(false), vec![exp.clone()]).into_exp()
         } else {
             exp.clone()
         }
@@ -1337,7 +1335,7 @@ impl<'env> Generator<'env> {
                 // temporary to the pattern.
                 let id = pat.node_id();
                 let ty = self.get_node_type(id);
-                let temp = self.new_temp_with_valid_type(id, ty);
+                let temp = self.new_temp(ty);
                 (temp, Some((id, pat.clone(), temp)))
             },
         }

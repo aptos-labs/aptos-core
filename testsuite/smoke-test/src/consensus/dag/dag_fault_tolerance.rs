@@ -1,4 +1,5 @@
 // Copyright © Aptos Foundation
+// SPDX-License-Identifier: Apache-2.0
 
 use crate::{
     consensus::consensus_fault_tolerance::{start_traffic, ActiveTrafficGuard},

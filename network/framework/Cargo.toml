@@ -11,7 +11,6 @@ aptos-bitvec = { workspace = true }
 aptos-compression = { workspace = true }
 aptos-config = { workspace = true }
 aptos-crypto = { workspace = true }
-aptos-event-notifications = { workspace = true }
 aptos-id-generator = { workspace = true }
 aptos-infallible = { workspace = true }
 aptos-logger = { workspace = true }
@@ -23,7 +22,6 @@ aptos-netcore = { workspace = true }
 aptos-num-variants = { workspace = true }
 aptos-peer-monitoring-service-types = { workspace = true }
 aptos-proptest-helpers = { workspace = true, optional = true }
-aptos-runtimes = { workspace = true }
 aptos-short-hex-str = { workspace = true }
 aptos-time-service = { workspace = true }
 aptos-types = { workspace = true }
@@ -75,3 +73,6 @@ console-subscriber = { workspace = true }
 default = []
 fuzzing = ["aptos-bitvec/fuzzing", "aptos-config/fuzzing", "aptos-crypto/fuzzing", "aptos-types/fuzzing", "aptos-proptest-helpers", "aptos-time-service/testing", "aptos-types/fuzzing", "aptos-memsocket/testing", "aptos-netcore/fuzzing", "proptest", "proptest-derive"]
 testing = ["aptos-config/testing", "aptos-time-service/testing", "aptos-memsocket/testing", "aptos-netcore/testing"]
+
+[package.metadata.cargo-machete]
+ignored = ["serde_bytes"]

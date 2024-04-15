@@ -1,4 +1,5 @@
 // Copyright © Aptos Foundation
+// SPDX-License-Identifier: Apache-2.0
 
 use crate::{
     agg_trx_producer::AggTranscriptProducer,
@@ -10,6 +11,7 @@ use crate::{
 use anyhow::Result;
 use aptos_bounded_executor::BoundedExecutor;
 use aptos_channels::{aptos_channel, message_queues::QueueStyle};
+use aptos_config::config::ReliableBroadcastConfig;
 use aptos_event_notifications::{
     EventNotification, EventNotificationListener, ReconfigNotification,
     ReconfigNotificationListener,
@@ -52,6 +54,7 @@ pub struct EpochManager<P: OnChainConfigProvider> {
     // Network utils
     self_sender: aptos_channels::Sender<Event<DKGMessage>>,
     network_sender: DKGNetworkClient<NetworkClient<DKGMessage>>,
+    rb_config: ReliableBroadcastConfig,
 }
 
 impl<P: OnChainConfigProvider> EpochManager<P> {
@@ -63,6 +66,7 @@ impl<P: OnChainConfigProvider> EpochManager<P> {
         self_sender: aptos_channels::Sender<Event<DKGMessage>>,
         network_sender: DKGNetworkClient<NetworkClient<DKGMessage>>,
         vtxn_pool: VTxnPoolState,
+        rb_config: ReliableBroadcastConfig,
     ) -> Self {
         Self {
             dkg_dealer_sk: Arc::new(dkg_dealer_sk),
@@ -76,6 +80,7 @@ impl<P: OnChainConfigProvider> EpochManager<P> {
             network_sender,
             vtxn_pool,
             dkg_start_event_tx: None,
+            rb_config,
         }
     }
 
@@ -181,9 +186,13 @@ impl<P: OnChainConfigProvider> EpochManager<P> {
             let rb = ReliableBroadcast::new(
                 epoch_state.verifier.get_ordered_account_addresses(),
                 Arc::new(network_sender),
-                ExponentialBackoff::from_millis(5),
+                ExponentialBackoff::from_millis(self.rb_config.backoff_policy_base_ms)
+                    .factor(self.rb_config.backoff_policy_factor)
+                    .max_delay(Duration::from_millis(
+                        self.rb_config.backoff_policy_max_delay_ms,
+                    )),
                 aptos_time_service::TimeService::real(),
-                Duration::from_millis(1000),
+                Duration::from_millis(self.rb_config.rpc_timeout_ms),
                 BoundedExecutor::new(8, tokio::runtime::Handle::current()),
             );
             let agg_trx_producer = AggTranscriptProducer::new(rb);

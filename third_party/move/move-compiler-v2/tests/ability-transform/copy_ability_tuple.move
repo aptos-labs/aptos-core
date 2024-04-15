@@ -5,7 +5,7 @@ module 0x42::M {
         (r, 0)
     }
 
-    public fun g(s: &signer) acquires R {
+    public fun g(s: &signer) {
         let r = R{f:1};
         let _i =3;
         (r,_i) = f(r);

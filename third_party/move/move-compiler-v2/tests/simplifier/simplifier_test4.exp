@@ -19,7 +19,7 @@ module 0x8675309::M {
             s));
             if true {
               x: u64 = Add<u64>(x, 1);
-              M::foo(Freeze<M::S>(s), x: u64 = Add<u64>(x, 1);
+              M::foo(Freeze(true)<M::S>(s), x: u64 = Add<u64>(x, 1);
               f = 0;
               1)
             } else {
@@ -42,6 +42,17 @@ module 0x8675309::M {
 
 
 Diagnostics:
+error: cannot immutably borrow since mutable references exist
+   ┌─ tests/simplifier/simplifier_test4.move:11:17
+   │
+ 8 │         let f = { x = x + 1; &mut ({x = x + 1; z; s}).f };
+   │                              -------------------------- previous mutable field borrow
+   ·
+11 │             foo(freeze(s), { *({x = x + 1; f}) = 0; 1 })
+   │                 ^^^^^^^^^                  - requirement enforced here
+   │                 │
+   │                 immutable borrow attempted here
+
 error: cannot immutably borrow since mutable references exist
    ┌─ tests/simplifier/simplifier_test4.move:11:17
    │

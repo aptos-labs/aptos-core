@@ -228,4 +228,7 @@ fn main() {
         println!("Failing, there were perf improvements or regressions.");
         exit(1);
     }
+
+    // Assert there were no error log lines in the run.
+    assert_eq!(0, aptos_logger::ERROR_LOG_COUNT.get());
 }
