@@ -692,7 +692,7 @@ impl NetworkTask {
             let mut rng = thread_rng();
             let sample = rng.gen_range(0.0, 1.0);
             println!("0414b - sample={}", sample);
-            if sample > 0.8 {
+            if sample > 0.9 {
                 warn!("0414b - manual failpoint: consensus message dropped!");
                 continue;
             }
