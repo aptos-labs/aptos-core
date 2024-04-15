@@ -406,7 +406,8 @@ impl PeersAndMetadata {
                     peer_metadata.connection_metadata.clone(),
                     *network_id,
                 );
-                if sender.try_send(event).is_err() {
+                if let Err(err) = sender.try_send(event) {
+                    warn!("could not send initial NewPeer on subscribe(): {:?}", err);
                     break 'outer;
                 }
             }

@@ -290,39 +290,6 @@ async fn connection_listener(
     let peers_and_metadata = network_client.get_peers_and_metadata();
     let mut connected_peers = HashSet::new();
     let mut connection_notifications = peers_and_metadata.subscribe();
-    if let Ok(peers) = peers_and_metadata.get_connected_peers_and_metadata() {
-        info!(
-            "netbench connection_listener got {} initial peers",
-            peers.len()
-        );
-        for peer_network_id in peers.keys() {
-            info!(
-                "netbench connection_listener new for initial {:?}",
-                peer_network_id
-            );
-            if config.enable_direct_send_testing {
-                handle.spawn(direct_sender(
-                    node_config.clone(),
-                    network_client.clone(),
-                    time_service.clone(),
-                    peer_network_id.network_id(),
-                    peer_network_id.peer_id(),
-                    shared.clone(),
-                ));
-            }
-            if config.enable_rpc_testing {
-                handle.spawn(rpc_sender(
-                    node_config.clone(),
-                    network_client.clone(),
-                    time_service.clone(),
-                    peer_network_id.network_id(),
-                    peer_network_id.peer_id(),
-                    shared.clone(),
-                ));
-            }
-            connected_peers.insert(*peer_network_id);
-        }
-    }
     loop {
         match connection_notifications.recv().await {
             None => {

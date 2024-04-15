@@ -477,6 +477,41 @@ async fn test_peers_and_metadata_subscriptions() {
         },
     }
 
+    // new subscripton should immediately get notified of existing connection
+    let mut sub2 = peers_and_metadata.subscribe();
+    match sub2.try_recv() {
+        Ok(notif) => match notif {
+            ConnectionNotification::NewPeer(conn_meta, network_id) => {
+                assert_eq!(network_id, NetworkId::Validator);
+                assert_eq!(conn_meta, connection_1);
+            },
+            ConnectionNotification::LostPeer(_, _) => {
+                panic!("should get connect but got lost");
+            },
+        },
+        Err(_) => {
+            panic!("should have pending NewPeer");
+        },
+    }
+    // but not more than that
+    match sub2.try_recv() {
+        Ok(unwanted_event) => {
+            panic!(
+                "connection_events should be empty but got {:?}",
+                unwanted_event,
+            )
+        },
+        Err(tre) => match tre {
+            TryRecvError::Empty => {
+                // ok
+            },
+            TryRecvError::Disconnected => {
+                panic!("connection_events disconnected early")
+            },
+        },
+    }
+    sub2.close();
+
     peers_and_metadata
         .remove_peer_metadata(peer_network_id_1, connection_1.connection_id)
         .unwrap();
