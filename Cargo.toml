@@ -132,7 +132,10 @@ members = [
     "execution/executor-types",
     "experimental/execution/ptx-executor",
     "experimental/runtimes",
-    "keyless/pepper/common", "keyless/pepper/example-client-rust", "keyless/pepper/service",
+    "experimental/storage/layered-map",
+    "keyless/pepper/common",
+    "keyless/pepper/example-client-rust",
+    "keyless/pepper/service",
     "mempool",
     "network/benchmark",
     "network/builder",
@@ -318,6 +321,7 @@ aptos-enum-conversion-derive = { path = "crates/aptos-enum-conversion-derive" }
 aptos-executor-service = { path = "execution/executor-service" }
 aptos-executor-test-helpers = { path = "execution/executor-test-helpers" }
 aptos-executor-types = { path = "execution/executor-types" }
+aptos-experimental-layered-map = { path = "experimental/storage/layered-map" }
 aptos-experimental-ptx-executor = { path = "experimental/execution/ptx-executor" }
 aptos-experimental-runtimes = { path = "experimental/runtimes" }
 aptos-faucet-cli = { path = "crates/aptos-faucet/cli" }
