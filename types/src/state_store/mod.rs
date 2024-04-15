@@ -18,6 +18,7 @@ use std::{collections::HashMap, ops::Deref};
 
 pub mod errors;
 pub mod in_memory_state_view;
+mod metrics;
 pub mod state_key;
 pub mod state_key_prefix;
 pub mod state_storage_usage;

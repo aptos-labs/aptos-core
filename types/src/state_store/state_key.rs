@@ -2,13 +2,15 @@
 // SPDX-License-Identifier: Apache-2.0
 
 #![allow(clippy::non_canonical_partial_ord_impl)]
-// FIXME(aldenhu): remove
-#![allow(dead_code)]
-#![allow(unused_variables)]
 
 use crate::{
-    access_path, access_path::AccessPath, on_chain_config::OnChainConfig,
-    state_store::table::TableHandle,
+    access_path,
+    access_path::AccessPath,
+    on_chain_config::OnChainConfig,
+    state_store::{
+        metrics::{STATE_KEY_COUNTERS, STATE_KEY_TIMER},
+        table::TableHandle,
+    },
 };
 use anyhow::Result;
 use aptos_crypto::{
@@ -17,7 +19,7 @@ use aptos_crypto::{
 };
 use aptos_crypto_derive::CryptoHasher;
 use aptos_infallible::RwLock;
-use bytes::Bytes;
+use aptos_metrics_core::{IntCounterHelper, TimerHelper};
 use move_core_types::{
     account_address::AccountAddress,
     identifier::{IdentStr, Identifier},
@@ -36,6 +38,7 @@ use std::{
     fmt,
     fmt::{Debug, Formatter},
     hash::Hash,
+    ops::Deref,
     sync::{Arc, Weak},
 };
 use thiserror::Error;
@@ -55,7 +58,7 @@ pub enum StateKeyInner {
     Raw(Vec<u8>),
 }
 
-impl fmt::Debug for StateKeyInner {
+impl Debug for StateKeyInner {
     fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
         match self {
             StateKeyInner::AccessPath(ap) => {
@@ -168,14 +171,27 @@ impl StateKeyInner {
 }
 
 #[derive(Debug)]
-struct Entry {
+struct EntryInner {
     pub deserialized: StateKeyInner,
     pub hash_value: HashValue,
     // pub serialized: Bytes,
     // pub encoded: Bytes,
 }
 
-impl Entry {
+/// n.b. Wrapping it so EntryInner is constructed outside the lock while Entry is only constructed
+///      and dropped if it's ever added to the registry.
+#[derive(Debug)]
+struct Entry(EntryInner);
+
+impl Deref for Entry {
+    type Target = EntryInner;
+
+    fn deref(&self) -> &Self::Target {
+        &self.0
+    }
+}
+
+impl EntryInner {
     pub fn from_deserialized(deserialized: StateKeyInner) -> Self {
         let hash_value = CryptoHash::hash(&deserialized);
 
@@ -184,35 +200,16 @@ impl Entry {
             hash_value,
         }
     }
-
-    pub fn from_serialized(serialized: Bytes) -> Result<Self> {
-        let deserialized = bcs::from_bytes(&serialized)?;
-        let hash_value = CryptoHash::hash(&deserialized);
-        Ok(Self {
-            deserialized,
-            hash_value,
-        })
-    }
-
-    pub fn from_encoded(encoded: Bytes) -> Result<Self> {
-        let decoded = StateKeyInner::decode(&encoded)?;
-        let hash_value = CryptoHash::hash(&decoded);
-        Ok(Self {
-            deserialized: decoded,
-            hash_value,
-        })
-    }
 }
 
 impl Drop for Entry {
     fn drop(&mut self) {
-        use access_path::Path;
-        // FIXME(aldenhu): implement: remove entry in the registry
-        // todo!()
         match &self.deserialized {
             StateKeyInner::AccessPath(AccessPath { address, path }) => {
-                // FIXME(aldenhu): maybe hold reference to the map(s)?
-                // FIXME(aldenhu): maybe let Inner carry the deserialized Path?
+                use access_path::Path;
+
+                // TODO(aldenhu): maybe hold reference to the map(s)?
+                // TODO(aldenhu): maybe let Inner carry the deserialized Path?
                 match &bcs::from_bytes::<Path>(path).expect("Failed to deserialize Path.") {
                     Path::Code(module_id) => GLOBAL_REGISTRY
                         .module_keys
@@ -234,15 +231,8 @@ impl Drop for Entry {
 }
 
 struct TwoLevelRegistry<Key1, Key2> {
+    key_type: &'static str,
     inner: RwLock<HashMap<Key1, HashMap<Key2, Weak<Entry>>>>,
-}
-
-impl<K1, K2> Default for TwoLevelRegistry<K1, K2> {
-    fn default() -> Self {
-        Self {
-            inner: RwLock::new(HashMap::new()),
-        }
-    }
 }
 
 impl<Key1, Key2> TwoLevelRegistry<Key1, Key2>
@@ -250,6 +240,13 @@ where
     Key1: Clone + Eq + Hash,
     Key2: Clone + Eq + Hash,
 {
+    fn new_empty(key_type: &'static str) -> Self {
+        Self {
+            key_type,
+            inner: RwLock::new(HashMap::new()),
+        }
+    }
+
     fn try_get<Q1, Q2>(&self, key1: &Q1, key2: &Q2) -> Option<Arc<Entry>>
     where
         Key1: Borrow<Q1>,
@@ -257,20 +254,31 @@ where
         Q1: Eq + Hash + ?Sized,
         Q2: Eq + Hash + ?Sized,
     {
-        self.inner
-            .read()
+        let locked = match self.inner.inner().try_read() {
+            Ok(locked) => locked,
+            Err(..) => {
+                // blocked by a write lock
+                STATE_KEY_COUNTERS.inc_with(&[self.key_type, "read_blocked_by_write"]);
+                // wait for write lock to release
+                self.inner.read()
+            },
+        };
+
+        locked
             .get(key1)
             .and_then(|m| m.get(key2))
             .and_then(|weak| weak.upgrade())
     }
 
-    fn lock_and_get_or_add<Q1, Q2>(&self, key1: &Q1, key2: &Q2, maybe_add: Entry) -> Arc<Entry>
+    fn lock_and_get_or_add<Q1, Q2>(&self, key1: &Q1, key2: &Q2, maybe_add: EntryInner) -> Arc<Entry>
     where
         Key1: Borrow<Q1>,
         Key2: Borrow<Q2>,
         Q1: Eq + Hash + ToOwned<Owned = Key1> + ?Sized,
         Q2: Eq + Hash + ToOwned<Owned = Key2> + ?Sized,
     {
+        let _timer = STATE_KEY_TIMER.timer_with(&[self.key_type, "lock_and_get_or_add"]);
+
         const MAX_TRIES: usize = 100;
 
         for _ in 0..MAX_TRIES {
@@ -282,19 +290,23 @@ where
                 .entry(key2.to_owned())
             {
                 hash_map::Entry::Occupied(occupied) => {
-                    if let Some(key_info) = occupied.get().upgrade() {
+                    if let Some(entry) = occupied.get().upgrade() {
                         // some other thread has added it
-                        return key_info;
+                        STATE_KEY_COUNTERS.inc_with(&[self.key_type, "entry_create_collision"]);
+                        return entry;
                     } else {
-                        // FIXME(aldenhu): make sure drop is implemented properly
                         // the key is being dropped, release lock and retry
+                        STATE_KEY_COUNTERS
+                            .inc_with(&[self.key_type, "entry_create_while_dropping"]);
                         continue;
                     }
                 },
                 hash_map::Entry::Vacant(vacant) => {
-                    let key_info = Arc::new(maybe_add);
-                    vacant.insert(Arc::downgrade(&key_info));
-                    return key_info;
+                    STATE_KEY_COUNTERS.inc_with(&[self.key_type, "entry_create"]);
+
+                    let entry = Arc::new(Entry(maybe_add));
+                    vacant.insert(Arc::downgrade(&entry));
+                    return entry;
                 },
             }
         }
@@ -302,7 +314,26 @@ where
     }
 
     fn lock_and_remove(&self, key1: &Key1, key2: &Key2) {
-        // FIXME(aldenhu): remove empty first level entries
+        match self.inner.write().entry(key1.to_owned()) {
+            hash_map::Entry::Occupied(mut occupied) => {
+                match occupied.get_mut().remove(key2) {
+                    Some(..) => {
+                        STATE_KEY_COUNTERS.inc_with(&[self.key_type, "entry_remove"]);
+                    },
+                    None => {
+                        unreachable!("Entry missing in registry when dropping.")
+                    },
+                }
+                if occupied.get().is_empty() {
+                    occupied.remove();
+                }
+            },
+            hash_map::Entry::Vacant(_) => {
+                // This should not happen
+                unreachable!("level 1 map must exist when an entry is supposed to be in it.");
+            },
+        }
+
         self.inner
             .write()
             .entry(key1.to_owned())
@@ -311,9 +342,8 @@ where
     }
 }
 
-static GLOBAL_REGISTRY: Lazy<StateKeyRegistry> = Lazy::new(StateKeyRegistry::default);
+static GLOBAL_REGISTRY: Lazy<StateKeyRegistry> = Lazy::new(StateKeyRegistry::new_empty);
 
-#[derive(Default)]
 pub struct StateKeyRegistry {
     // FIXME(aldenhu): reverse dimensions to save memory?
     resource_keys: TwoLevelRegistry<AccountAddress, StructTag>,
@@ -324,38 +354,14 @@ pub struct StateKeyRegistry {
 }
 
 impl StateKeyRegistry {
-    fn get_or_add_resource(&self, address: &AccountAddress, struct_tag: &StructTag) -> Arc<Entry> {
-        if let Some(key_info) = self.resource_keys.try_get(address, struct_tag) {
-            return key_info;
+    fn new_empty() -> Self {
+        Self {
+            resource_keys: TwoLevelRegistry::new_empty("resource"),
+            resource_group_keys: TwoLevelRegistry::new_empty("resource_group"),
+            module_keys: TwoLevelRegistry::new_empty("module"),
+            table_item_keys: TwoLevelRegistry::new_empty("table_item"),
+            raw_keys: TwoLevelRegistry::new_empty("raw"),
         }
-
-        let inner = StateKeyInner::AccessPath(
-            AccessPath::resource_access_path(*address, struct_tag.clone())
-                .expect("Failed to create access path"),
-        );
-        let key_info = Entry::from_deserialized(inner);
-
-        self.resource_keys
-            .lock_and_get_or_add(address, struct_tag, key_info)
-    }
-
-    fn get_or_add_resource_group(
-        &self,
-        address: &AccountAddress,
-        struct_tag: &StructTag,
-    ) -> Arc<Entry> {
-        if let Some(key_info) = self.resource_group_keys.try_get(address, struct_tag) {
-            return key_info;
-        }
-
-        let inner = StateKeyInner::AccessPath(AccessPath::resource_group_access_path(
-            *address,
-            struct_tag.clone(),
-        ));
-        let key_info = Entry::from_deserialized(inner);
-
-        self.resource_group_keys
-            .lock_and_get_or_add(address, struct_tag, key_info)
     }
 }
 
@@ -416,7 +422,7 @@ impl StateKey {
             AccessPath::resource_access_path(*address, struct_tag.clone())
                 .expect("Failed to create access path"),
         );
-        let maybe_add = Entry::from_deserialized(inner);
+        let maybe_add = EntryInner::from_deserialized(inner);
 
         let entry = GLOBAL_REGISTRY
             .resource_keys
@@ -444,7 +450,7 @@ impl StateKey {
             *address,
             struct_tag.clone(),
         ));
-        let maybe_add = Entry::from_deserialized(inner);
+        let maybe_add = EntryInner::from_deserialized(inner);
 
         let entry = GLOBAL_REGISTRY
             .resource_group_keys
@@ -461,7 +467,7 @@ impl StateKey {
             *address,
             name.to_owned(),
         )));
-        let maybe_add = Entry::from_deserialized(inner);
+        let maybe_add = EntryInner::from_deserialized(inner);
 
         let entry = GLOBAL_REGISTRY
             .module_keys
@@ -482,7 +488,7 @@ impl StateKey {
             handle: *handle,
             key: key.to_vec(),
         };
-        let maybe_add = Entry::from_deserialized(inner);
+        let maybe_add = EntryInner::from_deserialized(inner);
 
         let entry = GLOBAL_REGISTRY
             .table_item_keys
@@ -496,7 +502,7 @@ impl StateKey {
         }
 
         let inner = StateKeyInner::Raw(bytes.to_vec());
-        let maybe_add = Entry::from_deserialized(inner);
+        let maybe_add = EntryInner::from_deserialized(inner);
 
         let entry = GLOBAL_REGISTRY
             .raw_keys

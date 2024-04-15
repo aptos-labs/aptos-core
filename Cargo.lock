@@ -3918,6 +3918,7 @@ dependencies = [
  "aptos-dkg",
  "aptos-experimental-runtimes",
  "aptos-infallible",
+ "aptos-metrics-core",
  "ark-bn254",
  "ark-ff",
  "ark-groth16",
