@@ -685,6 +685,16 @@ impl LifetimeState {
         map
     }
 
+    fn leaves_for_labels(&self, lbl: &BTreeSet<LifetimeLabel>) -> BTreeSet<TempIndex> {
+        let mut set: BTreeSet<TempIndex> = BTreeSet::new();
+        for (temp, label) in &self.temp_to_label_map {
+            if lbl.contains(label) {
+                set.insert(*temp);
+            }
+        }
+        set
+    }
+
     /// Releases graph resources for a reference in temporary.
     fn release_ref(&mut self, temp: TempIndex) {
         if let Some(label) = self.temp_to_label_map.remove(&temp) {
@@ -1005,22 +1015,32 @@ impl<'env, 'state> LifetimeAnalysisStep<'env, 'state> {
         }
     }
 
-    /// Check whether a local can be written. This is only allowed if no borrowed references exist.
+    /// Check whether a local can be written. This is only allowed if it is not borrowed by any
+    /// temps that are alive after the statement
     fn check_write_local(&self, local: TempIndex) {
         if self.is_ref(local) {
             // Always valid
             return;
         }
         if let Some(label) = self.state.label_for_temp_with_children(local) {
-            // The destination is currently borrowed and cannot be assigned
-            self.error_with_hints(
-                self.cur_loc(),
-                format!("cannot assign to borrowed {}", self.display(local)),
-                "attempted to assign here",
-                self.borrow_info(label, |_| true)
-                    .into_iter()
-                    .chain(self.usage_info(label, |t| t != &local)),
-            )
+            let children = self.state.transitive_children(label);
+            // cannot be assigned if the destination is currently borrowed by temps that are alive
+            // after the statement
+            if self
+                .state
+                .leaves_for_labels(&children)
+                .iter()
+                .any(|temp| self.alive.after.contains_key(temp) && *temp != local)
+            {
+                self.error_with_hints(
+                    self.cur_loc(),
+                    format!("cannot assign to borrowed {}", self.display(local)),
+                    "attempted to assign here",
+                    self.borrow_info(label, |_| true)
+                        .into_iter()
+                        .chain(self.usage_info(label, |t| t != &local)),
+                )
+            }
         }
     }
 
