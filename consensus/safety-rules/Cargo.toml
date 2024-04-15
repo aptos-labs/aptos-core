@@ -17,6 +17,7 @@ anyhow = { workspace = true }
 aptos-config = { workspace = true }
 aptos-consensus-types = { workspace = true }
 aptos-crypto = { workspace = true }
+aptos-executor-types = { workspace = true }
 aptos-global-constants = { workspace = true }
 aptos-infallible = { workspace = true }
 aptos-logger = { workspace = true }

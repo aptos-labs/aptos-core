@@ -3342,6 +3342,7 @@ dependencies = [
  "aptos-config",
  "aptos-consensus-types",
  "aptos-crypto",
+ "aptos-executor-types",
  "aptos-global-constants",
  "aptos-infallible",
  "aptos-logger",

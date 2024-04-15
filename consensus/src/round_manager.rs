@@ -8,7 +8,9 @@ use crate::{
         BlockReader, BlockRetriever, BlockStore,
     },
     counters::{
-        self, FAILED_ORDER_VOTE_BROADCASTED, ORDER_VOTE_ADDED, ORDER_VOTE_BROADCASTED, ORDER_VOTE_BRODCAST_DIDNT_START, ORDER_VOTE_OTHER_ERRORS, PROPOSED_VTXN_BYTES, PROPOSED_VTXN_COUNT
+        self, FAILED_ORDER_VOTE_BROADCASTED, ORDER_VOTE_ADDED, ORDER_VOTE_BROADCASTED,
+        ORDER_VOTE_BRODCAST_DIDNT_START, ORDER_VOTE_OTHER_ERRORS, PROPOSED_VTXN_BYTES,
+        PROPOSED_VTXN_COUNT,
     },
     error::{error_kind, VerifyError},
     liveness::{
@@ -1116,13 +1118,11 @@ impl RoundManager {
                         );
                     }
                 }
-                let result = self
-                    .new_order_vote_aggregated(
-                        ledger_info_with_signatures.clone(),
-                        order_vote.author(),
-                    )
-                    .await;
-                result
+                self.new_order_vote_aggregated(
+                    ledger_info_with_signatures.clone(),
+                    order_vote.author(),
+                )
+                .await
             },
             OrderVoteReceptionResult::VoteAdded(_) => {
                 ORDER_VOTE_ADDED.inc();

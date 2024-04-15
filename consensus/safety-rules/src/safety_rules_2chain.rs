@@ -112,7 +112,7 @@ impl SafetyRules {
 
         // Construct and sign order vote
         let author = self.signer()?.author();
-        let ledger_info = self.construct_ledger_info_2chain(proposed_block, HashValue::zero())?;
+        let ledger_info = LedgerInfo::new(vote_proposal.block_info().clone(), HashValue::zero());
         let signature = self.sign(&ledger_info)?;
         let order_vote = OrderVote::new_with_signature(author, ledger_info.clone(), signature);
 
