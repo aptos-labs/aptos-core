@@ -2,7 +2,7 @@
 // Parts of the project are originally copyright © Meta Platforms, Inc.
 // SPDX-License-Identifier: Apache-2.0
 
-use crate::{experiments, DefaultValue, EXPERIMENTS};
+use crate::experiments::{DefaultValue, EXPERIMENTS};
 use clap::Parser;
 use codespan_reporting::diagnostic::Severity;
 use itertools::Itertools;
@@ -90,7 +90,7 @@ impl Options {
     pub fn set_experiment(self, name: impl AsRef<str>, on: bool) -> Self {
         let name = name.as_ref().to_string();
         assert!(
-            experiments::EXPERIMENTS.contains_key(&name),
+            EXPERIMENTS.contains_key(&name),
             "experiment `{}` not declared",
             name
         );
@@ -122,7 +122,7 @@ impl Options {
         if let Some(on) = self.experiment_cache.borrow().get(name).cloned() {
             return on;
         }
-        if let Some(exp) = experiments::EXPERIMENTS.get(&name.to_string()) {
+        if let Some(exp) = EXPERIMENTS.get(&name.to_string()) {
             // First we look at experiments provided via the command line, second
             // via the env var, and last we take the configured default.
             let on = if let Some(on) = find_experiment(&self.experiments, name) {

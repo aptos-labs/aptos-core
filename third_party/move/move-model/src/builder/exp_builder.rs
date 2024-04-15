@@ -2226,7 +2226,7 @@ impl<'env, 'translator, 'module_translator> ExpTranslator<'env, 'translator, 'mo
                     let specialized_expected_type = self.subs.specialize(expected_type);
                     if let Type::Tuple(tys) = specialized_expected_type {
                         if tys.len() != 1 {
-                            self.error(loc, &context.arity_mismatch(false, 1, tys.len()));
+                            self.error(loc, &context.arity_mismatch(false, tys.len(), 1));
                             return self.new_error_pat(loc);
                         }
                     }

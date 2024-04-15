@@ -761,8 +761,10 @@ impl<'env> Docgen<'env> {
                     let value = self.convert_to_anchor(parts[1].trim());
                     row_data[index] = value;
                     current_key = Some(index);
+                    continue;
                 }
-            } else if let Some(key_index) = current_key {
+            }
+            if let Some(key_index) = current_key {
                 row_data[key_index].push(' ');
                 row_data[key_index].push_str(&self.convert_to_anchor(trimmed_line));
             }

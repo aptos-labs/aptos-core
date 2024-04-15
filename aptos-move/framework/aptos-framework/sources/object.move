@@ -1,4 +1,4 @@
-/// This defines the Move object model with the the following properties:
+/// This defines the Move object model with the following properties:
 /// - Simplified storage interface that supports a heterogeneous collection of resources to be
 ///   stored together. This enables data types to share a common core data layer (e.g., tokens),
 ///   while having richer extensions (e.g., concert ticket, sword).

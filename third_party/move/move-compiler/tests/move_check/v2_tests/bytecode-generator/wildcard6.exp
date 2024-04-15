@@ -1,0 +1,9 @@
+error[E06002]: use of unassigned variable
+  ┌─ tests/move_check/v2_tests/bytecode-generator/wildcard6.move:4:31
+  │
+4 │         let (y, _) = (move x, x);
+  │                       ------  ^ Invalid usage of previously moved variable 'x'.
+  │                       │        
+  │                       The value of 'x' was previously moved here.
+  │                       Suggestion: use 'copy x' to avoid the move.
+

@@ -10327,6 +10327,7 @@ dependencies = [
  "move-bytecode-viewer",
  "move-command-line-common",
  "move-compiler",
+ "move-compiler-v2",
  "move-core-types",
  "move-coverage",
  "move-disassembler",

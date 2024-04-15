@@ -304,9 +304,9 @@ impl<'e, E: ExecutorView> TDelayedFieldView for StorageAdapter<'e, E> {
 }
 
 impl<'e, E: ExecutorView> ConfigStorage for StorageAdapter<'e, E> {
-    fn fetch_config(&self, access_path: AccessPath) -> Option<Bytes> {
+    fn fetch_config_bytes(&self, state_key: &StateKey) -> Option<Bytes> {
         self.executor_view
-            .get_resource_bytes(&StateKey::access_path(access_path), None)
+            .get_resource_bytes(state_key, None)
             .ok()?
     }
 }

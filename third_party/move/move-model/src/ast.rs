@@ -87,6 +87,12 @@ impl Attribute {
     pub fn has(attrs: &[Attribute], pred: impl Fn(&Attribute) -> bool) -> bool {
         attrs.iter().any(pred)
     }
+
+    pub fn node_id(&self) -> NodeId {
+        match self {
+            Attribute::Assign(id, _, _) | Attribute::Apply(id, _, _) => *id,
+        }
+    }
 }
 
 // =================================================================================================
