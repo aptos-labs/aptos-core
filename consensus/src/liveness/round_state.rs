@@ -16,7 +16,8 @@ use aptos_consensus_types::{
 use aptos_crypto::HashValue;
 use aptos_logger::{prelude::*, Schema};
 use aptos_types::{
-    ledger_info::LedgerInfoWithPartialSignatures, validator_verifier::ValidatorVerifier,
+    ledger_info::{LedgerInfo, LedgerInfoWithPartialSignatures},
+    validator_verifier::ValidatorVerifier,
 };
 use futures::future::AbortHandle;
 use futures_channel::mpsc::UnboundedSender;
@@ -254,6 +255,10 @@ impl RoundState {
         counters::TIMEOUT_COUNT.inc();
         self.setup_timeout(1);
         true
+    }
+
+    pub fn has_enough_order_votes(&self, ledger_info: &LedgerInfo) -> bool {
+        self.pending_order_votes.has_enough_order_votes(ledger_info)
     }
 
     /// Notify the RoundState about the potentially new QC, TC, and highest committed round.

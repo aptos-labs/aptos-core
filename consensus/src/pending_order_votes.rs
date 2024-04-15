@@ -7,7 +7,7 @@ use aptos_crypto::{hash::CryptoHash, HashValue};
 use aptos_logger::prelude::*;
 use aptos_types::{
     aggregate_signature::PartialSignatures,
-    ledger_info::{LedgerInfoWithPartialSignatures, LedgerInfoWithSignatures},
+    ledger_info::{LedgerInfo, LedgerInfoWithPartialSignatures, LedgerInfoWithSignatures},
     validator_verifier::{ValidatorVerifier, VerifyError},
 };
 use std::{collections::HashMap, sync::Arc};
@@ -33,13 +33,21 @@ pub enum OrderVoteReceptionResult {
     ErrorAggregatingSignature(VerifyError),
 }
 
+#[derive(Debug, PartialEq, Eq)]
+enum OrderVoteStatus {
+    EnoughVotes,
+    NotEnoughVotes,
+}
+
 /// A PendingVotes structure keep track of votes
 pub struct PendingOrderVotes {
     /// Maps LedgerInfo digest to associated signatures (contained in a partial LedgerInfoWithSignatures).
     /// This might keep multiple LedgerInfos for the current round: either due to different proposals (byzantine behavior)
     /// or due to different NIL proposals (clients can have a different view of what block to extend).
-    li_digest_to_votes:
-        HashMap<HashValue /* LedgerInfo digest */, (usize, LedgerInfoWithPartialSignatures)>,
+    li_digest_to_votes: HashMap<
+        HashValue, /* LedgerInfo digest */
+        (usize, OrderVoteStatus, LedgerInfoWithPartialSignatures),
+    >,
     /// Map of Author to (vote, li_digest). This is useful to discard multiple votes.
     author_to_order_vote: HashMap<(Author, u64), (OrderVote, HashValue)>,
 }
@@ -90,18 +98,18 @@ impl PendingOrderVotes {
 
         let len = self.li_digest_to_votes.len() + 1;
         // obtain the ledger info with signatures associated to the order vote's ledger info
-        let (_hash_index, li_with_sig) =
+        let (_hash_index, status, li_with_sig) =
             self.li_digest_to_votes.entry(li_digest).or_insert_with(|| {
                 // if the ledger info with signatures doesn't exist yet, create it
                 (
                     len,
+                    OrderVoteStatus::NotEnoughVotes,
                     LedgerInfoWithPartialSignatures::new(
                         order_vote.ledger_info().clone(),
                         PartialSignatures::empty(),
                     ),
                 )
             });
-
         let validator_voting_power = validator_verifier
             .get_voting_power(&order_vote.author())
             .unwrap_or(0);
@@ -123,6 +131,7 @@ impl PendingOrderVotes {
                 );
                 match li_with_sig.aggregate_signatures(validator_verifier) {
                     Ok(ledger_info_with_sig) => {
+                        *status = OrderVoteStatus::EnoughVotes;
                         OrderVoteReceptionResult::NewLedgerInfoWithSignatures(Arc::new(
                             ledger_info_with_sig,
                         ))
@@ -150,8 +159,18 @@ impl PendingOrderVotes {
     // Removes votes older than round-1
     pub fn set_round(&mut self, round: u64) {
         self.li_digest_to_votes
-            .retain(|_, (_, li)| li.ledger_info().round() + 2 >= round);
+            .retain(|_, (_, _, li)| li.ledger_info().round() + 2 >= round);
         self.author_to_order_vote
             .retain(|&(_, r), _| r + 2 >= round);
+    }
+
+    pub fn has_enough_order_votes(&self, ledger_info: &LedgerInfo) -> bool {
+        let li_digest = ledger_info.hash();
+        if let Some((_, status, _)) = self.li_digest_to_votes.get(&li_digest) {
+            if *status == OrderVoteStatus::EnoughVotes {
+                return true;
+            }
+        }
+        false
     }
 }

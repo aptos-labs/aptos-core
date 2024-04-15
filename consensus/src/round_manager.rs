@@ -1055,6 +1055,12 @@ impl RoundManager {
         });
         info!(self.new_log(LogEvent::ReceiveOrderVote), "{}", order_vote);
 
+        if self
+            .round_state
+            .has_enough_order_votes(order_vote.ledger_info())
+        {
+            return Ok(());
+        }
         let vote_reception_result = self
             .round_state
             .insert_order_vote(&order_vote, &self.epoch_state.verifier);
