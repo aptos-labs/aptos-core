@@ -27,6 +27,10 @@ module 0xABCD::aggregator_example {
         count: Aggregator<u64>,
     }
 
+    struct FlagAggV2 has key {
+        count: Aggregator<u64>,
+    }
+
     struct BoundedAggV2 has key {
         count: Aggregator<u64>,
     }
@@ -47,9 +51,15 @@ module 0xABCD::aggregator_example {
             publisher,
             CounterAggV2 { count: aggregator_v2::create_unbounded_aggregator() }
         );
+        move_to<FlagAggV2>(
+            publisher,
+            FlagAggV2 { count: aggregator_v2::create_aggregator(100) }
+        );
+        let agg = aggregator_v2::create_aggregator(100);
+        aggregator_v2::try_add(&mut agg, 1);
         move_to<BoundedAggV2>(
             publisher,
-            BoundedAggV2 { count: aggregator_v2::create_aggregator(100) }
+            BoundedAggV2 { count: agg }
         );
     }
 
@@ -68,6 +78,16 @@ module 0xABCD::aggregator_example {
     public entry fun modify_bounded_agg_v2(increment: bool, delta: u64) acquires BoundedAggV2 {
         assert!(exists<BoundedAggV2>(@publisher_address), error::invalid_argument(EBOUNDED_AGG_RESOURCE_NOT_PRESENT));
         let bounded = borrow_global_mut<BoundedAggV2>(@publisher_address);
+        if (increment) {
+            aggregator_v2::try_add(&mut bounded.count, delta);
+        } else {
+            aggregator_v2::try_sub(&mut bounded.count, delta);
+        }
+    }
+    
+    public entry fun modify_flag_agg_v2(increment: bool, delta: u64) acquires FlagAggV2 {
+        assert!(exists<FlagAggV2>(@publisher_address), error::invalid_argument(EBOUNDED_AGG_RESOURCE_NOT_PRESENT));
+        let bounded = borrow_global_mut<FlagAggV2>(@publisher_address);
         if (increment) {
             aggregator_v2::try_add(&mut bounded.count, delta);
         } else {

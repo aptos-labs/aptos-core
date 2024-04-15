@@ -182,7 +182,9 @@ pub enum EntryPoints {
     ModifyGlobalBoundedAggV2 {
         step: u64,
     },
-
+    ModifyFlagAggV2 {
+        step: u64,
+    },
     /// Modifying a single random tag in a resource group (which contains 8 tags),
     /// from a global resource (at module publishers' address)
     ResourceGroupsGlobalWriteTag {
@@ -270,6 +272,7 @@ impl EntryPoints {
             EntryPoints::IncGlobal
             | EntryPoints::IncGlobalAggV2
             | EntryPoints::ModifyGlobalBoundedAggV2 { .. }
+            | EntryPoints::ModifyFlagAggV2 { .. }
             | EntryPoints::CreateObjects { .. }
             | EntryPoints::CreateObjectsConflict { .. }
             | EntryPoints::TokenV1InitializeCollection
@@ -318,7 +321,8 @@ impl EntryPoints {
             | EntryPoints::MakeOrChangeTableRandom { .. } => "simple",
             EntryPoints::IncGlobal
             | EntryPoints::IncGlobalAggV2
-            | EntryPoints::ModifyGlobalBoundedAggV2 { .. } => "aggregator_example",
+            | EntryPoints::ModifyGlobalBoundedAggV2 { .. }
+            | EntryPoints::ModifyFlagAggV2 { .. } => "aggregator_example",
             EntryPoints::CreateObjects { .. } | EntryPoints::CreateObjectsConflict { .. } => {
                 "objects"
             },
@@ -451,6 +455,9 @@ impl EntryPoints {
             EntryPoints::IncGlobalAggV2 => inc_global_agg_v2(module_id),
             EntryPoints::ModifyGlobalBoundedAggV2 { step } => {
                 modify_bounded_agg_v2(module_id, rng.expect("Must provide RNG"), *step)
+            },
+            EntryPoints::ModifyFlagAggV2 { step } => {
+                modify_flag_agg_v2(module_id, rng.expect("Must provide RNG"), *step)
             },
             EntryPoints::CreateObjects {
                 num_objects,
@@ -681,7 +688,8 @@ impl EntryPoints {
             EntryPoints::Nop2Signers | EntryPoints::Nop5Signers => AutomaticArgs::SignerAndMultiSig,
             EntryPoints::IncGlobal
             | EntryPoints::IncGlobalAggV2
-            | EntryPoints::ModifyGlobalBoundedAggV2 { .. } => AutomaticArgs::None,
+            | EntryPoints::ModifyGlobalBoundedAggV2 { .. }
+            | EntryPoints::ModifyFlagAggV2 => AutomaticArgs::None,
             EntryPoints::CreateObjects { .. } | EntryPoints::CreateObjectsConflict { .. } => {
                 AutomaticArgs::Signer
             },
@@ -811,6 +819,17 @@ fn modify_bounded_agg_v2(module_id: ModuleId, rng: &mut StdRng, step: u64) -> Tr
     get_payload(
         module_id,
         ident_str!("modify_bounded_agg_v2").to_owned(),
+        vec![
+            bcs::to_bytes(&rng.gen::<bool>()).unwrap(),
+            bcs::to_bytes(&step).unwrap(),
+        ],
+    )
+}
+
+fn modify_flag_agg_v2(module_id: ModuleId, rng: &mut StdRng, step: u64) -> TransactionPayload {
+    get_payload(
+        module_id,
+        ident_str!("modify_flag_agg_v2").to_owned(),
         vec![
             bcs::to_bytes(&rng.gen::<bool>()).unwrap(),
             bcs::to_bytes(&step).unwrap(),
