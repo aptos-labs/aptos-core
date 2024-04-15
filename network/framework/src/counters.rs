@@ -39,6 +39,10 @@ const PRE_DIAL_LABEL: &str = "pre_dial";
 pub const SERIALIZATION_LABEL: &str = "serialization";
 pub const DESERIALIZATION_LABEL: &str = "deserialization";
 
+const LATENCY_BUCKETS: [f64; 21] = [
+    0.001, 0.002, 0.005, 0.01, 0.02, 0.03, 0.05, 0.1, 0.2, 0.3, 0.4, 0.5, 0.7, 0.9, 1.0, 2.0, 3.0, 5.0, 7.0, 9.0, 10.0,
+];
+
 pub static APTOS_CONNECTIONS: Lazy<IntGaugeVec> = Lazy::new(|| {
     register_int_gauge_vec!(
         "aptos_connections",
@@ -252,7 +256,8 @@ pub static APTOS_NETWORK_OUTBOUND_RPC_REQUEST_LATENCY: Lazy<HistogramVec> = Lazy
     register_histogram_vec!(
         "aptos_network_outbound_rpc_request_latency_seconds",
         "Outbound RPC request latency in seconds",
-        &["role_type", "network_id", "peer_id", "protocol_id"]
+        &["role_type", "network_id", "peer_id", "protocol_id"],
+        LATENCY_BUCKETS.to_vec(),
     )
     .unwrap()
 });
@@ -273,7 +278,8 @@ pub static APTOS_NETWORK_INBOUND_RPC_HANDLER_LATENCY: Lazy<HistogramVec> = Lazy:
     register_histogram_vec!(
         "aptos_network_inbound_rpc_handler_latency_seconds",
         "Inbound RPC request application handler latency in seconds",
-        &["role_type", "network_id", "peer_id", "protocol_id"]
+        &["role_type", "network_id", "peer_id", "protocol_id"],
+        LATENCY_BUCKETS.to_vec(),
     )
     .unwrap()
 });
