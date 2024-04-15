@@ -3930,7 +3930,6 @@ dependencies = [
  "ciborium",
  "claims",
  "coset",
- "derivative",
  "fixed",
  "hex",
  "itertools 0.12.1",
