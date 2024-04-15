@@ -24,3 +24,13 @@ proposals:
           git_hash: ~
       - DefaultGasWithOverride:
           feature_version: 13
+  - name: step_3_enable_checking_unstable_bytecode
+    metadata:
+      title: "Enable the check to reject unstable bytecode to be published to mainnet"
+      description: "Reject unstable bytecode to be published to mainnet"
+      discussion_url: "https://github.com/aptos-labs/aptos-core/pull/12814"
+    execution_mode: MultiStep
+    update_sequence:
+      - FeatureFlag:
+          enabled:
+            - reject_unstable_bytecode
