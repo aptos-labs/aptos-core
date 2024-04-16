@@ -335,12 +335,6 @@ where
                 unreachable!("level 1 map must exist when an entry is supposed to be in it.");
             },
         }
-
-        self.inner
-            .write()
-            .entry(key1.to_owned())
-            .or_default()
-            .remove(key2);
     }
 }
 
