@@ -45,81 +45,84 @@ for liveness using the [`HealthChecker`] protocol.
 This approach should scale up to a few hundred validators before requiring
 partial membership views, sophisticated failure detectors, or network overlays.
 
-## Implementation Details
+The current internal design tries to be _as flat as possible_. There is one queue outbound to each peer with messages to send (actually two in parallel for high priority and low priority, but only one queue of _depth_). There is one queue inbound towards each application handler. That's it. The application assembles an outbound message and it goes on the peer queue(s). The peer code decodes a message and it goes on the app queue.
 
-### System Architecture
+## Network Design Stories
 
-```
-                      +-----------+---------+------------+--------+
- Application Modules  | Consensus | Mempool | State Sync | Health |
-                      +-----------+---------+------------+--------+
-                            ^          ^          ^           ^
-   Network Interface        |          |          |           |
-                            v          v          v           v
-                      +----------------+--------------------------+   +---------------------+
-      Network Module  |                 PeerManager               |<->| ConnectivityManager |
-                      +----------------------+--------------------+   +---------------------+
-                      |        Peer(s)       |                    |
-                      +----------------------+                    |
-                      |                AptosTransport             |
-                      +-------------------------------------------+
-```
+The design of the Aptos blockchain networking code, as told through a few stories...
 
-The network component is implemented in the
-[Actor](https://en.wikipedia.org/wiki/Actor_model) model &mdash; it uses
-message-passing to communicate between different subcomponents running as
-independent "tasks." The [tokio](https://tokio.rs/) framework is used as the task
-runtime. The primary subcomponents in the network module are:
+### A message comes in from a peer
 
-* [`Network Interface`] &mdash; The interface provided to application modules
-using AptosNet.
+The TCP stream is wrapped by the [noise](framkework/src/noise/) streaming encryption protocol.
 
-* [`PeerManager`] &mdash; Listens for incoming connections, and dials outbound
-connections to other peers. Demultiplexes and forwards inbound messages from
-[`Peer`]s to appropriate application handlers. Additionally, notifies upstream
-components of new or closed connections. Optionally can be connected to
-[`ConnectivityManager`] for a network with Discovery.
+The decrypted stream flows through tokio_util [FramedRead+LengthDelimitedCodec](framework/src/protocols/wire/messaging/v1/mod.rs) which breaks up the stream into messages.
 
-* [`Peer`] &mdash; Manages a single connection to another peer. It reads and
-writes [`NetworkMessage`]es from/to the wire. Currently, it implements the two
-protocols: DirectSend and Rpc.
+[MultiplexMessageStream](framework/src/protocols/wire/messaging/v1/mod.rs) reads the message blob and decodes the BCS into a Stream of Rust enum MultiplexMessage
 
-+ [`AptosTransport`] &mdash; A secure, reliable transport. It uses [NoiseIK] over
-TCP to negotiate an encrypted and authenticated connection between peers.
-The AptosNet version and any Aptos-specific application protocols are negotiated
-afterward using the [AptosNet Handshake Protocol].
+[Peer code ReaderContext](framework/src/peer.rs) handles the MultiplexMessage which might be a NetworkMessage enum, or a StreamMessage chunk where many chunks gets reassembled to a NetworkMessage. If the NetworkMessage is an RpcRequest, RpcResponse, or DirectSndMsg, peer code forwards that message to the inbound queue for some application code.
 
-* [`ConnectivityManager`] &mdash; Establishes connections to known peers found
-via Discovery. Notifies [`PeerManager`] to make outbound dials, or disconnects based
-on updates to known peers via Discovery updates.
+[NetworkEvents code](framework/src/protocols/network/mod.rs), running in application thread, unpacks a blob by a second round of BCS decode into the application’s message struct type. NetworkEvents presents this message to the application in a Stream implementation.
 
-* [`validator-set-discovery`] &mdash; Discovers the set of peers to connect to
-via on-chain configuration. These are the `validator_network_addresses` and
-`fullnode_network_addresses` of each [`ValidatorConfig`] in the
-[`ValidatorSet`] set. Notifies the [`ConnectivityManager`] of updates
-to the known peer set.
+### Application code sends a message to a peer
 
-* [`HealthChecker`] &mdash; Performs periodic liveness probes to ensure the
-health of a peer/connection. It resets the connection with the peer if a
-configurable number of probes fail in succession. Probes currently fail on a
-configurable static timeout.
+[NetworkClient](framework/src/application/interface.rs) is the interface for application code to send messages to other peers, either a one way direct message or an RPC request with waiting for reply.
+
+Just under that is the [NetworkSender](framework/src/protocols/network/mod.rs) which starts the fan out into validator-network/vfn-network/pfn-network. NetworkSender encodes the application struct into bytes to put into a NetworkMessage, then puts that NetworkMessage on a queue to the peer writer thread. Some ProtocolId-s are ‘high priority’ and go on a special queue.
+
+[Peer code WriterContext](framework/src/peer.rs) pulls messages from its queues (high priority preferentially, and low priority). Small messages are wrapped in a MultiplexMessage and sent directly, large messages are split into StreamMessage chunks. One large message is held and its chunks are sent out alternating with small messages. If a second large message arrives the first large message gets all of its chunks sent.
+
+Peer code writes into a MultiplexMessageSink object which writes into a tokio_util FramedWrite+LengthDelimitedCodec object that writes into a noise stream that writes to the TCP socket.
+
+### A new peer connects
+
+[PeerListener](builder/src/peer_listener.rs) holds the listening socket bound to some port.
+
+PeerListener::check_new_inbound_connection() does a bunch of checks, if all successful it starts [Peer code](framework/src/peer.rs) which inserts the new peer into the PeersAndMetadata object and starts several tokio tasks to handle the peer.
+
+### Outbound connections to peers
+
+The [ConnectivityManager](framework/src/connectivity_manager/mod.rs) code checks periodically[1] if it has the configured number of outbound connections[2], and if not starts a new one.
+
+ConnectivityManager can also close a connection to an outbound peer if [DiscoveryChangeListener](discovery/src/lib.rs) finds out that a peer should no longer be connected to (e.g. a Validator leaves the set of Validators).
+
+An attempt at an outbound connection should close if a successful inbound connection completes first.
+
+Most of the sequence of connecting to a peer is in ConnectivityManager::queue_dial_peer()
+
+[1] config `connectivity_check_interval_ms`, default 5 seconds
+
+[2] config `max_outbound_connections`, default 4
+
+## Network Applications
+
+ * [Mempool](../mempool/) move pending transactions around
+ * [Consensus](../consensus/) decide what goes in a block
+ * [JWK](../crates/aptos-jwk-consensus/) advances in consensus
+ * [State Sync](../state-sync/) move completed block data around
+ * [DKG](../dkg/) on-chain randomness
+ * [Peer Monitoring Service](peer-monitoring-service/) reliability and latency monitoring of connected peers
+ * [HealthChecker](framework/src/protocols/health_checker/) (probably soon to be replaced by Peer Monitoring Service)
+ * [Benchmark](benchmark/) how fast can we push data?
 
 ## How is this module organized?
     ../types/src
     ├── network-address            # Network addresses and encryption
 
+    ../aptos-node/src/network2.rs  # where node inits and uses all this
+
     network
+    ├── benchmark                  # Service for measuring how fast we can push data
     ├── builder                    # Builds a network from a NetworkConfig
+    ├── discovery                  # Protocols for peer discovery
     ├── memsocket                  # In-memory socket interface for tests
     ├── netcore
     │   └── src
     │       ├── transport          # Composable transport API
     │       └── framing            # Read/write length prefixes to sockets
-    ├── discovery                  # Protocols for peer discovery
-    └── src
-        ├── application
-        ├── peer_manager           # Manage peer connections and messages to/from peers
-        ├── peer                   # Handles a single peer connection's state
+    ├── peer-monitoring-service    # Measure availability and latency of peers
+    └── framework/src
+        ├── application            # interfaces for acting on the network
+        ├── peer                   # Move data to/from a peer
         ├── connectivity_manager   # Monitor connections and ensure connectivity
         ├── protocols
         │   ├── network            # Application layer interface to network module
@@ -143,3 +146,5 @@ configurable static timeout.
 [`Peer`]: ./src/peer/mod.rs
 [`ValidatorConfig`]: ../documentation/specifications/network/onchain-discovery.md#on-chain-config
 [`validator-set-discovery`]: discovery/src/lib.rs
+[`NetworkClient`]:framework/src/application/interface.rs
+[`PeersAndMetadata`]:framework/src/application/storage.rs
