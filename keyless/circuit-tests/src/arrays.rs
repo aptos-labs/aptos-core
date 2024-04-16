@@ -70,3 +70,17 @@ fn single_one_array_test() {
     let result = circuit_handle.gen_witness(circuit_input_signals);
     assert!(result.is_ok());
 }
+
+#[test]
+fn select_array_value_test() {
+    let circuit_handle = TestCircuitHandle::new("select_array_value_test.circom").unwrap();
+    let array = [4,6,1,8,9,4,2,3];
+    let index = 4;
+    let output = 9;
+    let in_len = 8;
+    let config = CircuitPaddingConfig::new().max_length("array", in_len);
+    let circuit_input_signals = CircuitInputSignals::new().u64_input("index", index).bytes_input("array", &array).u64_input("expected_output", output).pad(&config).unwrap();
+     
+    let result = circuit_handle.gen_witness(circuit_input_signals);
+    assert!(result.is_ok());
+}
