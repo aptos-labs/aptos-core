@@ -323,7 +323,8 @@ fn compute_profile_fixed_point(
     let delta_total_fixed = delta_down_fixed + delta_up_fixed;
     let reconstruct_threshold_in_weights_fixed =
         (secrecy_threshold_in_stake_ratio * stake_sum_fixed / stake_per_weight + delta_up_fixed)
-            .ceil() + one;
+            .ceil()
+            + one;
     let reconstruct_threshold_in_weights: u64 =
         reconstruct_threshold_in_weights_fixed.to_num::<u64>();
     let stake_gap_fixed = stake_per_weight * delta_total_fixed / stake_sum_fixed;
