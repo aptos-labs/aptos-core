@@ -70,7 +70,8 @@ fn test_rounding_equal_stakes() {
         let wconfig = WeightedConfig::new(
             (U64F64::from_num(validator_num) * *DEFAULT_SECRECY_THRESHOLD.deref())
                 .ceil()
-                .to_num::<usize>(),
+                .to_num::<usize>()
+                + 1,
             vec![1; validator_num],
         )
         .unwrap();
