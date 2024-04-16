@@ -329,7 +329,12 @@ pub const MAINNET_STAKES: [u64; 129] = [
 
 #[test]
 fn test_infallible_rounding_with_mainnet() {
-    let profile = DKGRoundingProfile::infallible(&MAINNET_STAKES.to_vec(), *DEFAULT_SECRECY_THRESHOLD, *DEFAULT_RECONSTRUCT_THRESHOLD, Some(*DEFAULT_FAST_PATH_SECRECY_THRESHOLD));
+    let profile = DKGRoundingProfile::infallible(
+        &MAINNET_STAKES.to_vec(),
+        *DEFAULT_SECRECY_THRESHOLD,
+        *DEFAULT_RECONSTRUCT_THRESHOLD,
+        Some(*DEFAULT_FAST_PATH_SECRECY_THRESHOLD),
+    );
     println!("profile={:?}", profile);
 }
 
@@ -345,7 +350,8 @@ fn test_infallible_rounding_brute_force() {
             let stake_total = U64F64::from_num(stakes.clone().into_iter().sum::<u64>());
             let stake_secrecy_threshold = stake_total * *DEFAULT_SECRECY_THRESHOLD;
             let stake_reconstruct_threshold = stake_total * *DEFAULT_RECONSTRUCT_THRESHOLD;
-            let fast_path_stake_secrecy_threshold = stake_total * *DEFAULT_FAST_PATH_SECRECY_THRESHOLD;
+            let fast_path_stake_secrecy_threshold =
+                stake_total * *DEFAULT_FAST_PATH_SECRECY_THRESHOLD;
             let profile = DKGRoundingProfile::infallible(
                 &stakes,
                 *DEFAULT_SECRECY_THRESHOLD,
@@ -355,12 +361,13 @@ fn test_infallible_rounding_brute_force() {
             println!("n={}, stakes={:?}, profile={:?}", n, stakes, profile);
             let num_subsets: u64 = 1 << n;
             let weight_total = U64F64::from_num(profile.validator_weights.iter().sum::<u64>());
-            let one = U64F64::from_num(1);
 
             // With default thresholds, weight_total <= (n/2 + 2)/(recon_threshod - secrecy_threshold) + rounding_weight_gain_total <= ceil((n/2 + 2)/(recon_threshod - secrecy_threshold)) + n/2
             assert_lt!(
                 weight_total,
-                ((n_halved + two) / (*DEFAULT_RECONSTRUCT_THRESHOLD - *DEFAULT_SECRECY_THRESHOLD)).ceil() + n_halved
+                ((n_halved + two) / (*DEFAULT_RECONSTRUCT_THRESHOLD - *DEFAULT_SECRECY_THRESHOLD))
+                    .ceil()
+                    + n_halved
             );
 
             for subset in 0..num_subsets {
