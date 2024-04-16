@@ -4,7 +4,7 @@ name: "v1.11"
 proposals:
   - name: step_1_increase_max_txn_gas
     metadata:
-      title: "Increase max txn gas temporarily for framework upgrade"
+      title: "Increase max txn gas temporarily for framework upgrade "
       description: "Increase max txn gas temporarily for framework upgrade"
     execution_mode: MultiStep
     update_sequence:
