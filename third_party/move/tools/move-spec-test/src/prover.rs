@@ -34,7 +34,10 @@ pub(crate) fn prove<W: WriteColor>(
                 .compiler_config
                 .compiler_version
                 .unwrap_or(CompilerVersion::V2_0),
-            language_version: LanguageVersion::V1,
+            language_version: config
+                .compiler_config
+                .language_version
+                .unwrap_or(LanguageVersion::V1),
         },
     )?;
 
