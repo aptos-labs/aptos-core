@@ -439,7 +439,7 @@ impl<'a> Transformer<'a> {
             for temp in copy_drop_at.check_drop.iter() {
                 self.check_drop(bytecode.get_attr_id(), *temp, || {
                     (
-                        "operator drops value here (consider to borrow the argument)".to_string(),
+                        "operator drops value here (consider borrowing the argument)".to_string(),
                         vec![],
                     )
                 });
