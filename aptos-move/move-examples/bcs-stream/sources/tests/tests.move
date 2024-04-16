@@ -2,6 +2,7 @@
 module bcs_stream::tests {
     use bcs_stream::bcs_stream;
     use std::vector;
+    use std::string::{Self, String};
 
     struct Bar has drop {
         x: u16,
@@ -344,7 +345,12 @@ module bcs_stream::tests {
     fun test_u256() {
         let data = x"0102030405060708111213141516171821222324252627283132333435363738";
         let stream = bcs_stream::new(data);
-        assert!(bcs_stream::deserialize_u256(&mut stream) == 0x3837363534333231282726252423222118171615141312110807060504030201, 0);
+        assert!(
+            bcs_stream::deserialize_u256(
+                &mut stream
+            ) == 0x3837363534333231282726252423222118171615141312110807060504030201,
+            0
+        );
     }
 
     #[test]
@@ -359,7 +365,12 @@ module bcs_stream::tests {
     fun test_address() {
         let data = x"0123456789ABCDEF0123456789ABCDEF0123456789ABCDEF0123456789ABCDEF";
         let stream = bcs_stream::new(data);
-        assert!(bcs_stream::deserialize_address(&mut stream) == @0x0123456789ABCDEF0123456789ABCDEF0123456789ABCDEF0123456789ABCDEF, 0);
+        assert!(
+            bcs_stream::deserialize_address(
+                &mut stream
+            ) == @0x0123456789ABCDEF0123456789ABCDEF0123456789ABCDEF0123456789ABCDEF,
+            0
+        );
     }
 
     #[test]
@@ -368,5 +379,37 @@ module bcs_stream::tests {
         let data = x"0123456789ABCDEF0123456789ABCDEF0123456789ABCDEF0123456789ABCD";
         let stream = bcs_stream::new(data);
         bcs_stream::deserialize_address(&mut stream);
+    }
+
+    #[test]
+    fun test_string_simple() {
+        // let data = x"24C3A7C3A5E2889EE289A0C2A2C3B5C39FE28882C692E288AB";
+        let data = x"0B736F6D6520737472696E67";
+        let stream = bcs_stream::new(data);
+
+        assert!(
+            bcs_stream::deserialize_string(&mut stream) == string::utf8(b"some string"),
+            0
+        );
+    }
+
+    #[test]
+    fun test_string_empty() {
+        let data = x"00";
+        let stream = bcs_stream::new(data);
+
+        assert!(
+            bcs_stream::deserialize_string(&mut stream) == string::utf8(b""),
+            0
+        );
+    }
+
+    #[test]
+    #[expected_failure(abort_code = 0x020002, location = bcs_stream::bcs_stream)]
+    fun test_string_not_enough_items() {
+        let data = x"030101";
+        let stream = bcs_stream::new(data);
+
+        bcs_stream::deserialize_string(&mut stream);
     }
 }
