@@ -8,6 +8,7 @@ use aptos_consensus_types::{
 };
 use aptos_crypto::{hash::CryptoHash, HashValue};
 use aptos_types::{ledger_info::LedgerInfoWithSignatures, transaction::SignedTransaction, PeerId};
+use rayon::prelude::*;
 use serde::{Deserialize, Serialize};
 use std::{
     fmt::{Display, Formatter},
@@ -148,12 +149,18 @@ impl Batch {
             self.payload.num_bytes() as u64 == self.num_bytes(),
             "Payload num bytes doesn't match batch info"
         );
-        for txn in self.payload.txns() {
-            ensure!(
-                txn.gas_unit_price() >= self.gas_bucket_start(),
-                "Payload gas unit price doesn't match batch info"
-            )
-        }
+        self.payload
+            .txns()
+            .par_iter()
+            .with_min_len(8)
+            .try_for_each(|txn| {
+                ensure!(
+                    txn.gas_unit_price() >= self.gas_bucket_start(),
+                    "Payload gas unit price doesn't match batch info"
+                );
+                ensure!(txn.verify_signature().is_ok(), "Invalid signature");
+                Ok(())
+            })?;
         Ok(())
     }
 
