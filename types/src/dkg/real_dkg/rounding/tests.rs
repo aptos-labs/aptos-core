@@ -328,50 +328,66 @@ pub const MAINNET_STAKES: [u64; 129] = [
 ];
 
 #[test]
+fn test_infallible_rounding_with_mainnet() {
+    let profile = DKGRoundingProfile::infallible(
+        &MAINNET_STAKES.to_vec(),
+        *DEFAULT_SECRECY_THRESHOLD,
+        *DEFAULT_RECONSTRUCT_THRESHOLD,
+        Some(*DEFAULT_FAST_PATH_SECRECY_THRESHOLD),
+    );
+    println!("profile={:?}", profile);
+}
+
+#[test]
 fn test_infallible_rounding_brute_force() {
     let mut rng = thread_rng();
-    for _ in 0..100 {
-        let n: u64 = rng.gen_range(10, 20);
+    let two = U64F64::from_num(2);
+    for n in 1..=20 {
         let n_fixed = U64F64::from_num(n);
-        let stakes: Vec<u64> = (0..n).map(|_| rng.gen_range(1, 100)).collect();
-        let stake_total = U64F64::from_num(stakes.clone().into_iter().sum::<u64>());
-        let stake_secrecy_threshold = stake_total * *DEFAULT_SECRECY_THRESHOLD;
-        let stake_reconstruct_threshold = stake_total * *DEFAULT_RECONSTRUCT_THRESHOLD;
-        let fast_path_stake_secrecy_threshold = stake_total * *DEFAULT_FAST_PATH_SECRECY_THRESHOLD;
-        let profile = DKGRoundingProfile::infallible(
-            &stakes,
-            *DEFAULT_SECRECY_THRESHOLD,
-            *DEFAULT_RECONSTRUCT_THRESHOLD,
-            Some(*DEFAULT_FAST_PATH_SECRECY_THRESHOLD),
-        );
-        let num_subsets: u64 = 1 << n;
-        let weight_total = U64F64::from_num(profile.validator_weights.iter().sum::<u64>());
-        let one = U64F64::from_num(1);
+        let n_halved = n_fixed / 2;
+        for _ in 0..10 {
+            let stakes: Vec<u64> = (0..n).map(|_| rng.gen_range(1, 100)).collect();
+            let stake_total = U64F64::from_num(stakes.clone().into_iter().sum::<u64>());
+            let stake_secrecy_threshold = stake_total * *DEFAULT_SECRECY_THRESHOLD;
+            let stake_reconstruct_threshold = stake_total * *DEFAULT_RECONSTRUCT_THRESHOLD;
+            let fast_path_stake_secrecy_threshold =
+                stake_total * *DEFAULT_FAST_PATH_SECRECY_THRESHOLD;
+            let profile = DKGRoundingProfile::infallible(
+                &stakes,
+                *DEFAULT_SECRECY_THRESHOLD,
+                *DEFAULT_RECONSTRUCT_THRESHOLD,
+                Some(*DEFAULT_FAST_PATH_SECRECY_THRESHOLD),
+            );
+            println!("n={}, stakes={:?}, profile={:?}", n, stakes, profile);
+            let num_subsets: u64 = 1 << n;
+            let weight_total = U64F64::from_num(profile.validator_weights.iter().sum::<u64>());
 
-        // With default thresholds, weight_total <= 3.5*n
-        assert_lt!(
-            weight_total,
-            n_fixed
-                * (one + one / ((*DEFAULT_RECONSTRUCT_THRESHOLD - *DEFAULT_SECRECY_THRESHOLD) * 2))
-        );
+            // With default thresholds, weight_total <= (n/2 + 2)/(recon_threshod - secrecy_threshold) + rounding_weight_gain_total <= ceil((n/2 + 2)/(recon_threshod - secrecy_threshold)) + n/2
+            assert_lt!(
+                weight_total,
+                ((n_halved + two) / (*DEFAULT_RECONSTRUCT_THRESHOLD - *DEFAULT_SECRECY_THRESHOLD))
+                    .ceil()
+                    + n_halved
+            );
 
-        for subset in 0..num_subsets {
-            let stake_sub_total = U64F64::from(get_sub_total(stakes.as_slice(), subset));
-            let weight_sub_total = get_sub_total(profile.validator_weights.as_slice(), subset);
-            if stake_sub_total <= stake_secrecy_threshold
-                && weight_sub_total >= profile.reconstruct_threshold_in_weights
-            {
-                unreachable!();
-            }
-            if stake_sub_total > stake_reconstruct_threshold
-                && weight_sub_total < profile.reconstruct_threshold_in_weights
-            {
-                unreachable!();
-            }
-            if stake_sub_total <= fast_path_stake_secrecy_threshold
-                && weight_sub_total >= profile.fast_reconstruct_threshold_in_weights.unwrap()
-            {
-                unreachable!();
+            for subset in 0..num_subsets {
+                let stake_sub_total = U64F64::from(get_sub_total(stakes.as_slice(), subset));
+                let weight_sub_total = get_sub_total(profile.validator_weights.as_slice(), subset);
+                if stake_sub_total <= stake_secrecy_threshold
+                    && weight_sub_total >= profile.reconstruct_threshold_in_weights
+                {
+                    unreachable!();
+                }
+                if stake_sub_total > stake_reconstruct_threshold
+                    && weight_sub_total < profile.reconstruct_threshold_in_weights
+                {
+                    unreachable!();
+                }
+                if stake_sub_total <= fast_path_stake_secrecy_threshold
+                    && weight_sub_total >= profile.fast_reconstruct_threshold_in_weights.unwrap()
+                {
+                    unreachable!();
+                }
             }
         }
     }
