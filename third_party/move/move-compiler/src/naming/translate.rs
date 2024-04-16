@@ -11,7 +11,7 @@ use crate::{
         translate::is_valid_struct_constant_or_schema_name as is_constant_name,
     },
     naming::ast as N,
-    parser::ast::{Ability_, ConstantName, Field, FunctionName, StructName, Var},
+    parser::ast::{Ability_, CallKind, ConstantName, Field, FunctionName, StructName, Var},
     shared::{unique_map::UniqueMap, *},
     FullyCompiledProgram,
 };
@@ -1026,7 +1026,7 @@ fn exp_(context: &mut Context, e: E::Exp) -> N::Exp {
         EE::Cast(e, t) => NE::Cast(exp(context, *e), type_(context, t)),
         EE::Annotate(e, t) => NE::Annotate(exp(context, *e), type_(context, t)),
 
-        EE::Call(sp!(mloc, E::ModuleAccess_::Name(n)), true, tys_opt, rhs)
+        EE::Call(sp!(mloc, E::ModuleAccess_::Name(n)), CallKind::Macro, tys_opt, rhs)
             if n.value.as_str() == N::BuiltinFunction_::ASSERT_MACRO =>
         {
             use N::BuiltinFunction_ as BF;
@@ -1039,7 +1039,14 @@ fn exp_(context: &mut Context, e: E::Exp) -> N::Exp {
             let nes = call_args(context, rhs);
             NE::Builtin(sp(mloc, BF::Assert(true)), nes)
         },
-        EE::Call(sp!(mloc, ma_), is_macro, tys_opt, rhs) => {
+        EE::Call(sp!(mloc, _), CallKind::Receiver, ..) => {
+            context.env.add_diag(diag!(
+                Syntax::UnsupportedLanguageItem,
+                (mloc, "receiver style syntax not supported by this compiler")
+            ));
+            NE::UnresolvedError
+        },
+        EE::Call(sp!(mloc, ma_), kind, tys_opt, rhs) => {
             use E::ModuleAccess_ as EA;
             let ty_args = tys_opt.map(|tys| types(context, tys));
             let nes = call_args(context, rhs);
@@ -1060,7 +1067,9 @@ fn exp_(context: &mut Context, e: E::Exp) -> N::Exp {
                         assert!(context.env.has_errors());
                         NE::UnresolvedError
                     },
-                    Some(_) => NE::ModuleCall(m, FunctionName(n), is_macro, ty_args, nes),
+                    Some(_) => {
+                        NE::ModuleCall(m, FunctionName(n), kind == CallKind::Macro, ty_args, nes)
+                    },
                 },
             }
         },

@@ -338,9 +338,6 @@ fn test_update() {
     let root_hash = hash_internal(y_hash, leaf3.hash());
     assert_eq!(smt1.root_hash(), root_hash);
 
-    // Verify oldest ancestor
-    assert!(Arc::ptr_eq(&smt1.get_oldest_ancestor().inner, &smt1.inner));
-
     // Next, we are going to delete key1. Create a proof for key1.
     let proof = SparseMerkleProofExt::new(Some(leaf1), vec![
         leaf2.into(),
@@ -370,9 +367,6 @@ fn test_update() {
     let root_hash = hash_internal(y_hash, leaf3.hash());
     assert_eq!(smt2.root_hash(), root_hash);
 
-    // Verify oldest ancestor
-    assert_eq_pointee(&smt2.get_oldest_ancestor(), &smt1);
-
     // We now try to create another branch on top of smt1.
     let value4 = StateValue::from(String::from("test_val4444").into_bytes());
 
@@ -395,16 +389,9 @@ fn test_update() {
         StateStoreStatus::ExistsInScratchPad(value4.clone())
     );
 
-    // Verify oldest ancestor
-    assert_eq_pointee(&smt22.get_oldest_ancestor(), &smt1);
-
     // Now prune smt1.
     drop(smt1);
     SUBTREE_DROPPER.wait_for_backlog_drop(0);
-
-    // Verify oldest ancestor
-    assert_eq_pointee(&smt2.get_oldest_ancestor(), &smt2);
-    assert_eq_pointee(&smt22.get_oldest_ancestor(), &smt22);
 
     // For smt2, no key should be available since smt2 was constructed by deleting key1.
     assert_eq!(smt2.get(key1), StateStoreStatus::DoesNotExist);
@@ -436,97 +423,6 @@ static PROOF_READER: Lazy<ProofReader> = Lazy::new(|| {
 fn update(smt: &SparseMerkleTree) -> SparseMerkleTree {
     smt.batch_update(vec![(*KEY, Some(&VALUE))], &*PROOF_READER)
         .unwrap()
-}
-
-#[test]
-#[ignore] // gonna remove this functionality
-fn test_get_oldest_ancestor() {
-    // smt0 - smt00 - smt000 - smt0000 - smt00000
-    //              \
-    //              |\ smt001 - smt0010 - smt00100
-    //              |        \
-    //              |          smt0011 - smt00110
-    //              |                  \
-    //              |                    smt00111
-    //              \
-    //                smt002
-
-    let smt0 = SparseMerkleTree::new_test(LEAF.hash());
-    let smt00 = update(&smt0);
-    let smt000 = update(&smt00);
-    let smt0000 = update(&smt000);
-    let smt00000 = update(&smt0000);
-    let smt001 = update(&smt00);
-    let smt0010 = update(&smt001);
-    let smt00100 = update(&smt0010);
-    let smt0011 = update(&smt001);
-    let smt00110 = update(&smt0011);
-    let smt00111 = update(&smt0011);
-    let smt002 = update(&smt00);
-
-    assert_eq_pointee(&smt0.get_oldest_ancestor(), &smt0);
-    assert_eq_pointee(&smt00.get_oldest_ancestor(), &smt0);
-    assert_eq_pointee(&smt000.get_oldest_ancestor(), &smt0);
-    assert_eq_pointee(&smt0000.get_oldest_ancestor(), &smt0);
-    assert_eq_pointee(&smt00000.get_oldest_ancestor(), &smt0);
-    assert_eq_pointee(&smt001.get_oldest_ancestor(), &smt0);
-    assert_eq_pointee(&smt0010.get_oldest_ancestor(), &smt0);
-    assert_eq_pointee(&smt00100.get_oldest_ancestor(), &smt0);
-    assert_eq_pointee(&smt0011.get_oldest_ancestor(), &smt0);
-    assert_eq_pointee(&smt00110.get_oldest_ancestor(), &smt0);
-    assert_eq_pointee(&smt00111.get_oldest_ancestor(), &smt0);
-    assert_eq_pointee(&smt002.get_oldest_ancestor(), &smt0);
-
-    drop(smt0);
-    assert_eq_pointee(&smt00.get_oldest_ancestor(), &smt00);
-    assert_eq_pointee(&smt000.get_oldest_ancestor(), &smt00);
-    assert_eq_pointee(&smt0000.get_oldest_ancestor(), &smt00);
-    assert_eq_pointee(&smt00000.get_oldest_ancestor(), &smt00);
-    assert_eq_pointee(&smt001.get_oldest_ancestor(), &smt00);
-    assert_eq_pointee(&smt0010.get_oldest_ancestor(), &smt00);
-    assert_eq_pointee(&smt00100.get_oldest_ancestor(), &smt00);
-    assert_eq_pointee(&smt0011.get_oldest_ancestor(), &smt00);
-    assert_eq_pointee(&smt00110.get_oldest_ancestor(), &smt00);
-    assert_eq_pointee(&smt00111.get_oldest_ancestor(), &smt00);
-    assert_eq_pointee(&smt002.get_oldest_ancestor(), &smt00);
-
-    drop(smt00);
-    assert_eq_pointee(&smt000.get_oldest_ancestor(), &smt000);
-    assert_eq_pointee(&smt0000.get_oldest_ancestor(), &smt000);
-    assert_eq_pointee(&smt00000.get_oldest_ancestor(), &smt000);
-    assert_eq_pointee(&smt001.get_oldest_ancestor(), &smt001);
-    assert_eq_pointee(&smt0010.get_oldest_ancestor(), &smt001);
-    assert_eq_pointee(&smt00100.get_oldest_ancestor(), &smt001);
-    assert_eq_pointee(&smt0011.get_oldest_ancestor(), &smt001);
-    assert_eq_pointee(&smt00110.get_oldest_ancestor(), &smt001);
-    assert_eq_pointee(&smt00111.get_oldest_ancestor(), &smt001);
-    assert_eq_pointee(&smt002.get_oldest_ancestor(), &smt002);
-
-    drop(smt001);
-    assert_eq_pointee(&smt000.get_oldest_ancestor(), &smt000);
-    assert_eq_pointee(&smt0000.get_oldest_ancestor(), &smt000);
-    assert_eq_pointee(&smt00000.get_oldest_ancestor(), &smt000);
-    assert_eq_pointee(&smt0010.get_oldest_ancestor(), &smt0010);
-    assert_eq_pointee(&smt00100.get_oldest_ancestor(), &smt0010);
-    assert_eq_pointee(&smt0011.get_oldest_ancestor(), &smt0011);
-    assert_eq_pointee(&smt00110.get_oldest_ancestor(), &smt0011);
-    assert_eq_pointee(&smt00111.get_oldest_ancestor(), &smt0011);
-    assert_eq_pointee(&smt002.get_oldest_ancestor(), &smt002);
-    drop(smt000);
-    assert_eq_pointee(&smt0000.get_oldest_ancestor(), &smt0000);
-    assert_eq_pointee(&smt00000.get_oldest_ancestor(), &smt0000);
-
-    drop(smt0000);
-    assert_eq_pointee(&smt00000.get_oldest_ancestor(), &smt00000);
-    drop(smt0010);
-    assert_eq_pointee(&smt00100.get_oldest_ancestor(), &smt00100);
-    drop(smt0011);
-    assert_eq_pointee(&smt00110.get_oldest_ancestor(), &smt00110);
-    assert_eq_pointee(&smt00111.get_oldest_ancestor(), &smt00111);
-}
-
-fn assert_eq_pointee(left: &SparseMerkleTree, right: &SparseMerkleTree) {
-    assert!(Arc::ptr_eq(&left.inner, &right.inner,))
 }
 
 /// update smt from multiple threads, creating branches, trying to explore edge cases around
@@ -561,43 +457,6 @@ fn test_multithread_branching() {
         .collect::<Vec<_>>()
         .into_iter()
         .for_each(|t| t.join().unwrap())
-}
-
-#[test]
-fn test_multithread_get_oldest_ancestor() {
-    let current_tree = Arc::new(Mutex::new(SparseMerkleTree::new_test(LEAF.hash())));
-
-    let update_fn = || {
-        let current_tree = current_tree.clone();
-        move || {
-            for _ in 0..100000 {
-                let t = current_tree.lock().clone();
-                *current_tree.lock() = update(&t);
-            }
-        }
-    };
-    let get_ancestor_fn = || {
-        let current_tree = current_tree.clone();
-        move || {
-            let t = current_tree.lock().clone();
-            let mut tree_pair = VecDeque::from(vec![t.clone(), t]);
-            for _ in 0..100000 {
-                assert!(tree_pair[0]
-                    .get_oldest_ancestor()
-                    .is_the_same(&tree_pair[1].get_oldest_ancestor()));
-                tree_pair.pop_front();
-                tree_pair.push_back(current_tree.lock().clone());
-            }
-        }
-    };
-    let update = std::thread::spawn(update_fn());
-    let gets: Vec<_> = (0..3)
-        .map(|_| std::thread::spawn(get_ancestor_fn()))
-        .collect();
-    update.join().unwrap();
-    for t in gets {
-        t.join().unwrap();
-    }
 }
 
 #[test]

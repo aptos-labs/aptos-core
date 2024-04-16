@@ -11,12 +11,7 @@ on:
       - '.github/workflows/move-test-compiler-v2.yaml'
       - '.github/actions/move-tests-compiler-v2/**'
   pull_request:
-    paths:
-      - 'aptos-move/e2e-move-tests/**'
-      - 'aptos-move/framework/**'
-      - 'third_party/move/**'
-      - '.github/workflows/move-test-compiler-v2.yaml'
-      - '.github/actions/move-tests-compiler-v2/**'
+    types: [labeled, opened, synchronize, reopened, auto_merge_enabled]
 
 env:
   CARGO_INCREMENTAL: "0"
@@ -29,8 +24,21 @@ concurrency:
   cancel-in-progress: true
 
 jobs:
-  # Run Aptos Move tests.
+  # This job determines which files were changed
+  file_change_determinator:
+    runs-on: ubuntu-latest
+    outputs:
+      move_compiler_v2_changes: ${{ steps.determine_file_changes.outputs.move_compiler_v2_changes }}
+    steps:
+      - uses: actions/checkout@v4
+      - name: Run the file change determinator
+        id: determine_file_changes
+        uses: ./.github/actions/file-change-determinator
+
+  # Run Aptos Move Compiler v2 tests. This is a PR required job.
+  # TODO: fix this so that we skip the tests when appropriate.
   rust-move-tests:
+    needs: file_change_determinator
     runs-on: high-perf-docker
     steps:
       - uses: actions/checkout@v3

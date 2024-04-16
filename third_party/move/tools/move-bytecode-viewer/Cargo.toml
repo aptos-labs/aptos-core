@@ -16,9 +16,7 @@ move-bytecode-source-map = { path = "../../move-ir-compiler/move-bytecode-source
 regex = "1.5.5"
 tui = "0.19.0"
 
-move-command-line-common = { path = "../../move-command-line-common" }
 move-disassembler = { path = "../move-disassembler" }
-move-ir-types = { path = "../../move-ir/types" }
 
 [features]
 default = []

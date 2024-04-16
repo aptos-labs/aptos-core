@@ -1,4 +1,4 @@
-//# publish --print-bytecode
+//# publish
 module 0xcafe::ConstantFailure {
     use std::vector;
 

@@ -17,7 +17,6 @@ anyhow = { workspace = true }
 aptos-cached-packages = { workspace = true }
 aptos-config = { workspace = true }
 aptos-forge = { workspace = true }
-aptos-framework = { workspace = true }
 aptos-global-constants = { workspace = true }
 aptos-logger = { workspace = true }
 aptos-rest-client = { workspace = true }

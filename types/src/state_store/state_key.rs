@@ -3,7 +3,9 @@
 
 #![allow(clippy::non_canonical_partial_ord_impl)]
 
-use crate::{access_path::AccessPath, state_store::table::TableHandle};
+use crate::{
+    access_path::AccessPath, on_chain_config::OnChainConfig, state_store::table::TableHandle,
+};
 use anyhow::Result;
 use aptos_crypto::{
     hash::{CryptoHash, CryptoHasher, DummyHasher},
@@ -11,6 +13,9 @@ use aptos_crypto::{
 };
 use aptos_crypto_derive::CryptoHasher;
 use derivative::Derivative;
+use move_core_types::{
+    account_address::AccountAddress, language_storage::StructTag, move_resource::MoveResource,
+};
 use num_derive::{FromPrimitive, ToPrimitive};
 use num_traits::FromPrimitive;
 use once_cell::sync::OnceCell;
@@ -135,6 +140,20 @@ impl StateKey {
         Self::new(StateKeyInner::AccessPath(access_path))
     }
 
+    pub fn resource(address: &AccountAddress, struct_tag: &StructTag) -> Self {
+        Self::access_path(
+            AccessPath::resource_access_path(*address, struct_tag.to_owned()).unwrap(),
+        )
+    }
+
+    pub fn resource_typed<T: MoveResource>(address: &AccountAddress) -> Self {
+        Self::resource(address, &T::struct_tag())
+    }
+
+    pub fn on_chain_config<T: OnChainConfig>() -> Self {
+        Self::resource(T::address(), &T::struct_tag())
+    }
+
     pub fn table_item(handle: TableHandle, key: Vec<u8>) -> Self {
         Self::new(StateKeyInner::TableItem { handle, key })
     }
@@ -156,7 +175,6 @@ impl StateKey {
     }
 
     pub fn is_aptos_code(&self) -> bool {
-        use move_core_types::account_address::AccountAddress;
         match self.inner() {
             StateKeyInner::AccessPath(access_path) => {
                 access_path.is_code()

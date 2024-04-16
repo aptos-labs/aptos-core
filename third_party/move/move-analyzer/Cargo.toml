@@ -23,8 +23,6 @@ move-compiler = { path = "../move-compiler" }
 move-ir-types = { path = "../move-ir/types" }
 move-package = { path = "../tools/move-package" }
 move-symbol-pool = { path = "../move-symbol-pool" }
-petgraph = "0.5.1"
-serde = { version = "1.0", features = ["derive"] }
 serde_json = "1.0.64"
 tempfile = "3.2.0"
 url = "2.2.2"

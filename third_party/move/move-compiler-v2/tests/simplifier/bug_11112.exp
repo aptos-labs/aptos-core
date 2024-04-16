@@ -11,7 +11,7 @@ module 0xcafe::vectors {
               {
                 let i: u64 = 0;
                 loop {
-                  if Lt<u64>(i, vector::length<u64>(Freeze(v))) {
+                  if Lt<u64>(i, vector::length<u64>(Freeze(false)(v))) {
                     {
                       let (e: &mut u64): (&mut u64) = Tuple(vector::borrow_mut<u64>(v, i));
                       e = s;
@@ -34,3 +34,6 @@ module 0xcafe::vectors {
         }
     }
 } // end 0xcafe::vectors
+
+
+============ bytecode verification succeeded ========

@@ -28,7 +28,10 @@ use anyhow::Result;
 use aptos_bounded_executor::BoundedExecutor;
 use aptos_channels::{aptos_channel, message_queues::QueueStyle};
 use aptos_config::config::ConsensusConfig;
-use aptos_consensus_types::{common::Author, pipelined_block::PipelinedBlock};
+use aptos_consensus_types::{
+    common::{Author, Round},
+    pipelined_block::PipelinedBlock,
+};
 use aptos_executor_types::ExecutorResult;
 use aptos_infallible::RwLock;
 use aptos_logger::prelude::*;
@@ -61,7 +64,9 @@ pub trait TExecutionClient: Send + Sync {
         onchain_execution_config: &OnChainExecutionConfig,
         onchain_randomness_config: &OnChainRandomnessConfig,
         rand_config: Option<RandConfig>,
+        fast_rand_config: Option<RandConfig>,
         rand_msg_rx: aptos_channel::Receiver<AccountAddress, IncomingRandGenRequest>,
+        highest_ordered_round: Round,
     );
 
     /// This is needed for some DAG tests. Clean this up as a TODO.
@@ -171,7 +176,9 @@ impl ExecutionProxyClient {
         commit_signer_provider: Arc<dyn CommitSignerProvider>,
         epoch_state: Arc<EpochState>,
         rand_config: Option<RandConfig>,
+        fast_rand_config: Option<RandConfig>,
         rand_msg_rx: aptos_channel::Receiver<AccountAddress, IncomingRandGenRequest>,
+        highest_ordered_round: Round,
     ) {
         let network_sender = NetworkSender::new(
             self.author,
@@ -205,10 +212,12 @@ impl ExecutionProxyClient {
                     epoch_state.clone(),
                     signer,
                     rand_config,
+                    fast_rand_config,
                     rand_ready_block_tx,
                     Arc::new(network_sender.clone()),
                     self.rand_storage.clone(),
                     self.bounded_executor.clone(),
+                    &self.consensus_config.rand_rb_config,
                 );
 
                 tokio::spawn(rand_manager.start(
@@ -216,6 +225,7 @@ impl ExecutionProxyClient {
                     rand_msg_rx,
                     reset_rand_manager_rx,
                     self.bounded_executor.clone(),
+                    highest_ordered_round,
                 ));
 
                 (
@@ -273,13 +283,17 @@ impl TExecutionClient for ExecutionProxyClient {
         onchain_execution_config: &OnChainExecutionConfig,
         onchain_randomness_config: &OnChainRandomnessConfig,
         rand_config: Option<RandConfig>,
+        fast_rand_config: Option<RandConfig>,
         rand_msg_rx: aptos_channel::Receiver<AccountAddress, IncomingRandGenRequest>,
+        highest_ordered_round: Round,
     ) {
         let maybe_rand_msg_tx = self.spawn_decoupled_execution(
             commit_signer_provider,
             epoch_state.clone(),
             rand_config,
+            fast_rand_config,
             rand_msg_rx,
+            highest_ordered_round,
         );
 
         let transaction_shuffler =
@@ -450,7 +464,9 @@ impl TExecutionClient for DummyExecutionClient {
         _onchain_execution_config: &OnChainExecutionConfig,
         _onchain_randomness_config: &OnChainRandomnessConfig,
         _rand_config: Option<RandConfig>,
+        _fast_rand_config: Option<RandConfig>,
         _rand_msg_rx: aptos_channel::Receiver<AccountAddress, IncomingRandGenRequest>,
+        _highest_ordered_round: Round,
     ) {
     }
 

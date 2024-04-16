@@ -28,3 +28,6 @@ public fun m::foo($t0: &m::S): u8 {
   4: $t1 := read_ref($t5)
   5: return $t1
 }
+
+
+============ bytecode verification succeeded ========

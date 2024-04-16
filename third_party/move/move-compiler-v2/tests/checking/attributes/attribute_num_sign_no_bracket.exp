@@ -1,0 +1,10 @@
+
+Diagnostics:
+error: unexpected token
+  ┌─ tests/checking/attributes/attribute_num_sign_no_bracket.move:4:5
+  │
+4 │     fun foo() {}
+  │     ^^^
+  │     │
+  │     Unexpected 'fun'
+  │     Expected '['

@@ -1,4 +1,5 @@
 // Copyright © Aptos Foundation
+// SPDX-License-Identifier: Apache-2.0
 
 use anyhow::{anyhow, ensure, Result};
 use aptos_crypto::{compat::Sha3_256, Uniform};

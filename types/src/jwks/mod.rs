@@ -1,4 +1,5 @@
 // Copyright © Aptos Foundation
+// SPDX-License-Identifier: Apache-2.0
 
 use self::jwk::JWK;
 use crate::{
@@ -23,6 +24,7 @@ use std::{
 };
 
 pub mod jwk;
+pub mod patch;
 pub mod rsa;
 pub mod unsupported;
 

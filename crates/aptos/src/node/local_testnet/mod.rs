@@ -52,13 +52,13 @@ use tracing_subscriber::fmt::MakeWriter;
 
 const TESTNET_FOLDER: &str = "testnet";
 
-/// Run a local testnet
+/// Run a localnet
 ///
-/// This local testnet will run it's own genesis and run as a single node network
+/// This localnet will run it's own genesis and run as a single node network
 /// locally. A faucet and grpc transaction stream will run alongside the node unless
 /// you specify otherwise with --no-faucet and --no-txn-stream respectively.
 #[derive(Parser)]
-pub struct RunLocalTestnet {
+pub struct RunLocalnet {
     /// The directory to save all files for the node
     ///
     /// Defaults to .aptos/testnet
@@ -105,7 +105,7 @@ pub struct RunLocalTestnet {
     log_to_stdout: bool,
 }
 
-impl RunLocalTestnet {
+impl RunLocalnet {
     /// Wait for many services to start up. This prints a message like "X is starting,
     /// please wait..." for each service and then "X is ready. Endpoint: <url>"
     /// when it's ready.
@@ -176,9 +176,9 @@ impl RunLocalTestnet {
 }
 
 #[async_trait]
-impl CliCommand<()> for RunLocalTestnet {
+impl CliCommand<()> for RunLocalnet {
     fn command_name(&self) -> &'static str {
-        "RunLocalTestnet"
+        "RunLocalnet"
     }
 
     fn jsonify_error_output(&self) -> bool {
@@ -201,7 +201,7 @@ impl CliCommand<()> for RunLocalTestnet {
         // If asked, remove the current test directory and start with a new node.
         if self.force_restart && test_dir.exists() {
             prompt_yes_with_override(
-                "Are you sure you want to delete the existing local testnet data?",
+                "Are you sure you want to delete the existing localnet data?",
                 self.prompt_options,
             )?;
             remove_dir_all(test_dir.as_path()).map_err(|err| {
@@ -391,7 +391,7 @@ impl CliCommand<()> for RunLocalTestnet {
                 .context("Failed to run post startup step")?;
         }
 
-        eprintln!("\nSetup is complete, you can now use the local testnet!");
+        eprintln!("\nSetup is complete, you can now use the localnet!");
 
         // Create a task that listens for ctrl-c. We want to intercept it so we can run
         // the shutdown steps before properly exiting. This is of course best effort,

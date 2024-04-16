@@ -1,4 +1,5 @@
 // Copyright © Aptos Foundation
+// SPDX-License-Identifier: Apache-2.0
 
 use crate::{
     randomness::{
@@ -43,8 +44,8 @@ async fn randomness_correctness() {
     let dkg_session = get_on_chain_resource::<DKGState>(&rest_client).await;
     assert!(verify_dkg_transcript(dkg_session.last_complete(), &decrypt_key_map).is_ok());
 
-    // Verify the randomness in 5 versions.
-    for _ in 0..5 {
+    // Verify the randomness in 10 versions.
+    for _ in 0..10 {
         let cur_txn_version = get_current_version(&rest_client).await;
         info!("Verifying WVUF output for version {}.", cur_txn_version);
         let wvuf_verify_result =
@@ -63,8 +64,8 @@ async fn randomness_correctness() {
     let dkg_session = get_on_chain_resource::<DKGState>(&rest_client).await;
     assert!(verify_dkg_transcript(dkg_session.last_complete(), &decrypt_key_map).is_ok());
 
-    // Again, verify the randomness in 5 versions.
-    for _ in 0..5 {
+    // Again, verify the randomness in 10 versions.
+    for _ in 0..10 {
         let cur_txn_version = get_current_version(&rest_client).await;
         info!("Verifying WVUF output for version {}.", cur_txn_version);
         let wvuf_verify_result =

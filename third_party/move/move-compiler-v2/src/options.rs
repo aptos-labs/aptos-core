@@ -2,10 +2,13 @@
 // Parts of the project are originally copyright © Meta Platforms, Inc.
 // SPDX-License-Identifier: Apache-2.0
 
+use crate::experiments::{DefaultValue, EXPERIMENTS};
 use clap::Parser;
 use codespan_reporting::diagnostic::Severity;
+use itertools::Itertools;
 use move_command_line_common::env::read_env_var;
 use move_compiler::command_line as cli;
+use move_model::metadata::LanguageVersion;
 use once_cell::sync::Lazy;
 use std::{
     cell::RefCell,
@@ -31,6 +34,9 @@ pub struct Options {
     /// Output directory.
     #[clap(short, long, default_value = "")]
     pub output_dir: String,
+    /// The language version to use.
+    #[clap(long, value_parser = clap::value_parser!(LanguageVersion))]
+    pub language_version: Option<LanguageVersion>,
     /// Do not complain about unknown attributes in Move code.
     #[clap(long, default_value = "false")]
     pub skip_attribute_checks: bool,
@@ -62,6 +68,9 @@ pub struct Options {
     /// Whether to compile everything, including dependencies.
     #[clap(long)]
     pub whole_program: bool,
+    /// Whether to compile #[test] and #[test_only] code
+    #[clap(skip)]
+    pub compile_test_code: bool,
 }
 
 impl Default for Options {
@@ -77,22 +86,119 @@ impl Options {
         Severity::Warning
     }
 
+    /// Turns an experiment on or off, overriding command line, environment, and defaults.
+    pub fn set_experiment(self, name: impl AsRef<str>, on: bool) -> Self {
+        let name = name.as_ref().to_string();
+        assert!(
+            EXPERIMENTS.contains_key(&name),
+            "experiment `{}` not declared",
+            name
+        );
+        self.experiment_cache.borrow_mut().insert(name, on);
+        self
+    }
+
+    /// Sets the language version to use.
+    pub fn set_language_version(self, version: LanguageVersion) -> Self {
+        Self {
+            language_version: Some(version),
+            ..self
+        }
+    }
+
     /// Returns true if an experiment is on.
     pub fn experiment_on(&self, name: &str) -> bool {
-        let on_opt = self.experiment_cache.borrow().get(name).cloned();
-        if let Some(on) = on_opt {
-            on
-        } else {
-            let on = self.experiments.iter().any(|s| s == name)
-                || compiler_exp_var().iter().any(|s| s == name);
+        self.experiment_on_recursive(name, &mut BTreeSet::new())
+    }
+
+    fn experiment_on_recursive(&self, name: &str, visited: &mut BTreeSet<String>) -> bool {
+        if !visited.insert(name.to_string()) {
+            panic!(
+                "cyclic inheritance relation between experiments: `{} -> {}`",
+                name,
+                visited.iter().clone().join(",")
+            )
+        }
+        if let Some(on) = self.experiment_cache.borrow().get(name).cloned() {
+            return on;
+        }
+        if let Some(exp) = EXPERIMENTS.get(&name.to_string()) {
+            // First we look at experiments provided via the command line, second
+            // via the env var, and last we take the configured default.
+            let on = if let Some(on) = find_experiment(&self.experiments, name) {
+                on
+            } else if let Some(on) = find_experiment(&compiler_exp_var(), name) {
+                on
+            } else {
+                match &exp.default {
+                    DefaultValue::Given(on) => *on,
+                    DefaultValue::Inherited(other_name) => {
+                        self.experiment_on_recursive(other_name, visited)
+                    },
+                }
+            };
             self.experiment_cache
                 .borrow_mut()
                 .insert(name.to_string(), on);
             on
+        } else {
+            panic!("unknown experiment `{}`", name)
+        }
+    }
+
+    pub fn set_skip_attribute_checks(self, value: bool) -> Self {
+        Self {
+            skip_attribute_checks: value,
+            ..self
+        }
+    }
+
+    pub fn set_compile_test_code(self, value: bool) -> Self {
+        Self {
+            compile_test_code: value,
+            ..self
         }
     }
 }
 
+/// Finds the experiment in the list of definitions. A definition
+/// can be either `<exp_name>` in which case it is on, or
+/// `<exp_name>=on/off`.
+fn find_experiment(s: &[String], name: &str) -> Option<bool> {
+    let mut result = None;
+    for e in s {
+        let mut parts = e.split('=');
+        let exp_name = parts.next().unwrap();
+        assert!(
+            EXPERIMENTS.contains_key(exp_name),
+            "undeclared experiment `{}`",
+            exp_name
+        );
+        if exp_name == name {
+            let on = if let Some(value) = parts.next() {
+                match value.trim().to_lowercase().as_str() {
+                    "on" => true,
+                    "off" => false,
+                    _ => panic!(
+                        "invalid value for experiment `{}`: \
+                        found `{}` but must be `on` or `off`",
+                        name, value
+                    ),
+                }
+            } else {
+                // Default is on
+                true
+            };
+            result = Some(on);
+            // continue going to (1) check all experiments
+            // in the list are actually declared (2) later
+            // entries override earlier ones
+        }
+    }
+    result
+}
+
+/// Gets the value of the env var for experiments.
 fn compiler_exp_var() -> Vec<String> {
     static EXP_VAR: Lazy<Vec<String>> = Lazy::new(|| {
         for s in ["MVC_EXP", "MOVE_COMPILER_EXP"] {
@@ -104,4 +210,41 @@ fn compiler_exp_var() -> Vec<String> {
         vec![]
     });
     (*EXP_VAR).clone()
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_options_ref_cell_clone() {
+        let test_key = "foo".to_owned();
+        let options1 = Options::default();
+
+        options1
+            .experiment_cache
+            .borrow_mut()
+            .insert(test_key.clone(), false);
+
+        let options2 = options1.clone();
+
+        options1
+            .experiment_cache
+            .borrow_mut()
+            .insert(test_key.clone(), true);
+
+        let x1 = *(options1
+            .experiment_cache
+            .borrow()
+            .get(&test_key)
+            .expect("we just set foo"));
+        assert!(x1);
+
+        let x2 = *(options2
+            .experiment_cache
+            .borrow()
+            .get(&test_key)
+            .expect("we just set foo"));
+        assert!(!x2);
+    }
 }

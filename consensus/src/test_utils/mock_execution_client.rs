@@ -16,7 +16,10 @@ use crate::{
 };
 use anyhow::{format_err, Result};
 use aptos_channels::aptos_channel;
-use aptos_consensus_types::{common::Payload, pipelined_block::PipelinedBlock};
+use aptos_consensus_types::{
+    common::{Payload, Round},
+    pipelined_block::PipelinedBlock,
+};
 use aptos_crypto::HashValue;
 use aptos_executor_types::ExecutorResult;
 use aptos_infallible::Mutex;
@@ -98,7 +101,9 @@ impl TExecutionClient for MockExecutionClient {
         _onchain_execution_config: &OnChainExecutionConfig,
         _onchain_randomness_config: &OnChainRandomnessConfig,
         _rand_config: Option<RandConfig>,
+        _fast_rand_config: Option<RandConfig>,
         _rand_msg_rx: aptos_channel::Receiver<AccountAddress, IncomingRandGenRequest>,
+        _highest_ordered_round: Round,
     ) {
     }
 

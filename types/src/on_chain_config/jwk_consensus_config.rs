@@ -1,4 +1,5 @@
 // Copyright © Aptos Foundation
+// SPDX-License-Identifier: Apache-2.0
 
 use crate::{
     jwks::SupportedOIDCProviders,
@@ -41,7 +42,11 @@ pub enum OnChainJWKConsensusConfig {
 impl OnChainJWKConsensusConfig {
     pub fn default_enabled() -> Self {
         Self::V1(ConfigV1 {
-            oidc_providers: vec![],
+            oidc_providers: vec![OIDCProvider {
+                name: "https://accounts.google.com".to_string(),
+                config_url: "https://accounts.google.com/.well-known/openid-configuration"
+                    .to_string(),
+            }],
         })
     }
 
@@ -54,6 +59,8 @@ impl OnChainJWKConsensusConfig {
     }
 
     pub fn default_for_genesis() -> Self {
+        // Here it is supposed to use `default_enabled()`.
+        // Using an empty list instead to avoid DDoSing the CI infra or the actual providers.
         Self::V1(ConfigV1 {
             oidc_providers: vec![],
         })

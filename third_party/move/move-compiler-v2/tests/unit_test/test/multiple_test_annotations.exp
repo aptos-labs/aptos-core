@@ -1,0 +1,20 @@
+
+Diagnostics:
+error: duplicate declaration, item, or annotation
+  ┌─ tests/unit_test/test/multiple_test_annotations.move:6:7
+  │
+5 │     #[test(_a=@0x1)]
+  │       ---- Attribute previously given here
+6 │     #[test(_b=@0x2)]
+  │       ^^^^^^^^^^^^^ Duplicate attribute 'test' attached to the same item
+
+error: duplicate declaration, item, or annotation
+   ┌─ tests/unit_test/test/multiple_test_annotations.move:10:7
+   │
+ 9 │     #[test]
+   │       ---- Attribute previously given here
+10 │     #[test(_a=@0x1, _b=@0x2)]
+   │       ^^^^^^^^^^^^^^^^^^^^^^ Duplicate attribute 'test' attached to the same item
+
+
+============ bytecode verification succeeded ========

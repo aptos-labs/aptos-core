@@ -418,12 +418,18 @@ impl<V: VMExecutor> ChunkExecutorInner<V> {
         } = chunk;
 
         let first_version = parent_accumulator.num_leaves();
-        let num_overlap = txn_infos_with_proof.verify_extends_ledger(
-            first_version,
-            parent_accumulator.root_hash(),
-            Some(first_version),
-        )?;
-        assert_eq!(num_overlap, 0, "overlapped chunks");
+
+        // In consensus-only mode, we cannot verify the proof against the executed output,
+        // because the proof returned by the remote peer is an empty one.
+        #[cfg(not(feature = "consensus-only-perf-test"))]
+        {
+            let num_overlap = txn_infos_with_proof.verify_extends_ledger(
+                first_version,
+                parent_accumulator.root_hash(),
+                Some(first_version),
+            )?;
+            assert_eq!(num_overlap, 0, "overlapped chunks");
+        }
 
         let (ledger_update_output, to_discard, to_retry) = {
             let _timer =
