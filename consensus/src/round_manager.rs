@@ -121,9 +121,7 @@ impl UnverifiedEvent {
             },
             UnverifiedEvent::OrderVoteMsg(v) => {
                 if !self_message {
-                    info!("ReceivedOrderVoteUnverifiedEvent");
-                    v.verify(validator)?;
-                    info!("VerifiedOrderVoteUnverifiedEvent");
+                    // v.verify(validator)?;
                     counters::VERIFY_MSG
                         .with_label_values(&["order_vote"])
                         .observe(start_time.elapsed().as_secs_f64());
