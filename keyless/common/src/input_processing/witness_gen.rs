@@ -5,7 +5,7 @@
 
 use anyhow::{anyhow, bail, Result};
 use std::fs;
-use std::process::Command;
+use std::process::{Command, Output};
 use tempfile::NamedTempFile;
 use tracing::info_span;
 
@@ -44,7 +44,8 @@ pub fn witness_gen(
     } else {
         // Print the error message if the command failed
         let stderr = String::from_utf8_lossy(&output.stderr);
-        bail!("Command failed:\n{}", stderr);
+        let stdout = String::from_utf8_lossy(&output.stdout);
+        bail!("Command failed:\n{}\n{}", stdout, stderr);
     }
 }
 
