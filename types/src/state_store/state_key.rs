@@ -19,6 +19,7 @@ use aptos_crypto::{
 };
 use aptos_crypto_derive::CryptoHasher;
 use aptos_infallible::RwLock;
+use bytes::{BufMut, Bytes, BytesMut};
 // use aptos_metrics_core::{IntCounterHelper, TimerHelper};
 use move_core_types::{
     account_address::AccountAddress,
@@ -38,6 +39,7 @@ use std::{
     fmt,
     fmt::{Debug, Formatter},
     hash::Hash,
+    io::Write,
     ops::Deref,
     sync::{Arc, Weak},
 };
@@ -79,20 +81,6 @@ impl Debug for StateKeyInner {
     }
 }
 
-impl CryptoHash for StateKeyInner {
-    type Hasher = StateKeyInnerHasher;
-
-    fn hash(&self) -> HashValue {
-        let mut state = Self::Hasher::default();
-        state.update(
-            self.encode()
-                .expect("Failed to serialize the state key")
-                .as_ref(),
-        );
-        state.finish()
-    }
-}
-
 /// Error thrown when a [`StateKey`] fails to be deserialized out of a byte sequence stored in physical
 /// storage, via [`StateKey::decode`].
 #[derive(Debug, Error)]
@@ -121,23 +109,26 @@ pub enum StateKeyTag {
 }
 
 impl StateKeyInner {
-    fn encode(&self) -> Result<Vec<u8>> {
-        let mut out = vec![];
+    fn encode(&self) -> Result<Bytes> {
+        let mut writer = BytesMut::new().writer();
 
-        let (prefix, raw_key) = match self {
+        match self {
             StateKeyInner::AccessPath(access_path) => {
-                (StateKeyTag::AccessPath, bcs::to_bytes(access_path)?)
+                writer.write_all(&[StateKeyTag::AccessPath as u8])?;
+                bcs::serialize_into(&mut writer, access_path)?;
             },
             StateKeyInner::TableItem { handle, key } => {
-                let mut bytes = bcs::to_bytes(&handle)?;
-                bytes.extend(key);
-                (StateKeyTag::TableItem, bytes)
+                writer.write_all(&[StateKeyTag::TableItem as u8])?;
+                bcs::serialize_into(&mut writer, &handle)?;
+                bcs::serialize_into(&mut writer, key)?;
             },
-            StateKeyInner::Raw(raw_bytes) => (StateKeyTag::Raw, raw_bytes.to_vec()),
+            StateKeyInner::Raw(raw_bytes) => {
+                writer.write_all(&[StateKeyTag::TableItem as u8])?;
+                writer.write_all(raw_bytes)?;
+            },
         };
-        out.push(prefix as u8);
-        out.extend(raw_key);
-        Ok(out)
+
+        Ok(writer.into_inner().into())
     }
 
     fn decode(val: &[u8]) -> Result<Self, StateKeyDecodeErr> {
@@ -173,9 +164,9 @@ impl StateKeyInner {
 #[derive(Debug)]
 struct EntryInner {
     pub deserialized: StateKeyInner,
-    pub hash_value: HashValue,
     // pub serialized: Bytes,
-    // pub encoded: Bytes,
+    pub encoded: Bytes,
+    pub hash_value: HashValue,
 }
 
 /// n.b. Wrapping it so EntryInner is constructed outside the lock while Entry is only constructed
@@ -193,10 +184,19 @@ impl Deref for Entry {
 
 impl EntryInner {
     pub fn from_deserialized(deserialized: StateKeyInner) -> Self {
-        let hash_value = CryptoHash::hash(&deserialized);
+        // FIXME(aldenhu): deal with error
+        let encoded = deserialized
+            .encode()
+            .expect("Failed to encode StateKeyInner.");
+
+        let mut state = StateKeyInnerHasher::default();
+        // FIXME(aldenhu): check error processing
+        state.update(&encoded);
+        let hash_value = state.finish();
 
         Self {
             deserialized,
+            encoded,
             hash_value,
         }
     }
@@ -512,9 +512,8 @@ impl StateKey {
         Self(entry)
     }
 
-    pub fn encode(&self) -> Result<Vec<u8>> {
-        // FIXME(aldenhu): maybe use cache?
-        self.inner().encode()
+    pub fn encode(&self) -> Result<Bytes> {
+        Ok(self.0.encoded.clone())
     }
 
     pub fn decode(_val: &[u8]) -> Result<Self, StateKeyDecodeErr> {
