@@ -16,8 +16,21 @@ pub fn total_weight_lower_bound(validator_stakes: &Vec<u64>) -> usize {
     validator_stakes.len()
 }
 
-/// Find the smallest `stake_per_weight` that guarantees a valid rounding.
-/// Output the resulting total weight.
+/// Compute the smallest `stake_per_weight` which guarantees a valid rounding.
+/// Output the corresponding estimated total weight, which is:
+/// `(num_validators/2 + 2)/(reconstruct_threshold - secrecy_threshold)`.
+///
+/// Here is an example with `secrecy_threshold_in_stake_ratio=1/2, reconstruct_threshold_in_stake_ratio=2/3`.
+/// Say the estimated total weight is `3n+12`, where `n` is the number of validators.
+/// After `compute_profile_fixed_point()` processing,
+/// - A validator with stake `cur_stake` gets rounded weight `round((3*n+12)*cur_stake/stake_total)`;
+/// - `rounding_weight_gain_total` and `rounding_weight_loss_total` are determined, whose sum is at most `n/2` (since everyone's rounding error is at most `1/2`);
+/// - `reconstruction_threshold` is set to be `ceil(1.5n + 6 + rounding_weight_gain_total) + 1`.
+/// Now, a validator subset of stake ratio `r` has `weight_sub_total` in range:
+///   `[(3*n+12)*r - rounding_weight_loss_total, (3*n+12)*r + rounding_weight_gain_total]`
+/// - when `r <= 1/2`, `weight_sub_total <= 1.5*n + 6 + rounding_weight_gain_total < reconstruction_threshold`.
+/// - when `r > 2/3`, `weight_sub_total >= 2*n + 8 - rounding_weight_loss_total >= 1.5*n + 8 + rounding_weight_gain_total > reconstruction_threshold`.
+
 pub fn total_weight_upper_bound(
     validator_stakes: &Vec<u64>,
     mut reconstruct_threshold_in_stake_ratio: U64F64,
@@ -27,10 +40,9 @@ pub fn total_weight_upper_bound(
         reconstruct_threshold_in_stake_ratio,
         secrecy_threshold_in_stake_ratio + U64F64::DELTA,
     );
+    let two = U64F64::from_num(2);
     let n = U64F64::from_num(validator_stakes.len());
-    (n / U64F64::from_num(2)
-        / (reconstruct_threshold_in_stake_ratio - secrecy_threshold_in_stake_ratio)
-        + n)
+    ((n / two + two) / (reconstruct_threshold_in_stake_ratio - secrecy_threshold_in_stake_ratio))
         .ceil()
         .to_num::<usize>()
 }
@@ -83,9 +95,6 @@ impl DKGRounding {
                 (profile, Some(format!("{e}")), "infallible".to_string())
             },
         };
-        println!("profile={:?}", profile);
-        println!("rounding_error={:?}", rounding_error);
-        println!("rounding_method={:?}", rounding_method);
         let wconfig = WeightedConfig::new(
             profile.reconstruct_threshold_in_weights as usize,
             profile
@@ -240,6 +249,8 @@ impl DKGRoundingProfile {
         }
     }
 
+    /// Assign weights using a `stake_per_weight` that guarantees liveness and privacy.
+    /// See comments of `total_weight_upper_bound()` for the detailed math.
     pub fn infallible(
         validator_stakes: &Vec<u64>,
         mut secrecy_threshold_in_stake_ratio: U64F64,
@@ -256,12 +267,12 @@ impl DKGRoundingProfile {
 
         let stake_total = U64F64::from_num(validator_stakes.clone().into_iter().sum::<u64>());
 
-        // This `stake_per_weight` value guarantees a weight assignment that achieves liveness and privacy
-        let stake_per_weight = stake_total
-            * 2
-            * (reconstruct_threshold_in_stake_ratio - secrecy_threshold_in_stake_ratio)
-            / U64F64::from_num(validator_stakes.len())
-            - U64F64::from_num(1);
+        let estimated_weight_total = total_weight_upper_bound(
+            validator_stakes,
+            reconstruct_threshold_in_stake_ratio,
+            secrecy_threshold_in_stake_ratio,
+        );
+        let stake_per_weight = stake_total / U64F64::from_num(estimated_weight_total);
         compute_profile_fixed_point(
             validator_stakes,
             stake_per_weight,
@@ -290,6 +301,7 @@ fn compute_profile_fixed_point(
     // Use fixed-point arithmetic to ensure the same result across machines.
     // See paper for details of the rounding algorithm
     // https://eprint.iacr.org/2024/198
+    let one = U64F64::from_num(1);
     let stake_sum: u64 = validator_stakes.iter().sum::<u64>();
     let stake_sum_fixed = U64F64::from_num(stake_sum);
     let mut delta_down_fixed = U64F64::from_num(0);
@@ -298,8 +310,7 @@ fn compute_profile_fixed_point(
     for stake in validator_stakes {
         let ideal_weight_fixed = U64F64::from_num(*stake) / stake_per_weight;
         // rounded to the nearest integer
-        let rounded_weight_fixed =
-            (ideal_weight_fixed + (U64F64::from_num(1) / U64F64::from_num(2))).floor();
+        let rounded_weight_fixed = (ideal_weight_fixed + (one / 2)).floor();
         let rounded_weight = rounded_weight_fixed.to_num::<u64>();
         validator_weights.push(rounded_weight);
         if ideal_weight_fixed > rounded_weight_fixed {
@@ -312,7 +323,7 @@ fn compute_profile_fixed_point(
     let delta_total_fixed = delta_down_fixed + delta_up_fixed;
     let reconstruct_threshold_in_weights_fixed =
         (secrecy_threshold_in_stake_ratio * stake_sum_fixed / stake_per_weight + delta_up_fixed)
-            .ceil();
+            .ceil() + one;
     let reconstruct_threshold_in_weights: u64 =
         reconstruct_threshold_in_weights_fixed.to_num::<u64>();
     let stake_gap_fixed = stake_per_weight * delta_total_fixed / stake_sum_fixed;
