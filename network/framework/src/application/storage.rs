@@ -15,7 +15,7 @@ use aptos_config::{
     config::{Peer, PeerSet},
     network_id::{NetworkId, PeerNetworkId},
 };
-use aptos_infallible::RwLock;
+use aptos_infallible::{Mutex, RwLock};
 use aptos_logger::{sample, sample::SampleRate, warn};
 use aptos_peer_monitoring_service_types::PeerMonitoringMetadata;
 use aptos_types::{account_address::AccountAddress, PeerId};
@@ -50,7 +50,7 @@ pub struct PeersAndMetadata {
     // TODO: should we remove this when generational versioning is supported?
     cached_peers_and_metadata: Arc<ArcSwap<HashMap<NetworkId, HashMap<PeerId, PeerMetadata>>>>,
 
-    subscribers: RwLock<Vec<tokio::sync::mpsc::Sender<ConnectionNotification>>>,
+    subscribers: Mutex<Vec<tokio::sync::mpsc::Sender<ConnectionNotification>>>,
 }
 
 impl PeersAndMetadata {
@@ -60,7 +60,7 @@ impl PeersAndMetadata {
             peers_and_metadata: RwLock::new(HashMap::new()),
             trusted_peers: HashMap::new(),
             cached_peers_and_metadata: Arc::new(ArcSwap::from(Arc::new(HashMap::new()))),
-            subscribers: RwLock::new(vec![]),
+            subscribers: Mutex::new(vec![]),
         };
 
         // Initialize each network mapping and trusted peer set
@@ -369,7 +369,7 @@ impl PeersAndMetadata {
     }
 
     fn broadcast(&self, event: ConnectionNotification) {
-        let mut listeners = self.subscribers.write();
+        let mut listeners = self.subscribers.lock();
         let mut to_del = vec![];
         for i in 0..listeners.len() {
             let dest = listeners.get_mut(i).unwrap();
@@ -412,14 +412,14 @@ impl PeersAndMetadata {
                 }
             }
         }
-        let mut listeners = self.subscribers.write();
+        let mut listeners = self.subscribers.lock();
         listeners.push(sender);
         receiver
     }
 
     #[cfg(test)]
     pub fn close_subscribers(&self) {
-        let mut listeners = self.subscribers.write();
+        let mut listeners = self.subscribers.lock();
         // drop all the senders to close them
         listeners.clear();
     }
