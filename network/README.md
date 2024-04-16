@@ -77,7 +77,7 @@ Peer code writes into a MultiplexMessageSink object which writes into a tokio_ut
 
 [PeerListener](builder/src/peer_listener.rs) holds the listening socket bound to some port.
 
-PeerListener::check_new_inbound_connection() does a bunch of checks, if all successful it starts [Peer code](framework/src/peer.rs) which inserts the new peer into the PeersAndMetadata object and starts several tokio tasks to handle the peer.
+PeerListener::check_new_inbound_connection() does a bunch of checks, if all successful it starts [Peer code](framework/src/peer.rs) which inserts the new peer into the [PeersAndMetadata](framework/src/application/storage.rs) object and starts several tokio tasks to handle the peer.
 
 ### Outbound connections to peers
 
@@ -134,17 +134,15 @@ Most of the sequence of connecting to a peer is in ConnectivityManager::queue_di
         └── noise                  # Noise handshaking and wire integration
 
 [`NetworkConfig`]:../config/src/config/network_config.rs
-[`ConnectivityManager`]: ./src/connectivity_manager/mod.rs
+[`ConnectivityManager`]: framework/src/connectivity_manager/mod.rs
 [`AptosNet Handshake Protocol`]: ../specifications/network/handshake-v1.md
 [`ValidatorSet`]: ../types/src/on_chain_config/validator_set.rs
-[`AptosTransport`]: ./src/transport/mod.rs
-[`HealthChecker`]: ./src/protocols/health_checker/mod.rs
-[`Network Interface`]: ./src/protocols/network/mod.rs
-[`NetworkMessage`]: ./src/protocols/wire/messaging/v1/mod.rs
+[`AptosTransport`]: framework/src/transport/mod.rs
+[`HealthChecker`]: framework/src/protocols/health_checker/mod.rs
+[`Network Interface`]: framework/src/protocols/network/mod.rs
+[`NetworkMessage`]: framework/src/protocols/wire/messaging/v1/mod.rs
 [`NoiseIK`]: ../specifications/network/noise.md
-[`PeerManager`]: ./src/peer_manager/mod.rs
-[`Peer`]: ./src/peer/mod.rs
 [`ValidatorConfig`]: ../documentation/specifications/network/onchain-discovery.md#on-chain-config
 [`validator-set-discovery`]: discovery/src/lib.rs
-[`NetworkClient`]:framework/src/application/interface.rs
-[`PeersAndMetadata`]:framework/src/application/storage.rs
+[`NetworkClient`]: framework/src/application/interface.rs
+[`PeersAndMetadata`]: framework/src/application/storage.rs
