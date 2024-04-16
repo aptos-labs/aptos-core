@@ -6,6 +6,7 @@
 //! value types, along with helpers to define a new schema with ease.
 use crate::ColumnFamilyName;
 use anyhow::Result;
+use bytes::Bytes;
 use std::fmt::Debug;
 
 /// Macro for defining a SchemaDB schema.
@@ -83,24 +84,47 @@ macro_rules! define_schema {
 /// This trait defines a type that can serve as a [`Schema::Key`].
 pub trait KeyCodec<S: Schema + ?Sized>: Sized + PartialEq + Debug {
     /// Converts `self` to bytes to be stored in DB.
-    fn encode_key(&self) -> Result<Vec<u8>>;
+    fn encode_key(&self) -> Result<Vec<u8>> {
+        unimplemented!("Implement either encode_key() or encode_key_to_bytes()")
+    }
+
     /// Converts bytes fetched from DB to `Self`.
     fn decode_key(data: &[u8]) -> Result<Self>;
+
+    /// Converts `self` to bytes to be stored in DB as a `Bytes` object.
+    fn encode_key_to_bytes(&self) -> Result<Bytes> {
+        self.encode_key().map(Bytes::from)
+    }
 }
 
 /// This trait defines a type that can serve as a [`Schema::Value`].
 pub trait ValueCodec<S: Schema + ?Sized>: Sized + PartialEq + Debug {
     /// Converts `self` to bytes to be stored in DB.
-    fn encode_value(&self) -> Result<Vec<u8>>;
+    fn encode_value(&self) -> Result<Vec<u8>> {
+        unimplemented!("Implement either encode_value() or encode_value_to_bytes()")
+    }
+
     /// Converts bytes fetched from DB to `Self`.
     fn decode_value(data: &[u8]) -> Result<Self>;
+
+    /// Converts `self` to bytes to be stored in DB as a `Bytes` object.
+    fn encode_value_to_bytes(&self) -> Result<Bytes> {
+        self.encode_value().map(Bytes::from)
+    }
 }
 
 /// This defines a type that can be used to seek a [`SchemaIterator`](crate::SchemaIterator), via
 /// interfaces like [`seek`](crate::SchemaIterator::seek).
 pub trait SeekKeyCodec<S: Schema + ?Sized>: Sized {
     /// Converts `self` to bytes which is used to seek the underlying raw iterator.
-    fn encode_seek_key(&self) -> Result<Vec<u8>>;
+    fn encode_seek_key(&self) -> Result<Vec<u8>> {
+        unimplemented!()
+    }
+
+    /// Converts `self` to bytes to be stored in DB as a `Bytes` object.
+    fn encode_seek_key_to_bytes(&self) -> Result<Bytes> {
+        self.encode_seek_key().map(Bytes::from)
+    }
 }
 
 /// All keys can automatically be used as seek keys.
@@ -137,12 +161,16 @@ pub mod fuzzing {
     /// to bytes and convert back.
     pub fn assert_encode_decode<S: Schema>(key: &S::Key, value: &S::Value) {
         {
-            let encoded = key.encode_key().expect("Encoding key should work.");
+            let encoded = key
+                .encode_key_to_bytes()
+                .expect("Encoding key should work.");
             let decoded = S::Key::decode_key(&encoded).expect("Decoding key should work.");
             assert_eq!(*key, decoded);
         }
         {
-            let encoded = value.encode_value().expect("Encoding value should work.");
+            let encoded = value
+                .encode_value_to_bytes()
+                .expect("Encoding value should work.");
             let decoded = S::Value::decode_value(&encoded).expect("Decoding value should work.");
             assert_eq!(*value, decoded);
         }

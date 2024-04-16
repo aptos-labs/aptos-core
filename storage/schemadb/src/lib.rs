@@ -33,6 +33,7 @@ use anyhow::format_err;
 use aptos_infallible::Mutex;
 use aptos_logger::prelude::*;
 use aptos_storage_interface::Result as DbResult;
+use bytes::Bytes;
 use iterator::{ScanDirection, SchemaIterator};
 use rand::Rng;
 /// Type alias to `rocksdb::ReadOptions`. See [`rocksdb doc`](https://github.com/pingcap/rust-rocksdb/blob/master/src/rocksdb_options.rs)
@@ -46,8 +47,8 @@ pub type ColumnFamilyName = &'static str;
 
 #[derive(Debug)]
 enum WriteOp {
-    Value { key: Vec<u8>, value: Vec<u8> },
-    Deletion { key: Vec<u8> },
+    Value { key: Bytes, value: Bytes },
+    Deletion { key: Bytes },
 }
 
 /// `SchemaBatch` holds a collection of updates that can be applied to a DB atomically. The updates
@@ -77,8 +78,8 @@ impl SchemaBatch {
         key: &S::Key,
         value: &S::Value,
     ) -> aptos_storage_interface::Result<()> {
-        let key = <S::Key as KeyCodec<S>>::encode_key(key)?;
-        let value = <S::Value as ValueCodec<S>>::encode_value(value)?;
+        let key = <S::Key as KeyCodec<S>>::encode_key_to_bytes(key)?;
+        let value = <S::Value as ValueCodec<S>>::encode_value_to_bytes(value)?;
         self.rows
             .lock()
             .entry(S::COLUMN_FAMILY_NAME)
@@ -90,7 +91,7 @@ impl SchemaBatch {
 
     /// Adds a delete operation to the batch.
     pub fn delete<S: Schema>(&self, key: &S::Key) -> DbResult<()> {
-        let key = <S::Key as KeyCodec<S>>::encode_key(key)?;
+        let key = <S::Key as KeyCodec<S>>::encode_key_to_bytes(key)?;
         self.rows
             .lock()
             .entry(S::COLUMN_FAMILY_NAME)
@@ -188,7 +189,7 @@ impl DB {
             .with_label_values(&[S::COLUMN_FAMILY_NAME])
             .start_timer();
 
-        let k = <S::Key as KeyCodec<S>>::encode_key(schema_key)?;
+        let k = <S::Key as KeyCodec<S>>::encode_key_to_bytes(schema_key)?;
         let cf_handle = self.get_cf_handle(S::COLUMN_FAMILY_NAME)?;
 
         let result = self.inner.get_cf(cf_handle, k)?;
