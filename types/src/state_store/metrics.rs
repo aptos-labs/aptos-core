@@ -14,7 +14,7 @@ pub static STATE_KEY_COUNTERS: Lazy<IntCounterVec> = Lazy::new(|| {
     register_int_counter_vec!(
         "aptos_state_key_counters",
         "Aptos storage state key counters",
-        &["key_type", "event"]
+        &["entry_type", "event"]
     )
     .unwrap()
 });
@@ -23,7 +23,7 @@ pub static STATE_KEY_TIMER: Lazy<HistogramVec> = Lazy::new(|| {
     register_histogram_vec!(
         "aptos_state_key_timer",
         "Various timers for performance analysis.",
-        &["key_type", "event"],
+        &["entry_type", "event"],
         exponential_buckets(/*start=*/ 1e-6, /*factor=*/ 2.0, /*count=*/ 22).unwrap(),
     )
     .unwrap()

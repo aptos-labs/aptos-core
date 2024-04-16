@@ -3,6 +3,7 @@
 
 #![allow(clippy::non_canonical_partial_ord_impl)]
 
+use crate::access_path::PathType;
 use crate::{
     access_path,
     access_path::AccessPath,
@@ -204,37 +205,45 @@ impl EntryInner {
 
 impl Drop for Entry {
     fn drop(&mut self) {
+        let encoded = &self.encoded;
+
         match &self.deserialized {
             StateKeyInner::AccessPath(AccessPath { address, path }) => {
                 use access_path::Path;
 
-                // TODO(aldenhu): maybe hold reference to the map(s)?
                 // TODO(aldenhu): maybe let Inner carry the deserialized Path?
                 match &bcs::from_bytes::<Path>(path).expect("Failed to deserialize Path.") {
-                    Path::Code(module_id) => GLOBAL_REGISTRY
-                        .module_keys
-                        .lock_and_remove(&module_id.address, &module_id.name),
+                    Path::Code(module_id) => GLOBAL_REGISTRY.module.lock_and_remove(
+                        &module_id.address,
+                        &module_id.name,
+                        encoded,
+                    ),
                     Path::Resource(struct_tag) => GLOBAL_REGISTRY
-                        .resource_keys
-                        .lock_and_remove(struct_tag, address),
+                        .resource
+                        .lock_and_remove(struct_tag, address, encoded),
                     Path::ResourceGroup(struct_tag) => GLOBAL_REGISTRY
-                        .resource_group_keys
-                        .lock_and_remove(struct_tag, address),
+                        .resource_group
+                        .lock_and_remove(struct_tag, address, encoded),
                 }
             },
-            StateKeyInner::TableItem { handle, key } => {
-                GLOBAL_REGISTRY.table_item_keys.lock_and_remove(handle, key)
-            },
-            StateKeyInner::Raw(bytes) => GLOBAL_REGISTRY.raw_keys.lock_and_remove(bytes, &()),
+            StateKeyInner::TableItem { handle, key } => GLOBAL_REGISTRY
+                .table_item
+                .lock_and_remove(handle, key, encoded),
+            StateKeyInner::Raw(bytes) => GLOBAL_REGISTRY.raw.lock_and_remove(bytes, &(), encoded),
         }
     }
+}
+
+struct TwoLevelRegistryInner<Key1, Key2> {
+    by_key: HashMap<Key1, HashMap<Key2, Weak<Entry>>>,
+    by_encoded: HashMap<Bytes, Weak<Entry>>,
 }
 
 struct TwoLevelRegistry<Key1, Key2> {
     // FIXME(aldenhu): remove
     #[allow(dead_code)]
-    key_type: &'static str,
-    inner: RwLock<HashMap<Key1, HashMap<Key2, Weak<Entry>>>>,
+    entry_type: &'static str,
+    inner: RwLock<TwoLevelRegistryInner<Key1, Key2>>,
 }
 
 impl<Key1, Key2> TwoLevelRegistry<Key1, Key2>
@@ -242,10 +251,13 @@ where
     Key1: Clone + Eq + Hash,
     Key2: Clone + Eq + Hash,
 {
-    fn new_empty(key_type: &'static str) -> Self {
+    fn new_empty(entry_type: &'static str) -> Self {
         Self {
-            key_type,
-            inner: RwLock::new(HashMap::new()),
+            entry_type,
+            inner: RwLock::new(TwoLevelRegistryInner {
+                by_key: HashMap::new(),
+                by_encoded: HashMap::new(),
+            }),
         }
     }
 
@@ -260,33 +272,57 @@ where
             Ok(locked) => locked,
             Err(..) => {
                 // blocked by a write lock
-                // STATE_KEY_COUNTERS.inc_with(&[self.key_type, "read_blocked_by_write"]);
+                // STATE_KEY_COUNTERS.inc_with(&[self.entry_type, "read_blocked_by_write"]);
                 // wait for write lock to release
                 self.inner.read()
             },
         };
 
         locked
+            .by_key
             .get(key1)
             .and_then(|m| m.get(key2))
             .and_then(|weak| weak.upgrade())
     }
 
-    fn lock_and_get_or_add<Q1, Q2>(&self, key1: &Q1, key2: &Q2, maybe_add: EntryInner) -> Arc<Entry>
+    fn try_get_by_encoded(&self, encoded: &[u8]) -> Option<Arc<Entry>> {
+        let locked = match self.inner.inner().try_read() {
+            Ok(locked) => locked,
+            Err(..) => {
+                // blocked by a write lock
+                // STATE_KEY_COUNTERS.inc_with(&[self.entry_type, "read_blocked_by_write"]);
+                // wait for write lock to release
+                self.inner.read()
+            },
+        };
+
+        locked
+            .by_encoded
+            .get(encoded)
+            .and_then(|weak| weak.upgrade())
+    }
+
+    fn lock_and_get_or_add<Q1, Q2>(
+        &self,
+        key1: &Q1,
+        key2: &Q2,
+        maybe_add: StateKeyInner,
+    ) -> Arc<Entry>
     where
         Key1: Borrow<Q1>,
         Key2: Borrow<Q2>,
         Q1: Eq + Hash + ToOwned<Owned = Key1> + ?Sized,
         Q2: Eq + Hash + ToOwned<Owned = Key2> + ?Sized,
     {
-        // let _timer = STATE_KEY_TIMER.timer_with(&[self.key_type, "lock_and_get_or_add"]);
+        // let _timer = STATE_KEY_TIMER.timer_with(&[self.entry_type, "lock_and_get_or_add"]);
+        let maybe_add = EntryInner::from_deserialized(maybe_add);
 
         const MAX_TRIES: usize = 100;
 
         for _ in 0..MAX_TRIES {
-            match self
-                .inner
-                .write()
+            let mut locked = self.inner.write();
+            match locked
+                .by_key
                 .entry(key1.to_owned())
                 .or_default()
                 .entry(key2.to_owned())
@@ -294,20 +330,25 @@ where
                 hash_map::Entry::Occupied(occupied) => {
                     if let Some(entry) = occupied.get().upgrade() {
                         // some other thread has added it
-                        // STATE_KEY_COUNTERS.inc_with(&[self.key_type, "entry_create_collision"]);
+                        // STATE_KEY_COUNTERS.inc_with(&[self.entry_type, "entry_create_collision"]);
                         return entry;
                     } else {
                         // the key is being dropped, release lock and retry
                         // STATE_KEY_COUNTERS
-                        //     .inc_with(&[self.key_type, "entry_create_while_dropping"]);
+                        //     .inc_with(&[self.entry_type, "entry_create_while_dropping"]);
                         continue;
                     }
                 },
                 hash_map::Entry::Vacant(vacant) => {
-                    // STATE_KEY_COUNTERS.inc_with(&[self.key_type, "entry_create"]);
+                    // STATE_KEY_COUNTERS.inc_with(&[self.entry_type, "entry_create"]);
 
                     let entry = Arc::new(Entry(maybe_add));
                     vacant.insert(Arc::downgrade(&entry));
+                    assert!(locked
+                        .by_encoded
+                        .insert(entry.encoded.clone(), Arc::downgrade(&entry))
+                        .is_none());
+
                     return entry;
                 },
             }
@@ -315,19 +356,23 @@ where
         unreachable!("Looks like deadlock");
     }
 
-    fn lock_and_remove(&self, key1: &Key1, key2: &Key2) {
-        match self.inner.write().entry(key1.to_owned()) {
+    fn lock_and_remove(&self, key1: &Key1, key2: &Key2, encoded: &Bytes) {
+        let mut locked = self.inner.write();
+
+        match locked.by_key.entry(key1.to_owned()) {
             hash_map::Entry::Occupied(mut occupied) => {
                 match occupied.get_mut().remove(key2) {
                     Some(..) => {
-                        // STATE_KEY_COUNTERS.inc_with(&[self.key_type, "entry_remove"]);
+                        // STATE_KEY_COUNTERS.inc_with(&[self.entry_type, "entry_remove"]);
+
+                        if occupied.get().is_empty() {
+                            occupied.remove();
+                        }
+                        assert!(locked.by_encoded.remove(encoded).is_some());
                     },
                     None => {
                         unreachable!("Entry missing in registry when dropping.")
                     },
-                }
-                if occupied.get().is_empty() {
-                    occupied.remove();
                 }
             },
             hash_map::Entry::Vacant(_) => {
@@ -342,21 +387,21 @@ static GLOBAL_REGISTRY: Lazy<StateKeyRegistry> = Lazy::new(StateKeyRegistry::new
 
 pub struct StateKeyRegistry {
     // FIXME(aldenhu): reverse dimensions to save memory?
-    resource_keys: TwoLevelRegistry<StructTag, AccountAddress>,
-    resource_group_keys: TwoLevelRegistry<StructTag, AccountAddress>,
-    module_keys: TwoLevelRegistry<AccountAddress, Identifier>,
-    table_item_keys: TwoLevelRegistry<TableHandle, Vec<u8>>,
-    raw_keys: TwoLevelRegistry<Vec<u8>, ()>, // for tests only
+    resource: TwoLevelRegistry<StructTag, AccountAddress>,
+    resource_group: TwoLevelRegistry<StructTag, AccountAddress>,
+    module: TwoLevelRegistry<AccountAddress, Identifier>,
+    table_item: TwoLevelRegistry<TableHandle, Vec<u8>>,
+    raw: TwoLevelRegistry<Vec<u8>, ()>, // for tests only
 }
 
 impl StateKeyRegistry {
     fn new_empty() -> Self {
         Self {
-            resource_keys: TwoLevelRegistry::new_empty("resource"),
-            resource_group_keys: TwoLevelRegistry::new_empty("resource_group"),
-            module_keys: TwoLevelRegistry::new_empty("module"),
-            table_item_keys: TwoLevelRegistry::new_empty("table_item"),
-            raw_keys: TwoLevelRegistry::new_empty("raw"),
+            resource: TwoLevelRegistry::new_empty("resource"),
+            resource_group: TwoLevelRegistry::new_empty("resource_group"),
+            module: TwoLevelRegistry::new_empty("module"),
+            table_item: TwoLevelRegistry::new_empty("table_item"),
+            raw: TwoLevelRegistry::new_empty("raw"),
         }
     }
 }
@@ -409,21 +454,61 @@ impl StateKey {
         }
     }
 
+    fn new_from_deserialized(deserialized: StateKeyInner) -> Self {
+        use access_path::Path;
+
+        match &deserialized.clone() {
+            StateKeyInner::AccessPath(AccessPath { address, path }) => {
+                // FIXME(aldenhu): figure out error processing
+                match bcs::from_bytes::<Path>(path).expect("Failed to parse AccessPath") {
+                    Path::Code(module_id) => Self(GLOBAL_REGISTRY.module.lock_and_get_or_add(
+                        module_id.address(),
+                        module_id.name(),
+                        deserialized,
+                    )),
+                    Path::Resource(struct_tag) => {
+                        Self(GLOBAL_REGISTRY.resource.lock_and_get_or_add(
+                            &struct_tag,
+                            address,
+                            deserialized,
+                        ))
+                    },
+                    Path::ResourceGroup(struct_tag) => {
+                        Self(GLOBAL_REGISTRY.resource_group.lock_and_get_or_add(
+                            &struct_tag,
+                            address,
+                            deserialized,
+                        ))
+                    },
+                }
+            },
+            StateKeyInner::TableItem { handle, key } => Self(
+                GLOBAL_REGISTRY
+                    .table_item
+                    .lock_and_get_or_add(handle, key, deserialized),
+            ),
+            StateKeyInner::Raw(bytes) => Self(GLOBAL_REGISTRY.raw.lock_and_get_or_add(
+                bytes,
+                &(),
+                deserialized,
+            )),
+        }
+    }
+
     pub fn resource(address: &AccountAddress, struct_tag: &StructTag) -> Self {
-        if let Some(entry) = GLOBAL_REGISTRY.resource_keys.try_get(struct_tag, address) {
+        if let Some(entry) = GLOBAL_REGISTRY.resource.try_get(struct_tag, address) {
             return Self(entry);
         }
-
-        let inner = StateKeyInner::AccessPath(
-            AccessPath::resource_access_path(*address, struct_tag.clone())
-                .expect("Failed to create access path"),
-        );
-        let maybe_add = EntryInner::from_deserialized(inner);
-
-        let entry = GLOBAL_REGISTRY
-            .resource_keys
-            .lock_and_get_or_add(struct_tag, address, maybe_add);
-        Self(entry)
+        Self(
+            GLOBAL_REGISTRY.resource.lock_and_get_or_add(
+                struct_tag,
+                address,
+                StateKeyInner::AccessPath(
+                    AccessPath::resource_access_path(*address, struct_tag.clone())
+                        .expect("Failed to create access path"),
+                ),
+            ),
+        )
     }
 
     pub fn resource_typed<T: MoveResource>(address: &AccountAddress) -> Self {
@@ -435,40 +520,33 @@ impl StateKey {
     }
 
     pub fn resource_group(address: &AccountAddress, struct_tag: &StructTag) -> Self {
-        if let Some(entry) = GLOBAL_REGISTRY
-            .resource_group_keys
-            .try_get(struct_tag, address)
-        {
+        if let Some(entry) = GLOBAL_REGISTRY.resource_group.try_get(struct_tag, address) {
             return Self(entry);
         }
 
-        let inner = StateKeyInner::AccessPath(AccessPath::resource_group_access_path(
-            *address,
-            struct_tag.clone(),
-        ));
-        let maybe_add = EntryInner::from_deserialized(inner);
-
-        let entry = GLOBAL_REGISTRY
-            .resource_group_keys
-            .lock_and_get_or_add(struct_tag, address, maybe_add);
-        Self(entry)
+        Self(GLOBAL_REGISTRY.resource_group.lock_and_get_or_add(
+            struct_tag,
+            address,
+            StateKeyInner::AccessPath(AccessPath::resource_group_access_path(
+                *address,
+                struct_tag.clone(),
+            )),
+        ))
     }
 
     pub fn module(address: &AccountAddress, name: &IdentStr) -> Self {
-        if let Some(entry) = GLOBAL_REGISTRY.module_keys.try_get(address, name) {
+        if let Some(entry) = GLOBAL_REGISTRY.module.try_get(address, name) {
             return Self(entry);
         }
 
-        let inner = StateKeyInner::AccessPath(AccessPath::code_access_path(ModuleId::new(
-            *address,
-            name.to_owned(),
-        )));
-        let maybe_add = EntryInner::from_deserialized(inner);
-
-        let entry = GLOBAL_REGISTRY
-            .module_keys
-            .lock_and_get_or_add(address, name, maybe_add);
-        Self(entry)
+        Self(GLOBAL_REGISTRY.module.lock_and_get_or_add(
+            address,
+            name,
+            StateKeyInner::AccessPath(AccessPath::code_access_path(ModuleId::new(
+                *address,
+                name.to_owned(),
+            ))),
+        ))
     }
 
     pub fn module_id(module_id: &ModuleId) -> Self {
@@ -476,44 +554,71 @@ impl StateKey {
     }
 
     pub fn table_item(handle: &TableHandle, key: &[u8]) -> Self {
-        if let Some(entry) = GLOBAL_REGISTRY.table_item_keys.try_get(handle, key) {
+        if let Some(entry) = GLOBAL_REGISTRY.table_item.try_get(handle, key) {
             return Self(entry);
         }
 
-        let inner = StateKeyInner::TableItem {
-            handle: *handle,
-            key: key.to_vec(),
-        };
-        let maybe_add = EntryInner::from_deserialized(inner);
-
-        let entry = GLOBAL_REGISTRY
-            .table_item_keys
-            .lock_and_get_or_add(handle, key, maybe_add);
-        Self(entry)
+        Self(GLOBAL_REGISTRY.table_item.lock_and_get_or_add(
+            handle,
+            key,
+            StateKeyInner::TableItem {
+                handle: *handle,
+                key: key.to_vec(),
+            },
+        ))
     }
 
     pub fn raw(bytes: &[u8]) -> Self {
-        if let Some(entry) = GLOBAL_REGISTRY.raw_keys.try_get(bytes, &()) {
+        if let Some(entry) = GLOBAL_REGISTRY.raw.try_get(bytes, &()) {
             return Self(entry);
         }
 
-        let inner = StateKeyInner::Raw(bytes.to_vec());
-        let maybe_add = EntryInner::from_deserialized(inner);
-
-        let entry = GLOBAL_REGISTRY
-            .raw_keys
-            .lock_and_get_or_add(bytes, &(), maybe_add);
-        Self(entry)
+        Self(GLOBAL_REGISTRY.raw.lock_and_get_or_add(
+            bytes,
+            &(),
+            StateKeyInner::Raw(bytes.to_vec()),
+        ))
     }
 
     pub fn encode(&self) -> Result<Bytes> {
         Ok(self.0.encoded.clone())
     }
 
-    pub fn decode(_val: &[u8]) -> Result<Self, StateKeyDecodeErr> {
-        // FIXME(aldenhu): maybe check cache?
-        let inner = StateKeyInner::decode(_val)?;
-        Ok(Self::from_deserialized(inner))
+    pub fn decode(encoded: &[u8]) -> Result<Self, StateKeyDecodeErr> {
+        if encoded.is_empty() {
+            return Err(StateKeyDecodeErr::EmptyInput);
+        }
+        let tag = encoded[0];
+        let state_key_tag =
+            StateKeyTag::from_u8(tag).ok_or(StateKeyDecodeErr::UnknownTag { unknown_tag: tag })?;
+        let entry_opt = match state_key_tag {
+            StateKeyTag::AccessPath => {
+                let path = &encoded[1 + AccountAddress::LENGTH..];
+                let path_type = path[skip_uleb128(path)];
+
+                match path_type {
+                    p if p == PathType::Resource as u8 => {
+                        GLOBAL_REGISTRY.resource.try_get_by_encoded(encoded)
+                    },
+                    p if p == PathType::Code as u8 => {
+                        GLOBAL_REGISTRY.module.try_get_by_encoded(encoded)
+                    },
+                    p if p == PathType::ResourceGroup as u8 => {
+                        GLOBAL_REGISTRY.resource_group.try_get_by_encoded(encoded)
+                    },
+                    _ => unreachable!("unknown path type"),
+                }
+            },
+            StateKeyTag::TableItem => GLOBAL_REGISTRY.table_item.try_get_by_encoded(encoded),
+            StateKeyTag::Raw => GLOBAL_REGISTRY.raw.try_get_by_encoded(encoded),
+        };
+        match entry_opt {
+            Some(entry) => Ok(Self(entry)),
+            None => {
+                let deserialized = StateKeyInner::decode(encoded)?;
+                Ok(Self::new_from_deserialized(deserialized))
+            },
+        }
     }
 }
 
@@ -587,6 +692,40 @@ impl proptest::arbitrary::Arbitrary for StateKey {
             .prop_map(StateKey::from_deserialized)
             .boxed()
     }
+}
+
+fn skip_uleb128(bytes: &[u8]) -> usize {
+    let mut idx = 0;
+    // let mut value: u64 = 0;
+    for _shift in (0..32).step_by(7) {
+        // FIXME(aldenhu): error processing
+        assert!(idx < bytes.len());
+        let byte = bytes[idx];
+        idx += 1;
+        if byte & 0x80 == 0 {
+            return idx;
+        }
+        /*
+        let digit = byte & 0x7f;
+        // value |= u64::from(digit) << shift;
+        // If the highest bit of `byte` is 0, return the final value.
+        if digit == byte {
+            if shift > 0 && digit == 0 {
+                // We only accept canonical ULEB128 encodings, therefore the
+                // heaviest (and last) base-128 digit must be non-zero.
+                // FIXME(alden)
+                // return Err(Error::NonCanonicalUleb128Encoding);
+                panic!()
+            }
+            // Decoded integer must not overflow.
+            return idx
+        }
+         */
+    }
+    // Decoded integer must not overflow.
+    // Err(Error::IntegerOverflowDuringUleb128Decoding)
+    // FIXME(aldenhu)
+    panic!()
 }
 
 #[cfg(test)]

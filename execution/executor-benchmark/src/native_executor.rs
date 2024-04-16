@@ -110,7 +110,7 @@ impl NativeExecutor {
             DbAccessUtil::get_coin_store(&sender_coin_store_key, state_view)?.unwrap()
         };
 
-        // Note: numbers below may not be real. When runninng in parallel there might be conflicts.
+        // Note: numbers below may not be real. When running in parallel there might be conflicts.
         sender_coin_store.coin -= transfer_amount;
 
         let gas = 1;
