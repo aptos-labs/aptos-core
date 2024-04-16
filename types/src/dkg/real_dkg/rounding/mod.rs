@@ -95,7 +95,6 @@ impl DKGRounding {
                 (profile, Some(format!("{e}")), "infallible".to_string())
             },
         };
-        println!("profile={:?}", profile);
         let wconfig = WeightedConfig::new(
             profile.reconstruct_threshold_in_weights as usize,
             profile
