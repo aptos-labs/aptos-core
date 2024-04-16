@@ -3,7 +3,6 @@
 // SPDX-License-Identifier: Apache-2.0
 
 use crate::{
-    access_path::AccessPath,
     account_config::CORE_CODE_ADDRESS,
     event::{EventHandle, EventKey},
     state_store::{state_key::StateKey, StateView},
@@ -201,14 +200,6 @@ impl<S: StateView> ConfigStorage for S {
 
 pub fn new_epoch_event_key() -> EventKey {
     EventKey::new(2, CORE_CODE_ADDRESS)
-}
-
-pub fn access_path_for_config(config_id: ConfigID) -> anyhow::Result<AccessPath> {
-    let struct_tag = struct_tag_for_config(config_id);
-    Ok(AccessPath::new(
-        CORE_CODE_ADDRESS,
-        AccessPath::resource_path_vec(struct_tag)?,
-    ))
 }
 
 pub fn struct_tag_for_config(config_id: ConfigID) -> StructTag {
