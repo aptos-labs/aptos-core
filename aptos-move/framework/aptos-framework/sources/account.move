@@ -23,13 +23,6 @@ module aptos_framework::account {
     friend aptos_framework::resource_account;
     friend aptos_framework::transaction_validation;
 
-    #[event]
-    struct KeyRotation has drop, store {
-        account: address,
-        old_authentication_key: vector<u8>,
-        new_authentication_key: vector<u8>,
-    }
-
     /// Resource representing an account.
     struct Account has key, store {
         authentication_key: vector<u8>,
@@ -612,11 +605,6 @@ module aptos_framework::account {
         let new_auth_key = from_bcs::to_address(new_auth_key_vector);
         table::add(address_map, new_auth_key, originating_addr);
 
-        event::emit<KeyRotation>(KeyRotation {
-            account: originating_addr,
-            old_authentication_key: account_resource.authentication_key,
-            new_authentication_key: new_auth_key_vector,
-        });
         event::emit_event<KeyRotationEvent>(
             &mut account_resource.key_rotation_events,
             KeyRotationEvent {

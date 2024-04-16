@@ -5,7 +5,6 @@
 
 
 
--  [Struct `KeyRotation`](#0x1_account_KeyRotation)
 -  [Resource `Account`](#0x1_account_Account)
 -  [Struct `KeyRotationEvent`](#0x1_account_KeyRotationEvent)
 -  [Struct `CoinRegisterEvent`](#0x1_account_CoinRegisterEvent)
@@ -112,46 +111,6 @@
 </code></pre>
 
 
-
-<a id="0x1_account_KeyRotation"></a>
-
-## Struct `KeyRotation`
-
-
-
-<pre><code>#[<a href="event.md#0x1_event">event</a>]
-<b>struct</b> <a href="account.md#0x1_account_KeyRotation">KeyRotation</a> <b>has</b> drop, store
-</code></pre>
-
-
-
-<details>
-<summary>Fields</summary>
-
-
-<dl>
-<dt>
-<code><a href="account.md#0x1_account">account</a>: <b>address</b></code>
-</dt>
-<dd>
-
-</dd>
-<dt>
-<code>old_authentication_key: <a href="../../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u8&gt;</code>
-</dt>
-<dd>
-
-</dd>
-<dt>
-<code>new_authentication_key: <a href="../../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u8&gt;</code>
-</dt>
-<dd>
-
-</dd>
-</dl>
-
-
-</details>
 
 <a id="0x1_account_Account"></a>
 
@@ -1819,11 +1778,6 @@ in the event of key recovery.
     <b>let</b> new_auth_key = <a href="../../aptos-stdlib/doc/from_bcs.md#0x1_from_bcs_to_address">from_bcs::to_address</a>(new_auth_key_vector);
     <a href="../../aptos-stdlib/doc/table.md#0x1_table_add">table::add</a>(address_map, new_auth_key, originating_addr);
 
-    <a href="event.md#0x1_event_emit">event::emit</a>&lt;<a href="account.md#0x1_account_KeyRotation">KeyRotation</a>&gt;(<a href="account.md#0x1_account_KeyRotation">KeyRotation</a> {
-        <a href="account.md#0x1_account">account</a>: originating_addr,
-        old_authentication_key: account_resource.authentication_key,
-        new_authentication_key: new_auth_key_vector,
-    });
     <a href="event.md#0x1_event_emit_event">event::emit_event</a>&lt;<a href="account.md#0x1_account_KeyRotationEvent">KeyRotationEvent</a>&gt;(
         &<b>mut</b> account_resource.key_rotation_events,
         <a href="account.md#0x1_account_KeyRotationEvent">KeyRotationEvent</a> {

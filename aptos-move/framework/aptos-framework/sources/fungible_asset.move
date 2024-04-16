@@ -111,6 +111,13 @@ module aptos_framework::fungible_asset {
         frozen: bool,
     }
 
+    #[resource_group_member(group = aptos_framework::object::ObjectGroup)]
+    struct FungibleAssetEvents has key {
+        deposit_events: event::EventHandle<DepositEvent>,
+        withdraw_events: event::EventHandle<WithdrawEvent>,
+        frozen_events: event::EventHandle<FrozenEvent>,
+    }
+
     /// FungibleAsset can be passed into function for type safety and to guarantee a specific amount.
     /// FungibleAsset is ephemeral and cannot be stored directly. It must be deposited back into a store.
     struct FungibleAsset {
@@ -134,24 +141,18 @@ module aptos_framework::fungible_asset {
         metadata: Object<Metadata>
     }
 
-    #[event]
     /// Emitted when fungible assets are deposited into a store.
-    struct Deposit has drop, store {
-        store: address,
+    struct DepositEvent has drop, store {
         amount: u64,
     }
 
-    #[event]
     /// Emitted when fungible assets are withdrawn from a store.
-    struct Withdraw has drop, store {
-        store: address,
+    struct WithdrawEvent has drop, store {
         amount: u64,
     }
 
-    #[event]
     /// Emitted when a store's frozen status is updated.
-    struct Frozen has drop, store {
-        store: address,
+    struct FrozenEvent has drop, store {
         frozen: bool,
     }
 
@@ -349,7 +350,7 @@ module aptos_framework::fungible_asset {
         from: Object<T>,
         to: Object<T>,
         amount: u64,
-    ) acquires FungibleStore {
+    ) acquires FungibleStore, FungibleAssetEvents {
         let fa = withdraw(sender, from, amount);
         deposit(to, fa);
     }
@@ -366,6 +367,14 @@ module aptos_framework::fungible_asset {
             balance: 0,
             frozen: false,
         });
+        move_to(store_obj,
+            FungibleAssetEvents {
+                deposit_events: object::new_event_handle<DepositEvent>(store_obj),
+                withdraw_events: object::new_event_handle<WithdrawEvent>(store_obj),
+                frozen_events: object::new_event_handle<FrozenEvent>(store_obj),
+            }
+        );
+
         object::object_from_constructor_ref<FungibleStore>(constructor_ref)
     }
 
@@ -376,17 +385,14 @@ module aptos_framework::fungible_asset {
         let FungibleStore { metadata: _, balance, frozen: _ }
             = move_from<FungibleStore>(addr);
         assert!(balance == 0, error::permission_denied(EBALANCE_IS_NOT_ZERO));
-        // Cleanup deprecated event handles if exist.
-        if (exists<FungibleAssetEvents>(addr)) {
-            let FungibleAssetEvents {
-                deposit_events,
-                withdraw_events,
-                frozen_events,
-            } = move_from<FungibleAssetEvents>(addr);
-            event::destroy_handle(deposit_events);
-            event::destroy_handle(withdraw_events);
-            event::destroy_handle(frozen_events);
-        }
+        let FungibleAssetEvents {
+            deposit_events,
+            withdraw_events,
+            frozen_events,
+        } = move_from<FungibleAssetEvents>(addr);
+        event::destroy_handle(deposit_events);
+        event::destroy_handle(withdraw_events);
+        event::destroy_handle(frozen_events);
     }
 
     /// Withdraw `amount` of the fungible asset from `store` by the owner.
@@ -394,14 +400,14 @@ module aptos_framework::fungible_asset {
         owner: &signer,
         store: Object<T>,
         amount: u64,
-    ): FungibleAsset acquires FungibleStore {
+    ): FungibleAsset acquires FungibleStore, FungibleAssetEvents {
         assert!(object::owns(store, signer::address_of(owner)), error::permission_denied(ENOT_STORE_OWNER));
         assert!(!is_frozen(store), error::invalid_argument(ESTORE_IS_FROZEN));
         withdraw_internal(object::object_address(&store), amount)
     }
 
     /// Deposit `amount` of the fungible asset to `store`.
-    public fun deposit<T: key>(store: Object<T>, fa: FungibleAsset) acquires FungibleStore {
+    public fun deposit<T: key>(store: Object<T>, fa: FungibleAsset) acquires FungibleStore, FungibleAssetEvents {
         assert!(!is_frozen(store), error::invalid_argument(ESTORE_IS_FROZEN));
         deposit_internal(store, fa);
     }
@@ -420,7 +426,7 @@ module aptos_framework::fungible_asset {
 
     /// Mint the specified `amount` of the fungible asset to a destination store.
     public fun mint_to<T: key>(ref: &MintRef, store: Object<T>, amount: u64)
-    acquires FungibleStore, Supply, ConcurrentSupply {
+    acquires FungibleStore, FungibleAssetEvents, Supply, ConcurrentSupply {
         deposit(store, mint(ref, amount));
     }
 
@@ -429,7 +435,7 @@ module aptos_framework::fungible_asset {
         ref: &TransferRef,
         store: Object<T>,
         frozen: bool,
-    ) acquires FungibleStore {
+    ) acquires FungibleStore, FungibleAssetEvents {
         assert!(
             ref.metadata == store_metadata(store),
             error::invalid_argument(ETRANSFER_REF_AND_STORE_MISMATCH),
@@ -437,7 +443,8 @@ module aptos_framework::fungible_asset {
         let store_addr = object::object_address(&store);
         borrow_global_mut<FungibleStore>(store_addr).frozen = frozen;
 
-        event::emit(Frozen { store: store_addr, frozen });
+        let events = borrow_global_mut<FungibleAssetEvents>(store_addr);
+        event::emit_event(&mut events.frozen_events, FrozenEvent { frozen });
     }
 
     /// Burns a fungible asset
@@ -455,7 +462,7 @@ module aptos_framework::fungible_asset {
         ref: &BurnRef,
         store: Object<T>,
         amount: u64
-    ) acquires FungibleStore, Supply, ConcurrentSupply {
+    ) acquires FungibleStore, FungibleAssetEvents, Supply, ConcurrentSupply {
         let metadata = ref.metadata;
         assert!(metadata == store_metadata(store), error::invalid_argument(EBURN_REF_AND_STORE_MISMATCH));
         let store_addr = object::object_address(&store);
@@ -467,7 +474,7 @@ module aptos_framework::fungible_asset {
         ref: &TransferRef,
         store: Object<T>,
         amount: u64
-    ): FungibleAsset acquires FungibleStore {
+    ): FungibleAsset acquires FungibleStore, FungibleAssetEvents {
         assert!(
             ref.metadata == store_metadata(store),
             error::invalid_argument(ETRANSFER_REF_AND_STORE_MISMATCH),
@@ -480,7 +487,7 @@ module aptos_framework::fungible_asset {
         ref: &TransferRef,
         store: Object<T>,
         fa: FungibleAsset
-    ) acquires FungibleStore {
+    ) acquires FungibleStore, FungibleAssetEvents {
         assert!(
             ref.metadata == fa.metadata,
             error::invalid_argument(ETRANSFER_REF_AND_FUNGIBLE_ASSET_MISMATCH)
@@ -494,7 +501,7 @@ module aptos_framework::fungible_asset {
         from: Object<T>,
         to: Object<T>,
         amount: u64,
-    ) acquires FungibleStore {
+    ) acquires FungibleStore, FungibleAssetEvents {
         let fa = withdraw_with_ref(transfer_ref, from, amount);
         deposit_with_ref(transfer_ref, to, fa);
     }
@@ -532,7 +539,7 @@ module aptos_framework::fungible_asset {
         assert!(amount == 0, error::invalid_argument(EAMOUNT_IS_NOT_ZERO));
     }
 
-    fun deposit_internal<T: key>(store: Object<T>, fa: FungibleAsset) acquires FungibleStore {
+    fun deposit_internal<T: key>(store: Object<T>, fa: FungibleAsset) acquires FungibleStore, FungibleAssetEvents {
         let FungibleAsset { metadata, amount } = fa;
         if (amount == 0) return;
 
@@ -542,21 +549,23 @@ module aptos_framework::fungible_asset {
         let store = borrow_global_mut<FungibleStore>(store_addr);
         store.balance = store.balance + amount;
 
-        event::emit<Deposit>(Deposit { store: store_addr, amount });
+        let events = borrow_global_mut<FungibleAssetEvents>(store_addr);
+        event::emit_event(&mut events.deposit_events, DepositEvent { amount });
     }
 
     /// Extract `amount` of the fungible asset from `store`.
     fun withdraw_internal(
         store_addr: address,
         amount: u64,
-    ): FungibleAsset acquires FungibleStore {
+    ): FungibleAsset acquires FungibleStore, FungibleAssetEvents {
         assert!(amount != 0, error::invalid_argument(EAMOUNT_CANNOT_BE_ZERO));
         let store = borrow_global_mut<FungibleStore>(store_addr);
         assert!(store.balance >= amount, error::invalid_argument(EINSUFFICIENT_BALANCE));
         store.balance = store.balance - amount;
 
+        let events = borrow_global_mut<FungibleAssetEvents>(store_addr);
         let metadata = store.metadata;
-        event::emit<Withdraw>(Withdraw { store: store_addr, amount });
+        event::emit_event(&mut events.withdraw_events, WithdrawEvent { amount });
 
         FungibleAsset { metadata, amount }
     }
@@ -747,7 +756,7 @@ module aptos_framework::fungible_asset {
     fun test_e2e_basic_flow(
         creator: &signer,
         aaron: &signer,
-    ) acquires FungibleStore, Supply, ConcurrentSupply {
+    ) acquires FungibleStore, FungibleAssetEvents, Supply, ConcurrentSupply {
         let (mint_ref, transfer_ref, burn_ref, test_token) = create_fungible_asset(creator);
         let metadata = mint_ref.metadata;
         let creator_store = create_test_store(creator, metadata);
@@ -779,7 +788,7 @@ module aptos_framework::fungible_asset {
     #[expected_failure(abort_code = 0x10003, location = Self)]
     fun test_frozen(
         creator: &signer
-    ) acquires FungibleStore, Supply, ConcurrentSupply {
+    ) acquires FungibleStore, FungibleAssetEvents, Supply, ConcurrentSupply {
         let (mint_ref, transfer_ref, _burn_ref, _) = create_fungible_asset(creator);
 
         let creator_store = create_test_store(creator, mint_ref.metadata);
@@ -792,7 +801,7 @@ module aptos_framework::fungible_asset {
     fun test_transfer_with_ref(
         creator: &signer,
         aaron: &signer,
-    ) acquires FungibleStore, Supply, ConcurrentSupply {
+    ) acquires FungibleStore, FungibleAssetEvents, Supply, ConcurrentSupply {
         let (mint_ref, transfer_ref, _burn_ref, _) = create_fungible_asset(creator);
         let metadata = mint_ref.metadata;
         let creator_store = create_test_store(creator, metadata);
@@ -855,7 +864,7 @@ module aptos_framework::fungible_asset {
     fun test_fungible_asset_upgrade(
         fx: &signer,
         creator: &signer
-    ) acquires Supply, ConcurrentSupply, FungibleStore {
+    ) acquires Supply, ConcurrentSupply, FungibleAssetEvents, FungibleStore {
         let feature = features::get_concurrent_fungible_assets_feature();
         let agg_feature = features::get_aggregator_v2_api_feature();
         features::change_feature_flags_for_testing(fx, vector[], vector[feature, agg_feature]);
@@ -879,28 +888,5 @@ module aptos_framework::fungible_asset {
         assert!(supply(test_token) == option::some(50), 3);
 
         deposit_with_ref(&transfer_ref, creator_store, fb);
-    }
-
-    #[deprecated]
-    #[resource_group_member(group = aptos_framework::object::ObjectGroup)]
-    struct FungibleAssetEvents has key {
-        deposit_events: event::EventHandle<DepositEvent>,
-        withdraw_events: event::EventHandle<WithdrawEvent>,
-        frozen_events: event::EventHandle<FrozenEvent>,
-    }
-
-    #[deprecated]
-    struct DepositEvent has drop, store {
-        amount: u64,
-    }
-
-    #[deprecated]
-    struct WithdrawEvent has drop, store {
-        amount: u64,
-    }
-
-    #[deprecated]
-    struct FrozenEvent has drop, store {
-        frozen: bool,
     }
 }
