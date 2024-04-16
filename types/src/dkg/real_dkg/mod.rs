@@ -31,7 +31,7 @@ pub type DkgPP = <WTrx as Transcript>::PublicParameters;
 pub type SSConfig = <WTrx as Transcript>::SecretSharingConfig;
 pub type EncPK = <WTrx as Transcript>::EncryptPubKey;
 
-#[derive(Deserialize, Serialize, Clone, Debug)]
+#[derive(Clone, Debug)]
 pub struct DKGPvssConfig {
     pub epoch: u64,
     // weighted config for randomness generation
@@ -43,7 +43,6 @@ pub struct DKGPvssConfig {
     // DKG encryption public keys
     pub eks: Vec<EncPK>,
     // Some metrics for caller to consume.
-    #[serde(skip)]
     pub rounding_summary: RoundingSummary,
 }
 

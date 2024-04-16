@@ -3,7 +3,7 @@
 
 use crate::{
     agg_trx_producer::TAggTranscriptProducer,
-    counters::{DKG_STAGE_SECONDS, ROUNDING_SECONDS},
+    counters::{DKG_STAGE_SECONDS, ROUNDING_SECONDS, ROUNDING_TOTAL_WEIGHT},
     network::IncomingRpcRequest,
     DKGMessage,
 };
@@ -317,6 +317,9 @@ impl<DKG: DKGTrait> DKGManager<DKG> {
             ROUNDING_SECONDS
                 .with_label_values(&[summary.method.as_str()])
                 .observe(summary.exec_time.as_secs_f64());
+            ROUNDING_TOTAL_WEIGHT
+                .with_label_values(&[summary.method.as_str()])
+                .observe(summary.output.total_weight() as f64);
         }
 
         let mut rng = if cfg!(feature = "smoke-test") {

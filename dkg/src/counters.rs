@@ -30,3 +30,12 @@ pub static ROUNDING_SECONDS: Lazy<HistogramVec> = Lazy::new(|| {
     )
     .unwrap()
 });
+
+pub static ROUNDING_TOTAL_WEIGHT: Lazy<HistogramVec> = Lazy::new(|| {
+    register_histogram_vec!(
+        "aptos_dkg_rounding_total_weight",
+        "Rounding total weight and counts by method",
+        &["method"]
+    )
+    .unwrap()
+});

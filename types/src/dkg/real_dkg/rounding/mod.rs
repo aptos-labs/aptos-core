@@ -147,11 +147,7 @@ pub struct DKGRoundingProfile {
 
 impl Debug for DKGRoundingProfile {
     fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
-        write!(
-            f,
-            "total_weight: {}, ",
-            self.validator_weights.iter().sum::<u64>()
-        )?;
+        write!(f, "total_weight: {}, ", self.total_weight())?;
         write!(
             f,
             "secrecy_threshold_in_stake_ratio: {}, ",
@@ -279,6 +275,10 @@ impl DKGRoundingProfile {
             secrecy_threshold_in_stake_ratio,
             fast_secrecy_threshold_in_stake_ratio,
         )
+    }
+
+    pub fn total_weight(&self) -> u64 {
+        self.validator_weights.iter().sum::<u64>()
     }
 }
 
