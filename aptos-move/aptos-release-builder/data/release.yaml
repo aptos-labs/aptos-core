@@ -21,4 +21,5 @@ proposals:
       - Framework:
           bytecode_version: 6
           git_hash: ~
+      - RawScript: aptos-move/aptos-release-builder/data/proposals/randomness_framework_initialization.move
       - DefaultGas
