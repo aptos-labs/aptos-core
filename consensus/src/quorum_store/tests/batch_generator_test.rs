@@ -737,13 +737,13 @@ async fn test_batches_in_progress_same_txn_across_batches() {
 
     // After all batches are complete, txns_in_progress_sorted will be empty.
     batch_generator
-        .remove_batch_in_progress_for_test(&first_three_result.first().unwrap().batch_id());
+        .remove_batch_in_progress_for_test(author, first_three_result.first().unwrap().batch_id());
     assert_eq!(batch_generator.txns_in_progress_sorted_len(), 2);
     batch_generator
-        .remove_batch_in_progress_for_test(&first_two_result.first().unwrap().batch_id());
+        .remove_batch_in_progress_for_test(author, first_two_result.first().unwrap().batch_id());
     assert_eq!(batch_generator.txns_in_progress_sorted_len(), 1);
     batch_generator
-        .remove_batch_in_progress_for_test(&first_one_result.first().unwrap().batch_id());
+        .remove_batch_in_progress_for_test(author, first_one_result.first().unwrap().batch_id());
     assert_eq!(batch_generator.txns_in_progress_sorted_len(), 0);
 }
 

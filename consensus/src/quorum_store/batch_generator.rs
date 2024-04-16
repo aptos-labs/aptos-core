@@ -63,9 +63,9 @@ pub struct BatchGenerator {
     batch_writer: Arc<dyn BatchWriter>,
     config: QuorumStoreConfig,
     mempool_proxy: MempoolProxy,
-    batches_in_progress: HashMap<BatchId, BatchInProgress>,
+    batches_in_progress: HashMap<(PeerId, BatchId), BatchInProgress>,
     txns_in_progress_sorted: BTreeMap<TransactionSummary, TransactionInProgress>,
-    batch_expirations: TimeExpirations<BatchId>,
+    batch_expirations: TimeExpirations<(PeerId, BatchId)>,
     latest_block_timestamp: u64,
     last_end_batch_time: Instant,
     // quorum store back pressure, get updated from proof manager
@@ -118,7 +118,13 @@ impl BatchGenerator {
         }
     }
 
-    fn insert_batch(&mut self, batch_id: BatchId, txns: Vec<SignedTransaction>, expiry_time: u64) {
+    fn insert_batch(
+        &mut self,
+        author: PeerId,
+        batch_id: BatchId,
+        txns: Vec<SignedTransaction>,
+        expiry_time: u64,
+    ) {
         let txns_in_progress: Vec<_> = txns
             .iter()
             .map(|txn| {
@@ -129,7 +135,7 @@ impl BatchGenerator {
             })
             .collect();
 
-        self.insert_batch_in_progress(batch_id, txns_in_progress, expiry_time);
+        self.insert_batch_in_progress(author, batch_id, txns_in_progress, expiry_time);
     }
 
     fn create_new_batch(
@@ -144,7 +150,7 @@ impl BatchGenerator {
             .save_batch_id(self.epoch, self.batch_id)
             .expect("Could not save to db");
 
-        self.insert_batch(batch_id, txns.clone(), expiry_time);
+        self.insert_batch(self.my_peer_id, batch_id, txns.clone(), expiry_time);
 
         counters::CREATED_BATCHES_COUNT.inc();
         counters::num_txn_per_batch(bucket_start.to_string().as_str(), txns.len());
@@ -261,6 +267,7 @@ impl BatchGenerator {
 
     fn insert_batch_in_progress(
         &mut self,
+        author: PeerId,
         batch_id: BatchId,
         txns_in_progress: Vec<(TransactionSummary, TransactionInProgress)>,
         expiry_time_usecs: u64,
@@ -277,20 +284,20 @@ impl BatchGenerator {
         }
         let updated_expiry_time_usecs = self
             .batches_in_progress
-            .get(&batch_id)
+            .get(&(author, batch_id))
             .map_or(expiry_time_usecs, |batch_in_progress| {
                 expiry_time_usecs.max(batch_in_progress.expiry_time_usecs)
             });
         self.batches_in_progress.insert(
-            batch_id,
+            (author, batch_id),
             BatchInProgress::new(txns, updated_expiry_time_usecs),
         );
         self.batch_expirations
-            .add_item(batch_id, updated_expiry_time_usecs);
+            .add_item((author, batch_id), updated_expiry_time_usecs);
     }
 
-    fn remove_batch_in_progress(&mut self, batch_id: &BatchId) -> bool {
-        let removed = self.batches_in_progress.remove(batch_id);
+    fn remove_batch_in_progress(&mut self, author: PeerId, batch_id: BatchId) -> bool {
+        let removed = self.batches_in_progress.remove(&(author, batch_id));
         match removed {
             Some(batch_in_progress) => {
                 for txn in batch_in_progress.txns {
@@ -308,8 +315,8 @@ impl BatchGenerator {
     }
 
     #[cfg(test)]
-    pub fn remove_batch_in_progress_for_test(&mut self, batch_id: &BatchId) -> bool {
-        self.remove_batch_in_progress(batch_id)
+    pub fn remove_batch_in_progress_for_test(&mut self, author: PeerId, batch_id: BatchId) -> bool {
+        self.remove_batch_in_progress(author, batch_id)
     }
 
     #[cfg(test)]
@@ -362,6 +369,17 @@ impl BatchGenerator {
         counters::BATCH_CREATION_COMPUTE_LATENCY.observe_duration(bucket_compute_start.elapsed());
 
         batches
+    }
+
+    pub(crate) fn handle_remote_batch(&mut self, batch: Batch) {
+        let expiry_time_usecs = aptos_infallible::duration_since_epoch().as_micros() as u64
+            + self.config.remote_batch_expiry_gap_when_init_usecs;
+        self.insert_batch(
+            batch.author(),
+            batch.batch_id(),
+            batch.into_transactions(),
+            expiry_time_usecs,
+        );
     }
 
     pub async fn start(
@@ -478,23 +496,23 @@ impl BatchGenerator {
                             );
                             self.latest_block_timestamp = block_timestamp;
 
-                            for batch_id in batches.iter().map(|b| b.batch_id()) {
-                                if self.remove_batch_in_progress(&batch_id) {
+                            for (author, batch_id) in batches.iter().map(|b| (b.author(), b.batch_id())) {
+                                if self.remove_batch_in_progress(author, batch_id) {
                                     counters::BATCH_IN_PROGRESS_COMMITTED.inc();
                                 }
                             }
 
                             // Cleans up all batches that expire in timestamp <= block_timestamp. This is
                             // safe since clean request must occur only after execution result is certified.
-                            for batch_id in self.batch_expirations.expire(block_timestamp) {
-                                if let Some(batch_in_progress) = self.batches_in_progress.get(&batch_id) {
+                            for (author, batch_id) in self.batch_expirations.expire(block_timestamp) {
+                                if let Some(batch_in_progress) = self.batches_in_progress.get(&(author, batch_id)) {
                                     // If there is an identical batch with higher expiry time, re-insert it.
                                     if batch_in_progress.expiry_time_usecs > block_timestamp {
-                                        self.batch_expirations.add_item(batch_id, batch_in_progress.expiry_time_usecs);
+                                        self.batch_expirations.add_item((author, batch_id), batch_in_progress.expiry_time_usecs);
                                         continue;
                                     }
                                 }
-                                if self.remove_batch_in_progress(&batch_id) {
+                                if self.remove_batch_in_progress(author, batch_id) {
                                     counters::BATCH_IN_PROGRESS_EXPIRED.inc();
                                     debug!(
                                         "QS: logical time based expiration batch w. id {} from batches_in_progress, new size {}",
@@ -512,17 +530,11 @@ impl BatchGenerator {
                                     batch_id
                                 );
                                 // Not able to gather the proof, allow transactions to be polled again.
-                                self.remove_batch_in_progress(&batch_id);
+                                self.remove_batch_in_progress(self.my_peer_id, batch_id);
                             }
                         },
                         BatchGeneratorCommand::RemoteBatch(batch) => {
-                            let batch_id = batch.batch_id();
-                            let txns = batch.into_transactions();
-
-                            // TODO: need some expiration mechanism for remote batches and proofs
-                            let expiry_time_usecs = aptos_infallible::duration_since_epoch().as_micros() as u64
-                                + self.config.remote_batch_expiry_gap_when_init_usecs;
-                            self.insert_batch(batch_id, txns, expiry_time_usecs);
+                            self.handle_remote_batch(batch);
                         },
                         BatchGeneratorCommand::Shutdown(ack_tx) => {
                             ack_tx
