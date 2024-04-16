@@ -48,6 +48,14 @@ impl CircuitInputSignals<Unpadded> {
         self
     }
 
+    pub fn byte_input(mut self, signal_name: &str, signal_value: u8) -> Self {
+        self.signals.insert(
+            String::from(signal_name),
+            CircuitInputSignal::U64(signal_value as u64),
+        );
+        self
+    }
+
     pub fn str_input(mut self, signal_name: &str, signal_value: &str) -> Self {
         self.signals.insert(
             String::from(signal_name),
