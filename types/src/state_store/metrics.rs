@@ -1,6 +1,9 @@
 // Copyright © Aptos Foundation
 // SPDX-License-Identifier: Apache-2.0
 
+// FIXME(aldenhu): remove
+#![allow(dead_code)]
+
 use aptos_metrics_core::{
     exponential_buckets, register_histogram_vec, register_int_counter_vec, HistogramVec,
     IntCounterVec,

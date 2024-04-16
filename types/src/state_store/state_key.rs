@@ -8,7 +8,7 @@ use crate::{
     access_path::AccessPath,
     on_chain_config::OnChainConfig,
     state_store::{
-        metrics::{STATE_KEY_COUNTERS, STATE_KEY_TIMER},
+        // metrics::{STATE_KEY_COUNTERS, STATE_KEY_TIMER},
         table::TableHandle,
     },
 };
@@ -19,7 +19,7 @@ use aptos_crypto::{
 };
 use aptos_crypto_derive::CryptoHasher;
 use aptos_infallible::RwLock;
-use aptos_metrics_core::{IntCounterHelper, TimerHelper};
+// use aptos_metrics_core::{IntCounterHelper, TimerHelper};
 use move_core_types::{
     account_address::AccountAddress,
     identifier::{IdentStr, Identifier},
@@ -231,6 +231,8 @@ impl Drop for Entry {
 }
 
 struct TwoLevelRegistry<Key1, Key2> {
+    // FIXME(aldenhu): remove
+    #[allow(dead_code)]
     key_type: &'static str,
     inner: RwLock<HashMap<Key1, HashMap<Key2, Weak<Entry>>>>,
 }
@@ -258,7 +260,7 @@ where
             Ok(locked) => locked,
             Err(..) => {
                 // blocked by a write lock
-                STATE_KEY_COUNTERS.inc_with(&[self.key_type, "read_blocked_by_write"]);
+                // STATE_KEY_COUNTERS.inc_with(&[self.key_type, "read_blocked_by_write"]);
                 // wait for write lock to release
                 self.inner.read()
             },
@@ -277,7 +279,7 @@ where
         Q1: Eq + Hash + ToOwned<Owned = Key1> + ?Sized,
         Q2: Eq + Hash + ToOwned<Owned = Key2> + ?Sized,
     {
-        let _timer = STATE_KEY_TIMER.timer_with(&[self.key_type, "lock_and_get_or_add"]);
+        // let _timer = STATE_KEY_TIMER.timer_with(&[self.key_type, "lock_and_get_or_add"]);
 
         const MAX_TRIES: usize = 100;
 
@@ -292,17 +294,17 @@ where
                 hash_map::Entry::Occupied(occupied) => {
                     if let Some(entry) = occupied.get().upgrade() {
                         // some other thread has added it
-                        STATE_KEY_COUNTERS.inc_with(&[self.key_type, "entry_create_collision"]);
+                        // STATE_KEY_COUNTERS.inc_with(&[self.key_type, "entry_create_collision"]);
                         return entry;
                     } else {
                         // the key is being dropped, release lock and retry
-                        STATE_KEY_COUNTERS
-                            .inc_with(&[self.key_type, "entry_create_while_dropping"]);
+                        // STATE_KEY_COUNTERS
+                        //     .inc_with(&[self.key_type, "entry_create_while_dropping"]);
                         continue;
                     }
                 },
                 hash_map::Entry::Vacant(vacant) => {
-                    STATE_KEY_COUNTERS.inc_with(&[self.key_type, "entry_create"]);
+                    // STATE_KEY_COUNTERS.inc_with(&[self.key_type, "entry_create"]);
 
                     let entry = Arc::new(Entry(maybe_add));
                     vacant.insert(Arc::downgrade(&entry));
@@ -318,7 +320,7 @@ where
             hash_map::Entry::Occupied(mut occupied) => {
                 match occupied.get_mut().remove(key2) {
                     Some(..) => {
-                        STATE_KEY_COUNTERS.inc_with(&[self.key_type, "entry_remove"]);
+                        // STATE_KEY_COUNTERS.inc_with(&[self.key_type, "entry_remove"]);
                     },
                     None => {
                         unreachable!("Entry missing in registry when dropping.")
