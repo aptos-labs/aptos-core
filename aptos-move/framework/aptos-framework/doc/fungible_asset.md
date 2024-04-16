@@ -394,6 +394,12 @@ Emitted when fungible assets are deposited into a store.
 <dd>
 
 </dd>
+<dt>
+<code>metadata_address: <b>address</b></code>
+</dt>
+<dd>
+
+</dd>
 </dl>
 
 
@@ -419,6 +425,12 @@ Emitted when fungible assets are withdrawn from a store.
 <dl>
 <dt>
 <code>store: <b>address</b></code>
+</dt>
+<dd>
+
+</dd>
+<dt>
+<code>metadata_address: <b>address</b></code>
 </dt>
 <dd>
 
@@ -1987,7 +1999,11 @@ Destroy an empty fungible asset.
     <b>let</b> store = <b>borrow_global_mut</b>&lt;<a href="fungible_asset.md#0x1_fungible_asset_FungibleStore">FungibleStore</a>&gt;(store_addr);
     store.balance = store.balance + amount;
 
-    <a href="event.md#0x1_event_emit">event::emit</a>(<a href="fungible_asset.md#0x1_fungible_asset_Deposit">Deposit</a> { store: store_addr, amount });
+    <a href="event.md#0x1_event_emit">event::emit</a>(<a href="fungible_asset.md#0x1_fungible_asset_Deposit">Deposit</a> {
+        store: store_addr,
+        amount,
+        metadata_address: <a href="object.md#0x1_object_object_address">object::object_address</a>(&metadata)
+    });
 }
 </code></pre>
 

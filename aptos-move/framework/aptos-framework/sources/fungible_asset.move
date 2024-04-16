@@ -147,6 +147,7 @@ module aptos_framework::fungible_asset {
     struct Withdraw has drop, store {
         store: address,
         amount: u64,
+        metadata_address: address,
     }
 
     #[event]
@@ -561,7 +562,11 @@ module aptos_framework::fungible_asset {
         store.balance = store.balance - amount;
 
         let metadata = store.metadata;
-        event::emit(Withdraw { store: store_addr, amount });
+        event::emit(Withdraw {
+            store: store_addr,
+            amount,
+            metadata_address: object::object_address(&metadata)
+        });
 
         FungibleAsset { metadata, amount }
     }
