@@ -947,6 +947,11 @@ async fn test_nodes_rewards() {
 #[tokio::test]
 async fn test_register_and_update_validator() {
     let (mut swarm, mut cli, _faucet) = SwarmBuilder::new_local(1)
+        .with_init_genesis_config(Arc::new(move |conf| {
+            // start with randomness disabled.
+            conf.consensus_config.enable_validator_txns();
+            conf.randomness_config_override = Some(OnChainRandomnessConfig::default_disabled());
+        }))
         .with_aptos()
         .build_with_cli(0)
         .await;
