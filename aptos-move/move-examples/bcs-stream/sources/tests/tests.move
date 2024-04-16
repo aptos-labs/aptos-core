@@ -382,9 +382,10 @@ module bcs_stream::tests {
         bcs_stream::deserialize_address(&mut stream);
     }
 
+    // TODO: add very large string
     #[test]
     fun test_string_simple() {
-        // let data = x"24C3A7C3A5E2889EE289A0C2A2C3B5C39FE28882C692E288AB";
+        // let data = x"24C3A7C3A5E2889EE289A0C2A2C3B5C39FE28882C692E288AB"; // not ASCII
         let data = x"0B736F6D6520737472696E67";
         let stream = bcs_stream::new(data);
 
