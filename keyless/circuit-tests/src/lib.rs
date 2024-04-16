@@ -33,6 +33,8 @@ impl TestCircuitHandle {
             "--wasm",
             "-o", dir.path().to_str().unwrap(),
         ]).output()?;
+        println!("{}", String::from_utf8_lossy(&output.stdout));
+        println!("{}", String::from_utf8_lossy(&output.stderr));
         ensure!(output.status.success());
         Ok(Self { dir })
     }
