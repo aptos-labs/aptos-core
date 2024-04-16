@@ -62,3 +62,38 @@ fn bits2num_big_endian_test() {
    }
 }
 
+#[test]
+fn bytes_to_bits_test() {
+    let circuit_handle = TestCircuitHandle::new("packing/bytes_to_bits_test.circom").unwrap();
+
+    let mut rng = ChaCha20Rng::seed_from_u64(2513478);
+    const bytes_max_size : usize = 10;
+    const bits_max_size : usize = bytes_max_size * 8;
+
+
+    for i in 0..=255 {
+        let bytes : &mut [u8] = &mut [0u8; bytes_max_size];
+        rng.fill_bytes(bytes);
+
+        let expected_bits : Vec<u8> = bytes
+            .into_iter()
+            .map(|byte| expected_num2bits_be(*byte as u64, 8))
+            .flatten()
+            .collect();
+
+        let config = CircuitPaddingConfig::new()
+            .max_length("bytes_in", bytes_max_size)
+            .max_length("bits_out", bits_max_size);
+
+        let circuit_input_signals = CircuitInputSignals::new()
+            .bytes_input("bytes_in", bytes)
+            .bytes_input("bits_out", &expected_bits)
+            .pad(&config).unwrap();
+
+        let result = circuit_handle.gen_witness(circuit_input_signals);
+        println!("{:?}", result);
+        assert!(result.is_ok());
+    }
+}
+
+
