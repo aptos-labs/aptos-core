@@ -2,7 +2,8 @@
 module bcs_stream::tests {
     use bcs_stream::bcs_stream;
     use std::vector;
-    use std::string::{Self, String};
+    use std::option;
+    use std::string;
 
     struct Bar has drop {
         x: u16,
@@ -411,5 +412,35 @@ module bcs_stream::tests {
         let stream = bcs_stream::new(data);
 
         bcs_stream::deserialize_string(&mut stream);
+    }
+
+    // TODO 1: add out of range error case
+    // TODO 2: add different types for `some_data` case
+    #[test]
+    fun test_option_some_data() {
+        let data = x"0101";
+        let stream = bcs_stream::new(data);
+
+        assert!(
+            bcs_stream::deserialize_option(
+                &mut stream,
+                |stream| { bcs_stream::deserialize_bool(stream) }
+            ) == option::some(true),
+            0
+        );
+    }
+
+    #[test]
+    fun test_option_no_data() {
+        let data = x"00";
+        let stream = bcs_stream::new(data);
+
+        assert!(
+            bcs_stream::deserialize_option(
+                &mut stream,
+                |stream| { bcs_stream::deserialize_bool(stream) }
+            ) == option::none(),
+            0
+        );
     }
 }

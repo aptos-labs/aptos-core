@@ -14,6 +14,7 @@
 module bcs_stream::bcs_stream {
     use std::error;
     use std::vector;
+    use std::option::{Self, Option};
     use std::string::{Self, String};
 
     use aptos_std::from_bcs;
@@ -264,6 +265,7 @@ module bcs_stream::bcs_stream {
     // 1. Use `string::utf8` to convert the byte array to a string (using vector slice)
     // 2. Get the vector slice with `deserialize_vector` and then convert it to a string
 
+    // TODO: check - utf8 string deserialization (except ASCII)
     public fun deserialize_string(stream: &mut BCSStream): String {
         let v = deserialize_vector(stream, |stream| deserialize_u8(stream));
         let res = string::utf8(v);
@@ -282,4 +284,14 @@ module bcs_stream::bcs_stream {
     //
     //     res
     // }
+
+    // TODO: is `elem_deserializer` required for `option::none` data?
+    public inline fun deserialize_option<E>(stream: &mut BCSStream, elem_deserializer: |&mut BCSStream| E): Option<E> {
+        let is_data = deserialize_bool(stream);
+        if (is_data) {
+            option::some(elem_deserializer(stream))
+        } else {
+            option::none()
+        }
+    }
 }
