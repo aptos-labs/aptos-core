@@ -2313,6 +2313,8 @@ dependencies = [
  "aptos-keyless-common",
  "base64 0.13.1",
  "itertools 0.12.1",
+ "rand 0.7.3",
+ "rand_chacha 0.3.1",
  "serde_json",
  "tempfile",
 ]
