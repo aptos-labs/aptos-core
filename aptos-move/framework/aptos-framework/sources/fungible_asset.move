@@ -139,6 +139,7 @@ module aptos_framework::fungible_asset {
     struct Deposit has drop, store {
         store: address,
         amount: u64,
+        metadata_address: address,
     }
 
     #[event]
@@ -542,7 +543,11 @@ module aptos_framework::fungible_asset {
         let store = borrow_global_mut<FungibleStore>(store_addr);
         store.balance = store.balance + amount;
 
-        event::emit(Deposit { store: store_addr, amount });
+        event::emit(Deposit {
+            store: store_addr,
+            amount,
+            metadata_address: object::object_address(&metadata)
+        });
     }
 
     /// Extract `amount` of the fungible asset from `store`.
