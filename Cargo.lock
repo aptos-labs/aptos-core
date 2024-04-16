@@ -2312,6 +2312,7 @@ dependencies = [
  "anyhow",
  "aptos-keyless-common",
  "base64 0.13.1",
+ "itertools 0.12.1",
  "serde_json",
  "tempfile",
 ]
