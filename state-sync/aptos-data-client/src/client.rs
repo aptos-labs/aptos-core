@@ -67,7 +67,7 @@ use std::{
 use tokio::runtime::Handle;
 
 // Useful constants
-const PEER_METRICS_FREQ_SECS: u64 = 5; // The frequency to update peer metrics and logs
+const PEER_METRICS_FREQ_SECS: u64 = 5; // The frequency to update peer metrics and logs.
 
 /// An [`AptosDataClientInterface`] that fulfills requests from remote peers' Storage Service
 /// over AptosNet.

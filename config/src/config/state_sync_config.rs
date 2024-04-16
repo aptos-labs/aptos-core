@@ -11,13 +11,13 @@ use serde::{Deserialize, Serialize};
 use serde_yaml::Value;
 
 // The maximum message size per state sync message
-const MAX_MESSAGE_SIZE: usize = 4 * 1024 * 1024; /* 4 MiB */
+const MAX_MESSAGE_SIZE: usize = 6 * 1024 * 1024; /* 6 MiB */
 
 // The maximum chunk sizes for data client requests and response
 const MAX_EPOCH_CHUNK_SIZE: u64 = 200;
 const MAX_STATE_CHUNK_SIZE: u64 = 4000;
-const MAX_TRANSACTION_CHUNK_SIZE: u64 = 2000;
-const MAX_TRANSACTION_OUTPUT_CHUNK_SIZE: u64 = 1000;
+const MAX_TRANSACTION_CHUNK_SIZE: u64 = 3000;
+const MAX_TRANSACTION_OUTPUT_CHUNK_SIZE: u64 = 3000;
 
 // The maximum number of concurrent requests to send
 const MAX_CONCURRENT_REQUESTS: u64 = 6;
@@ -247,7 +247,7 @@ impl Default for DataStreamingServiceConfig {
     fn default() -> Self {
         Self {
             dynamic_prefetching: DynamicPrefetchingConfig::default(),
-            enable_subscription_streaming: false,
+            enable_subscription_streaming: true,
             global_summary_refresh_interval_ms: 50,
             max_concurrent_requests: MAX_CONCURRENT_REQUESTS,
             max_concurrent_state_requests: MAX_CONCURRENT_STATE_REQUESTS,
