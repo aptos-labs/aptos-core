@@ -27,6 +27,7 @@ tempfile = "3.10"
 termcolor = "1.1"
 
 move-command-line-common = { path = "../../move-command-line-common" }
+move-model = { path = "../../move-model" }
 move-mutator = { path = "../move-mutator" }
 move-package = { path = "../move-package" }
 move-prover = { path = "../../move-prover" }

@@ -2,7 +2,8 @@
 // Copyright © Aptos Foundation
 // SPDX-License-Identifier: Apache-2.0
 
-use move_package::{BuildConfig, CompilerVersion, ModelConfig};
+use move_model::metadata::{CompilerVersion, LanguageVersion};
+use move_package::{BuildConfig, ModelConfig};
 use std::{path::Path, time::Instant};
 use termcolor::WriteColor;
 
@@ -32,7 +33,8 @@ pub(crate) fn prove<W: WriteColor>(
             compiler_version: config
                 .compiler_config
                 .compiler_version
-                .unwrap_or(CompilerVersion::V2),
+                .unwrap_or(CompilerVersion::V2_0),
+            language_version: LanguageVersion::V1,
         },
     )?;
 
