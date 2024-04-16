@@ -67,8 +67,6 @@ pub struct QuorumStoreConfig {
     pub batch_expiry_gap_when_init_usecs: u64,
     /// Duration for expiring remotely created batches.
     pub remote_batch_expiry_gap_when_init_usecs: u64,
-    /// Duration for expiring remotely created proofs.
-    pub remote_proof_expiry_gap_when_init_usecs: u64,
     pub memory_quota: usize,
     pub db_quota: usize,
     pub batch_quota: usize,
@@ -106,7 +104,6 @@ impl Default for QuorumStoreConfig {
             batch_request_rpc_timeout_ms: 5000,
             batch_expiry_gap_when_init_usecs: Duration::from_secs(60).as_micros() as u64,
             remote_batch_expiry_gap_when_init_usecs: Duration::from_millis(500).as_micros() as u64,
-            remote_proof_expiry_gap_when_init_usecs: Duration::from_secs(10).as_micros() as u64,
             memory_quota: 120_000_000,
             db_quota: 300_000_000,
             batch_quota: 300_000,
