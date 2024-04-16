@@ -3,6 +3,7 @@
 // SPDX-License-Identifier: Apache-2.0
 
 use crate::proof_of_store::{BatchInfo, ProofCache, ProofOfStore};
+use anyhow::ensure;
 use aptos_crypto::{
     hash::{CryptoHash, CryptoHasher},
     HashValue,
@@ -405,13 +406,15 @@ impl Payload {
             (true, Payload::QuorumStoreInlineHybrid(inline_batches, proof_with_data, _)) => {
                 Self::verify_with_cache(&proof_with_data.proofs, validator, proof_cache)?;
                 for (batch, payload) in inline_batches.iter() {
-                    // TODO: Can cloning be avoided here?
-                    if BatchPayload::new(batch.author(), payload.clone()).hash() != *batch.digest()
-                    {
-                        return Err(anyhow::anyhow!(
-                            "Hash of the received inline batch doesn't match the digest value",
-                        ));
-                    }
+                    ensure!(
+                        BatchPayload::new(batch.author(), payload.clone()).hash()
+                            == *batch.digest(),
+                        "Hash of the received inline batch doesn't match the digest value"
+                    );
+                    payload.par_iter().with_min_len(8).try_for_each(|txn| {
+                        ensure!(txn.verify_signature().is_ok(), "Invalid signature");
+                        Ok(())
+                    })?;
                 }
                 Ok(())
             },

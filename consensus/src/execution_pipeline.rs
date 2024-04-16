@@ -125,6 +125,7 @@ impl ExecutionPipeline {
         tokio::task::spawn_blocking(move || {
             let txns_to_execute =
                 Block::combine_to_input_transactions(validator_txns, input_txns.clone(), metadata);
+            // TODO: next version remove signature verification, it's done in quorum store
             let sig_verified_txns: Vec<SignatureVerifiedTransaction> =
                 SIG_VERIFY_POOL.install(|| {
                     let num_txns = txns_to_execute.len();
