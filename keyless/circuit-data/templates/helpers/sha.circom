@@ -80,7 +80,7 @@ template Sha2_256_prepadded_varlen(maxNumBlocks) {
 
 // Verifies SHA2_256 input padding according to https://www.rfc-editor.org/rfc/rfc4634.html#section-4.1
 template Sha2PaddingVerify(maxInputLen) {
-    signal input in[maxInputLen]; // bit array
+    signal input in[maxInputLen]; // byte array
     signal input num_blocks; // Number of 512-bit blocks in `in` including sha padding
     signal input padding_start; // equivalent to L/8, where L is the length of the unpadded message in bits as specified in RFC4634
     signal input L_byte_encoded[8]; // 64-bit encoding of L
