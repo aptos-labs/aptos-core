@@ -4,6 +4,7 @@ module 0xABCD::aggregator_example {
     use std::error;
     use std::signer;
     use std::vector;
+    use 0x1::table::{Self, Table};
     use aptos_framework::aggregator_v2::{Self, Aggregator};
 
     // Resource being modified doesn't exist
@@ -58,6 +59,22 @@ module 0xABCD::aggregator_example {
 
     struct AggregatorArrayCount1000 has key {
         count: vector<Aggregator<u64>>,
+    }
+
+    struct AggregatorTableCount1 has key {
+        count: Table<u64, Aggregator<u64>>
+    }
+
+    struct AggregatorTableCount10 has key {
+        count: Table<u64, Aggregator<u64>>
+    }
+
+    struct AggregatorTableCount100 has key {
+        count: Table<u64, Aggregator<u64>>
+    }
+
+    struct AggregatorTableCount1000 has key {
+        count: Table<u64, Aggregator<u64>>
     }
 
     struct UnboundedAggV2 has key {
@@ -141,6 +158,50 @@ module 0xABCD::aggregator_example {
         move_to<AggregatorArrayCount1000>(
             publisher,
             AggregatorArrayCount1000 { count: aggs4 }
+        );
+
+        let table1 = table::new();
+        let i = 0;
+        while (i < 1) {
+            table::upsert(&mut table1, i, aggregator_v2::create_unbounded_aggregator());
+            i = i + 1;
+        };
+        move_to<AggregatorTableCount1>(
+            publisher,
+            AggregatorTableCount1 { count: table1 }
+        );
+
+        let table2 = table::new();
+        let j = 0;
+        while (j < 10) {
+            table::upsert(&mut table2, j, aggregator_v2::create_unbounded_aggregator());
+            j = j + 1;
+        };
+        move_to<AggregatorTableCount10>(
+            publisher,
+            AggregatorTableCount10 { count: table2 }
+        );
+
+        let table3 = table::new();
+        let k = 0;
+        while (k < 100) {
+            table::upsert(&mut table3, k, aggregator_v2::create_unbounded_aggregator());
+            k = k + 1;
+        };
+        move_to<AggregatorTableCount100>(
+            publisher,
+            AggregatorTableCount100 { count: table3 }
+        );
+
+        let table4 = table::new();
+        let l = 0;
+        while (l < 1000) {
+            table::upsert(&mut table4, l, aggregator_v2::create_unbounded_aggregator());
+            l = l + 1;
+        };
+        move_to<AggregatorTableCount1000>(
+            publisher,
+            AggregatorTableCount1000 { count: table4 }
         );
     }
 
@@ -254,5 +315,61 @@ module 0xABCD::aggregator_example {
                 aggregator_v2::try_sub(agg, delta);
             });
         }
+    }
+
+    public entry fun modify_agg_table_count_1(increment: bool, delta: u64) acquires AggregatorTableCount1 {
+        assert!(exists<AggregatorTableCount1>(@publisher_address), error::invalid_argument(EBOUNDED_AGG_RESOURCE_NOT_PRESENT));
+        let counts = &mut borrow_global_mut<AggregatorTableCount1>(@publisher_address).count;
+        let i = 0;
+        while (i < 1) {
+            if (increment) {
+                aggregator_v2::try_add(table::borrow_mut(counts, i), delta);
+            } else {
+                aggregator_v2::try_sub(table::borrow_mut(counts, i), delta);
+            };
+            i = i + 1;
+        };
+    }
+
+    public entry fun modify_agg_table_count_10(increment: bool, delta: u64) acquires AggregatorTableCount10 {
+        assert!(exists<AggregatorTableCount10>(@publisher_address), error::invalid_argument(EBOUNDED_AGG_RESOURCE_NOT_PRESENT));
+        let counts = &mut borrow_global_mut<AggregatorTableCount10>(@publisher_address).count;
+        let i = 0;
+        while (i < 10) {
+            if (increment) {
+                aggregator_v2::try_add(table::borrow_mut(counts, i), delta);
+            } else {
+                aggregator_v2::try_sub(table::borrow_mut(counts, i), delta);
+            };
+            i = i + 1;
+        };
+    }
+
+    public entry fun modify_agg_table_count_100(increment: bool, delta: u64) acquires AggregatorTableCount100 {
+        assert!(exists<AggregatorTableCount100>(@publisher_address), error::invalid_argument(EBOUNDED_AGG_RESOURCE_NOT_PRESENT));
+        let counts = &mut borrow_global_mut<AggregatorTableCount100>(@publisher_address).count;
+        let i = 0;
+        while (i < 100) {
+            if (increment) {
+                aggregator_v2::try_add(table::borrow_mut(counts, i), delta);
+            } else {
+                aggregator_v2::try_sub(table::borrow_mut(counts, i), delta);
+            };
+            i = i + 1;
+        };
+    }
+
+    public entry fun modify_agg_table_count_1000(increment: bool, delta: u64) acquires AggregatorTableCount1000 {
+        assert!(exists<AggregatorTableCount1000>(@publisher_address), error::invalid_argument(EBOUNDED_AGG_RESOURCE_NOT_PRESENT));
+        let counts = &mut borrow_global_mut<AggregatorTableCount1000>(@publisher_address).count;
+        let i = 0;
+        while (i < 1000) {
+            if (increment) {
+                aggregator_v2::try_add(table::borrow_mut(counts, i), delta);
+            } else {
+                aggregator_v2::try_sub(table::borrow_mut(counts, i), delta);
+            };
+            i = i + 1;
+        };
     }
 }

@@ -202,6 +202,18 @@ pub enum EntryPoints {
     ModifyArrayAggV2Limit1000 {
         step: u64,
     },
+    ModifyTableAggV2Count1 {
+        step: u64,
+    },
+    ModifyTableAggV2Count10 {
+        step: u64,
+    },
+    ModifyTableAggV2Count100 {
+        step: u64,
+    },
+    ModifyTableAggV2Count1000 {
+        step: u64,
+    },
     ModifyFlagAggV2 {
         step: u64,
     },
@@ -298,6 +310,10 @@ impl EntryPoints {
             | EntryPoints::ModifyArrayAggV2Limit10 { .. }
             | EntryPoints::ModifyArrayAggV2Limit100 { .. }
             | EntryPoints::ModifyArrayAggV2Limit1000 { .. }
+            | EntryPoints::ModifyTableAggV2Count1 { .. }
+            | EntryPoints::ModifyTableAggV2Count10 { .. }
+            | EntryPoints::ModifyTableAggV2Count100 { .. }
+            | EntryPoints::ModifyTableAggV2Count1000 { .. }
             | EntryPoints::ModifyFlagAggV2 { .. }
             | EntryPoints::CreateObjects { .. }
             | EntryPoints::CreateObjectsConflict { .. }
@@ -354,6 +370,10 @@ impl EntryPoints {
             | EntryPoints::ModifyArrayAggV2Limit10 { .. }
             | EntryPoints::ModifyArrayAggV2Limit100 { .. }
             | EntryPoints::ModifyArrayAggV2Limit1000 { .. }
+            | EntryPoints::ModifyTableAggV2Count1 { .. }
+            | EntryPoints::ModifyTableAggV2Count10 { .. }
+            | EntryPoints::ModifyTableAggV2Count100 { .. }
+            | EntryPoints::ModifyTableAggV2Count1000 { .. }
             | EntryPoints::ModifyFlagAggV2 { .. } => "aggregator_example",
             EntryPoints::CreateObjects { .. } | EntryPoints::CreateObjectsConflict { .. } => {
                 "objects"
@@ -508,6 +528,18 @@ impl EntryPoints {
             },
             EntryPoints::ModifyFlagAggV2 { step } => {
                 modify_flag_agg_v2(module_id, rng.expect("Must provide RNG"), *step)
+            },
+            EntryPoints::ModifyTableAggV2Count1 { step } => {
+                modify_table_agg_v2_count_1(module_id, rng.expect("Must provide RNG"), *step)
+            },
+            EntryPoints::ModifyTableAggV2Count10 { step } => {
+                modify_table_agg_v2_count_10(module_id, rng.expect("Must provide RNG"), *step)
+            },
+            EntryPoints::ModifyTableAggV2Count100 { step } => {
+                modify_table_agg_v2_count_100(module_id, rng.expect("Must provide RNG"), *step)
+            },
+            EntryPoints::ModifyTableAggV2Count1000 { step } => {
+                modify_table_agg_v2_count_1000(module_id, rng.expect("Must provide RNG"), *step)
             },
             EntryPoints::CreateObjects {
                 num_objects,
@@ -745,6 +777,10 @@ impl EntryPoints {
             | EntryPoints::ModifyArrayAggV2Limit10 { .. }
             | EntryPoints::ModifyArrayAggV2Limit100 { .. }
             | EntryPoints::ModifyArrayAggV2Limit1000 { .. }
+            | EntryPoints::ModifyTableAggV2Count1 { .. }
+            | EntryPoints::ModifyTableAggV2Count10 { .. }
+            | EntryPoints::ModifyTableAggV2Count100 { .. }
+            | EntryPoints::ModifyTableAggV2Count1000 { .. }
             | EntryPoints::ModifyFlagAggV2 { .. } => AutomaticArgs::None,
             EntryPoints::CreateObjects { .. } | EntryPoints::CreateObjectsConflict { .. } => {
                 AutomaticArgs::Signer
@@ -943,6 +979,50 @@ fn modify_array_agg_v2_limit_1000(module_id: ModuleId, rng: &mut StdRng, step: u
     get_payload(
         module_id,
         ident_str!("modify_agg_array_count_1000").to_owned(),
+        vec![
+            bcs::to_bytes(&true).unwrap(),
+            bcs::to_bytes(&step).unwrap(),
+        ],
+    )
+}
+
+fn modify_table_agg_v2_count_1(module_id: ModuleId, rng: &mut StdRng, step: u64) -> TransactionPayload {
+    get_payload(
+        module_id,
+        ident_str!("modify_agg_table_count_1").to_owned(),
+        vec![
+            bcs::to_bytes(&true).unwrap(),
+            bcs::to_bytes(&step).unwrap(),
+        ],
+    )
+}
+
+fn modify_table_agg_v2_count_10(module_id: ModuleId, rng: &mut StdRng, step: u64) -> TransactionPayload {
+    get_payload(
+        module_id,
+        ident_str!("modify_agg_table_count_10").to_owned(),
+        vec![
+            bcs::to_bytes(&true).unwrap(),
+            bcs::to_bytes(&step).unwrap(),
+        ],
+    )
+}
+
+fn modify_table_agg_v2_count_100(module_id: ModuleId, rng: &mut StdRng, step: u64) -> TransactionPayload {
+    get_payload(
+        module_id,
+        ident_str!("modify_agg_table_count_100").to_owned(),
+        vec![
+            bcs::to_bytes(&true).unwrap(),
+            bcs::to_bytes(&step).unwrap(),
+        ],
+    )
+}
+
+fn modify_table_agg_v2_count_1000(module_id: ModuleId, rng: &mut StdRng, step: u64) -> TransactionPayload {
+    get_payload(
+        module_id,
+        ident_str!("modify_agg_table_count_1000").to_owned(),
         vec![
             bcs::to_bytes(&true).unwrap(),
             bcs::to_bytes(&step).unwrap(),

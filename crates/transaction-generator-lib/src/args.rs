@@ -44,6 +44,10 @@ pub enum TransactionTypeArg {
     ModifyIncrementAggV2Count10,
     ModifyIncrementAggV2Count100,
     ModifyIncrementAggV2Count1000,
+    ModifyTableAggV2Count1,
+    ModifyTableAggV2Count10,
+    ModifyTableAggV2Count100,
+    ModifyTableAggV2Count1000,
     // Complex EntryPoints
     CreateObjects10,
     CreateObjects10WithPayload10k,
@@ -201,6 +205,26 @@ impl TransactionTypeArg {
             },
             TransactionTypeArg::ModifyIncrementAggV2Count1000 => TransactionType::CallCustomModules {
                 entry_point: EntryPoints::IncGlobalAggV2 { count: 100 },
+                num_modules: module_working_set_size,
+                use_account_pool: sender_use_account_pool,
+            },
+            TransactionTypeArg::ModifyTableAggV2Count1 => TransactionType::CallCustomModules {
+                entry_point: EntryPoints::ModifyTableAggV2Count1 { step: 1 },
+                num_modules: module_working_set_size,
+                use_account_pool: sender_use_account_pool,
+            },
+            TransactionTypeArg::ModifyTableAggV2Count10 => TransactionType::CallCustomModules {
+                entry_point: EntryPoints::ModifyTableAggV2Count10 { step: 1 },
+                num_modules: module_working_set_size,
+                use_account_pool: sender_use_account_pool,
+            },
+            TransactionTypeArg::ModifyTableAggV2Count100 => TransactionType::CallCustomModules {
+                entry_point: EntryPoints::ModifyTableAggV2Count100 { step: 1 },
+                num_modules: module_working_set_size,
+                use_account_pool: sender_use_account_pool,
+            },
+            TransactionTypeArg::ModifyTableAggV2Count1000 => TransactionType::CallCustomModules {
+                entry_point: EntryPoints::ModifyTableAggV2Count1000 { step: 1 },
                 num_modules: module_working_set_size,
                 use_account_pool: sender_use_account_pool,
             },
