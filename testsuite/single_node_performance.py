@@ -175,8 +175,8 @@ TESTS = [
    
 
     # fee payer sequentializes transactions today. in these tests module publisher is the fee payer, so larger number of modules tests throughput with multiple fee payers
-    RunGroupConfig(expected_tps=10000, key=RunGroupKey("no-op-fee-payer"), included_in=Flow.FEE_PAYER | Flow.CUSTOM_TEST),
-    RunGroupConfig(expected_tps=17747, key=RunGroupKey("no-op-fee-payer", module_working_set_size=20), included_in=Flow.CONTINUOUS | Flow.FEE_PAYER | Flow.CUSTOM_TEST),
+    RunGroupConfig(expected_tps=10000, key=RunGroupKey("no-op-fee-payer"), included_in=Flow.FEE_PAYER),
+    RunGroupConfig(expected_tps=17747, key=RunGroupKey("no-op-fee-payer", module_working_set_size=20), included_in=Flow.CONTINUOUS | Flow.FEE_PAYER),
 
     RunGroupConfig(expected_tps=50000, key=RunGroupKey("coin_transfer_connected_components", executor_type="sharded", sharding_traffic_flags="--connected-tx-grps 5000", transaction_type_override=""), included_in=Flow.REPRESENTATIVE),
     RunGroupConfig(expected_tps=50000, key=RunGroupKey("coin_transfer_hotspot", executor_type="sharded", sharding_traffic_flags="--hotspot-probability 0.8", transaction_type_override=""), included_in=Flow.REPRESENTATIVE),
