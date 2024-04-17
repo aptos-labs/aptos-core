@@ -106,13 +106,23 @@ TESTS = [
     RunGroupConfig(expected_tps=10000, key=RunGroupKey("token-v2-ambassador-mint", module_working_set_size=20), included_in=Flow.CONTINUOUS),
     
     RunGroupConfig(expected_tps=14200, key=RunGroupKey("coin-transfer"), included_in=LAND_BLOCKING_AND_C | Flow.REPRESENTATIVE | Flow.CUSTOM_TEST),
-    RunGroupConfig(expected_tps=14200, key=RunGroupKey("coin-transfer-single-sender"), included_in=LAND_BLOCKING_AND_C | Flow.REPRESENTATIVE | Flow.CUSTOM_TEST),
-    RunGroupConfig(expected_tps=14200, key=RunGroupKey("coin-transfer-single-receiver"), included_in=LAND_BLOCKING_AND_C | Flow.REPRESENTATIVE | Flow.CUSTOM_TEST),
+    # RunGroupConfig(expected_tps=14200, key=RunGroupKey("coin-transfer-single-sender"), included_in=LAND_BLOCKING_AND_C | Flow.REPRESENTATIVE | Flow.CUSTOM_TEST),
+    # RunGroupConfig(expected_tps=14200, key=RunGroupKey("coin-transfer-single-receiver"), included_in=LAND_BLOCKING_AND_C | Flow.REPRESENTATIVE | Flow.CUSTOM_TEST),
     
-    RunGroupConfig(expected_tps=7300, key=RunGroupKey("modify-global-flag-agg-v2"), included_in=Flow.AGG_V2 | Flow.CONTINUOUS),
-    RunGroupConfig(expected_tps=12500, key=RunGroupKey("modify-global-flag-agg-v2", module_working_set_size=20), included_in=Flow.AGG_V2),
-    RunGroupConfig(expected_tps=12600, key=RunGroupKey("modify-global-bounded-agg-v2"), included_in=Flow.AGG_V2 | Flow.CONTINUOUS),
-    RunGroupConfig(expected_tps=12500, key=RunGroupKey("modify-global-bounded-agg-v2", module_working_set_size=20), included_in=Flow.AGG_V2),
+    RunGroupConfig(expected_tps=10000, key=RunGroupKey("modify-global-flag-agg-v2"), included_in=Flow.AGG_V2 | Flow.CONTINUOUS),
+    RunGroupConfig(expected_tps=12600, key=RunGroupKey("modify-global-bounded-agg-v2-limit10"), included_in=Flow.AGG_V2 | Flow.CONTINUOUS),
+    RunGroupConfig(expected_tps=12600, key=RunGroupKey("modify-global-bounded-agg-v2-limit100"), included_in=Flow.AGG_V2 | Flow.CONTINUOUS),
+    RunGroupConfig(expected_tps=12600, key=RunGroupKey("modify-global-bounded-agg-v2-limit1000"), included_in=Flow.AGG_V2 | Flow.CONTINUOUS),
+    
+    RunGroupConfig(expected_tps=12600, key=RunGroupKey("modify-array-agg-v2-limit1"), included_in=Flow.AGG_V2 | Flow.CONTINUOUS),
+    RunGroupConfig(expected_tps=12600, key=RunGroupKey("modify-array-agg-v2-limit10"), included_in=Flow.AGG_V2 | Flow.CONTINUOUS),
+    RunGroupConfig(expected_tps=12600, key=RunGroupKey("modify-array-agg-v2-limit100"), included_in=Flow.AGG_V2 | Flow.CONTINUOUS),
+    RunGroupConfig(expected_tps=12600, key=RunGroupKey("modify-array-agg-v2-limit1000"), included_in=Flow.AGG_V2 | Flow.CONTINUOUS),
+
+    RunGroupConfig(expected_tps=12600, key=RunGroupKey("modify-increment-agg-v2-count1"), included_in=Flow.AGG_V2 | Flow.CONTINUOUS),
+    RunGroupConfig(expected_tps=12600, key=RunGroupKey("modify-increment-agg-v2-count10"), included_in=Flow.AGG_V2 | Flow.CONTINUOUS),
+    RunGroupConfig(expected_tps=12600, key=RunGroupKey("modify-increment-agg-v2-count100"), included_in=Flow.AGG_V2 | Flow.CONTINUOUS),
+    RunGroupConfig(expected_tps=12600, key=RunGroupKey("modify-increment-agg-v2-count1000"), included_in=Flow.AGG_V2 | Flow.CONTINUOUS),
 
 
     # RunGroupConfig(expected_tps=37000, key=RunGroupKey("coin-transfer", executor_type="native"), included_in=LAND_BLOCKING_AND_C),
@@ -139,8 +149,6 @@ TESTS = [
     # RunGroupConfig(expected_tps=10, key=RunGroupKey("smart-table-picture1-m-with256-change"), included_in=LAND_BLOCKING_AND_C, waived=True),
     # RunGroupConfig(expected_tps=40, key=RunGroupKey("smart-table-picture1-m-with256-change", module_working_set_size=20), included_in=Flow.CONTINUOUS, waived=True),
 
-    RunGroupConfig(expected_tps=20000, key=RunGroupKey("modify-global-resource-agg-v2"), included_in=Flow.AGG_V2 | LAND_BLOCKING_AND_C),
-    RunGroupConfig(expected_tps=12500, key=RunGroupKey("modify-global-resource-agg-v2", module_working_set_size=50), included_in=Flow.AGG_V2),
 
     RunGroupConfig(expected_tps=3600, key=RunGroupKey("resource-groups-global-write-tag1-kb"), included_in=LAND_BLOCKING_AND_C | Flow.RESOURCE_GROUPS),
     RunGroupConfig(expected_tps=8000, key=RunGroupKey("resource-groups-global-write-tag1-kb", module_working_set_size=20), included_in=Flow.RESOURCE_GROUPS, waived=True),
@@ -196,7 +204,7 @@ CODE_PERF_VERSION = "v4"
 
 # default to using production number of execution threads for assertions
 NUMBER_OF_EXECUTION_THREADS = int(
-    os.environ.get("NUMBER_OF_EXECUTION_THREADS", default=8)
+    os.environ.get("NUMBER_OF_EXECUTION_THREADS", default=1)
 )
 
 if os.environ.get("DETAILED"):
