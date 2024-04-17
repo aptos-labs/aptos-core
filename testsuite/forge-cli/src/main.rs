@@ -605,7 +605,7 @@ fn get_land_blocking_test(
 ) -> Option<ForgeConfig> {
     let test = match test_name {
         "land_blocking" => land_blocking_test_suite(duration), // TODO: remove land_blocking, superseded by below
-        "realistic_env_max_load" => pfn_performance(duration, true, true, false),
+        "realistic_env_max_load" => pfn_performance(duration, true, true, true, 7, 7, true),
         "compat" => compat(),
         "framework_upgrade" => framework_upgrade(),
         _ => return None, // The test name does not match a land-blocking test
@@ -663,9 +663,14 @@ fn get_pfn_test(test_name: &str, duration: Duration) -> Option<ForgeConfig> {
         "pfn_const_tps" => pfn_const_tps(duration, false, false, true),
         "pfn_const_tps_with_network_chaos" => pfn_const_tps(duration, false, true, false),
         "pfn_const_tps_with_realistic_env" => pfn_const_tps(duration, true, true, false),
-        "pfn_performance" => pfn_performance(duration, false, false, true),
-        "pfn_performance_with_network_chaos" => pfn_performance(duration, false, true, false),
-        "pfn_performance_with_realistic_env" => pfn_performance(duration, true, true, false),
+        "pfn_performance" => pfn_performance(duration, false, false, true, 7, 1, false),
+        "pfn_performance_with_network_chaos" => {
+            pfn_performance(duration, false, true, false, 7, 1, false)
+        },
+        "pfn_performance_with_realistic_env" => {
+            pfn_performance(duration, true, true, false, 7, 1, false)
+        },
+        "pfn_spam_duplicates" => pfn_performance(duration, true, true, true, 7, 7, true),
         _ => return None, // The test name does not match a PFN test
     };
     Some(test)
@@ -2467,7 +2472,12 @@ fn pfn_const_tps(
         .with_initial_validator_count(NonZeroUsize::new(7).unwrap())
         .with_initial_fullnode_count(7)
         .with_emit_job(EmitJobRequest::default().mode(EmitJobMode::ConstTps { tps: 100 }))
-        .add_network_test(PFNPerformance::new(7, add_cpu_chaos, add_network_emulation))
+        .add_network_test(PFNPerformance::new(
+            7,
+            add_cpu_chaos,
+            add_network_emulation,
+            None,
+        ))
         .with_genesis_helm_config_fn(Arc::new(move |helm_values| {
             helm_values["chain"]["epoch_duration_secs"] = epoch_duration_secs.into();
         }))
@@ -2502,6 +2512,9 @@ fn pfn_performance(
     add_cpu_chaos: bool,
     add_network_emulation: bool,
     epoch_changes: bool,
+    num_validators: usize,
+    num_pfns: usize,
+    broadcast_to_all_vfns: bool,
 ) -> ForgeConfig {
     // Determine the minimum expected TPS
     let min_expected_tps = 4500;
@@ -2511,14 +2524,27 @@ fn pfn_performance(
         60 * 60 * 2 // 2 hours; avoid epoch changes which can introduce noise
     };
 
+    let config_override_fn = if broadcast_to_all_vfns {
+        let f: OverrideNodeConfigFn = Arc::new(move |pfn_config: &mut NodeConfig, _| {
+            pfn_config.mempool.default_failovers = num_validators;
+            for network in &mut pfn_config.full_node_networks {
+                network.max_outbound_connections = num_validators;
+            }
+        });
+        Some(f)
+    } else {
+        None
+    };
+
     // Create the forge config
     ForgeConfig::default()
-        .with_initial_validator_count(NonZeroUsize::new(20).unwrap())
-        .with_initial_fullnode_count(20)
+        .with_initial_validator_count(NonZeroUsize::new(num_validators).unwrap())
+        .with_initial_fullnode_count(num_validators)
         .add_network_test(PFNPerformance::new(
-            10,
+            num_pfns as u64,
             add_cpu_chaos,
             add_network_emulation,
+            config_override_fn,
         ))
         .with_genesis_helm_config_fn(Arc::new(move |helm_values| {
             helm_values["chain"]["epoch_duration_secs"] = epoch_duration_secs.into();
