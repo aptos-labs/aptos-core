@@ -33,7 +33,7 @@ use aptos_framework::{
 };
 use aptos_gas_algebra::{Gas, GasQuantity, NumBytes, Octa};
 use aptos_gas_meter::{AptosGasMeter, GasAlgebra, StandardGasAlgebra, StandardGasMeter};
-use aptos_gas_schedule::{AptosGasParameters, VMGasParameters};
+use aptos_gas_schedule::{AptosGasParameters, TransactionGasParameters, VMGasParameters};
 use aptos_logger::{enabled, prelude::*, Level};
 use aptos_memory_usage_tracker::MemoryTrackedGasMeter;
 use aptos_metrics_core::TimerHelper;
@@ -53,6 +53,7 @@ use aptos_types::{
     move_utils::as_move_value::AsMoveValue,
     on_chain_config::{
         new_epoch_event_key, ConfigurationResource, FeatureFlag, Features, OnChainConfig,
+        OnChainConsensusConfig, OnChainRandomnessConfig, RandomnessConfigMoveStruct,
         TimedFeatureOverride, TimedFeatures, TimedFeaturesBuilder,
     },
     randomness::Randomness,
@@ -200,6 +201,7 @@ pub struct AptosVM {
     gas_params: Result<AptosGasParameters, String>,
     pub(crate) storage_gas_params: Result<StorageGasParameters, String>,
     timed_features: TimedFeatures,
+    randomness_enabled: bool,
 }
 
 impl AptosVM {
@@ -239,6 +241,12 @@ impl AptosVM {
         let aggregator_v2_type_tagging = override_is_delayed_field_optimization_capable
             && features.is_aggregator_v2_delayed_fields_enabled();
 
+        let consensus_config = OnChainConsensusConfig::fetch_config(resolver).unwrap_or_default();
+        let randomness_config = RandomnessConfigMoveStruct::fetch_config(resolver)
+            .and_then(|x| OnChainRandomnessConfig::try_from(x).ok())
+            .unwrap_or_else(OnChainRandomnessConfig::default_if_missing);
+        let randomness_enabled =
+            consensus_config.is_vtxn_enabled() && randomness_config.randomness_enabled();
         let move_vm = MoveVmExt::new(
             native_gas_params,
             misc_gas_params,
@@ -258,6 +266,7 @@ impl AptosVM {
             gas_params,
             storage_gas_params,
             timed_features,
+            randomness_enabled,
         }
     }
 
@@ -735,12 +744,12 @@ impl AptosVM {
 
     fn validate_and_execute_entry_function(
         &self,
-        resolver: &impl AptosMoveResolver,
         session: &mut SessionExt,
         gas_meter: &mut impl AptosGasMeter,
         traversal_context: &mut TraversalContext,
         senders: Vec<AccountAddress>,
         entry_fn: &EntryFunction,
+        txn_data: &TransactionMetadata,
     ) -> Result<(), VMStatus> {
         // Note: Feature gating is needed here because the traversal of the dependencies could
         //       result in shallow-loading of the modules and therefore subtle changes in
@@ -761,7 +770,7 @@ impl AptosVM {
             entry_fn.ty_args(),
         )?;
 
-        if is_friend_or_private && has_randomness_attribute(resolver, session, entry_fn)? {
+        if is_friend_or_private && txn_data.required_deposit.is_some() {
             let txn_context = session
                 .get_native_extensions()
                 .get_mut::<RandomnessContext>();
@@ -824,12 +833,12 @@ impl AptosVM {
             TransactionPayload::EntryFunction(entry_fn) => {
                 session.execute(|session| {
                     self.validate_and_execute_entry_function(
-                        resolver,
                         session,
                         gas_meter,
                         traversal_context,
                         txn_data.senders(),
                         entry_fn,
+                        txn_data,
                     )
                 })?;
             },
@@ -930,13 +939,13 @@ impl AptosVM {
                         aptos_try!({
                             return_on_failure!(session.execute(|session| self
                                 .execute_multisig_entry_function(
-                                    resolver,
                                     session,
                                     gas_meter,
                                     traversal_context,
                                     payload.multisig_address,
                                     entry_function,
                                     new_published_modules_loaded,
+                                    txn_data,
                                 )));
                             // TODO: Deduplicate this against execute_multisig_transaction
                             // A bit tricky since we need to skip success/failure cleanups,
@@ -1052,13 +1061,13 @@ impl AptosVM {
             MultisigTransactionPayload::EntryFunction(entry_function) => {
                 session.execute(|session| {
                     self.execute_multisig_entry_function(
-                        resolver,
                         session,
                         gas_meter,
                         traversal_context,
                         txn_payload.multisig_address,
                         &entry_function,
                         new_published_modules_loaded,
+                        txn_data,
                     )
                 })
             },
@@ -1153,23 +1162,23 @@ impl AptosVM {
 
     fn execute_multisig_entry_function(
         &self,
-        resolver: &impl AptosMoveResolver,
         session: &mut SessionExt,
         gas_meter: &mut impl AptosGasMeter,
         traversal_context: &mut TraversalContext,
         multisig_address: AccountAddress,
         payload: &EntryFunction,
         new_published_modules_loaded: &mut bool,
+        txn_data: &TransactionMetadata,
     ) -> Result<(), VMStatus> {
         // If txn args are not valid, we'd still consider the transaction as executed but
         // failed. This is primarily because it's unrecoverable at this point.
         self.validate_and_execute_entry_function(
-            resolver,
             session,
             gas_meter,
             traversal_context,
             vec![multisig_address],
             payload,
+            txn_data,
         )?;
 
         // Resolve any pending module publishes in case the multisig transaction is deploying
@@ -1616,20 +1625,22 @@ impl AptosVM {
         gas_meter: &mut impl AptosGasMeter,
         traversal_context: &mut TraversalContext<'a>,
     ) -> (VMStatus, VMOutput) {
-        let txn_data = TransactionMetadata::new(txn);
+        let mut txn_data = TransactionMetadata::new(txn);
 
         // Revalidate the transaction.
         let mut prologue_session =
             unwrap_or_discard!(PrologueSession::new(self, &txn_data, resolver));
-        unwrap_or_discard!(
-            prologue_session.execute(|session| self.validate_signed_transaction(
+        unwrap_or_discard!(prologue_session.execute(|session| {
+            let required_deposit = self.get_required_deposit(
                 session,
                 resolver,
-                txn,
+                &gas_meter.vm_gas_params().txn,
                 &txn_data,
-                log_context
-            ))
-        );
+                txn.payload(),
+            );
+            txn_data.set_required_deposit(required_deposit);
+            self.validate_signed_transaction(session, resolver, txn, &txn_data, log_context)
+        }));
 
         let storage_gas_params = unwrap_or_discard!(get_or_vm_startup_failure(
             &self.storage_gas_params,
@@ -2300,6 +2311,41 @@ impl AptosVM {
             },
         })
     }
+
+    pub fn get_required_deposit(
+        &self,
+        session: &mut SessionExt,
+        resolver: &impl AptosMoveResolver,
+        txn_gas_params: &TransactionGasParameters,
+        txn_metadata: &TransactionMetadata,
+        payload: &TransactionPayload,
+    ) -> Option<u64> {
+        match payload {
+            TransactionPayload::EntryFunction(entry_func) => {
+                if self.randomness_enabled
+                    && has_randomness_attribute(resolver, session, entry_func).unwrap_or(false)
+                {
+                    let max_execution_gas: Gas = txn_gas_params
+                        .max_execution_gas
+                        .to_unit_round_up_with_params(txn_gas_params);
+                    let max_io_gas: Gas = txn_gas_params
+                        .max_io_gas
+                        .to_unit_round_up_with_params(txn_gas_params);
+                    let cand_0 = txn_metadata.gas_unit_price * (max_execution_gas + max_io_gas)
+                        + txn_gas_params.max_storage_fee;
+                    let cand_1 =
+                        txn_metadata.gas_unit_price * txn_gas_params.maximum_number_of_gas_units;
+                    let required_fee_deposit = min(cand_0, cand_1);
+                    Some(u64::from(required_fee_deposit))
+                } else {
+                    None
+                }
+            },
+            TransactionPayload::Script(_)
+            | TransactionPayload::ModuleBundle(_)
+            | TransactionPayload::Multisig(_) => None,
+        }
+    }
 }
 
 // Executor external API
@@ -2431,10 +2477,23 @@ impl VMValidator for AptosVM {
                 return VMValidatorResult::error(StatusCode::INVALID_SIGNATURE);
             },
         };
-        let txn_data = TransactionMetadata::new(&txn);
+        let mut txn_data = TransactionMetadata::new(&txn);
 
         let resolver = self.as_move_resolver(&state_view);
         let mut session = self.new_session(&resolver, SessionId::prologue_meta(&txn_data));
+        let required_deposit = if let Ok(gas_params) = &self.gas_params {
+            self.get_required_deposit(
+                &mut session,
+                &resolver,
+                &gas_params.vm.txn,
+                &txn_data,
+                txn.payload(),
+            )
+        } else {
+            return VMValidatorResult::error(StatusCode::GAS_PARAMS_MISSING);
+        };
+
+        txn_data.set_required_deposit(required_deposit);
 
         // Increment the counter for transactions verified.
         let (counter_label, result) = match self.validate_signed_transaction(
