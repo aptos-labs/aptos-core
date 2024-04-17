@@ -91,7 +91,30 @@ MAIN_SIGNER_ACCOUNTS = 2 * MAX_BLOCK_SIZE
 TESTS = [
     RunGroupConfig(expected_tps=22200, key=RunGroupKey("no-op"), included_in=LAND_BLOCKING_AND_C | Flow.CUSTOM_TEST),
     RunGroupConfig(expected_tps=11500, key=RunGroupKey("no-op", module_working_set_size=20), included_in=LAND_BLOCKING_AND_C | Flow.CUSTOM_TEST),
+    
+    RunGroupConfig(expected_tps=17747, key=RunGroupKey("no-op-fee-payer", module_working_set_size=1), included_in=LAND_BLOCKING_AND_C),
+    RunGroupConfig(expected_tps=17747, key=RunGroupKey("no-op-fee-payer", module_working_set_size=2), included_in=Flow.CONTINUOUS),
+    RunGroupConfig(expected_tps=17747, key=RunGroupKey("no-op-fee-payer", module_working_set_size=4), included_in=Flow.CONTINUOUS),
+    RunGroupConfig(expected_tps=17747, key=RunGroupKey("no-op-fee-payer", module_working_set_size=8), included_in=Flow.CONTINUOUS),
+    RunGroupConfig(expected_tps=17747, key=RunGroupKey("no-op-fee-payer", module_working_set_size=16), included_in=Flow.CONTINUOUS),
+    RunGroupConfig(expected_tps=17747, key=RunGroupKey("no-op-fee-payer", module_working_set_size=24), included_in=Flow.CONTINUOUS),
+    RunGroupConfig(expected_tps=17747, key=RunGroupKey("no-op-fee-payer", module_working_set_size=32), included_in=Flow.CONTINUOUS),
+    RunGroupConfig(expected_tps=17747, key=RunGroupKey("no-op-fee-payer", module_working_set_size=48), included_in=Flow.CONTINUOUS),
+    RunGroupConfig(expected_tps=17747, key=RunGroupKey("no-op-fee-payer", module_working_set_size=60), included_in=Flow.CONTINUOUS),
+
+    RunGroupConfig(expected_tps=10000, key=RunGroupKey("token-v2-ambassador-mint"), included_in=LAND_BLOCKING_AND_C | Flow.REPRESENTATIVE),
+    RunGroupConfig(expected_tps=10000, key=RunGroupKey("token-v2-ambassador-mint", module_working_set_size=20), included_in=Flow.CONTINUOUS),
+    
     RunGroupConfig(expected_tps=14200, key=RunGroupKey("coin-transfer"), included_in=LAND_BLOCKING_AND_C | Flow.REPRESENTATIVE | Flow.CUSTOM_TEST),
+    RunGroupConfig(expected_tps=14200, key=RunGroupKey("coin-transfer-single-sender"), included_in=LAND_BLOCKING_AND_C | Flow.REPRESENTATIVE | Flow.CUSTOM_TEST),
+    RunGroupConfig(expected_tps=14200, key=RunGroupKey("coin-transfer-single-receiver"), included_in=LAND_BLOCKING_AND_C | Flow.REPRESENTATIVE | Flow.CUSTOM_TEST),
+    
+    RunGroupConfig(expected_tps=7300, key=RunGroupKey("modify-global-flag-agg-v2"), included_in=Flow.AGG_V2 | Flow.CONTINUOUS),
+    RunGroupConfig(expected_tps=12500, key=RunGroupKey("modify-global-flag-agg-v2", module_working_set_size=20), included_in=Flow.AGG_V2),
+    RunGroupConfig(expected_tps=12600, key=RunGroupKey("modify-global-bounded-agg-v2"), included_in=Flow.AGG_V2 | Flow.CONTINUOUS),
+    RunGroupConfig(expected_tps=12500, key=RunGroupKey("modify-global-bounded-agg-v2", module_working_set_size=20), included_in=Flow.AGG_V2),
+
+
     # RunGroupConfig(expected_tps=37000, key=RunGroupKey("coin-transfer", executor_type="native"), included_in=LAND_BLOCKING_AND_C),
     RunGroupConfig(expected_tps=12000, key=RunGroupKey("account-generation"), included_in=LAND_BLOCKING_AND_C | Flow.REPRESENTATIVE | Flow.CUSTOM_TEST),
     # RunGroupConfig(expected_tps=30443, key=RunGroupKey("account-generation", executor_type="native"), included_in=Flow.CONTINUOUS),
@@ -118,10 +141,6 @@ TESTS = [
 
     RunGroupConfig(expected_tps=20000, key=RunGroupKey("modify-global-resource-agg-v2"), included_in=Flow.AGG_V2 | LAND_BLOCKING_AND_C),
     RunGroupConfig(expected_tps=12500, key=RunGroupKey("modify-global-resource-agg-v2", module_working_set_size=50), included_in=Flow.AGG_V2),
-    RunGroupConfig(expected_tps=7300, key=RunGroupKey("modify-global-flag-agg-v2"), included_in=Flow.AGG_V2 | Flow.CONTINUOUS),
-    RunGroupConfig(expected_tps=12500, key=RunGroupKey("modify-global-flag-agg-v2", module_working_set_size=50), included_in=Flow.AGG_V2),
-    RunGroupConfig(expected_tps=12600, key=RunGroupKey("modify-global-bounded-agg-v2"), included_in=Flow.AGG_V2 | Flow.CONTINUOUS),
-    RunGroupConfig(expected_tps=12500, key=RunGroupKey("modify-global-bounded-agg-v2", module_working_set_size=50), included_in=Flow.AGG_V2),
 
     RunGroupConfig(expected_tps=3600, key=RunGroupKey("resource-groups-global-write-tag1-kb"), included_in=LAND_BLOCKING_AND_C | Flow.RESOURCE_GROUPS),
     RunGroupConfig(expected_tps=8000, key=RunGroupKey("resource-groups-global-write-tag1-kb", module_working_set_size=20), included_in=Flow.RESOURCE_GROUPS, waived=True),
@@ -146,8 +165,6 @@ TESTS = [
     RunGroupConfig(expected_tps=22200, key=RunGroupKey("no-op5-signers"), included_in=Flow.CONTINUOUS),
     RunGroupConfig(expected_tps=22200, key=RunGroupKey("no-op5-signers", module_working_set_size=20), included_in=Flow.CONTINUOUS),
    
-    RunGroupConfig(expected_tps=7006, key=RunGroupKey("token-v2-ambassador-mint"), included_in=LAND_BLOCKING_AND_C | Flow.REPRESENTATIVE),
-    RunGroupConfig(expected_tps=6946, key=RunGroupKey("token-v2-ambassador-mint", module_working_set_size=20), included_in=Flow.CONTINUOUS),
 
     # fee payer sequentializes transactions today. in these tests module publisher is the fee payer, so larger number of modules tests throughput with multiple fee payers
     RunGroupConfig(expected_tps=10000, key=RunGroupKey("no-op-fee-payer"), included_in=Flow.FEE_PAYER | Flow.CUSTOM_TEST),
