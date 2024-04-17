@@ -13,6 +13,7 @@ use ark_ff::PrimeField;
 use ark_ff::BigInteger;
 
 
+const TEST_RNG_SEED : u64 = 2513478;
 
 fn expected_num2bits_be(n: u64, size: usize) -> Vec<u8> {
 
@@ -58,7 +59,7 @@ fn num2bits_be_test() {
 #[test]
 fn bits2num_big_endian_test() {
     let circuit_handle = TestCircuitHandle::new("packing/bits2num_big_endian_test.circom").unwrap();
-    let mut rng = ChaCha20Rng::seed_from_u64(2513478);
+    let mut rng = ChaCha20Rng::seed_from_u64(TEST_RNG_SEED);
     let bits_max_size = 64;
 
     for i in 0..=255 {
@@ -83,7 +84,7 @@ fn bits2num_big_endian_test() {
 fn bytes_to_bits_test() {
     let circuit_handle = TestCircuitHandle::new("packing/bytes_to_bits_test.circom").unwrap();
 
-    let mut rng = ChaCha20Rng::seed_from_u64(2513478);
+    let mut rng = ChaCha20Rng::seed_from_u64(TEST_RNG_SEED);
     const bytes_max_size : usize = 10;
     const bits_max_size : usize = bytes_max_size * 8;
 
@@ -117,7 +118,7 @@ fn bytes_to_bits_test() {
 fn bits_to_field_elems_test() {
     let circuit_handle = TestCircuitHandle::new("packing/bits_to_field_elems_test.circom").unwrap();
 
-    let mut rng = ChaCha20Rng::seed_from_u64(2513478);
+    let mut rng = ChaCha20Rng::seed_from_u64(TEST_RNG_SEED);
 
     // Keeping both of these constant makes sense here, since the circuit only ever uses these two
     // particular parameters when calling this template
