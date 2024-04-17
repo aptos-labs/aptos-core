@@ -4,6 +4,8 @@ use aptos_keyless_common::input_processing::witness_gen::witness_gen;
 use crate::{TestCircuitHandle};
 use itertools::*;
 use aptos_crypto::poseidon_bn254;
+use ark_bn254::Fr;
+use ark_ff::{Zero, One};
      
 #[test]
 fn array_selector_test() {
@@ -86,19 +88,21 @@ fn select_array_value_test() {
     assert!(result.is_ok());
 }
 
-// TODO: Fix this
-/*#[test]
+#[test]
 fn single_neg_one_array_test() {
     let circuit_handle = TestCircuitHandle::new("single_neg_one_array_test.circom").unwrap();
-    let output = [0,0,-1,0,0,0,0,0];
+    let output = [Fr::zero(), Fr::zero(), Fr::zero()-Fr::one(), Fr::zero(), Fr::zero(), Fr::zero(), Fr::zero(), Fr::zero()]; //[0,0,-1,0,0,0,0,0];
     let index = 2;
     let out_len = 8;
     let config = CircuitPaddingConfig::new().max_length("expected_output", out_len);
-    let circuit_input_signals = CircuitInputSignals::new().u64_input("index", index).bytes_input("expected_output", &output).pad(&config).unwrap();
+    let circuit_input_signals = CircuitInputSignals::new().u64_input("index", index).frs_input("expected_output", &output).pad(&config).unwrap();
      
     let result = circuit_handle.gen_witness(circuit_input_signals);
+    println!("Hello world");
+    println!("{:?}", result);
+    println!("goodbye");
     assert!(result.is_ok());
-}*/
+}
 
 #[test]
 fn check_substr_inclusion_poly_test() {
