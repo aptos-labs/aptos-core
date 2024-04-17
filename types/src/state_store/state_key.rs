@@ -398,10 +398,13 @@ impl StateKey {
 
         match deserialized {
             StateKeyInner::AccessPath(AccessPath { address, path }) => {
-                match bcs::from_bytes::<Path>(&path).expect("Failed to parse AccessPath") {
-                    Path::Code(module_id) => Self::module_id(&module_id),
-                    Path::Resource(struct_tag) => Self::resource(&address, &struct_tag),
-                    Path::ResourceGroup(struct_tag) => Self::resource_group(&address, &struct_tag),
+                let path_deserialized = bcs::from_bytes(&path).expect("Failed to parse AccessPath");
+                let known_path = Some(path);
+
+                match path_deserialized {
+                    Path::Code(module_id) => Self::module_(module_id.address(), module_id.name(), known_path),
+                    Path::Resource(struct_tag) => Self::resource_(&address, &struct_tag, known_path),
+                    Path::ResourceGroup(struct_tag) => Self::resource_group_(&address, &struct_tag, known_path),
                 }
             },
             StateKeyInner::TableItem { handle, key } => Self::table_item(&handle, &key),
@@ -409,14 +412,20 @@ impl StateKey {
         }
     }
 
-    pub fn resource(address: &AccountAddress, struct_tag: &StructTag) -> Self {
+    fn resource_(address: &AccountAddress, struct_tag: &StructTag, path: Option<Vec<u8>>) -> Self {
         if let Some(entry) = GLOBAL_REGISTRY.resource_keys.try_get(struct_tag, address) {
             return Self(entry);
         }
 
         let inner = StateKeyInner::AccessPath(
-            AccessPath::resource_access_path(*address, struct_tag.clone())
-                .expect("Failed to create access path"),
+            // FIXME(alden): error handling
+            AccessPath::new(
+                *address,
+                path.unwrap_or_else(|| {
+                    bcs::to_bytes(&access_path::Path::Resource(struct_tag.clone()))
+                        .expect("failed to serialize Path")
+                }),
+            ),
         );
         let maybe_add = EntryInner::from_deserialized(inner);
 
@@ -424,6 +433,10 @@ impl StateKey {
             .resource_keys
             .lock_and_get_or_add(struct_tag, address, maybe_add);
         Self(entry)
+    }
+
+    pub fn resource(address: &AccountAddress, struct_tag: &StructTag) -> Self {
+        Self::resource_(address, struct_tag, None)
     }
 
     pub fn resource_typed<T: MoveResource>(address: &AccountAddress) -> Self {
@@ -434,7 +447,11 @@ impl StateKey {
         Self::resource(T::address(), &T::struct_tag())
     }
 
-    pub fn resource_group(address: &AccountAddress, struct_tag: &StructTag) -> Self {
+    fn resource_group_(
+        address: &AccountAddress,
+        struct_tag: &StructTag,
+        path: Option<Vec<u8>>,
+    ) -> Self {
         if let Some(entry) = GLOBAL_REGISTRY
             .resource_group_keys
             .try_get(struct_tag, address)
@@ -442,9 +459,12 @@ impl StateKey {
             return Self(entry);
         }
 
-        let inner = StateKeyInner::AccessPath(AccessPath::resource_group_access_path(
+        let inner = StateKeyInner::AccessPath(AccessPath::new(
             *address,
-            struct_tag.clone(),
+            path.unwrap_or_else(|| {
+                bcs::to_bytes(&access_path::Path::ResourceGroup(struct_tag.clone()))
+                    .expect("failed to serialize Path")
+            }),
         ));
         let maybe_add = EntryInner::from_deserialized(inner);
 
@@ -454,21 +474,35 @@ impl StateKey {
         Self(entry)
     }
 
-    pub fn module(address: &AccountAddress, name: &IdentStr) -> Self {
+    pub fn resource_group(address: &AccountAddress, struct_tag: &StructTag) -> Self {
+        Self::resource_group_(address, struct_tag, None)
+    }
+
+    fn module_(address: &AccountAddress, name: &IdentStr, path: Option<Vec<u8>>) -> Self {
         if let Some(entry) = GLOBAL_REGISTRY.module_keys.try_get(address, name) {
             return Self(entry);
         }
 
-        let inner = StateKeyInner::AccessPath(AccessPath::code_access_path(ModuleId::new(
+        let inner = StateKeyInner::AccessPath(AccessPath::new(
             *address,
-            name.to_owned(),
-        )));
+            path.unwrap_or_else(|| {
+                bcs::to_bytes(&access_path::Path::Code(ModuleId::new(
+                    *address,
+                    name.to_owned(),
+                )))
+                .expect("failed to serialize Path")
+            }),
+        ));
         let maybe_add = EntryInner::from_deserialized(inner);
 
         let entry = GLOBAL_REGISTRY
             .module_keys
             .lock_and_get_or_add(address, name, maybe_add);
         Self(entry)
+    }
+
+    pub fn module(address: &AccountAddress, name: &IdentStr) -> Self {
+        Self::module_(address, name, None)
     }
 
     pub fn module_id(module_id: &ModuleId) -> Self {
