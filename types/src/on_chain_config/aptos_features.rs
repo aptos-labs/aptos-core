@@ -105,7 +105,7 @@ impl FeatureFlag {
             FeatureFlag::SINGLE_SENDER_AUTHENTICATOR,
             FeatureFlag::SPONSORED_AUTOMATIC_ACCOUNT_V1_CREATION,
             FeatureFlag::FEE_PAYER_ACCOUNT_OPTIONAL,
-            FeatureFlag::AGGREGATOR_V2_DELAYED_FIELDS,
+            // FeatureFlag::AGGREGATOR_V2_DELAYED_FIELDS,
             FeatureFlag::CONCURRENT_TOKEN_V2,
             FeatureFlag::LIMIT_MAX_IDENTIFIER_LENGTH,
             FeatureFlag::OPERATOR_BENEFICIARY_CHANGE,
@@ -123,8 +123,8 @@ impl FeatureFlag {
             FeatureFlag::KEYLESS_ACCOUNTS_WITH_PASSKEYS,
             FeatureFlag::MULTISIG_V2_ENHANCEMENT,
             FeatureFlag::COIN_TO_FUNGIBLE_ASSET_MIGRATION,
-            // FeatureFlag::CONCURRENT_FUNGIBLE_ASSETS,
-            // FeatureFlag::MIGRATE_TO_CONCURRENT_FUNGIBLE_BALANCE,
+            FeatureFlag::CONCURRENT_FUNGIBLE_ASSETS,
+            FeatureFlag::MIGRATE_TO_CONCURRENT_FUNGIBLE_BALANCE,
         ]
     }
 }
