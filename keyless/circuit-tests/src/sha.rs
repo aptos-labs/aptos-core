@@ -72,3 +72,34 @@ fn sha_test() {
         assert!(result.is_ok());
     }
 }
+
+#[test]
+fn sha_padding_verify_test() {
+    let mut rng = thread_rng();
+    let circuit_handle = Arc::new(TestCircuitHandle::new("sha2_padding_verify_test.circom").unwrap());
+
+    for input_byte_len in 180..248 {
+        let input_bit_len = input_byte_len * 8;
+        let mut input = vec![0; input_byte_len];
+        rng.fill_bytes(&mut input);
+        let padded_input = sha256_padding(input.as_slice());
+        let padded_input_byte_len = padded_input.len();
+        let config = CircuitPaddingConfig::new()
+            .max_length("in", 256)
+            .max_length("L_byte_encoded", 8)
+            .max_length("padding_without_len", 64);
+
+        let circuit_input_signals = CircuitInputSignals::new()
+            .bytes_input("in", padded_input.as_slice())
+            .usize_input("num_blocks", padded_input_byte_len / 64)
+            .usize_input("padding_start", input_byte_len)
+            .bytes_input("L_byte_encoded", (input_bit_len as u64).to_be_bytes().as_slice())
+            .bytes_input("padding_without_len", &padded_input[input_byte_len..(padded_input_byte_len - 8)])
+            .pad(&config)
+            .unwrap();
+        println!("circuit_input_signals={:?}", circuit_input_signals);
+        let result = circuit_handle.gen_witness(circuit_input_signals);
+        println!("input_byte_len={}, result={:?}", input_byte_len, result);
+        assert!(result.is_ok());
+    }
+}

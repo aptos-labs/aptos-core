@@ -19,8 +19,11 @@ pub enum CircuitInputSignal {
 }
 
 pub struct Unpadded;
+
+#[derive(Debug)]
 pub struct Padded;
 
+#[derive(Debug)]
 pub struct CircuitInputSignals<T> {
     signals: BTreeMap<String, CircuitInputSignal>,
     t: PhantomData<T>,
