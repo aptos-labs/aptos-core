@@ -53,6 +53,26 @@ impl TransactionAccumulatorDb {
     pub(crate) fn write_schemas(&self, batch: SchemaBatch) -> Result<()> {
         self.db.write_schemas(batch)
     }
+
+    pub(crate) fn revert_transaction_accumulator(
+        &self,
+        version: Version,
+        batch: SchemaBatch,
+    ) -> Result<()> {
+        // Delete the transaction accumulator entry for the given version
+        batch.delete::<TransactionAccumulatorSchema>(&version)?;
+
+        // Update the transaction accumulator pruner progress to the previous version
+        let prev_version = version
+            .checked_sub(1)
+            .ok_or_else(|| anyhow::anyhow!("Cannot revert transaction accumulator at version 0"))?;
+        batch.put::<DbMetadataSchema>(
+            &DbMetadataKey::TransactionAccumulatorPrunerProgress,
+            &DbMetadataValue::Version(prev_version),
+        )?;
+
+        Ok(())
+    }
 }
 
 impl TransactionAccumulatorDb {

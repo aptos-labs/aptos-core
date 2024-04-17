@@ -498,9 +498,8 @@ impl AptosDB {
                     &batch,
                 )?;
 
-
-            Ok(())
-        })?;
+                Ok(())
+            })?;
 
         let _timer = OTHER_TIMERS_SECONDS
             .with_label_values(&["commit_transaction_auxiliary_data___commit"])
@@ -627,6 +626,82 @@ impl AptosDB {
 
             LEDGER_VERSION.set(x.ledger_info().version() as i64);
             NEXT_BLOCK_EPOCH.set(x.ledger_info().next_block_epoch() as i64);
+        }
+
+        Ok(())
+    }
+
+    pub fn revert_last_commit(
+        &self,
+        last_version: Version,
+        new_root_hash: HashValue,
+        ledger_info_with_sigs: Option<&LedgerInfoWithSignatures>,
+    ) -> Result<()> {
+        let _timer = OTHER_TIMERS_SECONDS
+            .with_label_values(&["revert_last_commit"])
+            .start_timer();
+
+        // Revert the ledger commit progress
+        let mut ledger_batch = SchemaBatch::new();
+        ledger_batch.put::<DbMetadataSchema>(
+            &DbMetadataKey::LedgerCommitProgress,
+            &DbMetadataValue::Version(last_version - 1),
+        )?;
+        self.ledger_db.metadata_db().write_schemas(ledger_batch)?;
+
+        // Revert the overall commit progress
+        let mut ledger_batch = SchemaBatch::new();
+        ledger_batch.put::<DbMetadataSchema>(
+            &DbMetadataKey::OverallCommitProgress,
+            &DbMetadataValue::Version(last_version - 1),
+        )?;
+        self.ledger_db.metadata_db().write_schemas(ledger_batch)?;
+
+        // Revert the transaction accumulator
+        let mut batch = SchemaBatch::new();
+        self.ledger_db
+            .transaction_accumulator_db()
+            .revert_transaction_accumulator(last_version, &batch)?;
+        self.ledger_db
+            .transaction_accumulator_db()
+            .write_schemas(batch)?;
+
+        // Revert the transaction info
+        let mut batch = SchemaBatch::new();
+        TransactionInfoDb::delete_transaction_info(last_version, &batch)?;
+        self.ledger_db.transaction_info_db().write_schemas(batch)?;
+
+        // Revert the events
+        let mut batch = SchemaBatch::new();
+        self.ledger_db
+            .event_db()
+            .delete_events(last_version, &batch)?;
+        self.ledger_db.event_db().write_schemas(batch)?;
+
+        // Revert the transaction auxiliary data
+        let mut batch = SchemaBatch::new();
+        TransactionAuxiliaryDataDb::delete_transaction_auxiliary_data(last_version, &batch)?;
+        self.ledger_db
+            .transaction_auxiliary_data_db()
+            .write_schemas(batch)?;
+
+        // Revert the write set
+        self.ledger_db
+            .write_set_db()
+            .revert_write_sets(last_version)?;
+
+        // Revert the transactions
+        self.ledger_db
+            .transaction_db()
+            .revert_transactions(last_version)?;
+
+        // Revert the state kv and ledger metadata
+        self.state_store
+            .revert_state_kv_and_ledger_metadata(last_version)?;
+
+        // Update the latest ledger info if provided
+        if let Some(x) = ledger_info_with_sigs {
+            self.commit_ledger_info(last_version - 1, new_root_hash, Some(x))?;
         }
 
         Ok(())
