@@ -9,13 +9,14 @@ use aptos_gas_schedule::{
     AptosGasParameters, FromOnChainGasSchedule, InitialGasSchedule, ToOnChainGasSchedule,
 };
 use aptos_language_e2e_tests::{
-    account::{Account, AccountData},
+    account::{Account, AccountData, TransactionBuilder},
     executor::FakeExecutor,
 };
 use aptos_types::{
     access_path::AccessPath,
     account_address::AccountAddress,
     account_config::{AccountResource, CoinStoreResource, CORE_CODE_ADDRESS},
+    chain_id::ChainId,
     contract_event::ContractEvent,
     move_utils::MemberId,
     on_chain_config::{FeatureFlag, GasScheduleV2, OnChainConfig},
@@ -75,7 +76,7 @@ pub struct MoveHarness {
     /// The last counted transaction sequence number, by account address.
     txn_seq_no: BTreeMap<AccountAddress, u64>,
 
-    default_gas_unit_price: u64,
+    pub default_gas_unit_price: u64,
     max_gas_per_txn: u64,
 }
 
@@ -237,12 +238,12 @@ impl MoveHarness {
         result
     }
 
-    /// Creates a transaction, based on provided payload.
-    pub fn create_transaction_payload(
+    /// Creates a transaction without signing it
+    pub fn create_transaction_without_sign(
         &mut self,
         account: &Account,
         payload: TransactionPayload,
-    ) -> SignedTransaction {
+    ) -> TransactionBuilder {
         let on_chain_seq_no = self.sequence_number(account.address());
         let seq_no_ref = self.txn_seq_no.get_mut(account.address()).unwrap();
         let seq_no = std::cmp::max(on_chain_seq_no, *seq_no_ref);
@@ -253,6 +254,27 @@ impl MoveHarness {
             .max_gas_amount(self.max_gas_per_txn)
             .gas_unit_price(self.default_gas_unit_price)
             .payload(payload)
+    }
+
+    /// Creates a transaction, based on provided payload.
+    /// The chain_id is by default for test
+    pub fn create_transaction_payload(
+        &mut self,
+        account: &Account,
+        payload: TransactionPayload,
+    ) -> SignedTransaction {
+        self.create_transaction_without_sign(account, payload)
+            .sign()
+    }
+
+    /// Creates a transaction to be sent to mainnet
+    pub fn create_transaction_payload_mainnet(
+        &mut self,
+        account: &Account,
+        payload: TransactionPayload,
+    ) -> SignedTransaction {
+        self.create_transaction_without_sign(account, payload)
+            .chain_id(ChainId::mainnet())
             .sign()
     }
 
@@ -264,6 +286,17 @@ impl MoveHarness {
         payload: TransactionPayload,
     ) -> TransactionStatus {
         let txn = self.create_transaction_payload(account, payload);
+        self.run(txn)
+    }
+
+    /// Runs a transaction sent to mainnet
+    pub fn run_transaction_payload_mainnet(
+        &mut self,
+        account: &Account,
+        payload: TransactionPayload,
+    ) -> TransactionStatus {
+        let txn = self.create_transaction_payload_mainnet(account, payload);
+        assert!(self.chain_id_is_mainnet(&CORE_CODE_ADDRESS));
         self.run(txn)
     }
 
@@ -793,6 +826,12 @@ impl MoveHarness {
         self.read_resource::<AccountResource>(addr, AccountResource::struct_tag())
             .unwrap()
             .sequence_number()
+    }
+
+    fn chain_id_is_mainnet(&self, addr: &AccountAddress) -> bool {
+        self.read_resource::<ChainId>(addr, ChainId::struct_tag())
+            .unwrap()
+            .is_mainnet()
     }
 
     pub fn modify_gas_schedule_raw(&mut self, modify: impl FnOnce(&mut GasScheduleV2)) {

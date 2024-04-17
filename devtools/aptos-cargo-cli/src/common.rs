@@ -40,6 +40,9 @@ const IGNORED_DETERMINATOR_PATHS: [&str; 8] = [
     "terraform/*",
 ];
 
+// The delimiter used to separate the package path and the package name.
+pub const PACKAGE_NAME_DELIMITER: &str = "#";
+
 fn workspace_dir() -> PathBuf {
     let output = Command::new("cargo")
         .arg("locate-project")
@@ -217,7 +220,7 @@ impl SelectedPackageArgs {
                 if url.ends_with('/') {
                     url.pop();
                 }
-                format!("{}#{}", url, package.name())
+                format!("{}{}{}", url, PACKAGE_NAME_DELIMITER, package.name())
             })
             .collect();
 
