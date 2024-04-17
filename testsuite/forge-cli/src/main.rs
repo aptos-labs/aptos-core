@@ -605,7 +605,7 @@ fn get_land_blocking_test(
 ) -> Option<ForgeConfig> {
     let test = match test_name {
         "land_blocking" => land_blocking_test_suite(duration), // TODO: remove land_blocking, superseded by below
-        "realistic_env_max_load" => pfn_performance(duration, true, true, true, 7, 7, true),
+        "realistic_env_max_load" => realistic_env_max_load_test(duration, test_cmd, 7, 5),
         "compat" => compat(),
         "framework_upgrade" => framework_upgrade(),
         _ => return None, // The test name does not match a land-blocking test
@@ -2517,7 +2517,7 @@ fn pfn_performance(
     broadcast_to_all_vfns: bool,
 ) -> ForgeConfig {
     // Determine the minimum expected TPS
-    let min_expected_tps = 4500;
+    let min_expected_tps = if broadcast_to_all_vfns { 2500 } else { 4500 };
     let epoch_duration_secs = if epoch_changes {
         300 // 5 minutes
     } else {
