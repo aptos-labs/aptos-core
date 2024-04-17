@@ -57,7 +57,7 @@ impl RelaxedCustomSerDe {
 // TODO[agg_v2](clean): propagate up, so this value is controlled by the gas schedule version.
 // Temporarily limit the number of delayed fields per resource,
 // until proper charges are implemented.
-pub const MAX_DELAYED_FIELDS_PER_RESOURCE: usize = 10;
+pub const MAX_DELAYED_FIELDS_PER_RESOURCE: usize = 2000;
 
 impl CustomDeserializer for RelaxedCustomSerDe {
     fn custom_deserialize<'d, D: Deserializer<'d>>(
