@@ -12,4 +12,4 @@ template sha_test(max_num_blocks) {
     expected_digest_bits === c1.out;
 }
 
-component main = sha_test(8);
+component main = sha_test(4);

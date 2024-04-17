@@ -1,5 +1,8 @@
+use std::sync::Arc;
+use std::time::Duration;
 use rand::{RngCore, thread_rng};
 use sha2::Digest;
+use tempfile::NamedTempFile;
 use aptos_keyless_common::input_processing::circuit_input_signals::CircuitInputSignals;
 use aptos_keyless_common::input_processing::config::CircuitPaddingConfig;
 use crate::TestCircuitHandle;
@@ -37,8 +40,11 @@ fn bytes_to_bits_msb(msg: Vec<u8>) -> Vec<bool> {
 #[test]
 fn sha_test() {
     let mut rng = thread_rng();
-    let circuit_handle = TestCircuitHandle::new("sha_test.circom").unwrap();
-    for input_byte_len in 0..200 {
+    let circuit_handle = Arc::new(TestCircuitHandle::new("sha_test.circom").unwrap());
+
+    /// TODO: figure out how to parallelize and why `tokio::task::spawn()` does not work.
+    /// Is it supported to do multiple `node generate_witness.js xxx` in parallel at all?
+    for input_byte_len in 0..248 {
         let mut input = vec![0; input_byte_len];
         rng.fill_bytes(&mut input);
         let padded_input = sha256_padding(input.as_slice());
@@ -50,7 +56,7 @@ fn sha_test() {
         let expected_output_bits = bytes_to_bits_msb(expected_output);
 
         let config = CircuitPaddingConfig::new()
-            .max_length("padded_input_bits", 4096)
+            .max_length("padded_input_bits", 2048) // should align with the `max_num_blocks=4` in `sha_test.circom`.
             .max_length("expected_digest_bits", 256);
 
         let circuit_input_signals = CircuitInputSignals::new()
@@ -59,7 +65,7 @@ fn sha_test() {
             .bits_input("expected_digest_bits", expected_output_bits.as_slice())
             .pad(&config).unwrap();
         let result = circuit_handle.gen_witness(circuit_input_signals);
+        println!("input_byte_len={}, result={:?}", input_byte_len, result);
         assert!(result.is_ok());
-        println!("PASS: input_byte_len={input_byte_len}")
     }
 }

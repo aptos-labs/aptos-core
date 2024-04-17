@@ -17,7 +17,9 @@ anyhow = { workspace = true }
 aptos-keyless-common = { workspace = true }
 base64 = { workspace = true }
 itertools.workspace = true
+futures = { workspace = true }
 serde_json = { workspace = true }
 tempfile = { workspace = true }
+tokio = { workspace = true }
 sha2 = { workspace = true }
 rand = { workspace = true }
