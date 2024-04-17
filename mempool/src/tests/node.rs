@@ -54,6 +54,7 @@ use tokio::runtime::Runtime;
 use tokio::sync::mpsc::error::TryRecvError;
 use aptos_network2::protocols::network::{NetworkSource, OutboundPeerConnections, PeerStub, ReceivedMessage};
 use aptos_network2::protocols::wire::messaging::v1::NetworkMessage;
+use aptos_time_service::TimeService;
 
 type MempoolNetworkHandle = (
     NetworkId,
@@ -330,6 +331,8 @@ pub struct Node {
     subscriber: UnboundedReceiver<SharedMempoolNotification>,
     /// Global peer connection data
     peers_and_metadata: Arc<PeersAndMetadata>,
+    /// Mockable time
+    time_service: TimeService,
 }
 
 /// Reimplement `NodeInfoTrait` for simplicity
@@ -354,8 +357,9 @@ impl NodeInfoTrait for Node {
 impl Node {
     /// Sets up a single node by starting up mempool and any network handles
     pub fn new(node: NodeInfo, config: NodeConfig) -> Node {
+        let time_service = TimeService::mock();
         let (network_interfaces, network_client, network_events, peers_and_metadata) =
-            setup_node_network_interfaces(&node);
+            setup_node_network_interfaces(&node, time_service.clone());
         let (mempool, runtime, subscriber) = start_node_mempool(
             config,
             network_client,
@@ -370,6 +374,7 @@ impl Node {
             runtime: Arc::new(runtime),
             subscriber,
             peers_and_metadata,
+            time_service,
         }
     }
 
@@ -530,6 +535,7 @@ impl NodeNetworkInterface {
 /// Sets up the network handles for a `Node`
 fn setup_node_network_interfaces(
     node: &NodeInfo,
+    time_service: TimeService,
 ) -> (
     HashMap<NetworkId, NodeNetworkInterface>,
     NetworkClient<MempoolSyncMsg>,
@@ -546,7 +552,7 @@ fn setup_node_network_interfaces(
     let mut network_interfaces = HashMap::new();
     for network_id in network_ids {
         let (network_interface, network_handle) =
-            setup_node_network_interface(PeerNetworkId::new(network_id, node.peer_id(network_id)));
+            setup_node_network_interface(PeerNetworkId::new(network_id, node.peer_id(network_id)), time_service.clone());
 
         network_senders.insert(network_id, network_handle.1);
         network_and_events.insert(network_id, network_handle.2);
@@ -577,6 +583,7 @@ fn setup_node_network_interfaces(
 /// Builds a single network interface with associated queues, and attaches it to the top level network
 fn setup_node_network_interface(
     peer_network_id: PeerNetworkId,
+    time_service: TimeService,
 ) -> (NodeNetworkInterface, MempoolNetworkHandle) {
     // Create the network sender and events receiver
     static MAX_QUEUE_SIZE: usize = 8;
@@ -593,6 +600,7 @@ fn setup_node_network_interface(
         peer_network_id.network_id(),
         peer_senders.clone(),
         RoleType::Validator,
+        time_service,
         // PeerManagerRequestSender::new(network_reqs_tx),
         // ConnectionRequestSender::new(connection_reqs_tx),
     );

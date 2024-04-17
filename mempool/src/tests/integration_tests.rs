@@ -205,7 +205,7 @@ async fn test_ready_txns() {
     node.add_txns_via_client(TXN_2).await;
 
     // setup receiver (which we expect to _not_ receive things accross 100ms timeout)
-    let mut peer_receiver = node.setup_fake_peer_receiver(other_peer_network_id);
+    let mut peer_receiver = node.setup_fake_peer_receiver(other_peer_network_id, node.time_service.clone());
 
     // No txns should be sent or ready
     node.connect_self(other_peer_network_id.network_id(), other_metadata.clone());

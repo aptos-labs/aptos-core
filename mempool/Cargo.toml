@@ -34,6 +34,7 @@ aptos-storage-interface = { workspace = true }
 aptos-time-service = { workspace = true }
 aptos-types = { workspace = true }
 aptos-vm-validator = { workspace = true }
+async-trait = { workspace = true }
 bcs = { workspace = true }
 bytes = { workspace = true }
 fail = { workspace = true }

@@ -2503,6 +2503,7 @@ dependencies = [
  "aptos-time-service",
  "aptos-types",
  "aptos-vm-validator",
+ "async-trait",
  "bcs 0.1.4",
  "bytes",
  "enum_dispatch",

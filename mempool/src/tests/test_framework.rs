@@ -57,6 +57,7 @@ use aptos_network2::application::interface::OutboundRpcMatcher;
 use aptos_network2::protocols::network::{Closer, NetworkSource, PeerStub, ReceivedMessage};
 use aptos_network2::protocols::wire::messaging::v1::{DirectSendMsg, NetworkMessage, RpcRequest, RpcResponse};
 use bytes::Bytes;
+use aptos_time_service::TimeService;
 
 /// An individual mempool node that runs in it's own runtime.
 ///
@@ -75,6 +76,8 @@ pub struct MempoolNode {
     pub consensus_to_mempool_sender: futures::channel::mpsc::Sender<QuorumStoreRequest>,
     /// Used for StateSync commit notifications
     pub mempool_notifications: MempoolNotifier,
+
+    pub time_service: TimeService,
 
     // Networking specifics
     node_id: NodeId,
@@ -256,9 +259,10 @@ impl MempoolNode {
     pub fn setup_fake_peer_receiver(
         &mut self,
         expected_peer_network_id: PeerNetworkId,
+        time_service: TimeService,
     ) -> (tokio::sync::mpsc::Receiver<(NetworkMessage,u64)>) {
         let (sender, mut peer_receiver) = tokio::sync::mpsc::channel(10);
-        let peer_outbound_rpc = OutboundRpcMatcher::new();
+        let peer_outbound_rpc = OutboundRpcMatcher::new(time_service);
         let peer_closer = Closer::new();
         let peer = PeerStub::new(sender.clone(), sender, peer_outbound_rpc, peer_closer);
         let network_id = expected_peer_network_id.network_id();
@@ -276,7 +280,7 @@ impl MempoolNode {
         let network_id = remote_peer_network_id.network_id();
 
         // setup receive
-        let mut peer_receiver = self.setup_fake_peer_receiver(remote_peer_network_id);
+        let mut peer_receiver = self.setup_fake_peer_receiver(remote_peer_network_id, self.time_service.clone());
         // let omr = self.outbound_handles.get_mut(&network_id).unwrap();
         // let (sender, mut peer_receiver) = tokio::sync::mpsc::channel(10);
         // let peer_outbound_rpc = OutboundRpcMatcher::new();
@@ -336,7 +340,7 @@ impl MempoolNode {
             sender: remote_peer_network_id,
             rx_at: 0,
         };
-        inbound_handle.inbound_message_sender.send(rmsg).await;
+        inbound_handle.inbound_message_sender.send(rmsg).await.unwrap();
 
         // wait for RPC or direct response
         // let omr = self.outbound_handles.get_mut(&network_id).unwrap();
@@ -443,7 +447,7 @@ impl MempoolNode {
         // };
         // assert_eq!(peer_id, expected_peer_id);
         let (sender, mut peer_receiver) = tokio::sync::mpsc::channel(10);
-        let peer_outbound_rpc = OutboundRpcMatcher::new();
+        let peer_outbound_rpc = OutboundRpcMatcher::new(self.time_service.clone());
         let peer_closer = Closer::new();
         let peer = PeerStub::new(sender.clone(), sender, peer_outbound_rpc, peer_closer);
         let peer_senders = self.outbound_handles.get_mut(&network_id).unwrap();
@@ -531,7 +535,7 @@ impl MempoolNode {
         &mut self,
         peer_network_id: PeerNetworkId,
     ) -> (ProtocolId, bytes::Bytes) {
-        let mut peer_receiver = self.setup_fake_peer_receiver(peer_network_id);
+        let mut peer_receiver = self.setup_fake_peer_receiver(peer_network_id, self.time_service.clone());
         let (message, _when) = peer_receiver.recv().await.unwrap();
         match message {
             NetworkMessage::RpcRequest(req) => {
@@ -610,6 +614,7 @@ impl TestFramework<MempoolNode> for MempoolTestFramework {
             network_ids.push(network_id);
             network_id_mapping.insert(network_id, *peer_network_id);
         }
+        let time_service = TimeService::mock();
 
         let (
             network_client,
@@ -617,7 +622,7 @@ impl TestFramework<MempoolNode> for MempoolTestFramework {
             inbound_handles,
             outbound_handles,
             peers_and_metadata,
-        ) = setup_node_networks(&network_ids);
+        ) = setup_node_networks(&network_ids, time_service.clone());
         let (mempool_client_sender, consensus_to_mempool_sender, mempool_notifications, mempool) =
             setup_mempool(
                 config,
@@ -638,6 +643,7 @@ impl TestFramework<MempoolNode> for MempoolTestFramework {
             other_inbound_handles: HashMap::new(),
             peers_and_metadata,
             request_id_generator: U32IdGenerator::new(),
+            time_service,
         }
     }
 
@@ -649,6 +655,7 @@ impl TestFramework<MempoolNode> for MempoolTestFramework {
 /// Setup the multiple networks built for a specific node
 pub fn setup_node_networks(
     network_ids: &[NetworkId],
+    time_service: TimeService,
 ) -> (
     NetworkClient<MempoolSyncMsg>,
     NetworkEvents<MempoolSyncMsg>,
@@ -665,7 +672,7 @@ pub fn setup_node_networks(
     let mut outbound_handles = HashMap::new();
     for network_id in network_ids {
         let (network_sender, network_events, inbound_handle, peer_senders) =
-            setup_network(peers_and_metadata.clone());
+            setup_network(peers_and_metadata.clone(), time_service.clone());
 
         network_senders.insert(*network_id, network_sender);
         network_and_events.insert(*network_id, network_events);
@@ -698,6 +705,7 @@ pub fn setup_node_networks(
 /// Builds all the channels used for networking
 fn setup_network(
     peers_and_metadata: Arc<PeersAndMetadata>,
+    time_service: TimeService,
 ) -> (
     NetworkSender<MempoolSyncMsg>,
     NetworkEvents<MempoolSyncMsg>,
@@ -715,6 +723,7 @@ fn setup_network(
         NetworkId::Validator,
         peer_senders.clone(),
         RoleType::Validator,
+        time_service,
     );
     let network_source = NetworkSource::new_single_source(reqs_inbound_receiver);
     let contexts = Arc::new(BTreeMap::new());
