@@ -1637,7 +1637,7 @@ impl AptosVM {
                 &gas_meter.vm_gas_params().txn,
                 &txn_data,
                 txn.payload(),
-            )?;
+            );
             txn_data.set_required_deposit(required_deposit);
             self.validate_signed_transaction(session, resolver, txn, &txn_data, log_context)
         }));
@@ -2319,11 +2319,11 @@ impl AptosVM {
         txn_gas_params: &TransactionGasParameters,
         txn_metadata: &TransactionMetadata,
         payload: &TransactionPayload,
-    ) -> VMResult<Option<u64>> {
+    ) -> Option<u64> {
         match payload {
             TransactionPayload::EntryFunction(entry_func) => {
                 if self.randomness_enabled
-                    && has_randomness_attribute(resolver, session, entry_func)?
+                    && has_randomness_attribute(resolver, session, entry_func).unwrap_or(false)
                 {
                     let max_execution_gas: Gas = txn_gas_params
                         .max_execution_gas
@@ -2336,14 +2336,14 @@ impl AptosVM {
                     let cand_1 =
                         txn_metadata.gas_unit_price * txn_gas_params.maximum_number_of_gas_units;
                     let required_fee_deposit = min(cand_0, cand_1);
-                    Ok(Some(u64::from(required_fee_deposit)))
+                    Some(u64::from(required_fee_deposit))
                 } else {
-                    Ok(None)
+                    None
                 }
             },
             TransactionPayload::Script(_)
             | TransactionPayload::ModuleBundle(_)
-            | TransactionPayload::Multisig(_) => Ok(None),
+            | TransactionPayload::Multisig(_) => None,
         }
     }
 }
@@ -2481,7 +2481,7 @@ impl VMValidator for AptosVM {
 
         let resolver = self.as_move_resolver(&state_view);
         let mut session = self.new_session(&resolver, SessionId::prologue_meta(&txn_data));
-        let maybe_required_deposit = if let Ok(gas_params) = &self.gas_params {
+        let required_deposit = if let Ok(gas_params) = &self.gas_params {
             self.get_required_deposit(
                 &mut session,
                 &resolver,
@@ -2491,13 +2491,6 @@ impl VMValidator for AptosVM {
             )
         } else {
             return VMValidatorResult::error(StatusCode::GAS_PARAMS_MISSING);
-        };
-
-        let required_deposit = match maybe_required_deposit {
-            Ok(v) => v,
-            Err(_e) => {
-                return VMValidatorResult::error(StatusCode::DEPOSIT_CALCULATION_FAILED);
-            },
         };
 
         txn_data.set_required_deposit(required_deposit);
