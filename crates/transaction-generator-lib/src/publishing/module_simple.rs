@@ -909,7 +909,7 @@ fn modify_bounded_agg_v2_limit_1000(module_id: ModuleId, rng: &mut StdRng, step:
 fn modify_array_agg_v2_limit_1(module_id: ModuleId, rng: &mut StdRng, step: u64) -> TransactionPayload {
     get_payload(
         module_id,
-        ident_str!("modify_array_agg_v2_limit_1").to_owned(),
+        ident_str!("modify_agg_array_count_1").to_owned(),
         vec![
             bcs::to_bytes(&true).unwrap(),
             bcs::to_bytes(&step).unwrap(),
@@ -920,7 +920,7 @@ fn modify_array_agg_v2_limit_1(module_id: ModuleId, rng: &mut StdRng, step: u64)
 fn modify_array_agg_v2_limit_10(module_id: ModuleId, rng: &mut StdRng, step: u64) -> TransactionPayload {
     get_payload(
         module_id,
-        ident_str!("modify_array_agg_v2_limit_10").to_owned(),
+        ident_str!("modify_agg_array_count_10").to_owned(),
         vec![
             bcs::to_bytes(&true).unwrap(),
             bcs::to_bytes(&step).unwrap(),
@@ -931,7 +931,7 @@ fn modify_array_agg_v2_limit_10(module_id: ModuleId, rng: &mut StdRng, step: u64
 fn modify_array_agg_v2_limit_100(module_id: ModuleId, rng: &mut StdRng, step: u64) -> TransactionPayload {
     get_payload(
         module_id,
-        ident_str!("modify_array_agg_v2_limit_100").to_owned(),
+        ident_str!("modify_agg_array_count_100").to_owned(),
         vec![
             bcs::to_bytes(&true).unwrap(),
             bcs::to_bytes(&step).unwrap(),
@@ -942,7 +942,7 @@ fn modify_array_agg_v2_limit_100(module_id: ModuleId, rng: &mut StdRng, step: u6
 fn modify_array_agg_v2_limit_1000(module_id: ModuleId, rng: &mut StdRng, step: u64) -> TransactionPayload {
     get_payload(
         module_id,
-        ident_str!("modify_array_agg_v2_limit_1000").to_owned(),
+        ident_str!("modify_agg_array_count_1000").to_owned(),
         vec![
             bcs::to_bytes(&true).unwrap(),
             bcs::to_bytes(&step).unwrap(),
