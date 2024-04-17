@@ -118,7 +118,7 @@ where
     }
     check_errors(&env, error_writer, "stackless-bytecode analysis errors")?;
 
-    let modules_and_scripts = run_file_format_gen(&env, &targets);
+    let modules_and_scripts = run_file_format_gen(&mut env, &targets);
     check_errors(&env, error_writer, "assembling errors")?;
 
     debug!(
@@ -297,7 +297,10 @@ pub fn run_bytecode_gen(env: &GlobalEnv) -> FunctionTargetsHolder {
     targets
 }
 
-pub fn run_file_format_gen(env: &GlobalEnv, targets: &FunctionTargetsHolder) -> Vec<CompiledUnit> {
+pub fn run_file_format_gen(
+    env: &mut GlobalEnv,
+    targets: &FunctionTargetsHolder,
+) -> Vec<CompiledUnit> {
     info!("File Format Generation");
     file_format_generator::generate_file_format(env, targets)
 }
