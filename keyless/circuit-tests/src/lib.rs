@@ -4,7 +4,7 @@
 use std::{env, fs};
 use std::fs::File;
 use std::path::PathBuf;
-use std::process::{Command, Output};
+use std::process::Command;
 use anyhow::ensure;
 use tempfile::{NamedTempFile, tempdir, TempDir};
 use aptos_keyless_common::input_processing::circuit_input_signals::{CircuitInputSignals, Padded};
