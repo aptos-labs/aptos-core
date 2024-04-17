@@ -584,11 +584,13 @@ pub enum StatusCode {
     MULTISIG_TRANSACTION_PAYLOAD_DOES_NOT_MATCH_HASH = 35,
     GAS_PAYER_ACCOUNT_MISSING = 36,
     INSUFFICIENT_BALANCE_FOR_REQUIRED_DEPOSIT = 37,
+    GAS_PARAMS_MISSING = 38,
+    DEPOSIT_CALCULATION_FAILED = 39,
     // Reserved error code for future use
-    RESERVED_VALIDATION_ERROR_3 = 38,
-    RESERVED_VALIDATION_ERROR_4 = 39,
     RESERVED_VALIDATION_ERROR_5 = 40,
     RESERVED_VALIDATION_ERROR_6 = 41,
+    RESERVED_VALIDATION_ERROR_7 = 42,
+    RESERVED_VALIDATION_ERROR_8 = 43,
 
     // When a code module/script is published it is verified. These are the
     // possible errors that can arise from the verification process.
