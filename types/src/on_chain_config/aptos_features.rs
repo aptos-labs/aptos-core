@@ -124,7 +124,7 @@ impl FeatureFlag {
             FeatureFlag::MULTISIG_V2_ENHANCEMENT,
             FeatureFlag::COIN_TO_FUNGIBLE_ASSET_MIGRATION,
             FeatureFlag::CONCURRENT_FUNGIBLE_ASSETS,
-            FeatureFlag::MIGRATE_TO_CONCURRENT_FUNGIBLE_BALANCE,
+            // FeatureFlag::MIGRATE_TO_CONCURRENT_FUNGIBLE_BALANCE,
         ]
     }
 }
