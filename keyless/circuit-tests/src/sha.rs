@@ -1,3 +1,6 @@
+// Copyright © Aptos Foundation
+// SPDX-License-Identifier: Apache-2.0
+
 use crate::TestCircuitHandle;
 use aptos_keyless_common::input_processing::{
     circuit_input_signals::CircuitInputSignals, config::CircuitPaddingConfig,
