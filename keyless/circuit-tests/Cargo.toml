@@ -14,7 +14,10 @@ rust-version = { workspace = true }
 
 [dependencies]
 anyhow = { workspace = true }
+aptos-crypto.workspace = true
 aptos-keyless-common = { workspace = true }
+ark-bn254 = "0.4.0"
+ark-ff = "0.4.2"
 base64 = { workspace = true }
 itertools.workspace = true
 rand.workspace = true

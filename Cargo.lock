@@ -2310,7 +2310,10 @@ name = "aptos-keyless-circuit-tests"
 version = "0.1.0"
 dependencies = [
  "anyhow",
+ "aptos-crypto",
  "aptos-keyless-common",
+ "ark-bn254",
+ "ark-ff",
  "base64 0.13.1",
  "itertools 0.12.1",
  "rand 0.7.3",
