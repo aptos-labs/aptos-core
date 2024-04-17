@@ -371,15 +371,15 @@ impl BatchGenerator {
         batches
     }
 
-    pub(crate) fn handle_remote_batch(&mut self, batch: Batch) {
+    pub(crate) fn handle_remote_batch(
+        &mut self,
+        author: PeerId,
+        batch_id: BatchId,
+        txns: Vec<SignedTransaction>,
+    ) {
         let expiry_time_usecs = aptos_infallible::duration_since_epoch().as_micros() as u64
             + self.config.remote_batch_expiry_gap_when_init_usecs;
-        self.insert_batch(
-            batch.author(),
-            batch.batch_id(),
-            batch.into_transactions(),
-            expiry_time_usecs,
-        );
+        self.insert_batch(author, batch_id, txns, expiry_time_usecs);
     }
 
     pub async fn start(
@@ -534,7 +534,7 @@ impl BatchGenerator {
                             }
                         },
                         BatchGeneratorCommand::RemoteBatch(batch) => {
-                            self.handle_remote_batch(batch);
+                            self.handle_remote_batch(batch.author(), batch.batch_id(), batch.into_transactions());
                         },
                         BatchGeneratorCommand::Shutdown(ack_tx) => {
                             ack_tx
