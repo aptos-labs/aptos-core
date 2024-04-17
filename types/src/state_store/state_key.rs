@@ -130,35 +130,6 @@ impl StateKeyInner {
 
         Ok(writer.into_inner().into())
     }
-
-    fn decode(val: &[u8]) -> Result<Self, StateKeyDecodeErr> {
-        if val.is_empty() {
-            return Err(StateKeyDecodeErr::EmptyInput);
-        }
-        let tag = val[0];
-        let state_key_tag =
-            StateKeyTag::from_u8(tag).ok_or(StateKeyDecodeErr::UnknownTag { unknown_tag: tag })?;
-        match state_key_tag {
-            StateKeyTag::AccessPath => Ok(Self::AccessPath(bcs::from_bytes(&val[1..])?)),
-            StateKeyTag::TableItem => {
-                const HANDLE_SIZE: usize = std::mem::size_of::<TableHandle>();
-                if val.len() < 1 + HANDLE_SIZE {
-                    return Err(StateKeyDecodeErr::NotEnoughBytes {
-                        tag,
-                        num_bytes: val.len(),
-                    });
-                }
-                let handle = bcs::from_bytes(
-                    val[1..1 + HANDLE_SIZE]
-                        .try_into()
-                        .expect("Bytes too short."),
-                )?;
-                let key = val[1 + HANDLE_SIZE..].to_vec();
-                Ok(Self::TableItem { handle, key })
-            },
-            StateKeyTag::Raw => Ok(Self::Raw(val[1..].to_vec())),
-        }
-    }
 }
 
 #[derive(Debug)]
@@ -369,6 +340,34 @@ impl StateKeyRegistry {
     }
 }
 
+enum RefOrOwn<'a, T> {
+    Ref(&'a T),
+    Own(T),
+    Neither,
+}
+
+impl<'a, T> From<&'a T> for RefOrOwn<'a, T> {
+    fn from(r: &'a T) -> Self {
+        RefOrOwn::Ref(r)
+    }
+}
+
+impl<'a, T> From<T> for RefOrOwn<'a, T> {
+    fn from(t: T) -> Self {
+        RefOrOwn::Own(t)
+    }
+}
+
+impl<'a, T: Clone> RefOrOwn<'a, T> {
+    fn move_clone_or_make<F: FnOnce() -> T>(self, make: F) -> T {
+        match self {
+            RefOrOwn::Ref(r) => r.clone(),
+            RefOrOwn::Own(t) => t,
+            RefOrOwn::Neither => make(),
+        }
+    }
+}
+
 #[derive(Clone, Debug)]
 pub struct StateKey(Arc<Entry>);
 
@@ -403,7 +402,7 @@ impl StateKey {
 
     fn from_deserialized(deserialized: StateKeyInner) -> Self {
         use access_path::Path;
-        let known_inner = Some(&deserialized);
+        let known_inner = RefOrOwn::Ref(&deserialized);
 
         match &deserialized {
             StateKeyInner::AccessPath(AccessPath { address, path }) => {
@@ -427,7 +426,7 @@ impl StateKey {
     fn resource_(
         address: &AccountAddress,
         struct_tag: &StructTag,
-        deserialized: Option<&StateKeyInner>,
+        deserialized: RefOrOwn<StateKeyInner>,
     ) -> Self {
         if let Some(entry) = GLOBAL_REGISTRY.resource.try_get(struct_tag, address) {
             return Self(entry);
@@ -436,7 +435,7 @@ impl StateKey {
         Self(GLOBAL_REGISTRY.resource.lock_and_get_or_add(
             struct_tag,
             address,
-            deserialized.cloned().unwrap_or_else(|| {
+            deserialized.move_clone_or_make(|| {
                 StateKeyInner::AccessPath(
                     AccessPath::resource_access_path(*address, struct_tag.clone())
                         .expect("Failed to create access path"),
@@ -446,7 +445,7 @@ impl StateKey {
     }
 
     pub fn resource(address: &AccountAddress, struct_tag: &StructTag) -> Self {
-        Self::resource_(address, struct_tag, None)
+        Self::resource_(address, struct_tag, RefOrOwn::Neither)
     }
 
     pub fn resource_typed<T: MoveResource>(address: &AccountAddress) -> Self {
@@ -457,10 +456,10 @@ impl StateKey {
         Self::resource(T::address(), &T::struct_tag())
     }
 
-    pub fn resource_group_(
+    fn resource_group_(
         address: &AccountAddress,
         struct_tag: &StructTag,
-        deserialized: Option<&StateKeyInner>,
+        deserialized: RefOrOwn<StateKeyInner>,
     ) -> Self {
         if let Some(entry) = GLOBAL_REGISTRY.resource_group.try_get(struct_tag, address) {
             return Self(entry);
@@ -469,7 +468,7 @@ impl StateKey {
         Self(GLOBAL_REGISTRY.resource_group.lock_and_get_or_add(
             struct_tag,
             address,
-            deserialized.cloned().unwrap_or_else(|| {
+            deserialized.move_clone_or_make(|| {
                 StateKeyInner::AccessPath(AccessPath::resource_group_access_path(
                     *address,
                     struct_tag.clone(),
@@ -479,13 +478,13 @@ impl StateKey {
     }
 
     pub fn resource_group(address: &AccountAddress, struct_tag: &StructTag) -> Self {
-        Self::resource_group_(address, struct_tag, None)
+        Self::resource_group_(address, struct_tag, RefOrOwn::Neither)
     }
 
-    pub fn module_(
+    fn module_(
         address: &AccountAddress,
         name: &IdentStr,
-        deserialized: Option<&StateKeyInner>,
+        deserialized: RefOrOwn<StateKeyInner>,
     ) -> Self {
         if let Some(entry) = GLOBAL_REGISTRY.module.try_get(address, name) {
             return Self(entry);
@@ -494,7 +493,7 @@ impl StateKey {
         Self(GLOBAL_REGISTRY.module.lock_and_get_or_add(
             address,
             name,
-            deserialized.map(StateKeyInner::clone).unwrap_or_else(|| {
+            deserialized.move_clone_or_make(|| {
                 StateKeyInner::AccessPath(AccessPath::code_access_path(ModuleId::new(
                     *address,
                     name.to_owned(),
@@ -504,68 +503,100 @@ impl StateKey {
     }
 
     pub fn module(address: &AccountAddress, name: &IdentStr) -> Self {
-        Self::module_(address, name, None)
+        Self::module_(address, name, RefOrOwn::Neither)
     }
 
     pub fn module_id(module_id: &ModuleId) -> Self {
         Self::module(&module_id.address, &module_id.name)
     }
 
-    pub fn table_item_(
+    fn table_item_(
         handle: &TableHandle,
         key: &[u8],
-        deserialized: Option<&StateKeyInner>,
+        deserialized: RefOrOwn<StateKeyInner>,
     ) -> Self {
         if let Some(entry) = GLOBAL_REGISTRY.table_item.try_get(handle, key) {
             return Self(entry);
         }
 
-        Self(
-            GLOBAL_REGISTRY.table_item.lock_and_get_or_add(
-                handle,
-                key,
-                deserialized
-                    .cloned()
-                    .unwrap_or_else(|| StateKeyInner::TableItem {
-                        handle: *handle,
-                        key: key.to_vec(),
-                    }),
-            ),
-        )
+        Self(GLOBAL_REGISTRY.table_item.lock_and_get_or_add(
+            handle,
+            key,
+            deserialized.move_clone_or_make(|| StateKeyInner::TableItem {
+                handle: *handle,
+                key: key.to_vec(),
+            }),
+        ))
     }
 
     pub fn table_item(handle: &TableHandle, key: &[u8]) -> Self {
-        Self::table_item_(handle, key, None)
+        Self::table_item_(handle, key, RefOrOwn::Neither)
     }
 
-    pub fn raw_(bytes: &[u8], deserialized: Option<&StateKeyInner>) -> Self {
+    fn raw_(bytes: &[u8], deserialized: RefOrOwn<StateKeyInner>) -> Self {
         if let Some(entry) = GLOBAL_REGISTRY.raw.try_get(bytes, &()) {
             return Self(entry);
         }
 
-        Self(
-            GLOBAL_REGISTRY.raw.lock_and_get_or_add(
-                bytes,
-                &(),
-                deserialized
-                    .cloned()
-                    .unwrap_or_else(|| StateKeyInner::Raw(bytes.to_vec())),
-            ),
-        )
+        Self(GLOBAL_REGISTRY.raw.lock_and_get_or_add(
+            bytes,
+            &(),
+            deserialized.move_clone_or_make(|| StateKeyInner::Raw(bytes.to_vec())),
+        ))
     }
 
     pub fn raw(bytes: &[u8]) -> Self {
-        Self::raw_(bytes, None)
+        Self::raw_(bytes, RefOrOwn::Neither)
     }
 
     pub fn encode(&self) -> Result<Bytes> {
         Ok(self.0.encoded.clone())
     }
 
-    pub fn decode(_val: &[u8]) -> Result<Self, StateKeyDecodeErr> {
+    pub fn decode(val: &[u8]) -> Result<Self, StateKeyDecodeErr> {
+        use access_path::Path;
+
         // FIXME(aldenhu): maybe check cache?
-        let inner = StateKeyInner::decode(_val)?;
-        Ok(Self::from_deserialized(inner))
+        if val.is_empty() {
+            return Err(StateKeyDecodeErr::EmptyInput);
+        }
+        let tag = val[0];
+        let state_key_tag =
+            StateKeyTag::from_u8(tag).ok_or(StateKeyDecodeErr::UnknownTag { unknown_tag: tag })?;
+        let myself = match state_key_tag {
+            StateKeyTag::AccessPath => {
+                let access_path: AccessPath = bcs::from_bytes(&val[1..])?;
+                let address = access_path.address;
+                let path = bcs::from_bytes(&access_path.path)?;
+                let inner = RefOrOwn::Own(StateKeyInner::AccessPath(access_path));
+
+                match path {
+                    Path::Code(module_id) => Self::module_(&address, module_id.name(), inner),
+                    Path::Resource(struct_tag) => Self::resource_(&address, &struct_tag, inner),
+                    Path::ResourceGroup(struct_tag) => {
+                        Self::resource_group_(&address, &struct_tag, inner)
+                    },
+                }
+            },
+            StateKeyTag::TableItem => {
+                const HANDLE_SIZE: usize = std::mem::size_of::<TableHandle>();
+                if val.len() < 1 + HANDLE_SIZE {
+                    return Err(StateKeyDecodeErr::NotEnoughBytes {
+                        tag,
+                        num_bytes: val.len(),
+                    });
+                }
+                let handle = bcs::from_bytes(
+                    val[1..1 + HANDLE_SIZE]
+                        .try_into()
+                        .expect("Bytes too short."),
+                )?;
+                let key = &val[1 + HANDLE_SIZE..];
+                Self::table_item(&handle, key)
+            },
+            StateKeyTag::Raw => Self::raw(&val[1..]),
+        };
+        Ok(myself)
     }
 }
 
