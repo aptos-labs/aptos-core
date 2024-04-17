@@ -412,6 +412,7 @@ impl StateKey {
         }
     }
 
+    #[inline]
     fn resource_(address: &AccountAddress, struct_tag: &StructTag, path: Option<Vec<u8>>) -> Self {
         if let Some(entry) = GLOBAL_REGISTRY.resource_keys.try_get(struct_tag, address) {
             return Self(entry);
@@ -447,6 +448,7 @@ impl StateKey {
         Self::resource(T::address(), &T::struct_tag())
     }
 
+    #[inline]
     fn resource_group_(
         address: &AccountAddress,
         struct_tag: &StructTag,
@@ -478,6 +480,7 @@ impl StateKey {
         Self::resource_group_(address, struct_tag, None)
     }
 
+    #[inline]
     fn module_(address: &AccountAddress, name: &IdentStr, path: Option<Vec<u8>>) -> Self {
         if let Some(entry) = GLOBAL_REGISTRY.module_keys.try_get(address, name) {
             return Self(entry);
