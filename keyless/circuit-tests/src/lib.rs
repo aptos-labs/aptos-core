@@ -4,7 +4,7 @@
 use std::{env, fs};
 use std::fs::File;
 use std::path::PathBuf;
-use std::process::{Command, ExitStatus};
+use std::process::Command;
 use anyhow::ensure;
 use tempfile::{NamedTempFile, tempdir, TempDir};
 use aptos_keyless_common::input_processing::circuit_input_signals::{CircuitInputSignals, Padded};
@@ -24,9 +24,10 @@ impl TestCircuitHandle {
         let include_root_dir = cargo_manifest_dir.join("../circuit-data/templates");
         let src_circuit_path = include_root_dir.join("tests").join(file_name);
         let tmp_circuit_path = dir.path().to_owned().join("circuit.circom");
-        let tmp_circuit_file = File::create(&tmp_circuit_path)?;
-        fs::copy(&src_circuit_path, &tmp_circuit_path)?;
-        let output = Command::new("circom").args(&[
+        // Rex: why is this variable never used?
+        let _tmp_circuit_file = File::create(&tmp_circuit_path)?;
+        fs::copy(src_circuit_path, &tmp_circuit_path)?;
+        let output = Command::new("circom").args([
             "-l", include_root_dir.to_str().unwrap(),
             tmp_circuit_path.to_str().unwrap(),
             "--c",

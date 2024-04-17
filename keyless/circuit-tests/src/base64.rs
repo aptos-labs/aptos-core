@@ -3,8 +3,7 @@
 
 use aptos_keyless_common::input_processing::circuit_input_signals::CircuitInputSignals;
 use aptos_keyless_common::input_processing::config::CircuitPaddingConfig;
-use aptos_keyless_common::input_processing::witness_gen::witness_gen;
-use crate::{TestCircuitHandle};
+use crate::TestCircuitHandle;
 use itertools::*;
 
 fn expected_decoded(b64: &str) -> Vec<u8> {
@@ -87,7 +86,7 @@ fn base64_decode_test_short_all_dashes() {
         .max_length("ascii_jwt_payload", max_ascii_jwt_payload_len);
 
     let circuit_input_signals = CircuitInputSignals::new()
-        .str_input("jwt_payload", &jwt_payload)
+        .str_input("jwt_payload", jwt_payload)
         .bytes_input("ascii_jwt_payload", &ascii_jwt_payload)
         .pad(&config).unwrap();
 
@@ -113,7 +112,7 @@ fn base64_decode_test_short_three_chars() {
         .max_length("ascii_jwt_payload", max_ascii_jwt_payload_len);
 
     let circuit_input_signals = CircuitInputSignals::new()
-        .str_input("jwt_payload", &jwt_payload)
+        .str_input("jwt_payload", jwt_payload)
         .bytes_input("ascii_jwt_payload", &ascii_jwt_payload)
         .pad(&config).unwrap();
 
@@ -131,7 +130,7 @@ fn base64_decode_test_short_exhaustive() {
     let base64_chars = ('A'..='Z')
             .chain('a'..='z')
             .chain('0'..='9')
-            .chain(['-', '_'].into_iter());
+            .chain(['-', '_']);
 
     let exhaustive_iter =
         (0..=3)
