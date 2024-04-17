@@ -403,32 +403,31 @@ impl StateKey {
 
     fn from_deserialized(deserialized: StateKeyInner) -> Self {
         use access_path::Path;
+        let known_inner = Some(&deserialized);
 
-        match deserialized.clone() {
+        match &deserialized {
             StateKeyInner::AccessPath(AccessPath { address, path }) => {
-                match bcs::from_bytes::<Path>(&path).expect("Failed to parse AccessPath") {
+                match bcs::from_bytes::<Path>(path).expect("Failed to parse AccessPath") {
                     Path::Code(module_id) => {
-                        Self::module_(module_id.address(), module_id.name(), Some(deserialized))
+                        Self::module_(module_id.address(), module_id.name(), known_inner)
                     },
                     Path::Resource(struct_tag) => {
-                        Self::resource_(&address, &struct_tag, Some(deserialized))
+                        Self::resource_(address, &struct_tag, known_inner)
                     },
                     Path::ResourceGroup(struct_tag) => {
-                        Self::resource_group_(&address, &struct_tag, Some(deserialized))
+                        Self::resource_group_(address, &struct_tag, known_inner)
                     },
                 }
             },
-            StateKeyInner::TableItem { handle, key } => {
-                Self::table_item_(&handle, &key, Some(deserialized))
-            },
-            StateKeyInner::Raw(bytes) => Self::raw_(&bytes, Some(deserialized)),
+            StateKeyInner::TableItem { handle, key } => Self::table_item_(handle, key, known_inner),
+            StateKeyInner::Raw(bytes) => Self::raw_(bytes, known_inner),
         }
     }
 
     fn resource_(
         address: &AccountAddress,
         struct_tag: &StructTag,
-        deserialized: Option<StateKeyInner>,
+        deserialized: Option<&StateKeyInner>,
     ) -> Self {
         if let Some(entry) = GLOBAL_REGISTRY.resource.try_get(struct_tag, address) {
             return Self(entry);
@@ -437,7 +436,7 @@ impl StateKey {
         Self(GLOBAL_REGISTRY.resource.lock_and_get_or_add(
             struct_tag,
             address,
-            deserialized.unwrap_or_else(|| {
+            deserialized.cloned().unwrap_or_else(|| {
                 StateKeyInner::AccessPath(
                     AccessPath::resource_access_path(*address, struct_tag.clone())
                         .expect("Failed to create access path"),
@@ -461,7 +460,7 @@ impl StateKey {
     pub fn resource_group_(
         address: &AccountAddress,
         struct_tag: &StructTag,
-        deserialized: Option<StateKeyInner>,
+        deserialized: Option<&StateKeyInner>,
     ) -> Self {
         if let Some(entry) = GLOBAL_REGISTRY.resource_group.try_get(struct_tag, address) {
             return Self(entry);
@@ -470,7 +469,7 @@ impl StateKey {
         Self(GLOBAL_REGISTRY.resource_group.lock_and_get_or_add(
             struct_tag,
             address,
-            deserialized.unwrap_or_else(|| {
+            deserialized.cloned().unwrap_or_else(|| {
                 StateKeyInner::AccessPath(AccessPath::resource_group_access_path(
                     *address,
                     struct_tag.clone(),
@@ -486,7 +485,7 @@ impl StateKey {
     pub fn module_(
         address: &AccountAddress,
         name: &IdentStr,
-        deserialized: Option<StateKeyInner>,
+        deserialized: Option<&StateKeyInner>,
     ) -> Self {
         if let Some(entry) = GLOBAL_REGISTRY.module.try_get(address, name) {
             return Self(entry);
@@ -495,7 +494,7 @@ impl StateKey {
         Self(GLOBAL_REGISTRY.module.lock_and_get_or_add(
             address,
             name,
-            deserialized.unwrap_or_else(|| {
+            deserialized.map(StateKeyInner::clone).unwrap_or_else(|| {
                 StateKeyInner::AccessPath(AccessPath::code_access_path(ModuleId::new(
                     *address,
                     name.to_owned(),
@@ -515,36 +514,44 @@ impl StateKey {
     pub fn table_item_(
         handle: &TableHandle,
         key: &[u8],
-        deserialized: Option<StateKeyInner>,
+        deserialized: Option<&StateKeyInner>,
     ) -> Self {
         if let Some(entry) = GLOBAL_REGISTRY.table_item.try_get(handle, key) {
             return Self(entry);
         }
 
-        Self(GLOBAL_REGISTRY.table_item.lock_and_get_or_add(
-            handle,
-            key,
-            deserialized.unwrap_or_else(|| StateKeyInner::TableItem {
-                handle: *handle,
-                key: key.to_vec(),
-            }),
-        ))
+        Self(
+            GLOBAL_REGISTRY.table_item.lock_and_get_or_add(
+                handle,
+                key,
+                deserialized
+                    .cloned()
+                    .unwrap_or_else(|| StateKeyInner::TableItem {
+                        handle: *handle,
+                        key: key.to_vec(),
+                    }),
+            ),
+        )
     }
 
     pub fn table_item(handle: &TableHandle, key: &[u8]) -> Self {
         Self::table_item_(handle, key, None)
     }
 
-    pub fn raw_(bytes: &[u8], deserialized: Option<StateKeyInner>) -> Self {
+    pub fn raw_(bytes: &[u8], deserialized: Option<&StateKeyInner>) -> Self {
         if let Some(entry) = GLOBAL_REGISTRY.raw.try_get(bytes, &()) {
             return Self(entry);
         }
 
-        Self(GLOBAL_REGISTRY.raw.lock_and_get_or_add(
-            bytes,
-            &(),
-            deserialized.unwrap_or_else(|| StateKeyInner::Raw(bytes.to_vec())),
-        ))
+        Self(
+            GLOBAL_REGISTRY.raw.lock_and_get_or_add(
+                bytes,
+                &(),
+                deserialized
+                    .cloned()
+                    .unwrap_or_else(|| StateKeyInner::Raw(bytes.to_vec())),
+            ),
+        )
     }
 
     pub fn raw(bytes: &[u8]) -> Self {
