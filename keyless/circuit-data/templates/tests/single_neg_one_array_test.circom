@@ -6,8 +6,7 @@ template single_neg_one_array_test(len) {
     signal input index;
     signal input expected_output[len];
     
-    signal out[len] <== SingleOneArray(len)(index);
-    log(42);
+    signal out[len] <== SingleNegOneArray(len)(index);
     out === expected_output;
 }
 

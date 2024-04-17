@@ -98,9 +98,6 @@ fn single_neg_one_array_test() {
     let circuit_input_signals = CircuitInputSignals::new().u64_input("index", index).frs_input("expected_output", &output).pad(&config).unwrap();
      
     let result = circuit_handle.gen_witness(circuit_input_signals);
-    println!("Hello world");
-    println!("{:?}", result);
-    println!("goodbye");
     assert!(result.is_ok());
 }
 
