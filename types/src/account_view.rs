@@ -3,7 +3,7 @@
 
 use crate::{
     access_path::AccessPath,
-    account_config::{AccountResource, ChainIdResource, CoinStoreResource},
+    account_config::{AccountResource, ChainIdResource, CoinStoreResource, ObjectGroupResource},
     on_chain_config::{ConfigurationResource, OnChainConfig, ValidatorSet, Version},
     state_store::state_key::StateKey,
     validator_config::{ValidatorConfig, ValidatorOperatorConfigResource},
@@ -12,6 +12,9 @@ use anyhow::anyhow;
 use bytes::Bytes;
 use move_core_types::{account_address::AccountAddress, move_resource::MoveResource};
 use serde::de::DeserializeOwned;
+use move_core_types::move_resource::MoveStructType;
+use std::collections::BTreeMap;
+use move_core_types::language_storage::StructTag;
 pub trait AccountView {
     fn get_state_value(&self, state_key: &StateKey) -> anyhow::Result<Option<Bytes>>;
 
@@ -70,7 +73,14 @@ pub trait AccountView {
     }
 
     fn get_account_resource(&self) -> anyhow::Result<Option<AccountResource>> {
-        self.get_resource::<AccountResource>()
+        self.get_resource_from_resource_group::<AccountResource>(
+            &self.get_account_address()?
+            .ok_or_else(|| anyhow!("Could not fetch account address"))?,
+            ObjectGroupResource::struct_tag(),
+            AccountResource::struct_tag(),
+        )
+
+        // self.get_resource::<AccountResource>()
     }
 
     fn get_config<T: OnChainConfig>(&self) -> anyhow::Result<Option<T>> {
@@ -83,4 +93,33 @@ pub trait AccountView {
             .transpose()
             .map_err(Into::into)
     }
+
+    fn get_resource_group(
+        &self,
+        addr: &AccountAddress,
+        struct_tag: StructTag,
+    ) -> anyhow::Result<Option<BTreeMap<StructTag, Vec<u8>>>> {
+        let path = AccessPath::resource_group_access_path(*addr, struct_tag);
+        self.get_state_value(&StateKey::access_path(path))?
+            .map(|data| bcs::from_bytes(&data))
+            .transpose()
+            .map_err(Into::into)
+    }
+
+    fn get_resource_from_resource_group<T: DeserializeOwned>(
+        &self,
+        addr: &AccountAddress,
+        resource_group: StructTag,
+        struct_tag: StructTag,
+    ) -> anyhow::Result<Option<T>> {
+        if let Some(group) = self.get_resource_group(addr, resource_group)? {
+            if let Some(data) = group.get(&struct_tag) {
+                return bcs::from_bytes::<T>(data)
+                    .map(Some)
+                    .map_err(Into::into);
+            }
+        }
+        Ok(None)
+    }
+
 }

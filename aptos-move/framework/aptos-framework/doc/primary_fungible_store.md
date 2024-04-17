@@ -222,15 +222,11 @@ Get the address of the primary store for the given account.
 
 <pre><code><b>public</b> <b>fun</b> <a href="primary_fungible_store.md#0x1_primary_fungible_store_primary_store_address">primary_store_address</a>&lt;T: key&gt;(owner: <b>address</b>, metadata: Object&lt;T&gt;): <b>address</b> {
     <b>let</b> metadata_addr = <a href="object.md#0x1_object_object_address">object::object_address</a>(&metadata);
-<<<<<<< HEAD
-    <a href="transaction_context.md#0x1_transaction_context_create_user_derived_object_address">transaction_context::create_user_derived_object_address</a>(owner, metadata_addr)
-=======
     <b>if</b> (metadata_addr == @aptos_fungible_asset) {
         owner
     } <b>else</b> {
-        <a href="object.md#0x1_object_create_user_derived_object_address">object::create_user_derived_object_address</a>(owner, metadata_addr)
+        <a href="transaction_context.md#0x1_transaction_context_create_user_derived_object_address">transaction_context::create_user_derived_object_address</a>(owner, metadata_addr)
     }
->>>>>>> a640a2e544 ([not for review] test after fa migration, apt on owner address)
 }
 </code></pre>
 

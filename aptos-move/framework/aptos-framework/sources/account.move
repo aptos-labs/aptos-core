@@ -15,6 +15,7 @@ module aptos_framework::account {
     use aptos_std::multi_ed25519;
     use aptos_std::table::{Self, Table};
     use aptos_std::type_info::{Self, TypeInfo};
+    use aptos_framework::object;
 
     friend aptos_framework::aptos_account;
     friend aptos_framework::coin;
@@ -31,6 +32,7 @@ module aptos_framework::account {
     }
 
     /// Resource representing an account.
+    #[resource_group_member(group = aptos_framework::object::ObjectGroup)]
     struct Account has key, store {
         authentication_key: vector<u8>,
         sequence_number: u64,
