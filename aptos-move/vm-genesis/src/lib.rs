@@ -1073,7 +1073,7 @@ pub fn test_genesis_module_publishing() {
 pub fn test_mainnet_end_to_end() {
     use aptos_types::{
         account_address,
-        on_chain_config::{OnChainConfig, ValidatorSet},
+        on_chain_config::ValidatorSet,
         state_store::state_key::StateKey,
         write_set::{TransactionWrite, WriteSet},
     };
@@ -1278,8 +1278,7 @@ pub fn test_mainnet_end_to_end() {
 
     let WriteSet::V0(writeset) = changeset.write_set();
 
-    let state_key =
-        StateKey::access_path(ValidatorSet::access_path().expect("access path in test"));
+    let state_key = StateKey::on_chain_config::<ValidatorSet>();
     let bytes = writeset
         .get(&state_key)
         .unwrap()

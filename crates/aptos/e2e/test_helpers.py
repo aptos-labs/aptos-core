@@ -30,7 +30,7 @@ class RunHelper:
 
     test_count: int
 
-    # This can be used by the tests to query the local testnet node.
+    # This can be used by the tests to query the localnet node.
     api_client: RestClient
 
     def __init__(

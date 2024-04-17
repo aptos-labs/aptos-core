@@ -6,7 +6,7 @@ error: the left-hand side has 2 items but the right-hand side provided 0
 13 │         (_, _) = ();
    │         ^^^^^^
 
-error: the left-hand side has 0 items but the right-hand side provided 1
+error: the left-hand side has 1 item but the right-hand side provided 0
    ┌─ tests/checking/typing/v1-commands/pop_weird.move:14:9
    │
 14 │         (_) = ();

@@ -113,7 +113,6 @@ members = [
     "devtools/aptos-cargo-cli",
     "dkg",
     "ecosystem/indexer-grpc/indexer-grpc-cache-worker",
-    "ecosystem/indexer-grpc/indexer-grpc-data-access",
     "ecosystem/indexer-grpc/indexer-grpc-data-service",
     "ecosystem/indexer-grpc/indexer-grpc-file-store",
     "ecosystem/indexer-grpc/indexer-grpc-fullnode",
@@ -133,7 +132,10 @@ members = [
     "execution/executor-types",
     "experimental/execution/ptx-executor",
     "experimental/runtimes",
-    "keyless/pepper/common", "keyless/pepper/example-client-rust", "keyless/pepper/service",
+    "experimental/storage/layered-map",
+    "keyless/pepper/common",
+    "keyless/pepper/example-client-rust",
+    "keyless/pepper/service",
     "mempool",
     "network/benchmark",
     "network/builder",
@@ -238,6 +240,7 @@ members = [
     "third_party/move/tools/move-package",
     "third_party/move/tools/move-resource-viewer",
     "third_party/move/tools/move-unit-test",
+    "tools/calc-dep-sizes",
     "types",
     "vm-validator",
 ]
@@ -319,6 +322,7 @@ aptos-enum-conversion-derive = { path = "crates/aptos-enum-conversion-derive" }
 aptos-executor-service = { path = "execution/executor-service" }
 aptos-executor-test-helpers = { path = "execution/executor-test-helpers" }
 aptos-executor-types = { path = "execution/executor-types" }
+aptos-experimental-layered-map = { path = "experimental/storage/layered-map" }
 aptos-experimental-ptx-executor = { path = "experimental/execution/ptx-executor" }
 aptos-experimental-runtimes = { path = "experimental/runtimes" }
 aptos-faucet-cli = { path = "crates/aptos-faucet/cli" }
@@ -343,7 +347,6 @@ aptos-id-generator = { path = "crates/aptos-id-generator" }
 aptos-indexer = { path = "crates/indexer" }
 aptos-indexer-grpc-cache-worker = { path = "ecosystem/indexer-grpc/indexer-grpc-cache-worker" }
 aptos-indexer-grpc-data-service = { path = "ecosystem/indexer-grpc/indexer-grpc-data-service" }
-aptos-indexer-grpc-data-access = { path = "ecosystem/indexer-grpc/indexer-grpc-data-access" }
 aptos-indexer-grpc-file-store = { path = "ecosystem/indexer-grpc/indexer-grpc-file-store" }
 aptos-indexer-grpc-fullnode = { path = "ecosystem/indexer-grpc/indexer-grpc-fullnode" }
 aptos-indexer-grpc-in-memory-cache-benchmark = { path = "ecosystem/indexer-grpc/indexer-grpc-in-memory-cache-benchmark" }
@@ -486,6 +489,7 @@ bollard = "0.15"
 bulletproofs = { version = "4.0.0" }
 byteorder = "1.4.3"
 bytes = { version = "1.4.0", features = ["serde"] }
+camino = { version = "1.1.6" }
 chrono = { version = "0.4.19", features = ["clock", "serde"] }
 cfg_block = "0.1.1"
 cfg-if = "1.0.0"

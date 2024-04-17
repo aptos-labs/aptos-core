@@ -21,7 +21,7 @@ use crate::{
 use aptos_bounded_executor::BoundedExecutor;
 use aptos_channels::aptos_channel;
 use aptos_config::config::ReliableBroadcastConfig;
-use aptos_consensus_types::common::Author;
+use aptos_consensus_types::common::{Author, Round};
 use aptos_infallible::Mutex;
 use aptos_logger::{error, info, spawn_named, warn};
 use aptos_network2::{protocols::network::RpcError, ProtocolId};
@@ -340,12 +340,16 @@ impl<S: TShare, D: TAugmentedData> RandManager<S, D> {
         incoming_rpc_request: aptos_channel::Receiver<Author, IncomingRandGenRequest>,
         mut reset_rx: Receiver<ResetRequest>,
         bounded_executor: BoundedExecutor,
+        highest_ordered_round: Round,
     ) {
         info!("RandManager started");
         let (verified_msg_tx, mut verified_msg_rx) = unbounded();
         let epoch_state = self.epoch_state.clone();
         let rand_config = self.config.clone();
         let fast_rand_config = self.fast_config.clone();
+        self.rand_store
+            .lock()
+            .update_highest_known_round(highest_ordered_round);
         spawn_named!(
             "rand manager verification",
             Self::verification_task(
@@ -362,7 +366,7 @@ impl<S: TShare, D: TAugmentedData> RandManager<S, D> {
         let mut interval = tokio::time::interval(Duration::from_millis(5000));
         while !self.stop {
             tokio::select! {
-                Some(blocks) = incoming_blocks.next() => {
+                Some(blocks) = incoming_blocks.next(), if self.aug_data_store.my_certified_aug_data_exists() => {
                     self.process_incoming_blocks(blocks);
                 }
                 Some(reset) = reset_rx.next() => {
@@ -444,7 +448,6 @@ impl<S: TShare, D: TAugmentedData> RandManager<S, D> {
                 _ = interval.tick().fuse() => {
                     self.observe_queue();
                 },
-
             }
             let maybe_ready_blocks = self.block_queue.dequeue_rand_ready_prefix();
             if !maybe_ready_blocks.is_empty() {

@@ -13,6 +13,8 @@ use std::{
 
 const UNSTABLE_MARKER: &str = "-unstable";
 
+pub static COMPILATION_METADATA_KEY: &[u8] = "compilation_metadata".as_bytes();
+
 // ================================================================================'
 // Metadata for compilation result (WORK IN PROGRESS)
 

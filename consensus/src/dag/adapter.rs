@@ -36,7 +36,7 @@ use aptos_types::{
     epoch_change::EpochChangeProof,
     epoch_state::EpochState,
     ledger_info::{LedgerInfo, LedgerInfoWithSignatures},
-    on_chain_config::{CommitHistoryResource, OnChainConfig},
+    on_chain_config::CommitHistoryResource,
     state_store::state_key::StateKey,
 };
 use async_trait::async_trait;
@@ -328,7 +328,7 @@ impl StorageAdapter {
         Ok(bcs::from_bytes(
             self.aptos_db
                 .get_state_value_by_version(
-                    &StateKey::access_path(CommitHistoryResource::access_path().unwrap()),
+                    &StateKey::on_chain_config::<CommitHistoryResource>(),
                     latest_version,
                 )?
                 .ok_or_else(|| format_err!("Resource doesn't exist"))?

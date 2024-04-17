@@ -1444,6 +1444,12 @@ impl AptosVM {
         mut expected_modules: BTreeSet<String>,
         allowed_deps: Option<BTreeMap<AccountAddress, BTreeSet<String>>>,
     ) -> VMResult<()> {
+        if self
+            .features()
+            .is_enabled(FeatureFlag::REJECT_UNSTABLE_BYTECODE)
+        {
+            self.reject_unstable_bytecode(modules)?;
+        }
         for m in modules {
             if !expected_modules.remove(m.self_id().name().as_str()) {
                 return Err(Self::metadata_validation_error(&format!(
@@ -1482,6 +1488,26 @@ impl AptosVM {
             return Err(Self::metadata_validation_error(
                 "not all registered modules published",
             ));
+        }
+        Ok(())
+    }
+
+    /// Check whether the bytecode can be published to mainnet based on the unstable tag in the metadata
+    fn reject_unstable_bytecode(&self, modules: &[CompiledModule]) -> VMResult<()> {
+        if self.move_vm.chain_id().is_mainnet() {
+            for module in modules {
+                if let Some(metadata) =
+                    aptos_framework::get_compilation_metadata_from_compiled_module(module)
+                {
+                    if metadata.unstable {
+                        return Err(PartialVMError::new(StatusCode::UNSTABLE_BYTECODE_REJECTED)
+                            .with_message(
+                                "code marked unstable is not published on mainnet".to_string(),
+                            )
+                            .finish(Location::Undefined));
+                    }
+                }
+            }
         }
         Ok(())
     }
@@ -1690,7 +1716,7 @@ impl AptosVM {
         })
     }
 
-    fn execute_user_transaction(
+    pub fn execute_user_transaction(
         &self,
         resolver: &impl AptosMoveResolver,
         txn: &SignedTransaction,

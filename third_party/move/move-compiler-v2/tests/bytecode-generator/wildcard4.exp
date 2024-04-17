@@ -1,0 +1,51 @@
+// -- Model dump before bytecode pipeline
+module 0xc0ffee::m {
+    private fun test() {
+        {
+          let x: u64 = 3;
+          {
+            let r: &mut u64 = Borrow(Mutable)(x);
+            {
+              let y: &mut u64 = Borrow(Mutable)(x);
+              {
+                let _: &u64 = Freeze(true)<u64>(y);
+                r = 4;
+                Tuple()
+              }
+            }
+          }
+        }
+    }
+} // end 0xc0ffee::m
+
+============ initial bytecode ================
+
+[variant baseline]
+fun m::test() {
+     var $t0: u64
+     var $t1: &mut u64
+     var $t2: &mut u64
+     var $t3: &u64
+     var $t4: &u64
+     var $t5: u64
+  0: $t0 := 3
+  1: $t1 := borrow_local($t0)
+  2: $t2 := borrow_local($t0)
+  3: $t3 := freeze_ref($t2)
+  4: $t4 := infer($t3)
+  5: $t5 := 4
+  6: write_ref($t1, $t5)
+  7: return ()
+}
+
+
+Diagnostics:
+error: cannot freeze local `y`  since multiple mutable references exist
+  ┌─ tests/bytecode-generator/wildcard4.move:6:17
+  │
+4 │         let r = &mut x;
+  │                 ------ conflicting mutable local borrow
+5 │         let y = &mut x;
+  │                 ------ originating mutable local borrow
+6 │         let _ = freeze(y);
+  │                 ^^^^^^^^^ frozen here

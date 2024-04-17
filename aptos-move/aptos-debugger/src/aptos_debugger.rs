@@ -132,7 +132,7 @@ impl AptosDebugger {
 
                     // Deprecated.
                     TransactionPayload::ModuleBundle(..) => {
-                        unreachable!("Module bundle payload has already been checked")
+                        unreachable!("Module bundle payload has already been checked because before this function is called")
                     },
                 };
                 Ok(gas_profiler)

@@ -675,7 +675,7 @@ Called by the Adapter
 <td>3</td>
 <td>After successful execution, base the transaction fee on the configuration set by the features library.</td>
 <td>High</td>
-<td>The epilogue function collects the transaction fee for either redistribution or burning based on</td>
+<td>The epilogue function collects the transaction fee for either redistribution or burning based on the feature::collect_and_distribute_gas_fees result.</td>
 <td>Formally Verified via <a href="#high-level-req-3">epilogue</a>. Moreover, the native transaction validation patterns have been manually audited.</td>
 </tr>
 

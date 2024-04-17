@@ -69,6 +69,7 @@ pub enum FeatureFlag {
     MULTISIG_V2_ENHANCEMENT = 55,
     DELEGATION_POOL_ALLOWLISTING = 56,
     MODULE_EVENT_MIGRATION = 57,
+    REJECT_UNSTABLE_BYTECODE = 58,
 }
 
 impl FeatureFlag {
@@ -124,6 +125,7 @@ impl FeatureFlag {
             FeatureFlag::MULTISIG_V2_ENHANCEMENT,
             FeatureFlag::DELEGATION_POOL_ALLOWLISTING,
             FeatureFlag::MODULE_EVENT_MIGRATION,
+            FeatureFlag::REJECT_UNSTABLE_BYTECODE,
         ]
     }
 }
