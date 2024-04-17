@@ -412,6 +412,7 @@ impl PeersAndMetadata {
                 }
             }
         }
+        // I expect the peers_and_metadata read lock to still be in effect until after listeners.push() below
         let mut listeners = self.subscribers.lock();
         listeners.push(sender);
         receiver
