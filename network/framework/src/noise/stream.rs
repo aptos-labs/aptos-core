@@ -9,7 +9,8 @@
 //!
 //! [handshake]: crate::noise::handshake
 
-use aptos_crypto::{noise, x25519};
+use crate::noise::crypto;
+use aptos_crypto::x25519;
 use aptos_logger::prelude::*;
 use futures::{
     io::{AsyncRead, AsyncWrite},
@@ -36,7 +37,7 @@ pub struct NoiseStream<TSocket> {
     /// the socket we write to and read from
     socket: TSocket,
     /// the noise session used to encrypt and decrypt messages
-    session: noise::NoiseSession,
+    session: crypto::NoiseSession,
     /// handy buffers to write/read
     buffers: Box<NoiseBuffers>,
     /// an enum used for progressively reading a noise payload
@@ -47,7 +48,7 @@ pub struct NoiseStream<TSocket> {
 
 impl<TSocket> NoiseStream<TSocket> {
     /// Create a NoiseStream from a socket and a noise post-handshake session
-    pub fn new(socket: TSocket, session: noise::NoiseSession) -> Self {
+    pub fn new(socket: TSocket, session: crypto::NoiseSession) -> Self {
         Self {
             socket,
             session,
@@ -82,7 +83,7 @@ enum ReadState {
     /// End of file reached, result indicated if EOF was expected or not
     Eof(Result<(), ()>),
     /// Decryption Error
-    DecryptionError(noise::NoiseError),
+    DecryptionError(crypto::NoiseError),
 }
 
 impl<TSocket> NoiseStream<TSocket>
@@ -219,7 +220,7 @@ enum WriteState {
     /// End of file reached
     Eof,
     /// Encryption Error
-    EncryptionError(noise::NoiseError),
+    EncryptionError(crypto::NoiseError),
 }
 
 impl<TSocket> NoiseStream<TSocket>
@@ -269,10 +270,11 @@ where
                         {
                             Ok(authentication_tag) => {
                                 // append the authentication tag
-                                self.buffers.write_buffer[*offset..*offset + noise::AES_GCM_TAGLEN]
+                                self.buffers.write_buffer
+                                    [*offset..*offset + crypto::AES_GCM_TAGLEN]
                                     .copy_from_slice(&authentication_tag);
                                 // calculate frame length
-                                let frame_len = noise::encrypted_len(*offset);
+                                let frame_len = crypto::encrypted_len(*offset);
                                 let frame_len = frame_len
                                     .try_into()
                                     .expect("offset should be able to fit in u16");
@@ -402,22 +404,22 @@ where
 //
 
 // encrypted messages include a tag along with the payload.
-const MAX_WRITE_BUFFER_LENGTH: usize = noise::decrypted_len(noise::MAX_SIZE_NOISE_MSG);
+const MAX_WRITE_BUFFER_LENGTH: usize = crypto::decrypted_len(crypto::MAX_SIZE_NOISE_MSG);
 
 /// Collection of buffers used for buffering data during the various read/write states of a
 /// [`NoiseStream`]
 struct NoiseBuffers {
     /// A read buffer, used for both a received ciphertext and then for its decrypted content.
-    read_buffer: [u8; noise::MAX_SIZE_NOISE_MSG],
+    read_buffer: [u8; crypto::MAX_SIZE_NOISE_MSG],
     /// A write buffer, used for both a plaintext to send, and then its encrypted version.
-    write_buffer: [u8; noise::MAX_SIZE_NOISE_MSG],
+    write_buffer: [u8; crypto::MAX_SIZE_NOISE_MSG],
 }
 
 impl NoiseBuffers {
     fn new() -> Self {
         Self {
-            read_buffer: [0; noise::MAX_SIZE_NOISE_MSG],
-            write_buffer: [0; noise::MAX_SIZE_NOISE_MSG],
+            read_buffer: [0; crypto::MAX_SIZE_NOISE_MSG],
+            write_buffer: [0; crypto::MAX_SIZE_NOISE_MSG],
         }
     }
 }

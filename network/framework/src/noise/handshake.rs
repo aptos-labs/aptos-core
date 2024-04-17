@@ -14,13 +14,13 @@
 use crate::{
     application::storage::PeersAndMetadata,
     logging::NetworkSchema,
-    noise::{error::NoiseHandshakeError, stream::NoiseStream},
+    noise::{crypto, error::NoiseHandshakeError, stream::NoiseStream},
 };
 use aptos_config::{
     config::{Peer, PeerRole},
     network_id::{NetworkContext, NetworkId},
 };
-use aptos_crypto::{noise, x25519};
+use aptos_crypto::x25519;
 use aptos_infallible::{duration_since_epoch, RwLock};
 use aptos_logger::{error, trace};
 use aptos_short_hex_str::{AsShortHexStr, ShortHexStr};
@@ -147,7 +147,7 @@ pub struct NoiseUpgrader {
     /// The validator's network context
     pub network_context: NetworkContext,
     /// Config for executing Noise handshakes. Includes our static private key.
-    noise_config: noise::NoiseConfig,
+    noise_config: crypto::NoiseConfig,
     /// Handshake authentication can be either mutual or server-only authentication.
     auth_mode: HandshakeAuthMode,
 }
@@ -155,11 +155,11 @@ pub struct NoiseUpgrader {
 impl NoiseUpgrader {
     /// The client message consist of the prologue + a noise message with a timestamp as payload.
     const CLIENT_MESSAGE_SIZE: usize =
-        Self::PROLOGUE_SIZE + noise::handshake_init_msg_len(AntiReplayTimestamps::TIMESTAMP_SIZE);
+        Self::PROLOGUE_SIZE + crypto::handshake_init_msg_len(AntiReplayTimestamps::TIMESTAMP_SIZE);
     /// The prologue is the client's peer_id and the remote's expected public key.
     const PROLOGUE_SIZE: usize = PeerId::LENGTH + x25519::PUBLIC_KEY_SIZE;
     /// The server's message contains no payload.
-    const SERVER_MESSAGE_SIZE: usize = noise::handshake_resp_msg_len(0);
+    const SERVER_MESSAGE_SIZE: usize = crypto::handshake_resp_msg_len(0);
 
     /// Create a new NoiseConfig with the provided keypair and authentication mode.
     pub fn new(
@@ -169,7 +169,7 @@ impl NoiseUpgrader {
     ) -> Self {
         Self {
             network_context,
-            noise_config: noise::NoiseConfig::new(key),
+            noise_config: crypto::NoiseConfig::new(key),
             auth_mode,
         }
     }
@@ -743,7 +743,7 @@ mod test {
         let ((mut client, _), (server, server_public_key)) = build_peers(true, None);
 
         // swap in a different keypair, so the connection will be unauthenticated
-        client.noise_config = noise::NoiseConfig::new(client_private_key);
+        client.noise_config = crypto::NoiseConfig::new(client_private_key);
         let (client_res, server_res) = perform_handshake(&client, &server, server_public_key);
 
         client_res.unwrap_err();
@@ -1019,10 +1019,11 @@ mod test {
                 PeerRole::ValidatorFullNode,
             ),
         );
-        insert_new_trusted_peers(&peers_and_metadata, NetworkId::Public, vec![
-            client_peer,
-            server_peer,
-        ]);
+        insert_new_trusted_peers(
+            &peers_and_metadata,
+            NetworkId::Public,
+            vec![client_peer, server_peer],
+        );
 
         // Create an in-memory socket for testing
         let (dialer_socket, listener_socket) = MemorySocket::new_pair();
