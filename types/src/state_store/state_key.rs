@@ -154,11 +154,13 @@ impl Deref for Entry {
 }
 
 impl EntryInner {
-    pub fn from_deserialized(deserialized: StateKeyInner) -> Self {
+    pub fn from_deserialized(deserialized: StateKeyInner, encoded: Option<&[u8]>) -> Self {
         // FIXME(aldenhu): deal with error
-        let encoded = deserialized
-            .encode()
-            .expect("Failed to encode StateKeyInner.");
+        let encoded = encoded.map(Bytes::copy_from_slice).unwrap_or_else(|| {
+            deserialized
+                .encode()
+                .expect("Failed to encode StateKeyInner.")
+        });
 
         let mut state = StateKeyInnerHasher::default();
         // FIXME(aldenhu): check error processing
@@ -248,6 +250,7 @@ where
         key1: &Q1,
         key2: &Q2,
         maybe_add: StateKeyInner,
+        encoded: Option<&[u8]>,
     ) -> Arc<Entry>
     where
         Key1: Borrow<Q1>,
@@ -258,7 +261,7 @@ where
         // let _timer = STATE_KEY_TIMER.timer_with(&[self.key_type, "lock_and_get_or_add"]);
 
         // construct the inner entry outside the lock
-        let maybe_add = EntryInner::from_deserialized(maybe_add);
+        let maybe_add = EntryInner::from_deserialized(maybe_add, encoded);
 
         const MAX_TRIES: usize = 100;
 
@@ -408,18 +411,20 @@ impl StateKey {
             StateKeyInner::AccessPath(AccessPath { address, path }) => {
                 match bcs::from_bytes::<Path>(path).expect("Failed to parse AccessPath") {
                     Path::Code(module_id) => {
-                        Self::module_(module_id.address(), module_id.name(), known_inner)
+                        Self::module_(module_id.address(), module_id.name(), known_inner, None)
                     },
                     Path::Resource(struct_tag) => {
-                        Self::resource_(address, &struct_tag, known_inner)
+                        Self::resource_(address, &struct_tag, known_inner, None)
                     },
                     Path::ResourceGroup(struct_tag) => {
-                        Self::resource_group_(address, &struct_tag, known_inner)
+                        Self::resource_group_(address, &struct_tag, known_inner, None)
                     },
                 }
             },
-            StateKeyInner::TableItem { handle, key } => Self::table_item_(handle, key, known_inner),
-            StateKeyInner::Raw(bytes) => Self::raw_(bytes, known_inner),
+            StateKeyInner::TableItem { handle, key } => {
+                Self::table_item_(handle, key, known_inner, None)
+            },
+            StateKeyInner::Raw(bytes) => Self::raw_(bytes, known_inner, None),
         }
     }
 
@@ -427,6 +432,7 @@ impl StateKey {
         address: &AccountAddress,
         struct_tag: &StructTag,
         deserialized: RefOrOwn<StateKeyInner>,
+        encoded: Option<&[u8]>,
     ) -> Self {
         if let Some(entry) = GLOBAL_REGISTRY.resource.try_get(struct_tag, address) {
             return Self(entry);
@@ -441,11 +447,12 @@ impl StateKey {
                         .expect("Failed to create access path"),
                 )
             }),
+            encoded,
         ))
     }
 
     pub fn resource(address: &AccountAddress, struct_tag: &StructTag) -> Self {
-        Self::resource_(address, struct_tag, RefOrOwn::Neither)
+        Self::resource_(address, struct_tag, RefOrOwn::Neither, None)
     }
 
     pub fn resource_typed<T: MoveResource>(address: &AccountAddress) -> Self {
@@ -460,6 +467,7 @@ impl StateKey {
         address: &AccountAddress,
         struct_tag: &StructTag,
         deserialized: RefOrOwn<StateKeyInner>,
+        encoded: Option<&[u8]>,
     ) -> Self {
         if let Some(entry) = GLOBAL_REGISTRY.resource_group.try_get(struct_tag, address) {
             return Self(entry);
@@ -474,17 +482,19 @@ impl StateKey {
                     struct_tag.clone(),
                 ))
             }),
+            encoded,
         ))
     }
 
     pub fn resource_group(address: &AccountAddress, struct_tag: &StructTag) -> Self {
-        Self::resource_group_(address, struct_tag, RefOrOwn::Neither)
+        Self::resource_group_(address, struct_tag, RefOrOwn::Neither, None)
     }
 
     fn module_(
         address: &AccountAddress,
         name: &IdentStr,
         deserialized: RefOrOwn<StateKeyInner>,
+        encoded: Option<&[u8]>,
     ) -> Self {
         if let Some(entry) = GLOBAL_REGISTRY.module.try_get(address, name) {
             return Self(entry);
@@ -499,11 +509,12 @@ impl StateKey {
                     name.to_owned(),
                 )))
             }),
+            encoded,
         ))
     }
 
     pub fn module(address: &AccountAddress, name: &IdentStr) -> Self {
-        Self::module_(address, name, RefOrOwn::Neither)
+        Self::module_(address, name, RefOrOwn::Neither, None)
     }
 
     pub fn module_id(module_id: &ModuleId) -> Self {
@@ -514,6 +525,7 @@ impl StateKey {
         handle: &TableHandle,
         key: &[u8],
         deserialized: RefOrOwn<StateKeyInner>,
+        encoded: Option<&[u8]>,
     ) -> Self {
         if let Some(entry) = GLOBAL_REGISTRY.table_item.try_get(handle, key) {
             return Self(entry);
@@ -526,14 +538,15 @@ impl StateKey {
                 handle: *handle,
                 key: key.to_vec(),
             }),
+            encoded,
         ))
     }
 
     pub fn table_item(handle: &TableHandle, key: &[u8]) -> Self {
-        Self::table_item_(handle, key, RefOrOwn::Neither)
+        Self::table_item_(handle, key, RefOrOwn::Neither, None)
     }
 
-    fn raw_(bytes: &[u8], deserialized: RefOrOwn<StateKeyInner>) -> Self {
+    fn raw_(bytes: &[u8], deserialized: RefOrOwn<StateKeyInner>, encoded: Option<&[u8]>) -> Self {
         if let Some(entry) = GLOBAL_REGISTRY.raw.try_get(bytes, &()) {
             return Self(entry);
         }
@@ -542,11 +555,12 @@ impl StateKey {
             bytes,
             &(),
             deserialized.move_clone_or_make(|| StateKeyInner::Raw(bytes.to_vec())),
+            encoded,
         ))
     }
 
     pub fn raw(bytes: &[u8]) -> Self {
-        Self::raw_(bytes, RefOrOwn::Neither)
+        Self::raw_(bytes, RefOrOwn::Neither, None)
     }
 
     pub fn encode(&self) -> Result<Bytes> {
@@ -555,6 +569,8 @@ impl StateKey {
 
     pub fn decode(val: &[u8]) -> Result<Self, StateKeyDecodeErr> {
         use access_path::Path;
+
+        let known_encoded = Some(val);
 
         // FIXME(aldenhu): maybe check cache?
         if val.is_empty() {
@@ -571,10 +587,14 @@ impl StateKey {
                 let inner = RefOrOwn::Own(StateKeyInner::AccessPath(access_path));
 
                 match path {
-                    Path::Code(module_id) => Self::module_(&address, module_id.name(), inner),
-                    Path::Resource(struct_tag) => Self::resource_(&address, &struct_tag, inner),
+                    Path::Code(module_id) => {
+                        Self::module_(&address, module_id.name(), inner, known_encoded)
+                    },
+                    Path::Resource(struct_tag) => {
+                        Self::resource_(&address, &struct_tag, inner, known_encoded)
+                    },
                     Path::ResourceGroup(struct_tag) => {
-                        Self::resource_group_(&address, &struct_tag, inner)
+                        Self::resource_group_(&address, &struct_tag, inner, known_encoded)
                     },
                 }
             },
@@ -592,9 +612,9 @@ impl StateKey {
                         .expect("Bytes too short."),
                 )?;
                 let key = &val[1 + HANDLE_SIZE..];
-                Self::table_item(&handle, key)
+                Self::table_item_(&handle, key, RefOrOwn::Neither, known_encoded)
             },
-            StateKeyTag::Raw => Self::raw(&val[1..]),
+            StateKeyTag::Raw => Self::raw_(&val[1..], RefOrOwn::Neither, known_encoded),
         };
         Ok(myself)
     }
