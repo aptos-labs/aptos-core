@@ -394,7 +394,13 @@ impl Payload {
         quorum_store_enabled: bool,
     ) -> anyhow::Result<()> {
         match (quorum_store_enabled, self) {
-            (false, Payload::DirectMempool(_)) => Ok(()),
+            (false, Payload::DirectMempool(txns)) => {
+                txns.par_iter().with_min_len(8).try_for_each(|txn| {
+                    ensure!(txn.verify_signature().is_ok(), "Invalid signature");
+                    Ok(())
+                })?;
+                Ok(())
+            },
             (true, Payload::InQuorumStore(proof_with_status)) => {
                 Self::verify_with_cache(&proof_with_status.proofs, validator, proof_cache)
             },
