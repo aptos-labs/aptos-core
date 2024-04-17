@@ -143,11 +143,6 @@ impl TransactionTypeArg {
                 num_modules: module_working_set_size,
                 use_account_pool: sender_use_account_pool,
             },
-            TransactionTypeArg::ModifyGlobalResourceAggV2 => TransactionType::CallCustomModules {
-                entry_point: EntryPoints::IncGlobalAggV2,
-                num_modules: module_working_set_size,
-                use_account_pool: sender_use_account_pool,
-            },
             TransactionTypeArg::ModifyGlobalFlagAggV2 => TransactionType::CallCustomModules {
                 // 100 is max, so equivalent to flag
                 entry_point: EntryPoints::ModifyGlobalBoundedAggV2 { step: 100 },
@@ -190,22 +185,22 @@ impl TransactionTypeArg {
                 use_account_pool: sender_use_account_pool,
             },
             TransactionTypeArg::ModifyIncrementAggV2Count1 => TransactionType::CallCustomModules {
-                entry_point: EntryPoints::ModifyIncrementAggV2Count1 { step: 1 },
+                entry_point: EntryPoints::IncGlobalAggV2 { count: 1 },
                 num_modules: module_working_set_size,
                 use_account_pool: sender_use_account_pool,
             },
             TransactionTypeArg::ModifyIncrementAggV2Count10 => TransactionType::CallCustomModules {
-                entry_point: EntryPoints::ModifyIncrementAggV2Count10 { step: 1 },
+                entry_point: EntryPoints::IncGlobalAggV2 { count: 10 },
                 num_modules: module_working_set_size,
                 use_account_pool: sender_use_account_pool,
             },
             TransactionTypeArg::ModifyIncrementAggV2Count100 => TransactionType::CallCustomModules {
-                entry_point: EntryPoints::ModifyIncrementAggV2Count100 { step: 1 },
+                entry_point: EntryPoints::IncGlobalAggV2 { count: 100 },
                 num_modules: module_working_set_size,
                 use_account_pool: sender_use_account_pool,
             },
             TransactionTypeArg::ModifyIncrementAggV2Count1000 => TransactionType::CallCustomModules {
-                entry_point: EntryPoints::ModifyIncrementAggV2Count1000 { step: 1 },
+                entry_point: EntryPoints::IncGlobalAggV2 { count: 100 },
                 num_modules: module_working_set_size,
                 use_account_pool: sender_use_account_pool,
             },

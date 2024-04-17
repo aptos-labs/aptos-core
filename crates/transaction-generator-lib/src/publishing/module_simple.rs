@@ -484,7 +484,7 @@ impl EntryPoints {
                 )
             },
             EntryPoints::IncGlobal => inc_global(module_id),
-            EntryPoints::IncGlobalAggV2 { count } => inc_global_agg_v2(module_id, count),
+            EntryPoints::IncGlobalAggV2 { count } => inc_global_agg_v2(module_id, *count),
             EntryPoints::ModifyGlobalBoundedAggV2Limit10 { step } => {
                 modify_bounded_agg_v2_limit_10(module_id, rng.expect("Must provide RNG"), *step)
             },
