@@ -8,7 +8,6 @@ use crate::gas_costs;
 use aptos_crypto::ed25519::*;
 use aptos_keygen::KeyGen;
 use aptos_types::{
-    access_path::AccessPath,
     account_address::AccountAddress,
     account_config::{self, AccountResource, CoinStoreResource},
     chain_id::ChainId,
@@ -22,7 +21,6 @@ use aptos_types::{
     write_set::{WriteOp, WriteSet, WriteSetMut},
 };
 use aptos_vm_genesis::GENESIS_KEYPAIR;
-use move_core_types::move_resource::MoveStructType;
 
 // TTL is 86400s. Initial time was set to 0.
 pub const DEFAULT_EXPIRATION_TIME: u64 = 4_000_000;
