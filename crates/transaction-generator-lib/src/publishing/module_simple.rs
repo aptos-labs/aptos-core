@@ -745,7 +745,7 @@ impl EntryPoints {
             | EntryPoints::ModifyArrayAggV2Limit10 { .. }
             | EntryPoints::ModifyArrayAggV2Limit100 { .. }
             | EntryPoints::ModifyArrayAggV2Limit1000 { .. }
-            | EntryPoints::ModifyFlagAggV2 => AutomaticArgs::None,
+            | EntryPoints::ModifyFlagAggV2 { .. } => AutomaticArgs::None,
             EntryPoints::CreateObjects { .. } | EntryPoints::CreateObjectsConflict { .. } => {
                 AutomaticArgs::Signer
             },

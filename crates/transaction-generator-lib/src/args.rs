@@ -145,7 +145,7 @@ impl TransactionTypeArg {
             },
             TransactionTypeArg::ModifyGlobalFlagAggV2 => TransactionType::CallCustomModules {
                 // 100 is max, so equivalent to flag
-                entry_point: EntryPoints::ModifyGlobalBoundedAggV2 { step: 100 },
+                entry_point: EntryPoints::ModifyFlagAggV2 { step: 100 },
                 num_modules: module_working_set_size,
                 use_account_pool: sender_use_account_pool,
             },
