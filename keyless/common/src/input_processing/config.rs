@@ -15,7 +15,7 @@ impl CircuitPaddingConfig {
     #[allow(clippy::new_without_default)]
     pub fn new() -> Self {
         Self {
-            max_lengths: BTreeMap::new()
+            max_lengths: BTreeMap::new(),
         }
     }
 

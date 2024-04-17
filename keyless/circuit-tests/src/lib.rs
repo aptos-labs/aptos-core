@@ -3,14 +3,13 @@
 
 extern crate core;
 
-use std::{env, fs};
-use std::fs::File;
-use std::path::PathBuf;
-use std::process::Command;
 use anyhow::ensure;
-use tempfile::{NamedTempFile, tempdir, TempDir};
-use aptos_keyless_common::input_processing::circuit_input_signals::{CircuitInputSignals, Padded};
-use aptos_keyless_common::input_processing::witness_gen::witness_gen;
+use aptos_keyless_common::input_processing::{
+    circuit_input_signals::{CircuitInputSignals, Padded},
+    witness_gen::witness_gen,
+};
+use std::{env, fs, fs::File, path::PathBuf, process::Command};
+use tempfile::{tempdir, NamedTempFile, TempDir};
 
 #[cfg(test)]
 mod base64;
@@ -31,20 +30,27 @@ impl TestCircuitHandle {
         // Rex: why is this variable never used?
         let _tmp_circuit_file = File::create(&tmp_circuit_path)?;
         fs::copy(src_circuit_path, &tmp_circuit_path)?;
-        let output = Command::new("circom").args([
-            "-l", include_root_dir.to_str().unwrap(),
-            tmp_circuit_path.to_str().unwrap(),
-            "--c",
-            "--wasm",
-            "-o", dir.path().to_str().unwrap(),
-        ]).output()?;
+        let output = Command::new("circom")
+            .args([
+                "-l",
+                include_root_dir.to_str().unwrap(),
+                tmp_circuit_path.to_str().unwrap(),
+                "--c",
+                "--wasm",
+                "-o",
+                dir.path().to_str().unwrap(),
+            ])
+            .output()?;
         println!("{}", String::from_utf8_lossy(&output.stdout));
         println!("{}", String::from_utf8_lossy(&output.stderr));
         ensure!(output.status.success());
         Ok(Self { dir })
     }
 
-    pub fn gen_witness(&self, input_signals: CircuitInputSignals<Padded>) -> anyhow::Result<NamedTempFile> {
+    pub fn gen_witness(
+        &self,
+        input_signals: CircuitInputSignals<Padded>,
+    ) -> anyhow::Result<NamedTempFile> {
         let formatted_input_str = serde_json::to_string(&input_signals.to_json_value())?;
         witness_gen(
             self.witness_gen_js_path().to_str().unwrap(),
@@ -54,7 +60,10 @@ impl TestCircuitHandle {
     }
 
     fn witness_gen_js_path(&self) -> PathBuf {
-        self.dir.path().to_owned().join("circuit_js/generate_witness.js")
+        self.dir
+            .path()
+            .to_owned()
+            .join("circuit_js/generate_witness.js")
     }
 
     fn witness_gen_wasm_path(&self) -> PathBuf {

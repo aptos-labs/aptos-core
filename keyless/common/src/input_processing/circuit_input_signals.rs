@@ -56,8 +56,8 @@ impl CircuitInputSignals<Unpadded> {
         self
     }
 
-    pub fn bits_input(mut self, signal_name: &str, signal_value: &[bool]) -> Self {
-        let bytes: Vec<u8> = signal_value.iter().map(|&val|val as u8).collect();
+    pub fn bits_input(self, signal_name: &str, signal_value: &[bool]) -> Self {
+        let bytes: Vec<u8> = signal_value.iter().map(|&val| val as u8).collect();
         self.bytes_input(signal_name, bytes.as_slice())
     }
 
@@ -166,7 +166,7 @@ fn pad_if_needed(
 
         CircuitInputSignal::Bytes(b) => {
             CircuitInputSignal::Bytes(pad_bytes(&b, global_input_max_lengths[k])?)
-        }
+        },
     })
 }
 

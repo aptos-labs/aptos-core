@@ -1,11 +1,10 @@
-use std::sync::Arc;
-use std::time::Duration;
-use rand::{RngCore, thread_rng};
-use sha2::Digest;
-use tempfile::NamedTempFile;
-use aptos_keyless_common::input_processing::circuit_input_signals::CircuitInputSignals;
-use aptos_keyless_common::input_processing::config::CircuitPaddingConfig;
 use crate::TestCircuitHandle;
+use aptos_keyless_common::input_processing::{
+    circuit_input_signals::CircuitInputSignals, config::CircuitPaddingConfig,
+};
+use rand::{thread_rng, RngCore};
+use sha2::Digest;
+use std::sync::Arc;
 
 fn sha256_padding(message: &[u8]) -> Vec<u8> {
     let mut padded_message = Vec::from(message);
@@ -16,7 +15,7 @@ fn sha256_padding(message: &[u8]) -> Vec<u8> {
 
     // Append zeros until the message length is 448 mod 512
     let current_length_bits = (padded_message.len() * 8) % 512;
-    let mut padding_bits = (960 - current_length_bits) % 512;
+    let padding_bits = (960 - current_length_bits) % 512;
 
     // Convert padding from bits to bytes and subtract 1 byte (the 0x80 already added)
     let padding_bytes = padding_bits / 8;
@@ -42,8 +41,8 @@ fn sha_test() {
     let mut rng = thread_rng();
     let circuit_handle = Arc::new(TestCircuitHandle::new("sha_test.circom").unwrap());
 
-    /// TODO: figure out how to parallelize and why `tokio::task::spawn()` does not work.
-    /// Is it supported to do multiple `node generate_witness.js xxx` in parallel at all?
+    // TODO: figure out how to parallelize and why `tokio::task::spawn()` does not work.
+    // Is it supported to do multiple `node generate_witness.js xxx` in parallel at all?
     for input_byte_len in 0..248 {
         let mut input = vec![0; input_byte_len];
         rng.fill_bytes(&mut input);
@@ -63,7 +62,8 @@ fn sha_test() {
             .bits_input("padded_input_bits", padded_input_bits.as_slice())
             .usize_input("input_bit_len", padded_input_bits.len())
             .bits_input("expected_digest_bits", expected_output_bits.as_slice())
-            .pad(&config).unwrap();
+            .pad(&config)
+            .unwrap();
         let result = circuit_handle.gen_witness(circuit_input_signals);
         println!("input_byte_len={}, result={:?}", input_byte_len, result);
         assert!(result.is_ok());
