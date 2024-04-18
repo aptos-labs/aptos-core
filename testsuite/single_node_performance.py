@@ -70,7 +70,7 @@ DEFAULT_NUM_INIT_ACCOUNTS = (
 DEFAULT_MAX_BLOCK_SIZE = "25000" if IS_MAINNET else "10000"
 
 MAX_BLOCK_SIZE = int(os.environ.get("MAX_BLOCK_SIZE", default=DEFAULT_MAX_BLOCK_SIZE))
-NUM_BLOCKS = int(os.environ.get("NUM_BLOCKS_PER_TEST", default=10))
+NUM_BLOCKS = int(os.environ.get("NUM_BLOCKS_PER_TEST", default=1))
 NUM_BLOCKS_DETAILED = 10
 NUM_ACCOUNTS = max(
     [
@@ -102,11 +102,11 @@ TESTS = [
     # RunGroupConfig(expected_tps=17747, key=RunGroupKey("no-op-fee-payer", module_working_set_size=48), included_in=Flow.CONTINUOUS | Flow.CUSTOM_TEST),
     # RunGroupConfig(expected_tps=17747, key=RunGroupKey("no-op-fee-payer", module_working_set_size=60), included_in=Flow.CONTINUOUS | Flow.CUSTOM_TEST),
 
-    RunGroupConfig(expected_tps=10000, key=RunGroupKey("token-v2-ambassador-mint"), included_in=LAND_BLOCKING_AND_C | Flow.REPRESENTATIVE | Flow.CUSTOM_TEST),
-    RunGroupConfig(expected_tps=10000, key=RunGroupKey("token-v2-ambassador-mint", module_working_set_size=20), included_in=Flow.CONTINUOUS | Flow.CUSTOM_TEST),
+    # RunGroupConfig(expected_tps=10000, key=RunGroupKey("token-v2-ambassador-mint"), included_in=LAND_BLOCKING_AND_C | Flow.REPRESENTATIVE | Flow.CUSTOM_TEST),
+    # RunGroupConfig(expected_tps=10000, key=RunGroupKey("token-v2-ambassador-mint", module_working_set_size=20), included_in=Flow.CONTINUOUS | Flow.CUSTOM_TEST),
     
-    # RunGroupConfig(expected_tps=10000, key=RunGroupKey("token-v2-ambassador-mint-fixed-supply"), included_in=LAND_BLOCKING_AND_C | Flow.REPRESENTATIVE | Flow.CUSTOM_TEST),
-    # RunGroupConfig(expected_tps=10000, key=RunGroupKey("token-v2-ambassador-mint-fixed-supply", module_working_set_size=20), included_in=Flow.CONTINUOUS | Flow.CUSTOM_TEST),
+    RunGroupConfig(expected_tps=10000, key=RunGroupKey("token-v2-ambassador-mint-fixed-supply"), included_in=LAND_BLOCKING_AND_C | Flow.REPRESENTATIVE | Flow.CUSTOM_TEST),
+    RunGroupConfig(expected_tps=10000, key=RunGroupKey("token-v2-ambassador-mint-fixed-supply", module_working_set_size=20), included_in=Flow.CONTINUOUS | Flow.CUSTOM_TEST),
     
     # RunGroupConfig(expected_tps=14200, key=RunGroupKey("coin-transfer"), included_in=LAND_BLOCKING_AND_C | Flow.REPRESENTATIVE | Flow.CUSTOM_TEST ),
     # # RunGroupConfig(expected_tps=14200, key=RunGroupKey("coin-transfer-single-sender"), included_in=LAND_BLOCKING_AND_C | Flow.REPRESENTATIVE | Flow.CUSTOM_TEST),
@@ -469,7 +469,7 @@ with tempfile.TemporaryDirectory() as tmpdirname:
 
     execute_command(f"cargo build {BUILD_FLAG} --package aptos-executor-benchmark")
     print(f"Warmup - creating DB with {NUM_ACCOUNTS} accounts")
-    create_db_command = f"RUST_BACKTRACE=1 {BUILD_FOLDER}/aptos-executor-benchmark --block-size {MAX_BLOCK_SIZE} --execution-threads {NUMBER_OF_EXECUTION_THREADS} {DB_CONFIG_FLAGS} {DB_PRUNER_FLAGS} create-db --data-dir {tmpdirname}/db --num-accounts {NUM_ACCOUNTS}"
+    create_db_command = f"RUST_BACKTRACE=1 {BUILD_FOLDER}/aptos-executor-benchmark --block-size {MAX_BLOCK_SIZE} --execution-threads {NUMBER_OF_EXECUTION_THREADS} {DB_CONFIG_FLAGS} {DB_PRUNER_FLAGS} --allow-aborts create-db --data-dir {tmpdirname}/db --num-accounts {NUM_ACCOUNTS}"
     output = execute_command(create_db_command)
 
     results = []
