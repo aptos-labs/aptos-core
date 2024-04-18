@@ -1008,6 +1008,8 @@ impl Scheduler {
                 *status = ExecutionStatus::Suspended(incarnation, baton);
                 Ok(()) 
             },
+            ExecutionStatus::ExecutionHalted => Ok(()),
+            //ExecutionStatus::ExecutionHalted => Ok(false),
             _ => Err(code_invariant_error(format!(
                 "Unexpected status {:?} in suspend",
                 &*status,
@@ -1027,6 +1029,7 @@ impl Scheduler {
                 );
                 Ok(())
             },
+            ExecutionStatus::ExecutionHalted => Ok(()),
             _ => Err(code_invariant_error(format!(
                 "Unexpected status {:?} in resume",
                 &*status,
