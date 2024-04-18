@@ -331,6 +331,29 @@ impl Client {
         Ok(response.and_then(|bytes| bcs::from_bytes(&bytes))?)
     }
 
+    pub async fn view_bcs_with_json_response(
+        &self,
+        request: &ViewFunction,
+        version: Option<u64>,
+    ) -> AptosResult<Response<Vec<serde_json::Value>>> {
+        let txn_payload = bcs::to_bytes(request)?;
+        let mut url = self.build_path("view")?;
+        if let Some(version) = version {
+            url.set_query(Some(format!("ledger_version={}", version).as_str()));
+        }
+
+        let response = self
+            .inner
+            .post(url)
+            .header(CONTENT_TYPE, BCS_VIEW_FUNCTION)
+            .header(ACCEPT, JSON)
+            .body(txn_payload)
+            .send()
+            .await?;
+
+        self.json(response).await
+    }
+
     pub async fn simulate(
         &self,
         txn: &SignedTransaction,

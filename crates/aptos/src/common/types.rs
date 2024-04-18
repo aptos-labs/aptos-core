@@ -19,6 +19,7 @@ use crate::{
     move_tool::{ArgWithType, FunctionArgType, MemberId},
 };
 use anyhow::Context;
+use aptos_api_types::ViewFunction;
 use aptos_crypto::{
     ed25519::{Ed25519PrivateKey, Ed25519PublicKey, Ed25519Signature},
     encoding_type::{EncodingError, EncodingType},
@@ -1595,9 +1596,12 @@ impl TransactionOptions {
         get_sequence_number(&client, sender_address).await
     }
 
-    pub async fn view(&self, payload: ViewRequest) -> CliTypedResult<Vec<serde_json::Value>> {
+    pub async fn view(&self, payload: ViewFunction) -> CliTypedResult<Vec<serde_json::Value>> {
         let client = self.rest_client()?;
-        Ok(client.view(&payload, None).await?.into_inner())
+        Ok(client
+            .view_bcs_with_json_response(&payload, None)
+            .await?
+            .into_inner())
     }
 
     /// Submit a transaction
@@ -2059,6 +2063,21 @@ impl TryInto<EntryFunction> for EntryFunctionArguments {
             entry_function_args.type_arg_vec.try_into()?,
             entry_function_args.arg_vec.try_into()?,
         ))
+    }
+}
+
+impl TryInto<ViewFunction> for EntryFunctionArguments {
+    type Error = CliError;
+
+    fn try_into(self) -> Result<ViewFunction, Self::Error> {
+        let view_function_args = self.check_input_style()?;
+        let function_id: MemberId = (&view_function_args).try_into()?;
+        Ok(ViewFunction {
+            module: function_id.module_id,
+            function: function_id.member_id,
+            ty_args: view_function_args.type_arg_vec.try_into()?,
+            args: view_function_args.arg_vec.try_into()?,
+        })
     }
 }
 
