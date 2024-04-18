@@ -73,5 +73,23 @@ module 0xABCD::aggregator_example {
         } else {
             aggregator_v2::try_sub(&mut bounded.count, delta);
         }
+
+        // Some heavy computation.
+
+        let vec = vector::empty<u64>();
+        let i = 0;
+        let len = 4;
+        while (i < len) {
+            vector::push_back(&mut vec, i);
+            i = i + 1;
+        };
+
+        let count = 100;
+        let sum: u64 = 0;
+        while (count > 0) {
+            let val = bcs::to_bytes(&vec);
+            sum = sum + ((*vector::borrow(&val, 0)) as u64);
+            count = count - 1;
+        }
     }
 }
