@@ -7,9 +7,21 @@ module bonding_curve_launchpad_addr::bonding_curve_launchpad {
     use aptos_std::smart_table::{Self, SmartTable};
     use aptos_std::math128;
 
+    const EFA_EXISTS_ALREADY: u64 = 10;
 
     struct LaunchPad has key {
-        description_to_fa: SmartTable<FADescription, FAController>,
+        description_to_fa: SmartTable<FAKey, FAData>,
+    }
+
+
+    struct FAKey has store, copy, drop {
+        name: string::String,
+        symbol: string::String,
+    }
+
+    struct FAData has key, store {
+        controller: FAController,
+        description: FADescription,
     }
 
     struct FAController has key, store {
@@ -18,6 +30,7 @@ module bonding_curve_launchpad_addr::bonding_curve_launchpad {
         transfer_ref: fungible_asset::TransferRef
     }
 
+    // ! Since this data is in our primary store, do I even need this?
     struct FADescription has store, copy, drop {
         name: string::String,
         symbol: string::String,
@@ -44,6 +57,10 @@ module bonding_curve_launchpad_addr::bonding_curve_launchpad {
         icon_uri: string::String,
         project_uri: string::String
     ) acquires LaunchPad {
+        let fa_key = FAKey {
+            name: name,
+            symbol: symbol,
+        };
         let fa_description = FADescription {
                 name: name,
                 symbol: symbol,
@@ -53,10 +70,12 @@ module bonding_curve_launchpad_addr::bonding_curve_launchpad {
                 project_uri: project_uri
         };
         // * Create new FA and store obj on launchpad. Need to disable transfer until threshold is met.
-        create_fa(fa_description);
+        create_fa(fa_key, fa_description);
 
         // ! Create new pair between APT and new FA.
         // ...
+
+        // ! Disable transfers for all, besides the creator (this contract).
     }
 
     public entry fun buy_fa () {
@@ -64,12 +83,13 @@ module bonding_curve_launchpad_addr::bonding_curve_launchpad {
     }
 
     fun create_fa(
+        fa_key: FAKey,
         fa_description: FADescription
     ) acquires LaunchPad {
         let fa_smartTable = borrow_global_mut<LaunchPad>(@bonding_curve_launchpad_addr);
-
-        // ! Verify it doesn't already exist in smart table.
-        // ! ...
+        // Only one of FA of that exact description must exist.
+        // ! I should I limit it down to name and symbol? Rather than including icon_uri and stuffs. Probably...
+        assert!(!smart_table::contains(&mut fa_smartTable.description_to_fa, fa_key), EFA_EXISTS_ALREADY);
 
         let base_unit_max_supply: option::Option<u128> = option::some(fa_description.max_supply * math128::pow(10, (fa_description.decimals as u128)));
 
@@ -89,16 +109,19 @@ module bonding_curve_launchpad_addr::bonding_curve_launchpad {
         let mint_ref = fungible_asset::generate_mint_ref(fa_obj_constructor_ref);
         let burn_ref = fungible_asset::generate_burn_ref(fa_obj_constructor_ref);
         let transfer_ref = fungible_asset::generate_transfer_ref(fa_obj_constructor_ref);
-        smart_table::add(&mut fa_smartTable.description_to_fa, fa_description, FAController {
+        let fa_controller = FAController {
             mint_ref,
             burn_ref,
             transfer_ref,
-        })
-
-
-
-
-
+        };
+        smart_table::add(
+            &mut fa_smartTable.description_to_fa,
+            fa_key,
+            FAData {
+                controller: fa_controller,
+                description: fa_description
+            }
+        );
     }
 
     fun mint_fa() {
