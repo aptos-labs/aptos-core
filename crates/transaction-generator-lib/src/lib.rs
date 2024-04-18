@@ -43,9 +43,9 @@ use self::{
     transaction_mix_generator::PhasedTxnMixGeneratorCreator,
 };
 use crate::{
-    accounts_pool_wrapper::AccountsPoolWrapperCreator,
+    accounts_pool_wrapper::{AccountsPoolWrapperCreator, FixedAccountsPoolWrapperCreator},
     batch_transfer::BatchTransferTransactionGeneratorCreator,
-    entry_points::EntryPointTransactionGenerator, p2p_transaction_generator::SamplingMode,
+    entry_points::EntryPointTransactionGenerator, p2p_transaction_generator::{SamplingMode, TransactionGeneratorType},
     workflow_delegator::WorkflowTxnGeneratorCreator,
 };
 pub use publishing::module_simple::EntryPoints;
@@ -59,6 +59,14 @@ pub enum TransactionType {
         sender_use_account_pool: bool,
     },
     CoinTransfer {
+        invalid_transaction_ratio: usize,
+        sender_use_account_pool: bool,
+    },
+    CoinTransferFixedSender {
+        invalid_transaction_ratio: usize,
+        sender_use_account_pool: bool,
+    },
+    CoinTransferFixedReceiver {
         invalid_transaction_ratio: usize,
         sender_use_account_pool: bool,
     },
@@ -284,6 +292,7 @@ pub async fn create_txn_generator_creator(
                         addresses_pool.clone(),
                         *invalid_transaction_ratio,
                         SamplingMode::BurnAndRecycle(addresses_pool.len() / 2),
+                        TransactionGeneratorType::RandomReceiver
                     )),
                     *sender_use_account_pool,
                     &accounts_pool,
@@ -298,10 +307,45 @@ pub async fn create_txn_generator_creator(
                         addresses_pool.clone(),
                         *invalid_transaction_ratio,
                         SamplingMode::Basic,
+                        TransactionGeneratorType::RandomReceiver
                     )),
                     *sender_use_account_pool,
                     &accounts_pool,
                 ),
+                TransactionType::CoinTransferFixedSender {
+                    invalid_transaction_ratio,
+                    sender_use_account_pool,
+                } => {
+                    Box::new(
+                        FixedAccountsPoolWrapperCreator::new(
+                            Box::new(P2PTransactionGeneratorCreator::new(
+                                txn_factory.clone(),
+                                SEND_AMOUNT,
+                                addresses_pool.clone(),
+                                *invalid_transaction_ratio,
+                                SamplingMode::Basic,
+                                TransactionGeneratorType::RandomReceiver
+                            )),
+                            accounts_pool.clone(),
+                        ))
+                },
+                TransactionType::CoinTransferFixedReceiver {
+                    invalid_transaction_ratio,
+                    sender_use_account_pool,
+                } => {
+                    wrap_accounts_pool(
+                        Box::new(P2PTransactionGeneratorCreator::new(
+                            txn_factory.clone(),
+                            SEND_AMOUNT,
+                            addresses_pool.clone(),
+                            *invalid_transaction_ratio,
+                            SamplingMode::Basic,
+                            TransactionGeneratorType::FixedReceiver
+                        )),
+                        *sender_use_account_pool,
+                        &accounts_pool,
+                    )
+                }
                 TransactionType::AccountGeneration {
                     add_created_accounts_to_pool,
                     max_account_working_set,

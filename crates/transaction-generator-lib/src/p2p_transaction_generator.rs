@@ -159,6 +159,8 @@ pub struct P2PTransactionGenerator {
     all_addresses: Arc<ObjectPool<AccountAddress>>,
     sampler: Box<dyn Sampler<AccountAddress>>,
     invalid_transaction_ratio: usize,
+    mode: TransactionGeneratorType,
+    fixed_receiver: Vec<AccountAddress>,
 }
 
 impl P2PTransactionGenerator {
@@ -169,6 +171,7 @@ impl P2PTransactionGenerator {
         all_addresses: Arc<ObjectPool<AccountAddress>>,
         invalid_transaction_ratio: usize,
         sampler: Box<dyn Sampler<AccountAddress>>,
+        mode: TransactionGeneratorType,
     ) -> Self {
         Self {
             rng,
@@ -177,6 +180,8 @@ impl P2PTransactionGenerator {
             all_addresses,
             sampler,
             invalid_transaction_ratio,
+            mode,
+            fixed_receiver: vec![],
         }
     }
 
@@ -285,12 +290,18 @@ impl TransactionGenerator for P2PTransactionGenerator {
         };
         let mut num_valid_tx = num_to_create * (1 - invalid_size);
 
-        let receivers: Vec<AccountAddress> = {
+        let receivers: Vec<AccountAddress> = if self.mode == TransactionGeneratorType::FixedReceiver {
+            if self.fixed_receiver.is_empty() {
+                let mut all_addrs = self.all_addresses.write_view();
+                self.fixed_receiver = self.sampler.sample_from_pool(&mut self.rng, all_addrs.as_mut(), 1);
+            }
+            self.fixed_receiver.clone()
+        } else {
             let mut all_addrs = self.all_addresses.write_view();
             self.sampler
-                .sample_from_pool(&mut self.rng, all_addrs.as_mut(), num_to_create)
+                    .sample_from_pool(&mut self.rng, all_addrs.as_mut(), num_to_create)
         };
-
+ 
         assert!(
             receivers.len() >= num_to_create,
             "failed: {} >= {}",
@@ -316,13 +327,21 @@ impl TransactionGenerator for P2PTransactionGenerator {
     }
 }
 
+#[derive(Clone, PartialEq, Eq)]
+pub enum TransactionGeneratorType {
+    FixedReceiver,
+    RandomReceiver,
+}
+
 pub struct P2PTransactionGeneratorCreator {
     txn_factory: TransactionFactory,
     amount: u64,
     all_addresses: Arc<ObjectPool<AccountAddress>>,
     invalid_transaction_ratio: usize,
     sampling_mode: SamplingMode,
+    mode: TransactionGeneratorType,
 }
+
 
 impl P2PTransactionGeneratorCreator {
     pub fn new(
@@ -331,6 +350,7 @@ impl P2PTransactionGeneratorCreator {
         all_addresses: Arc<ObjectPool<AccountAddress>>,
         invalid_transaction_ratio: usize,
         sampling_mode: SamplingMode,
+        mode: TransactionGeneratorType,
     ) -> Self {
         let mut rng = StdRng::from_entropy();
         all_addresses.shuffle(&mut rng);
@@ -341,6 +361,7 @@ impl P2PTransactionGeneratorCreator {
             all_addresses,
             invalid_transaction_ratio,
             sampling_mode,
+            mode,
         }
     }
 }
@@ -361,6 +382,7 @@ impl TransactionGeneratorCreator for P2PTransactionGeneratorCreator {
             self.all_addresses.clone(),
             self.invalid_transaction_ratio,
             sampler,
+            self.mode.clone(),
         ))
     }
 }

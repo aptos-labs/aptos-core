@@ -15,6 +15,8 @@ pub enum TransactionTypeArg {
     #[default]
     CoinTransfer,
     CoinTransferWithInvalid,
+    CoinTransferFixedSender,
+    CoinTransferFixedReceiver,
     NonConflictingCoinTransfer,
     AccountGeneration,
     AccountGenerationLargePool,
@@ -98,6 +100,18 @@ impl TransactionTypeArg {
             },
             TransactionTypeArg::NonConflictingCoinTransfer => {
                 TransactionType::NonConflictingCoinTransfer {
+                    invalid_transaction_ratio: 0,
+                    sender_use_account_pool,
+                }
+            },
+            TransactionTypeArg::CoinTransferFixedSender => {
+                TransactionType::CoinTransferFixedSender {
+                    invalid_transaction_ratio: 0,
+                    sender_use_account_pool,
+                }
+            },
+            TransactionTypeArg::CoinTransferFixedReceiver => {
+                TransactionType::CoinTransferFixedReceiver {
                     invalid_transaction_ratio: 0,
                     sender_use_account_pool,
                 }

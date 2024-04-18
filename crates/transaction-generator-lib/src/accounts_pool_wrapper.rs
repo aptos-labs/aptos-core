@@ -88,3 +88,75 @@ impl TransactionGeneratorCreator for AccountsPoolWrapperCreator {
         ))
     }
 }
+
+
+
+/// Wrapper that allows inner transaction generator to have unique accounts
+/// for all transactions (instead of having 5-20 transactions per account, as default)
+/// This is achieved via using accounts from the pool that account creatin can fill,
+/// and burning (removing accounts from the pool) them - basically using them only once.
+/// (we cannot use more as sequence number is not updated on failure)
+pub struct FixedAccountsPoolWrapperGenerator {
+    rng: StdRng,
+    generator: Box<dyn TransactionGenerator>,
+    source_accounts_pool: Arc<ObjectPool<LocalAccount>>,
+    sender: Option<LocalAccount>,
+}
+
+impl FixedAccountsPoolWrapperGenerator {
+    pub fn new(
+        rng: StdRng,
+        generator: Box<dyn TransactionGenerator>,
+        source_accounts_pool: Arc<ObjectPool<LocalAccount>>,
+    ) -> Self {
+        Self {
+            rng,
+            generator,
+            source_accounts_pool,
+            sender: None,
+        }
+    }
+}
+
+impl TransactionGenerator for FixedAccountsPoolWrapperGenerator {
+    fn generate_transactions(
+        &mut self,
+        _account: &LocalAccount,
+        num_to_create: usize,
+    ) -> Vec<SignedTransaction> {
+        if self.sender.is_none() {
+            self.sender = self.source_accounts_pool.take_from_pool(1, true, &mut self.rng).pop();
+        }
+        self.sender
+            .iter_mut()
+            .flat_map(|account| self.generator.generate_transactions(account, 1))
+            .collect()
+    }
+}
+
+pub struct FixedAccountsPoolWrapperCreator {
+    creator: Box<dyn TransactionGeneratorCreator>,
+    source_accounts_pool: Arc<ObjectPool<LocalAccount>>,
+}
+
+impl FixedAccountsPoolWrapperCreator {
+    pub fn new(
+        creator: Box<dyn TransactionGeneratorCreator>,
+        source_accounts_pool: Arc<ObjectPool<LocalAccount>>,
+    ) -> Self {
+        Self {
+            creator,
+            source_accounts_pool,
+        }
+    }
+}
+
+impl TransactionGeneratorCreator for FixedAccountsPoolWrapperCreator {
+    fn create_transaction_generator(&self) -> Box<dyn TransactionGenerator> {
+        Box::new(FixedAccountsPoolWrapperGenerator::new(
+            StdRng::from_entropy(),
+            self.creator.create_transaction_generator(),
+            self.source_accounts_pool.clone(),
+        ))
+    }
+}
