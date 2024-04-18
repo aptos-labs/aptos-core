@@ -35,7 +35,6 @@ use std::{
     borrow::Borrow,
     cmp::Ordering,
     collections::{hash_map, HashMap},
-    convert::TryInto,
     fmt,
     fmt::{Debug, Formatter},
     hash::Hash,
@@ -130,35 +129,6 @@ impl StateKeyInner {
 
         Ok(writer.into_inner().into())
     }
-
-    fn decode(val: &[u8]) -> Result<Self, StateKeyDecodeErr> {
-        if val.is_empty() {
-            return Err(StateKeyDecodeErr::EmptyInput);
-        }
-        let tag = val[0];
-        let state_key_tag =
-            StateKeyTag::from_u8(tag).ok_or(StateKeyDecodeErr::UnknownTag { unknown_tag: tag })?;
-        match state_key_tag {
-            StateKeyTag::AccessPath => Ok(Self::AccessPath(bcs::from_bytes(&val[1..])?)),
-            StateKeyTag::TableItem => {
-                const HANDLE_SIZE: usize = std::mem::size_of::<TableHandle>();
-                if val.len() < 1 + HANDLE_SIZE {
-                    return Err(StateKeyDecodeErr::NotEnoughBytes {
-                        tag,
-                        num_bytes: val.len(),
-                    });
-                }
-                let handle = bcs::from_bytes(
-                    val[1..1 + HANDLE_SIZE]
-                        .try_into()
-                        .expect("Bytes too short."),
-                )?;
-                let key = val[1 + HANDLE_SIZE..].to_vec();
-                Ok(Self::TableItem { handle, key })
-            },
-            StateKeyTag::Raw => Ok(Self::Raw(val[1..].to_vec())),
-        }
-    }
 }
 
 #[derive(Debug)]
@@ -183,11 +153,13 @@ impl Deref for Entry {
 }
 
 impl EntryInner {
-    pub fn from_deserialized(deserialized: StateKeyInner) -> Self {
+    pub fn from_deserialized(deserialized: StateKeyInner, encoded: Option<&[u8]>) -> Self {
         // FIXME(aldenhu): deal with error
-        let encoded = deserialized
-            .encode()
-            .expect("Failed to encode StateKeyInner.");
+        let encoded = encoded.map(Bytes::copy_from_slice).unwrap_or_else(|| {
+            deserialized
+                .encode()
+                .expect("Failed to encode StateKeyInner.")
+        });
 
         let mut state = StateKeyInnerHasher::default();
         // FIXME(aldenhu): check error processing
@@ -399,9 +371,18 @@ impl StateKey {
         match deserialized {
             StateKeyInner::AccessPath(AccessPath { address, path }) => {
                 match bcs::from_bytes::<Path>(&path).expect("Failed to parse AccessPath") {
-                    Path::Code(module_id) => Self::module_id(&module_id),
-                    Path::Resource(struct_tag) => Self::resource(&address, &struct_tag),
-                    Path::ResourceGroup(struct_tag) => Self::resource_group(&address, &struct_tag),
+                    Path::Code(module_id) => {
+                        // Self::module_(module_id.address(), module_id.name(), path)
+                        Self::module(module_id.address(), module_id.name())
+                    },
+                    Path::Resource(struct_tag) => {
+                        // Self::resource_(&address, &struct_tag, path)
+                        Self::resource(&address, &struct_tag)
+                    },
+                    Path::ResourceGroup(struct_tag) => {
+                        // Self::resource_group_(&address, &struct_tag, path)
+                        Self::resource_group(&address, &struct_tag)
+                    },
                 }
             },
             StateKeyInner::TableItem { handle, key } => Self::table_item(&handle, &key),
@@ -409,7 +390,11 @@ impl StateKey {
         }
     }
 
-    pub fn resource(address: &AccountAddress, struct_tag: &StructTag) -> Self {
+    pub fn resource_(
+        address: &AccountAddress,
+        struct_tag: &StructTag,
+        encoded: Option<&[u8]>,
+    ) -> Self {
         if let Some(entry) = GLOBAL_REGISTRY.resource_keys.try_get(struct_tag, address) {
             return Self(entry);
         }
@@ -418,12 +403,16 @@ impl StateKey {
             AccessPath::resource_access_path(*address, struct_tag.clone())
                 .expect("Failed to create access path"),
         );
-        let maybe_add = EntryInner::from_deserialized(inner);
+        let maybe_add = EntryInner::from_deserialized(inner, encoded);
 
         let entry = GLOBAL_REGISTRY
             .resource_keys
             .lock_and_get_or_add(struct_tag, address, maybe_add);
         Self(entry)
+    }
+
+    pub fn resource(address: &AccountAddress, struct_tag: &StructTag) -> Self {
+        Self::resource_(address, struct_tag, None)
     }
 
     pub fn resource_typed<T: MoveResource>(address: &AccountAddress) -> Self {
@@ -434,7 +423,11 @@ impl StateKey {
         Self::resource(T::address(), &T::struct_tag())
     }
 
-    pub fn resource_group(address: &AccountAddress, struct_tag: &StructTag) -> Self {
+    fn resource_group_(
+        address: &AccountAddress,
+        struct_tag: &StructTag,
+        encoded: Option<&[u8]>,
+    ) -> Self {
         if let Some(entry) = GLOBAL_REGISTRY
             .resource_group_keys
             .try_get(struct_tag, address)
@@ -446,7 +439,7 @@ impl StateKey {
             *address,
             struct_tag.clone(),
         ));
-        let maybe_add = EntryInner::from_deserialized(inner);
+        let maybe_add = EntryInner::from_deserialized(inner, encoded);
 
         let entry = GLOBAL_REGISTRY
             .resource_group_keys
@@ -454,7 +447,11 @@ impl StateKey {
         Self(entry)
     }
 
-    pub fn module(address: &AccountAddress, name: &IdentStr) -> Self {
+    pub fn resource_group(address: &AccountAddress, struct_tag: &StructTag) -> Self {
+        Self::resource_group_(address, struct_tag, None)
+    }
+
+    pub fn module_(address: &AccountAddress, name: &IdentStr, encoded: Option<&[u8]>) -> Self {
         if let Some(entry) = GLOBAL_REGISTRY.module_keys.try_get(address, name) {
             return Self(entry);
         }
@@ -463,7 +460,7 @@ impl StateKey {
             *address,
             name.to_owned(),
         )));
-        let maybe_add = EntryInner::from_deserialized(inner);
+        let maybe_add = EntryInner::from_deserialized(inner, encoded);
 
         let entry = GLOBAL_REGISTRY
             .module_keys
@@ -471,11 +468,15 @@ impl StateKey {
         Self(entry)
     }
 
+    pub fn module(address: &AccountAddress, name: &IdentStr) -> Self {
+        Self::module_(address, name, None)
+    }
+
     pub fn module_id(module_id: &ModuleId) -> Self {
         Self::module(&module_id.address, &module_id.name)
     }
 
-    pub fn table_item(handle: &TableHandle, key: &[u8]) -> Self {
+    pub fn table_item_(handle: &TableHandle, key: &[u8], encoded: Option<&[u8]>) -> Self {
         if let Some(entry) = GLOBAL_REGISTRY.table_item_keys.try_get(handle, key) {
             return Self(entry);
         }
@@ -484,7 +485,7 @@ impl StateKey {
             handle: *handle,
             key: key.to_vec(),
         };
-        let maybe_add = EntryInner::from_deserialized(inner);
+        let maybe_add = EntryInner::from_deserialized(inner, encoded);
 
         let entry = GLOBAL_REGISTRY
             .table_item_keys
@@ -492,13 +493,17 @@ impl StateKey {
         Self(entry)
     }
 
-    pub fn raw(bytes: &[u8]) -> Self {
+    pub fn table_item(handle: &TableHandle, key: &[u8]) -> Self {
+        Self::table_item_(handle, key, None)
+    }
+
+    pub fn raw_(bytes: &[u8], encoded: Option<&[u8]>) -> Self {
         if let Some(entry) = GLOBAL_REGISTRY.raw_keys.try_get(bytes, &()) {
             return Self(entry);
         }
 
         let inner = StateKeyInner::Raw(bytes.to_vec());
-        let maybe_add = EntryInner::from_deserialized(inner);
+        let maybe_add = EntryInner::from_deserialized(inner, encoded);
 
         let entry = GLOBAL_REGISTRY
             .raw_keys
@@ -506,14 +511,54 @@ impl StateKey {
         Self(entry)
     }
 
+    pub fn raw(bytes: &[u8]) -> Self {
+        Self::raw_(bytes, None)
+    }
+
     pub fn encode(&self) -> Result<Bytes> {
         Ok(self.0.encoded.clone())
     }
 
-    pub fn decode(_val: &[u8]) -> Result<Self, StateKeyDecodeErr> {
+    pub fn decode(encoded: &[u8]) -> Result<Self, StateKeyDecodeErr> {
         // FIXME(aldenhu): maybe check cache?
-        let inner = StateKeyInner::decode(_val)?;
-        Ok(Self::from_deserialized(inner))
+        if encoded.is_empty() {
+            return Err(StateKeyDecodeErr::EmptyInput);
+        }
+        let tag = encoded[0];
+        let state_key_tag =
+            StateKeyTag::from_u8(tag).ok_or(StateKeyDecodeErr::UnknownTag { unknown_tag: tag })?;
+        let myself = match state_key_tag {
+            StateKeyTag::AccessPath => {
+                use access_path::Path;
+
+                let AccessPath { address, path } = bcs::from_bytes(&encoded[1..])?;
+                let path: Path = bcs::from_bytes(&path)?;
+                match path {
+                    Path::Code(module_id) => {
+                        Self::module_(&address, &module_id.name, Some(encoded))
+                    },
+                    Path::Resource(struct_tag) => {
+                        Self::resource_(&address, &struct_tag, Some(encoded))
+                    },
+                    Path::ResourceGroup(struct_tag) => {
+                        Self::resource_group_(&address, &struct_tag, Some(encoded))
+                    },
+                }
+            },
+            StateKeyTag::TableItem => {
+                const HANDLE_SIZE: usize = std::mem::size_of::<TableHandle>();
+                if encoded.len() < 1 + HANDLE_SIZE {
+                    return Err(StateKeyDecodeErr::NotEnoughBytes {
+                        tag,
+                        num_bytes: encoded.len(),
+                    });
+                }
+                let handle = bcs::from_bytes(&encoded[1..1 + HANDLE_SIZE])?;
+                Self::table_item_(&handle, &encoded[1 + HANDLE_SIZE..], Some(encoded))
+            },
+            StateKeyTag::Raw => Self::raw_(&encoded[1..], Some(encoded)),
+        };
+        Ok(myself)
     }
 }
 
