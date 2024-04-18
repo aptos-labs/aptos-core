@@ -397,14 +397,32 @@ impl StateKey {
         match deserialized {
             StateKeyInner::AccessPath(AccessPath { address, path }) => {
                 match bcs::from_bytes::<Path>(&path).expect("Failed to parse AccessPath") {
-                    Path::Code(module_id) => Self::module_id(&module_id),
-                    Path::Resource(struct_tag) => Self::resource(&address, &struct_tag),
-                    Path::ResourceGroup(struct_tag) => Self::resource_group(&address, &struct_tag),
+                    Path::Code(module_id) => {
+                        Self::module_(module_id.address(), module_id.name(), path)
+                    },
+                    Path::Resource(struct_tag) => Self::resource_(&address, &struct_tag, path),
+                    Path::ResourceGroup(struct_tag) => {
+                        Self::resource_group_(&address, &struct_tag, path)
+                    },
                 }
             },
             StateKeyInner::TableItem { handle, key } => Self::table_item(&handle, &key),
             StateKeyInner::Raw(bytes) => Self::raw(&bytes),
         }
+    }
+
+    fn resource_(address: &AccountAddress, struct_tag: &StructTag, path: Vec<u8>) -> Self {
+        if let Some(entry) = GLOBAL_REGISTRY.resource_keys.try_get(address, struct_tag) {
+            return Self(entry);
+        }
+
+        let inner = StateKeyInner::AccessPath(AccessPath::new(*address, path));
+        let maybe_add = EntryInner::from_deserialized(inner);
+
+        let entry = GLOBAL_REGISTRY
+            .resource_keys
+            .lock_and_get_or_add(address, struct_tag, maybe_add);
+        Self(entry)
     }
 
     pub fn resource(address: &AccountAddress, struct_tag: &StructTag) -> Self {
@@ -432,6 +450,23 @@ impl StateKey {
         Self::resource(T::address(), &T::struct_tag())
     }
 
+    fn resource_group_(address: &AccountAddress, struct_tag: &StructTag, path: Vec<u8>) -> Self {
+        if let Some(entry) = GLOBAL_REGISTRY
+            .resource_group_keys
+            .try_get(address, struct_tag)
+        {
+            return Self(entry);
+        }
+
+        let inner = StateKeyInner::AccessPath(AccessPath::new(*address, path));
+        let maybe_add = EntryInner::from_deserialized(inner);
+
+        let entry = GLOBAL_REGISTRY
+            .resource_group_keys
+            .lock_and_get_or_add(address, struct_tag, maybe_add);
+        Self(entry)
+    }
+
     pub fn resource_group(address: &AccountAddress, struct_tag: &StructTag) -> Self {
         if let Some(entry) = GLOBAL_REGISTRY
             .resource_group_keys
@@ -449,6 +484,20 @@ impl StateKey {
         let entry = GLOBAL_REGISTRY
             .resource_group_keys
             .lock_and_get_or_add(address, struct_tag, maybe_add);
+        Self(entry)
+    }
+
+    fn module_(address: &AccountAddress, name: &IdentStr, path: Vec<u8>) -> Self {
+        if let Some(entry) = GLOBAL_REGISTRY.module_keys.try_get(address, name) {
+            return Self(entry);
+        }
+
+        let inner = StateKeyInner::AccessPath(AccessPath::new(*address, path));
+        let maybe_add = EntryInner::from_deserialized(inner);
+
+        let entry = GLOBAL_REGISTRY
+            .module_keys
+            .lock_and_get_or_add(address, name, maybe_add);
         Self(entry)
     }
 
