@@ -761,7 +761,7 @@ impl AbilitySet {
     pub fn polymorphic_abilities<I1, I2>(
         declared_abilities: Self,
         declared_phantom_parameters: I1,
-        type_arguments: I2,
+        type_argument_abilitysets: I2,
     ) -> PartialVMResult<Self>
     where
         I1: IntoIterator<Item = bool>,
@@ -770,9 +770,9 @@ impl AbilitySet {
         I2::IntoIter: ExactSizeIterator,
     {
         let declared_phantom_parameters = declared_phantom_parameters.into_iter();
-        let type_arguments = type_arguments.into_iter();
+        let type_argument_abilitysets = type_argument_abilitysets.into_iter();
 
-        if declared_phantom_parameters.len() != type_arguments.len() {
+        if declared_phantom_parameters.len() != type_argument_abilitysets.len() {
             return Err(
                 PartialVMError::new(StatusCode::VERIFIER_INVARIANT_VIOLATION).with_message(
                     "the length of `declared_phantom_parameters` doesn't match the length of `type_arguments`".to_string(),
@@ -783,12 +783,12 @@ impl AbilitySet {
         // Conceptually this is performing the following operation:
         // For any ability 'a' in `declared_abilities`
         // 'a' is in the result only if
-        //   for all (abi_i, is_phantom_i) in `type_arguments` s.t. !is_phantom then a.required() is a subset of abi_i
+        //   for all (abi_i, is_phantom_i) in `type_argument_abilitysets` s.t. !is_phantom then a.requires() is a subset of abi_i
         //
-        // So to do this efficiently, we can determine the required_by set for each ti
+        // So to do this efficiently, we can determine the required_by set for each ty_arg_ability_i
         // and intersect them together along with the declared abilities
         // This only works because for any ability y, |y.requires()| == 1
-        let abs = type_arguments
+        let abs = type_argument_abilitysets
             .zip(declared_phantom_parameters)
             .filter(|(_, is_phantom)| !is_phantom)
             .map(|(ty_arg_abilities, _)| {
