@@ -58,6 +58,7 @@ use std::{
 };
 use rand::{Rng, thread_rng};
 use tokio::time::timeout;
+use futures::FutureExt;
 
 pub trait TConsensusMsg: Sized + Serialize + DeserializeOwned {
     fn epoch(&self) -> u64;
@@ -653,8 +654,13 @@ impl NetworkTask {
 
         // Collect all the network events into a single stream
         let network_events: Vec<_> = network_and_events.into_values().collect();
-        let network_events = select_all(network_events).filter(|_|thread_rng().gen_range(0.0, 1.0) >= 0.9).fuse();
-        let all_events = Box::new(select(network_events, self_receiver));
+        let network_events = select_all(network_events).fuse();
+        let filtered_network_events = network_events.filter(|event| {
+            async move {
+                thread_rng().gen_range(0.0, 1.0) >= 0.9
+            }.boxed()
+        }).fuse();
+        let all_events = Box::new(select(filtered_network_events, self_receiver));
 
         (
             NetworkTask {
