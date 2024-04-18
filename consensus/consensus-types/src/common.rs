@@ -40,6 +40,19 @@ pub static SIG_VERIFY_POOL: Lazy<Arc<rayon::ThreadPool>> = Lazy::new(|| {
     )
 });
 
+pub fn verify_signatures(txns: &[SignedTransaction]) -> anyhow::Result<()> {
+    SIG_VERIFY_POOL.install(|| {
+        let num_txns = txns.len();
+        txns.par_iter()
+            .with_min_len(optimal_min_len(num_txns, 32))
+            .try_for_each(|txn| {
+                ensure!(txn.verify_signature().is_ok(), "Invalid signature");
+                Ok(())
+            })?;
+        Ok(())
+    })
+}
+
 #[derive(Clone, Copy, Debug, Eq, PartialEq, Deserialize, Serialize, Hash, Ord, PartialOrd)]
 pub struct TransactionSummary {
     pub sender: AccountAddress,
@@ -398,19 +411,6 @@ impl Payload {
         Ok(())
     }
 
-    fn verify_signatures(txns: &[SignedTransaction]) -> anyhow::Result<()> {
-        SIG_VERIFY_POOL.install(|| {
-            let num_txns = txns.len();
-            txns.par_iter()
-                .with_min_len(optimal_min_len(num_txns, 32))
-                .try_for_each(|txn| {
-                    ensure!(txn.verify_signature().is_ok(), "Invalid signature");
-                    Ok(())
-                })?;
-            Ok(())
-        })
-    }
-
     pub fn verify(
         &self,
         validator: &ValidatorVerifier,
@@ -418,7 +418,7 @@ impl Payload {
         quorum_store_enabled: bool,
     ) -> anyhow::Result<()> {
         match (quorum_store_enabled, self) {
-            (false, Payload::DirectMempool(txns)) => Self::verify_signatures(txns),
+            (false, Payload::DirectMempool(txns)) => verify_signatures(txns),
             (true, Payload::InQuorumStore(proof_with_status)) => {
                 Self::verify_with_cache(&proof_with_status.proofs, validator, proof_cache)
             },
@@ -435,7 +435,7 @@ impl Payload {
                             == *batch.digest(),
                         "Hash of the received inline batch doesn't match the digest value"
                     );
-                    Self::verify_signatures(payload)?;
+                    verify_signatures(payload)?;
                 }
                 Ok(())
             },
