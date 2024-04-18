@@ -9,8 +9,6 @@ include "helpers/misc.circom";
 template ArraySelector(len) {
     signal input start_index;
     signal input end_index;
-    log("start_index: ", start_index);
-    log("end_index: ", end_index);
     signal output out[len];
     assert(end_index > start_index);
 
@@ -109,7 +107,7 @@ template SingleNegOneArray(len) {
         lc = lc + out[i];
     }
     lc ==> success;
-    // support array sizes up to a million. Being conservative here b/c according to Michael this test is very cheap
+    // support array sizes up to a million. Being conservative here b/c according to Michael this template is very cheap
     signal should_be_all_zeros <== GreaterEqThan(20)([index, len]);
     success === -1 * (1 - should_be_all_zeros);
 }
@@ -134,7 +132,7 @@ template CheckSubstrInclusionPoly(maxStrLen, maxSubstrLen) {
     for (var i = 2; i < maxStrLen; i++) {
         challenge_powers[i] <== challenge_powers[i-1] * random_challenge;
     }
-    log("start_index+substr_len: ", start_index+substr_len);
+
     signal selector_bits[maxStrLen] <== ArraySelector(maxStrLen)(start_index, start_index+substr_len); 
 
     signal selected_str[maxStrLen];
