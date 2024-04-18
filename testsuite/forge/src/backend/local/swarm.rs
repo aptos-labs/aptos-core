@@ -282,8 +282,11 @@ impl LocalSwarm {
     pub async fn wait_all_alive(&mut self, timeout: Duration) -> Result<()> {
         // Wait for all of them to startup
         let deadline = Instant::now() + timeout;
+        println!("0417 - before wait_for_startup");
         self.wait_for_startup().await?;
+        println!("0417 - before wait_for_connectivity");
         self.wait_for_connectivity(deadline).await?;
+        println!("0417 - before liveness_check");
         self.liveness_check(deadline).await?;
         info!("Swarm alive.");
         Ok(())
