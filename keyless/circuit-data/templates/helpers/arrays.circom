@@ -108,7 +108,8 @@ template SingleNegOneArray(len) {
         lc = lc + out[i];
     }
     lc ==> success;
-    success === -1;
+    signal should_be_all_zeros <== IsZero()(len - index);
+    success === -1 * (1 - should_be_all_zeros) ;
 }
 
 // Checks that `substr` of length `substr_len` matches `str` beginning at `start_index`
