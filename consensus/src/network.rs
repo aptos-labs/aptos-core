@@ -609,6 +609,7 @@ impl ProofNotifier for NetworkSender {
 }
 
 pub struct NetworkTask {
+    my_addr: Option<Author>,
     consensus_messages_tx: aptos_channel::Sender<
         (AccountAddress, Discriminant<ConsensusMsg>),
         (AccountAddress, ConsensusMsg),
@@ -627,6 +628,7 @@ pub struct NetworkTask {
 impl NetworkTask {
     /// Establishes the initial connections with the peers and returns the receivers.
     pub fn new(
+        my_addr: Option<Author>,
         network_service_events: NetworkServiceEvents<ConsensusMsg>,
         self_receiver: aptos_channels::UnboundedReceiver<Event<ConsensusMsg>>,
     ) -> (NetworkTask, NetworkReceivers) {
@@ -655,15 +657,11 @@ impl NetworkTask {
         // Collect all the network events into a single stream
         let network_events: Vec<_> = network_and_events.into_values().collect();
         let network_events = select_all(network_events).fuse();
-        let filtered_network_events = network_events.filter(|event| {
-            async move {
-                thread_rng().gen_range(0.0, 1.0) >= 0.9
-            }.boxed()
-        }).fuse();
-        let all_events = Box::new(select(filtered_network_events, self_receiver));
+        let all_events = Box::new(select(network_events, self_receiver));
 
         (
             NetworkTask {
+                my_addr,
                 consensus_messages_tx,
                 quorum_store_messages_tx,
                 rpc_tx,
@@ -695,6 +693,18 @@ impl NetworkTask {
 
     pub async fn start(mut self) {
         while let Some(message) = self.all_events.next().await {
+            let sender = match message {
+                Event::Message(peer_id, _) => Some(peer_id),
+                Event::RpcRequest(peer_id, _, _, _) => Some(peer_id),
+                _ => None,
+            };
+            let sample = thread_rng().gen_range(0.0, 1.0);
+            println!("sample={}", sample);
+            if sender != self.my_addr && sample >= 0.9 {
+                println!("0417 - dropping msg: {:?}", message);
+                continue;
+            }
+
             monitor!("network_main_loop", match message {
                 Event::Message(peer_id, msg) => {
                     counters::CONSENSUS_RECEIVED_MSGS

@@ -95,8 +95,8 @@ pub fn start_consensus(
         vtxn_pool,
         rand_storage,
     );
-
-    let (network_task, network_receiver) = NetworkTask::new(network_service_events, self_receiver);
+    let my_addr = node_config.validator_network.as_ref().map(|c|c.peer_id());
+    let (network_task, network_receiver) = NetworkTask::new(my_addr, network_service_events, self_receiver);
 
     runtime.spawn(network_task.start());
     runtime.spawn(epoch_mgr.start(timeout_receiver, network_receiver));
