@@ -3,6 +3,8 @@
 // SPDX-License-Identifier: Apache-2.0
 
 use crate::explicit_sync_wrapper::ExplicitSyncWrapper;
+use crate::thread_garage::{Baton, SuspendResult, ThreadGarageHandle, ThreadGarageExecutor};
+
 use aptos_aggregator::types::code_invariant_error;
 use aptos_infallible::Mutex;
 use aptos_mvhashmap::types::{Incarnation, TxnIndex};
@@ -51,22 +53,13 @@ impl ArmedLock {
     }
 }
 
-#[derive(Debug)]
+#[derive(Debug,PartialEq,Copy,Clone)]
 pub enum DependencyStatus {
     // The dependency is not resolved yet.
     Unresolved,
     // The dependency is resolved.
     Resolved,
-    // The parallel execution is halted.
-    ExecutionHalted,
-}
-type DependencyCondvar = Arc<(Mutex<DependencyStatus>, Condvar)>;
-
-// Return value of the function wait_for_dependency
-#[derive(Debug)]
-pub enum DependencyResult {
-    Dependency(DependencyCondvar),
-    Resolved,
+    //we probably do not need this?
     ExecutionHalted,
 }
 
@@ -76,7 +69,7 @@ pub enum DependencyResult {
 #[derive(Debug, Clone)]
 pub enum ExecutionTaskType {
     Execution,
-    Wakeup(DependencyCondvar),
+    Wakeup(Baton<DependencyStatus>),
 }
 
 /// Task type that the parallel execution workers get from the scheduler.
@@ -141,7 +134,7 @@ pub enum SchedulerTask {
 enum ExecutionStatus {
     Ready(Incarnation, ExecutionTaskType),
     Executing(Incarnation, ExecutionTaskType),
-    Suspended(Incarnation, DependencyCondvar),
+    Suspended(Incarnation, Baton<DependencyStatus>),
     Executed(Incarnation),
     // TODO[agg_v2](cleanup): rename to Finalized or ReadyToCommit / CommitReady?
     // it gets committed later, without scheduler tracking.
@@ -251,7 +244,100 @@ pub trait TWaitForDependency {
         &self,
         txn_idx: TxnIndex,
         dep_txn_idx: TxnIndex,
-    ) -> Result<DependencyResult, PanicError>;
+        baton: Baton<DependencyStatus>,
+    ) -> Result<DependencyStatus, PanicError>;
+}
+
+
+
+pub trait ConditionalSuspend {
+    fn conditional_suspend(
+        &self,
+        txn_idx: TxnIndex,
+        dep_txn_idx: TxnIndex,
+    ) -> Result<DependencyStatus, PanicError>;
+}
+
+pub struct SchedulerHandle<'a> {
+    scheduler: &'a Scheduler,
+    garage: Option<&'a ThreadGarageHandle<'a>>,
+}
+
+impl<'a> ConditionalSuspend for SchedulerHandle<'a> {
+    fn conditional_suspend(
+        &self,
+        txn_idx: TxnIndex,
+        dep_txn_idx: TxnIndex,
+    ) -> Result<DependencyStatus, PanicError> {
+        
+        
+        let suspend_result = self.garage.unwrap().conditional_suspend(|baton|-> Option<Result<DependencyStatus,PanicError>> {
+            let dep_result = self.scheduler.wait_for_dependency(txn_idx, dep_txn_idx, baton);
+            match dep_result {
+                Ok(dep_result) => {
+                    match dep_result {
+                        DependencyStatus::Resolved => return Some(Ok(DependencyStatus::Resolved)),
+                        DependencyStatus::Unresolved => return None,
+                        DependencyStatus::ExecutionHalted => return Some(Err(code_invariant_error("dependencency should not see halted state yet"))),
+                    }
+                },
+                Err(e) => {
+                    return Some(Err(e));
+                },
+            }    
+        }, 
+        DependencyStatus::Unresolved);  
+
+        match suspend_result {
+            Ok(suspend_result) => {
+                if let  SuspendResult::NotHalted(dependency_status) = suspend_result {
+                    return Ok(dependency_status);
+                } 
+                else {
+                    return Ok(DependencyStatus::ExecutionHalted);
+                }
+            }
+            Err(e) => return Err(e),
+        }
+    }
+}
+
+impl<'a> SchedulerHandle<'a> {
+    pub fn new(scheduler: &'a Scheduler, garage: &'a ThreadGarageHandle) -> Self {
+        Self {
+            scheduler: scheduler,
+            garage: Some(garage),
+        }
+    }
+
+    pub fn new_scheduler_only(scheduler: &'a Scheduler) -> Self {
+        Self {
+            scheduler,
+            garage: None,
+        }
+    }
+
+    pub fn get_scheduler(&self) -> &Scheduler {
+        self.scheduler
+    }
+
+    pub fn halt(&self) -> bool {
+        eprintln!("set done marker in halt");
+        if self.scheduler.set_done_marker() {
+            for txn_idx in 0..self.scheduler.num_txns {
+                self.scheduler.halt_transaction_execution(txn_idx);
+            }
+        }
+        self.garage.unwrap().halt()
+    }
+
+    pub fn is_halted(&self) -> bool {
+        self.garage.unwrap().is_halted()
+    }
+
+    pub fn get_thread_id(&self) -> usize {
+        self.garage.unwrap().get_thread_id()
+    }
 }
 
 pub struct Scheduler {
@@ -304,6 +390,10 @@ pub struct Scheduler {
 
 /// Public Interfaces for the Scheduler
 impl Scheduler {
+    pub fn set_done_marker(&self) -> bool {
+        !self.done_marker.swap(true, Ordering::SeqCst)
+    }
+
     pub fn new(num_txns: TxnIndex) -> Self {
         // Empty block should early return and not create a scheduler.
         assert!(num_txns > 0, "No scheduler needed for 0 transactions");
@@ -392,7 +482,8 @@ impl Scheduler {
                         *commit_idx += 1;
                         if *commit_idx == self.num_txns {
                             // All txns have been committed, the parallel execution can finish.
-                            self.done_marker.store(true, Ordering::SeqCst);
+                            self.done_marker.store(                                 true, Ordering::SeqCst);
+                            eprintln!("yay done with all transactions?");
                         }
                         return Some((*commit_idx - 1, incarnation));
                     }
@@ -616,6 +707,7 @@ impl Scheduler {
         Ok(SchedulerTask::Retry)
     }
 
+    /* 
     /// This function can halt the BlockSTM early, even if there are unfinished tasks.
     /// It will set the done_marker to be true, and resolve all pending dependencies.
     ///
@@ -643,6 +735,7 @@ impl Scheduler {
 
         !self.has_halted.swap(true, Ordering::SeqCst)
     }
+    */
 }
 
 impl TWaitForDependency for Scheduler {
@@ -656,7 +749,8 @@ impl TWaitForDependency for Scheduler {
         &self,
         txn_idx: TxnIndex,
         dep_txn_idx: TxnIndex,
-    ) -> Result<DependencyResult, PanicError> {
+        baton: Baton<DependencyStatus>
+    ) -> Result<DependencyStatus, PanicError> {
         if txn_idx <= dep_txn_idx || dep_txn_idx >= self.num_txns {
             return Err(code_invariant_error(
                 "In wait_for_dependency: {txn_idx} > {dep_txn_idx}, num txns = {self.num_txns}",
@@ -665,9 +759,6 @@ impl TWaitForDependency for Scheduler {
 
         // Note: Could pre-check that txn dep_txn_idx isn't in an executed state, but the caller
         // usually has just observed the read dependency.
-
-        // Create a condition variable associated with the dependency.
-        let dep_condvar = Arc::new((Mutex::new(DependencyStatus::Unresolved), Condvar::new()));
 
         let mut stored_deps = self.txn_dependency[dep_txn_idx as usize].lock();
 
@@ -682,7 +773,7 @@ impl TWaitForDependency for Scheduler {
 
             // Note: acquires (a different, status) mutex, while holding (dependency) mutex.
             // For status lock this only happens here, thus the order is always higher index to lower.
-            return Ok(DependencyResult::Resolved);
+            return Ok(DependencyStatus::Resolved);
         }
 
         // If the execution is already halted, suspend will return false.
@@ -691,9 +782,7 @@ impl TWaitForDependency for Scheduler {
         // to be ExecutionHalted, then notify the conditional variable. So if a thread sees ExecutionHalted,
         // it knows the execution is halted and it can return; otherwise, the finishing thread will notify
         // the conditional variable later and awake the pending thread.
-        if !self.suspend(txn_idx, dep_condvar.clone())? {
-            return Ok(DependencyResult::ExecutionHalted);
-        }
+        self.suspend(txn_idx, baton)?;
 
         // Safe to add dependency here (still holding the lock) - finish_execution of txn
         // dep_txn_idx is guaranteed to acquire the same lock later and clear the dependency.
@@ -701,7 +790,7 @@ impl TWaitForDependency for Scheduler {
 
         // Stored deps gets unlocked here.
 
-        Ok(DependencyResult::Dependency(dep_condvar))
+        Ok(DependencyStatus::Unresolved)
     }
 }
 
@@ -722,24 +811,12 @@ impl Scheduler {
     ///    or Resolved (if the worker with WakeUp task did it), and also calling notify_one. This
     ///    ensures that a thread that waits until the condition variable changes from Unresolved will
     ///    get released in all cases.
+    
     fn halt_transaction_execution(&self, txn_idx: TxnIndex) {
         let mut status = self.txn_status[txn_idx as usize].0.write();
-
-        // Always replace the status.
-        match std::mem::replace(&mut *status, ExecutionStatus::ExecutionHalted) {
-            ExecutionStatus::Suspended(_, condvar)
-            | ExecutionStatus::Ready(_, ExecutionTaskType::Wakeup(condvar))
-            | ExecutionStatus::Executing(_, ExecutionTaskType::Wakeup(condvar)) => {
-                // Condvar lock must always be taken inner-most.
-                let (lock, cvar) = &*condvar;
-
-                let mut lock = lock.lock();
-                *lock = DependencyStatus::ExecutionHalted;
-                cvar.notify_one();
-            },
-            _ => (),
-        }
+        std::mem::replace(&mut *status, ExecutionStatus::ExecutionHalted);
     }
+    
 
     fn unpack_validation_idx(validation_idx: u64) -> (TxnIndex, Wave) {
         (
@@ -915,6 +992,7 @@ impl Scheduler {
             })
     }
 
+    
     /// Put a transaction in a suspended state, with a condition variable that can be
     /// used to wake it up after the dependency is resolved.
     /// Return true when the txn is successfully suspended.
@@ -922,15 +1000,14 @@ impl Scheduler {
     fn suspend(
         &self,
         txn_idx: TxnIndex,
-        dep_condvar: DependencyCondvar,
-    ) -> Result<bool, PanicError> {
+        baton: Baton<DependencyStatus>,
+    ) -> Result<(), PanicError> {
         let mut status = self.txn_status[txn_idx as usize].0.write();
         match *status {
             ExecutionStatus::Executing(incarnation, _) => {
-                *status = ExecutionStatus::Suspended(incarnation, dep_condvar);
-                Ok(true)
+                *status = ExecutionStatus::Suspended(incarnation, baton);
+                Ok(()) 
             },
-            ExecutionStatus::ExecutionHalted => Ok(false),
             _ => Err(code_invariant_error(format!(
                 "Unexpected status {:?} in suspend",
                 &*status,
@@ -943,14 +1020,13 @@ impl Scheduler {
     fn resume(&self, txn_idx: TxnIndex) -> Result<(), PanicError> {
         let mut status = self.txn_status[txn_idx as usize].0.write();
         match &*status {
-            ExecutionStatus::Suspended(incarnation, dep_condvar) => {
+            ExecutionStatus::Suspended(incarnation, baton) => {
                 *status = ExecutionStatus::Ready(
                     *incarnation,
-                    ExecutionTaskType::Wakeup(dep_condvar.clone()),
+                    ExecutionTaskType::Wakeup(baton.clone()),
                 );
                 Ok(())
             },
-            ExecutionStatus::ExecutionHalted => Ok(()),
             _ => Err(code_invariant_error(format!(
                 "Unexpected status {:?} in resume",
                 &*status,
@@ -965,6 +1041,7 @@ impl Scheduler {
         incarnation: Incarnation,
     ) -> Result<(), PanicError> {
         let mut status = self.txn_status[txn_idx as usize].0.write();
+        eprintln!("was here maybe should be halted?");
         match *status {
             ExecutionStatus::Executing(stored_incarnation, _)
                 if stored_incarnation == incarnation =>
@@ -990,9 +1067,11 @@ impl Scheduler {
         txn_idx: TxnIndex,
         incarnation: Incarnation,
     ) -> Result<(), PanicError> {
+        eprintln!("was here transaction_id={}", txn_idx);
         let mut status = self.txn_status[txn_idx as usize].0.write();
         match *status {
             ExecutionStatus::Aborting(stored_incarnation) if stored_incarnation == incarnation => {
+                eprintln!("aborted transaction_id={}", txn_idx);
                 *status = ExecutionStatus::Ready(incarnation + 1, ExecutionTaskType::Execution);
                 Ok(())
             },
@@ -1015,68 +1094,75 @@ impl Scheduler {
 
 #[cfg(test)]
 mod tests {
+    use crate::thread_garage::ReturnType;
+
     use super::*;
     use claims::{assert_err, assert_matches, assert_ok, assert_ok_eq, assert_some};
 
     #[test]
     fn scheduler_halt() {
-        let s = Scheduler::new(5);
-        assert!(!s.done());
-        assert!(s.halt());
-        assert!(s.done());
-        assert!(!s.halt());
+        let s = Scheduler::new(5);   
+        let garage = ThreadGarageExecutor::new(1, 1);
+
+        garage.spawn_n(|handle| -> ReturnType {
+            assert!(!handle.is_halted());
+            assert!(handle.halt());
+            assert!(handle.is_halted());
+            assert!(!handle.halt());
+            return ReturnType::new(Option::<Baton<DependencyStatus>>::None);
+        });
     }
 
     #[test]
     fn scheduler_halt_status() {
         let s = Scheduler::new(5);
-        for i in 0..5 {
-            s.try_incarnate(i);
-        }
-        let dep_arc = |wait_result| -> DependencyCondvar {
-            match wait_result {
-                Ok(DependencyResult::Dependency(dep_arc)) => dep_arc,
-                _ => unreachable!("Must return a dependency {:?}", wait_result),
-            }
-        };
 
-        let dep_1 = dep_arc(s.wait_for_dependency(1, 0));
-        let dep_2 = dep_arc(s.wait_for_dependency(2, 0));
-        // Check wait for dependency error conditions w. indices (correct statuses).
-        assert_err!(s.wait_for_dependency(3, 3));
-        assert_err!(s.wait_for_dependency(6, 5));
-        let dep_3 = dep_arc(s.wait_for_dependency(3, 0));
-        assert_ok!(s.resume(2));
-        assert_ok!(s.resume(3));
-        assert_some!(s.try_incarnate(3));
 
-        assert_matches!(&*dep_1.0.lock(), DependencyStatus::Unresolved);
-        assert_matches!(&*dep_2.0.lock(), DependencyStatus::Unresolved);
-        assert_matches!(&*dep_3.0.lock(), DependencyStatus::Unresolved);
-        s.halt();
-        assert_matches!(&*dep_1.0.lock(), DependencyStatus::ExecutionHalted);
-        assert_matches!(&*dep_2.0.lock(), DependencyStatus::ExecutionHalted);
-        assert_matches!(&*dep_3.0.lock(), DependencyStatus::ExecutionHalted);
+        let garage = ThreadGarageExecutor::new(1, 1);
+        let generate_baton = || -> Baton<DependencyStatus>  { Baton::new(0, DependencyStatus::Unresolved) };
 
-        assert_ok_eq!(
-            s.suspend(
-                1,
-                Arc::new((Mutex::new(DependencyStatus::Unresolved), Condvar::new()))
-            ),
-            false
-        );
+        garage.spawn_n(|handle| -> ReturnType {
+            for i in 0..5 {
+                s.try_incarnate(i);     }
+           
+            let baton1 = generate_baton();
+            let dep_1 = s.wait_for_dependency(1, 0, baton1.clone());
+            let baton2 = generate_baton();
+            let dep_2 =s.wait_for_dependency(2, 0, baton2.clone());
+            // Check wait for dependency error conditions w. indices (correct statuses).
+            assert_err!(s.wait_for_dependency(3, 3, generate_baton()));
+            assert_err!(s.wait_for_dependency(6, 5, generate_baton()));
+            let baton3 = generate_baton();
+            let dep_3 = s.wait_for_dependency(3, 0, baton3.clone());
+            assert_ok!(s.resume(2));
+            assert_ok!(s.resume(3));
+            assert_some!(s.try_incarnate(3)); 
+    
+            assert_matches!(baton1.get_value(), DependencyStatus::Unresolved);
+            assert_matches!(baton2.get_value(), DependencyStatus::Unresolved);
+            assert_matches!(baton3.get_value(), DependencyStatus::Unresolved);
+            
+            handle.halt();
+            
+            let scheduler_handle = SchedulerHandle::new(&s, handle);
+            assert_matches!(scheduler_handle.conditional_suspend(1, 0), Ok(DependencyStatus::ExecutionHalted));
+            
+            return ReturnType::new(Option::<Baton<DependencyStatus>>::None);
+
+        });     
     }
 
     #[test]
     fn scheduler_panic_error() {
         let s = Scheduler::new(2);
+        let baton = Baton::new(0, DependencyStatus::Unresolved);
         assert_err!(s.suspend(
             0,
-            Arc::new((Mutex::new(DependencyStatus::Unresolved), Condvar::new()))
+            baton.clone(),
         ));
         assert_err!(s.resume(0));
         assert_err!(s.set_executed_status(0, 0));
         assert_err!(s.set_aborted_status(0, 0));
-        assert_err!(s.wait_for_dependency(1, 0));
+        assert_err!(s.wait_for_dependency(1, 0, baton.clone()));
     }
 }

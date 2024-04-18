@@ -148,7 +148,9 @@ pub mod explicit_sync_wrapper;
 mod limit_processor;
 #[cfg(any(test, feature = "fuzzing"))]
 pub mod proptest_types;
-mod scheduler;
+mod scheduler; 
+mod thread_garage;
+mod thread_garage_barrier;
 pub mod task;
 pub mod txn_commit_hook;
 pub mod txn_last_input_output;

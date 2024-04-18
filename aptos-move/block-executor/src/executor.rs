@@ -12,12 +12,13 @@ use crate::{
     executor_utilities::*,
     explicit_sync_wrapper::ExplicitSyncWrapper,
     limit_processor::BlockGasLimitProcessor,
-    scheduler::{DependencyStatus, ExecutionTaskType, Scheduler, SchedulerTask, Wave},
+    scheduler::{DependencyStatus, ExecutionTaskType, Scheduler, SchedulerHandle, SchedulerTask, Wave},
     task::{ExecutionStatus, ExecutorTask, TransactionOutput},
     txn_commit_hook::TransactionCommitHook,
     txn_last_input_output::{KeyKind, TxnLastInputOutput},
     types::ReadWriteSummary,
     view::{LatestView, ParallelState, SequentialState, ViewState},
+    thread_garage::{ThreadGarageExecutor,Baton,ReturnType},
 };
 use aptos_aggregator::{
     delayed_change::{ApplyBase, DelayedChange},
@@ -64,7 +65,8 @@ pub struct BlockExecutor<T, E, S, L, X> {
     // Number of active concurrent tasks, corresponding to the maximum number of rayon
     // threads that may be concurrently participating in parallel execution.
     config: BlockExecutorConfig,
-    executor_thread_pool: Arc<ThreadPool>,
+    garage: ThreadGarageExecutor,
+    //executor_thread_pool: Arc<ThreadPool>,
     transaction_commit_hook: Option<L>,
     phantom: PhantomData<(T, E, S, L, X)>,
 }
@@ -81,7 +83,7 @@ where
     /// be handled by sequential execution) and that concurrency_level <= num_cpus.
     pub fn new(
         config: BlockExecutorConfig,
-        executor_thread_pool: Arc<ThreadPool>,
+        _executor_thread_pool: Arc<ThreadPool>,
         transaction_commit_hook: Option<L>,
     ) -> Self {
         assert!(
@@ -89,9 +91,11 @@ where
             "Parallel execution concurrency level {} should be between 1 and number of CPUs",
             config.local.concurrency_level
         );
+        let concurrency_level = config.local.concurrency_level;
         Self {
             config,
-            executor_thread_pool,
+            garage: ThreadGarageExecutor::new(concurrency_level, concurrency_level*10),
+            //executor_thread_pool,
             transaction_commit_hook,
             phantom: PhantomData,
         }
@@ -369,18 +373,18 @@ where
         validation_wave: Wave,
         last_input_output: &TxnLastInputOutput<T, E::Output, E::Error>,
         versioned_cache: &MVHashMap<T::Key, T::Tag, T::Value, X, T::Identifier>,
-        scheduler: &Scheduler,
+        scheduler_handle: &SchedulerHandle,
     ) -> Result<SchedulerTask, PanicError> {
-        let aborted = !valid && scheduler.try_abort(txn_idx, incarnation);
+        let aborted = !valid && scheduler_handle.get_scheduler().try_abort(txn_idx, incarnation);
 
         if aborted {
             Self::update_transaction_on_abort(txn_idx, last_input_output, versioned_cache);
-            scheduler.finish_abort(txn_idx, incarnation)
+            scheduler_handle.get_scheduler().finish_abort(txn_idx, incarnation)
         } else {
-            scheduler.finish_validation(txn_idx, validation_wave);
+            scheduler_handle.get_scheduler().finish_validation(txn_idx, validation_wave);
 
             if valid {
-                scheduler.queueing_commits_arm();
+                scheduler_handle.get_scheduler().queueing_commits_arm();
             }
 
             Ok(SchedulerTask::Retry)
@@ -430,7 +434,7 @@ where
     fn prepare_and_queue_commit_ready_txns(
         &self,
         block_gas_limit_type: &BlockGasLimitType,
-        scheduler: &Scheduler,
+        scheduler_handle: &SchedulerHandle,
         versioned_cache: &MVHashMap<T::Key, T::Tag, T::Value, X, T::Identifier>,
         scheduler_task: &mut SchedulerTask,
         last_input_output: &TxnLastInputOutput<T, E::Output, E::Error>,
@@ -443,7 +447,7 @@ where
     ) -> Result<(), PanicOr<ParallelBlockExecutionError>> {
         let mut block_limit_processor = shared_commit_state.acquire();
 
-        while let Some((txn_idx, incarnation)) = scheduler.try_commit() {
+        while let Some((txn_idx, incarnation)) = scheduler_handle.get_scheduler().try_commit() {
             if !Self::validate_commit_ready(txn_idx, versioned_cache, last_input_output)? {
                 // Transaction needs to be re-executed, one final time.
 
@@ -462,13 +466,13 @@ where
                     base_view,
                     ParallelState::new(
                         versioned_cache,
-                        scheduler,
+                        scheduler_handle,
                         start_shared_counter,
                         shared_counter,
                     ),
                 )?;
 
-                scheduler.finish_execution_during_commit(txn_idx)?;
+                scheduler_handle.get_scheduler().finish_execution_during_commit(txn_idx)?;
 
                 let validation_result =
                     Self::validate(txn_idx, last_input_output, versioned_cache)?;
@@ -514,7 +518,7 @@ where
                     approx_output_size,
                 );
 
-                if txn_idx < scheduler.num_txns() - 1
+                if txn_idx < scheduler_handle.get_scheduler().num_txns() - 1
                     && block_limit_processor.should_end_block_parallel()
                 {
                     // Set the execution output status to be SkipRest, to skip the rest of the txns.
@@ -546,7 +550,7 @@ where
 
             last_input_output.record_finalized_group(txn_idx, finalized_groups);
             defer! {
-                scheduler.add_to_commit_queue(txn_idx);
+                scheduler_handle.get_scheduler().add_to_commit_queue(txn_idx);
             }
 
             // While the above propagate errors and lead to eventually halting parallel execution,
@@ -554,20 +558,20 @@ where
             // a) all transactions are scheduled for committing
             // b) we skip_rest after a transaction
             // Either all txn committed, or a committed txn caused an early halt.
-            if txn_idx + 1 == scheduler.num_txns()
+            if txn_idx + 1 == scheduler_handle.get_scheduler().num_txns()
                 || last_input_output.block_skips_rest_at_idx(txn_idx)
             {
-                if txn_idx + 1 == scheduler.num_txns() {
+                if txn_idx + 1 == scheduler_handle.get_scheduler().num_txns() {
                     assert!(
                         !matches!(scheduler_task, SchedulerTask::ExecutionTask(_, _, _)),
                         "All transactions can be committed, can't have execution task"
                     );
                 }
 
-                if scheduler.halt() {
+                if scheduler_handle.halt() {
                     block_limit_processor.finish_parallel_update_counters_and_log_info(
                         txn_idx + 1,
-                        scheduler.num_txns(),
+                        scheduler_handle.get_scheduler().num_txns(),
                     );
 
                     // failpoint triggering error at the last committed transaction,
@@ -639,7 +643,7 @@ where
         &self,
         txn_idx: TxnIndex,
         versioned_cache: &MVHashMap<T::Key, T::Tag, T::Value, X, T::Identifier>,
-        scheduler: &Scheduler,
+        scheduler_handle: &SchedulerHandle,
         start_shared_counter: u32,
         shared_counter: &AtomicU32,
         last_input_output: &TxnLastInputOutput<T, E::Output, E::Error>,
@@ -648,7 +652,7 @@ where
     ) -> Result<(), PanicError> {
         let parallel_state = ParallelState::<T, X>::new(
             versioned_cache,
-            scheduler,
+            scheduler_handle,
             start_shared_counter,
             shared_counter,
         );
@@ -725,14 +729,14 @@ where
         block: &[T],
         last_input_output: &TxnLastInputOutput<T, E::Output, E::Error>,
         versioned_cache: &MVHashMap<T::Key, T::Tag, T::Value, X, T::Identifier>,
-        scheduler: &Scheduler,
+        scheduler_handle: &SchedulerHandle,
         // TODO: should not need to pass base view.
         base_view: &S,
         start_shared_counter: u32,
         shared_counter: &AtomicU32,
         shared_commit_state: &ExplicitSyncWrapper<BlockGasLimitProcessor<T>>,
         final_results: &ExplicitSyncWrapper<Vec<E::Output>>,
-    ) -> Result<(), PanicOr<ParallelBlockExecutionError>> {
+    ) -> Result<Option<Baton<DependencyStatus>>, PanicOr<ParallelBlockExecutionError>> {
         // Make executor for each task. TODO: fast concurrent executor.
         let init_timer = VM_INIT_SECONDS.start_timer();
         let executor = E::init(*executor_arguments);
@@ -742,11 +746,11 @@ where
         let mut scheduler_task = SchedulerTask::Retry;
 
         let drain_commit_queue = || -> Result<(), PanicError> {
-            while let Ok(txn_idx) = scheduler.pop_from_commit_queue() {
+            while let Ok(txn_idx) = scheduler_handle.get_scheduler().pop_from_commit_queue() {
                 self.materialize_txn_commit(
                     txn_idx,
                     versioned_cache,
-                    scheduler,
+                    scheduler_handle,
                     start_shared_counter,
                     shared_counter,
                     last_input_output,
@@ -758,10 +762,11 @@ where
         };
 
         loop {
-            while scheduler.should_coordinate_commits() {
+
+            while scheduler_handle.get_scheduler().should_coordinate_commits() {
                 self.prepare_and_queue_commit_ready_txns(
                     &self.config.onchain.block_gas_limit_type,
-                    scheduler,
+                    scheduler_handle,
                     versioned_cache,
                     &mut scheduler_task,
                     last_input_output,
@@ -772,10 +777,12 @@ where
                     &executor,
                     block,
                 )?;
-                scheduler.queueing_commits_mark_done();
+                scheduler_handle.get_scheduler().queueing_commits_mark_done();
             }
 
             drain_commit_queue()?;
+
+            eprintln!("getting new task thread={}", scheduler_handle.get_thread_id());
 
             scheduler_task = match scheduler_task {
                 SchedulerTask::ValidationTask(txn_idx, incarnation, wave) => {
@@ -787,7 +794,7 @@ where
                         wave,
                         last_input_output,
                         versioned_cache,
-                        scheduler,
+                        scheduler_handle,
                     )?
                 },
                 SchedulerTask::ExecutionTask(
@@ -795,6 +802,8 @@ where
                     incarnation,
                     ExecutionTaskType::Execution,
                 ) => {
+                    eprintln!("getting new task thread={}, execution, txn={}", scheduler_handle.get_thread_id(), txn_idx);
+
                     let updates_outside = Self::execute(
                         txn_idx,
                         incarnation,
@@ -805,30 +814,29 @@ where
                         base_view,
                         ParallelState::new(
                             versioned_cache,
-                            scheduler,
+                            scheduler_handle,
                             start_shared_counter,
                             shared_counter,
                         ),
                     )?;
-                    scheduler.finish_execution(txn_idx, incarnation, updates_outside)?
+                    scheduler_handle.get_scheduler().finish_execution(txn_idx, incarnation, updates_outside)?
                 },
-                SchedulerTask::ExecutionTask(_, _, ExecutionTaskType::Wakeup(condvar)) => {
-                    {
-                        let (lock, cvar) = &*condvar;
+                SchedulerTask::ExecutionTask(txn_idx, _, ExecutionTaskType::Wakeup(baton)) => {
+                    eprintln!("getting new task thread={}, wakeup, txn={}", scheduler_handle.get_thread_id(), txn_idx);
 
-                        // Mark dependency resolved.
-                        let mut lock = lock.lock();
-                        *lock = DependencyStatus::Resolved;
-                        // Wake up the process waiting for dependency.
-                        cvar.notify_one();
-                    }
-
-                    scheduler.next_task()
+                    assert!(baton.get_value() == DependencyStatus::Unresolved);
+                    let temp_baton = baton.change_value(DependencyStatus::Resolved);
+                    assert!(temp_baton.get_value() == DependencyStatus::Resolved);
+                    return Ok(Some(temp_baton));                
                 },
-                SchedulerTask::Retry => scheduler.next_task(),
+                SchedulerTask::Retry => {
+                    eprintln!("getting new task thread={}, retry", scheduler_handle.get_thread_id());
+                    scheduler_handle.get_scheduler().next_task()
+                },
                 SchedulerTask::Done => {
                     drain_commit_queue()?;
-                    break Ok(());
+                    eprintln!("why done here?");
+                    break Ok(None);
                 },
             }
         }
@@ -840,6 +848,7 @@ where
         signature_verified_block: &[T],
         base_view: &S,
     ) -> Result<BlockOutput<E::Output>, ()> {
+        eprintln!("entered function!");
         let _timer = PARALLEL_EXECUTION_SECONDS.start_timer();
         // Using parallel execution with 1 thread currently will not work as it
         // will only have a coordinator role but no workers for rolling commit.
@@ -876,10 +885,16 @@ where
 
         let num_txns = num_txns as u32;
 
+        eprintln!("num txns={}", num_txns);
+
         let last_input_output = TxnLastInputOutput::new(num_txns);
         let scheduler = Scheduler::new(num_txns);
 
         let timer = RAYON_EXECUTION_SECONDS.start_timer();
+
+        eprintln!("ready to spawn");
+
+        /* 
         self.executor_thread_pool.scope(|s| {
             for _ in 0..self.config.local.concurrency_level {
                 s.spawn(|_| {
@@ -907,6 +922,43 @@ where
                         scheduler.halt();
                     }
                 });
+            }
+        });*/
+
+        self.garage.spawn_n(|garage| -> ReturnType {
+            eprintln!("calling function");
+            let scheduler_handle = SchedulerHandle::new(&scheduler, garage);
+            let res = self.worker_loop(
+                &executor_initial_arguments,
+                signature_verified_block,
+                &last_input_output,
+                &versioned_cache,
+                &scheduler_handle,
+                base_view,
+                start_shared_counter,
+                &shared_counter,
+                &shared_commit_state,
+                &final_results,
+            );
+            match res {
+                Err(err) => {
+                    // If there are multiple errors, they all get logged:
+                    // ModulePathReadWriteError and FatalVMErrorvariant is logged at construction,
+                    // and below we log CodeInvariantErrors.
+                    if let PanicOr::CodeInvariantError(err_msg) = err {
+                        alert!("[BlockSTM] worker loop: CodeInvariantError({:?})", err_msg);
+                    }
+                    shared_maybe_error.store(true, Ordering::SeqCst);
+
+                    eprintln!("halting from here thread= {}", garage.get_thread_id());
+                    // Make sure to halt the scheduler if it hasn't already been halted.
+                    scheduler_handle.halt();
+
+                    return ReturnType::new(Option::<Baton<DependencyStatus>>::None);
+                },
+                Ok(baton) => {
+                    return ReturnType::new(baton);
+                }
             }
         });
         drop(timer);

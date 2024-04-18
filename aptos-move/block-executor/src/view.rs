@@ -7,12 +7,13 @@ use crate::{
     captured_reads::{
         CapturedReads, DataRead, DelayedFieldRead, DelayedFieldReadKind, GroupRead, ReadKind,
         UnsyncReadSet,
-    },
+    }, 
     counters,
-    scheduler::{DependencyResult, DependencyStatus, Scheduler, TWaitForDependency},
+    scheduler::{ConditionalSuspend, DependencyStatus, Scheduler, SchedulerHandle, TWaitForDependency}, 
+    thread_garage::{ThreadGarageHandle,Baton}, 
     value_exchange::{
         does_value_need_exchange, filter_value_for_exchange, TemporaryValueToIdentifierMapping,
-    },
+    }
 };
 use aptos_aggregator::{
     bounded_math::{ok_overflow, BoundedMath, SignedU128},
@@ -157,7 +158,7 @@ trait ResourceGroupState<T: Transaction> {
 
 pub(crate) struct ParallelState<'a, T: Transaction, X: Executable> {
     pub(crate) versioned_map: &'a MVHashMap<T::Key, T::Tag, T::Value, X, T::Identifier>,
-    scheduler: &'a Scheduler,
+    scheduler_handle: &'a SchedulerHandle<'a>,
     start_counter: u32,
     counter: &'a AtomicU32,
     captured_reads: RefCell<CapturedReads<T>>,
@@ -166,12 +167,12 @@ pub(crate) struct ParallelState<'a, T: Transaction, X: Executable> {
 fn get_delayed_field_value_impl<T: Transaction>(
     captured_reads: &RefCell<CapturedReads<T>>,
     versioned_delayed_fields: &dyn TVersionedDelayedFieldView<T::Identifier>,
-    wait_for: &dyn TWaitForDependency,
+    wait_for: &dyn ConditionalSuspend,
     id: &T::Identifier,
     txn_idx: TxnIndex,
 ) -> Result<DelayedFieldValue, PanicOr<DelayedFieldsSpeculativeError>> {
     // We expect only DelayedFieldReadKind::Value (which is set from this function),
-    // to be a "full materialized/aggregated" read, and so we don't use the value
+    // to be a "full des materialized/aggregated" read, and so we don't use the value
     // from HistoryBounded reads.
     // If we wanted to make it more dynamic, we could have a type of the read value
     // inside HistoryBounded
@@ -304,7 +305,7 @@ fn compute_delayed_field_try_add_delta_outcome_first_time(
 fn delayed_field_try_add_delta_outcome_impl<T: Transaction>(
     captured_reads: &RefCell<CapturedReads<T>>,
     versioned_delayed_fields: &dyn TVersionedDelayedFieldView<T::Identifier>,
-    wait_for: &dyn TWaitForDependency,
+    wait_for: &dyn ConditionalSuspend,
     id: &T::Identifier,
     base_delta: &SignedU128,
     delta: &SignedU128,
@@ -403,10 +404,21 @@ fn delayed_field_try_add_delta_outcome_impl<T: Transaction>(
 // Returns after the dependency has been resolved, the returned indicator is true if
 // it is safe to continue, and false if the execution has been halted.
 fn wait_for_dependency(
-    wait_for: &dyn TWaitForDependency,
+    wait_for: &dyn ConditionalSuspend,
     txn_idx: TxnIndex,
     dep_idx: TxnIndex,
 ) -> Result<bool, PanicError> {
+    
+
+    eprintln!("calling suspend txn={} dep_txn={}", txn_idx, dep_idx);
+    
+    match wait_for.conditional_suspend(txn_idx, dep_idx)? {
+        DependencyStatus::ExecutionHalted => Ok(false),
+        DependencyStatus::Resolved => Ok(true),
+        DependencyStatus::Unresolved => Err(code_invariant_error("dependency should not be unresolved after conditional suspend"))
+    }
+
+    /*
     match wait_for.wait_for_dependency(txn_idx, dep_idx)? {
         DependencyResult::Dependency(dep_condition) => {
             let _timer = counters::DEPENDENCY_WAIT_SECONDS.start_timer();
@@ -435,18 +447,19 @@ fn wait_for_dependency(
         DependencyResult::ExecutionHalted => Ok(false),
         DependencyResult::Resolved => Ok(true),
     }
+    */
 }
 
 impl<'a, T: Transaction, X: Executable> ParallelState<'a, T, X> {
     pub(crate) fn new(
         shared_map: &'a MVHashMap<T::Key, T::Tag, T::Value, X, T::Identifier>,
-        shared_scheduler: &'a Scheduler,
+        shared_scheduler_handle: &'a SchedulerHandle,
         start_shared_counter: u32,
         shared_counter: &'a AtomicU32,
     ) -> Self {
         Self {
             versioned_map: shared_map,
-            scheduler: shared_scheduler,
+            scheduler_handle: shared_scheduler_handle,
             start_counter: start_shared_counter,
             counter: shared_counter,
             captured_reads: RefCell::new(CapturedReads::new()),
@@ -508,7 +521,7 @@ impl<'a, T: Transaction, X: Executable> ParallelState<'a, T, X> {
                     unreachable!("Reading group size does not require a specific tag look-up");
                 },
                 Err(Dependency(dep_idx)) => {
-                    if !wait_for_dependency(self.scheduler, txn_idx, dep_idx)? {
+                    if !wait_for_dependency(self.scheduler_handle, txn_idx, dep_idx)? {
                         return Err(PartialVMError::new(
                             StatusCode::SPECULATIVE_EXECUTION_ABORT_ERROR,
                         )
@@ -633,7 +646,7 @@ impl<'a, T: Transaction, X: Executable> ResourceState<T> for ParallelState<'a, T
                     return ReadResult::Uninitialized;
                 },
                 Err(Dependency(dep_idx)) => {
-                    match wait_for_dependency(self.scheduler, txn_idx, dep_idx) {
+                    match wait_for_dependency(self.scheduler_handle, txn_idx, dep_idx) {
                         Err(e) => {
                             error!("Error {:?} in wait for dependency", e);
                             self.captured_reads.borrow_mut().mark_incorrect_use();
@@ -751,7 +764,7 @@ impl<'a, T: Transaction, X: Executable> ResourceGroupState<T> for ParallelState<
                     return Ok(GroupReadResult::Value(None, None));
                 },
                 Err(Dependency(dep_idx)) => {
-                    if !wait_for_dependency(self.scheduler, txn_idx, dep_idx)? {
+                    if !wait_for_dependency(self.scheduler_handle, txn_idx, dep_idx)? {
                         // TODO[agg_v2](cleanup): consider changing from PartialVMResult<GroupReadResult> to GroupReadResult
                         // like in ReadResult for resources.
                         return Err(PartialVMError::new(
@@ -1628,7 +1641,7 @@ impl<'a, T: Transaction, S: TStateView<Key = T::Key>, X: Executable> TDelayedFie
             ViewState::Sync(state) => get_delayed_field_value_impl(
                 &state.captured_reads,
                 state.versioned_map.delayed_fields(),
-                state.scheduler,
+                state.scheduler_handle,
                 id,
                 self.txn_idx,
             ),
@@ -1652,7 +1665,7 @@ impl<'a, T: Transaction, S: TStateView<Key = T::Key>, X: Executable> TDelayedFie
             ViewState::Sync(state) => delayed_field_try_add_delta_outcome_impl(
                 &state.captured_reads,
                 state.versioned_map.delayed_fields(),
-                state.scheduler,
+                state.scheduler_handle,
                 id,
                 base_delta,
                 delta,
@@ -1771,7 +1784,7 @@ mod test {
     use crate::{
         captured_reads::{CapturedReads, DelayedFieldRead, DelayedFieldReadKind},
         proptest_types::types::{KeyType, MockEvent, ValueType},
-        scheduler::{DependencyResult, Scheduler, TWaitForDependency},
+        scheduler::{Scheduler, TWaitForDependency},
         view::{delayed_field_try_add_delta_outcome_impl, get_delayed_field_value_impl, ViewState},
     };
     use aptos_aggregator::{
@@ -1851,7 +1864,20 @@ mod test {
             &self,
             _txn_idx: TxnIndex,
             _dep_txn_idx: TxnIndex,
-        ) -> Result<DependencyResult, PanicError> {
+            _baton: Baton<DependencyStatus>,
+        ) -> Result<DependencyStatus, PanicError> {
+            unreachable!();
+        }
+    }
+
+    struct FakeConditionalSuspend();
+
+    impl ConditionalSuspend for FakeConditionalSuspend {
+        fn conditional_suspend(
+            &self,
+            _txn_idx: TxnIndex,
+            _dep_txn_idx: TxnIndex,
+        ) -> Result<DependencyStatus, PanicError> {
             unreachable!();
         }
     }
@@ -1875,7 +1901,8 @@ mod test {
     fn test_history_updates() {
         let mut view = FakeVersionedDelayedFieldView::default();
         let captured_reads = RefCell::new(CapturedReads::<TestTransactionType>::new());
-        let wait_for = FakeWaitForDependency();
+        let wait_for = FakeConditionalSuspend();
+
         let id = DelayedFieldID::new_for_test_for_u64(600);
         let max_value = 600;
         let math = BoundedMath::new(max_value);
@@ -2014,7 +2041,7 @@ mod test {
     fn test_aggregator_overflows() {
         let mut view = FakeVersionedDelayedFieldView::default();
         let captured_reads = RefCell::new(CapturedReads::<TestTransactionType>::new());
-        let wait_for = FakeWaitForDependency();
+        let wait_for = FakeConditionalSuspend();
         let id = DelayedFieldID::new_for_test_for_u64(600);
         let max_value = 600;
         let math = BoundedMath::new(max_value);
@@ -2153,7 +2180,7 @@ mod test {
     fn test_aggregator_underflows() {
         let mut view = FakeVersionedDelayedFieldView::default();
         let captured_reads = RefCell::new(CapturedReads::<TestTransactionType>::new());
-        let wait_for = FakeWaitForDependency();
+        let wait_for = FakeConditionalSuspend();
         let id = DelayedFieldID::new_for_test_for_u64(600);
         let max_value = 600;
         let math = BoundedMath::new(max_value);
@@ -2292,7 +2319,7 @@ mod test {
     fn test_read_kind_upgrade_fail() {
         let mut view = FakeVersionedDelayedFieldView::default();
         let captured_reads = RefCell::new(CapturedReads::<TestTransactionType>::new());
-        let wait_for = FakeWaitForDependency();
+        let wait_for = FakeConditionalSuspend();
         let id = DelayedFieldID::new_for_test_for_u64(600);
         let max_value = 600;
         let txn_idx = 1;
@@ -2766,7 +2793,10 @@ mod test {
             let counter = AtomicU32::new(start_counter);
             let base_view = MockStateView::new(data);
             let versioned_map = MVHashMap::new();
+            
             let scheduler = Scheduler::new(30);
+
+            //create scheduler handle
 
             Self {
                 start_counter,
@@ -2778,14 +2808,16 @@ mod test {
             }
         }
 
-        fn new_view(&self) -> ViewsComparison<'_> {
+        //do we need to keep '_ here?
+        fn new_view<'a>(&'a self , scheduler_handle: &'a SchedulerHandle) -> ViewsComparison<'a> {
             let latest_view_seq = create_sequential_latest_view(&self.holder);
+            
             let latest_view_par =
                 LatestView::<TestTransactionType, MockStateView, MockExecutable>::new(
                     &self.base_view,
                     ViewState::Sync(ParallelState::new(
                         &self.versioned_map,
-                        &self.scheduler,
+                        scheduler_handle,
                         self.start_counter,
                         &self.counter,
                     )),
@@ -2796,7 +2828,11 @@ mod test {
                 latest_view_seq,
                 latest_view_par,
             }
-        }
+        }    
+
+        fn new_scheduler_handle(&self) -> SchedulerHandle<'_> {
+            SchedulerHandle::new_scheduler_only(&self.scheduler)
+        } 
     }
 
     struct ViewsComparison<'a> {
@@ -2904,7 +2940,8 @@ mod test {
     #[test]
     fn test_missing_same() {
         let holder = ComparisonHolder::new(HashMap::new(), 1000);
-        let views = holder.new_view();
+        let scheduler_handle = holder.new_scheduler_handle();
+        let views = holder.new_view(&scheduler_handle);
 
         assert_ok_eq!(
             views.get_resource_state_value(&KeyType::<u32>(1, false), None),
@@ -2925,7 +2962,8 @@ mod test {
         let data = HashMap::from([(KeyType::<u32>(1, false), state_value.clone())]);
 
         let holder = ComparisonHolder::new(data, 1000);
-        let views = holder.new_view();
+        let scheduler_handle = holder.new_scheduler_handle();
+        let views = holder.new_view(&scheduler_handle);
 
         assert_ok_eq!(views.resource_exists(&KeyType::<u32>(1, false)), true,);
         assert!(views
@@ -2967,7 +3005,8 @@ mod test {
         let data = HashMap::from([(KeyType::<u32>(1, false), state_value.clone())]);
 
         let holder = ComparisonHolder::new(data, 1000);
-        let views = holder.new_view();
+        let scheduler_handle = holder.new_scheduler_handle();
+        let views = holder.new_view(&scheduler_handle);
 
         assert_ok_eq!(
             views.get_resource_state_value(&KeyType::<u32>(1, false), None),
@@ -2998,7 +3037,8 @@ mod test {
         let id = DelayedFieldID::new_with_width(start_counter, 8);
 
         let holder = ComparisonHolder::new(data, start_counter);
-        let views = holder.new_view();
+        let scheduler_handle = holder.new_scheduler_handle();
+        let views = holder.new_view(&scheduler_handle);
 
         let patched_value = create_struct_value(create_aggregator_value_u64(id.as_u64(), 30));
         let patched_state_value = create_state_value(&patched_value, &storage_layout);
@@ -3055,7 +3095,8 @@ mod test {
         let start_counter = 1000;
         let id = DelayedFieldID::new_with_width(start_counter, 8);
         let holder = ComparisonHolder::new(data, start_counter);
-        let views = holder.new_view();
+        let scheduler_handle = holder.new_scheduler_handle();
+        let views = holder.new_view(&scheduler_handle);
 
         assert_eq!(
             views
