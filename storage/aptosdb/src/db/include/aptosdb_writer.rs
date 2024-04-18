@@ -699,7 +699,7 @@ impl AptosDB {
             last_version + 1,
             &batch,
         )?;
-        // Revert the state kv and ledger metadata
+        // Revert the state kv and ledger metadata not yet implemented
         self.state_store
             .revert_state_kv_and_ledger_metadata(last_version)?;
 
