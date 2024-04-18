@@ -212,7 +212,7 @@ Can only called during genesis to initialize the Aptos coin.
         <a href="../../aptos-stdlib/../move-stdlib/doc/string.md#0x1_string_utf8">string::utf8</a>(b"Aptos Coin"),
         <a href="../../aptos-stdlib/../move-stdlib/doc/string.md#0x1_string_utf8">string::utf8</a>(b"APT"),
         8, // decimals
-        <b>false</b>, // monitor_supply
+        <b>true</b>, // monitor_supply
     );
 
     // Aptos framework needs mint cap <b>to</b> mint coins <b>to</b> initial validators. This will be revoked once the validators
