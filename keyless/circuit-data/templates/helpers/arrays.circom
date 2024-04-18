@@ -1,6 +1,9 @@
 pragma circom 2.1.3;
 
 include "../../node_modules/circomlib/circuits/multiplexer.circom";
+include "../../node_modules/circomlib/circuits/comparators.circom";
+include "helpers/hashtofield.circom";
+include "helpers/misc.circom";
 
 // Outputs a bit array where indices [start_index, end_index) (inclusive of start_index, exclusive of end_index) are all 1, and all other bits are 0. Does not work if end_index is greater than `len`
 template ArraySelector(len) {
@@ -104,7 +107,9 @@ template SingleNegOneArray(len) {
         lc = lc + out[i];
     }
     lc ==> success;
-    success === -1;
+    // support array sizes up to a million. Being conservative here b/c according to Michael this template is very cheap
+    signal should_be_all_zeros <== GreaterEqThan(20)([index, len]);
+    success === -1 * (1 - should_be_all_zeros);
 }
 
 // Checks that `substr` of length `substr_len` matches `str` beginning at `start_index`
@@ -127,6 +132,7 @@ template CheckSubstrInclusionPoly(maxStrLen, maxSubstrLen) {
     for (var i = 2; i < maxStrLen; i++) {
         challenge_powers[i] <== challenge_powers[i-1] * random_challenge;
     }
+
     signal selector_bits[maxStrLen] <== ArraySelector(maxStrLen)(start_index, start_index+substr_len); 
 
     signal selected_str[maxStrLen];
