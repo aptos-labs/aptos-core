@@ -2310,6 +2310,7 @@ name = "aptos-keyless-circuit-tests"
 version = "0.1.0"
 dependencies = [
  "anyhow",
+ "aptos-crypto",
  "aptos-keyless-common",
  "base64 0.13.1",
  "futures",
