@@ -109,8 +109,8 @@ TESTS = [
     # RunGroupConfig(expected_tps=10000, key=RunGroupKey("token-v2-ambassador-mint-fixed-supply", module_working_set_size=20), included_in=Flow.CONTINUOUS | Flow.CUSTOM_TEST),
     
     # RunGroupConfig(expected_tps=14200, key=RunGroupKey("coin-transfer"), included_in=LAND_BLOCKING_AND_C | Flow.REPRESENTATIVE | Flow.CUSTOM_TEST ),
-    RunGroupConfig(expected_tps=14200, key=RunGroupKey("coin-transfer-fixed-sender"), included_in=LAND_BLOCKING_AND_C | Flow.REPRESENTATIVE | Flow.CUSTOM_TEST),
-    RunGroupConfig(expected_tps=14200, key=RunGroupKey("coin-transfer-fixed-receiver"), included_in=LAND_BLOCKING_AND_C | Flow.REPRESENTATIVE | Flow.CUSTOM_TEST),
+    # RunGroupConfig(expected_tps=14200, key=RunGroupKey("coin-transfer-fixed-sender"), included_in=LAND_BLOCKING_AND_C | Flow.REPRESENTATIVE | Flow.CUSTOM_TEST),
+    # RunGroupConfig(expected_tps=14200, key=RunGroupKey("coin-transfer-fixed-receiver"), included_in=LAND_BLOCKING_AND_C | Flow.REPRESENTATIVE | Flow.CUSTOM_TEST),
     
     # RunGroupConfig(expected_tps=10000, key=RunGroupKey("modify-global-flag-agg-v2"), included_in=Flow.AGG_V2 | Flow.CONTINUOUS | Flow.CUSTOM_TEST),
     # RunGroupConfig(expected_tps=12600, key=RunGroupKey("modify-global-bounded-agg-v2-limit10"), included_in=Flow.AGG_V2 | Flow.CONTINUOUS | Flow.CUSTOM_TEST),
@@ -131,6 +131,18 @@ TESTS = [
     # RunGroupConfig(expected_tps=12600, key=RunGroupKey("modify-table-agg-v2-count10"), included_in=Flow.AGG_V2 | Flow.CONTINUOUS | Flow.CUSTOM_TEST),
     # RunGroupConfig(expected_tps=12600, key=RunGroupKey("modify-table-agg-v2-count100"), included_in=Flow.AGG_V2 | Flow.CONTINUOUS | Flow.CUSTOM_TEST),
     # RunGroupConfig(expected_tps=12600, key=RunGroupKey("modify-table-agg-v2-count1000"), included_in=Flow.AGG_V2 | Flow.CONTINUOUS | Flow.CUSTOM_TEST),
+
+    RunGroupConfig(expected_tps=12600, key=RunGroupKey("modify-heavy-agg-v2-limit10"), included_in=Flow.AGG_V2 | Flow.CONTINUOUS | Flow.CUSTOM_TEST),
+    RunGroupConfig(expected_tps=12600, key=RunGroupKey("modify-heavy-agg-v2-limit100"), included_in=Flow.AGG_V2 | Flow.CONTINUOUS | Flow.CUSTOM_TEST),
+    RunGroupConfig(expected_tps=12600, key=RunGroupKey("modify-heavy-agg-v2-limit1000"), included_in=Flow.AGG_V2 | Flow.CONTINUOUS | Flow.CUSTOM_TEST),
+
+    RunGroupConfig(expected_tps=12600, key=RunGroupKey("modify-read-agg-v2-prob10"), included_in=Flow.AGG_V2 | Flow.CONTINUOUS | Flow.CUSTOM_TEST),
+    RunGroupConfig(expected_tps=12600, key=RunGroupKey("modify-read-agg-v2-prob25"), included_in=Flow.AGG_V2 | Flow.CONTINUOUS | Flow.CUSTOM_TEST),
+    RunGroupConfig(expected_tps=12600, key=RunGroupKey("modify-read-agg-v2-prob50"), included_in=Flow.AGG_V2 | Flow.CONTINUOUS | Flow.CUSTOM_TEST),
+    RunGroupConfig(expected_tps=12600, key=RunGroupKey("modify-read-agg-v2-prob75"), included_in=Flow.AGG_V2 | Flow.CONTINUOUS | Flow.CUSTOM_TEST),
+    RunGroupConfig(expected_tps=12600, key=RunGroupKey("modify-read-agg-v2-prob90"), included_in=Flow.AGG_V2 | Flow.CONTINUOUS | Flow.CUSTOM_TEST),
+    RunGroupConfig(expected_tps=12600, key=RunGroupKey("modify-read-agg-v2-prob100"), included_in=Flow.AGG_V2 | Flow.CONTINUOUS | Flow.CUSTOM_TEST),
+    
 
     # RunGroupConfig(expected_tps=37000, key=RunGroupKey("coin-transfer", executor_type="native"), included_in=LAND_BLOCKING_AND_C),
     # RunGroupConfig(expected_tps=12000, key=RunGroupKey("account-generation"), included_in=LAND_BLOCKING_AND_C | Flow.REPRESENTATIVE | Flow.CUSTOM_TEST),

@@ -4,6 +4,7 @@ module 0xABCD::aggregator_example {
     use std::error;
     use std::signer;
     use std::vector;
+    use std::bcs;
     use 0x1::table::{Self, Table};
     use aptos_framework::aggregator_v2::{Self, Aggregator};
 
@@ -221,6 +222,21 @@ module 0xABCD::aggregator_example {
         }
     }
 
+    public entry fun modify_read_agg_v2(inc_or_read: bool, count: u64) acquires CounterAggV2 {
+        assert!(exists<CounterAggV2>(@publisher_address), error::invalid_argument(ECOUNTER_AGG_RESOURCE_NOT_PRESENT));
+        if (inc_or_read) {
+            let counter = borrow_global<CounterAggV2>(@publisher_address);
+            let _ = aggregator_v2::read(&counter.count);
+        } else {
+            let counter = borrow_global_mut<CounterAggV2>(@publisher_address);
+            let i = 0;
+            while (i < count) {
+                aggregator_v2::try_add(&mut counter.count, 1);
+                i = i + 1;
+            };
+        }
+    }
+
     public entry fun modify_bounded_agg_v2_limit_10(increment: bool, delta: u64) acquires BoundedAggV2Limit10 {
         assert!(exists<BoundedAggV2Limit10>(@publisher_address), error::invalid_argument(EBOUNDED_AGG_RESOURCE_NOT_PRESENT));
         let bounded = borrow_global_mut<BoundedAggV2Limit10>(@publisher_address);
@@ -371,5 +387,80 @@ module 0xABCD::aggregator_example {
             };
             i = i + 1;
         };
+    }
+
+    public entry fun modify_agg_heavy_limit_10(increment: bool, delta: u64) acquires BoundedAggV2Limit10 {
+        assert!(exists<BoundedAggV2Limit10>(@publisher_address), error::invalid_argument(EBOUNDED_AGG_RESOURCE_NOT_PRESENT));
+        let bounded = borrow_global_mut<BoundedAggV2Limit10>(@publisher_address);
+        if (increment) {
+            aggregator_v2::try_add(&mut bounded.count, delta);
+        } else {
+            aggregator_v2::try_sub(&mut bounded.count, delta);
+        };
+        let vec = vector::empty<u64>();
+        let i = 0;
+        let len = 4;
+        while (i < len) {
+            vector::push_back(&mut vec, i);
+            i = i + 1;
+        };
+
+        let count = 100;
+        let sum: u64 = 0;
+        while (count > 0) {
+            let val = bcs::to_bytes(&vec);
+            sum = sum + ((*vector::borrow(&val, 0)) as u64);
+            count = count - 1;
+        }
+    }
+
+    public entry fun modify_agg_heavy_limit_100(increment: bool, delta: u64) acquires BoundedAggV2Limit100 {
+        assert!(exists<BoundedAggV2Limit100>(@publisher_address), error::invalid_argument(EBOUNDED_AGG_RESOURCE_NOT_PRESENT));
+        let bounded = borrow_global_mut<BoundedAggV2Limit100>(@publisher_address);
+        if (increment) {
+            aggregator_v2::try_add(&mut bounded.count, delta);
+        } else {
+            aggregator_v2::try_sub(&mut bounded.count, delta);
+        };
+        let vec = vector::empty<u64>();
+        let i = 0;
+        let len = 4;
+        while (i < len) {
+            vector::push_back(&mut vec, i);
+            i = i + 1;
+        };
+
+        let count = 100;
+        let sum: u64 = 0;
+        while (count > 0) {
+            let val = bcs::to_bytes(&vec);
+            sum = sum + ((*vector::borrow(&val, 0)) as u64);
+            count = count - 1;
+        }
+    }
+
+    public entry fun modify_agg_heavy_limit_1000(increment: bool, delta: u64) acquires BoundedAggV2Limit1000 {
+        assert!(exists<BoundedAggV2Limit1000>(@publisher_address), error::invalid_argument(EBOUNDED_AGG_RESOURCE_NOT_PRESENT));
+        let bounded = borrow_global_mut<BoundedAggV2Limit1000>(@publisher_address);
+        if (increment) {
+            aggregator_v2::try_add(&mut bounded.count, delta);
+        } else {
+            aggregator_v2::try_sub(&mut bounded.count, delta);
+        };
+        let vec = vector::empty<u64>();
+        let i = 0;
+        let len = 4;
+        while (i < len) {
+            vector::push_back(&mut vec, i);
+            i = i + 1;
+        };
+
+        let count = 100;
+        let sum: u64 = 0;
+        while (count > 0) {
+            let val = bcs::to_bytes(&vec);
+            sum = sum + ((*vector::borrow(&val, 0)) as u64);
+            count = count - 1;
+        }
     }
 }

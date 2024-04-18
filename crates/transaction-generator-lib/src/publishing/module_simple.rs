@@ -214,6 +214,18 @@ pub enum EntryPoints {
     ModifyTableAggV2Count1000 {
         step: u64,
     },
+    ModifyHeavyAggV2Limit10 {
+        step: u64,
+    },
+    ModifyHeavyAggV2Limit100 {
+        step: u64,
+    },
+    ModifyHeavyAggV2Limit1000 {
+        step: u64,
+    },
+    ModifyReadAggV2 {
+        prob: u64,
+    },
     ModifyFlagAggV2 {
         step: u64,
     },
@@ -314,6 +326,10 @@ impl EntryPoints {
             | EntryPoints::ModifyTableAggV2Count10 { .. }
             | EntryPoints::ModifyTableAggV2Count100 { .. }
             | EntryPoints::ModifyTableAggV2Count1000 { .. }
+            | EntryPoints::ModifyHeavyAggV2Limit10 { .. }
+            | EntryPoints::ModifyHeavyAggV2Limit100 { .. }
+            | EntryPoints::ModifyHeavyAggV2Limit1000 { .. }
+            | EntryPoints::ModifyReadAggV2 { .. }
             | EntryPoints::ModifyFlagAggV2 { .. }
             | EntryPoints::CreateObjects { .. }
             | EntryPoints::CreateObjectsConflict { .. }
@@ -374,6 +390,10 @@ impl EntryPoints {
             | EntryPoints::ModifyTableAggV2Count10 { .. }
             | EntryPoints::ModifyTableAggV2Count100 { .. }
             | EntryPoints::ModifyTableAggV2Count1000 { .. }
+            | EntryPoints::ModifyHeavyAggV2Limit10 { .. }
+            | EntryPoints::ModifyHeavyAggV2Limit100 { .. }
+            | EntryPoints::ModifyHeavyAggV2Limit1000 { .. }
+            | EntryPoints::ModifyReadAggV2 { .. }
             | EntryPoints::ModifyFlagAggV2 { .. } => "aggregator_example",
             EntryPoints::CreateObjects { .. } | EntryPoints::CreateObjectsConflict { .. } => {
                 "objects"
@@ -540,6 +560,18 @@ impl EntryPoints {
             },
             EntryPoints::ModifyTableAggV2Count1000 { step } => {
                 modify_table_agg_v2_count_1000(module_id, rng.expect("Must provide RNG"), *step)
+            },
+            EntryPoints::ModifyHeavyAggV2Limit10 { step } => {
+                modify_heavy_agg_v2_limit_10(module_id, rng.expect("Must provide RNG"), *step)
+            },
+            EntryPoints::ModifyHeavyAggV2Limit100 { step } => {
+                modify_heavy_agg_v2_limit_100(module_id, rng.expect("Must provide RNG"), *step)
+            },
+            EntryPoints::ModifyHeavyAggV2Limit1000 { step } => {
+                modify_heavy_agg_v2_limit_1000(module_id, rng.expect("Must provide RNG"), *step)
+            },
+            EntryPoints::ModifyReadAggV2 { prob } => {
+                modify_read_agg_v2(module_id, rng.expect("Must provide RNG"), *prob)
             },
             EntryPoints::CreateObjects {
                 num_objects,
@@ -781,6 +813,10 @@ impl EntryPoints {
             | EntryPoints::ModifyTableAggV2Count10 { .. }
             | EntryPoints::ModifyTableAggV2Count100 { .. }
             | EntryPoints::ModifyTableAggV2Count1000 { .. }
+            | EntryPoints::ModifyHeavyAggV2Limit10 { .. }
+            | EntryPoints::ModifyHeavyAggV2Limit100 { .. }
+            | EntryPoints::ModifyHeavyAggV2Limit1000 { .. }
+            | EntryPoints::ModifyReadAggV2 { .. }
             | EntryPoints::ModifyFlagAggV2 { .. } => AutomaticArgs::None,
             EntryPoints::CreateObjects { .. } | EntryPoints::CreateObjectsConflict { .. } => {
                 AutomaticArgs::Signer
@@ -986,6 +1022,18 @@ fn modify_array_agg_v2_limit_1000(module_id: ModuleId, rng: &mut StdRng, step: u
     )
 }
 
+fn modify_read_agg_v2(module_id: ModuleId, rng: &mut StdRng, prob: u64) -> TransactionPayload {
+    let inc_or_read = rng.gen_range(0usize, 100) < prob as usize;
+    get_payload(
+        module_id,
+        ident_str!("modify_read_agg_v2").to_owned(),
+        vec![
+            bcs::to_bytes(&inc_or_read).unwrap(),
+            bcs::to_bytes(&1).unwrap(),
+        ],
+    )
+}
+
 fn modify_table_agg_v2_count_1(module_id: ModuleId, rng: &mut StdRng, step: u64) -> TransactionPayload {
     get_payload(
         module_id,
@@ -1025,6 +1073,39 @@ fn modify_table_agg_v2_count_1000(module_id: ModuleId, rng: &mut StdRng, step: u
         ident_str!("modify_agg_table_count_1000").to_owned(),
         vec![
             bcs::to_bytes(&true).unwrap(),
+            bcs::to_bytes(&step).unwrap(),
+        ],
+    )
+}
+
+fn modify_heavy_agg_v2_limit_10(module_id: ModuleId, rng: &mut StdRng, step: u64) -> TransactionPayload {
+    get_payload(
+        module_id,
+        ident_str!("modify_agg_heavy_limit_10").to_owned(),
+        vec![
+            bcs::to_bytes(&rng.gen::<bool>()).unwrap(),
+            bcs::to_bytes(&step).unwrap(),
+        ],
+    )
+}   
+
+fn modify_heavy_agg_v2_limit_100(module_id: ModuleId, rng: &mut StdRng, step: u64) -> TransactionPayload {
+    get_payload(
+        module_id,
+        ident_str!("modify_agg_heavy_limit_100").to_owned(),
+        vec![
+            bcs::to_bytes(&rng.gen::<bool>()).unwrap(),
+            bcs::to_bytes(&step).unwrap(),
+        ],
+    )
+}
+
+fn modify_heavy_agg_v2_limit_1000(module_id: ModuleId, rng: &mut StdRng, step: u64) -> TransactionPayload {
+    get_payload(
+        module_id,
+        ident_str!("modify_agg_heavy_limit_1000").to_owned(),
+        vec![
+            bcs::to_bytes(&rng.gen::<bool>()).unwrap(),
             bcs::to_bytes(&step).unwrap(),
         ],
     )
