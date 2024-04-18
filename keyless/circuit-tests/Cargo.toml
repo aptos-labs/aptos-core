@@ -20,7 +20,6 @@ ark-bn254 = { workspace = true }
 ark-ff = { workspace = true }
 base64 = { workspace = true }
 itertools = { workspace = true }
-rand = { workspace = true }
 serde_json = { workspace = true }
 tempfile = { workspace = true }
 
