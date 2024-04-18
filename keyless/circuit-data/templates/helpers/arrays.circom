@@ -1,6 +1,7 @@
 pragma circom 2.1.3;
 
 include "../../node_modules/circomlib/circuits/multiplexer.circom";
+include "../../node_modules/circomlib/circuits/comparators.circom";
 include "helpers/hashtofield.circom";
 include "helpers/misc.circom";
 
@@ -108,8 +109,9 @@ template SingleNegOneArray(len) {
         lc = lc + out[i];
     }
     lc ==> success;
-    signal should_be_all_zeros <== IsZero()(len - index);
-    success === -1 * (1 - should_be_all_zeros) ;
+    // support array sizes up to a million. Being conservative here b/c according to Michael this test is very cheap
+    signal should_be_all_zeros <== GreaterEqThan(20)([index, len]);
+    success === -1 * (1 - should_be_all_zeros);
 }
 
 // Checks that `substr` of length `substr_len` matches `str` beginning at `start_index`
