@@ -145,10 +145,12 @@ impl LocalFactory {
         )?;
 
         // Launch the swarm
+        println!("0417 - before swarm.launch");
         swarm
             .launch()
             .await
             .with_context(|| format!("Swarm logs can be found here: {}", swarm.logs_location()))?;
+        println!("0417 - after swarm.launch");
 
         let vfn_config = vfn_config.unwrap_or_else(NodeConfig::get_default_vfn_config);
         let vfn_override_config = OverrideNodeConfig::new_with_default_base(vfn_config);
@@ -160,6 +162,7 @@ impl LocalFactory {
                 .add_validator_fullnode(version, vfn_override_config.clone(), *validator_peer_id)
                 .unwrap();
         }
+        println!("0417 - before wait_all_alive");
         swarm.wait_all_alive(Duration::from_secs(60)).await?;
 
         Ok(swarm)
