@@ -57,10 +57,11 @@ impl TransactionAccumulatorDb {
     pub(crate) fn revert_transaction_accumulator(
         &self,
         version: Version,
-        batch: SchemaBatch,
+        batch: &SchemaBatch,
+        position: Position,
     ) -> Result<()> {
         // Delete the transaction accumulator entry for the given version
-        batch.delete::<TransactionAccumulatorSchema>(&version)?;
+        batch.delete::<TransactionAccumulatorSchema>(&position)?;
 
         // Update the transaction accumulator pruner progress to the previous version
         let prev_version = version

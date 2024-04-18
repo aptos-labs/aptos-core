@@ -43,7 +43,7 @@ pub(crate) mod transaction_accumulator_db;
 pub(crate) mod transaction_auxiliary_data_db;
 #[cfg(test)]
 mod transaction_auxiliary_data_db_test;
-mod transaction_db;
+pub(crate) mod transaction_db;
 #[cfg(test)]
 pub(crate) mod transaction_db_test;
 pub(crate) mod transaction_info_db;
@@ -51,7 +51,7 @@ pub(crate) mod transaction_info_db;
 mod transaction_info_db_test;
 pub(crate) mod write_set_db;
 #[cfg(test)]
-mod write_set_db_test;
+pub mod write_set_db_test;
 
 pub const LEDGER_DB_FOLDER_NAME: &str = "ledger_db";
 pub const LEDGER_DB_NAME: &str = "ledger_db";

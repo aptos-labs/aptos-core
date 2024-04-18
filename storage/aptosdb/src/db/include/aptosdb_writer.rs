@@ -1,5 +1,7 @@
 // Copyright © Aptos Foundation
 // SPDX-License-Identifier: Apache-2.0
+use crate::ledger_db::{transaction_db::TransactionDb, write_set_db::WriteSetDb};
+use aptos_types::proof::position::Position;
 
 impl DbWriter for AptosDB {
     /// `first_version` is the version of the first transaction in `txns_to_commit`.
@@ -657,18 +659,22 @@ impl AptosDB {
         )?;
         self.ledger_db.metadata_db().write_schemas(ledger_batch)?;
 
+        let temp_position = Position::from_postorder_index(last_version)?;
         // Revert the transaction accumulator
         let mut batch = SchemaBatch::new();
         self.ledger_db
             .transaction_accumulator_db()
-            .revert_transaction_accumulator(last_version, &batch)?;
+            .revert_transaction_accumulator(last_version, &batch, temp_position)?;
         self.ledger_db
             .transaction_accumulator_db()
             .write_schemas(batch)?;
 
         // Revert the transaction info
         let mut batch = SchemaBatch::new();
-        TransactionInfoDb::delete_transaction_info(last_version, &batch)?;
+        self.ledger_db
+            .transaction_info_db()
+            .delete_transaction_info(last_version, &batch)?;
+
         self.ledger_db.transaction_info_db().write_schemas(batch)?;
 
         // Revert the events
@@ -680,21 +686,19 @@ impl AptosDB {
 
         // Revert the transaction auxiliary data
         let mut batch = SchemaBatch::new();
-        TransactionAuxiliaryDataDb::delete_transaction_auxiliary_data(last_version, &batch)?;
+        TransactionAuxiliaryDataDb::prune(last_version, last_version + 1, &batch)?;
+
         self.ledger_db
             .transaction_auxiliary_data_db()
             .write_schemas(batch)?;
 
         // Revert the write set
-        self.ledger_db
-            .write_set_db()
-            .revert_write_sets(last_version)?;
-
-        // Revert the transactions
-        self.ledger_db
-            .transaction_db()
-            .revert_transactions(last_version)?;
-
+        WriteSetDb::prune(last_version, last_version + 1, &batch)?;
+        self.ledger_db.transaction_db().prune_transactions(
+            last_version,
+            last_version + 1,
+            &batch,
+        )?;
         // Revert the state kv and ledger metadata
         self.state_store
             .revert_state_kv_and_ledger_metadata(last_version)?;
