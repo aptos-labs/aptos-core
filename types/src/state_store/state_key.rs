@@ -270,7 +270,12 @@ where
             .and_then(|weak| weak.upgrade())
     }
 
-    fn lock_and_get_or_add<Q1, Q2>(&self, key1: &Q1, key2: &Q2, maybe_add: EntryInner) -> Arc<Entry>
+    fn lock_and_get_or_add<Q1, Q2>(
+        &self,
+        key1: &Q1,
+        key2: &Q2,
+        maybe_add: StateKeyInner,
+    ) -> Arc<Entry>
     where
         Key1: Borrow<Q1>,
         Key2: Borrow<Q2>,
@@ -278,6 +283,9 @@ where
         Q2: Eq + Hash + ToOwned<Owned = Key2> + ?Sized,
     {
         let _timer = STATE_KEY_TIMER.timer_with(&[self.key_type, "lock_and_get_or_add"]);
+
+        // construct EntryInner outside lock
+        let maybe_add = EntryInner::from_deserialized(maybe_add);
 
         const MAX_TRIES: usize = 100;
 
@@ -311,6 +319,20 @@ where
             }
         }
         unreachable!("Looks like deadlock");
+    }
+
+    fn try_get_or_add<Q1, Q2>(&self, key1: &Q1, key2: &Q2, maybe_add: StateKeyInner) -> Arc<Entry>
+    where
+        Key1: Borrow<Q1>,
+        Key2: Borrow<Q2>,
+        Q1: Eq + Hash + ToOwned<Owned = Key1> + ?Sized,
+        Q2: Eq + Hash + ToOwned<Owned = Key2> + ?Sized,
+    {
+        if let Some(entry) = self.try_get(key1, key2) {
+            return entry;
+        }
+
+        self.lock_and_get_or_add(key1, key2, maybe_add)
     }
 
     fn lock_and_remove(&self, key1: &Key1, key2: &Key2) {
@@ -391,32 +413,15 @@ impl StateKey {
         }
     }
 
-    fn from_deserialized(deserialized: StateKeyInner) -> Self {
-        use access_path::Path;
-
-        match deserialized {
-            StateKeyInner::AccessPath(AccessPath { address, path }) => {
-                match bcs::from_bytes::<Path>(&path).expect("Failed to parse AccessPath") {
-                    Path::Code(module_id) => Self::module_id(&module_id),
-                    Path::Resource(struct_tag) => Self::resource(&address, &struct_tag),
-                    Path::ResourceGroup(struct_tag) => Self::resource_group(&address, &struct_tag),
-                }
-            },
-            StateKeyInner::TableItem { handle, key } => Self::table_item(&handle, &key),
-            StateKeyInner::Raw(bytes) => Self::raw(&bytes),
-        }
-    }
-
     pub fn resource(address: &AccountAddress, struct_tag: &StructTag) -> Self {
         if let Some(entry) = GLOBAL_REGISTRY.resource_keys.try_get(address, struct_tag) {
             return Self(entry);
         }
 
-        let inner = StateKeyInner::AccessPath(
+        let maybe_add = StateKeyInner::AccessPath(
             AccessPath::resource_access_path(*address, struct_tag.clone())
                 .expect("Failed to create access path"),
         );
-        let maybe_add = EntryInner::from_deserialized(inner);
 
         let entry = GLOBAL_REGISTRY
             .resource_keys
@@ -440,11 +445,10 @@ impl StateKey {
             return Self(entry);
         }
 
-        let inner = StateKeyInner::AccessPath(AccessPath::resource_group_access_path(
+        let maybe_add = StateKeyInner::AccessPath(AccessPath::resource_group_access_path(
             *address,
             struct_tag.clone(),
         ));
-        let maybe_add = EntryInner::from_deserialized(inner);
 
         let entry = GLOBAL_REGISTRY
             .resource_group_keys
@@ -457,11 +461,10 @@ impl StateKey {
             return Self(entry);
         }
 
-        let inner = StateKeyInner::AccessPath(AccessPath::code_access_path(ModuleId::new(
+        let maybe_add = StateKeyInner::AccessPath(AccessPath::code_access_path(ModuleId::new(
             *address,
             name.to_owned(),
         )));
-        let maybe_add = EntryInner::from_deserialized(inner);
 
         let entry = GLOBAL_REGISTRY
             .module_keys
@@ -478,11 +481,10 @@ impl StateKey {
             return Self(entry);
         }
 
-        let inner = StateKeyInner::TableItem {
+        let maybe_add = StateKeyInner::TableItem {
             handle: *handle,
             key: key.to_vec(),
         };
-        let maybe_add = EntryInner::from_deserialized(inner);
 
         let entry = GLOBAL_REGISTRY
             .table_item_keys
@@ -495,13 +497,48 @@ impl StateKey {
             return Self(entry);
         }
 
-        let inner = StateKeyInner::Raw(bytes.to_vec());
-        let maybe_add = EntryInner::from_deserialized(inner);
+        let maybe_add = StateKeyInner::Raw(bytes.to_vec());
 
         let entry = GLOBAL_REGISTRY
             .raw_keys
             .lock_and_get_or_add(bytes, &(), maybe_add);
         Self(entry)
+    }
+
+    fn from_deserialized(deserialized: StateKeyInner) -> Self {
+        use access_path::Path;
+
+        match deserialized {
+            StateKeyInner::AccessPath(AccessPath {
+                ref address,
+                ref path,
+            }) => {
+                let address = *address;
+                match bcs::from_bytes::<Path>(path).expect("Failed to parse AccessPath") {
+                    Path::Code(module_id) => Self(GLOBAL_REGISTRY.module_keys.try_get_or_add(
+                        &address,
+                        &module_id.name,
+                        deserialized,
+                    )),
+                    Path::Resource(struct_tag) => {
+                        Self(GLOBAL_REGISTRY.resource_keys.try_get_or_add(
+                            &address,
+                            &struct_tag,
+                            deserialized,
+                        ))
+                    },
+                    Path::ResourceGroup(struct_tag) => {
+                        Self(GLOBAL_REGISTRY.resource_group_keys.try_get_or_add(
+                            &address,
+                            &struct_tag,
+                            deserialized,
+                        ))
+                    },
+                }
+            },
+            StateKeyInner::TableItem { handle, key } => Self::table_item(&handle, &key),
+            StateKeyInner::Raw(bytes) => Self::raw(&bytes),
+        }
     }
 
     pub fn encode(&self) -> Result<Vec<u8>> {
