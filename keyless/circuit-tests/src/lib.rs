@@ -13,6 +13,8 @@ use tempfile::{tempdir, NamedTempFile, TempDir};
 mod base64;
 #[cfg(test)]
 mod packing;
+#[cfg(test)]
+mod arrays;
 
 pub struct TestCircuitHandle {
     dir: TempDir,

@@ -4,3 +4,5 @@
 pub mod circuit_input_signals;
 pub mod config;
 pub mod witness_gen;
+pub mod bits;
+pub mod sha;
