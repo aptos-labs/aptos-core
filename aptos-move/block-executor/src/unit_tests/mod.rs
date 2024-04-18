@@ -13,8 +13,9 @@ use crate::{
         },
     },
     scheduler::{
-        DependencyResult, ExecutionTaskType, Scheduler, SchedulerTask, TWaitForDependency,
+        DependencyStatus, ExecutionTaskType, Scheduler, SchedulerTask, TWaitForDependency
     },
+    thread_garage::Baton,
     txn_commit_hook::NoOpTransactionCommitHook,
 };
 use aptos_aggregator::{
@@ -654,7 +655,7 @@ fn scheduler_first_wave() {
 #[test]
 fn scheduler_dependency() {
     let s = Scheduler::new(10);
-
+    let baton = Baton::new(0, DependencyStatus::Unresolved);
     for i in 0..5 {
         // Nothing to validate.
         assert_matches!(
@@ -669,11 +670,11 @@ fn scheduler_dependency() {
     // Now we can validate version (0, 0).
     assert_matches!(s.next_task(), SchedulerTask::ValidationTask(0, 0, 0));
     // Current status of 0 is executed - hence, no dependency added.
-    assert_matches!(s.wait_for_dependency(3, 0), Ok(DependencyResult::Resolved));
+    assert_matches!(s.wait_for_dependency(3, 0, baton.clone()), Ok(DependencyStatus::Resolved));
     // Dependency added for transaction 4 on transaction 2.
     assert_matches!(
-        s.wait_for_dependency(4, 2),
-        Ok(DependencyResult::Dependency(_))
+        s.wait_for_dependency(4, 2, baton.clone()),
+        Ok(DependencyStatus::Unresolved)
     );
 
     assert_matches!(s.finish_execution(2, 0, false), Ok(SchedulerTask::Retry));
@@ -714,14 +715,15 @@ fn incarnation_one_scheduler(num_txns: TxnIndex) -> Scheduler {
 fn scheduler_incarnation() {
     let s = incarnation_one_scheduler(5);
 
+    let baton = Baton::new(0, DependencyStatus::Unresolved);
     // execution/validation index = 5, wave = 0.
     assert_matches!(
-        s.wait_for_dependency(1, 0),
-        Ok(DependencyResult::Dependency(_))
+        s.wait_for_dependency(1, 0, baton.clone()),
+        Ok(DependencyStatus::Unresolved)
     );
     assert_matches!(
-        s.wait_for_dependency(3, 0),
-        Ok(DependencyResult::Dependency(_))
+        s.wait_for_dependency(3, 0, baton.clone()),
+        Ok(DependencyStatus::Unresolved)
     );
 
     // Because validation index is higher, return validation task to caller (even with
