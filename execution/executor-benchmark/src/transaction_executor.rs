@@ -37,7 +37,7 @@ where
         executor: Arc<BlockExecutor<V>>,
         parent_block_id: HashValue,
         ledger_update_sender: mpsc::SyncSender<LedgerUpdateMessage>,
-        allow_aborts: bool,
+        _allow_aborts: bool,
         allow_discards: bool,
         allow_retries: bool,
     ) -> Self {
@@ -47,7 +47,7 @@ where
             parent_block_id,
             maybe_first_block_start_time: None,
             ledger_update_sender,
-            allow_aborts,
+            allow_aborts: true,
             allow_discards,
             allow_retries,
         }
