@@ -7,7 +7,6 @@ use crate::{
         error::Error,
         metadata::{ConnectionState, PeerMetadata},
     },
-    peer_manager::ConnectionNotification,
     transport::{ConnectionId, ConnectionMetadata},
     ProtocolId,
 };
@@ -48,8 +47,6 @@ pub struct PeersAndMetadata {
     // trusted_peers have separate locking and access
     trusted_peers: HashMap<NetworkId, Arc<RwLock<PeerSet>>>,
 
-    subscribers: RwLock<Vec<tokio::sync::mpsc::Sender<ConnectionNotification>>>,
-
     // We maintain a cached copy of the peers and metadata. This is useful to
     // reduce lock contention, as we expect very heavy and frequent reads,
     // but infrequent writes. The cache is updated on all underlying updates.
@@ -70,7 +67,6 @@ impl PeersAndMetadata {
             network_ids,
             peers_and_metadata: RwLock::new(HashMap::new()),
             trusted_peers: HashMap::new(),
-            subscribers: RwLock::new(vec![]),
             cached_peers_and_metadata: Arc::new(ArcSwap::from(Arc::new(HashMap::new()))),
             subscribers: Mutex::new(vec![]),
         };
@@ -243,8 +239,6 @@ impl PeersAndMetadata {
 
         // Update the cached peers and metadata
         self.set_cached_peers_and_metadata(writer.clone());
-        let event = ConnectionNotification::NewPeer(connection_metadata, net_context);
-        self.broadcast(event);
 
         let event =
             ConnectionNotification::NewPeer(connection_metadata, peer_network_id.network_id());
@@ -502,9 +496,9 @@ impl fmt::Display for DisconnectReason {
 #[derive(Clone, PartialEq, Eq, Serialize)]
 pub enum ConnectionNotification {
     /// Connection with a new peer has been established.
-    NewPeer(ConnectionMetadata, NetworkContext),
+    NewPeer(ConnectionMetadata, NetworkId),
     /// Connection to a peer has been terminated. This could have been triggered from either end.
-    LostPeer(ConnectionMetadata, NetworkContext, DisconnectReason),
+    LostPeer(ConnectionMetadata, NetworkId),
 }
 
 impl fmt::Debug for ConnectionNotification {
@@ -516,11 +510,11 @@ impl fmt::Debug for ConnectionNotification {
 impl fmt::Display for ConnectionNotification {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         match self {
-            ConnectionNotification::NewPeer(metadata, context) => {
-                write!(f, "[{},{}]", metadata, context)
+            ConnectionNotification::NewPeer(metadata, network_id) => {
+                write!(f, "[{},{}]", metadata, network_id)
             },
-            ConnectionNotification::LostPeer(metadata, context, reason) => {
-                write!(f, "[{},{},{}]", metadata, context, reason)
+            ConnectionNotification::LostPeer(metadata, network_id) => {
+                write!(f, "[{},{}]", metadata, network_id)
             },
         }
     }

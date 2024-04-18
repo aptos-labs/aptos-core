@@ -21,6 +21,7 @@
 pub use crate::protocols::health_checker::interface::HealthCheckNetworkInterface;
 use crate::{
     application::interface::{NetworkClient, NetworkClientInterface},
+    application::storage::ConnectionNotification,
     // constants::NETWORK_CHANNEL_SIZE,
     // counters,
     // logging::NetworkSchema,
