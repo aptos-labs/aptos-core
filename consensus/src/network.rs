@@ -699,7 +699,9 @@ impl NetworkTask {
                 _ => None,
             };
             let sample = thread_rng().gen_range(0.0, 1.0);
-            println!("sample={}", sample);
+            if sender == self.my_addr {
+                println!("0417 - self msg!: {:?}", message);
+            }
             if sender != self.my_addr && sample >= 0.9 {
                 println!("0417 - dropping msg: {:?}", message);
                 continue;
