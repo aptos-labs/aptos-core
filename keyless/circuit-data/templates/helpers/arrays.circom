@@ -8,6 +8,8 @@ include "helpers/misc.circom";
 template ArraySelector(len) {
     signal input start_index;
     signal input end_index;
+    log("start_index: ", start_index);
+    log("end_index: ", end_index);
     signal output out[len];
     assert(end_index > start_index);
 
@@ -129,6 +131,7 @@ template CheckSubstrInclusionPoly(maxStrLen, maxSubstrLen) {
     for (var i = 2; i < maxStrLen; i++) {
         challenge_powers[i] <== challenge_powers[i-1] * random_challenge;
     }
+    log("start_index+substr_len: ", start_index+substr_len);
     signal selector_bits[maxStrLen] <== ArraySelector(maxStrLen)(start_index, start_index+substr_len); 
 
     signal selected_str[maxStrLen];

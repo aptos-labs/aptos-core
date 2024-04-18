@@ -4,6 +4,7 @@ include "helpers/arrays.circom";
 include "helpers/hashtofield.circom";
 include "helpers/packing.circom";
 include "../node_modules/circomlib/circuits/gates.circom";
+include "../node_modules/circomlib/circuits/bitify.circom";
 
 // Checks the given jwt key value pair has a colon in between the name and value, a comma or endbrace at the end, and only whitespace in between the name and colon, colon and value, and value and end character. Returns the name and value fields 
 // We did this instead of a polynomial concatenation check to avoid having to implement a multi-variable concatenation check

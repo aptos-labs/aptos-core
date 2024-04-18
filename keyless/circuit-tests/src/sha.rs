@@ -4,6 +4,7 @@
 use crate::TestCircuitHandle;
 use aptos_keyless_common::input_processing::{
     circuit_input_signals::CircuitInputSignals, config::CircuitPaddingConfig,
+    sha
 };
 use rand::{thread_rng, RngCore};
 use sha2::Digest;
@@ -82,7 +83,7 @@ fn sha_padding_verify_test() {
         let input_bit_len = input_byte_len * 8;
         let mut input = vec![0; input_byte_len];
         rng.fill_bytes(&mut input);
-        let padded_input = sha256_padding(input.as_slice());
+        let padded_input = sha::with_sha_padding_bytes(input.as_slice());
         let padded_input_byte_len = padded_input.len();
         let config = CircuitPaddingConfig::new()
             .max_length("in", 256)
