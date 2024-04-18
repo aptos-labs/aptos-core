@@ -106,7 +106,7 @@ impl FeatureFlag {
             FeatureFlag::SPONSORED_AUTOMATIC_ACCOUNT_V1_CREATION,
             FeatureFlag::FEE_PAYER_ACCOUNT_OPTIONAL,
             FeatureFlag::AGGREGATOR_V2_DELAYED_FIELDS,
-            // FeatureFlag::CONCURRENT_TOKEN_V2,
+            FeatureFlag::CONCURRENT_TOKEN_V2,
             FeatureFlag::LIMIT_MAX_IDENTIFIER_LENGTH,
             FeatureFlag::OPERATOR_BENEFICIARY_CHANGE,
             FeatureFlag::BN254_STRUCTURES,

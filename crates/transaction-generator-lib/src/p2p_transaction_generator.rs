@@ -312,6 +312,7 @@ impl TransactionGenerator for P2PTransactionGenerator {
             let receiver = receivers.get(i).expect("all_addresses can't be empty");
             let request = if num_valid_tx > 0 {
                 num_valid_tx -= 1;
+                println!("sender: {:?}, receiver: {:?}", account.address(), receiver);
                 self.gen_single_txn(account, receiver, self.send_amount, &self.txn_factory)
             } else {
                 self.generate_invalid_transaction(
