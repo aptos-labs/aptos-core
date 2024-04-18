@@ -653,7 +653,7 @@ impl NetworkTask {
 
         // Collect all the network events into a single stream
         let network_events: Vec<_> = network_and_events.into_values().collect();
-        let network_events = select_all(network_events).fuse().filter(|_|thread_rng().gen_range(0.0, 1.0) >= 0.9);
+        let network_events = select_all(network_events).filter(|_|thread_rng().gen_range(0.0, 1.0) >= 0.9).fuse();
         let all_events = Box::new(select(network_events, self_receiver));
 
         (
