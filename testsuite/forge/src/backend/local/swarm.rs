@@ -273,7 +273,7 @@ impl LocalSwarm {
         for validator in self.validators.values_mut() {
             validator.start()?;
         }
-
+        println!("0417 - before wait_all_alive");
         self.wait_all_alive(Duration::from_secs(60)).await?;
         info!("Swarm launched successfully.");
         Ok(())
