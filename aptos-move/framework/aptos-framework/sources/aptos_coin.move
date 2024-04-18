@@ -44,7 +44,7 @@ module aptos_framework::aptos_coin {
             string::utf8(b"Aptos Coin"),
             string::utf8(b"APT"),
             8, // decimals
-            false, // monitor_supply
+            true, // monitor_supply
         );
 
         // Aptos framework needs mint cap to mint coins to initial validators. This will be revoked once the validators

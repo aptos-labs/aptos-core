@@ -65,7 +65,7 @@ pub enum TransactionTypeArg {
     TokenV1NFTMintAndTransferParallel,
     TokenV1FTMintAndStore,
     TokenV1FTMintAndTransfer,
-    TokenV2AmbassadorMint,
+    TokenV2AmbassadorMintFixedSupply,
     TokenV2AmbassadorMintAndBurn1M,
     VectorPictureCreate30k,
     VectorPicture30k,
@@ -402,7 +402,7 @@ impl TransactionTypeArg {
                 num_modules: module_working_set_size,
                 use_account_pool: sender_use_account_pool,
             },
-            TransactionTypeArg::TokenV2AmbassadorMint => TransactionType::CallCustomModules {
+            TransactionTypeArg::TokenV2AmbassadorMintFixedSupply => TransactionType::CallCustomModules {
                 entry_point: EntryPoints::TokenV2AmbassadorMint { numbered: true },
                 num_modules: module_working_set_size,
                 use_account_pool: sender_use_account_pool,
