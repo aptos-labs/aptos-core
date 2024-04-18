@@ -929,6 +929,7 @@ dependencies = [
  "aptos-crypto",
  "aptos-crypto-derive",
  "aptos-executor-types",
+ "aptos-experimental-runtimes",
  "aptos-infallible",
  "aptos-logger",
  "aptos-short-hex-str",

@@ -54,7 +54,7 @@ pub static SIG_VERIFY_POOL: Lazy<Arc<rayon::ThreadPool>> = Lazy::new(|| {
     Arc::new(
         rayon::ThreadPoolBuilder::new()
             .num_threads(8) // More than 8 threads doesn't seem to help much
-            .thread_name(|index| format!("signature-checker-{}", index))
+            .thread_name(|index| format!("sig-verify-chunk-exec-{}", index))
             .build()
             .unwrap(),
     )

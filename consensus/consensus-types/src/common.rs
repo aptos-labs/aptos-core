@@ -10,13 +10,14 @@ use aptos_crypto::{
 };
 use aptos_crypto_derive::CryptoHasher;
 use aptos_executor_types::ExecutorResult;
+use aptos_experimental_runtimes::thread_manager::optimal_min_len;
 use aptos_infallible::Mutex;
 use aptos_logger::prelude::*;
 use aptos_types::{
     account_address::AccountAddress, transaction::SignedTransaction,
     validator_verifier::ValidatorVerifier, vm_status::DiscardedVMStatus, PeerId,
 };
-use once_cell::sync::OnceCell;
+use once_cell::sync::{Lazy, OnceCell};
 use rayon::prelude::*;
 use serde::{Deserialize, Serialize};
 use std::{collections::HashSet, fmt, fmt::Write, sync::Arc};
@@ -28,6 +29,16 @@ use tokio::sync::oneshot;
 pub type Round = u64;
 /// Author refers to the author's account address
 pub type Author = AccountAddress;
+
+pub static SIG_VERIFY_POOL: Lazy<Arc<rayon::ThreadPool>> = Lazy::new(|| {
+    Arc::new(
+        rayon::ThreadPoolBuilder::new()
+            .num_threads(8) // More than 8 threads doesn't seem to help much
+            .thread_name(|index| format!("sig-verify-qs-batch-{}", index))
+            .build()
+            .unwrap(),
+    )
+});
 
 #[derive(Clone, Copy, Debug, Eq, PartialEq, Deserialize, Serialize, Hash, Ord, PartialOrd)]
 pub struct TransactionSummary {
@@ -387,6 +398,19 @@ impl Payload {
         Ok(())
     }
 
+    fn verify_signatures(txns: &[SignedTransaction]) -> anyhow::Result<()> {
+        SIG_VERIFY_POOL.install(|| {
+            let num_txns = txns.len();
+            txns.par_iter()
+                .with_min_len(optimal_min_len(num_txns, 32))
+                .try_for_each(|txn| {
+                    ensure!(txn.verify_signature().is_ok(), "Invalid signature");
+                    Ok(())
+                })?;
+            Ok(())
+        })
+    }
+
     pub fn verify(
         &self,
         validator: &ValidatorVerifier,
@@ -394,13 +418,7 @@ impl Payload {
         quorum_store_enabled: bool,
     ) -> anyhow::Result<()> {
         match (quorum_store_enabled, self) {
-            (false, Payload::DirectMempool(txns)) => {
-                txns.par_iter().with_min_len(8).try_for_each(|txn| {
-                    ensure!(txn.verify_signature().is_ok(), "Invalid signature");
-                    Ok(())
-                })?;
-                Ok(())
-            },
+            (false, Payload::DirectMempool(txns)) => Self::verify_signatures(txns),
             (true, Payload::InQuorumStore(proof_with_status)) => {
                 Self::verify_with_cache(&proof_with_status.proofs, validator, proof_cache)
             },
@@ -417,10 +435,7 @@ impl Payload {
                             == *batch.digest(),
                         "Hash of the received inline batch doesn't match the digest value"
                     );
-                    payload.par_iter().with_min_len(8).try_for_each(|txn| {
-                        ensure!(txn.verify_signature().is_ok(), "Invalid signature");
-                        Ok(())
-                    })?;
+                    Self::verify_signatures(payload)?;
                 }
                 Ok(())
             },
