@@ -11,7 +11,7 @@ use crate::{
 use aptos_channels::{aptos_channel, message_queues::QueueStyle};
 use aptos_config::{
     config::{Identity, NodeConfig, PeerRole, RoleType},
-    network_id::{NetworkContext, NetworkId, PeerNetworkId},
+    network_id::{NetworkId, PeerNetworkId},
 };
 use aptos_crypto::{x25519::PrivateKey, Uniform};
 use aptos_event_notifications::{ReconfigNotification, ReconfigNotificationListener};
@@ -413,16 +413,9 @@ impl Node {
         metadata
             .application_protocols
             .insert(ProtocolId::MempoolDirectSend);
-        let notif = ConnectionNotification::NewPeer(metadata.clone(), NetworkContext::mock());
         self.peers_and_metadata
             .insert_connection_metadata(peer_network_id, metadata)
             .unwrap();
-        self.send_connection_event(peer_network_id.network_id(), notif);
-    }
-
-    /// Sends a connection event, and waits for the notification to arrive
-    fn send_connection_event(&mut self, network_id: NetworkId, notif: ConnectionNotification) {
-        self.send_network_notif(network_id, notif);
         self.wait_for_event(SharedMempoolNotification::PeerStateChange);
     }
 
@@ -471,12 +464,6 @@ impl Node {
     ) {
         self.get_network_interface(peer_network_id.network_id())
             .send_network_req(protocol, &peer_network_id, notif);
-    }
-
-    /// Sends a `ConnectionNotification` to the local node
-    pub fn send_network_notif(&mut self, network_id: NetworkId, notif: ConnectionNotification) {
-        self.get_network_interface(network_id)
-            .send_connection_notif(notif)
     }
 }
 

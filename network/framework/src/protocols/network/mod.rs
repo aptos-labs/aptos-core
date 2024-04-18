@@ -257,7 +257,7 @@ impl<TMessage: Message + Unpin> NewNetworkEvents for NetworkEvents<TMessage> {
             phantom: Default::default(),
             label: label.to_string(),
             contexts,
-        }
+	}
     }
 }
 

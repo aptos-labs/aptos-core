@@ -17,7 +17,7 @@ use aptos_consensus_types::common::Author;
 use aptos_logger::debug;
 use aptos_network2::{
     application::interface::NetworkClient,
-    peer_manager::{conn_notifs_channel, ConnectionRequestSender, PeerManagerRequestSender},
+    peer_manager::{ConnectionRequestSender, PeerManagerRequestSender},
     protocols::{
         network::{self, Event, NetworkEvents, NewNetworkEvents, NewNetworkSender},
         wire::handshake::v1::ProtocolIdSet,
@@ -147,7 +147,6 @@ fn create_network(
     let (connection_reqs_tx, _) = aptos_channel::new(QueueStyle::FIFO, 8, None);
     let (consensus_tx, consensus_rx) = aptos_channel::new(QueueStyle::FIFO, 8, None);
     let (_conn_mgr_reqs_tx, conn_mgr_reqs_rx) = aptos_channels::new_test(8);
-    let (_, conn_status_rx) = conn_notifs_channel::new();
     let network_sender = network::NetworkSender::new(
         PeerManagerRequestSender::new(network_reqs_tx),
         ConnectionRequestSender::new(connection_reqs_tx),
@@ -159,7 +158,7 @@ fn create_network(
         playground.peer_protocols(),
     );
     let consensus_network_client = ConsensusNetworkClient::new(network_client);
-    let network_events = NetworkEvents::new(consensus_rx, conn_status_rx, None);
+    let network_events = NetworkEvents::new(consensus_rx, None);
 
     let (self_sender, self_receiver) = aptos_channels::new_unbounded_test();
     let network = NetworkSender::new(author, consensus_network_client, self_sender, validators);

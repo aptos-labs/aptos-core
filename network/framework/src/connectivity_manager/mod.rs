@@ -1159,7 +1159,7 @@ where
             "Connection notification"
         );
         match notif {
-            ConnectionNotification::NewPeer(metadata, _context) => {
+            ConnectionNotification::NewPeer(metadata, _network_id) => {
                 let peer_id = metadata.remote_peer_id;
                 counters::peer_connected(&self.network_context, &peer_id, 1);
 
@@ -1167,7 +1167,7 @@ where
                 self.dial_states.remove(&peer_id);
                 self.dial_queue.remove(&peer_id).map(|x| x.send(()));
             },
-            ConnectionNotification::LostPeer(metadata, _context, _reason) => {
+            ConnectionNotification::LostPeer(metadata, _network_id) => {
                 let peer_id = metadata.remote_peer_id;
                 counters::peer_connected(&self.network_context, &peer_id, 0);
 

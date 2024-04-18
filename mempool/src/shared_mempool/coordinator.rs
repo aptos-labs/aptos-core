@@ -264,9 +264,7 @@ async fn handle_mempool_reconfig_event<NetworkClient, TransactionValidator, Conf
         .await;
 }
 
-/// Handles all NewPeer, LostPeer, and network messages.
-/// - NewPeer events start new automatic broadcasts if the peer is upstream. If the peer is not upstream, we ignore it.
-/// - LostPeer events disable the upstream peer, which will cancel ongoing broadcasts.
+/// Handles all network messages.
 /// - Network messages follow a simple Request/Response framework to accept new transactions
 /// TODO: Move to RPC off of DirectSend
 async fn handle_network_event<NetworkClient, TransactionValidator>(

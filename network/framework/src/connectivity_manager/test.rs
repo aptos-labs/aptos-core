@@ -211,11 +211,7 @@ impl TestHarness {
         //     ConnectionOrigin::Outbound,
         // );
         // metadata.addr = address;
-        // let notif = peer_manager::ConnectionNotification::LostPeer(
-        //     metadata,
-        //     NetworkContext::mock(),
-        //     DisconnectReason::ConnectionLost,
-        // );
+        // let notif = peer_manager::ConnectionNotification::LostPeer(metadata, NetworkId::Validator);
         // self.send_notification_await_delivery(peer_id, notif).await;
         let peer_network_id = PeerNetworkId::new(self.network_context.network_id(), peer_id);
         let pm = self

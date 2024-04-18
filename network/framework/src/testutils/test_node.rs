@@ -4,8 +4,7 @@
 
 use crate::protocols::network::OutboundPeerConnections;
 use crate::{
-    application::metadata::ConnectionState,
-    application::storage::PeersAndMetadata,
+    application::{metadata::ConnectionState, storage::PeersAndMetadata},
     // application::{metadata::ConnectionState, storage::{PeersAndMetadata,DisconnectReason}},
     // peer_manager::{ConnectionNotification, PeerManagerNotification, PeerManagerRequest},
     // protocols::{
@@ -54,12 +53,7 @@ pub struct InboundNetworkHandle {
 // #[cfg(obsolete)]
 impl InboundNetworkHandle {
     /// Push connection update, and update the local storage
-    pub fn connect(
-        &self,
-        _role: RoleType, // TODO: use in logging?
-        self_peer_network_id: PeerNetworkId,
-        conn_metadata: ConnectionMetadata,
-    ) {
+    pub fn connect(&self, self_peer_network_id: PeerNetworkId, conn_metadata: ConnectionMetadata) {
         // PeerManager pushes this data before it's received by events
         let network_id = self_peer_network_id.network_id();
         let peer_id = conn_metadata.remote_peer_id;
@@ -69,27 +63,14 @@ impl InboundNetworkHandle {
                 conn_metadata.clone(),
             )
             .unwrap();
-
-        // let self_peer_id = self_peer_network_id.peer_id();
-        // self.connection_update_sender
-        //     .push(
-        //         conn_metadata.remote_peer_id,
-        //         ConnectionNotification::NewPeer(
-        //             conn_metadata,
-        //             NetworkContext::new(role, network_id, self_peer_id),
-        //         ),
-        //     )
-        //     .unwrap();
     }
 
     /// Push disconnect update, and update the local storage
     pub fn disconnect(
         &self,
-        _role: RoleType, // TODO: use in logging?
         self_peer_network_id: PeerNetworkId,
         conn_metadata: ConnectionMetadata,
     ) {
-        // let self_peer_id = self_peer_network_id.peer_id();
         let network_id = self_peer_network_id.network_id();
 
         // Set the state of the peer as disconnected
@@ -97,18 +78,6 @@ impl InboundNetworkHandle {
         self.peers_and_metadata
             .update_connection_state(peer_network_id, ConnectionState::Disconnected)
             .unwrap();
-
-        // Push the notification of the lost peer
-        // self.connection_update_sender
-        //     .push(
-        //         conn_metadata.remote_peer_id,
-        //         ConnectionNotification::LostPeer(
-        //             conn_metadata,
-        //             NetworkContext::new(role, network_id, self_peer_id),
-        //             DisconnectReason::ConnectionLost,
-        //         ),
-        //     )
-        //     .unwrap();
     }
 }
 
@@ -236,7 +205,7 @@ pub trait TestNode: ApplicationNode + Sync {
         // Tell the other node it's good to send to the connected peer now
         let remote_peer_network_id = PeerNetworkId::new(network_id, remote_peer_id);
         self.get_inbound_handle_for_peer(remote_peer_network_id)
-            .connect(self.node_id().role(), remote_peer_network_id, self_metadata);
+            .connect(remote_peer_network_id, self_metadata);
 
         // Then connect us
         self.connect_self(network_id, metadata);
@@ -244,20 +213,14 @@ pub trait TestNode: ApplicationNode + Sync {
 
     /// Connects only the local side, useful for mocking the other node
     fn connect_self(&self, network_id: NetworkId, metadata: ConnectionMetadata) {
-        self.get_inbound_handle(network_id).connect(
-            self.node_id().role(),
-            self.peer_network_id(network_id),
-            metadata,
-        );
+        self.get_inbound_handle(network_id)
+            .connect(self.peer_network_id(network_id), metadata);
     }
 
     /// Disconnects only the local side, useful for mocking the other node
     fn disconnect_self(&self, network_id: NetworkId, metadata: ConnectionMetadata) {
-        self.get_inbound_handle(network_id).disconnect(
-            self.node_id().role(),
-            self.peer_network_id(network_id),
-            metadata,
-        );
+        self.get_inbound_handle(network_id)
+            .disconnect(self.peer_network_id(network_id), metadata);
     }
 
     /// Find a common [`NetworkId`] between nodes based on [`NodeType`]

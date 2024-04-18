@@ -77,6 +77,7 @@ jobs:
       && !cancelled()
     needs: [ rust-unit-coverage, rust-smoke-coverage ]
     runs-on: ubuntu-latest
+    continue-on-error: true # Don't fail if the codecov upload fails
     steps:
       - uses: actions/checkout@v3
       - uses: actions/download-artifact@v3

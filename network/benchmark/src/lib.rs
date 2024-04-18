@@ -25,7 +25,7 @@ use futures::{
 use once_cell::sync::Lazy;
 use rand::{rngs::OsRng, Rng};
 use serde::{Deserialize, Serialize};
-use std::{ops::DerefMut, sync::Arc, time::Duration};
+use std::{collections::HashSet, ops::DerefMut, sync::Arc, time::Duration};
 use tokio::{runtime::Handle, select, sync::RwLock};
 use aptos_network2::application::error::Error;
 use aptos_network2::application::storage::ConnectionNotification;
@@ -273,8 +273,9 @@ pub async fn run_netbench_service(
     }
     let listener_task_result = listener_task.await;
     info!("netbench listener_task exited {:?}",listener_task_result);
-    let source_task_result = source_task.await;
-    info!("netbench source_task exited {:?}", source_task_result);
+    if let Err(err) = source_task.await {
+        warn!("benchmark source_thread join: {}", err);
+    }
     for hai in handlers {
         if let Err(err) = hai.await {
             warn!("netbench handler_thread[] join: {}", err);
@@ -353,6 +354,64 @@ async fn connection_listener(
                     // don't care, things will disconnect elsewhere
                 }
             }
+        }
+    }
+}
+
+async fn connection_listener(
+    node_config: NodeConfig,
+    network_client: NetworkClient<NetbenchMessage>,
+    time_service: TimeService,
+    shared: Arc<RwLock<NetbenchSharedState>>,
+    handle: Handle,
+) {
+    let config = node_config.netbench.unwrap();
+    let peers_and_metadata = network_client.get_peers_and_metadata();
+    let mut connected_peers = HashSet::new();
+    let mut connection_notifications = peers_and_metadata.subscribe();
+    loop {
+        match connection_notifications.recv().await {
+            None => {
+                info!("netbench connection_listener exit");
+                return;
+            },
+            Some(note) => match note {
+                ConnectionNotification::NewPeer(meta, network_id) => {
+                    let peer_network_id = PeerNetworkId::new(network_id, meta.remote_peer_id);
+                    if connected_peers.contains(&peer_network_id) {
+                        continue;
+                    }
+                    info!(
+                        "netbench connection_listener new {:?} {:?}",
+                        meta, network_id
+                    );
+                    if config.enable_direct_send_testing {
+                        handle.spawn(direct_sender(
+                            node_config.clone(),
+                            network_client.clone(),
+                            time_service.clone(),
+                            network_id,
+                            meta.remote_peer_id,
+                            shared.clone(),
+                        ));
+                    }
+                    if config.enable_rpc_testing {
+                        handle.spawn(rpc_sender(
+                            node_config.clone(),
+                            network_client.clone(),
+                            time_service.clone(),
+                            network_id,
+                            meta.remote_peer_id,
+                            shared.clone(),
+                        ));
+                    }
+                    connected_peers.insert(peer_network_id);
+                },
+                ConnectionNotification::LostPeer(meta, network_id) => {
+                    let peer_network_id = PeerNetworkId::new(network_id, meta.remote_peer_id);
+                    connected_peers.remove(&peer_network_id);
+                },
+            },
         }
     }
 }
