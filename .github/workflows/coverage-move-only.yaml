@@ -61,6 +61,7 @@ jobs:
         with:
           name: lcov_unit
       - name: Upload coverage to Codecov
+        continue-on-error: true # Don't fail if the codecov upload fails
         uses: codecov/codecov-action@d9f34f8cd5cb3b3eb79b3e4b5dae3a16df499a70 # pin@v3
         with:
           files: lcov_unit.info
