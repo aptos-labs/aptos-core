@@ -46,8 +46,9 @@ pub fn witness_gen(
         Ok(witness_file)
     } else {
         // Print the error message if the command failed
+        let stdout = String::from_utf8_lossy(&output.stdout);
         let stderr = String::from_utf8_lossy(&output.stderr);
-        bail!("Command failed:\n{}", stderr);
+        bail!("Command failed:\n{}\n{}", stdout,stderr);
     }
 }
 

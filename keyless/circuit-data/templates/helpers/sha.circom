@@ -89,6 +89,8 @@ template Sha2PaddingVerify(maxInputLen) {
     var len_bits = num_blocks * 512;
     var padding_start_bits = padding_start * 8;
     var K = len_bits - padding_start_bits - 1 - 64; 
+    log("K: ", K);
+    log("(1+K)/8: ", (1+K)/8);
 
     // Ensure K is smallest value below 512 that satisfies above equation
     signal K_is_correct <== LessThan(10)([K,512]);

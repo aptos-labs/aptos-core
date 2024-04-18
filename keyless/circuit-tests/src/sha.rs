@@ -100,6 +100,7 @@ fn sha_padding_verify_test() {
         println!("circuit_input_signals={:?}", circuit_input_signals);
         let result = circuit_handle.gen_witness(circuit_input_signals);
         println!("input_byte_len={}, result={:?}", input_byte_len, result);
+        println!("{:?}", result);
         assert!(result.is_ok());
     }
 }
