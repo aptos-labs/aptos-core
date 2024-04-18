@@ -1006,7 +1006,7 @@ where
             "Connection notification"
         );
         match notif {
-            peer_manager::ConnectionNotification::NewPeer(metadata, _context) => {
+            peer_manager::ConnectionNotification::NewPeer(metadata, _network_id) => {
                 let peer_id = metadata.remote_peer_id;
                 counters::peer_connected(&self.network_context, &peer_id, 1);
                 self.connected.insert(peer_id, metadata);
@@ -1015,7 +1015,7 @@ where
                 self.dial_states.remove(&peer_id);
                 self.dial_queue.remove(&peer_id);
             },
-            peer_manager::ConnectionNotification::LostPeer(metadata, _context, _reason) => {
+            peer_manager::ConnectionNotification::LostPeer(metadata, _network_id) => {
                 let peer_id = metadata.remote_peer_id;
                 if let Some(stored_metadata) = self.connected.get(&peer_id) {
                     // Remove node from connected peers list.

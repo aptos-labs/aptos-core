@@ -89,7 +89,6 @@ impl ConsensusObserverNetworkEvents {
                 };
                 Some(network_message)
             },
-            _ => None, // We don't care about connection events
         }
     }
 }
