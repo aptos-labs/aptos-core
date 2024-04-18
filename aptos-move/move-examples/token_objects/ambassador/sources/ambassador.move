@@ -119,9 +119,10 @@ module ambassador::ambassador {
         let uri = string::utf8(COLLECTION_URI);
 
         // Creates the collection with unlimited supply and without establishing any royalty configuration.
-        collection::create_unlimited_collection(
+        collection::create_fixed_collection(
             creator,
             description,
+            66000,
             name,
             option::none(),
             uri,

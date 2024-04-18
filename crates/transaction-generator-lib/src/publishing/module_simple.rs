@@ -1023,13 +1023,14 @@ fn modify_array_agg_v2_limit_1000(module_id: ModuleId, rng: &mut StdRng, step: u
 }
 
 fn modify_read_agg_v2(module_id: ModuleId, rng: &mut StdRng, prob: u64) -> TransactionPayload {
-    let inc_or_read = rng.gen_range(0usize, 100) < prob as usize;
+    let inc_or_read: bool = rng.gen_range(0, 100) < prob;
+    let step: u64 = 1;
     get_payload(
         module_id,
         ident_str!("modify_read_agg_v2").to_owned(),
         vec![
             bcs::to_bytes(&inc_or_read).unwrap(),
-            bcs::to_bytes(&1).unwrap(),
+            bcs::to_bytes(&step).unwrap(),
         ],
     )
 }
