@@ -15,6 +15,8 @@ use tempfile::{tempdir, NamedTempFile, TempDir};
 mod base64;
 #[cfg(test)]
 mod sha;
+#[cfg(test)]
+mod arrays;
 
 pub struct TestCircuitHandle {
     dir: TempDir,
