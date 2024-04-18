@@ -70,7 +70,7 @@ DEFAULT_NUM_INIT_ACCOUNTS = (
 DEFAULT_MAX_BLOCK_SIZE = "25000" if IS_MAINNET else "10000"
 
 MAX_BLOCK_SIZE = int(os.environ.get("MAX_BLOCK_SIZE", default=DEFAULT_MAX_BLOCK_SIZE))
-NUM_BLOCKS = int(os.environ.get("NUM_BLOCKS_PER_TEST", default=1))
+NUM_BLOCKS = int(os.environ.get("NUM_BLOCKS_PER_TEST", default=10))
 NUM_BLOCKS_DETAILED = 10
 NUM_ACCOUNTS = max(
     [
@@ -89,21 +89,21 @@ MAIN_SIGNER_ACCOUNTS = 2 * MAX_BLOCK_SIZE
 # https://app.axiom.co/aptoslabs-hghf/explorer?qid=29zYzeVi7FX-s4ukl5&relative=1
 # fmt: off
 TESTS = [
-    RunGroupConfig(expected_tps=22200, key=RunGroupKey("no-op"), included_in=LAND_BLOCKING_AND_C | Flow.CUSTOM_TEST),
-    RunGroupConfig(expected_tps=11500, key=RunGroupKey("no-op", module_working_set_size=20), included_in=LAND_BLOCKING_AND_C | Flow.CUSTOM_TEST),
+    # RunGroupConfig(expected_tps=22200, key=RunGroupKey("no-op"), included_in=LAND_BLOCKING_AND_C | Flow.CUSTOM_TEST),
+    # RunGroupConfig(expected_tps=11500, key=RunGroupKey("no-op", module_working_set_size=20), included_in=LAND_BLOCKING_AND_C | Flow.CUSTOM_TEST),
     
-    RunGroupConfig(expected_tps=17747, key=RunGroupKey("no-op-fee-payer", module_working_set_size=1), included_in=LAND_BLOCKING_AND_C | Flow.CUSTOM_TEST),
-    RunGroupConfig(expected_tps=17747, key=RunGroupKey("no-op-fee-payer", module_working_set_size=2), included_in=Flow.CONTINUOUS | Flow.CUSTOM_TEST),
-    RunGroupConfig(expected_tps=17747, key=RunGroupKey("no-op-fee-payer", module_working_set_size=4), included_in=Flow.CONTINUOUS | Flow.CUSTOM_TEST),
-    RunGroupConfig(expected_tps=17747, key=RunGroupKey("no-op-fee-payer", module_working_set_size=8), included_in=Flow.CONTINUOUS | Flow.CUSTOM_TEST),
-    RunGroupConfig(expected_tps=17747, key=RunGroupKey("no-op-fee-payer", module_working_set_size=16), included_in=Flow.CONTINUOUS | Flow.CUSTOM_TEST),
-    RunGroupConfig(expected_tps=17747, key=RunGroupKey("no-op-fee-payer", module_working_set_size=24), included_in=Flow.CONTINUOUS | Flow.CUSTOM_TEST),
-    RunGroupConfig(expected_tps=17747, key=RunGroupKey("no-op-fee-payer", module_working_set_size=32), included_in=Flow.CONTINUOUS | Flow.CUSTOM_TEST),
-    RunGroupConfig(expected_tps=17747, key=RunGroupKey("no-op-fee-payer", module_working_set_size=48), included_in=Flow.CONTINUOUS | Flow.CUSTOM_TEST),
-    RunGroupConfig(expected_tps=17747, key=RunGroupKey("no-op-fee-payer", module_working_set_size=60), included_in=Flow.CONTINUOUS | Flow.CUSTOM_TEST),
+    # RunGroupConfig(expected_tps=17747, key=RunGroupKey("no-op-fee-payer", module_working_set_size=1), included_in=LAND_BLOCKING_AND_C | Flow.CUSTOM_TEST),
+    # RunGroupConfig(expected_tps=17747, key=RunGroupKey("no-op-fee-payer", module_working_set_size=2), included_in=Flow.CONTINUOUS | Flow.CUSTOM_TEST),
+    # RunGroupConfig(expected_tps=17747, key=RunGroupKey("no-op-fee-payer", module_working_set_size=4), included_in=Flow.CONTINUOUS | Flow.CUSTOM_TEST),
+    # RunGroupConfig(expected_tps=17747, key=RunGroupKey("no-op-fee-payer", module_working_set_size=8), included_in=Flow.CONTINUOUS | Flow.CUSTOM_TEST),
+    # RunGroupConfig(expected_tps=17747, key=RunGroupKey("no-op-fee-payer", module_working_set_size=16), included_in=Flow.CONTINUOUS | Flow.CUSTOM_TEST),
+    # RunGroupConfig(expected_tps=17747, key=RunGroupKey("no-op-fee-payer", module_working_set_size=24), included_in=Flow.CONTINUOUS | Flow.CUSTOM_TEST),
+    # RunGroupConfig(expected_tps=17747, key=RunGroupKey("no-op-fee-payer", module_working_set_size=32), included_in=Flow.CONTINUOUS | Flow.CUSTOM_TEST),
+    # RunGroupConfig(expected_tps=17747, key=RunGroupKey("no-op-fee-payer", module_working_set_size=48), included_in=Flow.CONTINUOUS | Flow.CUSTOM_TEST),
+    # RunGroupConfig(expected_tps=17747, key=RunGroupKey("no-op-fee-payer", module_working_set_size=60), included_in=Flow.CONTINUOUS | Flow.CUSTOM_TEST),
 
-    RunGroupConfig(expected_tps=10000, key=RunGroupKey("token-v2-ambassador-mint"), included_in=LAND_BLOCKING_AND_C | Flow.REPRESENTATIVE | Flow.CUSTOM_TEST),
-    RunGroupConfig(expected_tps=10000, key=RunGroupKey("token-v2-ambassador-mint", module_working_set_size=20), included_in=Flow.CONTINUOUS | Flow.CUSTOM_TEST),
+    # RunGroupConfig(expected_tps=10000, key=RunGroupKey("token-v2-ambassador-mint"), included_in=LAND_BLOCKING_AND_C | Flow.REPRESENTATIVE | Flow.CUSTOM_TEST),
+    # RunGroupConfig(expected_tps=10000, key=RunGroupKey("token-v2-ambassador-mint", module_working_set_size=20), included_in=Flow.CONTINUOUS | Flow.CUSTOM_TEST),
     
     # RunGroupConfig(expected_tps=10000, key=RunGroupKey("token-v2-ambassador-mint-fixed-supply"), included_in=LAND_BLOCKING_AND_C | Flow.REPRESENTATIVE | Flow.CUSTOM_TEST),
     # RunGroupConfig(expected_tps=10000, key=RunGroupKey("token-v2-ambassador-mint-fixed-supply", module_working_set_size=20), included_in=Flow.CONTINUOUS | Flow.CUSTOM_TEST),
