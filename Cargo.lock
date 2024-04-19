@@ -817,7 +817,6 @@ dependencies = [
  "aptos-short-hex-str",
  "aptos-types",
  "bcs 0.1.4",
- "futures",
  "itertools 0.10.5",
  "mirai-annotations",
  "once_cell",
@@ -826,7 +825,6 @@ dependencies = [
  "rayon",
  "serde",
  "serde_json",
- "tokio",
 ]
 
 [[package]]

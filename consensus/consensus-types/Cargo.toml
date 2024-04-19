@@ -23,7 +23,6 @@ aptos-logger = { workspace = true }
 aptos-short-hex-str = { workspace = true }
 aptos-types = { workspace = true }
 bcs = { workspace = true }
-futures = { workspace = true }
 itertools = { workspace = true }
 mirai-annotations = { workspace = true }
 once_cell = { workspace = true }
@@ -31,7 +30,6 @@ proptest = { workspace = true, optional = true }
 rand = { workspace = true }
 rayon = { workspace = true }
 serde = { workspace = true }
-tokio = { workspace = true }
 
 [dev-dependencies]
 aptos-types = { workspace = true, features = ["fuzzing"] }
