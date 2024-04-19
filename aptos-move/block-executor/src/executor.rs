@@ -316,8 +316,9 @@ where
             ));
         }
 
-        // Note: we validate delayed field reads only at try_commit.
-        // TODO[agg_v2](optimize): potentially add some basic validation.
+        // Note: For Delayed Fields:
+        // Ee validate reads here, but not other reveals.
+        // We re-validate everything at try_commit, so validation here doesn't need to catch all incorrect speculation.
         // TODO[agg_v2](optimize): potentially add more sophisticated validation, but if it fails,
         // we mark it as a soft failure, requires some new statuses in the scheduler
         // (i.e. not re-execute unless some other part of the validation fails or
@@ -326,7 +327,8 @@ where
         // TODO: validate modules when there is no r/w fallback.
         Ok(
             read_set.validate_data_reads(versioned_cache.data(), idx_to_validate)
-                && read_set.validate_group_reads(versioned_cache.group_data(), idx_to_validate),
+                && read_set.validate_group_reads(versioned_cache.group_data(), idx_to_validate)
+                && read_set.partially_validate_delayed_field_reads(versioned_cache.delayed_fields(), idx_to_validate)?
         )
     }
 
