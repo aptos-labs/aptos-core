@@ -91,6 +91,7 @@ members = [
     "crates/aptos-rosetta-cli",
     "crates/aptos-runtimes",
     "crates/aptos-speculative-state-helper",
+    "crates/aptos-system-utils",
     "crates/aptos-telemetry",
     "crates/aptos-telemetry-service",
     "crates/aptos-temppath",
@@ -420,6 +421,7 @@ aptos-storage-service-client = { path = "state-sync/storage-service/client" }
 aptos-storage-service-notifications = { path = "state-sync/inter-component/storage-service-notifications" }
 aptos-storage-service-types = { path = "state-sync/storage-service/types" }
 aptos-storage-service-server = { path = "state-sync/storage-service/server" }
+aptos-system-utils = { path = "crates/aptos-system-utils" }
 aptos-telemetry = { path = "crates/aptos-telemetry" }
 aptos-telemetry-service = { path = "crates/aptos-telemetry-service" }
 aptos-temppath = { path = "crates/aptos-temppath" }

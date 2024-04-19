@@ -4,14 +4,14 @@
 #![allow(unused)]
 
 use anyhow::{Error, Result};
-use aptos_logger::debug;
 use http::header::{HeaderName, HeaderValue};
 use hyper::{Body, Response, StatusCode};
 use std::{convert::Into, iter::IntoIterator};
+use tracing::debug;
 
 pub const UNEXPECTED_ERROR_MESSAGE: &str = "An unexpected error was encountered!";
 
-pub(crate) async fn spawn_blocking<F, T>(func: F) -> Result<T>
+pub async fn spawn_blocking<F, T>(func: F) -> Result<T>
 where
     F: FnOnce() -> Result<T> + Send + 'static,
     T: Send + 'static,
@@ -21,14 +21,14 @@ where
         .map_err(Error::msg)?
 }
 
-pub(crate) fn reply_with_status<T>(status_code: StatusCode, message: T) -> Response<Body>
+pub fn reply_with_status<T>(status_code: StatusCode, message: T) -> Response<Body>
 where
     T: Into<Body>,
 {
     reply_with_internal(status_code, [], message)
 }
 
-pub(crate) fn reply_with<H, T>(headers: H, body: T) -> Response<Body>
+pub fn reply_with<H, T>(headers: H, body: T) -> Response<Body>
 where
     H: IntoIterator<Item = (HeaderName, HeaderValue)>,
     T: Into<Body>,
