@@ -100,7 +100,7 @@ pub const SUBMITTED_BY_DOWNSTREAM_LABEL: &str = "downstream";
 pub const SUBMITTED_BY_PEER_VALIDATOR_LABEL: &str = "peer_validator";
 
 // Histogram buckets with a large range of 0-500s and some constant sized buckets between:
-// 0-1.3s (every 25ms), 1.3-2s (every 1-00ms), 2-5s (250ms), 5-10s (1s), and 10-25s (2.5s).
+// 0-1.3s (every 25ms), 1.3-2s (every 100ms), 2-5s (250ms), 5-10s (1s), and 10-25s (2.5s).
 const MEMPOOL_LATENCY_BUCKETS: &[f64] = &[
     0.025, 0.05, 0.075, 0.1, 0.125, 0.15, 0.175, 0.2, 0.225, 0.250, 0.275, 0.3, 0.325, 0.35, 0.375,
     0.4, 0.425, 0.45, 0.475, 0.5, 0.525, 0.55, 0.575, 0.6, 0.625, 0.65, 0.675, 0.7, 0.725, 0.75,
