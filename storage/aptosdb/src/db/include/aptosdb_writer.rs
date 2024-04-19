@@ -701,6 +701,7 @@ impl AptosDB {
         )?;
         // Revert the state kv and ledger metadata not yet implemented
         self.state_store
+            .state_kv_db
             .revert_state_kv_and_ledger_metadata(last_version)?;
 
         // Update the latest ledger info if provided
