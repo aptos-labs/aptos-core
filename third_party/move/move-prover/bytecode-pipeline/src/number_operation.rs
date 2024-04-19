@@ -217,6 +217,14 @@ impl GlobalNumberOperationState {
             } else {
                 // If not appearing in the pragma, mark it as Arithmetic or Bottom
                 // Similar logic when populating ret_operation_map below
+                let opt_local_type = func_env.get_local_type(i);
+                if opt_local_type.is_none() {
+                    panic!(
+                        "No local type for {} of func {}",
+                        i,
+                        func_env.get_full_name_str()
+                    );
+                }
                 let local_ty = func_env.get_local_type(i).expect(COMPILED_MODULE_AVAILABLE);
                 let arith_flag = if let Type::Reference(_, tr) = local_ty {
                     tr.is_number()

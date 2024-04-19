@@ -15,7 +15,9 @@ use move_compiler::{command_line::SKIP_ATTRIBUTE_CHECKS, shared::NumericalAddres
 use move_docgen::DocgenOptions;
 use move_errmapgen::ErrmapOptions;
 use move_model::{
-    metadata::LanguageVersion, model::VerificationScope, options::ModelBuilderOptions,
+    metadata::{CompilerVersion, LanguageVersion},
+    model::VerificationScope,
+    options::ModelBuilderOptions,
 };
 use move_prover_boogie_backend::options::{BoogieOptions, CustomNativeOptions, VectorTheory};
 use move_prover_bytecode_pipeline::options::{AutoTraceLevel, ProverOptions};
@@ -108,7 +110,10 @@ impl Default for Options {
             errmapgen: ErrmapOptions::default(),
             experimental_pipeline: false,
             skip_attribute_checks: false,
-            compiler_v2: false,
+            compiler_v2: match CompilerVersion::default() {
+                CompilerVersion::V1 => false,
+                CompilerVersion::V2_0 => true,
+            },
             language_version: None,
         }
     }

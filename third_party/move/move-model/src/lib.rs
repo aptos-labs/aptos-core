@@ -296,7 +296,8 @@ pub fn run_model_builder_with_options_and_compilation_flags<
         E::Program { modules, scripts }
     };
 
-    if !compile_via_model {
+    let default_compiler = metadata::CompilerVersion::default();
+    if !compile_via_model && default_compiler == metadata::CompilerVersion::V1 {
         // Legacy compilation via v1 compiler
         // TODO: eventually remove this code and related helpers
 
