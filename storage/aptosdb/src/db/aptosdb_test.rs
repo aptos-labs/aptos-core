@@ -35,6 +35,9 @@ use aptos_types::{
 };
 use proptest::prelude::*;
 use std::{collections::HashSet, sync::Arc};
+use aptos_executor_types::StateComputeResult;
+use aptos_types::proof::position::Position;
+use aptos_types::transaction::Transaction;
 use test_helper::{test_save_blocks_impl, test_sync_transactions_impl};
 
 proptest! {
@@ -311,6 +314,119 @@ pub fn test_state_merkle_pruning_impl(
             .collect();
 
         assert_eq!(expected_nodes, all_nodes);
+    }
+
+    #[test]
+    fn test_revert_last_commit() {
+        let tmp_dir = TempPath::new();
+        let db = AptosDB::new_for_test(&tmp_dir);
+
+        // Commit some transactions
+        let txns_to_commit = vec![
+            vec![
+                TransactionToCommit::new(
+                    Transaction::UserTransaction(signed_transaction_v2()),
+                    TransactionToCommitMetadata::new(
+                        StateComputeResult::new(
+                            StateChangeSet::new(
+                                HashMap::new(),
+                                HashMap::new(),
+                                Version::new(1),
+                            ),
+                            Vec::new(),
+                            0,
+                            TransactionStatus::Keep(ExecutionStatus::Success),
+                            Arc::new(ExecutedTrees::new_empty()),
+                        ),
+                        None,
+                    ),
+                ),
+            ],
+            vec![
+                TransactionToCommit::new(
+                    Transaction::UserTransaction(signed_transaction_v2()),
+                    TransactionToCommitMetadata::new(
+                        StateComputeResult::new(
+                            StateChangeSet::new(
+                                HashMap::new(),
+                                HashMap::new(),
+                                Version::new(2),
+                            ),
+                            Vec::new(),
+                            0,
+                            TransactionStatus::Keep(ExecutionStatus::Success),
+                            Arc::new(ExecutedTrees::new_empty()),
+                        ),
+                        None,
+                    ),
+                ),
+            ],
+        ];
+
+        let ledger_info_with_sigs = generate_ledger_info_with_sigs(1, &db, None);
+        db.save_transactions_for_test(
+            &txns_to_commit[0],
+            0,
+            0,
+            Some(&ledger_info_with_sigs),
+            true,
+        )
+            .unwrap();
+
+        let ledger_info_with_sigs = generate_ledger_info_with_sigs(2, &db, None);
+        db.save_transactions_for_test(
+            &txns_to_commit[1],
+            1,
+            1,
+            Some(&ledger_info_with_sigs),
+            true,
+        )
+            .unwrap();
+
+        // Revert the last commit
+        let last_version = 2;
+        let new_root_hash = db
+            .state_store
+            .get_root_hash(last_version - 1)
+            .unwrap()
+            .unwrap();
+        let ledger_info_with_sigs = generate_ledger_info_with_sigs(last_version - 1, &db, None);
+
+        db.revert_last_commit(last_version, new_root_hash, Some(&ledger_info_with_sigs))
+            .unwrap();
+
+        // Check that the latest version is now one less
+        assert_eq!(
+            db.get_latest_ledger_info().unwrap().ledger_info().version(),
+            last_version - 1
+        );
+
+        // Check that the transaction at the reverted version is no longer queryable
+        assert!(db
+            .get_transaction_by_version(last_version)
+            .unwrap()
+            .is_none());
+
+        // Check that the transaction info at the reverted version is no longer queryable
+        assert!(db
+            .get_transaction_info_by_version(last_version)
+            .unwrap()
+            .is_none());
+
+        // Check that the events at the reverted version are no longer queryable
+        assert!(db
+            .get_events_by_version(last_version)
+            .unwrap()
+            .is_empty());
+
+        // Check that the transaction accumulator is reverted
+        let position = Position::from_postorder_index(last_version).unwrap();
+        assert!(db
+            .ledger_db
+            .transaction_accumulator_db()
+            .get_hash_by_position(&position)
+            .unwrap()
+            .is_none());
     }
 }
 

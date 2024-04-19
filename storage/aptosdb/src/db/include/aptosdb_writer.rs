@@ -644,7 +644,7 @@ impl AptosDB {
             .start_timer();
 
         // Revert the ledger commit progress
-        let mut ledger_batch = SchemaBatch::new();
+        let ledger_batch = SchemaBatch::new();
         ledger_batch.put::<DbMetadataSchema>(
             &DbMetadataKey::LedgerCommitProgress,
             &DbMetadataValue::Version(last_version - 1),
@@ -652,7 +652,7 @@ impl AptosDB {
         self.ledger_db.metadata_db().write_schemas(ledger_batch)?;
 
         // Revert the overall commit progress
-        let mut ledger_batch = SchemaBatch::new();
+        let ledger_batch = SchemaBatch::new();
         ledger_batch.put::<DbMetadataSchema>(
             &DbMetadataKey::OverallCommitProgress,
             &DbMetadataValue::Version(last_version - 1),
@@ -661,7 +661,7 @@ impl AptosDB {
 
         let temp_position = Position::from_postorder_index(last_version)?;
         // Revert the transaction accumulator
-        let mut batch = SchemaBatch::new();
+        let batch = SchemaBatch::new();
         self.ledger_db
             .transaction_accumulator_db()
             .revert_transaction_accumulator(last_version, &batch, temp_position)?;
@@ -670,29 +670,32 @@ impl AptosDB {
             .write_schemas(batch)?;
 
         // Revert the transaction info
-        let mut batch = SchemaBatch::new();
+        let batch = SchemaBatch::new();
         self.ledger_db
             .transaction_info_db()
             .delete_transaction_info(last_version, &batch)?;
 
+        let batch = SchemaBatch::new();
         self.ledger_db.transaction_info_db().write_schemas(batch)?;
 
         // Revert the events
-        let mut batch = SchemaBatch::new();
+        let batch = SchemaBatch::new();
         self.ledger_db
             .event_db()
             .delete_events(last_version, &batch)?;
         self.ledger_db.event_db().write_schemas(batch)?;
 
         // Revert the transaction auxiliary data
-        let mut batch = SchemaBatch::new();
+        let batch = SchemaBatch::new();
         TransactionAuxiliaryDataDb::prune(last_version, last_version + 1, &batch)?;
 
+        let batch = SchemaBatch::new();
         self.ledger_db
             .transaction_auxiliary_data_db()
             .write_schemas(batch)?;
 
         // Revert the write set
+        let batch = SchemaBatch::new();
         WriteSetDb::prune(last_version, last_version + 1, &batch)?;
         self.ledger_db.transaction_db().prune_transactions(
             last_version,
