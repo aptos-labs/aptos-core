@@ -313,10 +313,8 @@ impl LedgerInfoWithV0 {
                     "Fail to verify signatures for LedgerInfo with error: {:?}, LedgerInfo: {:?}, signatures: {:?}, num_votes: {}",
                     e, self.ledger_info(), self.signatures, self.signatures.get_num_voters()
                 );
-                use std::backtrace::Backtrace;
-                println!("Custom backtrace: {}", Backtrace::capture());
                 Err(e)
-            }
+            },
         }
     }
 
