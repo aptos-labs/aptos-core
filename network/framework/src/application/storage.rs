@@ -435,13 +435,6 @@ impl PeersAndMetadata {
     }
 
     #[cfg(test)]
-    pub fn close_subscribers(&self) {
-        let mut listeners = self.subscribers.write();
-        // drop all the senders to close them
-        listeners.clear();
-    }
-
-    #[cfg(test)]
     #[cfg(disabled)]
     /// Returns all internal maps (for testing purposes only)
     /// TODO: unused?

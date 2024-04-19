@@ -2,20 +2,18 @@
 // Parts of the project are originally copyright © Meta Platforms, Inc.
 // SPDX-License-Identifier: Apache-2.0
 
-//use tokio::sync::mpsc::error::TryRecvError;
-//use tokio::time::timeout;
-use crate::protocols::wire::messaging::v1::{DirectSendMsg, NetworkMessage, RpcRequest};
 use crate::{
     application::{
         error::Error,
         interface::{NetworkClient, NetworkClientInterface},
         metadata::{ConnectionState, PeerMetadata},
-        storage::PeersAndMetadata,
+        storage::{ConnectionNotification, PeersAndMetadata},
         ApplicationCollector, ApplicationConnections,
     },
     protocols::{
-        network::ReceivedMessage, //Event, NetworkEvents, NetworkSender,NewNetworkEvents, NewNetworkSender,
+        network::{NetworkEvents, NetworkSender, ReceivedMessage}, //Event, NewNetworkEvents, NewNetworkSender,
         wire::handshake::v1::{ProtocolId, ProtocolIdSet},
+        wire::messaging::v1::{DirectSendMsg, NetworkMessage, RpcRequest}
     },
     transport::ConnectionMetadata,
 };
@@ -940,6 +938,7 @@ fn compare_vectors_ignore_order<T: Clone + Debug + Ord>(
 /// Creates a set of network senders and events for the specified
 /// network IDs. Also returns the internal inbound and outbound
 /// channels for emulating network message sends across the wire.
+#[cfg(obsolete)]
 fn create_network_sender_and_events(
     network_ids: &[NetworkId],
 ) -> (
