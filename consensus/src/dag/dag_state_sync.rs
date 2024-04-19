@@ -143,11 +143,13 @@ impl StateSyncTrigger {
     /// Check if we're far away from this ledger info and need to sync.
     /// This ensures that the block referred by the ledger info is not in buffer manager.
     fn need_sync_for_ledger_info(&self, li: &LedgerInfoWithSignatures) -> bool {
-        if li.get_highest_committed_rounds_for_shoalpp()[self.dag_id as usize]
-            <= self
-                .ledger_info_provider
-                .get_highest_committed_anchor_round(self.dag_id)
-        {
+        let commit_info_anchor_round = li.get_highest_committed_rounds_for_shoalpp()
+            [self.dag_id as usize]
+            / self.epoch_state.verifier.len() as u64;
+        let local_highest_committed_anchor_round = self
+            .ledger_info_provider
+            .get_highest_committed_anchor_round(self.dag_id);
+        if commit_info_anchor_round <= local_highest_committed_anchor_round {
             return false;
         }
 
@@ -160,12 +162,9 @@ impl StateSyncTrigger {
         // fetch can't work since nodes are garbage collected
         dag_reader.is_empty()
             || dag_reader.highest_round() + 1 + self.dag_window_size_config
-                < li.get_highest_committed_rounds_for_shoalpp()[self.dag_id as usize]
-            || self
-                .ledger_info_provider
-                .get_highest_committed_anchor_round(self.dag_id)
-                + 2 * self.dag_window_size_config
-                < li.get_highest_committed_rounds_for_shoalpp()[self.dag_id as usize]
+                < commit_info_anchor_round
+            || local_highest_committed_anchor_round + 2 * self.dag_window_size_config
+                < commit_info_anchor_round
     }
 }
 
@@ -207,18 +206,18 @@ impl DagStateSynchronizer {
         highest_committed_anchor_round: Round,
     ) -> (RemoteFetchRequest, Vec<Author>, Arc<DagStore>) {
         let commit_li = node.ledger_info();
-        let commit_info_anchor_round =
-            commit_li.commit_info().round() / self.epoch_state.verifier.len() as u64;
+        let commit_info_anchor_round = commit_li.get_highest_committed_rounds_for_shoalpp()
+            [self.dag_id as usize]
+            / self.epoch_state.verifier.len() as u64;
         {
             let dag_reader = current_dag_store.read();
             assert!(
                 dag_reader
                     .highest_ordered_anchor_round()
                     .unwrap_or_default()
-                    < commit_li.get_highest_committed_rounds_for_shoalpp()[self.dag_id as usize]
+                    < commit_info_anchor_round
                     || highest_committed_anchor_round + self.dag_window_size_config
-                        < commit_li.get_highest_committed_rounds_for_shoalpp()
-                            [self.dag_id as usize]
+                        < commit_info_anchor_round
             );
         }
 
@@ -229,11 +228,6 @@ impl DagStateSynchronizer {
         let target_round = node.round();
         let commit_round = commit_info_anchor_round;
         let start_round = commit_round.saturating_sub(self.dag_window_size_config);
-        let start_round = commit_li.get_highest_committed_rounds_for_shoalpp()
-            [self.dag_id as usize]
-            // .commit_info()
-            // .round()
-            .saturating_sub(self.dag_window_size_config);
         let sync_dag_store = Arc::new(DagStore::new_empty(
             self.dag_id,
             self.epoch_state.clone(),
