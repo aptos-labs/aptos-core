@@ -642,14 +642,16 @@ impl<T: Transaction> CapturedReads<T> {
         use MVDelayedFieldsError::*;
         for (id, read_value) in &self.delayed_field_reads {
             if let DelayedFieldRead::Value { value, .. } = read_value {
-                match delayed_fields.read(id, idx_to_validate) {
-                    Ok(current_value) => if value != &current_value {
-                        return Ok(false);
-                    },
-                    Err(PanicOr::CodeInvariantError(msg)) => return Err(code_invariant_error(msg)),
-                    Err(PanicOr::Or(NotFound | Dependency(_) | DeltaApplicationFailure)) => {
-                        return Ok(false);
-                    },
+                if delayed_fields.pending_values(id, idx_to_validate) <= 8 {
+                    match delayed_fields.read(id, idx_to_validate) {
+                        Ok(current_value) => if value != &current_value {
+                            return Ok(false);
+                        },
+                        Err(PanicOr::CodeInvariantError(msg)) => return Err(code_invariant_error(msg)),
+                        Err(PanicOr::Or(NotFound | Dependency(_) | DeltaApplicationFailure)) => {
+                            return Ok(false);
+                        },
+                    }
                 }
             }
         }
