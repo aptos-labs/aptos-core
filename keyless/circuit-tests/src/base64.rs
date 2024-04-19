@@ -1,16 +1,14 @@
 // Copyright © Aptos Foundation
 // SPDX-License-Identifier: Apache-2.0
 
-use aptos_keyless_common::input_processing::circuit_input_signals::CircuitInputSignals;
-use aptos_keyless_common::input_processing::config::CircuitPaddingConfig;
 use crate::TestCircuitHandle;
+use aptos_keyless_common::input_processing::{
+    circuit_input_signals::CircuitInputSignals, config::CircuitPaddingConfig,
+};
 use itertools::*;
 
 fn expected_decoded(b64: &str) -> Vec<u8> {
-    base64::decode_config(
-        b64,
-        base64::URL_SAFE_NO_PAD,
-    ).unwrap()
+    base64::decode_config(b64, base64::URL_SAFE_NO_PAD).unwrap()
 }
 
 fn expected_lookup(b64_char: u8) -> u8 {
@@ -20,7 +18,7 @@ fn expected_lookup(b64_char: u8) -> u8 {
         b'0'..=b'9' => b64_char - b'0' + 52,
         b'-' => 62,
         b'_' => 63,
-        _ => panic!("Tried to lookup a non-base64 char.")
+        _ => panic!("Tried to lookup a non-base64 char."),
     }
 }
 
@@ -32,9 +30,8 @@ fn base64_decode_test() {
 
     let ascii_jwt_payload = expected_decoded(jwt_payload);
 
-
-    let max_jwt_payload_len = 192*8-64;
-    let max_ascii_jwt_payload_len = 3*max_jwt_payload_len/4;
+    let max_jwt_payload_len = 192 * 8 - 64;
+    let max_ascii_jwt_payload_len = 3 * max_jwt_payload_len / 4;
     let config = CircuitPaddingConfig::new()
         .max_length("jwt_payload", max_jwt_payload_len)
         .max_length("ascii_jwt_payload", max_ascii_jwt_payload_len);
@@ -42,8 +39,10 @@ fn base64_decode_test() {
     let circuit_input_signals = CircuitInputSignals::new()
         .str_input("jwt_payload", jwt_payload)
         .bytes_input("ascii_jwt_payload", &ascii_jwt_payload)
-        .pad(&config).unwrap();
+        .pad(&config)
+        .unwrap();
     let result = circuit_handle.gen_witness(circuit_input_signals);
+    println!("result={:?}", result);
     assert!(result.is_ok());
 }
 
@@ -52,18 +51,18 @@ fn base64_lookup_test() {
     let circuit_handle = TestCircuitHandle::new("base64_lookup_test.circom").unwrap();
 
     let base64_chars = (b'A'..=b'Z')
-            .chain(b'a'..=b'z')
-            .chain(b'0'..=b'9')
-            .chain([b'-', b'_']);
+        .chain(b'a'..=b'z')
+        .chain(b'0'..=b'9')
+        .chain([b'-', b'_']);
 
     for in_b64_char in base64_chars {
-
         let config = CircuitPaddingConfig::new();
 
         let circuit_input_signals = CircuitInputSignals::new()
             .byte_input("in_b64_char", in_b64_char)
             .byte_input("out_num", expected_lookup(in_b64_char))
-            .pad(&config).unwrap();
+            .pad(&config)
+            .unwrap();
 
         let result = circuit_handle.gen_witness(circuit_input_signals);
         assert!(result.is_ok());
@@ -78,9 +77,8 @@ fn base64_decode_test_short_all_dashes() {
 
     let ascii_jwt_payload = expected_decoded(jwt_payload);
 
-
     let max_jwt_payload_len = 4;
-    let max_ascii_jwt_payload_len = 3*max_jwt_payload_len/4;
+    let max_ascii_jwt_payload_len = 3 * max_jwt_payload_len / 4;
     let config = CircuitPaddingConfig::new()
         .max_length("jwt_payload", max_jwt_payload_len)
         .max_length("ascii_jwt_payload", max_ascii_jwt_payload_len);
@@ -88,7 +86,8 @@ fn base64_decode_test_short_all_dashes() {
     let circuit_input_signals = CircuitInputSignals::new()
         .str_input("jwt_payload", jwt_payload)
         .bytes_input("ascii_jwt_payload", &ascii_jwt_payload)
-        .pad(&config).unwrap();
+        .pad(&config)
+        .unwrap();
 
     let result = circuit_handle.gen_witness(circuit_input_signals);
     assert!(result.is_ok());
@@ -104,9 +103,8 @@ fn base64_decode_test_short_three_chars() {
 
     let ascii_jwt_payload = expected_decoded(jwt_payload);
 
-
     let max_jwt_payload_len = 4;
-    let max_ascii_jwt_payload_len = 3*max_jwt_payload_len/4;
+    let max_ascii_jwt_payload_len = 3 * max_jwt_payload_len / 4;
     let config = CircuitPaddingConfig::new()
         .max_length("jwt_payload", max_jwt_payload_len)
         .max_length("ascii_jwt_payload", max_ascii_jwt_payload_len);
@@ -114,12 +112,12 @@ fn base64_decode_test_short_three_chars() {
     let circuit_input_signals = CircuitInputSignals::new()
         .str_input("jwt_payload", jwt_payload)
         .bytes_input("ascii_jwt_payload", &ascii_jwt_payload)
-        .pad(&config).unwrap();
+        .pad(&config)
+        .unwrap();
 
     let result = circuit_handle.gen_witness(circuit_input_signals);
     assert!(result.is_ok());
 }
-
 
 // ignoring b/c takes forever
 #[test]
@@ -128,16 +126,15 @@ fn base64_decode_test_short_exhaustive() {
     let circuit_handle = TestCircuitHandle::new("base64_decode_test_short.circom").unwrap();
 
     let base64_chars = ('A'..='Z')
-            .chain('a'..='z')
-            .chain('0'..='9')
-            .chain(['-', '_']);
+        .chain('a'..='z')
+        .chain('0'..='9')
+        .chain(['-', '_']);
 
-    let exhaustive_iter =
-        (0..=3)
+    let exhaustive_iter = (0..=3)
         .map(|_| base64_chars.clone())
         .multi_cartesian_product()
         .map(|s| s.into_iter().collect::<String>());
-        //.collect();
+    //.collect();
 
     for jwt_payload in exhaustive_iter {
         println!("{jwt_payload}");
@@ -145,7 +142,7 @@ fn base64_decode_test_short_exhaustive() {
         let ascii_jwt_payload = expected_decoded(&jwt_payload);
 
         let max_jwt_payload_len = 4;
-        let max_ascii_jwt_payload_len = 3*max_jwt_payload_len/4;
+        let max_ascii_jwt_payload_len = 3 * max_jwt_payload_len / 4;
         let config = CircuitPaddingConfig::new()
             .max_length("jwt_payload", max_jwt_payload_len)
             .max_length("ascii_jwt_payload", max_ascii_jwt_payload_len);
@@ -153,11 +150,10 @@ fn base64_decode_test_short_exhaustive() {
         let circuit_input_signals = CircuitInputSignals::new()
             .str_input("jwt_payload", &jwt_payload)
             .bytes_input("ascii_jwt_payload", &ascii_jwt_payload)
-            .pad(&config).unwrap();
-
+            .pad(&config)
+            .unwrap();
 
         let result = circuit_handle.gen_witness(circuit_input_signals);
         assert!(result.is_ok());
     }
-
 }

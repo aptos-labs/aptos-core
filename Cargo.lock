@@ -2313,9 +2313,13 @@ dependencies = [
  "aptos-crypto",
  "aptos-keyless-common",
  "base64 0.13.1",
+ "futures",
  "itertools 0.12.1",
+ "rand 0.7.3",
  "serde_json",
+ "sha2 0.9.9",
  "tempfile",
+ "tokio",
 ]
 
 [[package]]
