@@ -15,7 +15,7 @@ use aptos_consensus_types::{block::Block, common::Payload, pipelined_block::Pipe
 use aptos_crypto::HashValue;
 use aptos_executor_types::StateComputeResult;
 use aptos_infallible::RwLock;
-use aptos_logger::error;
+use aptos_logger::{debug, error};
 use aptos_types::{
     aggregate_signature::AggregateSignature,
     block_info::BlockInfo,
@@ -65,17 +65,21 @@ impl ShoalppOrderNotifier {
         HashValue::from_slice(&bytes).expect("Failed to create HashValue from committed rounds")
     }
 
-    fn create_block(&mut self, block_info: ShoalppOrderBlocksInfo) -> OrderedBlocks {
+    fn create_block(&mut self, block_info: ShoalppOrderBlocksInfo) -> Option<OrderedBlocks> {
         let ShoalppOrderBlocksInfo {
             dag_id,
             ordered_nodes,
             failed_author,
+            idx,
+            dag_external_round,
         } = block_info;
 
         let anchor = ordered_nodes.last().unwrap();
         assert!(anchor.round() > self.sent_to_commit_anchor_rounds[dag_id as usize]);
-        self.sent_to_commit_anchor_rounds[dag_id as usize] = anchor.round();
+
+        self.sent_to_commit_anchor_rounds[dag_id as usize] = dag_external_round;
         let block_round = self.sent_to_commit_anchor_rounds.iter().sum();
+
         let epoch = anchor.epoch();
         let timestamp = anchor.metadata().timestamp();
         let parent_timestamp = self.parent_block_info.timestamp_usecs();
@@ -87,6 +91,15 @@ impl ShoalppOrderNotifier {
             payload = payload.extend(node.payload().clone());
             node_digests.push(node.digest());
         }
+
+        if idx > 0 && payload.is_empty() {
+            debug!(
+                "payload is empty. not producing block ({}, {})",
+                dag_external_round, idx
+            );
+            return None;
+        }
+
         let parent_block_id = self.parent_block_info.id();
         // construct the bitvec that indicates which nodes present in the previous round in CommitEvent
         let mut parents_bitvec = BitVec::with_num_bits(self.epoch_state.verifier.len() as u16);
@@ -128,7 +141,7 @@ impl ShoalppOrderNotifier {
             .collect();
 
         let consensus_data_hash = self.committed_anchors_to_hashvalue();
-        OrderedBlocks {
+        Some(OrderedBlocks {
             ordered_blocks: vec![block],
             ordered_proof: LedgerInfoWithSignatures::new(
                 LedgerInfo::new(block_info, consensus_data_hash),
@@ -149,7 +162,7 @@ impl ShoalppOrderNotifier {
                     update_counters_for_committed_blocks(committed_blocks);
                 },
             ),
-        }
+        })
     }
 
     pub async fn run(mut self) {
@@ -161,8 +174,10 @@ impl ShoalppOrderNotifier {
             for dag_id in 0..=(num_dags - 1) {
                 if let Some(bolt_block_info) = self.receivers[dag_id].recv().await {
                     let block = self.create_block(bolt_block_info);
-                    if let Err(e) = self.ordered_nodes_tx.unbounded_send(block) {
-                        error!("Failed to send ordered nodes {:?}", e);
+                    if let Some(block) = block {
+                        if let Err(e) = self.ordered_nodes_tx.unbounded_send(block) {
+                            error!("Failed to send ordered nodes {:?}", e);
+                        }
                     }
                 } else {
                     // shutdown in progress, but notifier should be killed before DAG

@@ -26,7 +26,7 @@ use aptos_consensus_types::{
 };
 use aptos_crypto::HashValue;
 use aptos_infallible::{Mutex, RwLock};
-use aptos_logger::{error, info};
+use aptos_logger::{debug, error, info};
 use aptos_storage_interface::DbReader;
 use aptos_types::{
     account_config::NewBlockEvent,
@@ -170,20 +170,8 @@ pub struct ShoalppOrderBlocksInfo {
     pub dag_id: u8,
     pub ordered_nodes: Vec<Arc<CertifiedNode>>,
     pub failed_author: Vec<(Round, Author)>,
-}
-
-impl ShoalppOrderBlocksInfo {
-    pub fn new(
-        dag_id: u8,
-        ordered_nodes: Vec<Arc<CertifiedNode>>,
-        failed_author: Vec<(Round, Author)>,
-    ) -> Self {
-        Self {
-            dag_id,
-            ordered_nodes,
-            failed_author,
-        }
-    }
+    pub idx: u64,
+    pub dag_external_round: Round,
 }
 
 impl OrderedNotifier for OrderedNotifierAdapter {
@@ -192,7 +180,20 @@ impl OrderedNotifier for OrderedNotifierAdapter {
         ordered_nodes: Vec<Arc<CertifiedNode>>,
         failed_author: Vec<(Round, Author)>,
     ) {
-        let block_info = ShoalppOrderBlocksInfo::new(self.dag_id, ordered_nodes, failed_author);
+        let anchor = ordered_nodes.last().unwrap();
+        let round = anchor.round();
+
+        let idx = self.idx_gen.lock().next(round);
+        assert!(idx < (self.epoch_state.verifier.len() as u64));
+        let dag_external_round = (round * self.epoch_state.verifier.len() as Round) + idx;
+
+        let block_info = ShoalppOrderBlocksInfo {
+            dag_id: self.dag_id,
+            ordered_nodes,
+            failed_author,
+            idx,
+            dag_external_round,
+        };
         if self.executor_channel.send(block_info).is_err() {
             error!("[DAG] execution pipeline closed");
         }
