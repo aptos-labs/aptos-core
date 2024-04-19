@@ -38,7 +38,15 @@ pub struct IdentityBlob {
 
 impl IdentityBlob {
     pub fn from_file(path: &Path) -> anyhow::Result<IdentityBlob> {
-        Ok(serde_yaml::from_str(&fs::read_to_string(path)?)?)
+        let content = fs::read_to_string(path)?;
+        match serde_yaml::from_str(&content) {
+            Ok(identity_blob) => Ok(identity_blob),
+            Err(e) => {
+                eprintln!("Deserialization error: {:?}", e);
+                eprintln!("YAML content:\n{}", content);
+                Err(e.into())
+            },
+        }
     }
 
     pub fn to_file(&self, path: &Path) -> anyhow::Result<()> {

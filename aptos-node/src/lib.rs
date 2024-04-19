@@ -6,10 +6,10 @@
 
 mod indexer;
 mod logger;
-mod network;
+pub mod network;
 mod services;
 mod state_sync;
-mod storage;
+pub mod storage;
 pub mod utils;
 
 #[cfg(test)]
