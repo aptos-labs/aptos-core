@@ -4,7 +4,6 @@
 use super::{
     observability::counters::ANCHOR_ORDER_TYPE,
     types::{DagSnapshotBitmask, NodeMetadata},
-    Node,
 };
 use crate::{
     dag::{
@@ -22,9 +21,7 @@ use aptos_logger::{debug, error, warn};
 use aptos_types::{epoch_state::EpochState, validator_verifier::ValidatorVerifier};
 use futures::executor::block_on;
 use itertools::Itertools;
-use rayon::iter::{
-    IndexedParallelIterator, IntoParallelIterator, IntoParallelRefIterator, ParallelIterator,
-};
+use rayon::iter::{IndexedParallelIterator, IntoParallelIterator, ParallelIterator};
 use std::{
     collections::{BTreeMap, HashMap, HashSet},
     mem,
@@ -92,6 +89,16 @@ impl InMemDag {
             .map(|(round, _)| round)
             .unwrap_or(&self.start_round)
             .max(&self.start_round)
+    }
+
+    pub fn highest_round_nodes(&self) -> Vec<NodeCertificate> {
+        let highest_round = self.highest_round();
+        self.get_round_iter(highest_round)
+            .map_or(Vec::new(), |node_status_iter| {
+                node_status_iter
+                    .map(|node_status| node_status.as_node().clone().certificate())
+                    .collect()
+            })
     }
 
     /// The highest strong links round is either the highest round or the highest round - 1
@@ -437,7 +444,7 @@ impl InMemDag {
         to_prune
     }
 
-    fn commit_callback(
+    pub(crate) fn commit_callback(
         &mut self,
         commit_round: Round,
     ) -> Option<BTreeMap<u64, Vec<Option<NodeStatus>>>> {
@@ -466,6 +473,7 @@ impl InMemDag {
 }
 
 pub struct DagStore {
+    dag_id: u8,
     dag: RwLock<InMemDag>,
     storage: Arc<dyn DAGStorage>,
     payload_manager: Arc<dyn TPayloadManager>,
@@ -473,6 +481,7 @@ pub struct DagStore {
 
 impl DagStore {
     pub fn new(
+        dag_id: u8,
         epoch_state: Arc<EpochState>,
         storage: Arc<dyn DAGStorage>,
         payload_manager: Arc<dyn TPayloadManager>,
@@ -481,12 +490,13 @@ impl DagStore {
     ) -> Self {
         let mut all_nodes = monitor!(
             "dag_store_new_storage",
-            storage.get_certified_nodes().unwrap_or_default()
+            storage.get_certified_nodes(dag_id).unwrap_or_default()
         );
         all_nodes.sort_unstable_by_key(|(_, node)| node.round());
         let mut to_prune = vec![];
         // Reconstruct the continuous dag starting from start_round and gc unrelated nodes
         let dag = Self::new_empty(
+            dag_id,
             epoch_state,
             storage.clone(),
             payload_manager,
@@ -521,7 +531,7 @@ impl DagStore {
 
         let handle = tokio::task::spawn_blocking(move || {
             monitor!("dag_store_new_gc", {
-                if let Err(e) = storage.delete_certified_nodes(to_prune) {
+                if let Err(e) = storage.delete_certified_nodes(to_prune, dag_id) {
                     error!("Error deleting expired nodes: {:?}", e);
                 }
             })
@@ -540,6 +550,7 @@ impl DagStore {
     }
 
     pub fn new_from_existing(
+        dag_id: u8,
         epoch_state: Arc<EpochState>,
         storage: Arc<dyn DAGStorage>,
         payload_manager: Arc<dyn TPayloadManager>,
@@ -548,6 +559,7 @@ impl DagStore {
         existing_dag: Self,
     ) -> Self {
         let dag = Self::new_empty(
+            dag_id,
             epoch_state,
             storage.clone(),
             payload_manager,
@@ -562,6 +574,7 @@ impl DagStore {
     }
 
     pub fn new_empty(
+        dag_id: u8,
         epoch_state: Arc<EpochState>,
         storage: Arc<dyn DAGStorage>,
         payload_manager: Arc<dyn TPayloadManager>,
@@ -570,6 +583,7 @@ impl DagStore {
     ) -> Self {
         let dag = InMemDag::new_empty(epoch_state, start_round, window_size);
         Self {
+            dag_id,
             dag: RwLock::new(dag),
             storage,
             payload_manager,
@@ -582,6 +596,7 @@ impl DagStore {
         payload_manager: Arc<dyn TPayloadManager>,
     ) -> Self {
         Self {
+            dag_id: 0, // TODO: fix test
             dag: RwLock::new(dag),
             storage,
             payload_manager,
@@ -601,7 +616,7 @@ impl DagStore {
 
         if write_to_storage {
             // mutate after all checks pass
-            self.storage.save_certified_node(&node)?;
+            self.storage.save_certified_node(&node, self.dag_id)?;
         }
 
         self.payload_manager
@@ -634,9 +649,10 @@ impl DagStore {
                 .collect();
             let storage = self.storage.clone();
             // TODO: limit spawns?
+            let dag_id = self.dag_id;
             tokio::task::spawn_blocking(move || {
                 monitor!("dag_commit_callback_gc", {
-                    if let Err(e) = storage.delete_certified_nodes(digests) {
+                    if let Err(e) = storage.delete_certified_nodes(digests, dag_id) {
                         error!("Error deleting expired nodes: {:?}", e);
                     }
                 });

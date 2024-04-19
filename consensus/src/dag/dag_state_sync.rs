@@ -48,6 +48,7 @@ impl fmt::Display for SyncOutcome {
 }
 
 pub(super) struct StateSyncTrigger {
+    dag_id: u8,
     epoch_state: Arc<EpochState>,
     ledger_info_provider: Arc<dyn TLedgerInfoProvider>,
     dag_store: Arc<DagStore>,
@@ -57,6 +58,7 @@ pub(super) struct StateSyncTrigger {
 
 impl StateSyncTrigger {
     pub(super) fn new(
+        dag_id: u8,
         epoch_state: Arc<EpochState>,
         ledger_info_provider: Arc<dyn TLedgerInfoProvider>,
         dag_store: Arc<DagStore>,
@@ -64,6 +66,7 @@ impl StateSyncTrigger {
         dag_window_size_config: Round,
     ) -> Self {
         Self {
+            dag_id,
             epoch_state,
             ledger_info_provider,
             dag_store,
@@ -75,7 +78,7 @@ impl StateSyncTrigger {
     fn verify_ledger_info(&self, ledger_info: &LedgerInfoWithSignatures) -> anyhow::Result<()> {
         ensure!(ledger_info.commit_info().epoch() == self.epoch_state.epoch);
 
-        if ledger_info.commit_info().round() > 0 {
+        if ledger_info.get_highest_committed_rounds_for_shoalpp()[self.dag_id as usize] > 0 {
             ledger_info
                 .verify_signatures(&self.epoch_state.verifier)
                 .map_err(|e| anyhow::anyhow!("unable to verify ledger info: {}", e))?;
@@ -114,18 +117,20 @@ impl StateSyncTrigger {
     async fn notify_commit_proof(&self, ledger_info: &LedgerInfoWithSignatures) {
         // if the anchor exists between ledger info round and highest ordered round
         // Note: ledger info round <= highest ordered round
-        let commit_info_anchor_round =
-            ledger_info.commit_info().round() / self.epoch_state.verifier.len() as u64;
+        let commit_info_anchor_round = ledger_info.get_highest_committed_rounds_for_shoalpp()
+            [self.dag_id as usize]
+            / self.epoch_state.verifier.len() as u64;
 
         let local_highest_committed_anchor_round = self
             .ledger_info_provider
-            .get_highest_committed_anchor_round();
+            .get_highest_committed_anchor_round(self.dag_id);
+
         let _local_highest_ordered_round = self
             .dag_store
             .read()
             .highest_ordered_anchor_round()
             .unwrap_or_default();
-        // TODO: investigate deduping commit proofs
+
         if local_highest_committed_anchor_round < commit_info_anchor_round
         // && local_highest_ordered_round < ledger_info.commit_info().round()
         {
@@ -138,12 +143,11 @@ impl StateSyncTrigger {
     /// Check if we're far away from this ledger info and need to sync.
     /// This ensures that the block referred by the ledger info is not in buffer manager.
     fn need_sync_for_ledger_info(&self, li: &LedgerInfoWithSignatures) -> bool {
-        let commit_info_anchor_round =
-            li.commit_info().round() / self.epoch_state.verifier.len() as u64;
-        let local_highest_committed_anchor_round = self
-            .ledger_info_provider
-            .get_highest_committed_anchor_round();
-        if commit_info_anchor_round <= local_highest_committed_anchor_round {
+        if li.get_highest_committed_rounds_for_shoalpp()[self.dag_id as usize]
+            <= self
+                .ledger_info_provider
+                .get_highest_committed_anchor_round(self.dag_id)
+        {
             return false;
         }
 
@@ -156,13 +160,17 @@ impl StateSyncTrigger {
         // fetch can't work since nodes are garbage collected
         dag_reader.is_empty()
             || dag_reader.highest_round() + 1 + self.dag_window_size_config
-                < commit_info_anchor_round
-            || local_highest_committed_anchor_round + 2 * self.dag_window_size_config
-                < commit_info_anchor_round
+                < li.get_highest_committed_rounds_for_shoalpp()[self.dag_id as usize]
+            || self
+                .ledger_info_provider
+                .get_highest_committed_anchor_round(self.dag_id)
+                + 2 * self.dag_window_size_config
+                < li.get_highest_committed_rounds_for_shoalpp()[self.dag_id as usize]
     }
 }
 
 pub(super) struct DagStateSynchronizer {
+    dag_id: u8,
     epoch_state: Arc<EpochState>,
     time_service: TimeService,
     execution_client: Arc<dyn TExecutionClient>,
@@ -173,6 +181,7 @@ pub(super) struct DagStateSynchronizer {
 
 impl DagStateSynchronizer {
     pub fn new(
+        dag_id: u8,
         epoch_state: Arc<EpochState>,
         time_service: TimeService,
         execution_client: Arc<dyn TExecutionClient>,
@@ -181,6 +190,7 @@ impl DagStateSynchronizer {
         dag_window_size_config: Round,
     ) -> Self {
         Self {
+            dag_id,
             epoch_state,
             time_service,
             execution_client,
@@ -205,9 +215,10 @@ impl DagStateSynchronizer {
                 dag_reader
                     .highest_ordered_anchor_round()
                     .unwrap_or_default()
-                    < commit_info_anchor_round
+                    < commit_li.get_highest_committed_rounds_for_shoalpp()[self.dag_id as usize]
                     || highest_committed_anchor_round + self.dag_window_size_config
-                        < commit_info_anchor_round
+                        < commit_li.get_highest_committed_rounds_for_shoalpp()
+                            [self.dag_id as usize]
             );
         }
 
@@ -218,7 +229,13 @@ impl DagStateSynchronizer {
         let target_round = node.round();
         let commit_round = commit_info_anchor_round;
         let start_round = commit_round.saturating_sub(self.dag_window_size_config);
+        let start_round = commit_li.get_highest_committed_rounds_for_shoalpp()
+            [self.dag_id as usize]
+            // .commit_info()
+            // .round()
+            .saturating_sub(self.dag_window_size_config);
         let sync_dag_store = Arc::new(DagStore::new_empty(
+            self.dag_id,
             self.epoch_state.clone(),
             self.storage.clone(),
             self.payload_manager.clone(),

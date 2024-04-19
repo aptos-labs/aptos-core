@@ -94,7 +94,7 @@ impl TLedgerInfoProvider for MockLedgerInfoProvider {
         self.latest_ledger_info.clone()
     }
 
-    fn get_highest_committed_anchor_round(&self) -> Round {
+    fn get_highest_committed_anchor_round(&self, _dag_id: u8) -> Round {
         self.latest_ledger_info.ledger_info().round()
     }
 }

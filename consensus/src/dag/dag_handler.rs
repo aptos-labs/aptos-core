@@ -14,7 +14,7 @@ use crate::{
         observability::counters::{INCOMING_MSG_PROCESSING, RPC_PROCESS_DURATION},
         rb_handler::NodeBroadcastHandler,
         types::{DAGMessage, DAGRpcResult},
-        CertifiedNode, Node, Vote,
+        CertifiedNode, Node,
     },
     monitor,
     network::{IncomingDAGRequest, RpcResponder},
@@ -34,7 +34,7 @@ use std::{
     sync::Arc,
     time::{Duration, Instant},
 };
-use tokio::{runtime::Handle, select, task::JoinHandle};
+use tokio::{runtime::Handle, select};
 
 pub(crate) struct NetworkHandler {
     epoch_state: Arc<EpochState>,
@@ -49,6 +49,7 @@ pub(crate) struct NetworkHandler {
 
 impl NetworkHandler {
     pub(super) fn new(
+        dag_id: u8,
         epoch_state: Arc<EpochState>,
         mut node_receiver: NodeBroadcastHandler,
         dag_driver: DagDriver,
@@ -71,6 +72,7 @@ impl NetworkHandler {
             new_round_event,
             missing_parents_rx,
             verified_msg_processor: Arc::new(VerifiedMessageProcessor {
+                dag_id,
                 node_receiver,
                 dag_driver,
                 fetch_receiver,
@@ -99,7 +101,6 @@ impl NetworkHandler {
             ..
         } = self;
 
-        let executor = BoundedExecutor::new(500, Handle::current());
         let monitor = tokio_metrics_collector::TaskMonitor::new();
         tokio_metrics_collector::default_task_collector()
             .add("dag_handler", monitor.clone())
@@ -111,7 +112,7 @@ impl NetworkHandler {
                     .with_label_values(&["dag_handler"])
                     .observe(rpc_request.start.elapsed().as_secs_f64());
                 let timer = INCOMING_MSG_PROCESSING.start_timer();
-                defer!({ drop(timer) });
+                defer!(drop(timer));
                 let epoch = rpc_request.req.epoch();
                 let result = rpc_request
                     .req
@@ -256,6 +257,7 @@ impl NetworkHandler {
 }
 
 struct VerifiedMessageProcessor {
+    dag_id: u8,
     node_receiver: Arc<NodeBroadcastHandler>,
     dag_driver: Arc<DagDriver>,
     fetch_receiver: FetchRequestHandler,
@@ -362,7 +364,7 @@ impl VerifiedMessageProcessor {
         );
 
         let response: DAGRpcResult = response
-            .map_err(|e| DAGRpcError::new(self.epoch_state.epoch, e))
+            .map_err(|e| DAGRpcError::new(self.dag_id, self.epoch_state.epoch, e))
             .into();
         responder.respond(response)?;
         RPC_PROCESS_DURATION

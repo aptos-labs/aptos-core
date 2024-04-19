@@ -46,23 +46,23 @@ impl CommitEvent {
 }
 
 pub trait DAGStorage: Send + Sync {
-    fn save_pending_node(&self, node: &Node) -> anyhow::Result<()>;
+    fn save_pending_node(&self, node: &Node, dag_id: u8) -> anyhow::Result<()>;
 
-    fn get_pending_node(&self) -> anyhow::Result<Option<Node>>;
+    fn get_pending_node(&self, dag_id: u8) -> anyhow::Result<Option<Node>>;
 
-    fn delete_pending_node(&self) -> anyhow::Result<()>;
+    fn delete_pending_node(&self, dag_id: u8) -> anyhow::Result<()>;
 
-    fn save_vote(&self, node_id: &NodeId, vote: &Vote) -> anyhow::Result<()>;
+    fn save_vote(&self, node_id: &NodeId, vote: &Vote, dag_id: u8) -> anyhow::Result<()>;
 
-    fn get_votes(&self) -> anyhow::Result<Vec<(NodeId, Vote)>>;
+    fn get_votes(&self, dag_id: u8) -> anyhow::Result<Vec<(NodeId, Vote)>>;
 
-    fn delete_votes(&self, node_ids: Vec<NodeId>) -> anyhow::Result<()>;
+    fn delete_votes(&self, node_ids: Vec<NodeId>, dag_id: u8) -> anyhow::Result<()>;
 
-    fn save_certified_node(&self, node: &CertifiedNode) -> anyhow::Result<()>;
+    fn save_certified_node(&self, node: &CertifiedNode, dag_id: u8) -> anyhow::Result<()>;
 
-    fn get_certified_nodes(&self) -> anyhow::Result<Vec<(HashValue, CertifiedNode)>>;
+    fn get_certified_nodes(&self, dag_id: u8) -> anyhow::Result<Vec<(HashValue, CertifiedNode)>>;
 
-    fn delete_certified_nodes(&self, digests: Vec<HashValue>) -> anyhow::Result<()>;
+    fn delete_certified_nodes(&self, digests: Vec<HashValue>, dag_id: u8) -> anyhow::Result<()>;
 
     fn get_latest_k_committed_events(&self, k: u64) -> anyhow::Result<Vec<CommitEvent>>;
 

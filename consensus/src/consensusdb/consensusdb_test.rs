@@ -2,7 +2,6 @@
 // Parts of the project are originally copyright © Meta Platforms, Inc.
 // SPDX-License-Identifier: Apache-2.0
 
-use self::schema::dag::NodeSchema;
 use super::*;
 use crate::dag::{CertifiedNode, Extensions, Node, Vote};
 use aptos_consensus_types::{
@@ -96,6 +95,7 @@ fn test_dag() {
 
     let node = Node::new(
         1,
+        0,
         1,
         Author::random(),
         123,
@@ -104,15 +104,15 @@ fn test_dag() {
         vec![],
         Extensions::empty(),
     );
-    test_dag_type::<NodeSchema, <NodeSchema as Schema>::Key>((), node.clone(), &db);
+    test_dag_type::<Dag0NodeSchema, <Dag0NodeSchema as Schema>::Key>((), node.clone(), &db);
 
     let certified_node = CertifiedNode::new(node.clone(), AggregateSignature::empty());
-    test_dag_type::<CertifiedNodeSchema, <CertifiedNodeSchema as Schema>::Key>(
+    test_dag_type::<Dag0CertifiedNodeSchema, <Dag0CertifiedNodeSchema as Schema>::Key>(
         certified_node.digest(),
         certified_node,
         &db,
     );
 
     let vote = Vote::new(node.metadata().clone(), Signature::dummy_signature());
-    test_dag_type::<DagVoteSchema, <DagVoteSchema as Schema>::Key>(node.id(), vote, &db);
+    test_dag_type::<Dag0VoteSchema, <Dag0VoteSchema as Schema>::Key>(node.id(), vote, &db);
 }

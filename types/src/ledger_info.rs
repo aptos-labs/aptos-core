@@ -271,6 +271,16 @@ impl LedgerInfoWithV0 {
         &self.ledger_info
     }
 
+    pub fn get_highest_committed_rounds_for_shoalpp(&self) -> Vec<Round> {
+        self.ledger_info
+            .consensus_data_hash()
+            .to_u64_vec()
+    }
+
+    pub fn set_consensus_data_hash(&mut self, hash_value: HashValue) {
+        self.ledger_info.set_consensus_data_hash(hash_value);
+    }
+
     pub fn commit_info(&self) -> &BlockInfo {
         self.ledger_info.commit_info()
     }

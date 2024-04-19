@@ -11,6 +11,7 @@ use crate::{
 };
 use aptos_consensus_types::common::{Payload, PayloadFilter};
 use aptos_logger::debug;
+#[allow(unused_imports)]
 use aptos_types::{
     dkg::{DKGTranscript, DKGTranscriptMetadata},
     on_chain_config::ValidatorTxnConfig,
@@ -19,6 +20,7 @@ use aptos_types::{
 use aptos_validator_transaction_pool as vtxn_pool;
 use fail::fail_point;
 use futures::future::BoxFuture;
+#[allow(unused_imports)]
 use move_core_types::account_address::AccountAddress;
 #[cfg(test)]
 use std::collections::HashSet;

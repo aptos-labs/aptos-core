@@ -81,6 +81,10 @@ impl RoundState {
         self.responsive_check.reset();
         Ok(())
     }
+
+    pub fn current_round(&self) -> Round {
+        *self.current_round.lock()
+    }
 }
 
 /// Interface to decide if we should move forward to a new round

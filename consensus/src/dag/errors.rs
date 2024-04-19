@@ -60,15 +60,24 @@ pub enum DAGError {
 pub struct DAGRpcError {
     error: DAGError,
     epoch: u64,
+    dag_id: u8,
 }
 
 impl DAGRpcError {
-    pub fn new(epoch: u64, error: DAGError) -> Self {
-        Self { epoch, error }
+    pub fn new(dag_id: u8, epoch: u64, error: DAGError) -> Self {
+        Self {
+            dag_id,
+            epoch,
+            error,
+        }
     }
 
     pub fn epoch(&self) -> u64 {
         self.epoch
+    }
+
+    pub fn dag_id(&self) -> u8 {
+        self.dag_id
     }
 }
 

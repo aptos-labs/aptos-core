@@ -32,7 +32,6 @@ use aptos_types::{
     validator_verifier::ValidatorVerifier,
 };
 use futures_channel::oneshot;
-use rayon::iter::IntoParallelRefIterator;
 use serde::{Deserialize, Serialize};
 use std::{
     cmp::min,
@@ -57,6 +56,7 @@ impl Extensions {
 #[derive(Serialize)]
 struct NodeWithoutDigest<'a> {
     epoch: u64,
+    dag_id: u8,
     round: Round,
     author: Author,
     timestamp: u64,
@@ -81,6 +81,7 @@ impl<'a> From<&'a Node> for NodeWithoutDigest<'a> {
     fn from(node: &'a Node) -> Self {
         Self {
             epoch: node.metadata.epoch,
+            dag_id: node.metadata.dag_id,
             round: node.metadata.round,
             author: node.metadata.author,
             timestamp: node.metadata.timestamp,
@@ -95,6 +96,7 @@ impl<'a> From<&'a Node> for NodeWithoutDigest<'a> {
 /// Represents the metadata about the node, without payload and parents from Node
 #[derive(Clone, Serialize, Deserialize, Debug, PartialEq, CryptoHasher, BCSCryptoHash)]
 pub struct NodeMetadata {
+    dag_id: u8,
     node_id: NodeId,
     timestamp: u64,
     digest: HashValue,
@@ -110,6 +112,7 @@ impl NodeMetadata {
         digest: HashValue,
     ) -> Self {
         Self {
+            dag_id: 0, // TODO
             node_id: NodeId {
                 epoch,
                 round,
@@ -118,6 +121,10 @@ impl NodeMetadata {
             timestamp,
             digest,
         }
+    }
+
+    pub fn dag_id(&self) -> u8 {
+        self.dag_id
     }
 
     pub fn digest(&self) -> &HashValue {
@@ -162,6 +169,7 @@ pub struct Node {
 impl Node {
     pub fn new(
         epoch: u64,
+        dag_id: u8,
         round: Round,
         author: Author,
         timestamp: u64,
@@ -172,6 +180,7 @@ impl Node {
     ) -> Self {
         let digest = Self::calculate_digest_internal(
             epoch,
+            dag_id,
             round,
             author,
             timestamp,
@@ -183,6 +192,7 @@ impl Node {
 
         Self {
             metadata: NodeMetadata {
+                dag_id,
                 node_id: NodeId {
                     epoch,
                     round,
@@ -217,6 +227,7 @@ impl Node {
     /// Calculate the node digest based on all fields in the node
     fn calculate_digest_internal(
         epoch: u64,
+        dag_id: u8,
         round: Round,
         author: Author,
         timestamp: u64,
@@ -227,6 +238,7 @@ impl Node {
     ) -> HashValue {
         let node_with_out_digest = NodeWithoutDigest {
             epoch,
+            dag_id,
             round,
             author,
             timestamp,
@@ -241,6 +253,7 @@ impl Node {
     fn calculate_digest(&self) -> HashValue {
         Self::calculate_digest_internal(
             self.metadata.epoch,
+            self.metadata.dag_id,
             self.metadata.round,
             self.metadata.author,
             self.metadata.timestamp,
@@ -249,6 +262,10 @@ impl Node {
             &self.parents,
             &self.extensions,
         )
+    }
+
+    pub fn dag_id(&self) -> u8 {
+        self.metadata.dag_id()
     }
 
     pub fn digest(&self) -> HashValue {
@@ -338,6 +355,13 @@ impl Node {
                 )
                 .is_ok(),
             "not enough parents to satisfy voting power"
+        );
+
+        ensure!(
+            self.parents()
+                .iter()
+                .all(|parent| parent.metadata().dag_id() == self.dag_id()),
+            "invalid parent dag_id"
         );
 
         // TODO: validate timestamp
@@ -465,6 +489,10 @@ impl CertifiedNodeMessage {
         }
     }
 
+    pub fn dag_id(&self) -> u8 {
+        self.certified_node.dag_id()
+    }
+
     pub fn certified_node(self) -> CertifiedNode {
         self.certified_node
     }
@@ -510,6 +538,10 @@ impl Vote {
             metadata,
             signature,
         }
+    }
+
+    pub fn dag_id(&self) -> u8 {
+        self.metadata.dag_id()
     }
 
     pub fn signature(&self) -> &Signature {
@@ -615,12 +647,17 @@ impl CertificateAckState {
 
 #[derive(Serialize, Deserialize, Clone, Debug, PartialEq)]
 pub struct CertifiedAck {
+    dag_id: u8,
     epoch: u64,
 }
 
 impl CertifiedAck {
-    pub fn new(epoch: u64) -> Self {
-        Self { epoch }
+    pub fn new(epoch: u64, dag_id: u8) -> Self {
+        Self { dag_id, epoch }
+    }
+
+    pub fn dag_id(&self) -> u8 {
+        self.dag_id
     }
 }
 
@@ -672,6 +709,10 @@ impl RemoteFetchRequest {
             targets,
             exists_bitmask,
         }
+    }
+
+    pub fn dag_id(&self) -> u8 {
+        self.targets[0].dag_id()
     }
 
     pub fn epoch(&self) -> u64 {
@@ -760,21 +801,44 @@ impl FetchResponse {
             }),
             "nodes don't match requested bitmask"
         );
+        ensure!(!self.certified_nodes.is_empty(), "Certified_nodes is empty");
+        ensure!(
+            self.certified_nodes
+                .iter()
+                .all(|node| node.verify(validator_verifier).is_ok()),
+            "unable to verify certified nodes"
+        );
+
+        ensure!(
+            self.certified_nodes
+                .iter()
+                .all(|node| node.dag_id() == self.dag_id()),
+            "wrong dag_id in certified nodes"
+        );
 
         Ok(self)
+    }
+
+    pub fn dag_id(&self) -> u8 {
+        self.certified_nodes[0].dag_id()
     }
 }
 
 #[derive(Serialize, Deserialize, Clone)]
 pub struct DAGNetworkMessage {
+    dag_id: u8,
     epoch: u64,
     #[serde(with = "serde_bytes")]
     data: Vec<u8>,
 }
 
 impl DAGNetworkMessage {
-    pub fn new(epoch: u64, data: Vec<u8>) -> Self {
-        Self { epoch, data }
+    pub fn new(dag_id: u8, epoch: u64, data: Vec<u8>) -> Self {
+        Self {
+            dag_id,
+            epoch,
+            data,
+        }
     }
 
     pub fn data(&self) -> &[u8] {
@@ -784,11 +848,16 @@ impl DAGNetworkMessage {
     pub fn epoch(&self) -> u64 {
         self.epoch
     }
+
+    pub fn dag_id(&self) -> u8 {
+        self.dag_id
+    }
 }
 
 impl core::fmt::Debug for DAGNetworkMessage {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         f.debug_struct("DAGNetworkMessage")
+            .field("dag_id", &self.dag_id)
             .field("epoch", &self.epoch)
             .field("data", &hex::encode(&self.data[..min(20, self.data.len())]))
             .finish()
@@ -834,6 +903,14 @@ impl DAGMessage {
         }
     }
 
+    pub fn round(&self) -> anyhow::Result<Round> {
+        match self {
+            DAGMessage::NodeMsg(node) => Ok(node.metadata.round),
+            DAGMessage::CertifiedNodeMsg(node) => Ok(node.metadata.round),
+            _ => bail!("message does not support round field"),
+        }
+    }
+
     pub fn verify(&self, sender: Author, verifier: &ValidatorVerifier) -> anyhow::Result<()> {
         match self {
             DAGMessage::NodeMsg(node) => node.verify(sender, verifier),
@@ -848,6 +925,21 @@ impl DAGMessage {
             DAGMessage::TestMessage(_) | DAGMessage::TestAck(_) => {
                 bail!("Unexpected to verify {}", self.name())
             },
+        }
+    }
+
+    pub fn dag_id(&self) -> u8 {
+        match self {
+            DAGMessage::NodeMsg(node) => node.dag_id(),
+            DAGMessage::VoteMsg(vote) => vote.dag_id(),
+            DAGMessage::CertifiedNodeMsg(cnm) => cnm.dag_id(),
+            DAGMessage::CertifiedAckMsg(ack) => ack.dag_id(),
+            DAGMessage::FetchRequest(req) => req.dag_id(),
+            DAGMessage::FetchResponse(rsp) => rsp.dag_id(),
+            #[cfg(test)]
+            DAGMessage::TestMessage(_) => 0, // todo
+            #[cfg(test)]
+            DAGMessage::TestAck(_) => 0, // todo
         }
     }
 }
@@ -879,6 +971,7 @@ impl TConsensusMsg for DAGMessage {
 
     fn into_network_message(self) -> ConsensusMsg {
         ConsensusMsg::DAGMessage(DAGNetworkMessage {
+            dag_id: self.dag_id(),
             epoch: self.epoch(),
             data: bcs::to_bytes(&self).unwrap(),
         })
@@ -904,6 +997,15 @@ impl TryFrom<ConsensusMsg> for DAGMessage {
 #[derive(Clone, Serialize, Deserialize, Debug)]
 pub struct DAGRpcResult(pub Result<DAGMessage, DAGRpcError>);
 
+impl DAGRpcResult {
+    fn dag_id(&self) -> u8 {
+        match &self.0 {
+            Ok(dag_message) => dag_message.dag_id(),
+            Err(error) => error.dag_id(),
+        }
+    }
+}
+
 impl TConsensusMsg for DAGRpcResult {
     fn epoch(&self) -> u64 {
         match &self.0 {
@@ -921,6 +1023,7 @@ impl TConsensusMsg for DAGRpcResult {
 
     fn into_network_message(self) -> ConsensusMsg {
         ConsensusMsg::DAGMessage(DAGNetworkMessage {
+            dag_id: self.dag_id(),
             epoch: self.epoch(),
             data: bcs::to_bytes(&self).unwrap(),
         })

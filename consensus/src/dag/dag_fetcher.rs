@@ -2,10 +2,7 @@
 // SPDX-License-Identifier: Apache-2.0
 
 use super::{
-    adapter::{LedgerInfoProvider, TLedgerInfoProvider},
-    dag_store::DagStore,
-    errors::DagFetchError,
-    DAGRpcResult,
+    adapter::TLedgerInfoProvider, dag_store::DagStore, errors::DagFetchError, DAGRpcResult,
 };
 use crate::{
     dag::{
@@ -146,6 +143,7 @@ impl LocalFetchRequest {
 }
 
 pub struct DagFetcherService {
+    dag_id: u8,
     inner: Arc<DagFetcher>,
     dag: Arc<DagStore>,
     request_rx: Receiver<LocalFetchRequest>,
@@ -163,6 +161,7 @@ pub struct DagFetcherService {
 
 impl DagFetcherService {
     pub fn new(
+        dag_id: u8,
         epoch_state: Arc<EpochState>,
         network: Arc<dyn TDAGNetworkSender>,
         dag: Arc<DagStore>,
@@ -183,6 +182,7 @@ impl DagFetcherService {
         let ordered_authors = epoch_state.verifier.get_ordered_account_addresses();
         (
             Self {
+                dag_id,
                 max_concurrent_fetches: config.max_concurrent_fetches,
                 inner: Arc::new(DagFetcher::new(epoch_state, network, time_service, config)),
                 dag,
@@ -256,7 +256,7 @@ impl DagFetcherService {
 
             let latest_committed_round = self
                 .ledger_info_provider
-                .get_highest_committed_anchor_round();
+                .get_highest_committed_anchor_round(self.dag_id);
             let target_round = node.round().saturating_sub(1);
 
             ensure!(

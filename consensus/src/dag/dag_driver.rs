@@ -16,6 +16,7 @@ use crate::{
         },
         order_rule::OrderRule,
         round_state::RoundState,
+        shoal_plus_plus::shoalpp_types::{BoltBCParms, BoltBCRet},
         storage::DAGStorage,
         types::{
             CertificateAckState, CertifiedAck, CertifiedNode, CertifiedNodeMessage, DAGMessage,
@@ -32,7 +33,6 @@ use aptos_config::{
     network_id::{NetworkId, PeerNetworkId},
 };
 use aptos_consensus_types::common::{Author, Payload, PayloadFilter};
-use aptos_crypto::hash::CryptoHash;
 use aptos_infallible::{Mutex, RwLock};
 use aptos_logger::{debug, error};
 use aptos_network::application::storage::PeersAndMetadata;
@@ -51,9 +51,11 @@ use std::{
     sync::Arc,
     time::{Duration, Instant},
 };
+use tokio::sync::mpsc::Sender;
 use tokio_retry::strategy::ExponentialBackoff;
 
 pub(crate) struct DagDriver {
+    dag_id: u8,
     author: Author,
     epoch_state: Arc<EpochState>,
     dag: Arc<DagStore>,
@@ -72,11 +74,13 @@ pub(crate) struct DagDriver {
     quorum_store_enabled: bool,
     allow_batches_without_pos_in_proposal: bool,
     pub peers_by_latency: RwLock<PeersByLatency>,
+    broadcast_sender: Sender<(oneshot::Sender<BoltBCRet>, BoltBCParms)>,
 }
 
 impl DagDriver {
     #[allow(clippy::too_many_arguments)]
     pub fn new(
+        dag_id: u8,
         author: Author,
         epoch_state: Arc<EpochState>,
         dag: Arc<DagStore>,
@@ -94,14 +98,16 @@ impl DagDriver {
         quorum_store_enabled: bool,
         allow_batches_without_pos_in_proposal: bool,
         peers_by_latency: PeersByLatency,
+        broadcast_sender: Sender<(oneshot::Sender<BoltBCRet>, BoltBCParms)>,
     ) -> Self {
         let pending_node = storage
-            .get_pending_node()
+            .get_pending_node(dag_id)
             .expect("should be able to read dag storage");
         let highest_strong_links_round =
             dag.read().highest_strong_links_round(&epoch_state.verifier);
 
         let driver = Self {
+            dag_id,
             author,
             epoch_state,
             dag,
@@ -120,6 +126,7 @@ impl DagDriver {
             quorum_store_enabled,
             allow_batches_without_pos_in_proposal,
             peers_by_latency: RwLock::new(peers_by_latency),
+            broadcast_sender,
         };
 
         // If we were broadcasting the node for the round already, resume it
@@ -171,6 +178,49 @@ impl DagDriver {
         self.dag.add_node(node)?;
 
         Ok(())
+    }
+
+    pub fn dag_id(&self) -> u8 {
+        self.dag_id
+    }
+
+    pub fn get_payload_filter(&self) -> PayloadFilter {
+        let strong_links = self.get_strong_links();
+        let dag_reader = self.dag.read();
+        let highest_commit_round = self
+            .ledger_info_provider
+            .get_highest_committed_anchor_round(self.dag_id);
+        if strong_links.is_empty() {
+            PayloadFilter::Empty
+        } else {
+            PayloadFilter::from(
+                &dag_reader
+                    .reachable(
+                        strong_links.iter().map(|node| node.metadata()),
+                        Some(highest_commit_round.saturating_sub(self.window_size_config)),
+                        |_| true,
+                    )
+                    .map(|node_status| node_status.as_node().payload())
+                    .collect(),
+            )
+        }
+    }
+
+    fn get_strong_links(&self) -> Vec<NodeCertificate> {
+        self.dag
+            .read()
+            .get_strong_links_for_round(
+                self.round_state.current_round() - 1,
+                &self.epoch_state.verifier,
+            )
+            .unwrap_or_else(|| {
+                assert_eq!(
+                    self.round_state.current_round(),
+                    1,
+                    "Only expect empty strong links for round 1"
+                );
+                vec![]
+            })
     }
 
     pub fn check_new_round(&self) {
@@ -233,38 +283,38 @@ impl DagDriver {
                     vec![]
                 });
 
-            if strong_links.is_empty() {
-                (
-                    strong_links,
-                    vtxn_pool::TransactionFilter::PendingTxnHashSet(HashSet::new()),
-                    PayloadFilter::Empty,
-                )
-            } else {
-                let highest_commit_round = self
-                    .ledger_info_provider
-                    .get_highest_committed_anchor_round();
+            // if strong_links.is_empty() {
+            (
+                strong_links,
+                vtxn_pool::TransactionFilter::PendingTxnHashSet(HashSet::new()),
+                PayloadFilter::Empty,
+            )
+            // } else {
+            //     let highest_commit_round = self
+            //         .ledger_info_provider
+            //         .get_highest_committed_anchor_round();
 
-                let nodes = dag_reader
-                    .reachable(
-                        strong_links.iter().map(|node| node.metadata()),
-                        Some(highest_commit_round.saturating_sub(self.window_size_config)),
-                        |_| true,
-                    )
-                    .map(|node_status| node_status.as_node())
-                    .collect::<Vec<_>>();
+            // let nodes = dag_reader
+            //     .reachable(
+            //         strong_links.iter().map(|node| node.metadata()),
+            //         Some(highest_commit_round.saturating_sub(self.window_size_config)),
+            //         |_| true,
+            //     )
+            //     .map(|node_status| node_status.as_node())
+            //     .collect::<Vec<_>>();
+            //
+            // let payload_filter =
+            //     PayloadFilter::from(&nodes.iter().map(|node| node.payload()).collect());
+            // let validator_txn_hashes = nodes
+            //     .iter()
+            //     .flat_map(|node| node.validator_txns())
+            //     .map(|txn| txn.hash());
+            // let validator_payload_filter = vtxn_pool::TransactionFilter::PendingTxnHashSet(
+            //     HashSet::from_iter(validator_txn_hashes),
+            // );
 
-                let payload_filter =
-                    PayloadFilter::from(&nodes.iter().map(|node| node.payload()).collect());
-                let validator_txn_hashes = nodes
-                    .iter()
-                    .flat_map(|node| node.validator_txns())
-                    .map(|txn| txn.hash());
-                let validator_payload_filter = vtxn_pool::TransactionFilter::PendingTxnHashSet(
-                    HashSet::from_iter(validator_txn_hashes),
-                );
-
-                (strong_links, validator_payload_filter, payload_filter)
-            }
+            // (strong_links, validator_payload_filter, payload_filter)
+            // }
         };
 
         let (max_txns, max_size_bytes) = self
@@ -314,6 +364,7 @@ impl DagDriver {
         );
         let new_node = Node::new(
             self.epoch_state.epoch,
+            self.dag_id,
             new_round,
             self.author,
             timestamp,
@@ -324,15 +375,15 @@ impl DagDriver {
         );
 
         self.storage
-            .save_pending_node(&new_node)
+            .save_pending_node(&new_node, self.dag_id)
             .expect("node must be saved");
 
         self.broadcast_node(new_node, &start);
     }
 
     fn broadcast_node(&self, node: Node, start: &Instant) {
-        let rb = self.reliable_broadcast.clone();
-        let rb2 = self.reliable_broadcast.clone();
+        let rb = self.broadcast_sender.clone();
+        let rb2 = self.broadcast_sender.clone();
         let (abort_handle, abort_registration) = AbortHandle::new_pair();
         let (tx, rx) = oneshot::channel();
         let signature_builder =
@@ -345,36 +396,91 @@ impl DagDriver {
         let timestamp = node.timestamp();
         let ordered_peers = self.peers_by_latency.read().get_peers();
         let ordered_peers_clone = ordered_peers.clone();
+        let dag_id = self.dag_id;
 
         let node_broadcast = async move {
-            debug!(LogSchema::new(LogEvent::BroadcastNode), id = node.id());
-
-            defer!( observe_round(timestamp, RoundStage::NodeBroadcastedAll); );
-            rb.multicast(node, signature_builder, ordered_peers_clone)
+            debug!(
+                "[Bolt] broadcast node task was spawned for dag_id: {}",
+                dag_id
+            );
+            let (tx, rx) = oneshot::channel();
+            if let Err(_) = rb
+                .clone()
+                .send((tx, BoltBCParms::Node(node.clone(), signature_builder)))
                 .await
+            {
+                error!("[Bolt] channel closed before sending node");
+            }
+            debug!(
+                "[Bolt] node sent to broadcast, dag_id: {} for round {}",
+                dag_id,
+                node.round()
+            );
+
+            match rx.await {
+                Ok(bolt_ret) => match bolt_ret {
+                    BoltBCRet::Node(ret) => {
+                        debug!("[Bolt] node broadcast done, dag_id: {}", dag_id);
+                        ret.await
+                    },
+                    _ => unreachable!(),
+                },
+                Err(_) => {
+                    error!("[Bolt] node broadcast failed, dag_id: {}", dag_id);
+                    return;
+                },
+            };
         };
+
         let certified_broadcast = async move {
             let Ok(certificate) = rx.await else {
-                error!("channel closed before receiving ceritifcate");
+                error!("channel closed before receiving certificate");
                 return;
             };
             observe_round(timestamp, RoundStage::NodeBroadcastedQuorum);
+            let round = node_clone.round();
 
             debug!(
-                LogSchema::new(LogEvent::BroadcastCertifiedNode),
-                id = node_clone.id()
+                "[Bolt] certified broadcast task was spawned for dag_id: {}",
+                dag_id
             );
-
-            defer!( observe_round(timestamp, RoundStage::CertifiedNodeBroadcasted); );
             let certified_node =
                 CertifiedNode::new(node_clone, certificate.signatures().to_owned());
             let certified_node_msg = CertifiedNodeMessage::new(
                 certified_node,
                 latest_ledger_info.get_latest_ledger_info(),
             );
-            rb2.multicast(certified_node_msg, cert_ack_set, ordered_peers)
+            let (tx, rx) = oneshot::channel();
+            if let Err(_) = rb2
+                .send((
+                    tx,
+                    BoltBCParms::CertifiedNode(certified_node_msg, cert_ack_set),
+                ))
                 .await
+            {
+                error!("[Bolt] channel closed before sending certified node");
+            }
+
+            debug!(
+                "[Bolt] node certificate sent to broadcast, dag_id: {} for round {}",
+                dag_id, round
+            );
+            match rx.await {
+                Ok(bolt_ret) => match bolt_ret {
+                    BoltBCRet::CertifiedNode(ret) => ret.await,
+                    _ => unreachable!(),
+                },
+                Err(_) => {
+                    error!("[Bolt] channel closed before receiving certificate ack");
+                    return;
+                },
+            }
+            debug!(
+                "[Bolt] node certificate acks done, dag_id: {} for round {}",
+                dag_id, round
+            );
         };
+
         let core_task = join(node_broadcast, certified_broadcast);
         let author = self.author;
         let task = async move {
@@ -421,7 +527,7 @@ impl RpcHandler for DagDriver {
             .remote_peer(*certified_node.author())
             .round(certified_node.round()));
         if self.dag.read().exists(certified_node.metadata()) {
-            return Ok(CertifiedAck::new(epoch));
+            return Ok(CertifiedAck::new(epoch, self.dag_id));
         }
 
         observe_node(certified_node.timestamp(), NodeStage::CertifiedNodeReceived);
@@ -434,7 +540,7 @@ impl RpcHandler for DagDriver {
         let order_rule = self.order_rule.clone();
         tokio::task::spawn_blocking(move || order_rule.process_new_node(&node_metadata));
 
-        Ok(CertifiedAck::new(epoch))
+        Ok(CertifiedAck::new(epoch, self.dag_id))
     }
 }
 

@@ -81,6 +81,7 @@ thiserror = { workspace = true }
 tokio = { workspace = true }
 tokio-retry = { workspace = true }
 tokio-metrics-collector = { workspace = true }
+arc-swap = { workspace = true }
 
 [dev-dependencies]
 aptos-cached-packages = { workspace = true }

@@ -113,6 +113,33 @@ pub struct IncomingDAGRequest {
     pub start: Instant,
 }
 
+impl IncomingDAGRequest {
+    pub fn dag_id(&self) -> u8 {
+        self.req.dag_id()
+    }
+}
+
+impl TryFrom<IncomingShoalppRequest> for IncomingDAGRequest {
+    type Error = anyhow::Error;
+
+    fn try_from(shoalpp_req: IncomingShoalppRequest) -> Result<Self, Self::Error> {
+        Ok(Self {
+            req: shoalpp_req.req,
+            sender: shoalpp_req.sender,
+            responder: shoalpp_req.responder,
+            start: shoalpp_req.start,
+        })
+    }
+}
+
+#[derive(Debug)]
+pub struct IncomingShoalppRequest {
+    pub req: DAGNetworkMessage,
+    pub sender: Author,
+    pub responder: RpcResponder,
+    pub start: Instant,
+}
+
 #[derive(Debug)]
 pub struct IncomingCommitRequest {
     pub req: CommitMessage,
@@ -133,7 +160,7 @@ pub struct IncomingRandGenRequest {
 pub enum IncomingRpcRequest {
     BlockRetrieval(IncomingBlockRetrievalRequest),
     BatchRetrieval(IncomingBatchRetrievalRequest),
-    DAGRequest(IncomingDAGRequest),
+    ShoalppRequest(IncomingShoalppRequest),
     CommitRequest(IncomingCommitRequest),
     RandGenRequest(IncomingRandGenRequest),
 }
@@ -142,7 +169,7 @@ impl IncomingRpcRequest {
     pub fn epoch(&self) -> Option<u64> {
         match self {
             IncomingRpcRequest::BatchRetrieval(req) => Some(req.req.epoch()),
-            IncomingRpcRequest::DAGRequest(req) => Some(req.req.epoch()),
+            IncomingRpcRequest::ShoalppRequest(req) => Some(req.req.epoch()),
             IncomingRpcRequest::RandGenRequest(req) => Some(req.req.epoch()),
             IncomingRpcRequest::CommitRequest(req) => req.req.epoch(),
             IncomingRpcRequest::BlockRetrieval(_) => None,
@@ -402,6 +429,7 @@ impl NetworkSender {
         self.broadcast(msg).await
     }
 
+    #[allow(dead_code)]
     pub async fn send_commit_vote(
         &self,
         commit_vote: CommitVote,
@@ -812,7 +840,7 @@ impl NetworkTask {
                             })
                         },
                         ConsensusMsg::DAGMessage(req) => {
-                            IncomingRpcRequest::DAGRequest(IncomingDAGRequest {
+                            IncomingRpcRequest::ShoalppRequest(IncomingShoalppRequest {
                                 req,
                                 sender: peer_id,
                                 responder: RpcResponder {

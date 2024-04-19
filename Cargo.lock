@@ -863,6 +863,7 @@ dependencies = [
  "aptos-validator-transaction-pool",
  "aptos-vm",
  "aptos-vm-validator",
+ "arc-swap",
  "async-trait",
  "bcs 0.1.4",
  "byteorder",

@@ -6,6 +6,11 @@
 mod consensusdb_test;
 mod schema;
 
+pub use crate::consensusdb::schema::dag::{
+    DAG0_CERTIFIED_NODE_CF_NAME, DAG0_NODE_CF_NAME, DAG0_VOTE_CF_NAME, DAG1_CERTIFIED_NODE_CF_NAME,
+    DAG1_NODE_CF_NAME, DAG1_VOTE_CF_NAME, DAG2_CERTIFIED_NODE_CF_NAME, DAG2_NODE_CF_NAME,
+    DAG2_VOTE_CF_NAME,
+};
 use crate::error::DbError;
 use anyhow::Result;
 use aptos_consensus_types::{block::Block, quorum_cert::QuorumCert};
@@ -21,13 +26,15 @@ use aptos_storage_interface::AptosDbError;
 use once_cell::sync::Lazy;
 pub use schema::{
     block::BlockSchema,
-    dag::{CertifiedNodeSchema, DagVoteSchema, NodeSchema},
+    dag::{
+        Dag0CertifiedNodeSchema, Dag0NodeSchema, Dag0VoteSchema, Dag1CertifiedNodeSchema,
+        Dag1NodeSchema, Dag1VoteSchema, Dag2CertifiedNodeSchema, Dag2NodeSchema, Dag2VoteSchema,
+    },
     quorum_certificate::QCSchema,
 };
 use schema::{
     single_entry::{SingleEntryKey, SingleEntrySchema},
-    BLOCK_CF_NAME, CERTIFIED_NODE_CF_NAME, DAG_VOTE_CF_NAME, NODE_CF_NAME, QC_CF_NAME,
-    SINGLE_ENTRY_CF_NAME,
+    BLOCK_CF_NAME, QC_CF_NAME, SINGLE_ENTRY_CF_NAME,
 };
 use std::{
     collections::HashMap,
@@ -37,6 +44,7 @@ use std::{
     thread::{self, JoinHandle},
     time::{Duration, Instant},
 };
+// use crate::consensusdb::schema::DAG2_NODE_CF_NAME;
 
 /// The name of the consensus db file
 pub const CONSENSUS_DB_NAME: &str = "consensus_db";
@@ -68,9 +76,15 @@ impl ConsensusDB {
             BLOCK_CF_NAME,
             QC_CF_NAME,
             SINGLE_ENTRY_CF_NAME,
-            NODE_CF_NAME,
-            CERTIFIED_NODE_CF_NAME,
-            DAG_VOTE_CF_NAME,
+            DAG0_NODE_CF_NAME,
+            DAG1_NODE_CF_NAME,
+            DAG2_NODE_CF_NAME,
+            DAG0_CERTIFIED_NODE_CF_NAME,
+            DAG1_CERTIFIED_NODE_CF_NAME,
+            DAG2_CERTIFIED_NODE_CF_NAME,
+            DAG0_VOTE_CF_NAME,
+            DAG1_VOTE_CF_NAME,
+            DAG2_VOTE_CF_NAME,
             "ordered_anchor_id", // deprecated CF
         ];
 
@@ -306,9 +320,15 @@ pub(super) fn consensus_db_column_families() -> Vec<ColumnFamilyName> {
         BLOCK_CF_NAME,
         QC_CF_NAME,
         SINGLE_ENTRY_CF_NAME,
-        NODE_CF_NAME,
-        CERTIFIED_NODE_CF_NAME,
-        DAG_VOTE_CF_NAME,
+        DAG0_NODE_CF_NAME,
+        DAG0_CERTIFIED_NODE_CF_NAME,
+        DAG0_VOTE_CF_NAME,
+        DAG1_NODE_CF_NAME,
+        DAG1_CERTIFIED_NODE_CF_NAME,
+        DAG1_VOTE_CF_NAME,
+        DAG2_NODE_CF_NAME,
+        DAG2_CERTIFIED_NODE_CF_NAME,
+        DAG2_VOTE_CF_NAME,
         "ordered_anchor_id",
     ]
 }

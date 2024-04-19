@@ -167,10 +167,7 @@ pub enum OnChainConsensusConfig {
 /// The public interface that exposes all values with safe fallback.
 impl OnChainConsensusConfig {
     pub fn default_for_genesis() -> Self {
-        OnChainConsensusConfig::V3 {
-            alg: ConsensusAlgorithmConfig::default_for_genesis(),
-            vtxn: ValidatorTxnConfig::default_for_genesis(),
-        }
+        OnChainConsensusConfig::V2(ConsensusConfigV1::default())
     }
 
     /// The number of recent rounds that don't count into reputations.

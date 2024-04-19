@@ -21,12 +21,13 @@ use super::{
 };
 use crate::{
     dag::{
-        adapter::{compute_initial_block_and_ledger_info, LedgerInfoProvider},
+        adapter::{LedgerInfoProvider, ShoalppOrderBlocksInfo},
         anchor_election::{LeaderReputationAdapter, MetadataBackendAdapter},
         dag_driver::PeersByLatency,
         dag_state_sync::{SyncModeMessageHandler, SyncOutcome},
         observability::logging::{LogEvent, LogSchema},
         round_state::{AdaptiveResponsive, RoundState},
+        shoal_plus_plus::shoalpp_types::{BoltBCParms, BoltBCRet},
     },
     liveness::{
         leader_reputation::{ProposerAndVoterHeuristic, ReputationHeuristic},
@@ -36,7 +37,7 @@ use crate::{
     network::IncomingDAGRequest,
     payload_client::PayloadClient,
     payload_manager::PayloadManager,
-    pipeline::{buffer_manager::OrderedBlocks, execution_client::TExecutionClient},
+    pipeline::execution_client::TExecutionClient,
 };
 use aptos_bounded_executor::BoundedExecutor;
 use aptos_channels::{
@@ -59,25 +60,27 @@ use aptos_types::{
     },
     validator_signer::ValidatorSigner,
 };
+use arc_swap::ArcSwapOption;
 use async_trait::async_trait;
 use enum_dispatch::enum_dispatch;
-use futures_channel::{
-    mpsc::{UnboundedReceiver, UnboundedSender},
-    oneshot,
-};
-use std::{fmt, ops::Deref, sync::Arc, time::Duration};
+use futures_channel::oneshot;
+use std::{collections::HashMap, fmt, ops::Deref, sync::Arc, time::Duration};
 use tokio::{
     runtime::Handle,
     select,
+    sync::mpsc::{Sender, UnboundedSender},
     task::{block_in_place, JoinHandle},
 };
 use tokio_retry::strategy::ExponentialBackoff;
+#[allow(unused_imports)]
+use tokio_retry::Action;
 
 #[derive(Clone)]
 struct BootstrapBaseState {
+    dag_id: u8,
     dag_store: Arc<DagStore>,
     order_rule: Arc<Mutex<OrderRule>>,
-    ledger_info_provider: Arc<dyn TLedgerInfoProvider>,
+    // ledger_info_provider: Arc<dyn TLedgerInfoProvider>,
     ordered_notifier: Arc<OrderedNotifierAdapter>,
     commit_history: Arc<dyn CommitHistory>,
 }
@@ -137,12 +140,9 @@ impl ActiveMode {
         info!(
             LogSchema::new(LogEvent::ActiveMode)
                 .round(self.base_state.dag_store.deref().read().highest_round()),
-            highest_committed_round = self
-                .base_state
+            highest_committed_round = bootstrapper
                 .ledger_info_provider
-                .get_latest_ledger_info()
-                .commit_info()
-                .round(),
+                .get_highest_committed_anchor_round(bootstrapper.dag_id),
             highest_ordered_round = self
                 .base_state
                 .dag_store
@@ -208,6 +208,7 @@ impl SyncMode {
         bootstrapper: &DagBootstrapper,
     ) -> Option<Mode> {
         let sync_manager = DagStateSynchronizer::new(
+            self.base_state.dag_id,
             bootstrapper.epoch_state.clone(),
             bootstrapper.time_service.clone(),
             bootstrapper.execution_client.clone(),
@@ -218,10 +219,9 @@ impl SyncMode {
                 .dag_ordering_causal_history_window as Round,
         );
 
-        let highest_committed_anchor_round = self
-            .base_state
+        let highest_committed_anchor_round = bootstrapper
             .ledger_info_provider
-            .get_highest_committed_anchor_round();
+            .get_highest_committed_anchor_round(self.base_state.dag_id);
 
         info!(
             LogSchema::new(LogEvent::SyncMode)
@@ -325,6 +325,7 @@ impl SyncMode {
 }
 
 pub struct DagBootstrapper {
+    dag_id: u8,
     self_peer: Author,
     config: DagConsensusConfig,
     onchain_config: DagConsensusConfigV1,
@@ -337,7 +338,8 @@ pub struct DagBootstrapper {
     time_service: aptos_time_service::TimeService,
     payload_manager: Arc<PayloadManager>,
     payload_client: Arc<dyn PayloadClient>,
-    ordered_nodes_tx: UnboundedSender<OrderedBlocks>,
+    // ordered_nodes_tx: UnboundedSender<OrderedBlocks>,
+    ordered_nodes_tx: UnboundedSender<ShoalppOrderBlocksInfo>,
     execution_client: Arc<dyn TExecutionClient>,
     quorum_store_enabled: bool,
     vtxn_config: ValidatorTxnConfig,
@@ -346,11 +348,16 @@ pub struct DagBootstrapper {
     executor: BoundedExecutor,
     allow_batches_without_pos_in_proposal: bool,
     peers_and_metadata: Arc<PeersAndMetadata>,
+    rb: Arc<ReliableBroadcast<DAGMessage, ExponentialBackoff, DAGRpcResult>>,
+    broadcast_sender: Sender<(oneshot::Sender<BoltBCRet>, BoltBCParms)>,
+    ledger_info_provider: Arc<RwLock<LedgerInfoProvider>>,
+    dag_store: Arc<ArcSwapOption<DagStore>>,
 }
 
 impl DagBootstrapper {
     #[allow(clippy::too_many_arguments)]
     pub fn new(
+        dag_id: u8,
         self_peer: Author,
         config: DagConsensusConfig,
         onchain_config: DagConsensusConfigV1,
@@ -363,7 +370,8 @@ impl DagBootstrapper {
         time_service: aptos_time_service::TimeService,
         payload_manager: Arc<PayloadManager>,
         payload_client: Arc<dyn PayloadClient>,
-        ordered_nodes_tx: UnboundedSender<OrderedBlocks>,
+        // ordered_nodes_tx: UnboundedSender<OrderedBlocks>,
+        ordered_nodes_tx: UnboundedSender<ShoalppOrderBlocksInfo>,
         execution_client: Arc<dyn TExecutionClient>,
         quorum_store_enabled: bool,
         vtxn_config: ValidatorTxnConfig,
@@ -372,9 +380,14 @@ impl DagBootstrapper {
         executor: BoundedExecutor,
         allow_batches_without_pos_in_proposal: bool,
         peers_and_metadata: Arc<PeersAndMetadata>,
+        rb: Arc<ReliableBroadcast<DAGMessage, ExponentialBackoff, DAGRpcResult>>,
+        broadcast_sender: Sender<(oneshot::Sender<BoltBCRet>, BoltBCParms)>,
+        ledger_info_provider: Arc<RwLock<LedgerInfoProvider>>,
+        dag_store: Arc<ArcSwapOption<DagStore>>,
     ) -> Self {
         info!("OnChainConfig: {:?}", onchain_config);
         Self {
+            dag_id,
             self_peer,
             config,
             onchain_config,
@@ -396,6 +409,10 @@ impl DagBootstrapper {
             executor,
             allow_batches_without_pos_in_proposal,
             peers_and_metadata,
+            rb,
+            broadcast_sender,
+            ledger_info_provider,
+            dag_store,
         }
     }
 
@@ -518,20 +535,16 @@ impl DagBootstrapper {
         dag_window_size_config: u64,
         existing_dag_store: Option<DagStore>,
     ) -> BootstrapBaseState {
-        let ledger_info_from_storage = self
-            .storage
-            .get_latest_ledger_info()
-            .expect("latest ledger info must exist");
-        let (parent_block_info, ledger_info) =
-            compute_initial_block_and_ledger_info(ledger_info_from_storage);
+        // let ledger_info_from_storage = self
+        //     .storage
+        //     .get_latest_ledger_info()
+        //     .expect("latest ledger info must exist");
+        // let (parent_block_info, ledger_info) =
+        //     compute_initial_block_and_ledger_info(ledger_info_from_storage);
 
-        let ledger_info_provider = Arc::new(RwLock::new(LedgerInfoProvider::new(
-            self.epoch_state.clone(),
-            ledger_info,
-        )));
-
-        let highest_committed_anchor_round =
-            ledger_info_provider.get_highest_committed_anchor_round();
+        let highest_committed_anchor_round = self
+            .ledger_info_provider
+            .get_highest_committed_anchor_round(self.dag_id);
         let initial_round = std::cmp::max(
             1,
             highest_committed_anchor_round.saturating_sub(dag_window_size_config),
@@ -540,6 +553,7 @@ impl DagBootstrapper {
         let dag = monitor!("dag_store_new", {
             if let Some(store) = existing_dag_store {
                 Arc::new(DagStore::new_from_existing(
+                    self.dag_id,
                     self.epoch_state.clone(),
                     self.storage.clone(),
                     self.payload_manager.clone(),
@@ -549,6 +563,7 @@ impl DagBootstrapper {
                 ))
             } else {
                 Arc::new(DagStore::new(
+                    self.dag_id,
                     self.epoch_state.clone(),
                     self.storage.clone(),
                     self.payload_manager.clone(),
@@ -561,11 +576,11 @@ impl DagBootstrapper {
         let ordered_notifier = monitor!(
             "dag_ordered_notifier_new",
             Arc::new(OrderedNotifierAdapter::new(
+                self.dag_id,
                 self.ordered_nodes_tx.clone(),
                 dag.clone(),
                 self.epoch_state.clone(),
-                parent_block_info,
-                ledger_info_provider.clone(),
+                self.ledger_info_provider.clone(),
                 self.allow_batches_without_pos_in_proposal,
             ))
         );
@@ -584,9 +599,10 @@ impl DagBootstrapper {
         );
 
         BootstrapBaseState {
+            dag_id: self.dag_id,
             dag_store: dag,
             order_rule,
-            ledger_info_provider,
+            // ledger_info_provider,
             ordered_notifier,
             commit_history,
         }
@@ -596,34 +612,23 @@ impl DagBootstrapper {
         &self,
         base_state: &BootstrapBaseState,
     ) -> (NetworkHandler, DagFetcherService) {
-        let validators = self.epoch_state.verifier.get_ordered_account_addresses();
-        let rb_config = self.config.rb_config.clone();
+        // let validators = self.epoch_state.verifier.get_ordered_account_addresses();
+        // let rb_config = self.config.rb_config.clone();
         let round_state_config = self.config.round_state_config.clone();
 
-        // A backoff policy that starts at _base_*_factor_ ms and multiplies by _base_ each iteration.
-        let rb_backoff_policy = ExponentialBackoff::from_millis(rb_config.backoff_policy_base_ms)
-            .factor(rb_config.backoff_policy_factor)
-            .max_delay(Duration::from_millis(rb_config.backoff_policy_max_delay_ms));
-        let rb = Arc::new(ReliableBroadcast::new(
-            validators.clone(),
-            self.rb_network_sender.clone(),
-            rb_backoff_policy,
-            self.time_service.clone(),
-            Duration::from_millis(rb_config.rpc_timeout_ms),
-            self.executor.clone(),
-        ));
-
         let BootstrapBaseState {
+            dag_id,
             dag_store,
-            ledger_info_provider,
+            // ledger_info_provider,
             order_rule,
             ordered_notifier,
             commit_history,
         } = base_state;
 
         let state_sync_trigger = StateSyncTrigger::new(
+            *dag_id,
             self.epoch_state.clone(),
-            ledger_info_provider.clone(),
+            self.ledger_info_provider.clone(),
             dag_store.clone(),
             self.proof_notifier.clone(),
             self.onchain_config.dag_ordering_causal_history_window as Round,
@@ -631,12 +636,13 @@ impl DagBootstrapper {
 
         let (dag_fetcher, fetch_requester, node_fetch_waiter, certified_node_fetch_waiter) =
             DagFetcherService::new(
+                self.dag_id,
                 self.epoch_state.clone(),
                 self.dag_network_sender.clone(),
                 dag_store.clone(),
                 self.time_service.clone(),
                 self.config.fetcher_config.clone(),
-                ledger_info_provider.clone(),
+                self.ledger_info_provider.clone(),
                 self.onchain_config.dag_ordering_causal_history_window as Round,
             );
         let fetch_requester = Arc::new(fetch_requester);
@@ -672,16 +678,17 @@ impl DagBootstrapper {
             self.peers_and_metadata.clone(),
         );
         let dag_driver = DagDriver::new(
+            self.dag_id,
             self.self_peer,
             self.epoch_state.clone(),
             dag_store.clone(),
             self.payload_client.clone(),
-            rb,
+            self.rb.clone(),
             self.time_service.clone(),
             self.storage.clone(),
             order_rule.clone(),
             fetch_requester.clone(),
-            ledger_info_provider.clone(),
+            self.ledger_info_provider.clone(),
             round_state,
             self.onchain_config.dag_ordering_causal_history_window as Round,
             self.config.node_payload_config.clone(),
@@ -689,8 +696,10 @@ impl DagBootstrapper {
             self.quorum_store_enabled,
             self.allow_batches_without_pos_in_proposal,
             peers_by_latency,
+            self.broadcast_sender.clone(),
         );
         let rb_handler = NodeBroadcastHandler::new(
+            self.dag_id,
             dag_store.clone(),
             order_rule.clone(),
             self.signer.clone(),
@@ -707,6 +716,7 @@ impl DagBootstrapper {
         let fetch_handler = FetchRequestHandler::new(dag_store.clone(), self.epoch_state.clone());
 
         let dag_handler = NetworkHandler::new(
+            self.dag_id,
             self.epoch_state.clone(),
             rb_handler,
             dag_driver,
@@ -792,13 +802,16 @@ pub(super) fn bootstrap_dag_for_test(
     payload_manager: Arc<PayloadManager>,
     payload_client: Arc<dyn PayloadClient>,
     execution_client: Arc<dyn TExecutionClient>,
+    rb: Arc<ReliableBroadcast<DAGMessage, ExponentialBackoff, DAGRpcResult>>,
+    broadcast_sender: Sender<(oneshot::Sender<BoltBCRet>, BoltBCParms)>,
+    ledger_info_provider: Arc<RwLock<LedgerInfoProvider>>,
+    dag_store: Arc<ArcSwapOption<DagStore>>,
 ) -> (
     JoinHandle<SyncOutcome>,
     JoinHandle<()>,
     aptos_channel::Sender<Author, IncomingDAGRequest>,
-    UnboundedReceiver<OrderedBlocks>,
+    tokio::sync::mpsc::UnboundedReceiver<ShoalppOrderBlocksInfo>,
 ) {
-    let (ordered_nodes_tx, ordered_nodes_rx) = futures_channel::mpsc::unbounded();
     let mut onchain_config = DagConsensusConfigV1::default();
     onchain_config.anchor_election_mode = AnchorElectionMode::LeaderReputation(
         LeaderReputationType::ProposerAndVoterV2(ProposerAndVoterConfig {
@@ -814,7 +827,9 @@ pub(super) fn bootstrap_dag_for_test(
         }),
     );
     let peers_and_metadata = PeersAndMetadata::new(&[NetworkId::Validator]);
+    let (ordered_nodes_tx, ordered_nodes_rx) = tokio::sync::mpsc::unbounded_channel();
     let bootstraper = DagBootstrapper::new(
+        0, // TODO
         self_peer,
         DagConsensusConfig::default(),
         onchain_config,
@@ -836,6 +851,10 @@ pub(super) fn bootstrap_dag_for_test(
         BoundedExecutor::new(2, Handle::current()),
         true,
         peers_and_metadata,
+        rb,
+        broadcast_sender,
+        ledger_info_provider,
+        dag_store,
     );
 
     let (_base_state, handler, fetch_service) = bootstraper.full_bootstrap(None);
