@@ -125,7 +125,7 @@ impl PipelineOpt {
             allow_retries: self.allow_retries,
             num_executor_shards: self.sharding_opt.num_executor_shards,
             use_global_executor: self.sharding_opt.use_global_executor,
-            num_generator_workers: 1,
+            num_generator_workers: self.num_generator_workers,
             partitioner_config: self.sharding_opt.partitioner_config(),
         }
     }
