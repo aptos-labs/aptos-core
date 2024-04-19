@@ -19,6 +19,8 @@ mod packing;
 mod sha;
 #[cfg(test)]
 mod arrays;
+#[cfg(test)]
+mod rsa;
 
 pub struct TestCircuitHandle {
     dir: TempDir,
