@@ -12,7 +12,7 @@ use rand_chacha::{
     ChaCha20Rng,
 };
 
-const TEST_RNG_SEED: u64 = 2513478;
+const TEST_RNG_SEED: u64 = 6896401633680249901;
 
 fn expected_num2bits_be(n: u64, size: usize) -> Vec<bool> {
     let mut bits_le = Vec::new();

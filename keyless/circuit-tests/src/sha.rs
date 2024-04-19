@@ -6,10 +6,14 @@ use aptos_keyless_common::input_processing::{
     circuit_input_signals::CircuitInputSignals, config::CircuitPaddingConfig,
     sha,
 };
-use rand::{thread_rng, RngCore};
+use rand_chacha::{
+    rand_core::{RngCore as _, SeedableRng as _},
+    ChaCha20Rng,
+};
 use sha2::Digest;
 use std::sync::Arc;
 
+const TEST_RNG_SEED: u64 = 13673030044145830633;
 
 fn byte_to_bits_msb(byte: u8) -> Vec<bool> {
     (0..8).map(|i| (byte >> (7 - i)) & 1 != 0).collect()
@@ -21,7 +25,7 @@ fn bytes_to_bits_msb(msg: Vec<u8>) -> Vec<bool> {
 
 #[test]
 fn sha_test() {
-    let mut rng = thread_rng();
+    let mut rng = ChaCha20Rng::seed_from_u64(TEST_RNG_SEED);
     let circuit_handle = Arc::new(TestCircuitHandle::new("sha_test.circom").unwrap());
 
     // TODO: figure out how to parallelize and why `tokio::task::spawn()` does not work.
@@ -55,7 +59,7 @@ fn sha_test() {
 
 #[test]
 fn sha_padding_verify_test() {
-    let mut rng = thread_rng();
+    let mut rng = ChaCha20Rng::seed_from_u64(TEST_RNG_SEED);
     let circuit_handle = Arc::new(TestCircuitHandle::new("sha2_padding_verify_test.circom").unwrap());
 
     for input_byte_len in 180..248 {
