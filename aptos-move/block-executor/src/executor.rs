@@ -94,7 +94,7 @@ where
         let concurrency_level = config.local.concurrency_level;
         Self {
             config,
-            garage: ThreadGarageExecutor::new(concurrency_level, concurrency_level*10),
+            garage: ThreadGarageExecutor::new(2, 2),
             //executor_thread_pool,
             transaction_commit_hook,
             phantom: PhantomData,
@@ -947,7 +947,9 @@ where
                     // and below we log CodeInvariantErrors.
                     if let PanicOr::CodeInvariantError(err_msg) = err {
                         alert!("[BlockSTM] worker loop: CodeInvariantError({:?})", err_msg);
+                        println!("error error {}",err_msg);
                     }
+                    
                     shared_maybe_error.store(true, Ordering::SeqCst);
 
                     eprintln!("halting from here thread= {}", garage.get_thread_id());

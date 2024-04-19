@@ -140,7 +140,6 @@ enum ExecutionStatus {
     // it gets committed later, without scheduler tracking.
     Committed(Incarnation),
     Aborting(Incarnation),
-    ExecutionHalted,
 }
 
 impl PartialEq for ExecutionStatus {
@@ -249,7 +248,7 @@ pub trait TWaitForDependency {
 }
 
 
-
+ 
 pub trait ConditionalSuspend {
     fn conditional_suspend(
         &self,
@@ -323,11 +322,7 @@ impl<'a> SchedulerHandle<'a> {
 
     pub fn halt(&self) -> bool {
         eprintln!("set done marker in halt");
-        if self.scheduler.set_done_marker() {
-            for txn_idx in 0..self.scheduler.num_txns {
-                self.scheduler.halt_transaction_execution(txn_idx);
-            }
-        }
+        self.scheduler.set_done_marker();
         self.garage.unwrap().halt()
     }
 
@@ -348,7 +343,7 @@ pub struct Scheduler {
     /// should be re-executed once transaction i's next incarnation finishes.
     txn_dependency: Vec<CachePadded<Mutex<Vec<TxnIndex>>>>,
     /// An index i maps to the most up-to-date status of transaction i.
-    txn_status: Vec<CachePadded<(RwLock<ExecutionStatus>, RwLock<ValidationStatus>, AtomicBool)>>,
+    txn_status: Vec<CachePadded<(RwLock<ExecutionStatus>, RwLock<ValidationStatus>)>>,
 
     /// Next transaction to commit, and sweeping lower bound on the wave of a validation that must
     /// be successful in order to commit the next transaction.
@@ -408,7 +403,6 @@ impl Scheduler {
                     CachePadded::new((
                         RwLock::new(ExecutionStatus::Ready(0, ExecutionTaskType::Execution)),
                         RwLock::new(ValidationStatus::new()),
-                        AtomicBool::new(false),
                     ))
                 })
                 .collect(),
@@ -464,10 +458,13 @@ impl Scheduler {
             .0
             .try_upgradable_read()
         {
+            if self.done() {
+                return None;
+            }
             // Acquired the execution status read lock, which can be upgrade to write lock if necessary.
             if let ExecutionStatus::Executed(incarnation) = *status {
                 // Status is executed and we are holding the lock.
-
+                eprintln!("maybe should not be here?");
                 // Note we update the wave inside commit_state only with max_triggered_wave,
                 // since max_triggered_wave records the new wave when validation index is
                 // decreased thus affecting all later txns as well,
@@ -522,7 +519,12 @@ impl Scheduler {
         // while unlikely there would be much contention on a specific index lock.
         let mut status = self.txn_status[txn_idx as usize].0.write();
 
+        if self.done() {
+            return false;
+        }
+
         if *status == ExecutionStatus::Executed(incarnation) {
+            eprintln!("I really should not be here after halt");
             *status = ExecutionStatus::Aborting(incarnation);
             true
         } else {
@@ -797,6 +799,8 @@ impl TWaitForDependency for Scheduler {
 
 /// Private functions of the Scheduler
 impl Scheduler {
+    /* 
+    
     /// Helper function to be called from Scheduler::halt(); Sets the transaction status to Halted and
     /// notifies the waiting thread, if applicable. The guarantee is that if halt(txn_idx) is called,
     /// then no thread can remain suspended on some dependency while executing transaction txn_idx.
@@ -825,6 +829,7 @@ impl Scheduler {
 
         //std::mem::replace(&mut *status, ExecutionStatus::ExecutionHalted);
     }
+    */
     
 
     fn unpack_validation_idx(validation_idx: u64) -> (TxnIndex, Wave) {
@@ -892,6 +897,11 @@ impl Scheduler {
         // However, it is likely an overkill (and overhead to actually upgrade),
         // while unlikely there would be much contention on a specific index lock.
         let mut status = self.txn_status[txn_idx as usize].0.write();
+        
+        if self.done() {
+            return None;
+        }
+        
         if let ExecutionStatus::Ready(incarnation, execution_task_type) = &*status {
             let ret: (u32, ExecutionTaskType) = (*incarnation, (*execution_task_type).clone());
             *status = ExecutionStatus::Executing(*incarnation, (*execution_task_type).clone());
@@ -1017,7 +1027,6 @@ impl Scheduler {
                 *status = ExecutionStatus::Suspended(incarnation, baton);
                 Ok(()) 
             },
-            ExecutionStatus::ExecutionHalted => Ok(()),
             //ExecutionStatus::ExecutionHalted => Ok(false),
             _ => Err(code_invariant_error(format!(
                 "Unexpected status {:?} in suspend",
@@ -1038,7 +1047,6 @@ impl Scheduler {
                 );
                 Ok(())
             },
-            ExecutionStatus::ExecutionHalted => Ok(()),
             _ => Err(code_invariant_error(format!(
                 "Unexpected status {:?} in resume",
                 &*status,
@@ -1056,19 +1064,19 @@ impl Scheduler {
         eprintln!("was here maybe should be halted?");
         match *status {
             ExecutionStatus::Executing(stored_incarnation, _)
-                if stored_incarnation == incarnation =>
+                if stored_incarnation == incarnation && !self.done() =>
             {
                 *status = ExecutionStatus::Executed(incarnation);
                 Ok(())
             },
-            ExecutionStatus::ExecutionHalted => {
+            _ if self.done() => {
                 // The execution is already halted.
                 Ok(())
             },
-            _ => Err(code_invariant_error(format!(
+            _ => { eprintln!("started panicking here 2"); Err(code_invariant_error(format!(
                 "Expected Executing incarnation {incarnation}, got {:?}",
                 &*status,
-            ))),
+            ))) },
         }
     }
 
@@ -1082,19 +1090,19 @@ impl Scheduler {
         eprintln!("was here transaction_id={}", txn_idx);
         let mut status = self.txn_status[txn_idx as usize].0.write();
         match *status {
-            ExecutionStatus::Aborting(stored_incarnation) if stored_incarnation == incarnation && !self.txn_status[txn_idx as usize].2.load(Ordering::SeqCst) => {
+            ExecutionStatus::Aborting(stored_incarnation) if stored_incarnation == incarnation && !self.done() => {
                 eprintln!("aborted transaction_id={}", txn_idx);
                 *status = ExecutionStatus::Ready(incarnation + 1, ExecutionTaskType::Execution);
                 Ok(())
             },
-            _ if self.txn_status[txn_idx as usize].2.load(Ordering::SeqCst)=> {
+            _ if self.done() => {
                 // The execution is already halted.
                 Ok(())
             },
-            _ => Err(code_invariant_error(format!(
+            _ => { eprintln!("started panicking here"); Err(code_invariant_error(format!(
                 "Expected Aborting incarnation {incarnation}, got {:?}",
                 &*status,
-            ))),
+            ))) },
         }
     }
 
