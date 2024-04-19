@@ -306,7 +306,18 @@ impl LedgerInfoWithV0 {
         &self,
         validator: &ValidatorVerifier,
     ) -> ::std::result::Result<(), VerifyError> {
-        validator.verify_multi_signatures(self.ledger_info(), &self.signatures)
+        match validator.verify_multi_signatures(self.ledger_info(), &self.signatures) {
+            Ok(result) => Ok(result),
+            Err(e) => {
+                println!(
+                    "Fail to verify signatures for LedgerInfo with error: {:?}, LedgerInfo: {:?}, signatures: {:?}, num_votes: {}",
+                    e, self.ledger_info(), self.signatures, self.signatures.get_num_voters()
+                );
+                use std::backtrace::Backtrace;
+                println!("Custom backtrace: {}", Backtrace::capture());
+                Err(e)
+            }
+        }
     }
 
     pub fn check_voting_power(
