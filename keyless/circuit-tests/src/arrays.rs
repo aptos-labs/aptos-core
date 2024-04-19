@@ -8,17 +8,46 @@ use ark_bn254::Fr;
 use ark_ff::{Zero, One};
      
 #[test]
-fn array_selector_test() {
+fn array_selector_test_large() {
     let circuit_handle = TestCircuitHandle::new("array_selector_test.circom").unwrap();
-    let output = [0,0,1,1,1,0,0,0];
-    let start_index = 2;
-    let end_index = 5;
-    let out_len = 8;
-    let config = CircuitPaddingConfig::new().max_length("expected_output", out_len);
-    let circuit_input_signals = CircuitInputSignals::new().u64_input("start_index", start_index).u64_input("end_index", end_index).bytes_input("expected_output", &output).pad(&config).unwrap();
+    let out_len = 2000;
+    let start = 2;
+    let end = 5;
+    let output = build_array_selector_output(out_len, start, end);
+    let config = CircuitPaddingConfig::new().max_length("expected_output", out_len as usize);
+    let circuit_input_signals = CircuitInputSignals::new().u64_input("start_index", start as u64).u64_input("end_index", end as u64).bytes_input("expected_output", &output).pad(&config).unwrap();
      
     let result = circuit_handle.gen_witness(circuit_input_signals);
     assert!(result.is_ok());
+}
+
+fn build_array_selector_output(len: u32, start: u32, end: u32) -> Vec<u8> {
+    let mut output = Vec::new();
+    for _ in 0..start {
+        output.push(0);
+    };
+    for _ in start..end {
+        output.push(1);
+    };
+    for _ in end..len {
+        output.push(0);
+    };
+    output
+}
+
+#[test]
+fn array_selector_test() {
+    let circuit_handle = TestCircuitHandle::new("array_selector_test.circom").unwrap();
+    let out_len = 8;
+    for start in 0..out_len {
+        for end in start+1..out_len {
+            let output = build_array_selector_output(out_len, start, end);
+            let config = CircuitPaddingConfig::new().max_length("expected_output", out_len as usize);
+            let circuit_input_signals = CircuitInputSignals::new().u64_input("start_index", start as u64).u64_input("end_index", end as u64).bytes_input("expected_output", &output[..]).pad(&config).unwrap();
+            let result = circuit_handle.gen_witness(circuit_input_signals);
+            assert!(result.is_ok());
+        };
+    };
 }
 
 #[test]
