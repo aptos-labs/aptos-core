@@ -997,7 +997,7 @@ impl CliTestFramework {
         let gas_options = GasOptions {
             gas_unit_price: Some(1),
             max_gas: Some(2000000),
-            expiration_secs: DEFAULT_EXPIRATION_SECS,
+            expiration_secs: 120,
         };
         RunScript {
             txn_options: self.transaction_options(index, Some(gas_options)),
