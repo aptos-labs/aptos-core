@@ -10,6 +10,8 @@ module aptos_framework::account {
     use aptos_framework::event::{Self, EventHandle};
     use aptos_framework::guid;
     use aptos_framework::system_addresses;
+    use aptos_framework::aggregator_v2::{Self, Aggregator};
+
     use aptos_std::ed25519;
     use aptos_std::from_bcs;
     use aptos_std::multi_ed25519;
@@ -33,7 +35,7 @@ module aptos_framework::account {
     /// Resource representing an account.
     struct Account has key, store {
         authentication_key: vector<u8>,
-        sequence_number: u64,
+        sequence_number: Aggregator<u64>,
         guid_creation_num: u64,
         coin_register_events: EventHandle<CoinRegisterEvent>,
         key_rotation_events: EventHandle<KeyRotationEvent>,
@@ -222,7 +224,7 @@ module aptos_framework::account {
             &new_account,
             Account {
                 authentication_key,
-                sequence_number: 0,
+                sequence_number: aggregator_v2::create_unbounded_aggregator(),
                 guid_creation_num,
                 coin_register_events,
                 key_rotation_events,
@@ -246,18 +248,16 @@ module aptos_framework::account {
 
     #[view]
     public fun get_sequence_number(addr: address): u64 acquires Account {
-        borrow_global<Account>(addr).sequence_number
+        aggregator_v2::read(&borrow_global<Account>(addr).sequence_number)
     }
 
     public(friend) fun increment_sequence_number(addr: address) acquires Account {
         let sequence_number = &mut borrow_global_mut<Account>(addr).sequence_number;
 
         assert!(
-            (*sequence_number as u128) < MAX_U64,
+            aggregator_v2::try_add(sequence_number, 1),
             error::out_of_range(ESEQUENCE_NUMBER_TOO_BIG)
         );
-
-        *sequence_number = *sequence_number + 1;
     }
 
     #[view]
@@ -347,7 +347,7 @@ module aptos_framework::account {
         // Construct a valid `RotationProofChallenge` that `cap_rotate_key` and `cap_update_table` will validate against.
         let curr_auth_key_as_address = from_bcs::to_address(account_resource.authentication_key);
         let challenge = RotationProofChallenge {
-            sequence_number: account_resource.sequence_number,
+            sequence_number: aggregator_v2::read(&account_resource.sequence_number),
             originator: addr,
             current_auth_key: curr_auth_key_as_address,
             new_public_key: to_public_key_bytes,
@@ -422,7 +422,7 @@ module aptos_framework::account {
         let account_resource = borrow_global_mut<Account>(addr);
         let proof_challenge = RotationCapabilityOfferProofChallengeV2 {
             chain_id: chain_id::get(),
-            sequence_number: account_resource.sequence_number,
+            sequence_number: aggregator_v2::read(&account_resource.sequence_number),
             source_address: addr,
             recipient_address,
         };
@@ -660,7 +660,7 @@ module aptos_framework::account {
                 error::already_exists(ERESOURCE_ACCCOUNT_EXISTS),
             );
             assert!(
-                account.sequence_number == 0,
+                aggregator_v2::read(&account.sequence_number) == 0,
                 error::invalid_state(EACCOUNT_ALREADY_USED),
             );
             create_signer(resource_addr)
@@ -746,7 +746,7 @@ module aptos_framework::account {
         recipient_address: address,
     ): SignerCapabilityOfferProofChallengeV2 acquires Account {
         SignerCapabilityOfferProofChallengeV2 {
-            sequence_number: borrow_global_mut<Account>(source_address).sequence_number,
+            sequence_number: get_sequence_number(source_address),
             source_address,
             recipient_address,
         }
@@ -849,7 +849,7 @@ module aptos_framework::account {
 
         let resource_addr = signer::address_of(&resource);
         let proof_challenge = SignerCapabilityOfferProofChallengeV2 {
-            sequence_number: borrow_global_mut<Account>(resource_addr).sequence_number,
+            sequence_number: get_sequence_number(resource_addr),
             source_address: resource_addr,
             recipient_address,
         };
@@ -913,7 +913,7 @@ module aptos_framework::account {
         addr: address,
     ) acquires Account {
         let acct = borrow_global_mut<Account>(addr);
-        acct.sequence_number = acct.sequence_number + 1;
+        aggregator_v2::read(acct.sequence_number);
     }
 
     #[test_only]
@@ -922,7 +922,9 @@ module aptos_framework::account {
         addr: address,
         s: u64
     ) acquires Account {
-        borrow_global_mut<Account>(addr).sequence_number = s;
+        let agg = aggregator_v2::create_unbounded_aggregator();
+        aggregator_v2::add(agg, s);
+        borrow_global_mut<Account>(addr).sequence_number = agg;
     }
 
     #[test_only]
@@ -949,13 +951,13 @@ module aptos_framework::account {
         let addr: address = @0x1234; // Define test address
         create_account(addr); // Initialize account resource
         // Assert sequence number intializes to 0
-        assert!(borrow_global<Account>(addr).sequence_number == 0, 0);
+        assert!(get_sequence_number(addr) == 0, 0);
         increment_sequence_number_for_test(addr); // Increment sequence number
         // Assert correct mock value post-increment
-        assert!(borrow_global<Account>(addr).sequence_number == 1, 1);
+        assert!(get_sequence_number(addr) == 1, 1);
         set_sequence_number(addr, 10); // Set mock sequence number
         // Assert correct mock value post-modification
-        assert!(borrow_global<Account>(addr).sequence_number == 10, 2);
+        assert!(get_sequence_number(addr) == 10, 2);
     }
 
     ///////////////////////////////////////////////////////////////////////////
@@ -1005,7 +1007,7 @@ module aptos_framework::account {
         create_account(bob_addr);
 
         let challenge = SignerCapabilityOfferProofChallengeV2 {
-            sequence_number: borrow_global<Account>(alice_addr).sequence_number,
+            sequence_number: get_sequence_number(alice_addr),
             source_address: alice_addr,
             recipient_address: bob_addr,
         };
@@ -1031,7 +1033,7 @@ module aptos_framework::account {
         create_account(bob_addr);
 
         let challenge = SignerCapabilityOfferProofChallengeV2 {
-            sequence_number: borrow_global<Account>(alice_addr).sequence_number,
+            sequence_number: get_sequence_number(alice_addr),
             source_address: alice_addr,
             recipient_address: bob_addr,
         };
@@ -1057,7 +1059,7 @@ module aptos_framework::account {
         create_account(bob_addr);
 
         let challenge = SignerCapabilityOfferProofChallengeV2 {
-            sequence_number: borrow_global<Account>(alice_addr).sequence_number,
+            sequence_number: get_sequence_number(alice_addr),
             source_address: alice_addr,
             recipient_address: bob_addr,
         };
@@ -1083,7 +1085,7 @@ module aptos_framework::account {
         create_account(bob_addr);
 
         let challenge = SignerCapabilityOfferProofChallengeV2 {
-            sequence_number: borrow_global<Account>(alice_addr).sequence_number,
+            sequence_number: get_sequence_number(alice_addr),
             source_address: alice_addr,
             recipient_address: bob_addr,
         };
@@ -1109,7 +1111,7 @@ module aptos_framework::account {
         create_account(bob_addr);
 
         let challenge = SignerCapabilityOfferProofChallengeV2 {
-            sequence_number: borrow_global<Account>(alice_addr).sequence_number,
+            sequence_number: get_sequence_number(alice_addr),
             source_address: alice_addr,
             recipient_address: bob_addr,
         };
@@ -1136,7 +1138,7 @@ module aptos_framework::account {
         create_account(charlie_addr);
 
         let challenge = SignerCapabilityOfferProofChallengeV2 {
-            sequence_number: alice_account_resource.sequence_number,
+            sequence_number: get_sequence_number(alice_addr),
             source_address: alice_addr,
             recipient_address: bob_addr,
         };
