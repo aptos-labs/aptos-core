@@ -127,7 +127,7 @@ impl<K: Copy + Clone + Debug + Eq> VersionedValue<K> {
             "Removed entry must be an Estimate",
         );
         // Incarnation changed output behavior, disable reading through estimates optimization.
-        self.read_estimate_deltas = false;
+        // self.read_estimate_deltas = false;
     }
 
     // Insert value computed from speculative transaction execution,
@@ -173,7 +173,7 @@ impl<K: Copy + Clone + Debug + Eq> VersionedValue<K> {
                     },
                 } {
                     // TODO[agg_v2](optimize): See if we want to invalidate, when we change read_estimate_deltas
-                    self.read_estimate_deltas = false;
+                    // self.read_estimate_deltas = false;
                 }
                 o.insert(Box::new(CachePadded::new(entry)));
             },
@@ -700,7 +700,7 @@ impl<K: Eq + Hash + Clone + Debug + Copy> VersionedDelayedFields<K> {
 impl<K: Eq + Hash + Clone + Debug + Copy> TVersionedDelayedFieldView<K>
     for VersionedDelayedFields<K>
 {
-    fn pending_values(&self, id: &K, txn_idx: TxnIndex) -> usize {
+    fn pending_values(&self, _id: &K, txn_idx: TxnIndex) -> usize {
         txn_idx.saturating_sub(self.next_idx_to_commit.load(Ordering::Relaxed)) as usize
         // self.values.get_mut(id).map_or(0, |v| {
         //     v.pending_values(self.next_idx_to_commit.load(Ordering::Relaxed), txn_idx)
