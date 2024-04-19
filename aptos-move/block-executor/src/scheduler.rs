@@ -348,7 +348,7 @@ pub struct Scheduler {
     /// should be re-executed once transaction i's next incarnation finishes.
     txn_dependency: Vec<CachePadded<Mutex<Vec<TxnIndex>>>>,
     /// An index i maps to the most up-to-date status of transaction i.
-    txn_status: Vec<CachePadded<(RwLock<ExecutionStatus>, RwLock<ValidationStatus>)>>,
+    txn_status: Vec<CachePadded<(RwLock<ExecutionStatus>, RwLock<ValidationStatus>, AtomicBool)>>,
 
     /// Next transaction to commit, and sweeping lower bound on the wave of a validation that must
     /// be successful in order to commit the next transaction.
@@ -408,6 +408,7 @@ impl Scheduler {
                     CachePadded::new((
                         RwLock::new(ExecutionStatus::Ready(0, ExecutionTaskType::Execution)),
                         RwLock::new(ValidationStatus::new()),
+                        AtomicBool::new(false),
                     ))
                 })
                 .collect(),
@@ -814,7 +815,15 @@ impl Scheduler {
     
     fn halt_transaction_execution(&self, txn_idx: TxnIndex) {
         let mut status = self.txn_status[txn_idx as usize].0.write();
-        std::mem::replace(&mut *status, ExecutionStatus::ExecutionHalted);
+        
+        self.txn_status[txn_idx as usize].2.store(true, Ordering::SeqCst);
+
+        match *status  {
+            ExecutionStatus::ExecutionHalted => eprintln!("11"),
+            _ => eprintln!("12"),
+        }
+
+        //std::mem::replace(&mut *status, ExecutionStatus::ExecutionHalted);
     }
     
 
@@ -1073,12 +1082,12 @@ impl Scheduler {
         eprintln!("was here transaction_id={}", txn_idx);
         let mut status = self.txn_status[txn_idx as usize].0.write();
         match *status {
-            ExecutionStatus::Aborting(stored_incarnation) if stored_incarnation == incarnation => {
+            ExecutionStatus::Aborting(stored_incarnation) if stored_incarnation == incarnation && !self.txn_status[txn_idx as usize].2.load(Ordering::SeqCst) => {
                 eprintln!("aborted transaction_id={}", txn_idx);
                 *status = ExecutionStatus::Ready(incarnation + 1, ExecutionTaskType::Execution);
                 Ok(())
             },
-            ExecutionStatus::ExecutionHalted => {
+            _ if self.txn_status[txn_idx as usize].2.load(Ordering::SeqCst)=> {
                 // The execution is already halted.
                 Ok(())
             },
