@@ -119,7 +119,11 @@ impl BatchGenerator {
             .iter()
             .map(|txn| {
                 (
-                    TransactionSummary::new(txn.sender(), txn.sequence_number()),
+                    TransactionSummary::new(
+                        txn.sender(),
+                        txn.sequence_number(),
+                        txn.committed_hash(),
+                    ),
                     TransactionInProgress::new(txn.gas_unit_price()),
                 )
             })

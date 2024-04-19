@@ -187,10 +187,6 @@ impl TransactionStore {
         self.sequence_numbers.get(address)
     }
 
-    pub(crate) fn get_gas_upgraded_txns(&self) -> &HashMap<TxnPointer, u64> {
-        &self.gas_upgraded_index
-    }
-
     /// Insert transaction into TransactionStore. Performs validation checks and updates indexes.
     pub(crate) fn insert(&mut self, txn: MempoolTransaction) -> MempoolStatus {
         let address = txn.get_sender();
@@ -764,11 +760,15 @@ impl TransactionStore {
         let mut txns_log = TxnsLog::new();
         for (account, txns) in self.transactions.iter() {
             for (seq_num, txn) in txns.iter() {
-                let status = if self.parking_lot_index.contains(account, seq_num) {
-                    "parked"
-                } else {
-                    "ready"
-                };
+                let status =
+                    if self
+                        .parking_lot_index
+                        .contains(account, *seq_num, txn.get_committed_hash())
+                    {
+                        "parked"
+                    } else {
+                        "ready"
+                    };
                 txns_log.add_full_metadata(
                     *account,
                     *seq_num,
