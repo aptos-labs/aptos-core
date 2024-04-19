@@ -2317,8 +2317,8 @@ dependencies = [
  "base64 0.13.1",
  "futures",
  "itertools 0.12.1",
- "rand_chacha 0.3.1",
  "rand 0.7.3",
+ "rand_chacha 0.3.1",
  "serde_json",
  "sha2 0.9.9",
  "tempfile",
@@ -2331,6 +2331,7 @@ version = "0.1.0"
 dependencies = [
  "anyhow",
  "ark-bn254",
+ "base64 0.13.1",
  "serde",
  "serde_json",
  "tempfile",
