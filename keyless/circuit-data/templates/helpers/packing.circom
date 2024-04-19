@@ -1,5 +1,7 @@
 pragma circom 2.1.3;
 
+include "helpers/arrays.circom";
+
 // Based on `Num2Bits` in circomlib
 template Num2BitsBE(n) {
     signal input in;

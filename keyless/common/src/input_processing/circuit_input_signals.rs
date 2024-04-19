@@ -112,6 +112,14 @@ impl CircuitInputSignals<Unpadded> {
         self
     }
 
+    pub fn bools_input(mut self, signal_name: &str, signal_value: &[bool]) -> Self {
+        self.signals.insert(
+            String::from(signal_name),
+            CircuitInputSignal::Bytes(signal_value.iter().map(|b| *b as u8).collect::<Vec<u8>>()),
+        );
+        self
+    }
+
     pub fn bool_input(mut self, signal_name: &str, signal_value: bool) -> Self {
         self.signals.insert(
             String::from(signal_name),
