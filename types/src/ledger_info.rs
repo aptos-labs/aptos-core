@@ -180,6 +180,15 @@ impl LedgerInfoWithSignatures {
             LedgerInfoWithSignatures::V0(ledger) => ledger.commit_info(),
         }
     }
+
+    pub fn verify_signatures(
+        &self,
+        validator: &ValidatorVerifier,
+    ) -> ::std::result::Result<(), VerifyError> {
+        match self {
+            LedgerInfoWithSignatures::V0(ledger) => ledger.verify_signatures(validator),
+        }
+    }
 }
 
 /// Helper function to generate LedgerInfoWithSignature from a set of validator signers used for testing

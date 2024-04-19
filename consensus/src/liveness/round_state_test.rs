@@ -149,11 +149,11 @@ fn generate_sync_info(
         ),
         ledger_info,
     );
-    let highest_ordered_cert = quorum_cert.clone();
+    let highest_ordered_decision = quorum_cert.ledger_info().clone();
     let tc = TwoChainTimeoutCertificate::new(TwoChainTimeout::new(
         1,
         timeout_round,
         quorum_cert.clone(),
     ));
-    SyncInfo::new(quorum_cert, highest_ordered_cert, Some(tc))
+    SyncInfo::new(quorum_cert, highest_ordered_decision, Some(tc))
 }

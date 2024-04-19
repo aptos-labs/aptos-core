@@ -76,7 +76,7 @@ impl BlockStore {
     }
 
     /// Fetches dependencies for given sync_info.quorum_cert
-    /// If gap is large, performs state sync using sync_to_highest_ordered_cert
+    /// If gap is large, performs state sync using sync_to_highest_ordered_decision
     /// Inserts sync_info.quorum_cert into block store as the last step
     pub async fn add_certs(
         &self,
@@ -88,15 +88,12 @@ impl BlockStore {
             &retriever.network,
         )
         .await;
-        self.sync_to_highest_ordered_cert(
-            sync_info.highest_ordered_cert().clone(),
+        self.sync_to_highest_ordered_decision(
+            sync_info.highest_ordered_decision().clone(),
             sync_info.highest_commit_decision().clone(),
             &mut retriever,
         )
         .await?;
-
-        self.insert_quorum_cert(sync_info.highest_ordered_cert(), &mut retriever)
-            .await?;
 
         self.insert_quorum_cert(sync_info.highest_quorum_cert(), &mut retriever)
             .await?;
@@ -194,13 +191,13 @@ impl BlockStore {
     /// Check the highest ordered cert sent by peer to see if we're behind and start a fast
     /// forward sync if the committed block doesn't exist in our tree.
     /// It works as follows:
-    /// 1. request the gap blocks from the peer (from highest_ledger_info to highest_ordered_cert)
+    /// 1. request the gap blocks from the peer (from highest_ledger_info to highest_ordered_decision)
     /// 2. We persist the gap blocks to storage before start sync to ensure we could restart if we
     /// crash in the middle of the sync.
     /// 3. We prune the old tree and replace with a new tree built with the 3-chain.
-    async fn sync_to_highest_ordered_cert(
+    async fn sync_to_highest_ordered_decision(
         &self,
-        highest_ordered_cert: QuorumCert,
+        highest_ordered_decision: LedgerInfoWithSignatures,
         highest_commit_decision: LedgerInfoWithSignatures,
         retriever: &mut BlockRetriever,
     ) -> anyhow::Result<()> {
@@ -208,7 +205,7 @@ impl BlockStore {
             return Ok(());
         }
         let (root, root_metadata, blocks, quorum_certs) = Self::fast_forward_sync(
-            &highest_ordered_cert,
+            &highest_ordered_decision,
             &highest_commit_decision,
             retriever,
             self.storage.clone(),
@@ -229,7 +226,7 @@ impl BlockStore {
             retriever
                 .network
                 .send_epoch_change(EpochChangeProof::new(
-                    vec![highest_ordered_cert.ledger_info().clone()],
+                    vec![highest_ordered_decision.clone()],
                     /* more = */ false,
                 ))
                 .await;
@@ -238,7 +235,7 @@ impl BlockStore {
     }
 
     pub async fn fast_forward_sync<'a>(
-        highest_ordered_cert: &'a QuorumCert,
+        highest_ordered_decision: &'a LedgerInfoWithSignatures,
         highest_commit_decision: &'a LedgerInfoWithSignatures,
         retriever: &'a mut BlockRetriever,
         storage: Arc<dyn PersistentLivenessStorage>,
@@ -247,13 +244,13 @@ impl BlockStore {
     ) -> anyhow::Result<RecoveryData> {
         info!(
             LogSchema::new(LogEvent::StateSync).remote_peer(retriever.preferred_peer),
-            "Start state sync to commit decision: {}, ordered cert: {}",
+            "Start state sync to commit decision: {}, ordered decision: {}",
             highest_commit_decision,
-            highest_ordered_cert,
+            highest_ordered_decision,
         );
 
         // we fetch the blocks from
-        let num_blocks = highest_ordered_cert.certified_block().round()
+        let num_blocks = highest_ordered_decision.commit_info().round()
             - highest_commit_decision.ledger_info().round()
             + 1;
 
@@ -261,8 +258,8 @@ impl BlockStore {
         assert!(num_blocks < std::usize::MAX as u64);
 
         let blocks = retriever
-            .retrieve_block_for_qc(
-                highest_ordered_cert,
+            .retrieve_block_for_li_with_sig(
+                highest_ordered_decision,
                 num_blocks,
                 highest_commit_decision.commit_info().id(),
             )
@@ -270,9 +267,9 @@ impl BlockStore {
 
         assert_eq!(
             blocks.first().expect("blocks are empty").id(),
-            highest_ordered_cert.certified_block().id(),
+            highest_ordered_decision.commit_info().id(),
             "Expecting in the retrieval response, first block should be {}, but got {}",
-            highest_ordered_cert.certified_block().id(),
+            highest_ordered_decision.commit_info().id(),
             blocks.first().expect("blocks are empty").id(),
         );
 
@@ -282,7 +279,7 @@ impl BlockStore {
             highest_commit_decision.commit_info().id()
         );
 
-        let mut quorum_certs = vec![highest_ordered_cert.clone()];
+        let mut quorum_certs = vec![];
         quorum_certs.extend(
             blocks
                 .iter()
@@ -617,6 +614,23 @@ impl BlockRetriever {
         let peers = qc.ledger_info().get_voters(&self.validator_addresses);
         self.retrieve_block_for_id(
             qc.certified_block().id(),
+            target_block_id,
+            peers,
+            num_blocks,
+        )
+        .await
+    }
+
+    /// Retrieve chain of n blocks for given LedgerInfoWithSignatures
+    async fn retrieve_block_for_li_with_sig<'a>(
+        &'a mut self,
+        li_with_sig: &'a LedgerInfoWithSignatures,
+        num_blocks: u64,
+        target_block_id: HashValue,
+    ) -> anyhow::Result<Vec<Block>> {
+        let peers = li_with_sig.get_voters(&self.validator_addresses);
+        self.retrieve_block_for_id(
+            li_with_sig.commit_info().id(),
             target_block_id,
             peers,
             num_blocks,

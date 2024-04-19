@@ -80,7 +80,7 @@ pub struct BlockTree {
     /// The highest 2-chain timeout certificate (if any).
     highest_2chain_timeout_cert: Option<Arc<TwoChainTimeoutCertificate>>,
     /// The quorum certificate that has highest commit info.
-    highest_ordered_cert: Arc<QuorumCert>,
+    highest_ordered_decision: Arc<LedgerInfoWithSignatures>,
     /// The quorum certificate that has highest commit decision info.
     highest_commit_decision: Arc<LedgerInfoWithSignatures>,
     /// Map of block id to its completed quorum certificate (2f + 1 votes)
@@ -95,14 +95,14 @@ impl BlockTree {
     pub(super) fn new(
         root: PipelinedBlock,
         root_quorum_cert: QuorumCert,
-        root_ordered_cert: QuorumCert,
+        root_ordered_decision: LedgerInfoWithSignatures,
         root_commit_decision: LedgerInfoWithSignatures,
         max_pruned_blocks_in_mem: usize,
         highest_2chain_timeout_cert: Option<Arc<TwoChainTimeoutCertificate>>,
     ) -> Self {
         assert_eq!(
             root.id(),
-            root_ordered_cert.commit_info().id(),
+            root_ordered_decision.commit_info().id(),
             "inconsistent root and ledger info"
         );
         let root_id = root.id();
@@ -126,7 +126,7 @@ impl BlockTree {
             commit_root_id: root_id, // initially we set commit_root_id = root_id
             highest_certified_block_id: root_id,
             highest_quorum_cert: Arc::clone(&root_quorum_cert),
-            highest_ordered_cert: Arc::new(root_ordered_cert),
+            highest_ordered_decision: Arc::new(root_ordered_decision),
             highest_commit_decision: Arc::new(root_commit_decision),
             id_to_quorum_cert,
             pruned_block_ids,
@@ -206,8 +206,8 @@ impl BlockTree {
         self.highest_2chain_timeout_cert.replace(tc);
     }
 
-    pub(super) fn highest_ordered_cert(&self) -> Arc<QuorumCert> {
-        Arc::clone(&self.highest_ordered_cert)
+    pub(super) fn highest_ordered_decision(&self) -> Arc<LedgerInfoWithSignatures> {
+        Arc::clone(&self.highest_ordered_decision)
     }
 
     pub(super) fn highest_commit_decision(&self) -> Arc<LedgerInfoWithSignatures> {
@@ -286,11 +286,19 @@ impl BlockTree {
             .entry(block_id)
             .or_insert_with(|| Arc::clone(&qc));
 
-        if self.highest_ordered_cert.commit_info().round() < qc.commit_info().round() {
-            self.highest_ordered_cert = qc;
+        if self.highest_ordered_decision.commit_info().round() < qc.commit_info().round() {
+            self.highest_ordered_decision = Arc::new(qc.ledger_info().clone());
         }
 
         Ok(())
+    }
+
+    pub fn insert_ordered_decision(&mut self, ordered_decision: LedgerInfoWithSignatures) {
+        if ordered_decision.commit_info().round()
+            > self.highest_ordered_decision.commit_info().round()
+        {
+            self.highest_ordered_decision = Arc::new(ordered_decision);
+        }
     }
 
     /// Find the blocks to prune up to next_root_id (keep next_root_id's block). Any branches not

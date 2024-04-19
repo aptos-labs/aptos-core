@@ -121,7 +121,7 @@ impl UnverifiedEvent {
             },
             UnverifiedEvent::OrderVoteMsg(v) => {
                 if !self_message {
-                    // v.verify(validator)?;
+                    v.verify(validator)?;
                     counters::VERIFY_MSG
                         .with_label_values(&["order_vote"])
                         .observe(start_time.elapsed().as_secs_f64());
@@ -1165,8 +1165,6 @@ impl RoundManager {
             )
             .await
             .context("[RoundManager] Failed to process a new OrderVoteAggregate")
-        // TODO: Should we process certificates here?
-        // self.process_certificates().await?;
     }
 
     async fn new_2chain_tc_aggregated(

@@ -140,7 +140,7 @@ impl BlockStore {
         vote_back_pressure_limit: Round,
         payload_manager: Arc<PayloadManager>,
     ) -> Self {
-        let RootInfo(root_block, root_qc, root_ordered_cert, root_commit_decision) = root;
+        let RootInfo(root_block, root_qc, root_ordered_decision, root_commit_decision) = root;
 
         //verify root is correct
         assert!(
@@ -182,7 +182,7 @@ impl BlockStore {
         let tree = BlockTree::new(
             pipelined_root_block,
             root_qc,
-            root_ordered_cert,
+            root_ordered_decision,
             root_commit_decision,
             max_pruned_blocks_in_mem,
             highest_2chain_timeout_cert.map(Arc::new),
@@ -264,6 +264,7 @@ impl BlockStore {
             .expect("Failed to persist commit");
 
         self.inner.write().update_ordered_root(block_to_commit.id());
+        self.inner.write().insert_ordered_decision(finality_proof);
         update_counters_for_ordered_blocks(&blocks_to_commit);
 
         Ok(())
@@ -564,8 +565,8 @@ impl BlockReader for BlockStore {
         self.inner.read().highest_quorum_cert()
     }
 
-    fn highest_ordered_cert(&self) -> Arc<QuorumCert> {
-        self.inner.read().highest_ordered_cert()
+    fn highest_ordered_decision(&self) -> Arc<LedgerInfoWithSignatures> {
+        self.inner.read().highest_ordered_decision()
     }
 
     fn highest_commit_decision(&self) -> Arc<LedgerInfoWithSignatures> {
@@ -579,7 +580,7 @@ impl BlockReader for BlockStore {
     fn sync_info(&self) -> SyncInfo {
         SyncInfo::new_decoupled(
             self.highest_quorum_cert().as_ref().clone(),
-            self.highest_ordered_cert().as_ref().clone(),
+            self.highest_ordered_decision().as_ref().clone(),
             self.highest_commit_decision().as_ref().clone(),
             self.highest_2chain_timeout_cert()
                 .map(|tc| tc.as_ref().clone()),

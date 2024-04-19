@@ -838,9 +838,9 @@ SyncInfo:
   STRUCT:
     - highest_quorum_cert:
         TYPENAME: QuorumCert
-    - highest_ordered_cert:
+    - highest_ordered_decision:
         OPTION:
-          TYPENAME: QuorumCert
+          TYPENAME: LedgerInfoWithSignatures
     - highest_commit_decision:
         TYPENAME: LedgerInfoWithSignatures
     - highest_2chain_timeout_cert:

@@ -60,8 +60,8 @@ pub trait PersistentLivenessStorage: Send + Sync {
 pub struct RootInfo(
     pub Box<Block>,
     pub QuorumCert,
-    pub QuorumCert,
     // TODO: Changing this to LedgerInfoWithSignatures could lead to backward incompatibility?
+    pub LedgerInfoWithSignatures,
     pub LedgerInfoWithSignatures,
 );
 
@@ -128,24 +128,21 @@ impl LedgerRecoveryData {
             .find(|qc| qc.certified_block().id() == root_block.id())
             .ok_or_else(|| format_err!("No QC found for root: {}", root_id))?
             .clone();
-        let root_ordered_cert = quorum_certs
+        let root_ordered_decision = quorum_certs
             .iter()
             .find(|qc| qc.commit_info().id() == root_block.id())
+            .map(|qc| qc.ledger_info())
             .ok_or_else(|| format_err!("No LI found for root: {}", root_id))?
             .clone();
 
         info!("Consensus root block is {}", root_block);
 
-        let root_commit_decision = root_ordered_cert
-            .create_merged_with_executed_state(latest_ledger_info_sig)
-            .expect("Inconsistent commit proof and evaluation decision, cannot commit block")
-            .ledger_info()
-            .clone();
+        let root_commit_decision = latest_ledger_info_sig;
 
         Ok(RootInfo(
             Box::new(root_block),
             root_quorum_cert,
-            root_ordered_cert,
+            root_ordered_decision,
             root_commit_decision,
         ))
     }
