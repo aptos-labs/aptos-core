@@ -113,13 +113,13 @@ pub fn shortest_cycle<'a, T: Ord + Hash>(
             );
             match (shortest_path, path_opt) {
                 (p, None) | (None, p) => p,
-                (Some((acc_len, acc_path)), Some((cur_len, cur_path))) => Some(
-                    if cur_len < acc_len {
+                (Some((acc_len, acc_path)), Some((cur_len, cur_path))) => {
+                    Some(if cur_len < acc_len {
                         (cur_len, cur_path)
                     } else {
                         (acc_len, acc_path)
-                    },
-                ),
+                    })
+                },
             }
         });
     let (_, mut path) = shortest_path.unwrap();
@@ -325,6 +325,11 @@ pub fn warn_of_deprecation_use_in_aptos_libs_env_var_str() -> &'static str {
     } else {
         "false"
     }
+}
+
+pub fn move_compiler_block_v1_env_var() -> bool {
+    static BLOCK_V1: Lazy<bool> = Lazy::new(|| read_bool_env_var(cli::MOVE_COMPILER_BLOCK_V1));
+    *BLOCK_V1
 }
 
 pub fn move_compiler_block_v1_env_var_str() -> &'static str {
