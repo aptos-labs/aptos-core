@@ -38,7 +38,7 @@ use std::{
     convert::TryInto,
     fmt,
     fmt::{Debug, Formatter},
-    hash::Hash,
+    hash::{Hash, Hasher},
     io::Write,
     ops::Deref,
     sync::{Arc, Weak},
@@ -212,20 +212,20 @@ impl Drop for Entry {
                 // TODO(aldenhu): maybe let Inner carry the deserialized Path?
                 match &bcs::from_bytes::<Path>(path).expect("Failed to deserialize Path.") {
                     Path::Code(module_id) => GLOBAL_REGISTRY
-                        .module_keys
+                        .module(address, &module_id.name)
                         .lock_and_remove(&module_id.address, &module_id.name),
                     Path::Resource(struct_tag) => GLOBAL_REGISTRY
-                        .resource_keys
+                        .resource(struct_tag, address)
                         .lock_and_remove(struct_tag, address),
                     Path::ResourceGroup(struct_tag) => GLOBAL_REGISTRY
-                        .resource_group_keys
+                        .resource_group(struct_tag, address)
                         .lock_and_remove(struct_tag, address),
                 }
             },
-            StateKeyInner::TableItem { handle, key } => {
-                GLOBAL_REGISTRY.table_item_keys.lock_and_remove(handle, key)
-            },
-            StateKeyInner::Raw(bytes) => GLOBAL_REGISTRY.raw_keys.lock_and_remove(bytes, &()),
+            StateKeyInner::TableItem { handle, key } => GLOBAL_REGISTRY
+                .table_item(handle, key)
+                .lock_and_remove(handle, key),
+            StateKeyInner::Raw(bytes) => GLOBAL_REGISTRY.raw(bytes).lock_and_remove(bytes, &()),
         }
     }
 }
@@ -340,24 +340,85 @@ where
 
 static GLOBAL_REGISTRY: Lazy<StateKeyRegistry> = Lazy::new(StateKeyRegistry::new_empty);
 
+const NUM_RESOURCE_SHARDS: usize = 256;
+const NUM_RESOURCE_GROUP_SHARDS: usize = 256;
+const NUM_MODULE_SHARDS: usize = 256;
+const NUM_TABLE_ITEM_SHARDS: usize = 256;
+const NUM_RAW_SHARDS: usize = 4;
+
 pub struct StateKeyRegistry {
     // FIXME(aldenhu): reverse dimensions to save memory?
-    resource_keys: TwoLevelRegistry<StructTag, AccountAddress>,
-    resource_group_keys: TwoLevelRegistry<StructTag, AccountAddress>,
-    module_keys: TwoLevelRegistry<AccountAddress, Identifier>,
-    table_item_keys: TwoLevelRegistry<TableHandle, Vec<u8>>,
-    raw_keys: TwoLevelRegistry<Vec<u8>, ()>, // for tests only
+    resource_shards: [TwoLevelRegistry<StructTag, AccountAddress>; NUM_RESOURCE_SHARDS],
+    resource_group_shards: [TwoLevelRegistry<StructTag, AccountAddress>; NUM_RESOURCE_GROUP_SHARDS],
+    module_shards: [TwoLevelRegistry<AccountAddress, Identifier>; NUM_MODULE_SHARDS],
+    table_item_shards: [TwoLevelRegistry<TableHandle, Vec<u8>>; NUM_TABLE_ITEM_SHARDS],
+    raw_shards: [TwoLevelRegistry<Vec<u8>, ()>; NUM_RAW_SHARDS], // for tests only
 }
 
 impl StateKeyRegistry {
     fn new_empty() -> Self {
+        use arr_macro::arr;
+
+        // `arr!` macro is not working with named constants, but the compiler checks these numbers
+        // match the NUM_*_SHARDS declared
         Self {
-            resource_keys: TwoLevelRegistry::new_empty("resource"),
-            resource_group_keys: TwoLevelRegistry::new_empty("resource_group"),
-            module_keys: TwoLevelRegistry::new_empty("module"),
-            table_item_keys: TwoLevelRegistry::new_empty("table_item"),
-            raw_keys: TwoLevelRegistry::new_empty("raw"),
+            resource_shards: arr![TwoLevelRegistry::new_empty("resource"); 256],
+            resource_group_shards: arr![TwoLevelRegistry::new_empty("resource_group"); 256],
+            module_shards: arr![TwoLevelRegistry::new_empty("module"); 256],
+            table_item_shards: arr![TwoLevelRegistry::new_empty("table_item"); 256],
+            raw_shards: arr![TwoLevelRegistry::new_empty("raw"); 4],
         }
+    }
+
+    fn hash_address_and_name(address: &AccountAddress, name: &[u8]) -> usize {
+        let mut hasher = fxhash::FxHasher::default();
+        hasher.write_u8(address.as_ref()[AccountAddress::LENGTH - 1]);
+        if !name.is_empty() {
+            hasher.write_u8(name[0]);
+            hasher.write_u8(name[name.len() - 1]);
+        }
+        hasher.finish() as usize
+    }
+
+    fn resource(
+        &self,
+        struct_tag: &StructTag,
+        address: &AccountAddress,
+    ) -> &TwoLevelRegistry<StructTag, AccountAddress> {
+        &self.resource_shards
+            [Self::hash_address_and_name(address, struct_tag.name.as_bytes()) % NUM_RESOURCE_SHARDS]
+    }
+
+    fn resource_group(
+        &self,
+        struct_tag: &StructTag,
+        address: &AccountAddress,
+    ) -> &TwoLevelRegistry<StructTag, AccountAddress> {
+        &self.resource_group_shards[Self::hash_address_and_name(
+            address,
+            struct_tag.name.as_bytes(),
+        ) % NUM_RESOURCE_GROUP_SHARDS]
+    }
+
+    fn module(
+        &self,
+        address: &AccountAddress,
+        name: &IdentStr,
+    ) -> &TwoLevelRegistry<AccountAddress, Identifier> {
+        &self.module_shards
+            [Self::hash_address_and_name(address, name.as_bytes()) % NUM_MODULE_SHARDS]
+    }
+
+    fn table_item(
+        &self,
+        handle: &TableHandle,
+        key: &[u8],
+    ) -> &TwoLevelRegistry<TableHandle, Vec<u8>> {
+        &self.table_item_shards[Self::hash_address_and_name(&handle.0, key) % NUM_MODULE_SHARDS]
+    }
+
+    fn raw(&self, bytes: &[u8]) -> &TwoLevelRegistry<Vec<u8>, ()> {
+        &self.raw_shards[Self::hash_address_and_name(&AccountAddress::ONE, bytes) % NUM_MODULE_SHARDS]
     }
 }
 
@@ -410,7 +471,10 @@ impl StateKey {
     }
 
     pub fn resource(address: &AccountAddress, struct_tag: &StructTag) -> Self {
-        if let Some(entry) = GLOBAL_REGISTRY.resource_keys.try_get(struct_tag, address) {
+        if let Some(entry) = GLOBAL_REGISTRY
+            .resource(struct_tag, address)
+            .try_get(struct_tag, address)
+        {
             return Self(entry);
         }
 
@@ -421,7 +485,7 @@ impl StateKey {
         let maybe_add = EntryInner::from_deserialized(inner);
 
         let entry = GLOBAL_REGISTRY
-            .resource_keys
+            .resource(struct_tag, address)
             .lock_and_get_or_add(struct_tag, address, maybe_add);
         Self(entry)
     }
@@ -436,7 +500,7 @@ impl StateKey {
 
     pub fn resource_group(address: &AccountAddress, struct_tag: &StructTag) -> Self {
         if let Some(entry) = GLOBAL_REGISTRY
-            .resource_group_keys
+            .resource_group(struct_tag, address)
             .try_get(struct_tag, address)
         {
             return Self(entry);
@@ -449,13 +513,13 @@ impl StateKey {
         let maybe_add = EntryInner::from_deserialized(inner);
 
         let entry = GLOBAL_REGISTRY
-            .resource_group_keys
+            .resource_group(struct_tag, address)
             .lock_and_get_or_add(struct_tag, address, maybe_add);
         Self(entry)
     }
 
     pub fn module(address: &AccountAddress, name: &IdentStr) -> Self {
-        if let Some(entry) = GLOBAL_REGISTRY.module_keys.try_get(address, name) {
+        if let Some(entry) = GLOBAL_REGISTRY.module(address, name).try_get(address, name) {
             return Self(entry);
         }
 
@@ -466,7 +530,7 @@ impl StateKey {
         let maybe_add = EntryInner::from_deserialized(inner);
 
         let entry = GLOBAL_REGISTRY
-            .module_keys
+            .module(address, name)
             .lock_and_get_or_add(address, name, maybe_add);
         Self(entry)
     }
@@ -476,7 +540,7 @@ impl StateKey {
     }
 
     pub fn table_item(handle: &TableHandle, key: &[u8]) -> Self {
-        if let Some(entry) = GLOBAL_REGISTRY.table_item_keys.try_get(handle, key) {
+        if let Some(entry) = GLOBAL_REGISTRY.table_item(handle, key).try_get(handle, key) {
             return Self(entry);
         }
 
@@ -487,13 +551,13 @@ impl StateKey {
         let maybe_add = EntryInner::from_deserialized(inner);
 
         let entry = GLOBAL_REGISTRY
-            .table_item_keys
+            .table_item(handle, key)
             .lock_and_get_or_add(handle, key, maybe_add);
         Self(entry)
     }
 
     pub fn raw(bytes: &[u8]) -> Self {
-        if let Some(entry) = GLOBAL_REGISTRY.raw_keys.try_get(bytes, &()) {
+        if let Some(entry) = GLOBAL_REGISTRY.raw(bytes).try_get(bytes, &()) {
             return Self(entry);
         }
 
@@ -501,7 +565,7 @@ impl StateKey {
         let maybe_add = EntryInner::from_deserialized(inner);
 
         let entry = GLOBAL_REGISTRY
-            .raw_keys
+            .raw(bytes)
             .lock_and_get_or_add(bytes, &(), maybe_add);
         Self(entry)
     }

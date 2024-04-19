@@ -30,6 +30,7 @@ base64 = { workspace = true }
 bcs = { workspace = true }
 bytes = { workspace = true }
 fixed = { workspace = true }
+fxhash = { workspace = true }
 hex = { workspace = true }
 itertools = { workspace = true }
 jsonwebtoken = { workspace = true }
