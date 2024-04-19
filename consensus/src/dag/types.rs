@@ -766,13 +766,15 @@ impl RemoteFetchRequest {
 /// It should fill in gaps from the `exists_bitmask` according to the parents from the `target_digest` node.
 #[derive(Serialize, Deserialize, Clone, Debug, PartialEq)]
 pub struct FetchResponse {
+    dag_id: u8,
     epoch: u64,
     certified_nodes: Vec<CertifiedNode>,
 }
 
 impl FetchResponse {
-    pub fn new(epoch: u64, certified_nodes: Vec<CertifiedNode>) -> Self {
+    pub fn new(dag_id: u8, epoch: u64, certified_nodes: Vec<CertifiedNode>) -> Self {
         Self {
+            dag_id,
             epoch,
             certified_nodes,
         }
@@ -820,7 +822,7 @@ impl FetchResponse {
     }
 
     pub fn dag_id(&self) -> u8 {
-        self.certified_nodes[0].dag_id()
+        self.dag_id
     }
 }
 

@@ -713,7 +713,8 @@ impl DagBootstrapper {
             health_backoff,
             self.quorum_store_enabled,
         );
-        let fetch_handler = FetchRequestHandler::new(dag_store.clone(), self.epoch_state.clone());
+        let fetch_handler =
+            FetchRequestHandler::new(self.dag_id, dag_store.clone(), self.epoch_state.clone());
 
         let dag_handler = NetworkHandler::new(
             self.dag_id,

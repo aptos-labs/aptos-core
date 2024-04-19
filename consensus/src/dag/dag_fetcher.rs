@@ -442,13 +442,15 @@ impl TDagFetcher for DagFetcher {
 }
 
 pub struct FetchRequestHandler {
+    dag_id: u8,
     dag: Arc<DagStore>,
     author_to_index: HashMap<Author, usize>,
 }
 
 impl FetchRequestHandler {
-    pub fn new(dag: Arc<DagStore>, epoch_state: Arc<EpochState>) -> Self {
+    pub fn new(dag_id: u8, dag: Arc<DagStore>, epoch_state: Arc<EpochState>) -> Self {
         Self {
+            dag_id,
             dag,
             author_to_index: epoch_state.verifier.address_to_validator_index().clone(),
         }
@@ -512,6 +514,10 @@ impl RpcHandler for FetchRequestHandler {
 
         // TODO: decide if the response is too big and act accordingly.
 
-        Ok(FetchResponse::new(message.epoch(), certified_nodes))
+        Ok(FetchResponse::new(
+            self.dag_id,
+            message.epoch(),
+            certified_nodes,
+        ))
     }
 }
