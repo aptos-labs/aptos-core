@@ -224,16 +224,14 @@ module 0xABCD::aggregator_example {
 
     public entry fun modify_read_agg_v2(inc_or_read: bool, count: u64) acquires CounterAggV2 {
         assert!(exists<CounterAggV2>(@publisher_address), error::invalid_argument(ECOUNTER_AGG_RESOURCE_NOT_PRESENT));
+        let counter = borrow_global_mut<CounterAggV2>(@publisher_address);
+        let i = 0;
+        while (i < count) {
+            aggregator_v2::try_add(&mut counter.count, 1);
+            i = i + 1;
+        };
         if (inc_or_read) {
-            let counter = borrow_global<CounterAggV2>(@publisher_address);
             let _ = aggregator_v2::read(&counter.count);
-        } else {
-            let counter = borrow_global_mut<CounterAggV2>(@publisher_address);
-            let i = 0;
-            while (i < count) {
-                aggregator_v2::try_add(&mut counter.count, 1);
-                i = i + 1;
-            };
         }
     }
 
