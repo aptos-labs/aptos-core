@@ -17,14 +17,14 @@ use move_binary_format::{
     CompiledModule,
 };
 use move_command_line_common::{
-    address::ParsedAddress,
-    env::read_bool_env_var,
-    files::verify_and_create_named_address_mapping,
-    testing::{MOVE_COMPILER_BLOCK_V1, MOVE_COMPILER_V2},
+    address::ParsedAddress, env::read_bool_env_var, files::verify_and_create_named_address_mapping,
+    testing::MOVE_COMPILER_V2,
 };
 use move_compiler::{
     compiled_unit::AnnotatedCompiledUnit,
-    shared::{known_attributes::KnownAttribute, Flags, PackagePaths},
+    shared::{
+        known_attributes::KnownAttribute, move_compiler_block_v1_env_var, Flags, PackagePaths,
+    },
     FullyCompiledProgram,
 };
 use move_core_types::{
@@ -427,7 +427,7 @@ impl<'a> SimpleVMTestAdapter<'a> {
 }
 
 static PRECOMPILED_MOVE_STDLIB: Lazy<Option<FullyCompiledProgram>> = Lazy::new(|| {
-    if read_bool_env_var(MOVE_COMPILER_BLOCK_V1) {
+    if move_compiler_block_v1_env_var() {
         return None;
     }
     let program_res = move_compiler::construct_pre_compiled_lib(
