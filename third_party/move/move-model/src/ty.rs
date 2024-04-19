@@ -5,21 +5,31 @@
 //! Contains types and related functions.
 
 use crate::{
-    ast::QualifiedSymbol,
-    model::{GlobalEnv, Loc, ModuleId, QualifiedInstId, StructEnv, StructId},
+    ast::{ModuleName, QualifiedSymbol},
+    builder::{ith_str, pluralize},
+    model::{
+        FunId, GlobalEnv, Loc, ModuleId, QualifiedId, QualifiedInstId, StructEnv, StructId,
+        TypeParameter, TypeParameterKind,
+    },
     symbol::Symbol,
 };
 use itertools::Itertools;
-use move_binary_format::{file_format::TypeParameterIndex, normalized::Type as MType};
+use move_binary_format::{
+    file_format::{Ability, AbilitySet, TypeParameterIndex},
+    normalized::Type as MType,
+};
 use move_core_types::{
     language_storage::{StructTag, TypeTag},
     u256::U256,
 };
 use num::BigInt;
+use num_traits::identities::Zero;
 use std::{
-    collections::{BTreeMap, BTreeSet, VecDeque},
+    cmp::Ordering,
+    collections::{btree_map::Entry, BTreeMap, BTreeSet, VecDeque},
     fmt,
     fmt::{Debug, Formatter},
+    iter,
 };
 
 /// Represents a type.
@@ -28,14 +38,14 @@ pub enum Type {
     Primitive(PrimitiveType),
     Tuple(Vec<Type>),
     Vector(Box<Type>),
-    Struct(ModuleId, StructId, Vec<Type>),
+    Struct(ModuleId, StructId, /*type-params*/ Vec<Type>),
     TypeParameter(u16),
+    Fun(/*args*/ Box<Type>, /*result*/ Box<Type>),
 
     // Types only appearing in programs.
     Reference(ReferenceKind, Box<Type>),
 
-    // Types only appearing in specifications
-    Fun(Box<Type>, Box<Type>),
+    // Types only appearing in specifications.
     TypeDomain(Box<Type>),
     ResourceDomain(ModuleId, StructId, Option<Vec<Type>>),
 
@@ -57,6 +67,15 @@ impl ReferenceKind {
             ReferenceKind::Mutable
         } else {
             ReferenceKind::Immutable
+        }
+    }
+}
+
+impl fmt::Display for ReferenceKind {
+    fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
+        match self {
+            ReferenceKind::Immutable => f.write_str("`&`"),
+            ReferenceKind::Mutable => f.write_str("`&mut`"),
         }
     }
 }
@@ -83,31 +102,261 @@ pub enum PrimitiveType {
 }
 
 /// A type substitution.
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, Default)]
 pub struct Substitution {
     /// Assignment of types to variables.
     subs: BTreeMap<u32, Type>,
     /// Constraints on (unassigned) variables.
     constraints: BTreeMap<u32, Vec<(Loc, WideningOrder, Constraint)>>,
+    /// Contexts for the constraints, used in error reporting.
+    constraint_contexts: BTreeMap<u32, ConstraintContext>,
+    /// Constraints which have been reported to be unsatisfied, by type. By
+    /// collecting those, we avoid followup errors in constraint
+    /// evaluation.
+    reported: BTreeMap<Type, BTreeSet<Constraint>>,
 }
 
 /// A constraint on a type variable, maintained during unification.
 #[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord)]
 pub enum Constraint {
-    /// Combination
     /// The type variable must be instantiated with one of the given number types. This is used
     /// for representing integer constants.
     SomeNumber(BTreeSet<PrimitiveType>),
     /// The type variable must be instantiated with a reference of given type.
     SomeReference(Type),
+    /// The type variable must be instantiated with a struct which has the given fields with
+    /// types.
+    SomeStruct(BTreeMap<Symbol, Type>),
+    /// The type variable must be instantiated with a type for which a receiver function with the given
+    /// signature exists: the name, the optional type arguments, the argument types, and the
+    /// result type.
+    SomeReceiverFunction(
+        Symbol,
+        /// The optional type arguments, with locations
+        Option<(Vec<Loc>, Vec<Type>)>,
+        /// The locations of the arguments
+        Vec<Loc>,
+        /// The argument type
+        Vec<Type>,
+        /// The result type
+        Type,
+    ),
+    /// The type must not be reference because it is used as the type of some field or
+    /// as a type argument.
+    NoReference,
+    /// The type must not be tuple because it is used as the type of some field or
+    /// as a type argument.
+    NoTuple,
+    /// The type must not be a phantom type. A phantom type is only allowed
+    /// as a type argument for a phantom type parameter.
+    NoPhantom,
+    /// The type must have the given set of abilities.
+    HasAbilities(AbilitySet),
     /// The type variable defaults to the given type if no other binding is found. This is
     /// a pseudo constraint which never fails, but used to generate a default for
     /// inference.
     WithDefault(Type),
 }
 
+/// A type to describe the context from where a constraint stems. Used for
+/// error reporting.
+#[derive(Debug, Clone, Default)]
+pub struct ConstraintContext {
+    // The constraint was added to a type which was inferred.
+    inferred: bool,
+    // The origin of the constraint.
+    origin: ConstraintOrigin,
+}
+
+/// A type to describe the origin of a constraint. Used for error reporting.
+#[derive(Debug, Clone, Default)]
+pub enum ConstraintOrigin {
+    /// Origin is not further specified.
+    #[default]
+    Unspecified,
+    /// The origin is a local of the given name.
+    Local(Symbol),
+    /// The origin is a field of the given name.
+    Field(Symbol),
+    /// The origin is a type parameter instantiation. In
+    /// `TypeParameter(parent, is_struct, name, param)`, `parent` is an optional parent
+    /// from which this origin is derived, `is_struct` indicates whether the parameter is from
+    /// a struct or function, `name` is the name of that struct or function, and
+    /// `param` the parameter declaration.
+    TypeParameter(
+        Option<Box<ConstraintOrigin>>,
+        /*is_struct*/ bool,
+        Symbol,
+        TypeParameter,
+    ),
+    /// The origin is a vector type parameter instantiation, with an optional parent
+    /// from which this origin is derived.
+    VectorTypeParameter(Option<Box<ConstraintOrigin>>),
+    /// For `TupleElement(parent, i)`, with an optional parent
+    /// from which this origin is derived.
+    TupleElement(Box<ConstraintOrigin>, usize),
+}
+
+impl ConstraintContext {
+    /// Creates a context with the property that the related type was inferred.
+    pub fn inferred() -> Self {
+        Self {
+            inferred: true,
+            origin: ConstraintOrigin::Unspecified,
+        }
+    }
+
+    /// Marks a context to be rooted in the given type parameter.
+    pub fn for_type_param(self, is_struct: bool, item: Symbol, type_param: TypeParameter) -> Self {
+        Self {
+            origin: ConstraintOrigin::TypeParameter(None, is_struct, item, type_param),
+            ..self
+        }
+    }
+
+    /// Marks a context to be rooted in a vector type parameter.
+    pub fn for_vector_type_param(self) -> Self {
+        Self {
+            origin: ConstraintOrigin::VectorTypeParameter(None),
+            ..self
+        }
+    }
+
+    /// Marks a context to be rooted in a local.
+    pub fn for_local(self, name: Symbol) -> Self {
+        Self {
+            origin: ConstraintOrigin::Local(name),
+            ..self
+        }
+    }
+
+    /// Marks a context to be rooted in a field.
+    pub fn for_field(self, name: Symbol) -> Self {
+        Self {
+            origin: ConstraintOrigin::Field(name),
+            ..self
+        }
+    }
+
+    /// Makes a derived context for a tuple element.
+    pub fn derive_tuple_element(self, idx: usize) -> Self {
+        Self {
+            origin: ConstraintOrigin::TupleElement(Box::new(self.origin.clone()), idx),
+            ..self
+        }
+    }
+
+    /// Makes a derived context for a vector type parameter
+    pub fn derive_vector_type_param(self) -> Self {
+        Self {
+            origin: ConstraintOrigin::VectorTypeParameter(Some(Box::new(self.origin.clone()))),
+            ..self
+        }
+    }
+
+    /// Makes a derived context for a struct type parameter.
+    pub fn derive_struct_parameter(self, name: Symbol, param: TypeParameter) -> Self {
+        Self {
+            origin: ConstraintOrigin::TypeParameter(
+                Some(Box::new(self.origin.clone())),
+                true,
+                name,
+                param,
+            ),
+            ..self
+        }
+    }
+
+    /// Creates a description from the context: a note to add to the general error
+    /// message, and hints and labels with additional information.
+    pub fn describe(
+        &self,
+        context: &TypeDisplayContext,
+    ) -> (String, Vec<String>, Vec<(Loc, String)>) {
+        let ConstraintContext { inferred, origin } = self;
+        let mut labels = vec![];
+        let mut hints = vec![];
+        origin.describe(context, &mut hints, &mut labels);
+        (
+            if *inferred { "type was inferred" } else { "" }.to_string(),
+            hints,
+            labels,
+        )
+    }
+}
+
+impl ConstraintOrigin {
+    /// Creates a description for the context origin, for error messages, in form of
+    /// hints and labels for the error diagnosis system.
+    fn describe(
+        &self,
+        context: &TypeDisplayContext,
+        hints: &mut Vec<String>,
+        labels: &mut Vec<(Loc, String)>,
+    ) {
+        use self::TypeParameter as TP;
+        use ConstraintOrigin::*;
+        match self {
+            Unspecified => {
+                // Do nothing
+            },
+            Local(name) => hints.push(format!(
+                "required by declaration of local `{}`",
+                name.display(context.env.symbol_pool())
+            )),
+            Field(name) => hints.push(format!(
+                "required by declaration of field `{}`",
+                name.display(context.env.symbol_pool()),
+            )),
+            TypeParameter(parent, is_struct, item, TP(name, kind, loc)) => {
+                let name = name.display(context.env.symbol_pool());
+                let phantom_str = if kind.is_phantom { "phantom " } else { "" };
+                let abilities_str = if kind.abilities.is_empty() {
+                    "".to_string()
+                } else {
+                    format!(":{}", kind.abilities)
+                };
+
+                hints.push(format!(
+                    "required by instantiating type parameter `{}{}{}` of {} `{}`",
+                    phantom_str,
+                    name,
+                    abilities_str,
+                    if *is_struct { "struct" } else { "function" },
+                    item.display(context.env.symbol_pool())
+                ));
+                if let Some(parent) = parent {
+                    parent.describe(context, hints, labels)
+                } else {
+                    // For the root context, add a label for the type parameter which
+                    // defines the constraints, but only if the location is not from
+                    // a builtin function. Note it doesn't make sense to add labels
+                    // for non-root type parameters because they do not contribute to ability
+                    // inference (only type arguments do, not the formal parameters).
+                    if loc != &context.env.internal_loc() {
+                        labels.push((
+                            loc.clone(),
+                            format!("declaration of type parameter `{}`", name),
+                        ));
+                    }
+                }
+            },
+            TupleElement(parent, idx) => {
+                hints.push(format!("required by {} tuple element", ith_str(*idx)));
+                parent.describe(context, hints, labels)
+            },
+            VectorTypeParameter(parent) => {
+                hints.push("required by instantiating vector type parameter".to_string());
+                if let Some(parent) = parent {
+                    parent.describe(context, hints, labels)
+                }
+            },
+        }
+    }
+}
+
 impl Constraint {
-    /// Returns the default type of a constraint. A the end of type unification, variables
+    /// Returns the default type of some constraint. At the end of type unification, variables
     /// with constraints that have defaults will be substituted by those defaults.
     pub fn default_type(&self) -> Option<Type> {
         match self {
@@ -123,9 +372,67 @@ impl Constraint {
         }
     }
 
+    /// Returns true if the constraint should be propagated over references, such that if we
+    /// have `&t`, the constraint should be forwarded to `t`.
+    pub fn propagate_over_reference(&self) -> bool {
+        matches!(
+            self,
+            Constraint::SomeStruct(..) | Constraint::SomeReceiverFunction(..)
+        )
+    }
+
+    /// Returns true if the constraint should be hidden in displays to user. This is
+    /// for internal constraints which would be mostly confusing to users.
+    pub fn hidden(&self) -> bool {
+        use Constraint::*;
+        matches!(self, NoPhantom | NoReference | NoTuple | WithDefault(..))
+    }
+
+    /// Returns true if this context is accumulating. When adding a new constraint
+    /// to the type substitution, an accumulating constraint can be added to the
+    /// existing constraints without creating a conflict. In contrast, a
+    /// non-accumulating constraint conflicts with all other constraints besides
+    /// itself and accumulating constraints. For example, `HasAbilities` can
+    /// co-exist with other constraints, but `SomeNumber` only with
+    /// another `SomeNumber` constraint plus accumulating constraints.
+    pub fn accumulating(&self) -> bool {
+        matches!(
+            self,
+            Constraint::HasAbilities(_)
+                | Constraint::WithDefault(_)
+                | Constraint::NoPhantom
+                | Constraint::NoTuple
+                | Constraint::NoReference
+        )
+    }
+
+    /// Defines an ordering on constraints to determine which one to
+    /// report first on violation. Accumulating constraints are later
+    /// in the order as they represent secondary errors.
+    pub fn compare(&self, other: &Constraint) -> Ordering {
+        if !self.accumulating() && other.accumulating() {
+            Ordering::Less
+        } else {
+            Ordering::Equal
+        }
+    }
+
+    /// Some constraint errors lead to unnecessary noise if reported more than once for
+    /// the same type.
+    pub fn report_only_once(&self) -> bool {
+        use Constraint::*;
+        matches!(self, HasAbilities(..) | NoReference | NoPhantom | NoTuple)
+    }
+
     /// Joins the two constraints. If they are incompatible, produces a type unification error.
-    /// Otherwise returns true if the constraint has been absorbed by the other and can be waived.
-    pub fn join(&mut self, loc: &Loc, other: &Constraint) -> Result<bool, TypeUnificationError> {
+    /// Otherwise, returns true if `self` absorbs the `other` constraint (and waives the `other`).
+    pub fn join(
+        &mut self,
+        context: &mut impl UnificationContext,
+        subs: &mut Substitution,
+        loc: &Loc,
+        other: &Constraint,
+    ) -> Result<bool, TypeUnificationError> {
         match (&mut *self, other) {
             (Constraint::SomeNumber(opts1), Constraint::SomeNumber(opts2)) => {
                 let joined: BTreeSet<PrimitiveType> = opts1.intersection(opts2).cloned().collect();
@@ -140,8 +447,77 @@ impl Constraint {
                     Ok(true)
                 }
             },
-            (Constraint::WithDefault(_), _) | (_, Constraint::WithDefault(_)) => Ok(false),
-            (_, _) => Err(TypeUnificationError::ConstraintsIncompatible(
+            (Constraint::SomeReference(ty1), Constraint::SomeReference(ty2)) => {
+                *ty1 = subs.unify(context, Variance::NoVariance, WideningOrder::Join, ty1, ty2)?;
+                Ok(true)
+            },
+            (Constraint::SomeStruct(fields1), Constraint::SomeStruct(fields2)) => {
+                // Join the fields together, unifying their types if there are overlaps.
+                for (name, ty) in fields2 {
+                    if let Some(old_type) = fields1.insert(*name, ty.clone()) {
+                        subs.unify(
+                            context,
+                            Variance::NoVariance,
+                            WideningOrder::Join,
+                            &old_type,
+                            ty,
+                        )?;
+                    }
+                }
+                Ok(true)
+            },
+            (
+                Constraint::SomeReceiverFunction(name1, generics1, _, args1, result1),
+                Constraint::SomeReceiverFunction(name2, generics2, _, args2, result2),
+            ) => {
+                if name1 == name2 {
+                    if let (Some(gens1), Some(gens2)) = (generics1, generics2) {
+                        subs.unify_vec_maybe_type_args(
+                            context,
+                            true,
+                            Variance::NoVariance,
+                            WideningOrder::Join,
+                            None,
+                            &gens1.1,
+                            &gens2.1,
+                        )?;
+                    }
+                    subs.unify_vec(
+                        context,
+                        Variance::NoVariance,
+                        WideningOrder::Join,
+                        None,
+                        args1,
+                        args2,
+                    )?;
+                    subs.unify(
+                        context,
+                        Variance::NoVariance,
+                        WideningOrder::Join,
+                        result1,
+                        result2,
+                    )?;
+                    Ok(true)
+                } else {
+                    Err(TypeUnificationError::ConstraintsIncompatible(
+                        loc.clone(),
+                        self.clone(),
+                        other.clone(),
+                    ))
+                }
+            },
+            (Constraint::NoReference, Constraint::NoReference) => Ok(true),
+            (Constraint::NoTuple, Constraint::NoTuple) => Ok(true),
+            (Constraint::NoPhantom, Constraint::NoPhantom) => Ok(true),
+            (Constraint::HasAbilities(a1), Constraint::HasAbilities(a2)) => {
+                *a1 = a1.union(*a2);
+                Ok(true)
+            },
+            // After the above checks, if one of the constraints is
+            // accumulating, indicate its compatible but cannot be joined.
+            (c1, c2) if c1.accumulating() || c2.accumulating() => Ok(false),
+            // Otherwise the constraints are incompatible.
+            _ => Err(TypeUnificationError::ConstraintsIncompatible(
                 loc.clone(),
                 self.clone(),
                 other.clone(),
@@ -149,13 +525,80 @@ impl Constraint {
         }
     }
 
+    /// Returns the constraints which need to be satisfied to instantiate the given
+    /// type parameter. This creates NoReference, NoTuple, NoPhantom unless the type parameter is
+    /// phantom, and HasAbilities if any abilities need to be met.
+    pub fn for_type_parameter(param: &TypeParameter) -> Vec<Constraint> {
+        let mut result = vec![Constraint::NoReference, Constraint::NoTuple];
+        let TypeParameter(
+            _,
+            TypeParameterKind {
+                abilities,
+                is_phantom,
+            },
+            _,
+        ) = param;
+        if !*is_phantom {
+            result.push(Constraint::NoPhantom)
+        }
+        if !abilities.is_empty() {
+            result.push(Constraint::HasAbilities(*abilities));
+        }
+        result
+    }
+
+    /// Returns the constraints which need to be satisfied for a vector type parameter.
+    pub fn for_vector() -> Vec<Constraint> {
+        vec![
+            Constraint::NoPhantom,
+            Constraint::NoReference,
+            Constraint::NoTuple,
+        ]
+    }
+
+    /// Returns the constraints which need to be satisfied for a field type,
+    /// given a struct with declared abilities.
+    pub fn for_field(struct_abilities: AbilitySet, field_ty: &Type) -> Vec<Constraint> {
+        let mut result = vec![
+            Constraint::NoPhantom,
+            Constraint::NoTuple,
+            Constraint::NoReference,
+        ];
+        let abilities = if !field_ty.depends_from_type_parameter() {
+            if struct_abilities.has_ability(Ability::Key) {
+                struct_abilities.remove(Ability::Key).add(Ability::Store)
+            } else {
+                struct_abilities
+            }
+        } else {
+            AbilitySet::EMPTY
+        };
+        result.push(Constraint::HasAbilities(abilities));
+        result
+    }
+
+    /// Returns the constraints which need to be satisfied for a local or
+    /// parameter type.
+    pub fn for_local() -> Vec<Constraint> {
+        vec![Constraint::NoPhantom, Constraint::NoTuple]
+    }
+
+    /// Displays a constraint.
     pub fn display(&self, display_context: &TypeDisplayContext) -> String {
+        fn fmt_types<'a>(ctx: &TypeDisplayContext, tys: impl Iterator<Item = &'a Type>) -> String {
+            tys.map(|ty| ty.display(ctx)).join(",")
+        }
+        let pool = display_context.env.symbol_pool();
         match self {
             Constraint::SomeNumber(options) => {
                 let all_ints = PrimitiveType::all_int_types()
                     .into_iter()
                     .collect::<BTreeSet<_>>();
-                if options == &all_ints {
+                let all_ints_including_num = PrimitiveType::all_int_types()
+                    .into_iter()
+                    .chain(iter::once(PrimitiveType::Num))
+                    .collect::<BTreeSet<_>>();
+                if options == &all_ints || options == &all_ints_including_num {
                     "integer".to_owned()
                 } else {
                     options
@@ -167,6 +610,34 @@ impl Constraint {
             Constraint::SomeReference(ty) => {
                 format!("&{}", ty.display(display_context))
             },
+            Constraint::SomeStruct(field_map) => {
+                format!(
+                    "struct{{{}}}",
+                    field_map
+                        .keys()
+                        .map(|s| s.display(pool).to_string())
+                        .join(",")
+                )
+            },
+            Constraint::SomeReceiverFunction(name, inst, _, args, result) => {
+                format!(
+                    "fun self.{}{}({}):{}",
+                    name.display(pool),
+                    if let Some(inst) = inst {
+                        format!("<{}>", fmt_types(display_context, inst.1.iter()))
+                    } else {
+                        "".to_owned()
+                    },
+                    fmt_types(display_context, args.iter()),
+                    result.display(display_context)
+                )
+            },
+            Constraint::NoReference => "no-ref".to_string(),
+            Constraint::NoTuple => "no-tuple".to_string(),
+            Constraint::NoPhantom => "no-phantom".to_string(),
+            Constraint::HasAbilities(required_abilities) => {
+                format!("{}", required_abilities)
+            },
             Constraint::WithDefault(_ty) => "".to_owned(),
         }
     }
@@ -175,13 +646,29 @@ impl Constraint {
 /// Represents an error resulting from type unification.
 #[derive(Debug)]
 pub enum TypeUnificationError {
+    /// The two types mismatch: `TypeMismatch(actual, expected)`
     TypeMismatch(Type, Type),
-    ArityMismatch(String, usize, usize),
-    CyclicSubstitution(Type, Type),
+    /// The arity  of some construct mismatches: `ArityMismatch(for_type_args, actual, expected)`
+    ArityMismatch(/*for_type_args*/ bool, usize, usize),
+    /// Two types have different mutability: `MutabilityMismatch(actual, expected)`.
     MutabilityMismatch(ReferenceKind, ReferenceKind),
-    ConstraintUnsatisfied(Loc, Type, WideningOrder, Constraint),
-    RedirectedError(Loc, Box<TypeUnificationError>),
+    /// A generic representation of the error that a constraint wasn't satisfied, with
+    /// an optional constraint context.
+    ConstraintUnsatisfied(
+        Loc,
+        Type,
+        WideningOrder,
+        Constraint,
+        Option<ConstraintContext>,
+    ),
+    /// The `HasAbilities` constraint failed: `MissingAbilities(loc, ty, missing, ctx)`.
+    MissingAbilities(Loc, Type, AbilitySet, Option<ConstraintContext>),
+    /// The two constraints are incompatible and cannot be joined.
     ConstraintsIncompatible(Loc, Constraint, Constraint),
+    /// A cyclic substitution when trying to unify the given types.
+    CyclicSubstitution(Type, Type),
+    /// Redirect the error message for the error to the given location.
+    RedirectedError(Loc, Box<TypeUnificationError>),
 }
 
 impl PrimitiveType {
@@ -244,6 +731,34 @@ impl PrimitiveType {
             _ => unreachable!("no num type"),
         }
     }
+
+    /// Gets the manimal value allowed for a numeric type, or none if it is unbounded.
+    pub fn get_min_value(self: &PrimitiveType) -> Option<BigInt> {
+        match self {
+            PrimitiveType::U8 => Some(BigInt::zero()),
+            PrimitiveType::U16 => Some(BigInt::zero()),
+            PrimitiveType::U32 => Some(BigInt::zero()),
+            PrimitiveType::U64 => Some(BigInt::zero()),
+            PrimitiveType::U128 => Some(BigInt::zero()),
+            PrimitiveType::U256 => Some(BigInt::zero()),
+            PrimitiveType::Num => None,
+            _ => unreachable!("no num type"),
+        }
+    }
+
+    /// Gets the number of bits in the type, or None if unbounded..
+    pub fn get_num_bits(self: &PrimitiveType) -> Option<usize> {
+        match self {
+            PrimitiveType::U8 => Some(8),
+            PrimitiveType::U16 => Some(16),
+            PrimitiveType::U32 => Some(32),
+            PrimitiveType::U64 => Some(64),
+            PrimitiveType::U128 => Some(128),
+            PrimitiveType::U256 => Some(256),
+            PrimitiveType::Num => None,
+            _ => unreachable!("no num type"),
+        }
+    }
 }
 
 impl Type {
@@ -265,6 +780,25 @@ impl Type {
     /// Determines whether this is a type parameter.
     pub fn is_type_parameter(&self) -> bool {
         matches!(self, Type::TypeParameter(..))
+    }
+
+    /// Returns true if the type depends on type parameters.
+    pub fn depends_from_type_parameter(&self) -> bool {
+        use Type::*;
+        match self {
+            TypeParameter(_) => true,
+            Tuple(ts) | Struct(_, _, ts) | ResourceDomain(_, _, Some(ts)) => {
+                ts.iter().any(|t| t.depends_from_type_parameter())
+            },
+            Vector(t) | Reference(_, t) | TypeDomain(t) => t.depends_from_type_parameter(),
+            Fun(t, r) => t.depends_from_type_parameter() || r.depends_from_type_parameter(),
+            _ => false,
+        }
+    }
+
+    /// Determines whether this is a primitive.
+    pub fn is_primitive(&self) -> bool {
+        matches!(self, Type::Primitive(_))
     }
 
     /// Determines whether this is a reference.
@@ -297,6 +831,24 @@ impl Type {
         matches!(self, Type::Vector(..))
     }
 
+    /// Get the element type of a vector
+    pub fn get_vector_element_type(&self) -> Option<Type> {
+        if let Type::Vector(e) = self {
+            Some(e.as_ref().clone())
+        } else {
+            None
+        }
+    }
+
+    /// Get the target type of a reference
+    pub fn get_target_type(&self) -> Option<&Type> {
+        if let Type::Reference(_, t) = self {
+            Some(t.as_ref())
+        } else {
+            None
+        }
+    }
+
     /// Determines whether this is a struct, or a vector of structs, or a reference to any of
     /// those.
     pub fn is_struct_or_vector_of_struct(&self) -> bool {
@@ -318,13 +870,19 @@ impl Type {
         }
     }
 
+    pub fn describe_valid_for_constant() -> &'static str {
+        "Expected one of `u8`, `u16, `u32`, `u64`, `u128`, `u256`, `bool`, `address`, \
+         or `vector<_>` with valid element type."
+    }
+
     /// Returns true if this type is a specification language only type or contains specification
     /// language only types
     pub fn is_spec(&self) -> bool {
         use Type::*;
         match self {
             Primitive(p) => p.is_spec(),
-            Fun(..) | TypeDomain(..) | ResourceDomain(..) | Error => true,
+            Fun(args, result) => args.is_spec() || result.is_spec(),
+            TypeDomain(..) | ResourceDomain(..) | Error => true,
             Var(..) | TypeParameter(..) => false,
             Tuple(ts) => ts.iter().any(|t| t.is_spec()),
             Struct(_, _, ts) => ts.iter().any(|t| t.is_spec()),
@@ -631,14 +1189,14 @@ impl Type {
                     .expect("Invariant violation: vector type argument contains incomplete, tuple, or spec type"))
             )),
             Reference(r, t) =>
-            match r {
-                ReferenceKind::Mutable => {
-                    Some(MType::MutableReference(Box::new(t.into_normalized_type(env).expect("Invariant violation: reference type contains incomplete, tuple, or spec type"))))
+                match r {
+                    ReferenceKind::Mutable => {
+                        Some(MType::MutableReference(Box::new(t.into_normalized_type(env).expect("Invariant violation: reference type contains incomplete, tuple, or spec type"))))
+                    }
+                    ReferenceKind::Immutable => {
+                        Some(MType::Reference(Box::new(t.into_normalized_type(env).expect("Invariant violation: reference type contains incomplete, tuple, or spec type"))))
+                    }
                 },
-                ReferenceKind::Immutable => {
-                    Some(MType::Reference(Box::new(t.into_normalized_type(env).expect("Invariant violation: reference type contains incomplete, tuple, or spec type"))))
-                },
-            },
             TypeParameter(idx) => Some(MType::TypeParameter(idx)),
             Tuple(..) | Error | Fun(..) | TypeDomain(..) | ResourceDomain(..) | Var(..) =>
                 None
@@ -753,6 +1311,16 @@ impl Type {
             tys.pop().unwrap()
         }
     }
+
+    /// If this is a tuple and it is not a unit type, return true.
+    pub fn is_non_unit_tuple(&self) -> bool {
+        matches!(self, Type::Tuple(ts) if !ts.is_empty())
+    }
+
+    /// If this is a tuple, return true.
+    pub fn is_tuple(&self) -> bool {
+        matches!(self, Type::Tuple(_))
+    }
 }
 
 /// A parameter for type unification that specifies the type compatibility rules to follow.
@@ -835,13 +1403,98 @@ impl WideningOrder {
     }
 }
 
+/// A trait to provide context information about abilities.
+pub trait AbilityContext {
+    /// Delivers the kind of the type parameter, as it is declared: `T: key+drop`.
+    fn type_param(&self, idx: u16) -> TypeParameter;
+
+    /// Delivers the signature of a struct, that is the kinds of its type parameters,
+    /// and the offered abilities of the struct.
+    fn struct_signature(
+        &self,
+        qid: QualifiedId<StructId>,
+    ) -> (Symbol, Vec<TypeParameter>, AbilitySet);
+}
+
+/// A trait to provide context information for unification.
+pub trait UnificationContext: AbilityContext {
+    /// Get the field map for a struct, with field types instantiated.
+    fn get_struct_field_map(&self, id: &QualifiedInstId<StructId>) -> BTreeMap<Symbol, Type>;
+
+    /// For a given type, return a receiver style function of the given name, if available.
+    /// If the function is generic it will be instantiated with fresh type variables.
+    fn get_receiver_function(
+        &mut self,
+        ty: &Type,
+        name: Symbol,
+    ) -> Option<ReceiverFunctionInstance>;
+
+    /// Returns a type display context.
+    fn type_display_context(&self) -> TypeDisplayContext;
+}
+
+/// Information returned about an instantiated function
+#[derive(Debug, Clone)]
+pub struct ReceiverFunctionInstance {
+    /// Qualified id
+    pub id: QualifiedId<FunId>,
+    /// Type instantiation of the function
+    pub type_inst: Vec<Type>,
+    /// Types of the arguments, instantiated
+    pub arg_types: Vec<Type>,
+    /// Result type, instantiated
+    pub result_type: Type,
+}
+
+impl ReceiverFunctionInstance {
+    /// Given the actual argument type, determine whether it needs to be borrowed to be passed
+    /// to this function. Returns the reference kind if so.
+    pub fn receiver_needs_borrow(&self, actual_arg_type: &Type) -> Option<ReferenceKind> {
+        match &self.arg_types[0] {
+            Type::Reference(kind, _) if !actual_arg_type.is_reference() => Some(*kind),
+            _ => None,
+        }
+    }
+}
+
+/// A struct representing an empty unification context.
+pub struct NoUnificationContext;
+
+impl UnificationContext for NoUnificationContext {
+    fn get_struct_field_map(&self, _id: &QualifiedInstId<StructId>) -> BTreeMap<Symbol, Type> {
+        BTreeMap::new()
+    }
+
+    fn get_receiver_function(
+        &mut self,
+        _ty: &Type,
+        _name: Symbol,
+    ) -> Option<ReceiverFunctionInstance> {
+        None
+    }
+
+    fn type_display_context(&self) -> TypeDisplayContext {
+        unimplemented!("NoUnificationContext does not support type display")
+    }
+}
+
+impl AbilityContext for NoUnificationContext {
+    fn type_param(&self, _idx: u16) -> TypeParameter {
+        unimplemented!("NoUnificationContext does not support abilities")
+    }
+
+    fn struct_signature(
+        &self,
+        _qid: QualifiedId<StructId>,
+    ) -> (Symbol, Vec<TypeParameter>, AbilitySet) {
+        unimplemented!("NoUnificationContext does not support abilities")
+    }
+}
+
 impl Substitution {
     /// Creates a new substitution.
     pub fn new() -> Self {
-        Self {
-            subs: BTreeMap::new(),
-            constraints: BTreeMap::new(),
-        }
+        Self::default()
     }
 
     /// Add a constraint to the variable. This tries to first join the constraint with existing
@@ -849,24 +1502,43 @@ impl Substitution {
     /// `SomeNumber({u16})`. A TypeUnificationError is returned if the constraints are incompatible.
     pub fn add_constraint(
         &mut self,
+        context: &mut impl UnificationContext,
         var: u32,
         loc: Loc,
         order: WideningOrder,
         ctr: Constraint,
+        ctx_opt: Option<ConstraintContext>,
     ) -> Result<(), TypeUnificationError> {
-        let current = self.constraints.entry(var).or_default();
+        // Move current constraint list out of self to avoid sharing conflicts while it
+        // is being transformed.
+        let mut current = self.constraints.remove(&var).unwrap_or_default();
         let mut absorbed = false;
-        for (_, o, c) in current.iter_mut() {
-            // If the orders are compatible, try to join constraints
-            if *o == order {
-                absorbed = c.join(&loc, &ctr)?;
-                if absorbed {
-                    break;
-                }
+        for (_, _, c) in current.iter_mut() {
+            // Join constraints. If join returns true the constraint is absorbed.
+            absorbed = c.join(context, self, &loc, &ctr)?;
+            if absorbed {
+                break;
             }
         }
         if !absorbed {
             current.push((loc, order, ctr))
+        }
+        self.constraints.insert(var, current);
+        if let Some(ctx) = ctx_opt {
+            match self.constraint_contexts.entry(var) {
+                Entry::Vacant(e) => {
+                    e.insert(ctx);
+                },
+                Entry::Occupied(e) => {
+                    let curr = e.into_mut();
+                    curr.inferred |= ctx.inferred;
+                    if matches!(ctx.origin, ConstraintOrigin::TypeParameter(..)) {
+                        // Prefer type parameter origin as it leads to
+                        // more precise error messages.
+                        curr.origin = ctx.origin;
+                    }
+                },
+            }
         }
         Ok(())
     }
@@ -899,18 +1571,40 @@ impl Substitution {
     /// errors.
     pub fn bind(
         &mut self,
+        context: &mut impl UnificationContext,
         var: u32,
+        variance: Variance,
         order: WideningOrder,
         ty: Type,
     ) -> Result<(), TypeUnificationError> {
         // Specialize the type before binding, to maximize groundness of type terms.
         let ty = self.specialize(&ty);
-        if let Some(constrs) = self.constraints.remove(&var) {
-            for (loc, o, c) in constrs {
+        if let Some(mut constrs) = self.constraints.remove(&var) {
+            // Sort constraints to report primary errors first
+            constrs.sort_by(|(_, _, c1), (_, _, c2)| c1.compare(c2).reverse());
+            while let Some((loc, o, c)) = constrs.pop() {
                 // The effective order is the one combining the constraint order with the
                 // context order. The result needs to be swapped because the constraint
                 // of the variable is evaluated against the given type.
-                self.eval_constraint(&loc, &ty, o.combine(order).swap(), c)?
+                match self.eval_constraint(
+                    context,
+                    &loc,
+                    &ty,
+                    variance,
+                    o.combine(order).swap(),
+                    c.clone(),
+                    self.constraint_contexts.get(&var).cloned(),
+                ) {
+                    Ok(_) => {
+                        // Constraint discharged
+                    },
+                    Err(e) => {
+                        // Put the constraint back, we may need it for error messages
+                        constrs.push((loc, o, c));
+                        self.constraints.insert(var, constrs);
+                        return Err(e);
+                    },
+                }
             }
         }
         self.subs.insert(var, ty);
@@ -918,53 +1612,298 @@ impl Substitution {
     }
 
     /// Evaluates whether the given type satisfies the constraint, discharging the constraint.
-    /// Notice that discharging is possible since we expect the type to be fully specialized.
-    /// For variables, we just transfer the constraint. For other types, since constraints
-    /// are over shallow structure of types, they can be decided.
+    /// Notice that discharging is possible since (a) for variables, we just transfer the
+    /// constraint. (b) For other types, since constraints are over shallow structure of types,
+    /// they can be decided based on the top-level type term.
     pub fn eval_constraint(
         &mut self,
+        context: &mut impl UnificationContext,
         loc: &Loc,
         ty: &Type,
+        variance: Variance,
         order: WideningOrder,
         c: Constraint,
+        ctx_opt: Option<ConstraintContext>,
     ) -> Result<(), TypeUnificationError> {
+        if c.report_only_once()
+            && !self
+                .reported
+                .entry(ty.clone())
+                .or_default()
+                .insert(c.clone())
+        {
+            // Already reported constraint mismatch for this type
+            return Ok(());
+        }
         if matches!(ty, Type::Error) {
             Ok(())
         } else if let Type::Var(other_var) = ty {
             // Transfer constraint on to other variable, which we assert to be free
             debug_assert!(!self.subs.contains_key(other_var));
-            self.add_constraint(*other_var, loc.clone(), order, c)
+            self.add_constraint(context, *other_var, loc.clone(), order, c, ctx_opt)
+        } else if c.propagate_over_reference() && ty.is_reference() {
+            // Propagate constraint to referred type
+            self.eval_constraint(
+                context,
+                loc,
+                ty.skip_reference(),
+                variance,
+                order,
+                c,
+                ctx_opt,
+            )
         } else {
-            match &c {
-                Constraint::SomeNumber(options) => match ty {
-                    Type::Primitive(prim) if options.contains(prim) => Ok(()),
-                    _ => Err(TypeUnificationError::ConstraintUnsatisfied(
-                        loc.clone(),
-                        ty.clone(),
-                        order,
-                        c,
-                    )),
+            let constraint_unsatisfied_error = || {
+                Err(TypeUnificationError::ConstraintUnsatisfied(
+                    loc.clone(),
+                    ty.clone(),
+                    order,
+                    c.clone(),
+                    ctx_opt.clone(),
+                ))
+            };
+            match (&c, ty) {
+                (Constraint::SomeNumber(options), Type::Primitive(prim))
+                    if options.contains(prim) =>
+                {
+                    Ok(())
                 },
-                Constraint::SomeReference(inner_type) => match ty {
-                    Type::Reference(_, target_type) => {
-                        match self.unify(Variance::NoVariance, order, target_type, inner_type) {
-                            Ok(_) => Ok(()),
-                            Err(e) => Err(TypeUnificationError::RedirectedError(
-                                loc.clone(),
-                                Box::new(e),
-                            )),
+                (Constraint::SomeReference(inner_type), Type::Reference(_, target_type)) => self
+                    .unify(context, variance, order, target_type, inner_type)
+                    .map(|_| ())
+                    .map_err(|e| e.redirect(loc.clone())),
+                (Constraint::SomeStruct(constr_field_map), Type::Struct(mid, sid, inst)) => {
+                    let field_map =
+                        context.get_struct_field_map(&mid.qualified_inst(*sid, inst.clone()));
+                    // The actual struct must have all the fields in the constraint, with same
+                    // type.
+                    for (field_name, field_ty) in constr_field_map {
+                        if let Some(declared_field_type) = field_map.get(field_name) {
+                            self.unify(
+                                context,
+                                variance,
+                                WideningOrder::RightToLeft,
+                                field_ty,
+                                declared_field_type,
+                            )
+                            .map(|_| ())
+                            .map_err(|e| e.redirect(loc.clone()))?
+                        } else {
+                            return constraint_unsatisfied_error();
                         }
-                    },
-                    _ => Err(TypeUnificationError::ConstraintUnsatisfied(
-                        loc.clone(),
-                        ty.clone(),
-                        order,
-                        c,
-                    )),
+                    }
+                    Ok(())
                 },
-                Constraint::WithDefault(_) => Ok(()),
+                (
+                    Constraint::SomeReceiverFunction(name, ty_args_opt, args_loc, args, result),
+                    ty,
+                ) => {
+                    if let Some(receiver) = context.get_receiver_function(ty, *name) {
+                        self.eval_receiver_function_constraint(
+                            context,
+                            variance,
+                            ty_args_opt,
+                            args_loc,
+                            args,
+                            result,
+                            receiver,
+                        )
+                    } else {
+                        constraint_unsatisfied_error()
+                    }
+                },
+                (Constraint::HasAbilities(required_abilities), ty) => {
+                    self.eval_ability_constraint(context, loc, *required_abilities, ty, ctx_opt)
+                },
+                (Constraint::NoReference, ty) => {
+                    if ty.is_reference() {
+                        constraint_unsatisfied_error()
+                    } else {
+                        Ok(())
+                    }
+                },
+                (Constraint::NoTuple, ty) => {
+                    if ty.is_tuple() {
+                        constraint_unsatisfied_error()
+                    } else {
+                        Ok(())
+                    }
+                },
+                (Constraint::NoPhantom, ty) => match ty {
+                    Type::TypeParameter(idx) if context.type_param(*idx).1.is_phantom => {
+                        constraint_unsatisfied_error()
+                    },
+                    _ => Ok(()),
+                },
+                (Constraint::WithDefault(_), _) => Ok(()),
+                _ => constraint_unsatisfied_error(),
             }
         }
+    }
+
+    fn eval_ability_constraint(
+        &mut self,
+        context: &mut impl UnificationContext,
+        loc: &Loc,
+        required_abilities: AbilitySet,
+        ty: &Type,
+        ctx_opt: Option<ConstraintContext>,
+    ) -> Result<(), TypeUnificationError> {
+        use Type::*;
+        let check = |abilities: AbilitySet| {
+            let missing = required_abilities.setminus(abilities);
+            if !missing.is_empty() {
+                Err(TypeUnificationError::MissingAbilities(
+                    loc.clone(),
+                    ty.clone(),
+                    missing,
+                    ctx_opt.clone(),
+                ))
+            } else {
+                Ok(())
+            }
+        };
+        match ty {
+            Primitive(PrimitiveType::Signer) => check(AbilitySet::SIGNER),
+            Primitive(_) => check(AbilitySet::PRIMITIVES),
+            Tuple(ts) => {
+                check(AbilitySet::PRIMITIVES)?;
+                for (i, t) in ts.iter().enumerate() {
+                    self.eval_ability_constraint(
+                        context,
+                        loc,
+                        required_abilities,
+                        t,
+                        ctx_opt.clone().map(|ctx| ctx.derive_tuple_element(i)),
+                    )?;
+                }
+                Ok(())
+            },
+            Vector(t) => {
+                check(AbilitySet::VECTOR)?;
+                self.eval_ability_constraint(
+                    context,
+                    loc,
+                    required_abilities,
+                    t,
+                    ctx_opt.map(|ctx| ctx.derive_vector_type_param()),
+                )
+            },
+            Struct(m, s, ts) => {
+                let (name, type_params, struct_abilities) =
+                    context.struct_signature(m.qualified(*s));
+
+                check(struct_abilities)?;
+                let required = if required_abilities.has_ability(Ability::Key) {
+                    required_abilities.remove(Ability::Key).add(Ability::Store)
+                } else {
+                    required_abilities
+                };
+                for (i, t) in ts.iter().enumerate() {
+                    let type_param = &type_params[i];
+                    // Pass the requirements on to the type instantiation, except
+                    // phantoms which are excluded from ability requirements
+                    if !type_param.1.is_phantom {
+                        self.eval_ability_constraint(
+                            context,
+                            loc,
+                            required,
+                            t,
+                            ctx_opt
+                                .clone()
+                                .map(|ctx| ctx.derive_struct_parameter(name, type_param.clone())),
+                        )?;
+                    }
+                    // Add constraints derived from the parameter itself.
+                    for ctr in Constraint::for_type_parameter(type_param) {
+                        self.eval_constraint(
+                            context,
+                            loc,
+                            t,
+                            Variance::NoVariance,
+                            WideningOrder::LeftToRight,
+                            ctr,
+                            Some(ConstraintContext::default().for_type_param(
+                                true,
+                                name,
+                                type_param.clone(),
+                            )),
+                        )?
+                    }
+                }
+                Ok(())
+            },
+            TypeParameter(idx) => {
+                let tparam = context.type_param(*idx);
+                check(tparam.1.abilities)
+            },
+            Fun(_, _) => check(AbilitySet::FUNCTIONS),
+            Reference(_, _) => check(AbilitySet::REFERENCES),
+            TypeDomain(_) | ResourceDomain(_, _, _) => check(AbilitySet::EMPTY),
+            Error => Ok(()),
+            Var(idx) => {
+                // Discharge the constraint by adding it to the substitution for
+                // later evaluation.
+                self.add_constraint(
+                    context,
+                    *idx,
+                    loc.clone(),
+                    WideningOrder::LeftToRight,
+                    Constraint::HasAbilities(required_abilities),
+                    ctx_opt,
+                )
+            },
+        }
+    }
+
+    fn eval_receiver_function_constraint(
+        &mut self,
+        context: &mut impl UnificationContext,
+        variance: Variance,
+        ty_args_opt: &Option<(Vec<Loc>, Vec<Type>)>,
+        args_loc: &[Loc],
+        args: &[Type],
+        result: &Type,
+        receiver: ReceiverFunctionInstance,
+    ) -> Result<(), TypeUnificationError> {
+        let mut args = args.to_vec();
+        let borrow_kind = receiver.receiver_needs_borrow(&args[0]);
+        if let Some(ref_kind) = borrow_kind {
+            // Wrap a reference around the arg type to reflect it will be automatically borrowed
+            let arg_type = args.remove(0);
+            args.insert(0, Type::Reference(ref_kind, Box::new(arg_type)));
+        }
+        if let Some(ty_args) = ty_args_opt {
+            // The call has explicit type parameters (`x.f<T>()`), check them.
+            self.unify_vec_maybe_type_args(
+                context,
+                true,
+                variance,
+                WideningOrder::Join,
+                // Pass in locations of type args for better error messages
+                Some(&ty_args.0),
+                &ty_args.1,
+                &receiver.type_inst,
+            )?;
+        }
+        self.unify_vec(
+            context,
+            variance,
+            WideningOrder::LeftToRight,
+            // Pass in locations of arguments for better error messages
+            Some(args_loc),
+            &args,
+            &receiver.arg_types,
+        )?;
+        // Result is contra-variant, hence RightToLeft
+        self.unify(
+            context,
+            variance,
+            WideningOrder::RightToLeft,
+            result,
+            &receiver.result_type,
+        )?;
+        Ok(())
     }
 
     /// Specializes the type, substituting all variables bound in this substitution.
@@ -1018,15 +1957,19 @@ impl Substitution {
 
     /// Unify two types, returning the unified type.
     ///
-    /// This currently implements the following notion of type compatibility:
+    /// This currently implements the following notion of type compatibility, depending
+    /// on mode:
     ///
+    /// In specification mode:
     /// - 1) References are dropped (i.e. &T and T are compatible)
     /// - 2) All integer types are compatible if spec-variance is allowed.
-    /// - 3) With the joint effect of 1) and 2), if (P, Q) is compatible under spec-variance,
-    ///      (&P, Q), (P, &Q), and (&P, &Q) are all compatible under co-variance.
-    /// - 4) If in two tuples (P1, P2, ..., Pn) and (Q1, Q2, ..., Qn), all (Pi, Qi) pairs are
+    /// - 3) If in two tuples (P1, P2, ..., Pn) and (Q1, Q2, ..., Qn), all (Pi, Qi) pairs are
     ///      compatible under spec-variance, then the two tuples are compatible under
     ///      spec-variance.
+    ///
+    /// In implementation mode:
+    /// - 1) The only known variance at this point is from `&mut T` to `&T`.
+    /// - 2) The same way as (3) above, implementation variance propagates over tuples.
     ///
     /// The substitution will be refined by variable assignments as needed to perform
     /// unification. If unification fails, the substitution will be in some intermediate state;
@@ -1034,6 +1977,7 @@ impl Substitution {
     /// this.
     pub fn unify(
         &mut self,
+        context: &mut impl UnificationContext,
         variance: Variance,
         order: WideningOrder,
         t1: &Type,
@@ -1054,22 +1998,22 @@ impl Substitution {
                 };
                 return Ok(Type::Reference(
                     *kind,
-                    Box::new(self.unify(sub_variance, order, bt1.as_ref(), t2)?),
+                    Box::new(self.unify(context, variance, order, bt1.as_ref(), t2)?),
                 ));
             }
             if let Type::Reference(kind, bt2) = t2 {
                 return Ok(Type::Reference(
                     *kind,
-                    Box::new(self.unify(sub_variance, order, t1, bt2.as_ref())?),
+                    Box::new(self.unify(context, variance, order, t1, bt2.as_ref())?),
                 ));
             }
         }
 
         // Substitute or assign variables.
-        if let Some(rt) = self.try_substitute_or_assign(variance, order, t1, t2)? {
+        if let Some(rt) = self.try_substitute_or_assign(context, variance, order, t1, t2)? {
             return Ok(rt);
         }
-        if let Some(rt) = self.try_substitute_or_assign(variance, order.swap(), t2, t1)? {
+        if let Some(rt) = self.try_substitute_or_assign(context, variance, order.swap(), t2, t1)? {
             return Ok(rt);
         }
 
@@ -1098,7 +2042,9 @@ impl Substitution {
                 }
             },
             (Type::Reference(k1, ty1), Type::Reference(k2, ty2)) => {
-                let ty = self.unify(sub_variance, order, ty1, ty2)?;
+                let ty = self
+                    .unify(context, sub_variance, order, ty1, ty2)
+                    .map_err(TypeUnificationError::lift(order, t1, t2))?;
                 let k = if variance.is_impl_variance() {
                     use ReferenceKind::*;
                     use WideningOrder::*;
@@ -1107,7 +2053,7 @@ impl Substitution {
                         (Immutable, Mutable, RightToLeft | Join) => k1,
                         (Mutable, Immutable, LeftToRight | Join) => k2,
                         _ => {
-                            let (kl, kr) = if order == RightToLeft {
+                            let (kl, kr) = if matches!(order, LeftToRight) {
                                 (k1, k2)
                             } else {
                                 (k2, k1)
@@ -1123,38 +2069,56 @@ impl Substitution {
                 return Ok(Type::Reference(*k, Box::new(ty)));
             },
             (Type::Tuple(ts1), Type::Tuple(ts2)) => {
-                return Ok(Type::Tuple(self.unify_vec(
-                    // Note for tuples, we pass on `variance` not `sub_variance`. A shallow
-                    // variance type will be effective for the elements of tuples,
-                    // which are treated similar as expression lists in function calls.
-                    variance, order, ts1, ts2, "tuples",
-                )?));
+                return Ok(Type::Tuple(
+                    self.unify_vec(
+                        // Note for tuples, we pass on `variance` not `sub_variance`. A shallow
+                        // variance type will be effective for the elements of tuples,
+                        // which are treated similar as expression lists in function calls, and allow
+                        // e.g. reference type conversions.
+                        context, variance, order, None, ts1, ts2,
+                    )
+                    .map_err(TypeUnificationError::lift(order, t1, t2))?,
+                ));
             },
             (Type::Fun(a1, r1), Type::Fun(a2, r2)) => {
+                // Same as for tuples, we pass on `variance` not `sub_variance`, allowing
+                // conversion for arguments. We also have contra-variance of arguments:
+                //   |T1|R1 <= |T2|R2  <==>  T1 >= T2 && R1 <= R2
+                // Intuitively, function f1 can safely _substitute_ function f2 if any argument
+                // of type T2 can be passed as a T1 -- which is the case since T1 >= T2 (every
+                // T2 is also a T1).
                 return Ok(Type::Fun(
-                    Box::new(self.unify(sub_variance, order, a1, a2)?),
-                    Box::new(self.unify(sub_variance, order, r1, r2)?),
+                    Box::new(
+                        self.unify(context, variance, order.swap(), a1, a2)
+                            .map_err(TypeUnificationError::lift(order, t1, t2))?,
+                    ),
+                    Box::new(
+                        self.unify(context, variance, order, r1, r2)
+                            .map_err(TypeUnificationError::lift(order, t1, t2))?,
+                    ),
                 ));
             },
             (Type::Struct(m1, s1, ts1), Type::Struct(m2, s2, ts2)) => {
                 if m1 == m2 && s1 == s2 {
+                    // For structs, also pass on `variance`, not `sub_variance`, to inherit
+                    // shallow processing to fields.
                     return Ok(Type::Struct(
                         *m1,
                         *s1,
-                        self.unify_vec(sub_variance, order, ts1, ts2, "structs")?,
+                        self.unify_vec(context, variance, order, None, ts1, ts2)
+                            .map_err(TypeUnificationError::lift(order, t1, t2))?,
                     ));
                 }
             },
             (Type::Vector(e1), Type::Vector(e2)) => {
-                return Ok(Type::Vector(Box::new(self.unify(
-                    sub_variance,
-                    order,
-                    e1,
-                    e2,
-                )?)));
+                return Ok(Type::Vector(Box::new(
+                    self.unify(context, sub_variance, order, e1, e2)
+                        .map_err(TypeUnificationError::lift(order, t1, t2))?,
+                )));
             },
             (Type::TypeDomain(e1), Type::TypeDomain(e2)) => {
                 return Ok(Type::TypeDomain(Box::new(self.unify(
+                    context,
                     sub_variance,
                     order,
                     e1,
@@ -1175,24 +2139,51 @@ impl Substitution {
     }
 
     /// Helper to unify two type vectors.
-    fn unify_vec(
+    pub fn unify_vec(
         &mut self,
+        context: &mut impl UnificationContext,
         variance: Variance,
         order: WideningOrder,
+        locs: Option<&[Loc]>,
         ts1: &[Type],
         ts2: &[Type],
-        item_name: &str,
     ) -> Result<Vec<Type>, TypeUnificationError> {
-        if ts1.len() != ts2.len() {
+        self.unify_vec_maybe_type_args(context, false, variance, order, locs, ts1, ts2)
+    }
+
+    /// Helper to unify two type vectors, maybe mark as type arguments.
+    pub fn unify_vec_maybe_type_args(
+        &mut self,
+        context: &mut impl UnificationContext,
+        for_type_args: bool,
+        variance: Variance,
+        order: WideningOrder,
+        locs: Option<&[Loc]>,
+        ts1: &[Type],
+        ts2: &[Type],
+    ) -> Result<Vec<Type>, TypeUnificationError> {
+        let ts1n = ts1.len();
+        let ts2n = ts2.len();
+        if ts1n != ts2n {
+            let (given, expected) =
+                if matches!(order, WideningOrder::LeftToRight | WideningOrder::Join) {
+                    (ts1n, ts2n)
+                } else {
+                    (ts2n, ts1n)
+                };
             return Err(TypeUnificationError::ArityMismatch(
-                item_name.to_owned(),
-                ts1.len(),
-                ts2.len(),
+                for_type_args,
+                given,
+                expected,
             ));
         }
         let mut rs = vec![];
         for i in 0..ts1.len() {
-            rs.push(self.unify(variance, order, &ts1[i], &ts2[i])?);
+            let mut res = self.unify(context, variance, order, &ts1[i], &ts2[i]);
+            if let Some(locs) = locs {
+                res = res.map_err(|e| e.redirect(locs[i].clone()))
+            }
+            rs.push(res?);
         }
         Ok(rs)
     }
@@ -1201,6 +2192,7 @@ impl Substitution {
     /// was performed, None if not.
     fn try_substitute_or_assign(
         &mut self,
+        context: &mut impl UnificationContext,
         variance: Variance,
         order: WideningOrder,
         t1: &Type,
@@ -1208,7 +2200,7 @@ impl Substitution {
     ) -> Result<Option<Type>, TypeUnificationError> {
         if let Type::Var(v1) = t1 {
             if let Some(s1) = self.subs.get(v1).cloned() {
-                return Ok(Some(self.unify(variance, order, &s1, t2)?));
+                return Ok(Some(self.unify(context, variance, order, &s1, t2)?));
             }
             // Be sure to skip any top-level var assignments for t2, for
             // cycle check.
@@ -1226,7 +2218,7 @@ impl Substitution {
             }
             // Cycle check.
             if !self.occurs_check(&t2, *v1) {
-                self.bind(*v1, order, t2.clone())?;
+                self.bind(context, *v1, variance, order, t2.clone())?;
                 Ok(Some(t2))
             } else {
                 Err(TypeUnificationError::CyclicSubstitution(
@@ -1252,12 +2244,6 @@ impl Substitution {
                 false
             }
         })
-    }
-}
-
-impl Default for Substitution {
-    fn default() -> Self {
-        Self::new()
     }
 }
 
@@ -1406,16 +2392,18 @@ impl TypeUnificationAdapter {
     /// unify the LHS and RHS respectively. If the LHS and RHS cannot unify, None is returned.
     pub fn unify(
         self,
+        context: &mut impl UnificationContext,
         variance: Variance,
         shallow_subst: bool,
     ) -> Option<(BTreeMap<u16, Type>, BTreeMap<u16, Type>)> {
         let mut subst = Substitution::new();
         match subst.unify_vec(
+            context,
             variance,
             WideningOrder::LeftToRight,
+            None,
             &self.types_adapted_lhs,
             &self.types_adapted_rhs,
-            "",
         ) {
             Ok(_) => {
                 let mut inst_lhs = BTreeMap::new();
@@ -1454,67 +2442,540 @@ impl TypeUnificationAdapter {
     }
 }
 
+/// A context which determines how type unification errors are presented
+/// to the user.
+///
+/// For each of the categories of errors (type mismatch, arity mismatch, etc.)
+/// a specific error rendering function is defined below to display the error.
+#[derive(Debug, Clone, Copy, PartialOrd, Ord, PartialEq, Eq)]
+pub enum ErrorMessageContext {
+    /// The error appears in a binding, where the rhs is not assignable to the lhs.
+    Binding,
+    /// The error appears in an assignment, where the rhs is not assignable to the lhs.
+    Assignment,
+    /// The error appears in the argument list of a function.
+    Argument,
+    /// The error appears in a type argument.
+    TypeArgument,
+    /// The error appears in the argument of a receiver style function.
+    ReceiverArgument,
+    /// The error appears in the argument of an operator.
+    OperatorArgument,
+    /// The error appears in a type annotation.
+    TypeAnnotation,
+    /// The error appears in the return expression of a function.
+    Return,
+    /// The error appears in the context of including a schema and
+    /// binding the given name.
+    SchemaInclusion(Symbol),
+    /// The error appears in a general generic context.
+    General,
+}
+
+/// Note: we currently do not have context specific messages for constraint mismatches.
+/// They are handled generically in `TypeUnificationError::message`.
+impl ErrorMessageContext {
+    pub fn type_mismatch(
+        self,
+        display_context: &TypeDisplayContext,
+        actual: &Type,
+        expected: &Type,
+    ) -> String {
+        self.type_mismatch_str(
+            display_context,
+            actual.display(display_context).to_string(),
+            expected.display(display_context).to_string(),
+        )
+    }
+
+    pub fn type_mismatch_str(
+        self,
+        display_context: &TypeDisplayContext,
+        actual: String,
+        expected: String,
+    ) -> String {
+        use ErrorMessageContext::*;
+        match self {
+            Binding => format!(
+                "cannot bind `{}` to left-hand side of type `{}`",
+                actual, expected
+            ),
+            Assignment => format!(
+                "cannot assign `{}` to left-hand side of type `{}`",
+                actual, expected
+            ),
+            Argument | ReceiverArgument => format!(
+                "cannot pass `{}` to a function which expects argument of type `{}`",
+                actual, expected
+            ),
+            OperatorArgument => format!(
+                "cannot use `{}` with an operator which expects a value of type `{}`",
+                actual, expected
+            ),
+            TypeArgument => format!(
+                "cannot use `{}` as a type argument which is expected to be of type `{}`",
+                actual, expected
+            ),
+            TypeAnnotation => format!("cannot adapt `{}` to annotated type `{}`", actual, expected),
+            Return => {
+                let result_str = if expected == "()" {
+                    "which returns nothing".to_string()
+                } else {
+                    format!("with result type `{}`", expected)
+                };
+                let actual_str = if actual == "()" {
+                    "nothing".to_string()
+                } else {
+                    format!("`{}`", actual)
+                };
+                format!(
+                    "cannot return {} from a function {}",
+                    actual_str, result_str
+                )
+            },
+            SchemaInclusion(name) => {
+                format!(
+                    "variable `{}` bound by schema \
+                inclusion expected to have type `{}` but provided was `{}`",
+                    name.display(display_context.env.symbol_pool()),
+                    expected,
+                    actual
+                )
+            },
+            General => {
+                if expected == "()" {
+                    format!("expected expression with no value but found `{}`", actual)
+                } else {
+                    format!(
+                        "expected `{}` but found a value of type `{}`",
+                        expected, actual
+                    )
+                }
+            },
+        }
+    }
+
+    pub fn arity_mismatch(self, for_type_args: bool, actual: usize, expected: usize) -> String {
+        use ErrorMessageContext::*;
+        match self {
+            Binding | Assignment => format!(
+                "the left-hand side has {} {} but the right-hand side provided {}",
+                expected,
+                pluralize("item", expected),
+                actual,
+            ),
+            Argument => format!(
+                "the function takes {} {} but {} were provided",
+                expected,
+                if for_type_args {
+                    pluralize("type argument", expected)
+                } else {
+                    pluralize("argument", expected)
+                },
+                actual
+            ),
+            ReceiverArgument => {
+                if for_type_args {
+                    format!(
+                        "the receiver function takes {} type {} but {} were provided",
+                        expected,
+                        pluralize("argument", expected),
+                        actual
+                    )
+                } else {
+                    format!(
+                        "the receiver function takes {} {} but {} were provided",
+                        expected - 1,
+                        pluralize("argument", expected - 1),
+                        actual - 1
+                    )
+                }
+            },
+            OperatorArgument => format!(
+                "the operator takes {} {} but {} were provided",
+                expected,
+                pluralize("argument", expected),
+                actual
+            ),
+            TypeArgument => {
+                format!(
+                    "expected {} type {} but {} were provided",
+                    expected,
+                    pluralize("argument", expected),
+                    actual
+                )
+            },
+            Return => format!(
+                "the function returns {} {} but {} were provided",
+                expected,
+                pluralize("argument", expected),
+                actual
+            ),
+            SchemaInclusion(_) | General | TypeAnnotation => {
+                format!("expected {} items but found {}", expected, actual)
+            },
+        }
+    }
+
+    pub fn mutability_mismatch(self, actual: ReferenceKind, expected: ReferenceKind) -> String {
+        use ErrorMessageContext::*;
+        match self {
+            Binding | Assignment => format!(
+                "the left-hand side expected {} but {} was provided",
+                expected, actual
+            ),
+            Argument | ReceiverArgument => format!(
+                "the function takes {} but {} was provided",
+                expected, actual
+            ),
+            Return => format!(
+                "the function returns {} but {} was provided",
+                expected, actual
+            ),
+            OperatorArgument => format!(
+                "the operator takes {} but {} was provided",
+                expected, actual
+            ),
+            SchemaInclusion(_) | TypeAnnotation | General | TypeArgument => {
+                format!("expected {} but {} was provided", expected, actual)
+            },
+        }
+    }
+
+    pub fn expected_reference(self, display_context: &TypeDisplayContext, actual: &Type) -> String {
+        use ErrorMessageContext::*;
+        let actual = actual.display(display_context);
+        match self {
+            Argument | ReceiverArgument => format!(
+                "the function takes a reference but `{}` was provided",
+                actual
+            ),
+            OperatorArgument => {
+                format!(
+                    "the operator takes a reference but `{}` was provided",
+                    actual
+                )
+            },
+            SchemaInclusion(_) | Binding | Assignment | Return | TypeAnnotation | General
+            | TypeArgument => {
+                format!("a reference is expected but `{}` was provided", actual)
+            },
+        }
+    }
+}
+
 impl TypeUnificationError {
-    /// If this error is associated with a specific location, return this.
+    /// Redirect the error to be reported at given location instead of default location.
+    pub fn redirect(self, loc: Loc) -> Self {
+        Self::RedirectedError(loc, Box::new(self))
+    }
+
+    /// Lifts a type unification error from the critical pair to the given context type.
+    /// A critical pair in type unification is the sub-term in which two type terms disagree,
+    /// e.g for `S<t> != S<t'>`, `(t, t')` is the critical pair.
+    /// NOTE: we may consider to store both critical pair and context type in the unification error
+    /// for better messages. However, the majority of type expressions is not very large in Move
+    /// so this may make create more noise than benefit.
+    pub fn lift<'a>(
+        order: WideningOrder,
+        cty1: &'a Type,
+        cty2: &'a Type,
+    ) -> impl Fn(TypeUnificationError) -> TypeUnificationError + 'a {
+        move |this| {
+            if matches!(
+                this,
+                TypeUnificationError::TypeMismatch(_, _)
+                // A SomeNumber constraint error is conceptually the same as a TypeMismatch,
+                // so lift that one as well
+                | TypeUnificationError::ConstraintUnsatisfied(
+                    _,
+                    _,
+                    _,
+                    Constraint::SomeNumber(..),
+                    _
+                )
+            ) {
+                if matches!(order, WideningOrder::LeftToRight | WideningOrder::Join) {
+                    TypeUnificationError::TypeMismatch(cty1.clone(), cty2.clone())
+                } else {
+                    TypeUnificationError::TypeMismatch(cty2.clone(), cty1.clone())
+                }
+            } else {
+                this
+            }
+        }
+    }
+
+    /// If this error is associated with a specific location and the error
+    /// is better reported at that location, return it.
     pub fn specific_loc(&self) -> Option<Loc> {
-        // Not used for now
-        None
+        match self {
+            TypeUnificationError::ConstraintUnsatisfied(_, _, _, c, _) if !c.accumulating() => {
+                // Non-accumulating constraints like `SomeNumber` or more similar than
+                // regular type errors and are better reported at the expression leading
+                // to the error instead of the location where the constraint stems from
+                None
+            },
+            TypeUnificationError::RedirectedError(loc, e) => {
+                Some(e.specific_loc().unwrap_or_else(|| loc.clone()))
+            },
+            TypeUnificationError::ConstraintsIncompatible(loc, ..)
+            | TypeUnificationError::ConstraintUnsatisfied(loc, ..)
+            | TypeUnificationError::MissingAbilities(loc, ..) => Some(loc.clone()),
+            _ => None,
+        }
     }
 
     /// Return the message for this error.
-    pub fn message(&self, display_context: &TypeDisplayContext) -> String {
+    pub fn message(
+        &self,
+        unification_context: &impl UnificationContext,
+        error_context: &ErrorMessageContext,
+    ) -> String {
+        self.message_with_hints_and_labels(unification_context, error_context)
+            .0
+    }
+
+    /// Return the message for this error.
+    pub fn message_with_hints_and_labels(
+        &self,
+        unification_context: &impl UnificationContext,
+        error_context: &ErrorMessageContext,
+    ) -> (String, Vec<String>, Vec<(Loc, String)>) {
+        let display_context = &unification_context.type_display_context();
         match self {
-            TypeUnificationError::TypeMismatch(t1, t2) => {
-                format!(
-                    "expected `{}` but found `{}`",
-                    t2.display(display_context),
-                    t1.display(display_context),
+            TypeUnificationError::TypeMismatch(actual, expected) => (
+                error_context.type_mismatch(display_context, actual, expected),
+                vec![],
+                vec![],
+            ),
+            TypeUnificationError::ArityMismatch(for_type_args, actual, expected) => (
+                error_context.arity_mismatch(*for_type_args, *actual, *expected),
+                vec![],
+                vec![],
+            ),
+            TypeUnificationError::CyclicSubstitution(_actual, _expected) => {
+                // We could print the types but users may find this more confusing than
+                // helpful.
+                (
+                    "unable to infer type due to cyclic \
+                    type constraints (try annotating the type)"
+                        .to_string(),
+                    vec![],
+                    vec![],
                 )
             },
-            TypeUnificationError::ArityMismatch(item, a1, a2) => {
-                format!("{} have different arity ({} != {})", item, a1, a2)
-            },
-            TypeUnificationError::CyclicSubstitution(t1, t2) => {
-                format!(
-                    "type unification cycle check failed (`{} =?= {}`, try to annotate type)",
-                    t1.display(display_context),
-                    t2.display(display_context),
-                )
-            },
-            TypeUnificationError::MutabilityMismatch(k1, k2) => {
-                let pr = |k: ReferenceKind| match k {
-                    ReferenceKind::Immutable => "&",
-                    ReferenceKind::Mutable => "&mut",
-                };
-                format!("mutability mismatch ({} != {})", pr(*k1), pr(*k2))
-            },
-            TypeUnificationError::ConstraintUnsatisfied(_, ty, order, constr) => match constr {
-                Constraint::SomeNumber(_) => {
-                    let options_str = constr.display(display_context);
-                    let type_str = ty.display(display_context).to_string();
-                    let (expected, actual) = match order {
-                        WideningOrder::Join | WideningOrder::LeftToRight => (options_str, type_str),
-                        WideningOrder::RightToLeft => (type_str, options_str),
-                    };
-                    format!("expected `{}` but found `{}`", expected, actual)
-                },
-                Constraint::SomeReference(_) => {
+            TypeUnificationError::MutabilityMismatch(actual, expected) => (
+                error_context.mutability_mismatch(*actual, *expected),
+                vec![],
+                vec![],
+            ),
+            TypeUnificationError::MissingAbilities(_, ty, missing, ctx_opt) => {
+                let (note, hints, labels) = ctx_opt
+                    .as_ref()
+                    .map(|ctx| ctx.describe(display_context))
+                    .unwrap_or_default();
+                (
                     format!(
-                        "expected `{}` to be a reference",
-                        ty.display(display_context)
-                    )
-                },
-                Constraint::WithDefault(_) => unreachable!("default constraint in error message"),
+                        "type `{}` is missing required {} `{}`{}",
+                        ty.display(display_context),
+                        pluralize("ability", missing.iter().count()),
+                        missing,
+                        if !note.is_empty() {
+                            format!(" ({})", note)
+                        } else {
+                            "".to_string()
+                        }
+                    ),
+                    hints,
+                    labels,
+                )
+            },
+            TypeUnificationError::ConstraintUnsatisfied(_, ty, order, constr, ctx_opt) => {
+                let item_name = || match ctx_opt {
+                    Some(ConstraintContext {
+                        origin: ConstraintOrigin::Field(_),
+                        ..
+                    }) => "as a field type",
+                    Some(ConstraintContext {
+                        origin: ConstraintOrigin::Local(_),
+                        ..
+                    }) => "as a local variable type",
+                    Some(ConstraintContext {
+                        origin: ConstraintOrigin::Unspecified,
+                        ..
+                    }) => "",
+                    Some(ConstraintContext {
+                        origin: ConstraintOrigin::TupleElement(_, _),
+                        ..
+                    }) => "as a tuple element",
+                    _ => "as a type argument",
+                };
+                let (mut note, mut hints, mut labels) = ctx_opt
+                    .as_ref()
+                    .map(|ctx| ctx.describe(display_context))
+                    .unwrap_or_default();
+                let main_msg = match constr {
+                    Constraint::SomeNumber(_) => {
+                        let options_str = constr.display(display_context);
+                        let type_str = ty.display(display_context).to_string();
+                        let (expected, actual) = match order {
+                            WideningOrder::Join | WideningOrder::LeftToRight => {
+                                (options_str, type_str)
+                            },
+                            WideningOrder::RightToLeft => (type_str, options_str),
+                        };
+                        // Providing instantiation context for number constraints is
+                        // confusing for users. Those constraints are used in
+                        // operators like `*` and so on but not visible to the user.
+                        // Clear the according context information.
+                        note = String::new();
+                        hints = vec![];
+                        labels = vec![];
+                        error_context.type_mismatch_str(display_context, actual, expected)
+                    },
+                    Constraint::SomeReference(ty) => {
+                        error_context.expected_reference(display_context, ty)
+                    },
+                    Constraint::SomeStruct(field_map) => Self::message_for_struct(
+                        unification_context,
+                        display_context,
+                        field_map,
+                        ty,
+                    ),
+                    Constraint::SomeReceiverFunction(name, ..) => {
+                        format!(
+                            "undeclared receiver function `{}` for type `{}`",
+                            name.display(display_context.env.symbol_pool()),
+                            ty.display(display_context)
+                        )
+                    },
+                    Constraint::NoTuple => {
+                        format!(
+                            "tuple type `{}` is not allowed {}",
+                            ty.display(display_context),
+                            item_name()
+                        )
+                    },
+                    Constraint::NoReference => {
+                        format!(
+                            "reference type `{}` is not allowed {}",
+                            ty.display(display_context),
+                            item_name()
+                        )
+                    },
+                    Constraint::NoPhantom => {
+                        format!(
+                            "phantom type `{}` can only be used as an argument for another phantom type parameter",
+                            ty.display(display_context)
+                        )
+                    },
+                    Constraint::HasAbilities(_) | Constraint::WithDefault(_) => {
+                        unreachable!("unexpected constraint in error message")
+                    },
+                };
+                if !note.is_empty() {
+                    (format!("{} ({})", main_msg, note), hints, labels)
+                } else {
+                    (main_msg, hints, labels)
+                }
             },
             TypeUnificationError::ConstraintsIncompatible(_, c1, c2) => {
-                format!(
-                    "constraint `{}` incompatible with `{}`",
-                    c1.display(display_context),
-                    c2.display(display_context)
-                )
+                use Constraint::*;
+                // Abstract details of gross incompatibilities
+                match (c1, c2) {
+                    (SomeStruct(..), SomeNumber(..)) | (SomeNumber(..), SomeStruct(..)) => (
+                        "struct incompatible with integer".to_owned(),
+                        vec![],
+                        vec![],
+                    ),
+                    (SomeReference(..), SomeNumber(..)) | (SomeNumber(..), SomeReference(..)) => (
+                        "reference incompatible with integer".to_owned(),
+                        vec![],
+                        vec![],
+                    ),
+                    _ => (
+                        format!(
+                            "constraint `{}` incompatible with `{}`",
+                            c1.display(display_context),
+                            c2.display(display_context)
+                        ),
+                        vec![],
+                        vec![],
+                    ),
+                }
             },
-            TypeUnificationError::RedirectedError(_, err) => err.message(display_context),
+            TypeUnificationError::RedirectedError(_, err) => {
+                err.message_with_hints_and_labels(unification_context, error_context)
+            },
         }
+    }
+
+    fn message_for_struct(
+        unification_context: &impl UnificationContext,
+        display_context: &TypeDisplayContext,
+        field_map: &BTreeMap<Symbol, Type>,
+        ty: &Type,
+    ) -> String {
+        // Determine why this constraint did not match for better error message
+        if let Type::Struct(mid, sid, inst) = ty {
+            let actual_field_map =
+                unification_context.get_struct_field_map(&mid.qualified_inst(*sid, inst.clone()));
+            let missing_fields = field_map
+                .keys()
+                .filter(|n| !actual_field_map.contains_key(n))
+                .collect::<Vec<_>>();
+            if !missing_fields.is_empty() {
+                // Primary error is missing fields
+                let fields =
+                    Self::print_fields(display_context.env, missing_fields.into_iter().cloned());
+                format!(
+                    "{} not declared in struct `{}`",
+                    fields,
+                    ty.display(display_context)
+                )
+            } else {
+                // Primary error is a type mismatch
+                let fields = field_map
+                    .iter()
+                    .filter_map(|(n, ty)| {
+                        let Some(actual_ty) = actual_field_map.get(n) else {
+                            return None;
+                        };
+                        if ty != actual_ty {
+                            Some(format!(
+                                "field `{}` has type `{}` instead of `{}`",
+                                n.display(display_context.env.symbol_pool()),
+                                ty.display(display_context),
+                                actual_ty.display(display_context)
+                            ))
+                        } else {
+                            None
+                        }
+                    })
+                    .join(" and ");
+                format!("{} in `{}`", fields, ty.display(display_context))
+            }
+        } else {
+            format!(
+                "expected a struct{} but found `{}`",
+                if field_map.is_empty() {
+                    "".to_owned()
+                } else {
+                    format!(
+                        " with {}",
+                        Self::print_fields(display_context.env, field_map.keys().cloned(),)
+                    )
+                },
+                ty.display(display_context)
+            )
+        }
+    }
+
+    fn print_fields(env: &GlobalEnv, names: impl Iterator<Item = Symbol>) -> String {
+        names
+            .map(|n| format!("field `{}`", n.display(env.symbol_pool()),))
+            .join(" and ")
     }
 }
 
@@ -1556,7 +3017,7 @@ impl TypeInstantiationDerivation {
                     treat_lhs_type_param_as_var_after_index,
                     treat_rhs_type_param_as_var_after_index,
                 );
-                let rel = adapter.unify(Variance::SpecVariance, false);
+                let rel = adapter.unify(&mut NoUnificationContext, Variance::SpecVariance, false);
                 if let Some((subst_lhs, subst_rhs)) = rel {
                     let subst = if target_lhs { subst_lhs } else { subst_rhs };
                     for (param_idx, inst_ty) in subst.into_iter() {
@@ -1687,6 +3148,10 @@ pub struct TypeDisplayContext<'a> {
     /// During type checking, the env might not contain the types yet of the currently checked
     /// module. This field allows to access symbolic information in this case.
     pub builder_struct_table: Option<&'a BTreeMap<(ModuleId, StructId), QualifiedSymbol>>,
+    /// If present, the module name in which context the type is displayed. Used to shorten type names.
+    pub module_name: Option<ModuleName>,
+    /// Whether to display type variables. If false, the will be displayed as `_`, otherwise as `_<n>`.
+    pub display_type_vars: bool,
 }
 
 impl<'a> TypeDisplayContext<'a> {
@@ -1696,6 +3161,15 @@ impl<'a> TypeDisplayContext<'a> {
             type_param_names: None,
             subs_opt: None,
             builder_struct_table: None,
+            module_name: None,
+            display_type_vars: false,
+        }
+    }
+
+    pub fn with_type_vars(&self) -> Self {
+        Self {
+            display_type_vars: true,
+            ..self.clone()
         }
     }
 
@@ -1708,6 +3182,8 @@ impl<'a> TypeDisplayContext<'a> {
             subs_opt: None,
             type_param_names: Some(type_param_names),
             builder_struct_table: None,
+            module_name: None,
+            display_type_vars: false,
         }
     }
 
@@ -1771,7 +3247,11 @@ impl<'a> fmt::Display for TypeDisplay<'a> {
                 f.write_str("|")?;
                 write!(f, "{}", a.display(self.context))?;
                 f.write_str("|")?;
-                write!(f, "{}", t.display(self.context))
+                if !t.is_unit() {
+                    write!(f, "{}", t.display(self.context))
+                } else {
+                    Ok(())
+                }
             },
             Struct(mid, sid, ts) => {
                 write!(f, "{}", self.struct_str(*mid, *sid))?;
@@ -1805,33 +3285,22 @@ impl<'a> fmt::Display for TypeDisplay<'a> {
             },
             Var(idx) => {
                 if let Some(ty) = self.context.subs_opt.and_then(|s| s.subs.get(idx)) {
-                    ty.fmt(f)
+                    write!(f, "{}", ty.display(self.context))
                 } else if let Some(ctrs) =
                     self.context.subs_opt.and_then(|s| s.constraints.get(idx))
                 {
-                    let mut out = "".to_owned();
-                    for (_, _, c) in ctrs {
-                        // We asssume no inconsistent constraints, so break on the first one
-                        match c {
-                            Constraint::SomeNumber(_) => {
-                                out = "integer".to_owned();
-                                break;
-                            },
-                            Constraint::SomeReference(ty) => {
-                                out = format!("&_{}", ty.display(self.context));
-                                break;
-                            },
-                            Constraint::WithDefault(ty) => {
-                                out = format!("{}/*default*/", ty.display(self.context))
-                            },
-                        }
+                    let ctrs = ctrs.iter().filter(|c| !c.2.hidden()).collect_vec();
+                    if ctrs.is_empty() {
+                        f.write_str(&self.type_var_str(*idx))
+                    } else {
+                        let out = ctrs
+                            .iter()
+                            .map(|(_, _, c)| c.display(self.context).to_string())
+                            .join(" + ");
+                        f.write_str(&out)
                     }
-                    if out.is_empty() {
-                        out = format!("?{}", idx)
-                    }
-                    f.write_str(&out)
                 } else {
-                    write!(f, "?{}", idx)
+                    f.write_str(&self.type_var_str(*idx))
                 }
             },
             Error => f.write_str("*error*"),
@@ -1840,9 +3309,17 @@ impl<'a> fmt::Display for TypeDisplay<'a> {
 }
 
 impl<'a> TypeDisplay<'a> {
+    fn type_var_str(&self, idx: u32) -> String {
+        if self.context.display_type_vars {
+            format!("_{}", idx)
+        } else {
+            "_".to_string()
+        }
+    }
+
     fn struct_str(&self, mid: ModuleId, sid: StructId) -> String {
         let env = self.context.env;
-        if let Some(builder_table) = self.context.builder_struct_table {
+        let mut str = if let Some(builder_table) = self.context.builder_struct_table {
             let qsym = builder_table.get(&(mid, sid)).expect("type known");
             qsym.display(self.context.env).to_string()
         } else {
@@ -1852,7 +3329,21 @@ impl<'a> TypeDisplay<'a> {
                 struct_env.module_env.get_name().display(env),
                 struct_env.get_name().display(env.symbol_pool())
             )
+        };
+        if let Some(mname) = &self.context.module_name {
+            let s = format!("{}::", mname.name().display(self.context.env.symbol_pool()));
+            if let Some(shortcut) = str.strip_prefix(&s) {
+                if let Some(tparams) = &self.context.type_param_names {
+                    // Avoid name clash with type parameter
+                    if !tparams.contains(&self.context.env.symbol_pool().make(shortcut)) {
+                        str = shortcut.to_owned()
+                    }
+                } else {
+                    str = shortcut.to_owned();
+                }
+            }
         }
+        str
     }
 }
 
@@ -1875,3 +3366,112 @@ impl fmt::Display for PrimitiveType {
         }
     }
 }
+
+/// A trait which allows to infer abilities of types
+pub trait AbilityInference: AbilityContext {
+    /// Infers the abilities of the type. The returned boolean indicates whether
+    /// the type is a phantom type parameter,
+    fn infer_abilities(&self, ty: &Type) -> (bool, AbilitySet) {
+        match ty {
+            Type::Primitive(p) => match p {
+                PrimitiveType::Bool
+                | PrimitiveType::U8
+                | PrimitiveType::U16
+                | PrimitiveType::U32
+                | PrimitiveType::U64
+                | PrimitiveType::U128
+                | PrimitiveType::U256
+                | PrimitiveType::Num
+                | PrimitiveType::Range
+                | PrimitiveType::EventStore
+                | PrimitiveType::Address => (false, AbilitySet::PRIMITIVES),
+                PrimitiveType::Signer => (false, AbilitySet::SIGNER),
+            },
+            Type::Vector(et) => (
+                false,
+                AbilitySet::VECTOR.intersect(self.infer_abilities(et).1),
+            ),
+            Type::Struct(mid, sid, ty_args) => (
+                false,
+                self.infer_struct_abilities(mid.qualified(*sid), ty_args),
+            ),
+            Type::TypeParameter(i) => {
+                let param = self.type_param(*i);
+                (param.1.is_phantom, param.1.abilities)
+            },
+            Type::Var(_) => (false, AbilitySet::EMPTY),
+            Type::Reference(_, _) => (false, AbilitySet::REFERENCES),
+            Type::Tuple(et) => (
+                false,
+                et.iter()
+                    .map(|ty| self.infer_abilities(ty).1)
+                    .reduce(|a, b| a.intersect(b))
+                    .unwrap_or(AbilitySet::PRIMITIVES),
+            ),
+            Type::Fun(_, _) | Type::TypeDomain(_) | Type::ResourceDomain(_, _, _) | Type::Error => {
+                (false, AbilitySet::EMPTY)
+            },
+        }
+    }
+
+    fn infer_struct_abilities(&self, qid: QualifiedId<StructId>, ty_args: &[Type]) -> AbilitySet {
+        let (_, ty_params, struct_abilities) = self.struct_signature(qid);
+        let ty_args_abilities_meet = ty_args
+            .iter()
+            .zip(ty_params)
+            .map(|(ty_arg, param)| {
+                let ty_arg_abilities = self.infer_abilities(ty_arg).1;
+                if param.1.is_phantom {
+                    // phantom type parameters don't participate in ability derivations
+                    AbilitySet::ALL
+                } else {
+                    ty_arg_abilities
+                }
+            })
+            .fold(AbilitySet::ALL, AbilitySet::intersect);
+        // a struct has copy/drop/store if it's declared with the ability
+        // and all it's fields have the ability
+        // a struct has key if it's declared with key
+        // and all fields have store
+        let result = struct_abilities.intersect(ty_args_abilities_meet);
+        if struct_abilities.has_ability(Ability::Key)
+            && ty_args_abilities_meet.has_ability(Ability::Store)
+        {
+            result.add(Ability::Key)
+        } else {
+            result.remove(Ability::Key)
+        }
+    }
+}
+
+/// A helper to infer abilities based on an environment and type parameters.
+pub struct AbilityInferer<'a> {
+    env: &'a GlobalEnv,
+    type_params: &'a [TypeParameter],
+}
+
+impl<'a> AbilityInferer<'a> {
+    pub fn new(env: &'a GlobalEnv, type_params: &'a [TypeParameter]) -> Self {
+        Self { env, type_params }
+    }
+}
+
+impl<'a> AbilityContext for AbilityInferer<'a> {
+    fn type_param(&self, idx: u16) -> TypeParameter {
+        self.type_params[idx as usize].clone()
+    }
+
+    fn struct_signature(
+        &self,
+        qid: QualifiedId<StructId>,
+    ) -> (Symbol, Vec<TypeParameter>, AbilitySet) {
+        let struct_env = self.env.get_struct(qid);
+        (
+            struct_env.get_name(),
+            struct_env.get_type_parameters().to_vec(),
+            struct_env.get_abilities(),
+        )
+    }
+}
+
+impl<'a> AbilityInference for AbilityInferer<'a> {}

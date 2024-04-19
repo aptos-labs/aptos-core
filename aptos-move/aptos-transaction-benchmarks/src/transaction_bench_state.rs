@@ -1,4 +1,5 @@
 // Copyright © Aptos Foundation
+// SPDX-License-Identifier: Apache-2.0
 
 use crate::{transactions, transactions::RAYON_EXEC_POOL};
 use aptos_bitvec::BitVec;
@@ -13,7 +14,10 @@ use aptos_language_e2e_tests::{
     executor::FakeExecutor,
 };
 use aptos_types::{
-    block_executor::partitioner::PartitionedTransactions,
+    block_executor::{
+        config::{BlockExecutorConfig, BlockExecutorConfigFromOnchain},
+        partitioner::PartitionedTransactions,
+    },
     block_metadata::BlockMetadata,
     on_chain_config::{OnChainConfig, ValidatorSet},
     transaction::{
@@ -215,11 +219,11 @@ where
             Arc::clone(&RAYON_EXEC_POOL),
             transactions,
             self.state_view.as_ref(),
-            1,
-            maybe_block_gas_limit,
+            BlockExecutorConfig::new_maybe_block_limit(1, maybe_block_gas_limit),
             None,
         )
-        .expect("VM should not fail to start");
+        .expect("VM should not fail to start")
+        .into_transaction_outputs_forced();
         let exec_time = timer.elapsed().as_millis();
 
         (output, block_size * 1000 / exec_time as usize)
@@ -241,7 +245,7 @@ where
                 self.state_view.clone(),
                 transactions,
                 concurrency_level_per_shard,
-                maybe_block_gas_limit,
+                BlockExecutorConfigFromOnchain::new_maybe_block_limit(maybe_block_gas_limit),
             )
             .expect("VM should not fail to start");
         let exec_time = timer.elapsed().as_millis();
@@ -264,11 +268,14 @@ where
             Arc::clone(&RAYON_EXEC_POOL),
             transactions,
             self.state_view.as_ref(),
-            concurrency_level_per_shard,
-            maybe_block_gas_limit,
+            BlockExecutorConfig::new_maybe_block_limit(
+                concurrency_level_per_shard,
+                maybe_block_gas_limit,
+            ),
             None,
         )
-        .expect("VM should not fail to start");
+        .expect("VM should not fail to start")
+        .into_transaction_outputs_forced();
         let exec_time = timer.elapsed().as_millis();
 
         (output, block_size * 1000 / exec_time as usize)

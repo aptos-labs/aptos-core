@@ -128,10 +128,10 @@ fun SmokeTest::borrow_global_mut_test($t0|a: address) {
      var $t4: &mut SmokeTest::R
   0: $t1 := copy($t0)
   1: $t2 := borrow_global<SmokeTest::R>($t1)
-  2: destroy($t2)
+  2: drop($t2)
   3: $t3 := move($t0)
   4: $t4 := borrow_global<SmokeTest::R>($t3)
-  5: destroy($t4)
+  5: drop($t4)
   6: return ()
 }
 
@@ -194,7 +194,7 @@ fun SmokeTest::move_from_addr($t0|a: address) {
   0: $t1 := move($t0)
   1: $t2 := move_from<SmokeTest::R>($t1)
   2: $t3 := unpack SmokeTest::R($t2)
-  3: destroy($t3)
+  3: drop($t3)
   4: return ()
 }
 

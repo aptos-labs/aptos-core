@@ -3,16 +3,19 @@
 
 use aptos_cached_packages::aptos_stdlib;
 use aptos_framework::BuiltPackage;
-use aptos_language_e2e_tests::{account::Account, executor::FakeExecutor};
+use aptos_language_e2e_tests::{
+    account::Account,
+    executor::{ExecFuncTimerDynamicArgs, FakeExecutor, GasMeterType},
+};
 use aptos_types::{move_utils::MemberId, transaction::TransactionPayload};
 use move_binary_format::CompiledModule;
 use move_core_types::{account_address::AccountAddress, language_storage::ModuleId};
 use std::{fs::ReadDir, path::PathBuf, string::String, time::Instant};
 
-//// CONSTANTS
+// CONSTANTS
 const PREFIX: &str = "benchmark";
 
-//// generate a TransactionPayload for modules
+// generate a TransactionPayload for modules
 pub fn generate_module_payload(package: &BuiltPackage) -> TransactionPayload {
     // extract package data
     let code = package.extract_code();
@@ -27,7 +30,7 @@ pub fn generate_module_payload(package: &BuiltPackage) -> TransactionPayload {
     )
 }
 
-//// sign transaction to create a Module and return transaction status
+// sign transaction to create a Module and return transaction status
 pub fn execute_module_txn(
     executor: &mut FakeExecutor,
     account: &Account,
@@ -59,14 +62,21 @@ pub fn execute_module_txn(
     println!("txn status: {:?}", txn_status);
 }
 
-//// sign user transaction and only records the body of the transaction
+// sign user transaction and only records the body of the transaction
 pub fn execute_user_txn(executor: &mut FakeExecutor, module_name: &ModuleId, function_name: &str) {
-    let elapsed =
-        executor.exec_func_record_running_time(module_name, function_name, vec![], vec![], 10);
+    let elapsed = executor.exec_func_record_running_time(
+        module_name,
+        function_name,
+        vec![],
+        vec![],
+        10,
+        ExecFuncTimerDynamicArgs::NoArgs,
+        GasMeterType::UnmeteredGasMeter,
+    );
     println!("running time (microseconds): {}", elapsed);
 }
 
-//// publish module under user and sign user transaction
+// publish module under user and sign user transaction
 pub fn publish(
     package: &BuiltPackage,
     executor: &mut FakeExecutor,
@@ -104,7 +114,7 @@ pub fn publish(
  * GETTER FUNCTIONS
  *
  */
-//// get module name
+// get module name
 pub fn get_module_name(
     address: AccountAddress,
     identifier: &String,
@@ -124,7 +134,7 @@ pub fn get_module_name(
     module_id
 }
 
-//// get all directories of Move projects
+// get all directories of Move projects
 pub fn get_dir_paths(dirs: ReadDir) -> Vec<PathBuf> {
     let mut dir_paths = Vec::new();
     for dir in dirs {
@@ -138,7 +148,7 @@ pub fn get_dir_paths(dirs: ReadDir) -> Vec<PathBuf> {
     dir_paths
 }
 
-//// get functional identifiers
+// get functional identifiers
 pub fn get_functional_identifiers(
     cm: CompiledModule,
     identifier: &String,

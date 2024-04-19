@@ -1,5 +1,5 @@
 
-<a name="@Aptos_Framework_0"></a>
+<a id="@Aptos_Framework_0"></a>
 
 # Aptos Framework
 
@@ -7,7 +7,7 @@
 This is the reference documentation of the Aptos framework.
 
 
-<a name="@Index_1"></a>
+<a id="@Index_1"></a>
 
 ## Index
 
@@ -24,9 +24,11 @@ This is the reference documentation of the Aptos framework.
 -  [`0x1::chain_status`](chain_status.md#0x1_chain_status)
 -  [`0x1::code`](code.md#0x1_code)
 -  [`0x1::coin`](coin.md#0x1_coin)
+-  [`0x1::config_buffer`](config_buffer.md#0x1_config_buffer)
 -  [`0x1::consensus_config`](consensus_config.md#0x1_consensus_config)
 -  [`0x1::create_signer`](create_signer.md#0x1_create_signer)
 -  [`0x1::delegation_pool`](delegation_pool.md#0x1_delegation_pool)
+-  [`0x1::dkg`](dkg.md#0x1_dkg)
 -  [`0x1::event`](event.md#0x1_event)
 -  [`0x1::execution_config`](execution_config.md#0x1_execution_config)
 -  [`0x1::fungible_asset`](fungible_asset.md#0x1_fungible_asset)
@@ -34,12 +36,20 @@ This is the reference documentation of the Aptos framework.
 -  [`0x1::genesis`](genesis.md#0x1_genesis)
 -  [`0x1::governance_proposal`](governance_proposal.md#0x1_governance_proposal)
 -  [`0x1::guid`](guid.md#0x1_guid)
+-  [`0x1::jwk_consensus_config`](jwk_consensus_config.md#0x1_jwk_consensus_config)
+-  [`0x1::jwks`](jwks.md#0x1_jwks)
+-  [`0x1::keyless_account`](keyless_account.md#0x1_keyless_account)
 -  [`0x1::managed_coin`](managed_coin.md#0x1_managed_coin)
 -  [`0x1::multisig_account`](multisig_account.md#0x1_multisig_account)
 -  [`0x1::object`](object.md#0x1_object)
+-  [`0x1::object_code_deployment`](object_code_deployment.md#0x1_object_code_deployment)
 -  [`0x1::optional_aggregator`](optional_aggregator.md#0x1_optional_aggregator)
 -  [`0x1::primary_fungible_store`](primary_fungible_store.md#0x1_primary_fungible_store)
+-  [`0x1::randomness`](randomness.md#0x1_randomness)
+-  [`0x1::randomness_config`](randomness_config.md#0x1_randomness_config)
 -  [`0x1::reconfiguration`](reconfiguration.md#0x1_reconfiguration)
+-  [`0x1::reconfiguration_state`](reconfiguration_state.md#0x1_reconfiguration_state)
+-  [`0x1::reconfiguration_with_dkg`](reconfiguration_with_dkg.md#0x1_reconfiguration_with_dkg)
 -  [`0x1::resource_account`](resource_account.md#0x1_resource_account)
 -  [`0x1::stake`](stake.md#0x1_stake)
 -  [`0x1::staking_config`](staking_config.md#0x1_staking_config)
@@ -53,6 +63,7 @@ This is the reference documentation of the Aptos framework.
 -  [`0x1::transaction_fee`](transaction_fee.md#0x1_transaction_fee)
 -  [`0x1::transaction_validation`](transaction_validation.md#0x1_transaction_validation)
 -  [`0x1::util`](util.md#0x1_util)
+-  [`0x1::validator_consensus_info`](validator_consensus_info.md#0x1_validator_consensus_info)
 -  [`0x1::version`](version.md#0x1_version)
 -  [`0x1::vesting`](vesting.md#0x1_vesting)
 -  [`0x1::voting`](voting.md#0x1_voting)

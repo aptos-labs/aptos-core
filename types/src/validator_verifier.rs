@@ -11,7 +11,12 @@ use crate::{
 };
 use anyhow::{ensure, Result};
 use aptos_bitvec::BitVec;
-use aptos_crypto::{bls12381, bls12381::PublicKey, hash::CryptoHash, Signature, VerifyingKey};
+use aptos_crypto::{
+    bls12381,
+    bls12381::{bls12381_keys, PublicKey},
+    hash::CryptoHash,
+    Signature, VerifyingKey,
+};
 use itertools::Itertools;
 #[cfg(any(test, feature = "fuzzing"))]
 use proptest_derive::Arbitrary;
@@ -64,9 +69,9 @@ pub enum VerifyError {
 #[derive(Clone, Debug, Deserialize, Eq, PartialEq, Serialize)]
 #[cfg_attr(any(test, feature = "fuzzing"), derive(Arbitrary))]
 pub struct ValidatorConsensusInfo {
-    address: AccountAddress,
-    public_key: PublicKey,
-    voting_power: u64,
+    pub address: AccountAddress,
+    pub public_key: PublicKey,
+    pub voting_power: u64,
 }
 
 impl ValidatorConsensusInfo {
@@ -80,6 +85,43 @@ impl ValidatorConsensusInfo {
 
     pub fn public_key(&self) -> &PublicKey {
         &self.public_key
+    }
+}
+
+/// Reflection of `0x1::types::ValidatorConsensusInfo` in rust.
+#[derive(Clone, Debug, Eq, PartialEq, Serialize, Deserialize)]
+pub struct ValidatorConsensusInfoMoveStruct {
+    pub addr: AccountAddress,
+    pub pk_bytes: Vec<u8>,
+    pub voting_power: u64,
+}
+
+impl From<ValidatorConsensusInfo> for ValidatorConsensusInfoMoveStruct {
+    fn from(value: ValidatorConsensusInfo) -> Self {
+        let ValidatorConsensusInfo {
+            address,
+            public_key,
+            voting_power,
+        } = value;
+        Self {
+            addr: address,
+            pk_bytes: public_key.to_bytes().to_vec(),
+            voting_power,
+        }
+    }
+}
+
+impl TryFrom<ValidatorConsensusInfoMoveStruct> for ValidatorConsensusInfo {
+    type Error = anyhow::Error;
+
+    fn try_from(value: ValidatorConsensusInfoMoveStruct) -> Result<Self, Self::Error> {
+        let ValidatorConsensusInfoMoveStruct {
+            addr,
+            pk_bytes,
+            voting_power,
+        } = value;
+        let public_key = bls12381_keys::PublicKey::try_from(pk_bytes.as_slice())?;
+        Ok(Self::new(addr, public_key, voting_power))
     }
 }
 
@@ -339,7 +381,14 @@ impl ValidatorVerifier {
         check_super_majority: bool,
     ) -> std::result::Result<u128, VerifyError> {
         let aggregated_voting_power = self.sum_voting_power(authors)?;
+        self.check_aggregated_voting_power(aggregated_voting_power, check_super_majority)
+    }
 
+    pub fn check_aggregated_voting_power(
+        &self,
+        aggregated_voting_power: u128,
+        check_super_majority: bool,
+    ) -> std::result::Result<u128, VerifyError> {
         let target = if check_super_majority {
             self.quorum_voting_power
         } else {

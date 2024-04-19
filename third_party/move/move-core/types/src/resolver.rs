@@ -8,8 +8,8 @@ use crate::{
     metadata::Metadata,
     value::MoveTypeLayout,
 };
-use anyhow::Error;
 use bytes::Bytes;
+use std::fmt::Debug;
 
 /// Traits for resolving Move modules and resources from persistent storage
 
@@ -23,9 +23,11 @@ use bytes::Bytes;
 ///                       are always structurally valid)
 ///                    - storage encounters internal error
 pub trait ModuleResolver {
+    type Error: Debug;
+
     fn get_module_metadata(&self, module_id: &ModuleId) -> Vec<Metadata>;
 
-    fn get_module(&self, id: &ModuleId) -> Result<Option<Bytes>, Error>;
+    fn get_module(&self, id: &ModuleId) -> Result<Option<Bytes>, Self::Error>;
 }
 
 pub fn resource_size(resource: &Option<Bytes>) -> usize {
@@ -42,37 +44,44 @@ pub fn resource_size(resource: &Option<Bytes>) -> usize {
 ///                       are always structurally valid)
 ///                    - storage encounters internal error
 pub trait ResourceResolver {
-    // TODO[move_values](optimize): this can return Value, so that we can push deserialization to
-    // implementations of `ResourceResolver`.
+    type Error: Debug;
+
     fn get_resource_bytes_with_metadata_and_layout(
         &self,
         address: &AccountAddress,
-        typ: &StructTag,
+        struct_tag: &StructTag,
         metadata: &[Metadata],
         layout: Option<&MoveTypeLayout>,
-    ) -> anyhow::Result<(Option<Bytes>, usize), Error>;
+    ) -> Result<(Option<Bytes>, usize), Self::Error>;
 }
 
 /// A persistent storage implementation that can resolve both resources and modules
-pub trait MoveResolver: ModuleResolver + ResourceResolver {
+pub trait MoveResolver<E: Debug>: ModuleResolver<Error = E> + ResourceResolver<Error = E> {
     fn get_resource(
         &self,
         address: &AccountAddress,
-        typ: &StructTag,
-    ) -> Result<Option<Bytes>, Error> {
+        struct_tag: &StructTag,
+    ) -> Result<Option<Bytes>, <Self as ResourceResolver>::Error> {
         Ok(self
-            .get_resource_with_metadata(address, typ, &self.get_module_metadata(&typ.module_id()))?
+            .get_resource_with_metadata(
+                address,
+                struct_tag,
+                &self.get_module_metadata(&struct_tag.module_id()),
+            )?
             .0)
     }
 
     fn get_resource_with_metadata(
         &self,
         address: &AccountAddress,
-        typ: &StructTag,
+        struct_tag: &StructTag,
         metadata: &[Metadata],
-    ) -> Result<(Option<Bytes>, usize), Error> {
-        self.get_resource_bytes_with_metadata_and_layout(address, typ, metadata, None)
+    ) -> Result<(Option<Bytes>, usize), <Self as ResourceResolver>::Error> {
+        self.get_resource_bytes_with_metadata_and_layout(address, struct_tag, metadata, None)
     }
 }
 
-impl<T: ModuleResolver + ResourceResolver + ?Sized> MoveResolver for T {}
+impl<E: Debug, T: ModuleResolver<Error = E> + ResourceResolver<Error = E> + ?Sized> MoveResolver<E>
+    for T
+{
+}

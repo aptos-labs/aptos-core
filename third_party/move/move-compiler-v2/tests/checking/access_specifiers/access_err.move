@@ -28,7 +28,7 @@ module 0x42::m {
     }
 
     fun make_up_address(foo: u64): address {
-      @0x42
+        @0x42
     }
 
     fun make_up_address_wrong(foo: u64): u64 {

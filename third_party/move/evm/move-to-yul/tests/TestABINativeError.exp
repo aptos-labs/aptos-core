@@ -53,6 +53,12 @@ error: encode function must only has one return value of type bytes
    │     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 
 error: encode function must only has one return value of type bytes
+   ┌─ tests/TestABINativeError.move:17:5
+   │
+17 │     public native fun encode_wrong_input_type_sig(input: vector<u64>): vector<u64>;
+   │     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+error: encode function must only has one return value of type bytes
    ┌─ tests/TestABINativeError.move:20:5
    │
 20 │     public native fun encode_wrong_input_type_packed(input: vector<u64>): vector<u64>;
@@ -63,9 +69,3 @@ error: encode function must only has one return value of type bytes
    │
 23 │     public native fun encode_wrong_input_type_packed_sig(input: vector<u64>): vector<u64>;
    │     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
-
-error: encode function must only has one return value of type bytes
-   ┌─ tests/TestABINativeError.move:17:5
-   │
-17 │     public native fun encode_wrong_input_type_sig(input: vector<u64>): vector<u64>;
-   │     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^

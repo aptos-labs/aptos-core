@@ -7,7 +7,7 @@ use crate::{
     network::MempoolSyncMsg,
 };
 use anyhow::{format_err, Result};
-use aptos_compression::metrics::CompressionClient;
+use aptos_compression::client::CompressionClient;
 use aptos_config::config::{NodeConfig, MAX_APPLICATION_MESSAGE_SIZE};
 use aptos_consensus_types::common::{TransactionInProgress, TransactionSummary};
 use aptos_crypto::{ed25519::Ed25519PrivateKey, PrivateKey, Uniform};
@@ -127,6 +127,11 @@ pub(crate) fn add_txns_to_mempool(
         transactions.push(txn);
     }
     transactions
+}
+
+pub(crate) fn txn_bytes_len(transaction: TestTransaction) -> u64 {
+    let txn = transaction.make_signed_transaction();
+    txn.txn_bytes_len() as u64
 }
 
 pub(crate) fn add_txn(pool: &mut CoreMempool, transaction: TestTransaction) -> Result<()> {

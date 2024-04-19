@@ -1,4 +1,5 @@
 // Copyright © Aptos Foundation
+// SPDX-License-Identifier: Apache-2.0
 
 use aptos_block_partitioner::{v2::config::PartitionerV2Config, PartitionerConfig};
 use aptos_language_e2e_tests::{
@@ -7,7 +8,9 @@ use aptos_language_e2e_tests::{
 };
 use aptos_types::{
     account_address::AccountAddress,
-    block_executor::partitioner::PartitionedTransactions,
+    block_executor::{
+        config::BlockExecutorConfigFromOnchain, partitioner::PartitionedTransactions,
+    },
     state_store::state_key::StateKeyInner,
     transaction::{
         analyzed_transaction::AnalyzedTransaction,
@@ -125,7 +128,7 @@ pub fn test_sharded_block_executor_no_conflict<E: ExecutorClient<FakeDataStore>>
             Arc::new(executor.data_store().clone()),
             partitioned_txns.clone(),
             2,
-            None,
+            BlockExecutorConfigFromOnchain::new_no_block_limit(),
         )
         .unwrap();
     let txns: Vec<SignatureVerifiedTransaction> =
@@ -133,7 +136,8 @@ pub fn test_sharded_block_executor_no_conflict<E: ExecutorClient<FakeDataStore>>
             .into_iter()
             .map(|t| t.into_txn())
             .collect();
-    let unsharded_txn_output = AptosVM::execute_block(&txns, executor.data_store(), None).unwrap();
+    let unsharded_txn_output =
+        AptosVM::execute_block_no_limit(&txns, executor.data_store()).unwrap();
     compare_txn_outputs(unsharded_txn_output, sharded_txn_output);
     sharded_block_executor.shutdown();
 }
@@ -182,12 +186,12 @@ pub fn sharded_block_executor_with_conflict<E: ExecutorClient<FakeDataStore>>(
             Arc::new(executor.data_store().clone()),
             partitioned_txns,
             concurrency,
-            None,
+            BlockExecutorConfigFromOnchain::new_no_block_limit(),
         )
         .unwrap();
 
     let unsharded_txn_output =
-        AptosVM::execute_block(&execution_ordered_txns, executor.data_store(), None).unwrap();
+        AptosVM::execute_block_no_limit(&execution_ordered_txns, executor.data_store()).unwrap();
     compare_txn_outputs(unsharded_txn_output, sharded_txn_output);
     sharded_block_executor.shutdown();
 }

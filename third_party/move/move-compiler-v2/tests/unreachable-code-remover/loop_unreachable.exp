@@ -1,0 +1,40 @@
+============ initial bytecode ================
+
+[variant baseline]
+fun m::test(): u64 {
+     var $t0: u64
+  0: label L0
+  1: goto 0
+  2: label L1
+  3: $t0 := 42
+  4: return $t0
+}
+
+============ after UnreachableCodeProcessor: ================
+
+[variant baseline]
+fun m::test(): u64 {
+     var $t0: u64
+     # maybe
+  0: label L0
+     # maybe
+  1: goto 0
+     # no
+  2: label L1
+     # no
+  3: $t0 := 42
+     # no
+  4: return $t0
+}
+
+============ after UnreachableCodeRemover: ================
+
+[variant baseline]
+fun m::test(): u64 {
+     var $t0: u64 [unused]
+  0: label L0
+  1: goto 0
+}
+
+
+============ bytecode verification succeeded ========

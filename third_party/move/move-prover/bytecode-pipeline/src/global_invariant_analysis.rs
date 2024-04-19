@@ -9,7 +9,10 @@ use move_binary_format::file_format::CodeOffset;
 use move_model::{
     ast::ConditionKind,
     model::{FunId, FunctionEnv, GlobalEnv, GlobalId, QualifiedId, QualifiedInstId, StructId},
-    ty::{Type, TypeDisplayContext, TypeInstantiationDerivation, TypeUnificationAdapter, Variance},
+    ty::{
+        NoUnificationContext, Type, TypeDisplayContext, TypeInstantiationDerivation,
+        TypeUnificationAdapter, Variance,
+    },
 };
 use move_stackless_bytecode::{
     function_target::{FunctionData, FunctionTarget},
@@ -434,7 +437,10 @@ impl PerFunctionRelevance {
 
                     // make sure these two types unify before trying to instantiate them
                     let adapter = TypeUnificationAdapter::new_pair(&rel_ty, &inv_ty, true, true);
-                    if adapter.unify(Variance::SpecVariance, false).is_none() {
+                    if adapter
+                        .unify(&mut NoUnificationContext, Variance::SpecVariance, false)
+                        .is_none()
+                    {
                         continue;
                     }
 
@@ -509,7 +515,7 @@ impl PerFunctionRelevance {
                             .or_insert_with(PerBytecodeRelevance::default)
                             .insts
                             .entry(rel_inst)
-                            .or_insert_with(BTreeSet::new)
+                            .or_default()
                             .extend(wellformed_inv_inst);
                     }
                 }

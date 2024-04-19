@@ -120,6 +120,7 @@ aptos-move/aptos-vm-profiling/**/*.txt
 
 # Gas profiler outputs
 aptos-move/e2e-move-tests/gas-profiling
+gas-profiling
 
 # replay-verify and module-verify script outputs
 metadata-cache
@@ -129,3 +130,8 @@ run_*
 # test files for indexer GRPC
 test_indexer_grpc_*.yaml
 test_indexer_grpc/*
+
+# ignore compiler artifacts
+*.dot
+*.bytecode
+!third_party/move/move-prover/tests/xsources/design/*.bytecode

@@ -5,9 +5,8 @@
 use crate::{
     transaction::{
         DecodedTableData, DeleteModule, DeleteResource, DeleteTableItem, DeletedTableData,
-        ModuleBundlePayload, MultisigPayload, MultisigTransactionPayload,
-        StateCheckpointTransaction, UserTransactionRequestInner, WriteModule, WriteResource,
-        WriteTableItem,
+        MultisigPayload, MultisigTransactionPayload, StateCheckpointTransaction,
+        UserTransactionRequestInner, WriteModule, WriteResource, WriteTableItem,
     },
     view::{ViewFunction, ViewRequest},
     Bytecode, DirectWriteSet, EntryFunctionId, EntryFunctionPayload, Event, HexEncodedBytes,
@@ -18,6 +17,7 @@ use crate::{
 };
 use anyhow::{bail, ensure, format_err, Context as AnyhowContext, Result};
 use aptos_crypto::{hash::CryptoHash, HashValue};
+use aptos_db_indexer::table_info_reader::TableInfoReader;
 use aptos_storage_interface::DbReader;
 use aptos_types::{
     access_path::{AccessPath, Path},
@@ -25,11 +25,10 @@ use aptos_types::{
     contract_event::{ContractEvent, EventWithVersion},
     state_store::{
         state_key::{StateKey, StateKeyInner},
-        table::TableHandle,
+        table::{TableHandle, TableInfo},
     },
     transaction::{
-        EntryFunction, ExecutionStatus, ModuleBundle, Multisig, RawTransaction, Script,
-        SignedTransaction,
+        EntryFunction, ExecutionStatus, Multisig, RawTransaction, Script, SignedTransaction,
     },
     vm_status::AbortLocation,
     write_set::WriteOp,
@@ -40,8 +39,8 @@ use move_core_types::{
     ident_str,
     identifier::{IdentStr, Identifier},
     language_storage::{ModuleId, StructTag, TypeTag},
-    resolver::MoveResolver,
-    value::{LayoutTag, MoveStructLayout, MoveTypeLayout},
+    resolver::ModuleResolver,
+    value::{MoveStructLayout, MoveTypeLayout},
 };
 use move_resource_viewer::MoveValueAnnotator;
 use serde_json::Value;
@@ -62,13 +61,19 @@ const OBJECT_STRUCT: &IdentStr = ident_str!("Object");
 pub struct MoveConverter<'a, R: ?Sized> {
     inner: MoveValueAnnotator<'a, R>,
     db: Arc<dyn DbReader>,
+    table_info_reader: Option<Arc<dyn TableInfoReader>>,
 }
 
-impl<'a, R: MoveResolver + ?Sized> MoveConverter<'a, R> {
-    pub fn new(inner: &'a R, db: Arc<dyn DbReader>) -> Self {
+impl<'a, R: ModuleResolver + ?Sized> MoveConverter<'a, R> {
+    pub fn new(
+        inner: &'a R,
+        db: Arc<dyn DbReader>,
+        table_info_reader: Option<Arc<dyn TableInfoReader>>,
+    ) -> Self {
         Self {
             inner: MoveValueAnnotator::new(inner),
             db,
+            table_info_reader,
         }
     }
 
@@ -145,12 +150,14 @@ impl<'a, R: MoveResolver + ?Sized> MoveConverter<'a, R> {
                 (info, payload, events).into()
             },
             BlockMetadata(txn) => (&txn, info, events).into(),
+            BlockMetadataExt(txn) => (&txn, info, events).into(),
             StateCheckpoint(_) => {
                 Transaction::StateCheckpointTransaction(StateCheckpointTransaction {
                     info,
                     timestamp: timestamp.into(),
                 })
             },
+            ValidatorTransaction(_txn) => (info, events, timestamp).into(),
         })
     }
 
@@ -260,13 +267,8 @@ impl<'a, R: MoveResolver + ?Sized> MoveConverter<'a, R> {
                 })
             },
 
-            // Deprecated. Will be removed in the future.
-            ModuleBundle(modules) => TransactionPayload::ModuleBundlePayload(ModuleBundlePayload {
-                modules: modules
-                    .into_iter()
-                    .map(|module| MoveModuleBytecode::from(module).try_parse_abi())
-                    .collect::<Result<Vec<_>>>()?,
-            }),
+            // Deprecated.
+            ModuleBundle(_) => bail!("Module bundle payload has been removed"),
         };
         Ok(ret)
     }
@@ -420,12 +422,9 @@ impl<'a, R: MoveResolver + ?Sized> MoveConverter<'a, R> {
         key: &[u8],
         value: &[u8],
     ) -> Result<Option<DecodedTableData>> {
-        if !self.db.indexer_enabled() {
-            return Ok(None);
-        }
-        let table_info = match self.db.get_table_info(handle) {
-            Ok(ti) => ti,
-            Err(_) => {
+        let table_info = match self.get_table_info(handle)? {
+            Some(ti) => ti,
+            None => {
                 aptos_logger::warn!(
                     "Table info not found for handle {:?}, can't decode table item. OK for simulation",
                     handle
@@ -433,6 +432,7 @@ impl<'a, R: MoveResolver + ?Sized> MoveConverter<'a, R> {
                 return Ok(None); // if table item not found return None anyway to avoid crash
             },
         };
+
         let key = self.try_into_move_value(&table_info.key_type, key)?;
         let value = self.try_into_move_value(&table_info.value_type, value)?;
 
@@ -449,12 +449,9 @@ impl<'a, R: MoveResolver + ?Sized> MoveConverter<'a, R> {
         handle: TableHandle,
         key: &[u8],
     ) -> Result<Option<DeletedTableData>> {
-        if !self.db.indexer_enabled() {
-            return Ok(None);
-        }
-        let table_info = match self.db.get_table_info(handle) {
-            Ok(ti) => ti,
-            Err(_) => {
+        let table_info = match self.get_table_info(handle)? {
+            Some(ti) => ti,
+            None => {
                 aptos_logger::warn!(
                     "Table info not found for handle {:?}, can't decode table item. OK for simulation",
                     handle
@@ -462,6 +459,7 @@ impl<'a, R: MoveResolver + ?Sized> MoveConverter<'a, R> {
                 return Ok(None); // if table item not found return None anyway to avoid crash
             },
         };
+
         let key = self.try_into_move_value(&table_info.key_type, key)?;
 
         Ok(Some(DeletedTableData {
@@ -696,15 +694,9 @@ impl<'a, R: MoveResolver + ?Sized> MoveConverter<'a, R> {
                 })
             },
 
-            // Deprecated. Will be removed in the future.
-            TransactionPayload::ModuleBundlePayload(payload) => {
-                Target::ModuleBundle(ModuleBundle::new(
-                    payload
-                        .modules
-                        .into_iter()
-                        .map(|m| m.bytecode.into())
-                        .collect(),
-                ))
+            // Deprecated.
+            TransactionPayload::ModuleBundlePayload(_) => {
+                bail!("Module bundle payload has been removed")
             },
         };
         Ok(ret)
@@ -800,13 +792,12 @@ impl<'a, R: MoveResolver + ?Sized> MoveConverter<'a, R> {
             MoveTypeLayout::Struct(struct_layout) => {
                 self.try_into_vm_value_struct(struct_layout, val)?
             },
-            MoveTypeLayout::Signer => {
+
+            // Some values, e.g., signer or ones with custom serialization
+            // (native), are not stored to storage and so we do not expect
+            // to see them here.
+            MoveTypeLayout::Signer | MoveTypeLayout::Native(..) => {
                 bail!("unexpected move type {:?} for value {:?}", layout, val)
-            },
-            MoveTypeLayout::Tagged(tag, inner_layout) => match tag {
-                LayoutTag::IdentifierMapping(_) => {
-                    self.try_into_vm_value_from_layout(inner_layout, val)?
-                },
             },
         })
     }
@@ -922,9 +913,21 @@ impl<'a, R: MoveResolver + ?Sized> MoveConverter<'a, R> {
             args,
         })
     }
+
+    fn get_table_info(&self, handle: TableHandle) -> Result<Option<TableInfo>> {
+        if let Some(table_info_reader) = self.table_info_reader.as_ref() {
+            // Attempt to get table_info from the table_info_reader if it exists
+            Ok(table_info_reader.get_table_info(handle)?)
+        } else if self.db.indexer_enabled() {
+            // Attempt to get table_info from the db if indexer is enabled
+            Ok(Some(self.db.get_table_info(handle)?))
+        } else {
+            Ok(None)
+        }
+    }
 }
 
-impl<'a, R: MoveResolver + ?Sized> ExplainVMStatus for MoveConverter<'a, R> {
+impl<'a, R: ModuleResolver + ?Sized> ExplainVMStatus for MoveConverter<'a, R> {
     fn get_module_bytecode(&self, module_id: &ModuleId) -> Result<Rc<dyn Bytecode>> {
         self.inner
             .get_module(module_id)
@@ -932,12 +935,20 @@ impl<'a, R: MoveResolver + ?Sized> ExplainVMStatus for MoveConverter<'a, R> {
     }
 }
 pub trait AsConverter<R> {
-    fn as_converter(&self, db: Arc<dyn DbReader>) -> MoveConverter<R>;
+    fn as_converter(
+        &self,
+        db: Arc<dyn DbReader>,
+        table_info_reader: Option<Arc<dyn TableInfoReader>>,
+    ) -> MoveConverter<R>;
 }
 
-impl<R: MoveResolver> AsConverter<R> for R {
-    fn as_converter(&self, db: Arc<dyn DbReader>) -> MoveConverter<R> {
-        MoveConverter::new(self, db)
+impl<R: ModuleResolver> AsConverter<R> for R {
+    fn as_converter(
+        &self,
+        db: Arc<dyn DbReader>,
+        table_info_reader: Option<Arc<dyn TableInfoReader>>,
+    ) -> MoveConverter<R> {
+        MoveConverter::new(self, db, table_info_reader)
     }
 }
 
@@ -969,14 +980,29 @@ pub trait ExplainVMStatus {
 
     fn explain_vm_status(&self, status: &ExecutionStatus) -> String {
         match status {
-            ExecutionStatus::MoveAbort { location, code, info } => match &location {
-                AbortLocation::Module(_) => {
-                    info.as_ref().map(|i| {
-                        format!("Move abort in {}: {}({:#x}): {}", abort_location_to_str(location), i.reason_name, code, i.description)
-                    }).unwrap_or_else(|| {
-                        format!("Move abort in {}: {:#x}", abort_location_to_str(location), code)
+            ExecutionStatus::MoveAbort {
+                location,
+                code,
+                info,
+            } => match &location {
+                AbortLocation::Module(_) => info
+                    .as_ref()
+                    .map(|i| {
+                        format!(
+                            "Move abort in {}: {}({:#x}): {}",
+                            abort_location_to_str(location),
+                            i.reason_name,
+                            code,
+                            i.description
+                        )
                     })
-                }
+                    .unwrap_or_else(|| {
+                        format!(
+                            "Move abort in {}: {:#x}",
+                            abort_location_to_str(location),
+                            code
+                        )
+                    }),
                 AbortLocation::Script => format!("Move abort: code {:#x}", code),
             },
             ExecutionStatus::Success => "Executed successfully".to_owned(),
@@ -987,24 +1013,27 @@ pub trait ExplainVMStatus {
                 code_offset,
             } => {
                 let func_name = match location {
-                    AbortLocation::Module(module_id) => self.explain_function_index(module_id, function)
+                    AbortLocation::Module(module_id) => self
+                        .explain_function_index(module_id, function)
                         .map(|name| format!("{}::{}", abort_location_to_str(location), name))
-                        .unwrap_or_else(|_| format!("{}::<#{} function>", abort_location_to_str(location), function)),
+                        .unwrap_or_else(|_| {
+                            format!(
+                                "{}::<#{} function>",
+                                abort_location_to_str(location),
+                                function
+                            )
+                        }),
                     AbortLocation::Script => "script".to_owned(),
                 };
                 format!(
                     "Execution failed in {} at code offset {}",
                     func_name, code_offset
                 )
-            }
-            ExecutionStatus::MiscellaneousError(code) => {
-                code.map_or(
-                    "Move bytecode deserialization / verification failed, including entry function not found or invalid arguments".to_owned(),
-                    |e| format!(
-                        "Transaction Executed and Committed with Error {:#?}", e
-                    ),
-                )
-            }
+            },
+            ExecutionStatus::MiscellaneousError(code) => code.map_or(
+                "Execution failed with miscellaneous error and no status code".to_owned(),
+                |e| format!("{:#?}", e),
+            ),
         }
     }
 

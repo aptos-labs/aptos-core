@@ -1,0 +1,6 @@
+error[E03009]: unbound variable
+   ┌─ tests/move_check/inlining/cool_inlining_test.move:15:17
+   │
+15 │         foo(| | beans())
+   │                 ^^^^^ Invalid function usage. Unbound variable 'beans'
+

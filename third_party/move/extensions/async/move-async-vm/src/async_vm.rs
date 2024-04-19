@@ -81,7 +81,7 @@ impl AsyncVM {
         &'l self,
         for_actor: AccountAddress,
         virtual_time: u128,
-        move_resolver: &'r mut dyn MoveResolver,
+        move_resolver: &'r mut impl MoveResolver<PartialVMError>,
     ) -> AsyncSession<'r, 'l> {
         self.new_session_with_extensions(
             for_actor,
@@ -96,7 +96,7 @@ impl AsyncVM {
         &'l self,
         for_actor: AccountAddress,
         virtual_time: u128,
-        move_resolver: &'r mut dyn MoveResolver,
+        move_resolver: &'r mut impl MoveResolver<PartialVMError>,
         ext: NativeContextExtensions<'r>,
     ) -> AsyncSession<'r, 'l> {
         let extensions = make_extensions(ext, for_actor, virtual_time, true);
@@ -340,7 +340,8 @@ impl<'r, 'l> AsyncSession<'r, 'l> {
         }
     }
 
-    fn to_bcs(&self, value: Value, tag: &TypeTag) -> PartialVMResult<Vec<u8>> {
+    #[allow(clippy::wrong_self_convention)]
+    fn to_bcs(&mut self, value: Value, tag: &TypeTag) -> PartialVMResult<Vec<u8>> {
         let type_layout = self
             .vm_session
             .get_type_layout(tag)

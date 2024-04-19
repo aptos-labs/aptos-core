@@ -1,24 +1,29 @@
 // Copyright © Aptos Foundation
-// Parts of the project are originally copyright © Meta Platforms, Inc.
 // SPDX-License-Identifier: Apache-2.0
 
-use crate::file_format_generator::{
-    function_generator::FunctionGenerator, MAX_ADDRESS_COUNT, MAX_CONST_COUNT, MAX_FIELD_COUNT,
-    MAX_FIELD_INST_COUNT, MAX_FUNCTION_COUNT, MAX_FUNCTION_INST_COUNT, MAX_IDENTIFIER_COUNT,
-    MAX_MODULE_COUNT, MAX_SIGNATURE_COUNT, MAX_STRUCT_COUNT, MAX_STRUCT_DEF_COUNT,
-    MAX_STRUCT_DEF_INST_COUNT,
+use crate::{
+    file_format_generator::{
+        function_generator::FunctionGenerator, MAX_ADDRESS_COUNT, MAX_CONST_COUNT, MAX_FIELD_COUNT,
+        MAX_FIELD_INST_COUNT, MAX_FUNCTION_COUNT, MAX_FUNCTION_INST_COUNT, MAX_IDENTIFIER_COUNT,
+        MAX_MODULE_COUNT, MAX_SIGNATURE_COUNT, MAX_STRUCT_COUNT, MAX_STRUCT_DEF_COUNT,
+        MAX_STRUCT_DEF_INST_COUNT,
+    },
+    Experiment, Options,
 };
 use codespan_reporting::diagnostic::Severity;
 use move_binary_format::{
     file_format as FF,
-    file_format::{FunctionHandle, ModuleHandle, TableIndex},
+    file_format::{AccessKind, FunctionHandle, ModuleHandle, StructDefinitionIndex, TableIndex},
     file_format_common,
 };
-use move_bytecode_source_map::source_map::SourceMap;
-use move_core_types::{account_address::AccountAddress, identifier::Identifier};
+use move_bytecode_source_map::source_map::{SourceMap, SourceName};
+use move_core_types::{
+    account_address::AccountAddress, identifier::Identifier, metadata::Metadata,
+};
 use move_ir_types::ast as IR_AST;
 use move_model::{
     ast::{AccessSpecifier, Address, AddressSpecifier, ResourceSpecifier},
+    metadata::{CompilationMetadata, CompilerVersion, LanguageVersion, COMPILATION_METADATA_KEY},
     model::{
         FieldEnv, FunId, FunctionEnv, GlobalEnv, Loc, ModuleEnv, ModuleId, Parameter, QualifiedId,
         StructEnv, StructId, TypeParameter, TypeParameterKind,
@@ -36,6 +41,8 @@ use std::collections::{BTreeMap, BTreeSet};
 /// Internal state of the module code generator
 #[derive(Debug)]
 pub struct ModuleGenerator {
+    /// Whether to generate access specifiers
+    gen_access_specifiers: bool,
     /// The module index for which we generate code.
     #[allow(unused)]
     module_idx: FF::ModuleHandleIndex,
@@ -86,15 +93,31 @@ pub struct ModuleContext<'env> {
     pub targets: &'env FunctionTargetsHolder,
 }
 
+/// Source map operations deliver Result but are really not expected to fail.
+/// The below message is used if they do anyway.
+pub(crate) const SOURCE_MAP_OK: &str = "expected valid source map";
+
 impl ModuleGenerator {
     /// Runs generation of `CompiledModule`.
     pub fn run(
         ctx: &ModuleContext,
         module_env: &ModuleEnv,
     ) -> (FF::CompiledModule, SourceMap, Option<FF::FunctionHandle>) {
+        let options = module_env.env.get_extension::<Options>().expect("options");
+        let language_version = options.language_version.unwrap_or_default();
+        let gen_access_specifiers = language_version >= LanguageVersion::V2_0
+            && options.experiment_on(Experiment::GEN_ACCESS_SPECIFIERS);
+        let compilation_metadata =
+            CompilationMetadata::new(CompilerVersion::V2_0, language_version);
+        let metadata = Metadata {
+            key: COMPILATION_METADATA_KEY.to_vec(),
+            value: bcs::to_bytes(&compilation_metadata)
+                .expect("Serialization of CompilationMetadata should succeed"),
+        };
         let module = move_binary_format::CompiledModule {
             version: file_format_common::VERSION_NEXT,
             self_module_handle_idx: FF::ModuleHandleIndex(0),
+            metadata: vec![metadata],
             ..Default::default()
         };
         let source_map = {
@@ -112,6 +135,7 @@ impl ModuleGenerator {
             SourceMap::new(ctx.env.to_ir_loc(&module_env.get_loc()), module_name_opt)
         };
         let mut gen = Self {
+            gen_access_specifiers,
             module_idx: FF::ModuleHandleIndex(0),
             module_to_idx: Default::default(),
             name_to_idx: Default::default(),
@@ -142,26 +166,61 @@ impl ModuleGenerator {
             self.module_index(ctx, loc, module_env);
         }
 
+        let options = ctx
+            .env
+            .get_extension::<Options>()
+            .expect("Options is available");
+        let compile_test_code = options.compile_test_code;
+
         for struct_env in module_env.get_structs() {
+            assert!(compile_test_code || !struct_env.is_test_only());
             self.gen_struct(ctx, &struct_env)
         }
 
         let acquires_map = ctx.generate_acquires_map(module_env);
         for fun_env in module_env.get_functions() {
+            assert!(compile_test_code || !fun_env.is_test_only());
             let acquires_list = &acquires_map[&fun_env.get_id()];
             FunctionGenerator::run(self, ctx, fun_env, acquires_list);
+        }
+
+        // At handles of friend modules
+        for mid in module_env.get_friend_modules() {
+            let handle = self.module_handle(ctx, &module_env.get_loc(), &ctx.env.get_module(mid));
+            self.module.friend_decls.push(handle)
         }
     }
 
     /// Generate information for a struct.
     fn gen_struct(&mut self, ctx: &ModuleContext, struct_env: &StructEnv<'_>) {
+        if struct_env.is_ghost_memory() {
+            return;
+        }
         let loc = &struct_env.get_loc();
+        let def_idx = StructDefinitionIndex::new(ctx.checked_bound(
+            loc,
+            self.module.struct_defs.len(),
+            MAX_STRUCT_DEF_COUNT,
+            "struct",
+        ));
+        self.source_map
+            .add_top_level_struct_mapping(def_idx, ctx.env.to_ir_loc(loc))
+            .expect(SOURCE_MAP_OK);
+        for TypeParameter(name, _, loc) in struct_env.get_type_parameters() {
+            self.source_map
+                .add_struct_type_parameter_mapping(def_idx, ctx.source_name(name, loc))
+                .expect(SOURCE_MAP_OK);
+        }
         let struct_handle = self.struct_index(ctx, loc, struct_env);
+        let fields = struct_env.get_fields();
         let field_information = FF::StructFieldInformation::Declared(
-            struct_env
-                .get_fields()
+            fields
                 .map(|f| {
-                    let name = self.name_index(ctx, loc, f.get_name());
+                    let field_loc = f.get_loc();
+                    self.source_map
+                        .add_struct_field_mapping(def_idx, ctx.env.to_ir_loc(field_loc))
+                        .expect(SOURCE_MAP_OK);
+                    let name = self.name_index(ctx, field_loc, f.get_name());
                     let signature =
                         FF::TypeSignature(self.signature_token(ctx, loc, &f.get_type()));
                     FF::FieldDefinition { name, signature }
@@ -172,13 +231,7 @@ impl ModuleGenerator {
             struct_handle,
             field_information,
         };
-        ctx.checked_bound(
-            loc,
-            self.module.struct_defs.len(),
-            MAX_STRUCT_DEF_COUNT,
-            "struct",
-        );
-        self.module.struct_defs.push(def);
+        self.module.struct_defs.push(def)
     }
 
     /// Obtains or creates an index for a signature, a sequence of types.
@@ -227,12 +280,12 @@ impl ModuleGenerator {
                 Address => FF::SignatureToken::Address,
                 Signer => FF::SignatureToken::Signer,
                 Num | Range | EventStore => {
-                    ctx.internal_error(loc, "unexpected specification type");
+                    ctx.internal_error(loc, format!("unexpected specification type {:#?}", ty));
                     FF::SignatureToken::Bool
                 },
             },
             Tuple(_) => {
-                ctx.internal_error(loc, "unexpected tuple type");
+                ctx.internal_error(loc, format!("unexpected tuple type {:#?}", ty));
                 FF::SignatureToken::Bool
             },
             Vector(ty) => FF::SignatureToken::Vector(Box::new(self.signature_token(ctx, loc, ty))),
@@ -333,10 +386,7 @@ impl ModuleGenerator {
         if let Some(idx) = self.module_to_idx.get(&id) {
             return *idx;
         }
-        let name = module_env.get_name();
-        let address = self.address_index(ctx, loc, name.addr().expect_numerical());
-        let name = self.name_index(ctx, loc, name.name());
-        let handle = FF::ModuleHandle { address, name };
+        let handle = self.module_handle(ctx, loc, module_env);
         let idx = if module_env.is_script_module() {
             self.script_handle = Some(handle);
             FF::ModuleHandleIndex(TableIndex::MAX)
@@ -354,6 +404,18 @@ impl ModuleGenerator {
         idx
     }
 
+    fn module_handle(
+        &mut self,
+        ctx: &ModuleContext,
+        loc: &Loc,
+        module_env: &ModuleEnv,
+    ) -> ModuleHandle {
+        let name = module_env.get_name();
+        let address = self.address_index(ctx, loc, name.addr().expect_numerical());
+        let name = self.name_index(ctx, loc, name.name());
+        FF::ModuleHandle { address, name }
+    }
+
     /// Obtains or generates a function index.
     pub fn function_index(
         &mut self,
@@ -369,7 +431,7 @@ impl ModuleGenerator {
         let type_parameters = fun_env
             .get_type_parameters()
             .into_iter()
-            .map(|TypeParameter(_, TypeParameterKind { abilities, .. })| abilities)
+            .map(|TypeParameter(_, TypeParameterKind { abilities, .. }, _)| abilities)
             .collect::<Vec<_>>();
         let parameters = self.signature(
             ctx,
@@ -377,7 +439,7 @@ impl ModuleGenerator {
             fun_env
                 .get_parameters()
                 .iter()
-                .map(|Parameter(_, ty)| ty.to_owned())
+                .map(|Parameter(_, ty, _)| ty.to_owned())
                 .collect(),
         );
         let return_ = self.signature(
@@ -385,11 +447,34 @@ impl ModuleGenerator {
             loc,
             fun_env.get_result_type().flatten().into_iter().collect(),
         );
-        let access_specifiers = fun_env.get_access_specifiers().as_ref().map(|v| {
-            v.iter()
-                .map(|s| self.access_specifier(ctx, fun_env, s))
-                .collect()
-        });
+        let access_specifiers = if self.gen_access_specifiers {
+            fun_env.get_access_specifiers().as_ref().map(|v| {
+                v.iter()
+                    .map(|s| self.access_specifier(ctx, fun_env, s))
+                    .collect()
+            })
+        } else {
+            // Report an error if we cannot drop the access specifiers.
+            // TODO(#12623): remove this once the bug is fixed
+            if fun_env
+                .get_access_specifiers()
+                .map(|v| {
+                    v.iter().any(|s| {
+                        s.kind != AccessKind::Acquires
+                            || s.negated
+                            || !matches!(s.resource.1, ResourceSpecifier::Resource(_))
+                            || !matches!(s.address.1, AddressSpecifier::Any)
+                    })
+                })
+                .unwrap_or_default()
+            {
+                ctx.internal_error(
+                    loc,
+                    "cannot strip extended access specifiers to mitigate bug #12623",
+                )
+            }
+            None
+        };
         let handle = FF::FunctionHandle {
             module,
             name,
@@ -459,7 +544,7 @@ impl ModuleGenerator {
                     let param_index = fun_env
                         .get_parameters()
                         .iter()
-                        .position(|Parameter(n, _)| n == name)
+                        .position(|Parameter(n, _ty, _)| n == name)
                         .expect("parameter defined") as u8;
                     FF::AddressSpecifier::Parameter(param_index, None)
                 },
@@ -467,7 +552,7 @@ impl ModuleGenerator {
                     let param_index = fun_env
                         .get_parameters()
                         .iter()
-                        .position(|Parameter(n, _)| n == name)
+                        .position(|Parameter(n, _ty, _)| n == name)
                         .expect("parameter defined") as u8;
                     let fun_index = self.function_instantiation_index(
                         ctx,
@@ -540,9 +625,11 @@ impl ModuleGenerator {
                             abilities,
                             is_phantom,
                         },
+                        _loc,
                     )| FF::StructTypeParameter {
                         constraints: *abilities,
                         is_phantom: *is_phantom,
+                        // TODO: use _loc here?
                     },
                 )
                 .collect(),
@@ -826,5 +913,13 @@ impl<'env> ModuleContext<'env> {
             }
         }
         result
+    }
+
+    /// Converts to a name with location as expected by the SourceMap format.
+    pub(crate) fn source_name(&self, name: impl AsRef<Symbol>, loc: impl AsRef<Loc>) -> SourceName {
+        (
+            name.as_ref().display(self.env.symbol_pool()).to_string(),
+            self.env.to_ir_loc(loc.as_ref()),
+        )
     }
 }

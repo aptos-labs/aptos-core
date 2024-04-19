@@ -8,7 +8,7 @@ use clap::Parser;
 use move_binary_format::CompiledModule;
 use std::{fs::read_dir, path::PathBuf};
 
-//// CLI options
+// CLI options
 #[derive(Parser, Debug)]
 struct Cli {
     #[clap(default_value = "")]

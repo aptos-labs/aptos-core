@@ -8,6 +8,7 @@ use aptos_schemadb::{
     schema::{KeyCodec, Schema, ValueCodec},
     ColumnFamilyName, SchemaBatch, DB,
 };
+use aptos_storage_interface::AptosDbError;
 use byteorder::{LittleEndian, ReadBytesExt};
 use rocksdb::DEFAULT_COLUMN_FAMILY_NAME;
 
@@ -178,7 +179,7 @@ fn collect_values<S: Schema>(db: &TestDB) -> Vec<(S::Key, S::Value)> {
         .iter::<S>(Default::default())
         .expect("Failed to create iterator.");
     iter.seek_to_first();
-    iter.collect::<Result<Vec<_>>>().unwrap()
+    iter.collect::<Result<Vec<_>, AptosDbError>>().unwrap()
 }
 
 fn gen_expected_values(values: &[(u32, u32)]) -> Vec<(TestField, TestField)> {

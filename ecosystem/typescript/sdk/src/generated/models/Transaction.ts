@@ -7,9 +7,10 @@ import type { Transaction_GenesisTransaction } from './Transaction_GenesisTransa
 import type { Transaction_PendingTransaction } from './Transaction_PendingTransaction';
 import type { Transaction_StateCheckpointTransaction } from './Transaction_StateCheckpointTransaction';
 import type { Transaction_UserTransaction } from './Transaction_UserTransaction';
+import type { Transaction_ValidatorTransaction } from './Transaction_ValidatorTransaction';
 
 /**
  * Enum of the different types of transactions in Aptos
  */
-export type Transaction = (Transaction_PendingTransaction | Transaction_UserTransaction | Transaction_GenesisTransaction | Transaction_BlockMetadataTransaction | Transaction_StateCheckpointTransaction);
+export type Transaction = (Transaction_PendingTransaction | Transaction_UserTransaction | Transaction_GenesisTransaction | Transaction_BlockMetadataTransaction | Transaction_StateCheckpointTransaction | Transaction_ValidatorTransaction);
 

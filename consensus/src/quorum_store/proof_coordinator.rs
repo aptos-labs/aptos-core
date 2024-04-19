@@ -2,6 +2,7 @@
 // SPDX-License-Identifier: Apache-2.0
 
 use crate::{
+    logging::{LogEvent, LogSchema},
     monitor,
     network::QuorumStoreSender,
     quorum_store::{
@@ -9,7 +10,7 @@ use crate::{
     },
 };
 use aptos_consensus_types::proof_of_store::{
-    BatchInfo, ProofOfStore, SignedBatchInfo, SignedBatchInfoError, SignedBatchInfoMsg,
+    BatchInfo, ProofCache, ProofOfStore, SignedBatchInfo, SignedBatchInfoError, SignedBatchInfoMsg,
 };
 use aptos_crypto::{bls12381, HashValue};
 use aptos_logger::prelude::*;
@@ -17,7 +18,7 @@ use aptos_types::{
     aggregate_signature::PartialSignatures, validator_verifier::ValidatorVerifier, PeerId,
 };
 use std::{
-    collections::{BTreeMap, HashMap},
+    collections::{hash_map::Entry, BTreeMap, HashMap},
     sync::Arc,
     time::Duration,
 };
@@ -29,6 +30,7 @@ use tokio::{
 #[derive(Debug)]
 pub(crate) enum ProofCoordinatorCommand {
     AppendSignature(SignedBatchInfoMsg),
+    CommitNotification(Vec<BatchInfo>),
     Shutdown(TokioOneshot::Sender<()>),
 }
 
@@ -57,7 +59,10 @@ impl IncrementalProofState {
         validator_verifier: &ValidatorVerifier,
     ) -> Result<(), SignedBatchInfoError> {
         if signed_batch_info.batch_info() != &self.info {
-            return Err(SignedBatchInfoError::WrongInfo);
+            return Err(SignedBatchInfoError::WrongInfo((
+                signed_batch_info.batch_id().id,
+                self.info.batch_id().id,
+            )));
         }
 
         if self
@@ -124,6 +129,10 @@ impl IncrementalProofState {
             Err(e) => unreachable!("Cannot aggregate signatures on digest err = {:?}", e),
         }
     }
+
+    fn batch_info(&self) -> &BatchInfo {
+        &self.info
+    }
 }
 
 pub(crate) struct ProofCoordinator {
@@ -133,8 +142,11 @@ pub(crate) struct ProofCoordinator {
     digest_to_time: HashMap<HashValue, u64>,
     // to record the batch creation time
     timeouts: Timeouts<BatchInfo>,
+    committed_batches: HashMap<BatchInfo, IncrementalProofState>,
     batch_reader: Arc<dyn BatchReader>,
     batch_generator_cmd_tx: tokio::sync::mpsc::Sender<BatchGeneratorCommand>,
+    proof_cache: ProofCache,
+    broadcast_proofs: bool,
 }
 
 //PoQS builder object - gather signed digest to form PoQS
@@ -144,6 +156,8 @@ impl ProofCoordinator {
         peer_id: PeerId,
         batch_reader: Arc<dyn BatchReader>,
         batch_generator_cmd_tx: tokio::sync::mpsc::Sender<BatchGeneratorCommand>,
+        proof_cache: ProofCache,
+        broadcast_proofs: bool,
     ) -> Self {
         Self {
             peer_id,
@@ -151,8 +165,11 @@ impl ProofCoordinator {
             digest_to_proof: HashMap::new(),
             digest_to_time: HashMap::new(),
             timeouts: Timeouts::new(),
+            committed_batches: HashMap::new(),
             batch_reader,
             batch_generator_cmd_tx,
+            proof_cache,
+            broadcast_proofs,
         }
     }
 
@@ -167,9 +184,16 @@ impl ProofCoordinator {
         let batch_author = self
             .batch_reader
             .exists(signed_batch_info.digest())
-            .ok_or(SignedBatchInfoError::WrongAuthor)?;
+            .ok_or(SignedBatchInfoError::NotFound)?;
         if batch_author != signed_batch_info.author() {
             return Err(SignedBatchInfoError::WrongAuthor);
+        }
+        if self
+            .committed_batches
+            .get(signed_batch_info.batch_info())
+            .is_some()
+        {
+            return Err(SignedBatchInfoError::AlreadyCommitted);
         }
 
         self.timeouts.add(
@@ -183,6 +207,11 @@ impl ProofCoordinator {
         self.digest_to_time
             .entry(*signed_batch_info.digest())
             .or_insert(chrono::Utc::now().naive_utc().timestamp_micros() as u64);
+        debug!(
+            LogSchema::new(LogEvent::ProofOfStoreInit),
+            digest = signed_batch_info.digest(),
+            batch_id = signed_batch_info.batch_id().id,
+        );
         Ok(())
     }
 
@@ -202,6 +231,9 @@ impl ProofCoordinator {
             value.add_signature(signed_batch_info, validator_verifier)?;
             if !value.completed && value.ready(validator_verifier) {
                 let proof = value.take(validator_verifier);
+                // proof validated locally, so adding to cache
+                self.proof_cache
+                    .insert(proof.info().clone(), proof.multi_signature().clone());
                 // quorum store measurements
                 let duration = chrono::Utc::now().naive_utc().timestamp_micros() as u64
                     - self
@@ -211,8 +243,23 @@ impl ProofCoordinator {
                 counters::BATCH_TO_POS_DURATION.observe_duration(Duration::from_micros(duration));
                 return Ok(Some(proof));
             }
+        } else if let Some(value) = self
+            .committed_batches
+            .get_mut(signed_batch_info.batch_info())
+        {
+            value.add_signature(signed_batch_info, validator_verifier)?;
+        } else {
+            return Err(SignedBatchInfoError::NotFound);
         }
         Ok(None)
+    }
+
+    fn update_counters_on_expire(state: &IncrementalProofState) {
+        counters::BATCH_RECEIVED_REPLIES_COUNT.observe(state.aggregated_signature.len() as f64);
+        counters::BATCH_RECEIVED_REPLIES_VOTING_POWER.observe(state.aggregated_voting_power as f64);
+        if !state.completed {
+            counters::BATCH_SUCCESSFUL_CREATION.observe(0.0);
+        }
     }
 
     async fn expire(&mut self) {
@@ -228,15 +275,18 @@ impl ProofCoordinator {
                 if !state.completed && !state.self_voted {
                     continue;
                 }
+
                 if !state.completed {
                     counters::TIMEOUT_BATCHES_COUNT.inc();
+                    info!(
+                        LogSchema::new(LogEvent::IncrementalProofExpired),
+                        digest = signed_batch_info_info.digest(),
+                        self_voted = state.self_voted,
+                    );
                 }
-                counters::BATCH_RECEIVED_REPLIES_COUNT
-                    .observe(state.aggregated_signature.len() as f64);
-                counters::BATCH_RECEIVED_REPLIES_VOTING_POWER
-                    .observe(state.aggregated_voting_power as f64);
-                counters::BATCH_SUCCESSFUL_CREATION
-                    .observe(if state.completed { 1.0 } else { 0.0 });
+                Self::update_counters_on_expire(&state);
+            } else if let Some(state) = self.committed_batches.remove(&signed_batch_info_info) {
+                Self::update_counters_on_expire(&state);
             }
         }
         if self
@@ -266,29 +316,56 @@ impl ProofCoordinator {
                                 .expect("Failed to send shutdown ack to QuorumStore");
                             break;
                         },
+                        ProofCoordinatorCommand::CommitNotification(batches) => {
+                            for batch in batches {
+                                let digest = batch.digest();
+                                if let Entry::Occupied(existing_proof) = self.digest_to_proof.entry(*digest) {
+                                    if batch == *existing_proof.get().batch_info() {
+                                        let incremental_proof = existing_proof.get();
+                                        if incremental_proof.completed {
+                                            counters::BATCH_SUCCESSFUL_CREATION.observe(1.0);
+                                        } else {
+                                            warn!("QS: received commit notification for batch that did not complete: {}, self_voted: {}", digest, incremental_proof.self_voted);
+                                        }
+                                        let committed_proof = existing_proof.remove();
+                                        self.committed_batches.insert(batch, committed_proof);
+                                    }
+                                }
+                            }
+                        },
                         ProofCoordinatorCommand::AppendSignature(signed_batch_infos) => {
                             let mut proofs = vec![];
                             for signed_batch_info in signed_batch_infos.take().into_iter() {
                                 let peer_id = signed_batch_info.signer();
                                 let digest = *signed_batch_info.digest();
+                                let batch_id = signed_batch_info.batch_id();
                                 match self.add_signature(signed_batch_info, &validator_verifier) {
                                     Ok(result) => {
                                         if let Some(proof) = result {
-                                            debug!("QS: received quorum of signatures, digest {}", digest);
+                                            debug!(
+                                                LogSchema::new(LogEvent::ProofOfStoreReady),
+                                                digest = digest,
+                                                batch_id = batch_id.id,
+                                            );
                                             proofs.push(proof);
                                         }
                                     },
                                     Err(e) => {
-                                        // TODO: better error messages
-                                        // Can happen if we already garbage collected
+                                        // Can happen if we already garbage collected, the commit notification is late, or the peer is misbehaving.
                                         if peer_id == self.peer_id {
-                                            debug!("QS: could not add signature from self, err = {:?}", e);
+                                            info!("QS: could not add signature from self, digest = {}, batch_id = {}, err = {:?}", digest, batch_id, e);
+                                        } else {
+                                            debug!("QS: could not add signature from peer {}, digest = {}, batch_id = {}, err = {:?}", peer_id, digest, batch_id, e);
                                         }
                                     },
                                 }
                             }
                             if !proofs.is_empty() {
-                                network_sender.broadcast_proof_of_store_msg(proofs).await;
+                                if self.broadcast_proofs {
+                                    network_sender.broadcast_proof_of_store_msg(proofs).await;
+                                } else {
+                                    network_sender.send_proof_of_store_msg_to_self(proofs).await;
+                                }
                             }
                         },
                     }

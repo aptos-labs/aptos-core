@@ -6,7 +6,10 @@ use crate::{
     AptosPublicInfo, ChainInfo, FullNode, NodeExt, Result, SwarmChaos, Validator, Version,
 };
 use anyhow::{anyhow, bail};
-use aptos_config::config::{NodeConfig, OverrideNodeConfig};
+use aptos_config::{
+    config::{NodeConfig, OverrideNodeConfig},
+    network_id::NetworkId,
+};
 use aptos_logger::info;
 use aptos_rest_client::Client as RestClient;
 use aptos_sdk::types::PeerId;
@@ -81,9 +84,9 @@ pub trait Swarm: Sync {
     fn logs_location(&mut self) -> String;
 
     /// Injects all types of chaos
-    fn inject_chaos(&mut self, chaos: SwarmChaos) -> Result<()>;
-    fn remove_chaos(&mut self, chaos: SwarmChaos) -> Result<()>;
-    fn remove_all_chaos(&mut self) -> Result<()>;
+    async fn inject_chaos(&mut self, chaos: SwarmChaos) -> Result<()>;
+    async fn remove_chaos(&mut self, chaos: SwarmChaos) -> Result<()>;
+    async fn remove_all_chaos(&mut self) -> Result<()>;
 
     async fn ensure_no_validator_restart(&self) -> Result<()>;
     async fn ensure_no_fullnode_restart(&self) -> Result<()>;
@@ -157,7 +160,7 @@ pub trait SwarmExt: Swarm {
         while !try_join_all(
             validators
                 .iter()
-                .map(|node| node.check_connectivity(validators.len() - 1))
+                .map(|node| node.check_connectivity(NetworkId::Validator, validators.len() - 1))
                 .chain(full_nodes.iter().map(|node| node.check_connectivity())),
         )
         .await
@@ -492,7 +495,7 @@ pub async fn get_highest_synced_epoch(clients: &[(String, RestClient)]) -> Resul
 }
 
 /// Returns the highest synced version and epoch of the given clients
-async fn get_highest_synced_version_and_epoch(
+pub async fn get_highest_synced_version_and_epoch(
     clients: &[(String, RestClient)],
 ) -> Result<(u64, u64)> {
     let mut latest_version_and_epoch = (0, 0);

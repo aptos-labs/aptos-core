@@ -1,18 +1,5 @@
 Move prover returns: exiting with verification errors
 error: post-condition does not hold
-   ┌─ tests/sources/functional/shift.move:95:9
-   │
-95 │         ensures result == x << 10u8;
-   │         ^^^^^^^^^^^^^^^^^^^^^^^^^^^^
-   │
-   =     at tests/sources/functional/shift.move:65: shift_l_11_incorrect
-   =         x = <redacted>
-   =     at tests/sources/functional/shift.move:66: shift_l_11_incorrect
-   =         result = <redacted>
-   =     at tests/sources/functional/shift.move:67: shift_l_11_incorrect
-   =     at tests/sources/functional/shift.move:95: shift_l_11_incorrect (spec)
-
-error: post-condition does not hold
    ┌─ tests/sources/functional/shift.move:38:9
    │
 38 │         ensures result == x * 128 + 1;
@@ -37,3 +24,16 @@ error: post-condition does not hold
    =         result = <redacted>
    =     at tests/sources/functional/shift.move:51: shiftr_7_incorrect
    =     at tests/sources/functional/shift.move:54: shiftr_7_incorrect (spec)
+
+error: post-condition does not hold
+   ┌─ tests/sources/functional/shift.move:95:9
+   │
+95 │         ensures result == x << 10u8;
+   │         ^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+   │
+   =     at tests/sources/functional/shift.move:65: shift_l_11_incorrect
+   =         x = <redacted>
+   =     at tests/sources/functional/shift.move:66: shift_l_11_incorrect
+   =         result = <redacted>
+   =     at tests/sources/functional/shift.move:67: shift_l_11_incorrect
+   =     at tests/sources/functional/shift.move:95: shift_l_11_incorrect (spec)

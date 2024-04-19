@@ -3,12 +3,14 @@
 
 use crate::config::{
     config_sanitizer::ConfigSanitizer, node_config_loader::NodeType, Error, NodeConfig,
-    MAX_SENDING_BLOCK_TXNS_QUORUM_STORE_OVERRIDE,
 };
 use aptos_global_constants::DEFAULT_BUCKETS;
 use aptos_types::chain_id::ChainId;
 use serde::{Deserialize, Serialize};
 use std::time::Duration;
+
+pub const BATCH_PADDING_BYTES: usize = 160;
+const DEFAULT_MAX_NUM_BATCHES: usize = 20;
 
 #[derive(Clone, Copy, Debug, Deserialize, PartialEq, Serialize)]
 #[serde(default, deny_unknown_fields)]
@@ -26,7 +28,8 @@ impl Default for QuorumStoreBackPressureConfig {
     fn default() -> QuorumStoreBackPressureConfig {
         QuorumStoreBackPressureConfig {
             // QS will be backpressured if the remaining total txns is more than this number
-            backlog_txn_limit_count: MAX_SENDING_BLOCK_TXNS_QUORUM_STORE_OVERRIDE * 4,
+            // Roughly, target TPS * commit latency seconds
+            backlog_txn_limit_count: 12_000,
             // QS will create batches at the max rate until this number is reached
             backlog_per_validator_batch_limit_count: 4,
             decrease_duration_ms: 1000,
@@ -65,10 +68,10 @@ pub struct QuorumStoreConfig {
     pub memory_quota: usize,
     pub db_quota: usize,
     pub batch_quota: usize,
-    pub mempool_txn_pull_max_bytes: u64,
     pub back_pressure: QuorumStoreBackPressureConfig,
     pub num_workers_for_remote_batches: usize,
     pub batch_buckets: Vec<u64>,
+    pub allow_batches_without_pos_in_proposal: bool,
 }
 
 impl Default for QuorumStoreConfig {
@@ -80,15 +83,19 @@ impl Default for QuorumStoreConfig {
             batch_generation_min_non_empty_interval_ms: 200,
             batch_generation_max_interval_ms: 250,
             sender_max_batch_txns: 250,
-            sender_max_batch_bytes: 1024 * 1024,
-            sender_max_num_batches: 20,
+            // TODO: on next release, remove BATCH_PADDING_BYTES
+            sender_max_batch_bytes: 1024 * 1024 - BATCH_PADDING_BYTES,
+            sender_max_num_batches: DEFAULT_MAX_NUM_BATCHES,
             sender_max_total_txns: 2000,
-            sender_max_total_bytes: 4 * 1024 * 1024,
+            // TODO: on next release, remove DEFAULT_MAX_NUM_BATCHES * BATCH_PADDING_BYTES
+            sender_max_total_bytes: 4 * 1024 * 1024 - DEFAULT_MAX_NUM_BATCHES * BATCH_PADDING_BYTES,
             receiver_max_batch_txns: 250,
-            receiver_max_batch_bytes: 1024 * 1024,
+            receiver_max_batch_bytes: 1024 * 1024 + BATCH_PADDING_BYTES,
             receiver_max_num_batches: 20,
             receiver_max_total_txns: 2000,
-            receiver_max_total_bytes: 4 * 1024 * 1024,
+            receiver_max_total_bytes: 4 * 1024 * 1024
+                + DEFAULT_MAX_NUM_BATCHES
+                + BATCH_PADDING_BYTES,
             batch_request_num_peers: 5,
             batch_request_retry_limit: 10,
             batch_request_retry_interval_ms: 1000,
@@ -97,16 +104,44 @@ impl Default for QuorumStoreConfig {
             memory_quota: 120_000_000,
             db_quota: 300_000_000,
             batch_quota: 300_000,
-            mempool_txn_pull_max_bytes: 4 * 1024 * 1024,
             back_pressure: QuorumStoreBackPressureConfig::default(),
             // number of batch coordinators to handle QS batch messages, should be >= 1
             num_workers_for_remote_batches: 10,
             batch_buckets: DEFAULT_BUCKETS.to_vec(),
+            allow_batches_without_pos_in_proposal: true,
         }
     }
 }
 
 impl QuorumStoreConfig {
+    /// Since every validator can contribute to every round, the quorum store
+    /// batches should be small enough to fit in a DAG node. And, since proof
+    /// broadcasting is disabled, Quorum Store needs to create only enough
+    /// batches to fit the self proposed nodes. These configs below reflect
+    /// this behavior.
+    pub fn default_for_dag() -> Self {
+        Self {
+            sender_max_batch_txns: 300,
+            sender_max_batch_bytes: 4 * 1024 * 1024,
+            sender_max_num_batches: 5,
+            sender_max_total_txns: 500,
+            sender_max_total_bytes: 8 * 1024 * 1024,
+            receiver_max_batch_txns: 300,
+            receiver_max_batch_bytes: 4 * 1024 * 1024,
+            receiver_max_num_batches: 5,
+            receiver_max_total_txns: 500,
+            receiver_max_total_bytes: 8 * 1024 * 1024,
+            back_pressure: QuorumStoreBackPressureConfig {
+                backlog_txn_limit_count: 100000,
+                backlog_per_validator_batch_limit_count: 20,
+                dynamic_min_txn_per_s: 100,
+                dynamic_max_txn_per_s: 200,
+                ..Default::default()
+            },
+            ..Default::default()
+        }
+    }
+
     fn sanitize_send_recv_batch_limits(
         sanitizer_name: &str,
         config: &QuorumStoreConfig,

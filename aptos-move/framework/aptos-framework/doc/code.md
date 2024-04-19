@@ -1,5 +1,5 @@
 
-<a name="0x1_code"></a>
+<a id="0x1_code"></a>
 
 # Module `0x1::code`
 
@@ -11,6 +11,7 @@ This module supports functionality related to code management.
 -  [Struct `PackageDep`](#0x1_code_PackageDep)
 -  [Struct `ModuleMetadata`](#0x1_code_ModuleMetadata)
 -  [Struct `UpgradePolicy`](#0x1_code_UpgradePolicy)
+-  [Struct `PublishPackage`](#0x1_code_PublishPackage)
 -  [Struct `AllowedDep`](#0x1_code_AllowedDep)
 -  [Constants](#@Constants_0)
 -  [Function `upgrade_policy_arbitrary`](#0x1_code_upgrade_policy_arbitrary)
@@ -19,6 +20,7 @@ This module supports functionality related to code management.
 -  [Function `can_change_upgrade_policy_to`](#0x1_code_can_change_upgrade_policy_to)
 -  [Function `initialize`](#0x1_code_initialize)
 -  [Function `publish_package`](#0x1_code_publish_package)
+-  [Function `freeze_code_object`](#0x1_code_freeze_code_object)
 -  [Function `publish_package_txn`](#0x1_code_publish_package_txn)
 -  [Function `check_upgradability`](#0x1_code_check_upgradability)
 -  [Function `check_coexistence`](#0x1_code_check_coexistence)
@@ -28,8 +30,11 @@ This module supports functionality related to code management.
 -  [Function `request_publish`](#0x1_code_request_publish)
 -  [Function `request_publish_with_allowed_deps`](#0x1_code_request_publish_with_allowed_deps)
 -  [Specification](#@Specification_1)
+    -  [High-level Requirements](#high-level-req)
+    -  [Module-level Specification](#module-level-spec)
     -  [Function `initialize`](#@Specification_1_initialize)
     -  [Function `publish_package`](#@Specification_1_publish_package)
+    -  [Function `freeze_code_object`](#@Specification_1_freeze_code_object)
     -  [Function `publish_package_txn`](#@Specification_1_publish_package_txn)
     -  [Function `check_upgradability`](#@Specification_1_check_upgradability)
     -  [Function `check_coexistence`](#@Specification_1_check_coexistence)
@@ -41,7 +46,9 @@ This module supports functionality related to code management.
 
 <pre><code><b>use</b> <a href="../../aptos-stdlib/doc/copyable_any.md#0x1_copyable_any">0x1::copyable_any</a>;
 <b>use</b> <a href="../../aptos-stdlib/../move-stdlib/doc/error.md#0x1_error">0x1::error</a>;
+<b>use</b> <a href="event.md#0x1_event">0x1::event</a>;
 <b>use</b> <a href="../../aptos-stdlib/../move-stdlib/doc/features.md#0x1_features">0x1::features</a>;
+<b>use</b> <a href="object.md#0x1_object">0x1::object</a>;
 <b>use</b> <a href="../../aptos-stdlib/../move-stdlib/doc/option.md#0x1_option">0x1::option</a>;
 <b>use</b> <a href="../../aptos-stdlib/../move-stdlib/doc/signer.md#0x1_signer">0x1::signer</a>;
 <b>use</b> <a href="../../aptos-stdlib/../move-stdlib/doc/string.md#0x1_string">0x1::string</a>;
@@ -52,7 +59,7 @@ This module supports functionality related to code management.
 
 
 
-<a name="0x1_code_PackageRegistry"></a>
+<a id="0x1_code_PackageRegistry"></a>
 
 ## Resource `PackageRegistry`
 
@@ -80,7 +87,7 @@ The package registry at the given address.
 
 </details>
 
-<a name="0x1_code_PackageMetadata"></a>
+<a id="0x1_code_PackageMetadata"></a>
 
 ## Struct `PackageMetadata`
 
@@ -152,7 +159,7 @@ Metadata for a package. All byte blobs are represented as base64-of-gzipped-byte
 
 </details>
 
-<a name="0x1_code_PackageDep"></a>
+<a id="0x1_code_PackageDep"></a>
 
 ## Struct `PackageDep`
 
@@ -186,7 +193,7 @@ A dependency to a package published at address
 
 </details>
 
-<a name="0x1_code_ModuleMetadata"></a>
+<a id="0x1_code_ModuleMetadata"></a>
 
 ## Struct `ModuleMetadata`
 
@@ -232,7 +239,7 @@ Metadata about a module in a package.
 
 </details>
 
-<a name="0x1_code_UpgradePolicy"></a>
+<a id="0x1_code_UpgradePolicy"></a>
 
 ## Struct `UpgradePolicy`
 
@@ -260,7 +267,42 @@ Describes an upgrade policy
 
 </details>
 
-<a name="0x1_code_AllowedDep"></a>
+<a id="0x1_code_PublishPackage"></a>
+
+## Struct `PublishPackage`
+
+Event emitted when code is published to an address.
+
+
+<pre><code>#[<a href="event.md#0x1_event">event</a>]
+<b>struct</b> <a href="code.md#0x1_code_PublishPackage">PublishPackage</a> <b>has</b> drop, store
+</code></pre>
+
+
+
+<details>
+<summary>Fields</summary>
+
+
+<dl>
+<dt>
+<code>code_address: <b>address</b></code>
+</dt>
+<dd>
+
+</dd>
+<dt>
+<code>is_upgrade: bool</code>
+</dt>
+<dd>
+
+</dd>
+</dl>
+
+
+</details>
+
+<a id="0x1_code_AllowedDep"></a>
 
 ## Struct `AllowedDep`
 
@@ -296,12 +338,22 @@ A helper type for request_publish_with_allowed_deps
 
 </details>
 
-<a name="@Constants_0"></a>
+<a id="@Constants_0"></a>
 
 ## Constants
 
 
-<a name="0x1_code_EDEP_ARBITRARY_NOT_SAME_ADDRESS"></a>
+<a id="0x1_code_ECODE_OBJECT_DOES_NOT_EXIST"></a>
+
+<code>code_object</code> does not exist.
+
+
+<pre><code><b>const</b> <a href="code.md#0x1_code_ECODE_OBJECT_DOES_NOT_EXIST">ECODE_OBJECT_DOES_NOT_EXIST</a>: u64 = 10;
+</code></pre>
+
+
+
+<a id="0x1_code_EDEP_ARBITRARY_NOT_SAME_ADDRESS"></a>
 
 A dependency to an <code>arbitrary</code> package must be on the same address.
 
@@ -311,7 +363,7 @@ A dependency to an <code>arbitrary</code> package must be on the same address.
 
 
 
-<a name="0x1_code_EDEP_WEAKER_POLICY"></a>
+<a id="0x1_code_EDEP_WEAKER_POLICY"></a>
 
 A dependency cannot have a weaker upgrade policy.
 
@@ -321,7 +373,7 @@ A dependency cannot have a weaker upgrade policy.
 
 
 
-<a name="0x1_code_EINCOMPATIBLE_POLICY_DISABLED"></a>
+<a id="0x1_code_EINCOMPATIBLE_POLICY_DISABLED"></a>
 
 Creating a package with incompatible upgrade policy is disabled.
 
@@ -331,7 +383,7 @@ Creating a package with incompatible upgrade policy is disabled.
 
 
 
-<a name="0x1_code_EMODULE_MISSING"></a>
+<a id="0x1_code_EMODULE_MISSING"></a>
 
 Cannot delete a module that was published in the same package
 
@@ -341,7 +393,7 @@ Cannot delete a module that was published in the same package
 
 
 
-<a name="0x1_code_EMODULE_NAME_CLASH"></a>
+<a id="0x1_code_EMODULE_NAME_CLASH"></a>
 
 Package contains duplicate module names with existing modules publised in other packages on this address
 
@@ -351,7 +403,17 @@ Package contains duplicate module names with existing modules publised in other 
 
 
 
-<a name="0x1_code_EPACKAGE_DEP_MISSING"></a>
+<a id="0x1_code_ENOT_PACKAGE_OWNER"></a>
+
+Not the owner of the package registry.
+
+
+<pre><code><b>const</b> <a href="code.md#0x1_code_ENOT_PACKAGE_OWNER">ENOT_PACKAGE_OWNER</a>: u64 = 9;
+</code></pre>
+
+
+
+<a id="0x1_code_EPACKAGE_DEP_MISSING"></a>
 
 Dependency could not be resolved to any published package.
 
@@ -361,7 +423,7 @@ Dependency could not be resolved to any published package.
 
 
 
-<a name="0x1_code_EUPGRADE_IMMUTABLE"></a>
+<a id="0x1_code_EUPGRADE_IMMUTABLE"></a>
 
 Cannot upgrade an immutable package
 
@@ -371,7 +433,7 @@ Cannot upgrade an immutable package
 
 
 
-<a name="0x1_code_EUPGRADE_WEAKER_POLICY"></a>
+<a id="0x1_code_EUPGRADE_WEAKER_POLICY"></a>
 
 Cannot downgrade a package's upgradability policy
 
@@ -381,7 +443,7 @@ Cannot downgrade a package's upgradability policy
 
 
 
-<a name="0x1_code_upgrade_policy_arbitrary"></a>
+<a id="0x1_code_upgrade_policy_arbitrary"></a>
 
 ## Function `upgrade_policy_arbitrary`
 
@@ -409,7 +471,7 @@ stored on chain.
 
 </details>
 
-<a name="0x1_code_upgrade_policy_compat"></a>
+<a id="0x1_code_upgrade_policy_compat"></a>
 
 ## Function `upgrade_policy_compat`
 
@@ -435,7 +497,7 @@ a new module has (a) the same public functions (b) for existing resources, no la
 
 </details>
 
-<a name="0x1_code_upgrade_policy_immutable"></a>
+<a id="0x1_code_upgrade_policy_immutable"></a>
 
 ## Function `upgrade_policy_immutable`
 
@@ -460,7 +522,7 @@ Whether the modules in the package are immutable and cannot be upgraded.
 
 </details>
 
-<a name="0x1_code_can_change_upgrade_policy_to"></a>
+<a id="0x1_code_can_change_upgrade_policy_to"></a>
 
 ## Function `can_change_upgrade_policy_to`
 
@@ -486,7 +548,7 @@ strengthened but not weakened.
 
 </details>
 
-<a name="0x1_code_initialize"></a>
+<a id="0x1_code_initialize"></a>
 
 ## Function `initialize`
 
@@ -518,7 +580,7 @@ Initialize package metadata for Genesis.
 
 </details>
 
-<a name="0x1_code_publish_package"></a>
+<a id="0x1_code_publish_package"></a>
 
 ## Function `publish_package`
 
@@ -582,6 +644,11 @@ package.
         <a href="../../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector_push_back">vector::push_back</a>(packages, pack)
     };
 
+    <a href="event.md#0x1_event_emit">event::emit</a>(<a href="code.md#0x1_code_PublishPackage">PublishPackage</a> {
+        code_address: addr,
+        is_upgrade: upgrade_number &gt; 0
+    });
+
     // Request publish
     <b>if</b> (<a href="../../aptos-stdlib/../move-stdlib/doc/features.md#0x1_features_code_dependency_check_enabled">features::code_dependency_check_enabled</a>())
         <a href="code.md#0x1_code_request_publish_with_allowed_deps">request_publish_with_allowed_deps</a>(addr, module_names, allowed_deps, <a href="code.md#0x1_code">code</a>, policy.policy)
@@ -596,7 +663,42 @@ package.
 
 </details>
 
-<a name="0x1_code_publish_package_txn"></a>
+<a id="0x1_code_freeze_code_object"></a>
+
+## Function `freeze_code_object`
+
+
+
+<pre><code><b>public</b> <b>fun</b> <a href="code.md#0x1_code_freeze_code_object">freeze_code_object</a>(publisher: &<a href="../../aptos-stdlib/../move-stdlib/doc/signer.md#0x1_signer">signer</a>, code_object: <a href="object.md#0x1_object_Object">object::Object</a>&lt;<a href="code.md#0x1_code_PackageRegistry">code::PackageRegistry</a>&gt;)
+</code></pre>
+
+
+
+<details>
+<summary>Implementation</summary>
+
+
+<pre><code><b>public</b> <b>fun</b> <a href="code.md#0x1_code_freeze_code_object">freeze_code_object</a>(publisher: &<a href="../../aptos-stdlib/../move-stdlib/doc/signer.md#0x1_signer">signer</a>, code_object: Object&lt;<a href="code.md#0x1_code_PackageRegistry">PackageRegistry</a>&gt;) <b>acquires</b> <a href="code.md#0x1_code_PackageRegistry">PackageRegistry</a> {
+    <b>let</b> code_object_addr = <a href="object.md#0x1_object_object_address">object::object_address</a>(&code_object);
+    <b>assert</b>!(<b>exists</b>&lt;<a href="code.md#0x1_code_PackageRegistry">PackageRegistry</a>&gt;(code_object_addr), <a href="../../aptos-stdlib/../move-stdlib/doc/error.md#0x1_error_not_found">error::not_found</a>(<a href="code.md#0x1_code_ECODE_OBJECT_DOES_NOT_EXIST">ECODE_OBJECT_DOES_NOT_EXIST</a>));
+    <b>assert</b>!(
+        <a href="object.md#0x1_object_is_owner">object::is_owner</a>(code_object, <a href="../../aptos-stdlib/../move-stdlib/doc/signer.md#0x1_signer_address_of">signer::address_of</a>(publisher)),
+        <a href="../../aptos-stdlib/../move-stdlib/doc/error.md#0x1_error_permission_denied">error::permission_denied</a>(<a href="code.md#0x1_code_ENOT_PACKAGE_OWNER">ENOT_PACKAGE_OWNER</a>)
+    );
+
+    <b>let</b> registry = <b>borrow_global_mut</b>&lt;<a href="code.md#0x1_code_PackageRegistry">PackageRegistry</a>&gt;(code_object_addr);
+    <a href="../../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector_for_each_mut">vector::for_each_mut</a>&lt;<a href="code.md#0x1_code_PackageMetadata">PackageMetadata</a>&gt;(&<b>mut</b> registry.packages, |pack| {
+        <b>let</b> package: &<b>mut</b> <a href="code.md#0x1_code_PackageMetadata">PackageMetadata</a> = pack;
+        package.upgrade_policy = <a href="code.md#0x1_code_upgrade_policy_immutable">upgrade_policy_immutable</a>();
+    });
+}
+</code></pre>
+
+
+
+</details>
+
+<a id="0x1_code_publish_package_txn"></a>
 
 ## Function `publish_package_txn`
 
@@ -623,7 +725,7 @@ of current restrictions for txn parameters, the metadata needs to be passed in s
 
 </details>
 
-<a name="0x1_code_check_upgradability"></a>
+<a id="0x1_code_check_upgradability"></a>
 
 ## Function `check_upgradability`
 
@@ -660,7 +762,7 @@ Checks whether the given package is upgradable, and returns true if a compatibil
 
 </details>
 
-<a name="0x1_code_check_coexistence"></a>
+<a id="0x1_code_check_coexistence"></a>
 
 ## Function `check_coexistence`
 
@@ -694,7 +796,7 @@ Checks whether a new package with given names can co-exist with old package.
 
 </details>
 
-<a name="0x1_code_check_dependencies"></a>
+<a id="0x1_code_check_dependencies"></a>
 
 ## Function `check_dependencies`
 
@@ -765,7 +867,7 @@ is passed on to the native layer to verify that bytecode dependencies are actual
 
 </details>
 
-<a name="0x1_code_is_policy_exempted_address"></a>
+<a id="0x1_code_is_policy_exempted_address"></a>
 
 ## Function `is_policy_exempted_address`
 
@@ -793,7 +895,7 @@ requires to be upgradable for maintenance and evolution, and is configured to be
 
 </details>
 
-<a name="0x1_code_get_module_names"></a>
+<a id="0x1_code_get_module_names"></a>
 
 ## Function `get_module_names`
 
@@ -823,7 +925,7 @@ Get the names of the modules in a package.
 
 </details>
 
-<a name="0x1_code_request_publish"></a>
+<a id="0x1_code_request_publish"></a>
 
 ## Function `request_publish`
 
@@ -851,7 +953,7 @@ Native function to initiate module loading
 
 </details>
 
-<a name="0x1_code_request_publish_with_allowed_deps"></a>
+<a id="0x1_code_request_publish_with_allowed_deps"></a>
 
 ## Function `request_publish_with_allowed_deps`
 
@@ -880,10 +982,86 @@ Native function to initiate module loading, including a list of allowed dependen
 
 </details>
 
-<a name="@Specification_1"></a>
+<a id="@Specification_1"></a>
 
 ## Specification
 
+
+
+
+<a id="high-level-req"></a>
+
+### High-level Requirements
+
+<table>
+<tr>
+<th>No.</th><th>Requirement</th><th>Criticality</th><th>Implementation</th><th>Enforcement</th>
+</tr>
+
+<tr>
+<td>1</td>
+<td>Updating a package should fail if the user is not the owner of it.</td>
+<td>Critical</td>
+<td>The publish_package function may only be able to update the package if the signer is the actual owner of the package.</td>
+<td>The Aptos upgrade native functions have been manually audited.</td>
+</tr>
+
+<tr>
+<td>2</td>
+<td>The arbitrary upgrade policy should never be used.</td>
+<td>Critical</td>
+<td>There should never be a pass of an arbitrary upgrade policy to the request_publish native function.</td>
+<td>Manually audited that it aborts if package.upgrade_policy.policy == 0.</td>
+</tr>
+
+<tr>
+<td>3</td>
+<td>Should perform accurate compatibility checks when the policy indicates compatibility, ensuring it meets the required conditions.</td>
+<td>Critical</td>
+<td>Specifies if it should perform compatibility checks for upgrades. The check only passes if a new module has (a) the same public functions, and (b) for existing resources, no layout change.</td>
+<td>The Move upgradability patterns have been manually audited.</td>
+</tr>
+
+<tr>
+<td>4</td>
+<td>Package upgrades should abide by policy change rules. In particular, The new upgrade policy must be equal to or stricter when compared to the old one. The original upgrade policy must not be immutable. The new package must contain all modules contained in the old package.</td>
+<td>Medium</td>
+<td>A package may only be updated using the publish_package function when the check_upgradability function returns true.</td>
+<td>This is audited by a manual review of the check_upgradability patterns.</td>
+</tr>
+
+<tr>
+<td>5</td>
+<td>The upgrade policy of a package must not exceed the strictness level imposed by its dependencies.</td>
+<td>Medium</td>
+<td>The upgrade_policy of a package may only be less than its dependencies throughout the upgrades. In addition, the native code properly restricts the use of dependencies outside the passed-in metadata.</td>
+<td>This has been manually audited.</td>
+</tr>
+
+<tr>
+<td>6</td>
+<td>The extension for package metadata is currently unused.</td>
+<td>Medium</td>
+<td>The extension field in PackageMetadata should be unused.</td>
+<td>Data invariant on the extension field has been manually audited.</td>
+</tr>
+
+<tr>
+<td>7</td>
+<td>The upgrade number of a package increases incrementally in a monotonic manner with each subsequent upgrade.</td>
+<td>Low</td>
+<td>On each upgrade of a particular package, the publish_package function updates the upgrade_number for that package.</td>
+<td>Post condition on upgrade_number has been manually audited.</td>
+</tr>
+
+</table>
+
+
+
+
+<a id="module-level-spec"></a>
+
+### Module-level Specification
 
 
 <pre><code><b>pragma</b> verify = <b>true</b>;
@@ -892,7 +1070,7 @@ Native function to initiate module loading, including a list of allowed dependen
 
 
 
-<a name="@Specification_1_initialize"></a>
+<a id="@Specification_1_initialize"></a>
 
 ### Function `initialize`
 
@@ -911,7 +1089,7 @@ Native function to initiate module loading, including a list of allowed dependen
 
 
 
-<a name="@Specification_1_publish_package"></a>
+<a id="@Specification_1_publish_package"></a>
 
 ### Function `publish_package`
 
@@ -930,7 +1108,28 @@ Native function to initiate module loading, including a list of allowed dependen
 
 
 
-<a name="@Specification_1_publish_package_txn"></a>
+<a id="@Specification_1_freeze_code_object"></a>
+
+### Function `freeze_code_object`
+
+
+<pre><code><b>public</b> <b>fun</b> <a href="code.md#0x1_code_freeze_code_object">freeze_code_object</a>(publisher: &<a href="../../aptos-stdlib/../move-stdlib/doc/signer.md#0x1_signer">signer</a>, code_object: <a href="object.md#0x1_object_Object">object::Object</a>&lt;<a href="code.md#0x1_code_PackageRegistry">code::PackageRegistry</a>&gt;)
+</code></pre>
+
+
+
+
+<pre><code><b>pragma</b> aborts_if_is_partial;
+<b>let</b> code_object_addr = code_object.inner;
+<b>aborts_if</b> !<b>exists</b>&lt;<a href="object.md#0x1_object_ObjectCore">object::ObjectCore</a>&gt;(code_object_addr);
+<b>aborts_if</b> !<b>exists</b>&lt;<a href="code.md#0x1_code_PackageRegistry">PackageRegistry</a>&gt;(code_object_addr);
+<b>aborts_if</b> !<a href="object.md#0x1_object_is_owner">object::is_owner</a>(code_object, <a href="../../aptos-stdlib/../move-stdlib/doc/signer.md#0x1_signer_address_of">signer::address_of</a>(publisher));
+<b>modifies</b> <b>global</b>&lt;<a href="code.md#0x1_code_PackageRegistry">PackageRegistry</a>&gt;(code_object_addr);
+</code></pre>
+
+
+
+<a id="@Specification_1_publish_package_txn"></a>
 
 ### Function `publish_package_txn`
 
@@ -946,7 +1145,7 @@ Native function to initiate module loading, including a list of allowed dependen
 
 
 
-<a name="@Specification_1_check_upgradability"></a>
+<a id="@Specification_1_check_upgradability"></a>
 
 ### Function `check_upgradability`
 
@@ -964,7 +1163,7 @@ Native function to initiate module loading, including a list of allowed dependen
 
 
 
-<a name="@Specification_1_check_coexistence"></a>
+<a id="@Specification_1_check_coexistence"></a>
 
 ### Function `check_coexistence`
 
@@ -980,7 +1179,7 @@ Native function to initiate module loading, including a list of allowed dependen
 
 
 
-<a name="@Specification_1_check_dependencies"></a>
+<a id="@Specification_1_check_dependencies"></a>
 
 ### Function `check_dependencies`
 
@@ -996,7 +1195,7 @@ Native function to initiate module loading, including a list of allowed dependen
 
 
 
-<a name="@Specification_1_get_module_names"></a>
+<a id="@Specification_1_get_module_names"></a>
 
 ### Function `get_module_names`
 
@@ -1015,7 +1214,7 @@ Native function to initiate module loading, including a list of allowed dependen
 
 
 
-<a name="@Specification_1_request_publish"></a>
+<a id="@Specification_1_request_publish"></a>
 
 ### Function `request_publish`
 
@@ -1031,7 +1230,7 @@ Native function to initiate module loading, including a list of allowed dependen
 
 
 
-<a name="@Specification_1_request_publish_with_allowed_deps"></a>
+<a id="@Specification_1_request_publish_with_allowed_deps"></a>
 
 ### Function `request_publish_with_allowed_deps`
 

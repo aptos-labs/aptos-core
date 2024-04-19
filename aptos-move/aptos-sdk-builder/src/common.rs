@@ -5,7 +5,7 @@
 use aptos_types::transaction::{
     ArgumentABI, EntryABI, EntryFunctionABI, TransactionScriptABI, TypeArgumentABI,
 };
-use heck::CamelCase;
+use heck::ToUpperCamelCase;
 use move_core_types::language_storage::{StructTag, TypeTag};
 use once_cell::sync::Lazy;
 use serde_reflection::{ContainerFormat, Format, Named, VariantFormat};
@@ -78,11 +78,11 @@ pub(crate) fn make_abi_enum_container(abis: &[EntryABI]) -> ContainerFormat {
             EntryABI::EntryFunction(sf) => {
                 format!(
                     "{}{}",
-                    sf.module_name().name().to_string().to_camel_case(),
-                    abi.name().to_camel_case()
+                    sf.module_name().name().to_string().to_upper_camel_case(),
+                    abi.name().to_upper_camel_case()
                 )
             },
-            _ => abi.name().to_camel_case(),
+            _ => abi.name().to_upper_camel_case(),
         };
 
         variants.insert(index as u32, Named {
@@ -157,8 +157,8 @@ pub(crate) fn get_required_helper_types(abis: &[EntryABI]) -> BTreeSet<&TypeTag>
 
 pub(crate) fn filter_transaction_scripts(abis: &[EntryABI]) -> Vec<EntryABI> {
     abis.iter()
-        .cloned()
         .filter(|abi| abi.is_transaction_script_abi())
+        .cloned()
         .collect()
 }
 

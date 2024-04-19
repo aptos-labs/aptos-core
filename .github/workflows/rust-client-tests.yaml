@@ -12,7 +12,7 @@ on:
 
 permissions:
   contents: read
-  id-token: write  # Required for GCP Workload Identity federation which we use to login into Google Artifact Registry
+  id-token: write # Required for GCP Workload Identity federation which we use to login into Google Artifact Registry
 
 jobs:
   # Note on the job-level `if` conditions:
@@ -20,7 +20,6 @@ jobs:
   # triggered the workflow or on 'pull_request's which have set auto_merge=true
   # or have the label "CICD:run-e2e-tests".
   permission-check:
-    if: github.event.pull_request.user.login != 'dependabot[bot]'
     runs-on: ubuntu-latest
     steps:
       - name: Check repository permission for user which triggered workflow
@@ -46,7 +45,7 @@ jobs:
       - uses: ./.github/actions/run-rust-client-tests
         with:
           NETWORK: devnet
-          GCP_DOCKER_ARTIFACT_REPO: ${{ secrets.GCP_DOCKER_ARTIFACT_REPO }}
+          GCP_DOCKER_ARTIFACT_REPO: ${{ vars.GCP_DOCKER_ARTIFACT_REPO }}
 
   run-tests-testnet:
     if: contains(github.event.pull_request.labels.*.name, 'CICD:non-required-tests')
@@ -65,7 +64,7 @@ jobs:
       - uses: ./.github/actions/run-rust-client-tests
         with:
           NETWORK: testnet
-          GCP_DOCKER_ARTIFACT_REPO: ${{ secrets.GCP_DOCKER_ARTIFACT_REPO }}
+          GCP_DOCKER_ARTIFACT_REPO: ${{ vars.GCP_DOCKER_ARTIFACT_REPO }}
 
   run-tests-mainnet:
     if: contains(github.event.pull_request.labels.*.name, 'CICD:non-required-tests')
@@ -84,4 +83,4 @@ jobs:
       - uses: ./.github/actions/run-rust-client-tests
         with:
           NETWORK: mainnet
-          GCP_DOCKER_ARTIFACT_REPO: ${{ secrets.GCP_DOCKER_ARTIFACT_REPO }}
+          GCP_DOCKER_ARTIFACT_REPO: ${{ vars.GCP_DOCKER_ARTIFACT_REPO }}

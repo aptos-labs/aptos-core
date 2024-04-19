@@ -1,4 +1,5 @@
 // Copyright © Aptos Foundation
+// SPDX-License-Identifier: Apache-2.0
 
 use crate::{
     consts::FUND_AMOUNT,
@@ -247,7 +248,7 @@ async fn publish_module(
     };
 
     // get blob for later comparison
-    let blob = match blobs.get(0) {
+    let blob = match blobs.first() {
         Some(bytecode) => HexEncodedBytes::from(bytecode.clone()),
         None => {
             error!(

@@ -4,7 +4,7 @@
 mod get_path;
 mod get_snapshots;
 
-use anyhow::Result;
+use aptos_storage_interface::Result;
 
 /// Tool supports listing snapshots before version and printing node in merkel tree with version and nibble path
 #[derive(clap::Subcommand)]
@@ -16,7 +16,7 @@ pub enum Cmd {
 impl Cmd {
     pub fn run(self) -> Result<()> {
         match self {
-            Self::GetSnapshots(cmd) => cmd.run(),
+            Self::GetSnapshots(cmd) => Ok(cmd.run()?),
             Self::GetPath(cmd) => cmd.run(),
         }
     }

@@ -1,0 +1,11 @@
+// -- Model dump before bytecode pipeline
+module <SELF>_0 {
+    private fun main() {
+        loop {
+          break
+        };
+        loop {
+          Tuple()
+        }
+    }
+} // end <SELF>_0

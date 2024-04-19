@@ -3,7 +3,8 @@
 
 use crate::{
     prometheus_metrics::{
-        fetch_system_metrics, LatencyBreakdown, LatencyBreakdownSlice, SystemMetrics,
+        fetch_error_metrics, fetch_system_metrics, LatencyBreakdown, LatencyBreakdownSlice,
+        SystemMetrics,
     },
     Swarm, SwarmExt, TestReport,
 };
@@ -143,6 +144,7 @@ pub struct SuccessCriteria {
     latency_thresholds: Vec<(Duration, LatencyType)>,
     latency_breakdown_thresholds: Option<LatencyBreakdownThreshold>,
     check_no_restarts: bool,
+    check_no_errors: bool,
     max_expired_tps: Option<usize>,
     max_failed_submission_tps: Option<usize>,
     wait_for_all_nodes_to_catchup: Option<Duration>,
@@ -158,12 +160,18 @@ impl SuccessCriteria {
             latency_thresholds: Vec::new(),
             latency_breakdown_thresholds: None,
             check_no_restarts: false,
+            check_no_errors: true,
             max_expired_tps: None,
             max_failed_submission_tps: None,
             wait_for_all_nodes_to_catchup: None,
             system_metrics_threshold: None,
             chain_progress_check: None,
         }
+    }
+
+    pub fn allow_errors(mut self) -> Self {
+        self.check_no_errors = false;
+        self
     }
 
     pub fn add_no_restarts(mut self) -> Self {
@@ -220,7 +228,7 @@ impl SuccessCriteriaChecker {
     ) -> anyhow::Result<()> {
         let traffic_name_addition = traffic_name
             .map(|n| format!(" for {}", n))
-            .unwrap_or_else(|| "".to_string());
+            .unwrap_or_default();
         Self::check_throughput(
             success_criteria.min_avg_tps,
             success_criteria.max_expired_tps,
@@ -295,6 +303,10 @@ impl SuccessCriteriaChecker {
                 .ensure_no_fullnode_restart()
                 .await
                 .context("Failed ensuring no fullnode restarted")?;
+        }
+
+        if success_criteria.check_no_errors {
+            Self::check_no_errors(swarm).await?;
         }
 
         if let Some(system_metrics_threshold) = success_criteria.system_metrics_threshold.clone() {
@@ -530,6 +542,19 @@ impl SuccessCriteriaChecker {
         if !failures.is_empty() {
             bail!("Failed latency check, for {:?}", failures);
         } else {
+            Ok(())
+        }
+    }
+
+    async fn check_no_errors(swarm: &mut dyn Swarm) -> anyhow::Result<()> {
+        let error_count = fetch_error_metrics(swarm).await?;
+        if error_count > 0 {
+            bail!(
+                "error!() count in validator logs was {}, and must be 0",
+                error_count
+            );
+        } else {
+            println!("No error!() found in validator logs");
             Ok(())
         }
     }

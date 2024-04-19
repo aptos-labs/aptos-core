@@ -211,7 +211,7 @@ impl<Loc: Copy, Lbl: Clone + Ord> Eq for BorrowEdge<Loc, Lbl> {}
 
 impl<Loc: Copy, Lbl: Clone + Ord> PartialOrd for BorrowEdge<Loc, Lbl> {
     fn partial_cmp(&self, other: &BorrowEdge<Loc, Lbl>) -> Option<Ordering> {
-        BorrowEdgeNoLoc::new(self).partial_cmp(&BorrowEdgeNoLoc::new(other))
+        Some(self.cmp(other))
     }
 }
 

@@ -8,10 +8,14 @@ on:
     paths:
       - 'third_party/move/**'
       - 'aptos-move/e2e-move-tests/**'
+      - 'aptos-move/framework/**'
+      - '.github/workflows/coverage-move-only.yaml'
   pull_request:
     paths:
       - 'third_party/move/**'
       - 'aptos-move/e2e-move-tests/**'
+      - 'aptos-move/framework/**'
+      - '.github/workflows/coverage-move-only.yaml'
 
 env:
   CARGO_INCREMENTAL: "0"
@@ -30,12 +34,23 @@ jobs:
     steps:
       - uses: actions/checkout@v3
       - uses: aptos-labs/aptos-core/.github/actions/rust-setup@main
+      - name: prepare move lang prover tooling.
+        shell: bash
+        run: |
+          echo 'Z3_EXE='/home/runner/bin/z3 | tee -a $GITHUB_ENV
+          echo 'CVC5_EXE='/home/runner/bin/cvc5 | tee -a $GITHUB_ENV
+          echo 'DOTNET_ROOT='/home/runner/.dotnet/ | tee -a $GITHUB_ENV
+          echo 'BOOGIE_EXE='/home/runner/.dotnet/tools/boogie | tee -a $GITHUB_ENV
+          echo 'MVP_TEST_ON_CI'='1' | tee -a $GITHUB_ENV
+          echo "/home/runner/bin" | tee -a $GITHUB_PATH
+          echo "/home/runner/.dotnet" | tee -a $GITHUB_PATH
+          echo "/home/runner/.dotnet/tools" | tee -a $GITHUB_PATH
       - run: rustup component add llvm-tools-preview
       - uses: taiki-e/install-action@6f1ebcd9e21315fc37d7f7bc851dfcc8356d7da3 # pin@v1.5.6
         with:
           tool: nextest,cargo-llvm-cov
       - run: docker run --detach -p 5432:5432 cimg/postgres:14.2
-      - run: cargo llvm-cov --ignore-run-fail -p "move*" -p e2e-move-tests --lcov --jobs 32 --output-path lcov_unit.info
+      - run: cargo llvm-cov --ignore-run-fail -p aptos-framework -p "move*" --lcov --jobs 32 --output-path lcov_unit.info
         env:
           INDEXER_DATABASE_URL: postgresql://postgres@localhost/postgres
       - uses: actions/upload-artifact@v3
@@ -46,6 +61,7 @@ jobs:
         with:
           name: lcov_unit
       - name: Upload coverage to Codecov
+        continue-on-error: true # Don't fail if the codecov upload fails
         uses: codecov/codecov-action@d9f34f8cd5cb3b3eb79b3e4b5dae3a16df499a70 # pin@v3
         with:
           files: lcov_unit.info

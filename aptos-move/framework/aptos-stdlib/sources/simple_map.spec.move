@@ -24,14 +24,6 @@ spec aptos_std::simple_map {
         pragma intrinsic;
     }
 
-    spec new {
-        pragma intrinsic;
-    }
-
-    spec new_from {
-        pragma intrinsic;
-    }
-
     spec create {
         pragma intrinsic;
     }
@@ -76,6 +68,27 @@ spec aptos_std::simple_map {
         pragma verify=false;
     }
 
+    spec new<Key: store, Value: store>(): SimpleMap<Key, Value> {
+        pragma intrinsic;
+        pragma opaque;
+        aborts_if [abstract] false;
+        ensures [abstract] spec_len(result) == 0;
+        ensures [abstract] forall k: Key: !spec_contains_key(result, k);
+    }
+
+    spec new_from<Key: store, Value: store>(
+    keys: vector<Key>,
+    values: vector<Value>,
+    ): SimpleMap<Key, Value> {
+        pragma intrinsic;
+        pragma opaque;
+        aborts_if [abstract] false;
+        ensures [abstract] spec_len(result) == len(keys);
+        ensures [abstract] forall k: Key: spec_contains_key(result, k) <==> vector::spec_contains(keys, k);
+        ensures [abstract] forall i in 0..len(keys):
+            spec_get(result, vector::borrow(keys, i)) == vector::borrow(values, i);
+    }
+
     spec to_vec_pair<Key: store, Value: store>(map: SimpleMap<Key, Value>): (vector<Key>, vector<Value>) {
         pragma intrinsic;
         pragma opaque;
@@ -93,6 +106,7 @@ spec aptos_std::simple_map {
         ): (std::option::Option<Key>, std::option::Option<Value>) {
         pragma intrinsic;
         pragma opaque;
+        aborts_if [abstract] false;
         ensures [abstract] !spec_contains_key(old(map), key) ==> option::is_none(result_1);
         ensures [abstract] !spec_contains_key(old(map), key) ==> option::is_none(result_2);
         ensures [abstract] spec_contains_key(map, key);

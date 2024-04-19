@@ -3,17 +3,15 @@
 // SPDX-License-Identifier: Apache-2.0
 
 use crate::{
-    event_store::EventStore,
-    ledger_store::LedgerStore,
+    ledger_db::LedgerDb,
     metrics::{
         BACKUP_EPOCH_ENDING_EPOCH, BACKUP_STATE_SNAPSHOT_LEAF_IDX, BACKUP_STATE_SNAPSHOT_VERSION,
         BACKUP_TXN_VERSION,
     },
     state_store::StateStore,
-    transaction_store::TransactionStore,
 };
-use anyhow::{anyhow, ensure, Context, Result};
 use aptos_crypto::hash::HashValue;
+use aptos_storage_interface::{db_ensure as ensure, AptosDbError, Result};
 use aptos_types::{
     contract_event::ContractEvent,
     ledger_info::LedgerInfoWithSignatures,
@@ -28,24 +26,15 @@ use std::{fmt, sync::Arc};
 /// `BackupHandler` provides functionalities for AptosDB data backup.
 #[derive(Clone)]
 pub struct BackupHandler {
-    ledger_store: Arc<LedgerStore>,
-    transaction_store: Arc<TransactionStore>,
     state_store: Arc<StateStore>,
-    event_store: Arc<EventStore>,
+    ledger_db: Arc<LedgerDb>,
 }
 
 impl BackupHandler {
-    pub(crate) fn new(
-        ledger_store: Arc<LedgerStore>,
-        transaction_store: Arc<TransactionStore>,
-        state_store: Arc<StateStore>,
-        event_store: Arc<EventStore>,
-    ) -> Self {
+    pub(crate) fn new(state_store: Arc<StateStore>, ledger_db: Arc<LedgerDb>) -> Self {
         Self {
-            ledger_store,
-            transaction_store,
             state_store,
-            event_store,
+            ledger_db,
         }
     }
 
@@ -58,34 +47,44 @@ impl BackupHandler {
         impl Iterator<Item = Result<(Transaction, TransactionInfo, Vec<ContractEvent>, WriteSet)>> + '_,
     > {
         let txn_iter = self
-            .transaction_store
+            .ledger_db
+            .transaction_db()
             .get_transaction_iter(start_version, num_transactions)?;
         let mut txn_info_iter = self
-            .ledger_store
+            .ledger_db
+            .transaction_info_db()
             .get_transaction_info_iter(start_version, num_transactions)?;
         let mut event_vec_iter = self
-            .event_store
+            .ledger_db
+            .event_db()
             .get_events_by_version_iter(start_version, num_transactions)?;
         let mut write_set_iter = self
-            .transaction_store
+            .ledger_db
+            .write_set_db()
             .get_write_set_iter(start_version, num_transactions)?;
 
         let zipped = txn_iter.enumerate().map(move |(idx, txn_res)| {
             let version = start_version + idx as u64; // overflow is impossible since it's check upon txn_iter construction.
 
             let txn = txn_res?;
-            let txn_info = txn_info_iter
-                .next()
-                .ok_or_else(|| anyhow!("TransactionInfo not found when Transaction exists."))
-                .context(version)??;
-            let event_vec = event_vec_iter
-                .next()
-                .ok_or_else(|| anyhow!("Events not found when Transaction exists."))
-                .context(version)??;
-            let write_set = write_set_iter
-                .next()
-                .ok_or_else(|| anyhow!("WriteSet not found when Transaction exists."))
-                .context(version)??;
+            let txn_info = txn_info_iter.next().ok_or_else(|| {
+                AptosDbError::NotFound(format!(
+                    "TransactionInfo not found when Transaction exists, version {}",
+                    version
+                ))
+            })??;
+            let event_vec = event_vec_iter.next().ok_or_else(|| {
+                AptosDbError::NotFound(format!(
+                    "Events not found when Transaction exists., version {}",
+                    version
+                ))
+            })??;
+            let write_set = write_set_iter.next().ok_or_else(|| {
+                AptosDbError::NotFound(format!(
+                    "WriteSet not found when Transaction exists, version {}",
+                    version
+                ))
+            })??;
             BACKUP_TXN_VERSION.set(version as i64);
             Ok((txn, txn_info, event_vec, write_set))
         });
@@ -106,13 +105,17 @@ impl BackupHandler {
             last_version
         );
         let num_transactions = last_version - first_version + 1;
-        let epoch = self.ledger_store.get_epoch(last_version)?;
-        let ledger_info = self.ledger_store.get_latest_ledger_info_in_epoch(epoch)?;
-        let accumulator_proof = self.ledger_store.get_transaction_range_proof(
-            Some(first_version),
-            num_transactions,
-            ledger_info.ledger_info().version(),
-        )?;
+        let ledger_metadata_db = self.ledger_db.metadata_db();
+        let epoch = ledger_metadata_db.get_epoch(last_version)?;
+        let ledger_info = ledger_metadata_db.get_latest_ledger_info_in_epoch(epoch)?;
+        let accumulator_proof = self
+            .ledger_db
+            .transaction_accumulator_db()
+            .get_transaction_range_proof(
+                Some(first_version),
+                num_transactions,
+                ledger_info.ledger_info().version(),
+            )?;
         Ok((accumulator_proof, ledger_info))
     }
 
@@ -146,7 +149,8 @@ impl BackupHandler {
     /// Gets the epoch, committed version, and synced version of the DB.
     pub fn get_db_state(&self) -> Result<Option<DbState>> {
         Ok(self
-            .ledger_store
+            .ledger_db
+            .metadata_db()
             .get_latest_ledger_info_option()
             .map(|li| DbState {
                 epoch: li.ledger_info().epoch(),
@@ -160,11 +164,17 @@ impl BackupHandler {
         &self,
         version: Version,
     ) -> Result<(TransactionInfoWithProof, LedgerInfoWithSignatures)> {
-        let epoch = self.ledger_store.get_epoch(version)?;
-        let ledger_info = self.ledger_store.get_latest_ledger_info_in_epoch(epoch)?;
+        let ledger_metadata_db = self.ledger_db.metadata_db();
+        let epoch = ledger_metadata_db.get_epoch(version)?;
+        let ledger_info = ledger_metadata_db.get_latest_ledger_info_in_epoch(epoch)?;
         let txn_info = self
-            .ledger_store
-            .get_transaction_info_with_proof(version, ledger_info.ledger_info().version())?;
+            .ledger_db
+            .transaction_info_db()
+            .get_transaction_info_with_proof(
+                version,
+                ledger_info.ledger_info().version(),
+                self.ledger_db.transaction_accumulator_db(),
+            )?;
 
         Ok((txn_info, ledger_info))
     }
@@ -175,7 +185,8 @@ impl BackupHandler {
         end_epoch: u64,
     ) -> Result<impl Iterator<Item = Result<LedgerInfoWithSignatures>> + '_> {
         Ok(self
-            .ledger_store
+            .ledger_db
+            .metadata_db()
             .get_epoch_ending_ledger_info_iter(start_epoch, end_epoch)?
             .enumerate()
             .map(move |(idx, li)| {

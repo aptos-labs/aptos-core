@@ -23,7 +23,10 @@ use move_compiler::{
     command_line::SKIP_ATTRIBUTE_CHECKS, shared::known_attributes::KnownAttribute,
 };
 use move_core_types::account_address::AccountAddress;
-use move_model::model;
+use move_model::{
+    metadata::{CompilerVersion, LanguageVersion},
+    model,
+};
 use serde::{Deserialize, Serialize};
 use source_package::layout::SourcePackageLayout;
 use std::{
@@ -164,20 +167,14 @@ pub struct CompilerConfig {
     pub skip_attribute_checks: bool,
 
     /// Compiler version to use
-    #[clap(long = "compiler-version", global = true)]
+    #[clap(long = "compiler-version", global = true,
+           value_parser = clap::value_parser!(CompilerVersion))]
     pub compiler_version: Option<CompilerVersion>,
-}
 
-#[derive(ValueEnum, Clone, Copy, Debug, Serialize, Deserialize, Eq, PartialEq, PartialOrd)]
-pub enum CompilerVersion {
-    V1,
-    V2,
-}
-
-impl Default for CompilerVersion {
-    fn default() -> Self {
-        Self::V1
-    }
+    /// Language version to support
+    #[clap(long = "language-version", global = true,
+           value_parser = clap::value_parser!(LanguageVersion))]
+    pub language_version: Option<LanguageVersion>,
 }
 
 #[derive(Debug, Clone, Eq, PartialEq, PartialOrd)]
@@ -187,6 +184,10 @@ pub struct ModelConfig {
     /// If set, a string how targets are filtered. A target is included if its file name
     /// contains this string. This is similar as the `cargo test <string>` idiom.
     pub target_filter: Option<String>,
+    /// The compiler version used to build the model
+    pub compiler_version: CompilerVersion,
+    /// The language version used to build the model
+    pub language_version: LanguageVersion,
 }
 
 impl BuildConfig {

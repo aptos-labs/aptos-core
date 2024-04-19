@@ -80,7 +80,7 @@ pub fn create_signed_p2p_transaction(
     receivers: Vec<&TestAccount>,
 ) -> Vec<AnalyzedTransaction> {
     let mut transactions = Vec::new();
-    for (_, receiver) in receivers.iter().enumerate() {
+    for receiver in receivers.iter() {
         let transaction_payload = TransactionPayload::EntryFunction(EntryFunction::new(
             ModuleId::new(AccountAddress::ONE, Identifier::new("coin").unwrap()),
             Identifier::new("transfer").unwrap(),
@@ -197,7 +197,7 @@ pub fn verify_partitioner_output(
             old_txn_idxs_seen.insert(old_txn_idx);
             old_txn_idxs_by_sender
                 .entry(sender)
-                .or_insert_with(Vec::new)
+                .or_default()
                 .push(old_txn_idx);
             let new_txn_idx = start_txn_idx + pos_in_sub_block;
             for loc in txn_with_dep.txn.write_hints().iter() {

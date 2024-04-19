@@ -27,18 +27,19 @@ use aptos_experimental_runtimes::thread_manager::{optimal_min_len, THREAD_MANAGE
 use aptos_infallible::{Mutex, RwLock};
 use aptos_logger::prelude::*;
 use aptos_metrics_core::TimerHelper;
-use aptos_state_view::StateViewId;
 use aptos_storage_interface::{
     async_proof_fetcher::AsyncProofFetcher, cached_state_view::CachedStateView,
     state_delta::StateDelta, DbReaderWriter, ExecutedTrees,
 };
 use aptos_types::{
+    block_executor::config::BlockExecutorConfigFromOnchain,
     contract_event::ContractEvent,
     ledger_info::LedgerInfoWithSignatures,
+    state_store::StateViewId,
     transaction::{
-        signature_verified_transaction::SignatureVerifiedTransaction, Transaction, TransactionInfo,
-        TransactionListWithProof, TransactionOutput, TransactionOutputListWithProof,
-        TransactionStatus, Version,
+        signature_verified_transaction::SignatureVerifiedTransaction, Transaction,
+        TransactionAuxiliaryData, TransactionInfo, TransactionListWithProof, TransactionOutput,
+        TransactionOutputListWithProof, TransactionStatus, Version,
     },
     write_set::WriteSet,
 };
@@ -156,13 +157,13 @@ impl<V: VMExecutor> ChunkExecutorInner<V> {
 
     fn latest_state_view(&self, latest_state: &StateDelta) -> Result<CachedStateView> {
         let first_version = latest_state.next_version();
-        CachedStateView::new(
+        Ok(CachedStateView::new(
             StateViewId::ChunkExecution { first_version },
             self.db.reader.clone(),
             first_version,
             latest_state.current.clone(),
             Arc::new(AsyncProofFetcher::new(self.db.reader.clone())),
-        )
+        )?)
     }
 
     fn commit_chunk_impl(&self) -> Result<ExecutedChunk> {
@@ -272,7 +273,11 @@ impl<V: VMExecutor> ChunkExecutorInner<V> {
         let chunk_output = {
             let _timer = APTOS_EXECUTOR_VM_EXECUTE_CHUNK_SECONDS.start_timer();
             // State sync executor shouldn't have block gas limit.
-            ChunkOutput::by_transaction_execution::<V>(sig_verified_txns.into(), state_view, None)?
+            ChunkOutput::by_transaction_execution::<V>(
+                sig_verified_txns.into(),
+                state_view,
+                BlockExecutorConfigFromOnchain::new_no_block_limit(),
+            )?
         };
 
         // Calcualte state snapshot
@@ -413,12 +418,18 @@ impl<V: VMExecutor> ChunkExecutorInner<V> {
         } = chunk;
 
         let first_version = parent_accumulator.num_leaves();
-        let num_overlap = txn_infos_with_proof.verify_extends_ledger(
-            first_version,
-            parent_accumulator.root_hash(),
-            Some(first_version),
-        )?;
-        assert_eq!(num_overlap, 0, "overlapped chunks");
+
+        // In consensus-only mode, we cannot verify the proof against the executed output,
+        // because the proof returned by the remote peer is an empty one.
+        #[cfg(not(feature = "consensus-only-perf-test"))]
+        {
+            let num_overlap = txn_infos_with_proof.verify_extends_ledger(
+                first_version,
+                parent_accumulator.root_hash(),
+                Some(first_version),
+            )?;
+            assert_eq!(num_overlap, 0, "overlapped chunks");
+        }
 
         let (ledger_update_output, to_discard, to_retry) = {
             let _timer =
@@ -674,8 +685,11 @@ impl<V: VMExecutor> ChunkExecutorInner<V> {
             .collect::<Vec<SignatureVerifiedTransaction>>();
 
         // State sync executor shouldn't have block gas limit.
-        let chunk_output =
-            ChunkOutput::by_transaction_execution::<V>(txns.into(), state_view, None)?;
+        let chunk_output = ChunkOutput::by_transaction_execution::<V>(
+            txns.into(),
+            state_view,
+            BlockExecutorConfigFromOnchain::new_no_block_limit(),
+        )?;
         // not `zip_eq`, deliberately
         for (version, txn_out, txn_info, write_set, events) in multizip((
             begin_version..end_version,
@@ -731,6 +745,7 @@ impl<V: VMExecutor> ChunkExecutorInner<V> {
                     events,
                     txn_info.gas_used(),
                     TransactionStatus::Keep(txn_info.status().clone()),
+                    TransactionAuxiliaryData::default(), // No auxiliary data if transaction is not executed through VM
                 ),
             )
         })
@@ -746,7 +761,6 @@ impl<V: VMExecutor> ChunkExecutorInner<V> {
                     .map(|txn_info| txn_info.state_checkpoint_hash())
                     .collect(),
             ),
-            None,
         )?;
         ensure_no_discard(to_discard)?;
         ensure_no_retry(to_retry)?;

@@ -5,6 +5,7 @@ mod event_store_pruner;
 mod ledger_metadata_pruner;
 pub(crate) mod ledger_pruner_manager;
 mod transaction_accumulator_pruner;
+mod transaction_auxiliary_data_pruner;
 mod transaction_info_pruner;
 mod transaction_pruner;
 mod write_set_pruner;
@@ -18,15 +19,17 @@ use crate::{
         ledger_pruner::{
             event_store_pruner::EventStorePruner, ledger_metadata_pruner::LedgerMetadataPruner,
             transaction_accumulator_pruner::TransactionAccumulatorPruner,
+            transaction_auxiliary_data_pruner::TransactionAuxiliaryDataPruner,
             transaction_info_pruner::TransactionInfoPruner, transaction_pruner::TransactionPruner,
             write_set_pruner::WriteSetPruner,
         },
     },
-    EventStore, TransactionStore,
+    transaction_store::TransactionStore,
 };
-use anyhow::{anyhow, Result};
+use anyhow::anyhow;
 use aptos_experimental_runtimes::thread_manager::THREAD_MANAGER;
 use aptos_logger::info;
+use aptos_storage_interface::Result;
 use aptos_types::transaction::{AtomicVersion, Version};
 use rayon::prelude::*;
 use std::{
@@ -127,28 +130,30 @@ impl LedgerPruner {
         let transaction_store = Arc::new(TransactionStore::new(Arc::clone(&ledger_db)));
 
         let event_store_pruner = Box::new(EventStorePruner::new(
-            Arc::new(EventStore::new(ledger_db.event_db_arc())),
-            ledger_db.event_db_arc(),
+            Arc::clone(&ledger_db),
             metadata_progress,
         )?);
         let transaction_accumulator_pruner = Box::new(TransactionAccumulatorPruner::new(
-            Arc::clone(&transaction_store),
-            ledger_db.transaction_accumulator_db_arc(),
+            Arc::clone(&ledger_db),
             metadata_progress,
         )?);
+
+        let transaction_auxiliary_data_pruner = Box::new(TransactionAuxiliaryDataPruner::new(
+            Arc::clone(&ledger_db),
+            metadata_progress,
+        )?);
+
         let transaction_info_pruner = Box::new(TransactionInfoPruner::new(
-            Arc::clone(&transaction_store),
-            ledger_db.transaction_info_db_arc(),
+            Arc::clone(&ledger_db),
             metadata_progress,
         )?);
         let transaction_pruner = Box::new(TransactionPruner::new(
             Arc::clone(&transaction_store),
-            ledger_db.transaction_db_arc(),
+            Arc::clone(&ledger_db),
             metadata_progress,
         )?);
         let write_set_pruner = Box::new(WriteSetPruner::new(
-            Arc::clone(&transaction_store),
-            ledger_db.write_set_db_arc(),
+            Arc::clone(&ledger_db),
             metadata_progress,
         )?);
 
@@ -159,6 +164,7 @@ impl LedgerPruner {
             sub_pruners: vec![
                 event_store_pruner,
                 transaction_accumulator_pruner,
+                transaction_auxiliary_data_pruner,
                 transaction_info_pruner,
                 transaction_pruner,
                 write_set_pruner,

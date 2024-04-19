@@ -109,7 +109,7 @@ fn fail_generic(
 }
 
 // Generates a vector of a vector of strings. Used to produce big size arguments
-// that require more than 1 byte lenght when compressed in uleb128
+// that require more than 1 byte length when compressed in uleb128
 fn big_string_vec(first_dim: u64, second_dim: u64, base: &str) -> Vec<u8> {
     let mut outer = vec![];
     for i in 0..first_dim {
@@ -656,4 +656,27 @@ fn string_args_generic_instantiation() {
     let string_type = TypeTag::Struct(Box::new(string_struct));
 
     success_generic(vec![string_type, address_type], tests);
+}
+
+#[test]
+fn huge_string_args_are_not_allowed() {
+    let mut tests = vec![];
+    let mut len: u64 = 1_000_000_000_000;
+    let mut big_str_arg = vec![];
+    loop {
+        let cur = len & 0x7F;
+        if cur != len {
+            big_str_arg.push((cur | 0x80) as u8);
+            len >>= 7;
+        } else {
+            big_str_arg.push(cur as u8);
+            break;
+        }
+    }
+    tests.push((
+        "0xcafe::test::hi",
+        vec![big_str_arg],
+        deserialization_failure(),
+    ));
+    fail(tests);
 }

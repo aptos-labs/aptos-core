@@ -1076,7 +1076,7 @@ object "test_A2_Tables_test_primitive" {
                 }
                 case 31 {
                     // label L27
-                    // destroy($t103)
+                    // drop($t103)
                     // $t108 := 109
                     $t108 := 109
                     // abort($t108)
@@ -1905,7 +1905,7 @@ object "test_A2_Tables_test_struct" {
                 }
                 case 10 {
                     // label L6
-                    // destroy($t55)
+                    // drop($t55)
                     // $t66 := 103
                     $t66 := 103
                     // abort($t66)
@@ -1941,7 +1941,7 @@ object "test_A2_Tables_test_struct" {
                 }
                 case 13 {
                     // label L9
-                    // destroy($t55)
+                    // drop($t55)
                     // $t74 := 104
                     $t74 := 104
                     // abort($t74)
@@ -1999,7 +1999,7 @@ object "test_A2_Tables_test_struct" {
                 }
                 case 16 {
                     // label L12
-                    // destroy($t55)
+                    // drop($t55)
                     // $t91 := 105
                     $t91 := 105
                     // abort($t91)
@@ -2032,7 +2032,7 @@ object "test_A2_Tables_test_struct" {
                 }
                 case 19 {
                     // label L15
-                    // destroy($t55)
+                    // drop($t55)
                     // $t97 := 106
                     $t97 := 106
                     // abort($t97)
@@ -3648,7 +3648,7 @@ object "test_A2_Tables_test_vector" {
                 }
                 case 16 {
                     // label L12
-                    // destroy($t63)
+                    // drop($t63)
                     // $t76 := 105
                     $t76 := 105
                     // abort($t76)
@@ -3688,7 +3688,7 @@ object "test_A2_Tables_test_vector" {
                 }
                 case 19 {
                     // label L15
-                    // destroy($t63)
+                    // drop($t63)
                     // $t86 := 106
                     $t86 := 106
                     // abort($t86)
@@ -3726,7 +3726,7 @@ object "test_A2_Tables_test_vector" {
                 }
                 case 22 {
                     // label L18
-                    // destroy($t63)
+                    // drop($t63)
                     // $t94 := 107
                     $t94 := 107
                     // abort($t94)
@@ -3758,7 +3758,7 @@ object "test_A2_Tables_test_vector" {
                 }
                 case 25 {
                     // label L21
-                    // destroy($t63)
+                    // drop($t63)
                     // $t101 := 108
                     $t101 := 108
                     // abort($t101)
@@ -3790,7 +3790,7 @@ object "test_A2_Tables_test_vector" {
                 }
                 case 28 {
                     // label L24
-                    // destroy($t63)
+                    // drop($t63)
                     // $t108 := 109
                     $t108 := 109
                     // abort($t108)

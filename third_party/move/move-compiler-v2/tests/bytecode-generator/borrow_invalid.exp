@@ -1,36 +1,7 @@
-// ---- Model Dump
-module 0x42::borrow {
-    struct S {
-        f: u64,
-    }
-    private fun mut_expr(x: u64): u64 {
-        {
-          let r: &mut u64 = Borrow(Mutable)(Add<u64>(x, 1));
-          r = 22;
-          Deref(r)
-        }
-    }
-    private fun mut_field(s: &borrow::S): u64 {
-        {
-          let r: &mut u64 = Borrow(Mutable)(select borrow::S.f(s));
-          r = 22;
-          Deref(r)
-        }
-    }
-    spec fun $mut_expr(x: u64): u64;
-    spec fun $mut_field(s: &borrow::S): u64;
-} // end 0x42::borrow
-
 
 Diagnostics:
-error: operand to `&mut` must be a field selection (`&mut s.f`) or a local (`&mut name`)
-   ┌─ tests/bytecode-generator/borrow_invalid.move:14:22
-   │
-14 │         let r = &mut (x + 1);
-   │                      ^^^^^^^
-
-error: operand to `&mut _.f` must have type `&mut borrow::S` or be a local of type `borrow::S`
-  ┌─ tests/bytecode-generator/borrow_invalid.move:8:22
+error: cannot mutably borrow from an immutable ref
+  ┌─ tests/bytecode-generator/borrow_invalid.move:8:17
   │
 8 │         let r = &mut s.f;
-  │                      ^
+  │                 ^^^^^^^^

@@ -39,9 +39,9 @@ use aptos_types::{
         state_value::{StateValue, StateValueChunkWithProof},
     },
     transaction::{
-        RawTransaction, Script, SignedTransaction, Transaction, TransactionListWithProof,
-        TransactionOutput, TransactionOutputListWithProof, TransactionPayload, TransactionStatus,
-        Version,
+        RawTransaction, Script, SignedTransaction, Transaction, TransactionAuxiliaryData,
+        TransactionListWithProof, TransactionOutput, TransactionOutputListWithProof,
+        TransactionPayload, TransactionStatus, Version,
     },
     write_set::WriteSet,
 };
@@ -863,11 +863,7 @@ impl ResponseCallback for NoopResponseCallback {
 /// Creates a data client response using a specified payload and random id
 pub fn create_data_client_response<T>(payload: T) -> Response<T> {
     let id = create_random_u64(MAX_RESPONSE_ID);
-    let response_callback = Box::new(NoopResponseCallback);
-    let context = ResponseContext {
-        id,
-        response_callback,
-    };
+    let context = ResponseContext::new(id, Box::new(NoopResponseCallback));
     Response::new(context, payload)
 }
 
@@ -997,7 +993,13 @@ fn create_transaction() -> Transaction {
 
 /// Creates an empty transaction output
 fn create_transaction_output() -> TransactionOutput {
-    TransactionOutput::new(WriteSet::default(), vec![], 0, TransactionStatus::Retry)
+    TransactionOutput::new(
+        WriteSet::default(),
+        vec![],
+        0,
+        TransactionStatus::Retry,
+        TransactionAuxiliaryData::default(),
+    )
 }
 
 /// Returns a random u64 with a value between 0 and `max_value` - 1 (inclusive).

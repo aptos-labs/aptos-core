@@ -5,7 +5,7 @@ use anyhow::{bail, format_err, Result};
 use aptos_config::keys::ConfigKey;
 use aptos_crypto::{ed25519::Ed25519PrivateKey, encoding_type::EncodingType};
 use aptos_sdk::types::chain_id::ChainId;
-use aptos_transaction_generator_lib::args::TransactionTypeArg;
+use aptos_transaction_generator_lib::{args::TransactionTypeArg, AccountType};
 use clap::{ArgGroup, Parser};
 use serde::{Deserialize, Serialize};
 use std::{
@@ -70,11 +70,17 @@ pub struct ClusterArgs {
     #[clap(long, conflicts_with = "targets")]
     pub targets_file: Option<String>,
 
-    #[clap(long, default_value_t = ChainId::test())]
-    pub chain_id: ChainId,
+    // If the chain_id is not provided, it is derived from the targets.
+    #[clap(long)]
+    pub chain_id: Option<ChainId>,
 
     #[clap(flatten)]
     pub coin_source_args: CoinSourceArgs,
+
+    /// Key to use for ratelimiting purposes with the node API. This value will be used
+    /// as `Authorization: Bearer <key>`.
+    #[clap(long, env)]
+    pub node_api_key: Option<String>,
 }
 
 impl ClusterArgs {
@@ -132,6 +138,9 @@ pub struct EmitArgs {
     )]
     pub transaction_type: Vec<TransactionTypeArg>,
 
+    #[clap(long, value_enum, default_value = "local", ignore_case = true)]
+    pub account_type: AccountType,
+
     /// Number of copies of the modules that will be published,
     /// under separate accounts, creating independent contracts,
     /// removing contention.
@@ -160,6 +169,9 @@ pub struct EmitArgs {
     pub max_gas_per_txn: Option<u64>,
 
     #[clap(long)]
+    pub init_max_gas_per_txn: Option<u64>,
+
+    #[clap(long)]
     pub init_gas_price_multiplier: Option<u64>,
 
     #[clap(long)]
@@ -169,7 +181,20 @@ pub struct EmitArgs {
     pub expected_gas_per_txn: Option<u64>,
 
     #[clap(long)]
+    pub expected_gas_per_transfer: Option<u64>,
+
+    #[clap(long)]
+    pub expected_gas_per_account_create: Option<u64>,
+
+    #[clap(long, conflicts_with = "num_accounts")]
     pub max_transactions_per_account: Option<usize>,
+
+    #[clap(long, conflicts_with = "max_transactions_per_account")]
+    pub num_accounts: Option<usize>,
+
+    #[clap(long, default_value = "false")]
+    /// Skip minting account during initialization
+    pub skip_minting_accounts: bool,
 
     #[clap(long)]
     pub latency_polling_interval_s: Option<f32>,

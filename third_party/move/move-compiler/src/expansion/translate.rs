@@ -13,9 +13,9 @@ use crate::{
         byte_string, hex_string,
     },
     parser::ast::{
-        self as P, Ability, AccessSpecifier_, AddressSpecifier_, ConstantName, Field, FunctionName,
-        LeadingNameAccess, LeadingNameAccess_, ModuleMember, ModuleName, NameAccessChain,
-        NameAccessChain_, StructName, Var,
+        self as P, Ability, AccessSpecifier_, AddressSpecifier_, CallKind, ConstantName, Field,
+        FunctionName, LeadingNameAccess, LeadingNameAccess_, ModuleMember, ModuleName,
+        NameAccessChain, NameAccessChain_, StructName, Var,
     },
     shared::{
         known_attributes::{AttributeKind, AttributePosition, KnownAttribute},
@@ -248,7 +248,7 @@ pub fn program(
         for s in scripts {
             collected
                 .entry(s.function_name.value())
-                .or_insert_with(Vec::new)
+                .or_default()
                 .push(s)
         }
         let mut keyed: BTreeMap<Symbol, E::Script> = BTreeMap::new();
@@ -523,7 +523,6 @@ fn module_(
             .add_diag(diag!(Declarations::InvalidName, (name.loc(), msg)));
     }
 
-    let name = name;
     let name_loc = name.0.loc;
     let current_module = sp(name_loc, ModuleIdent_::new(*context.cur_address(), name));
     if context
@@ -747,7 +746,7 @@ fn unique_attributes(
                             .add_diag(diag!(Declarations::UnknownAttribute, (nloc, msg)));
                     } else if is_nested && known_attributes.contains(sym.as_str()) {
                         let msg = format!(
-                            "Known attribute '{}' is not expected in a nested attribute position.",
+                            "Attribute '{}' is not expected in a nested attribute position.",
                             sym.as_str()
                         );
                         context
@@ -761,7 +760,7 @@ fn unique_attributes(
                 debug_assert!(known.name() == sym.as_str());
                 if is_nested {
                     let msg = format!(
-                        "Known attribute '{}' is not expected in a nested attribute position",
+                        "Attribute '{}' is not expected in a nested attribute position",
                         sym.as_str()
                     );
                     context
@@ -773,7 +772,7 @@ fn unique_attributes(
                 let expected_positions = known.expected_positions();
                 if !expected_positions.contains(&attr_position) {
                     let msg = format!(
-                        "Known attribute '{}' is not expected with a {}",
+                        "Attribute '{}' is not expected with a {}",
                         known.name(),
                         attr_position
                     );
@@ -1811,7 +1810,8 @@ fn access_specifier_name_access_chain(
 
 fn address_specifier(context: &mut Context, specifier: P::AddressSpecifier) -> E::AddressSpecifier {
     let s = match specifier.value {
-        AddressSpecifier_::Empty | AddressSpecifier_::Any => E::AddressSpecifier_::Any,
+        AddressSpecifier_::Empty => E::AddressSpecifier_::Empty,
+        AddressSpecifier_::Any => E::AddressSpecifier_::Any,
         AddressSpecifier_::Literal(addr) => E::AddressSpecifier_::Literal(addr),
         AddressSpecifier_::Name(name) => E::AddressSpecifier_::Name(name),
         AddressSpecifier_::Call(chain, type_args, name) => {
@@ -2443,17 +2443,25 @@ fn exp_(context: &mut Context, sp!(loc, pe_): P::Exp) -> E::Exp {
                 },
             }
         },
-        PE::Call(pn, is_macro, ptys_opt, sp!(rloc, prs)) => {
+        PE::Call(pn, kind, ptys_opt, sp!(rloc, prs)) => {
             let tys_opt = optional_types(context, ptys_opt);
             let ers = sp(rloc, exps(context, prs));
-            let en_opt = name_access_chain(
-                context,
-                Access::ApplyPositional,
-                pn,
-                Some(DeprecatedItem::Function),
-            );
+            let en_opt = if kind != CallKind::Receiver {
+                name_access_chain(
+                    context,
+                    Access::ApplyPositional,
+                    pn,
+                    Some(DeprecatedItem::Function),
+                )
+            } else {
+                // Skip resolution for receiver calls, which are expected to use a single name
+                let P::NameAccessChain_::One(name) = pn.value else {
+                    panic!("unexpected qualified name in receiver call")
+                };
+                Some(E::ModuleAccess::new(pn.loc, E::ModuleAccess_::Name(name)))
+            };
             match en_opt {
-                Some(en) => EE::Call(en, is_macro, tys_opt, ers),
+                Some(en) => EE::Call(en, kind, tys_opt, ers),
                 None => {
                     assert!(context.env.has_errors());
                     EE::UnresolvedError

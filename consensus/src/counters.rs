@@ -6,7 +6,7 @@ use crate::{
     block_storage::tracing::{observe_block, BlockStage},
     quorum_store,
 };
-use aptos_consensus_types::executed_block::ExecutedBlock;
+use aptos_consensus_types::pipelined_block::PipelinedBlock;
 use aptos_metrics_core::{
     exponential_buckets, op_counters::DurationHistogram, register_avg_counter, register_counter,
     register_gauge, register_gauge_vec, register_histogram, register_histogram_vec,
@@ -230,6 +230,14 @@ pub static LEADER_REPUTATION_ROUND_HISTORY_SIZE: Lazy<IntGauge> = Lazy::new(|| {
         "Total number of new block events in the current reputation window"
     )
     .unwrap()
+});
+
+/// Counts when chain_health backoff is triggered
+pub static CONSENSUS_WITHOLD_VOTE_BACKPRESSURE_TRIGGERED: Lazy<Histogram> = Lazy::new(|| {
+    register_avg_counter(
+        "aptos_consensus_withold_vote_backpressure_triggered",
+        "Counts when consensus vote_backpressure is triggered",
+    )
 });
 
 /// Counts when chain_health backoff is triggered
@@ -594,12 +602,23 @@ pub static NUM_TXNS_PER_BLOCK: Lazy<Histogram> = Lazy::new(|| {
     .unwrap()
 });
 
+// Histogram buckets that expand DEFAULT_BUCKETS with more granularity:
+// * 0.3 to 2.0: step 0.1
+// * 2.0 to 4.0: step 0.2
+// * 4.0 to 7.5: step 0.5
+const BLOCK_TRACING_BUCKETS: &[f64] = &[
+    0.005, 0.01, 0.025, 0.05, 0.1, 0.15, 0.2, 0.25, 0.3, 0.4, 0.5, 0.6, 0.7, 0.8, 0.9, 1.0, 1.1,
+    1.2, 1.3, 1.4, 1.5, 1.6, 1.7, 1.8, 1.9, 2.0, 2.2, 2.4, 2.6, 2.8, 3.0, 3.2, 3.4, 3.6, 3.8, 4.0,
+    4.5, 5.0, 5.5, 6.0, 6.5, 7.0, 7.5, 10.0,
+];
+
 /// Traces block movement throughout the node
 pub static BLOCK_TRACING: Lazy<HistogramVec> = Lazy::new(|| {
     register_histogram_vec!(
         "aptos_consensus_block_tracing",
         "Histogram for different stages of a block",
-        &["stage"]
+        &["stage"],
+        BLOCK_TRACING_BUCKETS.to_vec()
     )
     .unwrap()
 });
@@ -615,6 +634,21 @@ pub static WAIT_DURATION_S: Lazy<DurationHistogram> = Lazy::new(|| {
     DurationHistogram::new(register_histogram!("aptos_consensus_wait_duration_s",
     "Histogram of the time it requires to wait before inserting blocks into block store. Measured as the block's timestamp minus the local timestamp.",
     CONSENSUS_WAIT_DURATION_BUCKETS.to_vec()).unwrap())
+});
+
+const VERIFY_BUCKETS: &[f64] = &[
+    0.0001, 0.00025, 0.0005, 0.001, 0.0015, 0.002, 0.0025, 0.003, 0.0035, 0.004, 0.005, 0.006,
+    0.007, 0.008, 0.009, 0.01, 0.025, 0.05, 0.1, 0.25, 0.5, 1.0,
+];
+
+pub static VERIFY_MSG: Lazy<HistogramVec> = Lazy::new(|| {
+    register_histogram_vec!(
+        "aptos_consensus_verify_msg",
+        "Histogram of the time it takes to verify a message",
+        &["msg"],
+        VERIFY_BUCKETS.to_vec()
+    )
+    .unwrap()
 });
 
 ///////////////////
@@ -815,11 +849,51 @@ pub static BUFFER_MANAGER_PHASE_PROCESS_SECONDS: Lazy<HistogramVec> = Lazy::new(
     .unwrap()
 });
 
+/// Count of the number of `ProposalExt` blocks received while the feature is disabled.
+pub static UNEXPECTED_PROPOSAL_EXT_COUNT: Lazy<IntCounter> = Lazy::new(|| {
+    register_int_counter!(
+        "aptos_consensus_unexpected_proposal_ext_count",
+        "Count of the number of `ProposalExt` blocks received while the feature is disabled."
+    )
+    .unwrap()
+});
+
+/// Histogram for the number of txns to be executed in a block.
+pub static MAX_TXNS_FROM_BLOCK_TO_EXECUTE: Lazy<Histogram> = Lazy::new(|| {
+    register_histogram!(
+        "max_txns_from_block_to_execute",
+        "Histogram for the number of txns to be executed in a block.",
+        exponential_buckets(/*start=*/ 1.5, /*factor=*/ 1.5, /*count=*/ 25).unwrap(),
+    )
+    .unwrap()
+});
+
+/// Count of the number of `DKG` validator transactions received while the feature is disabled.
+pub static UNEXPECTED_DKG_VTXN_COUNT: Lazy<IntCounter> = Lazy::new(|| {
+    register_int_counter!(
+        "aptos_consensus_unexpected_dkg_vtxn_count",
+        "Count of the number of `DKG` validator transactions received while the feature is disabled."
+    )
+        .unwrap()
+});
+
+/// Histogram of the time durations for fetching commit history.
+pub static FETCH_COMMIT_HISTORY_DURATION: Lazy<DurationHistogram> = Lazy::new(|| {
+    DurationHistogram::new(
+        register_histogram!(
+            "aptos_consensus_fetch_commit_history_duration",
+            "Histogram of the time durations for fetching commit history.",
+            // exponential_buckets(/*start=*/ 100.0, /*factor=*/ 1.1, /*count=*/ 100).unwrap(),
+        )
+        .unwrap(),
+    )
+});
+
 /// Update various counters for committed blocks
-pub fn update_counters_for_committed_blocks(blocks_to_commit: &[Arc<ExecutedBlock>]) {
+pub fn update_counters_for_committed_blocks(blocks_to_commit: &[Arc<PipelinedBlock>]) {
     for block in blocks_to_commit {
         observe_block(block.block().timestamp_usecs(), BlockStage::COMMITTED);
-        let txn_status = block.compute_result().compute_status();
+        let txn_status = block.compute_result().compute_status_for_input_txns();
         NUM_TXNS_PER_BLOCK.observe(txn_status.len() as f64);
         COMMITTED_BLOCKS_COUNT.inc();
         LAST_COMMITTED_ROUND.set(block.round() as i64);
@@ -858,3 +932,38 @@ pub fn update_counters_for_committed_blocks(blocks_to_commit: &[Arc<ExecutedBloc
         }
     }
 }
+
+pub static EPOCH_MANAGER_ISSUES_DETAILS: Lazy<IntCounterVec> = Lazy::new(|| {
+    register_int_counter_vec!(
+        "aptos_consensus_epoch_manager_issues",
+        "Count of occurences of different epoch manager processing issues.",
+        &["kind"]
+    )
+    .unwrap()
+});
+
+pub static PROPOSED_VTXN_COUNT: Lazy<IntCounterVec> = Lazy::new(|| {
+    register_int_counter_vec!(
+        "aptos_proposed_vtxn_count",
+        "Number of validator transactions proposed",
+        &["proposer"]
+    )
+    .unwrap()
+});
+
+pub static PROPOSED_VTXN_BYTES: Lazy<IntCounterVec> = Lazy::new(|| {
+    register_int_counter_vec!(
+        "aptos_proposed_vtxn_bytes",
+        "The total size in bytes of validator transactions proposed",
+        &["proposer"]
+    )
+    .unwrap()
+});
+
+pub static RAND_QUEUE_SIZE: Lazy<IntGauge> = Lazy::new(|| {
+    register_int_gauge!(
+        "aptos_consensus_rand_queue_size",
+        "Number of randomness-pending blocks."
+    )
+    .unwrap()
+});

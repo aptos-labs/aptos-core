@@ -1,24 +1,28 @@
 // Copyright © Aptos Foundation
 // SPDX-License-Identifier: Apache-2.0
 
-use super::DagConsensusConfig;
+use super::{DagConsensusConfig, IndexerTableInfoConfig};
 use crate::{
     config::{
-        netbench::NetbenchConfig, node_config_loader::NodeConfigLoader,
-        persistable_config::PersistableConfig, utils::RootPath, AdminServiceConfig, ApiConfig,
-        BaseConfig, ConsensusConfig, Error, ExecutionConfig, IndexerConfig, IndexerGrpcConfig,
-        InspectionServiceConfig, LoggerConfig, MempoolConfig, NetworkConfig,
-        PeerMonitoringServiceConfig, SafetyRulesTestConfig, StateSyncConfig, StorageConfig,
+        dkg_config::DKGConfig, jwk_consensus_config::JWKConsensusConfig,
+        netbench_config::NetbenchConfig, node_config_loader::NodeConfigLoader,
+        node_startup_config::NodeStartupConfig, persistable_config::PersistableConfig,
+        utils::RootPath, AdminServiceConfig, ApiConfig, BaseConfig, ConsensusConfig, Error,
+        ExecutionConfig, IndexerConfig, IndexerGrpcConfig, InspectionServiceConfig, LoggerConfig,
+        MempoolConfig, NetworkConfig, PeerMonitoringServiceConfig, SafetyRulesTestConfig,
+        StateSyncConfig, StorageConfig,
     },
     network_id::NetworkId,
 };
 use aptos_crypto::x25519;
+use aptos_logger::info;
 use aptos_temppath::TempPath;
 use aptos_types::account_address::AccountAddress as PeerId;
 use rand::{prelude::StdRng, SeedableRng};
 use serde::{Deserialize, Serialize};
 use std::{
     collections::HashMap,
+    fmt::Debug,
     path::{Path, PathBuf},
 };
 
@@ -40,6 +44,8 @@ pub struct NodeConfig {
     #[serde(default)]
     pub dag_consensus: DagConsensusConfig,
     #[serde(default)]
+    pub dkg: DKGConfig,
+    #[serde(default)]
     pub execution: ExecutionConfig,
     #[serde(default)]
     pub failpoints: Option<HashMap<String, String>>,
@@ -50,13 +56,19 @@ pub struct NodeConfig {
     #[serde(default)]
     pub indexer_grpc: IndexerGrpcConfig,
     #[serde(default)]
+    pub indexer_table_info: IndexerTableInfoConfig,
+    #[serde(default)]
     pub inspection_service: InspectionServiceConfig,
+    #[serde(default)]
+    pub jwk_consensus: JWKConsensusConfig,
     #[serde(default)]
     pub logger: LoggerConfig,
     #[serde(default)]
     pub mempool: MempoolConfig,
     #[serde(default)]
     pub netbench: Option<NetbenchConfig>,
+    #[serde(default)]
+    pub node_startup: NodeStartupConfig,
     #[serde(default)]
     pub peer_monitoring_service: PeerMonitoringServiceConfig,
     #[serde(default)]
@@ -68,6 +80,24 @@ pub struct NodeConfig {
 }
 
 impl NodeConfig {
+    /// Logs the node config using INFO level logging. This is useful for
+    /// working around the length restrictions in the logger.
+    pub fn log_all_configs(&self) {
+        // Parse the node config as serde JSON
+        let config_value =
+            serde_json::to_value(self).expect("Failed to serialize the node config!");
+        let config_map = config_value
+            .as_object()
+            .expect("Failed to get the config map!");
+
+        // Log each config entry
+        for (config_name, config_value) in config_map {
+            let config_string =
+                serde_json::to_string(config_value).expect("Failed to parse the config value!");
+            info!("Using {} config: {}", config_name, config_string);
+        }
+    }
+
     /// Returns the data directory for this config
     pub fn get_data_dir(&self) -> &Path {
         &self.base.data_dir

@@ -9,8 +9,8 @@ use crate::{
     },
     state_kv_db::StateKvDb,
 };
-use anyhow::{anyhow, ensure, Result};
 use aptos_schemadb::{iterator::SchemaIterator, ReadOptions};
+use aptos_storage_interface::{db_ensure as ensure, AptosDbError, Result};
 use aptos_types::{
     account_address::AccountAddress,
     contract_event::ContractEvent,
@@ -91,7 +91,7 @@ where
             expected_next_version: first_version,
             end_version: first_version
                 .checked_add(limit as u64)
-                .ok_or_else(|| anyhow!("Too many items requested"))?,
+                .ok_or(AptosDbError::TooManyRequested(first_version, limit as u64))?,
             _phantom: Default::default(),
         })
     }
@@ -219,7 +219,11 @@ impl<'a> PrefixedStateValueIterator<'a> {
                     .db_shard(state_key.get_shard_id())
                     .get::<StateValueSchema>(&(state_key.clone(), version))?
                     .ok_or_else(|| {
-                        anyhow!("Key {state_key:?} is not found at version {version}.")
+                        AptosDbError::NotFound(format!(
+                            "Key {state_key:?} is not found at version {version}.",
+                            state_key = state_key,
+                            version = version
+                        ))
                     })?
                 {
                     return Ok(Some((state_key, state_value)));
@@ -407,7 +411,7 @@ impl<'a> EventsByVersionIter<'a> {
         while let Some(res) = self.inner.peek() {
             let ((version, _index), _event) = res
                 .as_ref()
-                .map_err(|e| anyhow!("Hit error iterating events: {}", e))?;
+                .map_err(|e| AptosDbError::Other(format!("Hit error iterating events: {}", e)))?;
             if *version != self.expected_next_version {
                 break;
             }
@@ -418,7 +422,7 @@ impl<'a> EventsByVersionIter<'a> {
         self.expected_next_version = self
             .expected_next_version
             .checked_add(1)
-            .ok_or_else(|| anyhow!("expected version overflowed."))?;
+            .ok_or_else(|| AptosDbError::Other("expected version overflowed.".to_string()))?;
         Ok(Some(ret))
     }
 }

@@ -18,7 +18,23 @@ pub struct AdminServiceConfig {
     pub enabled: Option<bool>,
     pub address: String,
     pub port: u16,
-    // TODO(grao): Add auth support if necessary.
+    // If empty, will allow all requests without authentication. (Not allowed on mainnet.)
+    pub authentication_configs: Vec<AuthenticationConfig>,
+}
+
+#[derive(Clone, Debug, Deserialize, PartialEq, Eq, Serialize)]
+#[serde(rename_all = "snake_case")]
+pub enum AuthenticationConfig {
+    // This will allow authentication through query parameter.
+    // e.g. `/profilez?passcode=abc`.
+    //
+    // To calculate sha256, use sha256sum tool, or other online tools.
+    //
+    // e.g.
+    //
+    // printf abc |sha256sum
+    PasscodeSha256(String),
+    // TODO(grao): Add SSL support if necessary.
 }
 
 impl Default for AdminServiceConfig {
@@ -27,6 +43,7 @@ impl Default for AdminServiceConfig {
             enabled: None,
             address: "0.0.0.0".to_string(),
             port: 9102,
+            authentication_configs: vec![],
         }
     }
 }
@@ -39,10 +56,25 @@ impl AdminServiceConfig {
 
 impl ConfigSanitizer for AdminServiceConfig {
     fn sanitize(
-        _node_config: &NodeConfig,
+        node_config: &NodeConfig,
         _node_type: NodeType,
-        _chain_id: Option<ChainId>,
+        chain_id: Option<ChainId>,
     ) -> Result<(), Error> {
+        let sanitizer_name = Self::get_sanitizer_name();
+
+        if node_config.admin_service.enabled == Some(true) {
+            if let Some(chain_id) = chain_id {
+                if chain_id.is_mainnet()
+                    && node_config.admin_service.authentication_configs.is_empty()
+                {
+                    return Err(Error::ConfigSanitizerFailed(
+                        sanitizer_name,
+                        "Must enable authentication for AdminService on mainnet.".into(),
+                    ));
+                }
+            }
+        }
+
         Ok(())
     }
 }

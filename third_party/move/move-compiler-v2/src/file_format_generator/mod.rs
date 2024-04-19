@@ -1,11 +1,10 @@
 // Copyright © Aptos Foundation
-// Parts of the project are originally copyright © Meta Platforms, Inc.
 // SPDX-License-Identifier: Apache-2.0
 
 mod function_generator;
 mod module_generator;
 
-use crate::file_format_generator::module_generator::ModuleContext;
+use crate::{file_format_generator::module_generator::ModuleContext, options::Options};
 use module_generator::ModuleGenerator;
 use move_binary_format::{file_format as FF, internals::ModuleIndex};
 use move_command_line_common::{address::NumericalAddress, parser::NumberFormat};
@@ -20,10 +19,15 @@ pub fn generate_file_format(
 ) -> Vec<CU::CompiledUnit> {
     let ctx = ModuleContext { env, targets };
     let mut result = vec![];
+    let options = env
+        .get_extension::<Options>()
+        .expect("Options is available");
+    let compile_test_code = options.compile_test_code;
     for module_env in ctx.env.get_modules() {
         if !module_env.is_target() {
             continue;
         }
+        assert!(compile_test_code || !module_env.is_test_only());
         let (ff_module, source_map, main_handle) = ModuleGenerator::run(&ctx, &module_env);
         if module_env.is_script_module() {
             let FF::CompiledModule {

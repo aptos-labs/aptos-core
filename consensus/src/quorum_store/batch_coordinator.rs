@@ -4,8 +4,9 @@
 use crate::{
     network::{NetworkSender, QuorumStoreSender},
     quorum_store::{
-        batch_store::BatchStore,
+        batch_store::{BatchStore, BatchWriter},
         counters,
+        proof_manager::ProofManagerCommand,
         types::{Batch, PersistedValue},
     },
 };
@@ -13,7 +14,10 @@ use anyhow::ensure;
 use aptos_logger::prelude::*;
 use aptos_types::PeerId;
 use std::sync::Arc;
-use tokio::sync::{mpsc::Receiver, oneshot};
+use tokio::sync::{
+    mpsc::{Receiver, Sender},
+    oneshot,
+};
 
 #[derive(Debug)]
 pub enum BatchCoordinatorCommand {
@@ -21,10 +25,12 @@ pub enum BatchCoordinatorCommand {
     NewBatches(PeerId, Vec<Batch>),
 }
 
+/// The `BatchCoordinator` is responsible for coordinating the receipt and persistence of batches.
 pub struct BatchCoordinator {
     my_peer_id: PeerId,
-    network_sender: NetworkSender,
-    batch_store: Arc<BatchStore<NetworkSender>>,
+    network_sender: Arc<NetworkSender>,
+    sender_to_proof_manager: Arc<Sender<ProofManagerCommand>>,
+    batch_store: Arc<BatchStore>,
     max_batch_txns: u64,
     max_batch_bytes: u64,
     max_total_txns: u64,
@@ -35,7 +41,8 @@ impl BatchCoordinator {
     pub(crate) fn new(
         my_peer_id: PeerId,
         network_sender: NetworkSender,
-        batch_store: Arc<BatchStore<NetworkSender>>,
+        sender_to_proof_manager: Sender<ProofManagerCommand>,
+        batch_store: Arc<BatchStore>,
         max_batch_txns: u64,
         max_batch_bytes: u64,
         max_total_txns: u64,
@@ -43,7 +50,8 @@ impl BatchCoordinator {
     ) -> Self {
         Self {
             my_peer_id,
-            network_sender,
+            network_sender: Arc::new(network_sender),
+            sender_to_proof_manager: Arc::new(sender_to_proof_manager),
             batch_store,
             max_batch_txns,
             max_batch_bytes,
@@ -59,14 +67,22 @@ impl BatchCoordinator {
 
         let batch_store = self.batch_store.clone();
         let network_sender = self.network_sender.clone();
+        let sender_to_proof_manager = self.sender_to_proof_manager.clone();
         tokio::spawn(async move {
             let peer_id = persist_requests[0].author();
+            let batches = persist_requests
+                .iter()
+                .map(|persisted_value| persisted_value.batch_info().clone())
+                .collect();
             let signed_batch_infos = batch_store.persist(persist_requests);
             if !signed_batch_infos.is_empty() {
                 network_sender
                     .send_signed_batch_info_msg(signed_batch_infos, vec![peer_id])
                     .await;
             }
+            let _ = sender_to_proof_manager
+                .send(ProofManagerCommand::ReceiveBatches(batches))
+                .await;
         });
     }
 
@@ -108,7 +124,8 @@ impl BatchCoordinator {
 
     async fn handle_batches_msg(&mut self, author: PeerId, batches: Vec<Batch>) {
         if let Err(e) = self.ensure_max_limits(&batches) {
-            warn!("Batch from {}: {}", author, e);
+            error!("Batch from {}: {}", author, e);
+            counters::RECEIVED_BATCH_MAX_LIMIT_FAILED.inc();
             return;
         }
 

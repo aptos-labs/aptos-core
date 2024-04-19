@@ -47,11 +47,11 @@ TESTNET_RANGES = [
     [516281796, 551052675],
     [551052676, 582481398],
     [582481399, 640_000_000],
-    [640_000_001, sys.maxsize],
+    [640_000_001, 980_000_000],
+    [980_000_000, sys.maxsize],
 ]
 
 MAINNET_RANGES = [
-    [0, 45_000_000],
     [45_000_001, 100_000_000],
     [100_000_001, 116_000_000],
     [116_000_001, 155_000_000],
@@ -62,13 +62,28 @@ MAINNET_RANGES = [
     [215_000_001, 225_000_000],
     [225_000_001, 235_000_000],
     [235_000_001, 246_000_000],
-    [246_000_001, 260_000_000],
-    [260_000_001, 275_000_000],
-    [275_000_001, 291_000_000],
-    [291_000_001, 301_000_000],
-    [301_000_001, 304_000_000],
-    [304_000_001, sys.maxsize],
+    [246_000_001, 270_000_000],
+    [270_000_001, 295_000_000],
+    [295_000_001, 321_000_000],
+    [321_000_001, 331_000_000],
+    [331_000_001, 354_000_000],
+    [354_000_001, 400_000_000],
+    [400_000_001, 490_000_000],
+    [490_000_000, sys.maxsize],
 ]
+
+
+# retry the replay_verify_partition if it fails
+def retry_replay_verify_partition(func, *args, **kwargs) -> Tuple[int, int, bytes]:
+    (partition_number, code, msg) = (0, 0, b"")
+    NUM_OF_RETRIES = 6
+    for i in range(1, NUM_OF_RETRIES + 1):
+        print(f"try {i}")
+        (partition_number, code, msg) = func(*args, **kwargs)
+        # let's only not retry on txn error and success case,
+        if code == 2 or code == 0:
+            break
+    return (partition_number, code, msg)
 
 
 def replay_verify_partition(
@@ -208,9 +223,10 @@ def main(runner_no=None, runner_cnt=None, start_version=None, end_version=None):
 
     with Pool(N) as p:
         all_partitions = p.starmap(
-            replay_verify_partition,
+            retry_replay_verify_partition,
             [
                 (
+                    replay_verify_partition,
                     n,
                     N,
                     runner_start,

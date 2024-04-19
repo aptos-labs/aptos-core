@@ -4,8 +4,7 @@
 
 use aptos_crypto::HashValue;
 use aptos_logger::Schema;
-use aptos_state_view::StateViewId;
-use aptos_types::transaction::Version;
+use aptos_types::{state_store::StateViewId, transaction::Version};
 use serde::Serialize;
 
 #[derive(Schema, Clone)]

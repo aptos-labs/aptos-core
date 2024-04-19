@@ -4,7 +4,6 @@
 
 use super::*;
 use crate::{
-    peer::DisconnectReason,
     peer_manager::{conn_notifs_channel, ConnectionNotification, ConnectionRequest},
     transport::ConnectionMetadata,
 };
@@ -19,7 +18,7 @@ use aptos_time_service::{MockTimeService, TimeService};
 use aptos_types::{account_address::AccountAddress, network_address::NetworkAddress};
 use futures::{executor::block_on, future, SinkExt};
 use maplit::{hashmap, hashset};
-use rand::rngs::StdRng;
+use rand::{rngs::StdRng, SeedableRng};
 use std::{io, str::FromStr};
 use tokio_retry::strategy::FixedInterval;
 
@@ -106,6 +105,7 @@ impl TestHarness {
             MAX_CONNECTION_DELAY,
             Some(MAX_TEST_CONNECTIONS),
             true, /* mutual_authentication */
+            true, /* enable_latency_aware_dialing */
         );
         let mock = Self {
             network_context,
@@ -166,7 +166,7 @@ impl TestHarness {
             ConnectionOrigin::Outbound,
         );
         metadata.addr = address;
-        let notif = peer_manager::ConnectionNotification::NewPeer(metadata, NetworkContext::mock());
+        let notif = peer_manager::ConnectionNotification::NewPeer(metadata, NetworkId::Validator);
         self.send_notification_await_delivery(peer_id, notif).await;
     }
 
@@ -181,11 +181,7 @@ impl TestHarness {
             ConnectionOrigin::Outbound,
         );
         metadata.addr = address;
-        let notif = peer_manager::ConnectionNotification::LostPeer(
-            metadata,
-            NetworkContext::mock(),
-            DisconnectReason::ConnectionLost,
-        );
+        let notif = peer_manager::ConnectionNotification::LostPeer(metadata, NetworkId::Validator);
         self.send_notification_await_delivery(peer_id, notif).await;
     }
 
@@ -837,8 +833,10 @@ async fn test_stale_peers_unknown_inbound() {
         PeerRole::Unknown,
         ConnectionOrigin::Outbound,
     );
-    let connection_notification =
-        ConnectionNotification::NewPeer(connection_metadata_1.clone(), network_context);
+    let connection_notification = ConnectionNotification::NewPeer(
+        connection_metadata_1.clone(),
+        network_context.network_id(),
+    );
     connectivity_manager.handle_control_notification(connection_notification);
 
     // Create and connect peer 2 (an unknown inbound connection)
@@ -849,7 +847,7 @@ async fn test_stale_peers_unknown_inbound() {
         ConnectionOrigin::Inbound,
     );
     let connection_notification =
-        ConnectionNotification::NewPeer(connection_metadata, network_context);
+        ConnectionNotification::NewPeer(connection_metadata, network_context.network_id());
     connectivity_manager.handle_control_notification(connection_notification);
 
     // Verify we have 2 peers
@@ -884,7 +882,7 @@ async fn test_stale_peers_vfn_inbound() {
         ConnectionOrigin::Inbound,
     );
     let connection_notification =
-        ConnectionNotification::NewPeer(connection_metadata, network_context);
+        ConnectionNotification::NewPeer(connection_metadata, network_context.network_id());
     connectivity_manager.handle_control_notification(connection_notification);
 
     // Create and connect peer 2 (a validator outbound connection)
@@ -894,8 +892,10 @@ async fn test_stale_peers_vfn_inbound() {
         PeerRole::Validator,
         ConnectionOrigin::Outbound,
     );
-    let connection_notification =
-        ConnectionNotification::NewPeer(connection_metadata_2.clone(), network_context);
+    let connection_notification = ConnectionNotification::NewPeer(
+        connection_metadata_2.clone(),
+        network_context.network_id(),
+    );
     connectivity_manager.handle_control_notification(connection_notification);
 
     // Verify we have 2 peers

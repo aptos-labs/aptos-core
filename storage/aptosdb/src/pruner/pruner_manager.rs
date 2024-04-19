@@ -2,6 +2,7 @@
 // SPDX-License-Identifier: Apache-2.0
 
 use crate::pruner::db_pruner::DBPruner;
+use aptos_storage_interface::Result;
 use aptos_types::transaction::Version;
 
 /// This module provides `Pruner` which manages a thread pruning old data in the background and is
@@ -31,20 +32,21 @@ pub trait PrunerManager: Sync {
 
     // Only used at the end of fast sync to store the min_readable_version to db and update the
     // in memory progress.
-    fn save_min_readable_version(&self, min_readable_version: Version) -> anyhow::Result<()>;
+    fn save_min_readable_version(&self, min_readable_version: Version) -> Result<()>;
 
     fn is_pruning_pending(&self) -> bool;
 
     /// (For tests only.) Notifies the worker thread and waits for it to finish its job by polling
     /// an internal counter.
     #[cfg(test)]
-    fn wake_and_wait_pruner(&self, latest_version: Version) -> anyhow::Result<()> {
+    fn wake_and_wait_pruner(&self, latest_version: Version) -> Result<()> {
         self.maybe_set_pruner_target_db_version(latest_version);
         self.wait_for_pruner()
     }
 
     #[cfg(test)]
-    fn wait_for_pruner(&self) -> anyhow::Result<()> {
+    fn wait_for_pruner(&self) -> Result<()> {
+        use aptos_storage_interface::{db_other_bail, AptosDbError};
         use std::{
             thread::sleep,
             time::{Duration, Instant},
@@ -64,7 +66,7 @@ pub trait PrunerManager: Sync {
             }
             sleep(Duration::from_millis(1));
         }
-        anyhow::bail!("Timeout waiting for pruner worker.");
+        db_other_bail!("Timeout waiting for pruner worker.");
     }
 
     #[cfg(test)]

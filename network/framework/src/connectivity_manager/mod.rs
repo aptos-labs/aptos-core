@@ -39,6 +39,7 @@ use aptos_config::{
     network_id::NetworkContext,
 };
 use aptos_crypto::x25519;
+use aptos_infallible::RwLock;
 use aptos_logger::prelude::*;
 use aptos_netcore::transport::ConnectionOrigin;
 use aptos_num_variants::NumVariants;
@@ -50,21 +51,24 @@ use futures::{
     future::{BoxFuture, FutureExt},
     stream::{FuturesUnordered, StreamExt},
 };
-use rand::{
-    prelude::{SeedableRng, SmallRng},
-    seq::SliceRandom,
-};
+use futures_util::future::join_all;
+use itertools::Itertools;
+use ordered_float::OrderedFloat;
+use rand_latest::Rng;
 use serde::Serialize;
 use std::{
     cmp::{min, Ordering},
     collections::{hash_map::Entry, HashMap, HashSet},
     fmt,
+    net::{Shutdown, TcpStream, ToSocketAddrs},
     sync::Arc,
-    time::{Duration, SystemTime},
+    time::{Duration, Instant, SystemTime},
 };
+use tokio::task::JoinHandle;
 use tokio_retry::strategy::jitter;
 
 pub mod builder;
+mod selection;
 #[cfg(test)]
 mod test;
 
@@ -75,6 +79,13 @@ mod test;
 /// to avoid spiky load / thundering herd issues where all dial requests happen
 /// around the same time at startup.
 const MAX_CONNECTION_DELAY_JITTER: Duration = Duration::from_millis(100);
+
+/// The maximum amount of time to wait before timing out a connection attempt.
+/// This should be relatively small to avoid blocking dials for too long.
+const MAX_CONNECTION_TIMEOUT_SECS: u64 = 2;
+
+/// The maximum number of socket addresses to ping for a single address
+const MAX_SOCKET_ADDRESSES_TO_PING: usize = 2;
 
 /// The amount of time to try other peers until dialing this peer again.
 ///
@@ -91,7 +102,7 @@ pub struct ConnectivityManager<TBackoff> {
     /// PeerId and address of remote peers to which this peer is connected.
     connected: HashMap<PeerId, ConnectionMetadata>,
     /// All information about peers from discovery sources.
-    discovered_peers: DiscoveredPeerSet,
+    discovered_peers: Arc<RwLock<DiscoveredPeerSet>>,
     /// Channel to send connection requests to PeerManager.
     connection_reqs_tx: ConnectionRequestSender,
     /// Channel to receive notifications from PeerManager.
@@ -115,10 +126,10 @@ pub struct ConnectivityManager<TBackoff> {
     event_id: u32,
     /// A way to limit the number of connected peers by outgoing dials.
     outbound_connection_limit: Option<usize>,
-    /// Random for shuffling which peers will be dialed
-    rng: SmallRng,
     /// Whether we are using mutual authentication or not
     mutual_authentication: bool,
+    /// Whether or not to enable latency aware peer dialing
+    enable_latency_aware_dialing: bool,
 }
 
 /// Different sources for peer addresses, ordered by priority (Onchain=highest,
@@ -163,36 +174,57 @@ pub enum ConnectivityRequest {
 }
 
 #[derive(Clone, Debug, Default, PartialEq, Serialize)]
-struct DiscoveredPeerSet(HashMap<PeerId, DiscoveredPeer>);
+struct DiscoveredPeerSet {
+    peer_set: HashMap<PeerId, DiscoveredPeer>,
+}
 
 impl DiscoveredPeerSet {
-    fn get_mut(&mut self, peer_id: &PeerId) -> Option<&mut DiscoveredPeer> {
-        self.0.get_mut(peer_id)
+    #[cfg(test)]
+    /// Creates a new discovered peer set from the
+    /// specified peer set. This is used for testing.
+    pub fn new_from_peer_set(peer_set: HashMap<PeerId, DiscoveredPeer>) -> Self {
+        Self { peer_set }
     }
 
-    fn try_remove_empty(&mut self, peer_id: &PeerId) -> bool {
-        match self.0.entry(*peer_id) {
-            Entry::Occupied(entry) => {
-                let peer = entry.get();
-                if peer.addrs.is_empty() && peer.keys.is_empty() {
-                    entry.remove();
-                    true
-                } else {
-                    false
-                }
-            },
-            Entry::Vacant(_) => true,
-        }
-    }
-
-    /// Converts `DiscoveredPeerSet` into a `PeerSet`, however disregards the source of discovery
-    /// TODO: Provide smarter merging based on discovery source
-    pub fn to_eligible_peers(&self) -> PeerSet {
-        self.0
+    /// Gets the eligible peers from the discovered peer set
+    fn get_eligible_peers(&self) -> PeerSet {
+        self.peer_set
             .iter()
             .filter(|(_, peer)| peer.is_eligible())
             .map(|(peer_id, peer)| (*peer_id, peer.into()))
             .collect()
+    }
+
+    /// Removes the specified peer from the set if the state is empty
+    fn remove_peer_if_empty(&mut self, peer_id: &PeerId) {
+        if let Entry::Occupied(entry) = self.peer_set.entry(*peer_id) {
+            if entry.get().is_empty() {
+                entry.remove();
+            }
+        }
+    }
+
+    /// Updates the last dial time for the specified peer (if one was found)
+    fn update_last_dial_time(&mut self, peer_id: &PeerId) {
+        if let Some(discovered_peer) = self.peer_set.get_mut(peer_id) {
+            discovered_peer.update_last_dial_time()
+        }
+    }
+
+    /// Returns the ping latency for the specified peer (if one was found)
+    fn get_ping_latency_secs(&self, peer_id: &PeerId) -> Option<f64> {
+        if let Some(discovered_peer) = self.peer_set.get(peer_id) {
+            discovered_peer.ping_latency_secs
+        } else {
+            None
+        }
+    }
+
+    /// Updates the ping latency for the specified peer (if one was found)
+    fn update_ping_latency_secs(&mut self, peer_id: &PeerId, latency_secs: f64) {
+        if let Some(discovered_peer) = self.peer_set.get_mut(peer_id) {
+            discovered_peer.set_ping_latency_secs(latency_secs)
+        }
     }
 }
 
@@ -204,6 +236,8 @@ struct DiscoveredPeer {
     keys: PublicKeys,
     /// The last time the node was dialed
     last_dial_time: SystemTime,
+    /// The calculated peer ping latency (secs)
+    ping_latency_secs: Option<f64>,
 }
 
 impl DiscoveredPeer {
@@ -213,6 +247,7 @@ impl DiscoveredPeer {
             addrs: Addresses::default(),
             keys: PublicKeys::default(),
             last_dial_time: SystemTime::UNIX_EPOCH,
+            ping_latency_secs: None,
         }
     }
 
@@ -226,15 +261,25 @@ impl DiscoveredPeer {
         self.is_eligible() && !self.addrs.is_empty()
     }
 
+    /// Returns true iff the peer's addresses and keys are empty
+    pub fn is_empty(&self) -> bool {
+        self.addrs.is_empty() && self.keys.is_empty()
+    }
+
     /// Updates the last time we tried to connect to this node
-    pub fn set_last_dial_time(&mut self, time: SystemTime) {
-        self.last_dial_time = time;
+    pub fn update_last_dial_time(&mut self) {
+        self.last_dial_time = SystemTime::now();
+    }
+
+    /// Updates the ping latency for this peer
+    pub fn set_ping_latency_secs(&mut self, latency_secs: f64) {
+        self.ping_latency_secs = Some(latency_secs);
     }
 
     /// Based on input, backoff on amount of time to dial a peer again
-    pub fn has_dialed_recently(&self, backoff_duration: Duration) -> bool {
+    pub fn has_dialed_recently(&self) -> bool {
         if let Ok(duration_since_last_dial) = self.last_dial_time.elapsed() {
-            duration_since_last_dial < backoff_duration
+            duration_since_last_dial < TRY_DIAL_BACKOFF_TIME
         } else {
             false
         }
@@ -243,8 +288,8 @@ impl DiscoveredPeer {
 
 impl PartialOrd for DiscoveredPeer {
     fn partial_cmp(&self, other: &Self) -> Option<Ordering> {
-        let self_dialed_recently = self.has_dialed_recently(TRY_DIAL_BACKOFF_TIME);
-        let other_dialed_recently = other.has_dialed_recently(TRY_DIAL_BACKOFF_TIME);
+        let self_dialed_recently = self.has_dialed_recently();
+        let other_dialed_recently = other.has_dialed_recently();
 
         // Less recently dialed is prioritized over recently dialed
         if !self_dialed_recently && other_dialed_recently {
@@ -313,6 +358,7 @@ where
         max_delay: Duration,
         outbound_connection_limit: Option<usize>,
         mutual_authentication: bool,
+        enable_latency_aware_dialing: bool,
     ) -> Self {
         // Verify that the trusted peers set exists and that it is empty
         let trusted_peers = peers_and_metadata
@@ -336,7 +382,7 @@ where
             time_service,
             peers_and_metadata,
             connected: HashMap::new(),
-            discovered_peers: DiscoveredPeerSet::default(),
+            discovered_peers: Arc::new(RwLock::new(DiscoveredPeerSet::default())),
             connection_reqs_tx,
             connection_notifs_rx,
             requests_rx,
@@ -347,11 +393,11 @@ where
             max_delay,
             event_id: 0,
             outbound_connection_limit,
-            rng: SmallRng::from_entropy(),
             mutual_authentication,
+            enable_latency_aware_dialing,
         };
 
-        // set the initial config addresses and pubkeys
+        // Set the initial seed config addresses and public keys
         connmgr.handle_update_discovered_peers(DiscoverySource::Config, seeds);
         connmgr
     }
@@ -510,68 +556,163 @@ where
         }
     }
 
-    fn dial_eligible_peers<'a>(
+    /// Identifies a set of peers to dial and queues them for dialing
+    async fn dial_eligible_peers<'a>(
         &'a mut self,
         pending_dials: &'a mut FuturesUnordered<BoxFuture<'static, PeerId>>,
     ) {
-        let to_connect = self.choose_peers_to_dial();
-        for (peer_id, peer) in to_connect {
+        for (peer_id, peer) in self.choose_peers_to_dial().await {
             self.queue_dial_peer(peer_id, peer, pending_dials);
         }
     }
 
-    fn choose_peers_to_dial(&mut self) -> Vec<(PeerId, DiscoveredPeer)> {
+    /// Selects a set of peers to dial
+    async fn choose_peers_to_dial(&mut self) -> Vec<(PeerId, DiscoveredPeer)> {
+        // Get the eligible peers to dial
         let network_id = self.network_context.network_id();
         let role = self.network_context.role();
         let roles_to_dial = network_id.upstream_roles(&role);
-        let mut eligible: Vec<_> = self
-            .discovered_peers
-            .0
-            .iter()
+        let discovered_peers = self.discovered_peers.read().peer_set.clone();
+        let eligible_peers: Vec<_> = discovered_peers
+            .into_iter()
             .filter(|(peer_id, peer)| {
                 peer.is_eligible_to_be_dialed() // The node is eligible to dial
-                    && !self.connected.contains_key(peer_id) // The node is not already connected.
-                    && !self.dial_queue.contains_key(peer_id) // There is no pending dial to this node.
+                    && !self.connected.contains_key(peer_id) // The node is not already connected
+                    && !self.dial_queue.contains_key(peer_id) // There is no pending dial to this node
                     && roles_to_dial.contains(&peer.role) // We can dial this role
             })
             .collect();
 
-        // Prioritize by PeerRole
-        // Shuffle so we don't get stuck on certain peers
-        eligible.shuffle(&mut self.rng);
+        // Initialize the dial state for any new peers
+        for (peer_id, _) in &eligible_peers {
+            self.dial_states
+                .entry(*peer_id)
+                .or_insert_with(|| DialState::new(self.backoff_strategy.clone()));
+        }
 
-        // Sort by peer priority
-        eligible
-            .sort_by(|(_, peer), (_, other)| peer.partial_cmp(other).unwrap_or(Ordering::Equal));
+        // Limit the number of dialed connections from a fullnode. Note: this does not
+        // limit the number of incoming connections. It only enforces that a fullnode
+        // cannot have more outgoing connections than the limit (including in-flight dials).
+        let num_eligible_peers = eligible_peers.len();
+        let num_peers_to_dial =
+            if let Some(outbound_connection_limit) = self.outbound_connection_limit {
+                // Get the number of outbound connections
+                let num_outbound_connections = self
+                    .connected
+                    .iter()
+                    .filter(|(_, metadata)| metadata.origin == ConnectionOrigin::Outbound)
+                    .count();
 
-        // Limit the number of dialed connections from a Full Node
-        // This does not limit the number of incoming connections
-        // It enforces that a full node cannot have more outgoing connections than `connection_limit`
-        // including in flight dials.
-        let num_eligible = eligible.len();
-        let to_connect = if let Some(conn_limit) = self.outbound_connection_limit {
-            let outbound_connections = self
-                .connected
-                .iter()
-                .filter(|(_, metadata)| metadata.origin == ConnectionOrigin::Outbound)
-                .count();
-            min(
-                conn_limit
-                    .saturating_sub(outbound_connections.saturating_add(self.dial_queue.len())),
-                num_eligible,
+                // Add any pending dials to the count
+                let total_outbound_connections =
+                    num_outbound_connections.saturating_add(self.dial_queue.len());
+
+                // Calculate the potential number of peers to dial
+                let num_peers_to_dial =
+                    outbound_connection_limit.saturating_sub(total_outbound_connections);
+
+                // Limit the number of peers to dial by the total number of eligible peers
+                min(num_peers_to_dial, num_eligible_peers)
+            } else {
+                num_eligible_peers // Otherwise, we attempt to dial all eligible peers
+            };
+
+        // If we have no peers to dial, return early
+        if num_peers_to_dial == 0 {
+            return vec![];
+        }
+
+        // Prioritize the eligible peers and select the peers to dial
+        if selection::should_select_peers_by_latency(
+            &self.network_context,
+            self.enable_latency_aware_dialing,
+        ) {
+            // Ping the eligible peers (so that we can fetch missing ping latency information)
+            self.ping_eligible_peers(eligible_peers.clone()).await;
+
+            // Choose the peers to dial (weighted by ping latency)
+            selection::choose_random_peers_by_ping_latency(
+                self.network_context,
+                eligible_peers,
+                num_peers_to_dial,
+                self.discovered_peers.clone(),
             )
         } else {
-            num_eligible
-        };
-
-        // Take peers to connect to in priority order
-        eligible
-            .iter()
-            .take(to_connect)
-            .map(|(peer_id, peer)| (**peer_id, (*peer).clone()))
-            .collect()
+            // Choose the peers randomly
+            selection::choose_peers_to_dial_randomly(eligible_peers, num_peers_to_dial)
+        }
     }
 
+    /// Pings the eligible peers to calculate their ping latencies
+    /// and updates the discovered peer state accordingly.
+    async fn ping_eligible_peers(&mut self, eligible_peers: Vec<(PeerId, DiscoveredPeer)>) {
+        // Identify the eligible peers that don't already have latency information
+        let peers_to_ping = eligible_peers
+            .into_iter()
+            .filter(|(_, peer)| peer.ping_latency_secs.is_none())
+            .collect::<Vec<_>>();
+
+        // If there are no peers to ping, return early
+        let num_peers_to_ping = peers_to_ping.len();
+        if num_peers_to_ping == 0 {
+            return;
+        }
+
+        // Spawn a task that pings each peer concurrently
+        let ping_start_time = Instant::now();
+        let mut ping_tasks = vec![];
+        for (peer_id, peer) in peers_to_ping.into_iter() {
+            // Get the network address for the peer
+            let network_context = self.network_context;
+            let network_address = match self.dial_states.get(&peer_id) {
+                Some(dial_state) => match dial_state.random_addr(&peer.addrs) {
+                    Some(network_address) => network_address.clone(),
+                    None => {
+                        warn!(
+                            NetworkSchema::new(&network_context),
+                            "Peer {} does not have a network address!",
+                            peer_id.short_str()
+                        );
+                        continue; // Continue onto the next peer
+                    },
+                },
+                None => {
+                    warn!(
+                        NetworkSchema::new(&network_context),
+                        "Peer {} does not have a dial state!",
+                        peer_id.short_str()
+                    );
+                    continue; // Continue onto the next peer
+                },
+            };
+
+            // Ping the peer
+            let ping_task = spawn_latency_ping_task(
+                network_context,
+                peer_id,
+                network_address,
+                self.discovered_peers.clone(),
+            );
+
+            // Add the task to the list of ping tasks
+            ping_tasks.push(ping_task);
+        }
+
+        // Wait for all the ping tasks to complete (or timeout)
+        let num_ping_tasks = ping_tasks.len();
+        join_all(ping_tasks).await;
+
+        // Log the peer ping latencies
+        log_peer_ping_latencies(
+            self.network_context,
+            self.discovered_peers.clone(),
+            num_peers_to_ping,
+            num_ping_tasks,
+            ping_start_time,
+        );
+    }
+
+    /// Queues a dial to the specified peer
     fn queue_dial_peer<'a>(
         &'a mut self,
         peer_id: PeerId,
@@ -582,19 +723,36 @@ where
         // newly eligible, but not connected to peers, have their counter initialized properly.
         counters::peer_connected(&self.network_context, &peer_id, 0);
 
-        let connection_reqs_tx = self.connection_reqs_tx.clone();
-        // The initial dial state; it has zero dial delay and uses the first
-        // address.
-        let init_dial_state = DialState::new(self.backoff_strategy.clone());
-        let dial_state = self
-            .dial_states
-            .entry(peer_id)
-            .or_insert_with(|| init_dial_state);
+        // Get the peer's dial state
+        let dial_state = match self.dial_states.get_mut(&peer_id) {
+            Some(dial_state) => dial_state,
+            None => {
+                // The peer should have a dial state! If not, log an error and return.
+                error!(
+                    NetworkSchema::new(&self.network_context).remote_peer(&peer_id),
+                    "{} Peer {} does not have a dial state!",
+                    self.network_context,
+                    peer_id.short_str()
+                );
+                return;
+            },
+        };
 
         // Choose the next addr to dial for this peer. Currently, we just
         // round-robin the selection, i.e., try the sequence:
         // addr[0], .., addr[len-1], addr[0], ..
-        let addr = dial_state.next_addr(&peer.addrs).clone();
+        let addr = match dial_state.next_addr(&peer.addrs) {
+            Some(addr) => addr.clone(),
+            None => {
+                warn!(
+                    NetworkSchema::new(&self.network_context).remote_peer(&peer_id),
+                    "{} Peer {} does not have any network addresses!",
+                    self.network_context,
+                    peer_id.short_str()
+                );
+                return;
+            },
+        };
 
         // Using the DialState's backoff strategy, compute the delay until
         // the next dial attempt for this peer.
@@ -606,6 +764,7 @@ where
         let network_context = self.network_context;
         // Create future which completes by either dialing after calculated
         // delay or on cancellation.
+        let connection_reqs_tx = self.connection_reqs_tx.clone();
         let f = async move {
             // We dial after a delay. The dial can be canceled by sending to or dropping
             // `cancel_rx`.
@@ -634,9 +793,9 @@ where
         pending_dials.push(f.boxed());
 
         // Update last dial time
-        if let Some(discovered_peer) = self.discovered_peers.get_mut(&peer_id) {
-            discovered_peer.set_last_dial_time(SystemTime::now())
-        }
+        self.discovered_peers
+            .write()
+            .update_last_dial_time(&peer_id);
         self.dial_queue.insert(peer_id, cancel_tx);
     }
 
@@ -658,7 +817,7 @@ where
             info!(
                 NetworkSchema::new(&self.network_context),
                 discovered_peers = ?self.discovered_peers,
-                "Current eligible peers"
+                "Active discovered peers"
             )
         });
 
@@ -668,12 +827,28 @@ where
         self.close_stale_connections().await;
         // Dial peers which are eligible but are neither connected nor queued for dialing in the
         // future.
-        self.dial_eligible_peers(pending_dials);
+        self.dial_eligible_peers(pending_dials).await;
+
+        // Update the metrics for any peer ping latencies
+        self.update_ping_latency_metrics();
     }
 
-    fn reset_dial_state(&mut self, peer_id: &PeerId) {
-        if let Some(dial_state) = self.dial_states.get_mut(peer_id) {
-            *dial_state = DialState::new(self.backoff_strategy.clone());
+    /// Updates the metrics for tracking pre-dial and connected peer ping latencies
+    fn update_ping_latency_metrics(&self) {
+        // Update the pre-dial peer ping latencies
+        for (_, peer) in self.discovered_peers.read().peer_set.iter() {
+            if let Some(ping_latency_secs) = peer.ping_latency_secs {
+                counters::observe_pre_dial_ping_time(&self.network_context, ping_latency_secs);
+            }
+        }
+
+        // Update the connected peer ping latencies
+        for peer_id in self.connected.keys() {
+            if let Some(ping_latency_secs) =
+                self.discovered_peers.read().get_ping_latency_secs(peer_id)
+            {
+                counters::observe_connected_ping_time(&self.network_context, ping_latency_secs);
+            }
         }
     }
 
@@ -704,11 +879,14 @@ where
         }
     }
 
+    /// Handles an update for newly discovered peers. This typically
+    /// occurs at node startup, and on epoch changes.
     fn handle_update_discovered_peers(
         &mut self,
         src: DiscoverySource,
         new_discovered_peers: PeerSet,
     ) {
+        // Log the update event
         info!(
             NetworkSchema::new(&self.network_context),
             "{} Received updated list of discovered peers! Source: {:?}, num peers: {:?}",
@@ -717,13 +895,10 @@ where
             new_discovered_peers.len()
         );
 
-        let self_peer_id = self.network_context.peer_id();
+        // Remove peers that no longer have relevant network information
         let mut keys_updated = false;
-
         let mut peers_to_check_remove = Vec::new();
-
-        // Remove peer info that no longer have information to use them
-        for (peer_id, peer) in self.discovered_peers.0.iter_mut() {
+        for (peer_id, peer) in self.discovered_peers.write().peer_set.iter_mut() {
             let new_peer = new_discovered_peers.get(peer_id);
             let check_remove = if let Some(new_peer) = new_peer {
                 if new_peer.keys.is_empty() {
@@ -745,24 +920,25 @@ where
 
         // Remove peers that no longer have state
         for peer_id in peers_to_check_remove {
-            self.discovered_peers.try_remove_empty(&peer_id);
+            self.discovered_peers.write().remove_peer_if_empty(&peer_id);
         }
 
         // Make updates to the peers accordingly
         for (peer_id, discovered_peer) in new_discovered_peers {
             // Don't include ourselves, because we don't need to dial ourselves
-            if peer_id == self_peer_id {
+            if peer_id == self.network_context.peer_id() {
                 continue;
             }
 
             // Create the new `DiscoveredPeer`, role is set when a `Peer` is first discovered
-            let peer = self
-                .discovered_peers
-                .0
+            let mut discovered_peers = self.discovered_peers.write();
+            let peer = discovered_peers
+                .peer_set
                 .entry(peer_id)
                 .or_insert_with(|| DiscoveredPeer::new(discovered_peer.role));
+
+            // Update the peer's pubkeys
             let mut peer_updated = false;
-            // Update peer's pubkeys
             if peer.keys.update(src, discovered_peer.keys) {
                 info!(
                     NetworkSchema::new(&self.network_context)
@@ -777,7 +953,7 @@ where
                 peer_updated = true;
             }
 
-            // Update peer's addresses
+            // Update the peer's addresses
             if peer.addrs.update(src, discovered_peer.addresses) {
                 info!(
                     NetworkSchema::new(&self.network_context).remote_peer(&peer_id),
@@ -797,7 +973,9 @@ where
             // fresh backoff (since the current backoff delay might be maxed
             // out if we can't reach any of their previous addresses).
             if peer_updated {
-                self.reset_dial_state(&peer_id)
+                if let Some(dial_state) = self.dial_states.get_mut(&peer_id) {
+                    *dial_state = DialState::new(self.backoff_strategy.clone());
+                }
             }
         }
 
@@ -805,7 +983,7 @@ where
         if keys_updated {
             // For each peer, union all of the pubkeys from each discovery source
             // to generate the new eligible peers set.
-            let new_eligible = self.discovered_peers.to_eligible_peers();
+            let new_eligible = self.discovered_peers.read().get_eligible_peers();
 
             // Swap in the new eligible peers set
             if let Err(error) = self
@@ -828,7 +1006,7 @@ where
             "Connection notification"
         );
         match notif {
-            peer_manager::ConnectionNotification::NewPeer(metadata, _context) => {
+            peer_manager::ConnectionNotification::NewPeer(metadata, _network_id) => {
                 let peer_id = metadata.remote_peer_id;
                 counters::peer_connected(&self.network_context, &peer_id, 1);
                 self.connected.insert(peer_id, metadata);
@@ -837,7 +1015,7 @@ where
                 self.dial_states.remove(&peer_id);
                 self.dial_queue.remove(&peer_id);
             },
-            peer_manager::ConnectionNotification::LostPeer(metadata, _context, _reason) => {
+            peer_manager::ConnectionNotification::LostPeer(metadata, _network_id) => {
                 let peer_id = metadata.remote_peer_id;
                 if let Some(stored_metadata) = self.connected.get(&peer_id) {
                     // Remove node from connected peers list.
@@ -931,6 +1109,119 @@ fn log_dial_result(
             },
         },
     }
+}
+
+/// Logs the total and individual ping latencies
+fn log_peer_ping_latencies(
+    network_context: NetworkContext,
+    discovered_peers: Arc<RwLock<DiscoveredPeerSet>>,
+    total_peers_to_ping: usize,
+    num_peers_pinged: usize,
+    ping_start_time: Instant,
+) {
+    // Log the total ping latency time
+    let ping_latency_duration = Instant::now().duration_since(ping_start_time);
+    info!(
+        NetworkSchema::new(&network_context),
+        "Finished pinging eligible peers! Total peers to ping: {}, num peers pinged: {}, time: {} secs",
+        total_peers_to_ping,
+        num_peers_pinged,
+        ping_latency_duration.as_secs_f64()
+    );
+
+    // Log the ping latencies for the eligible peers (sorted by latency)
+    let eligible_peers = discovered_peers.read().peer_set.clone();
+    let eligible_peers_and_latencies = eligible_peers
+        .into_iter()
+        .map(|(peer_id, peer)| (peer_id, peer.ping_latency_secs))
+        .collect::<Vec<_>>();
+    let sorted_eligible_peers_and_latencies = eligible_peers_and_latencies
+        .iter()
+        .sorted_by_key(|(_, ping_latency_secs)| ping_latency_secs.map(OrderedFloat))
+        .collect::<Vec<_>>();
+    info!(
+        NetworkSchema::new(&network_context),
+        "Sorted eligible peers with recorded ping latencies: {:?}",
+        sorted_eligible_peers_and_latencies
+    );
+}
+
+/// Spawns a task that pings the peer at the specified
+/// network address and updates the peer's ping latency.
+fn spawn_latency_ping_task(
+    network_context: NetworkContext,
+    peer_id: AccountAddress,
+    network_address: NetworkAddress,
+    discovered_peers: Arc<RwLock<DiscoveredPeerSet>>,
+) -> JoinHandle<()> {
+    tokio::task::spawn_blocking(move || {
+        // Extract the socket addresses from the network address
+        let socket_addresses = match network_address.to_socket_addrs() {
+            Ok(socket_addresses) => socket_addresses.collect::<Vec<_>>(),
+            Err(error) => {
+                warn!(
+                    NetworkSchema::new(&network_context),
+                    "Failed to resolve network address {:?}: {}", network_address, error
+                );
+                return;
+            },
+        };
+
+        // If no socket addresses were found, log an error and return
+        if socket_addresses.is_empty() {
+            warn!(
+                NetworkSchema::new(&network_context),
+                "Peer {} does not have any socket addresses for network address {:?}!",
+                peer_id.short_str(),
+                network_address,
+            );
+            return;
+        }
+
+        // Limit the number of socket addresses we'll try to connect to
+        let socket_addresses = socket_addresses
+            .iter()
+            .take(MAX_SOCKET_ADDRESSES_TO_PING)
+            .collect::<Vec<_>>();
+
+        // Attempt to connect to the socket addresses over TCP and time the connection
+        for socket_address in socket_addresses {
+            // Start the ping timer
+            let start_time = Instant::now();
+
+            // Attempt to connect to the socket address
+            if let Ok(tcp_stream) = TcpStream::connect_timeout(
+                socket_address,
+                Duration::from_secs(MAX_CONNECTION_TIMEOUT_SECS),
+            ) {
+                // We connected successfully, update the peer's ping latency
+                let ping_latency_secs = start_time.elapsed().as_secs_f64();
+                discovered_peers
+                    .write()
+                    .update_ping_latency_secs(&peer_id, ping_latency_secs);
+
+                // Attempt to terminate the TCP stream cleanly
+                if let Err(error) = tcp_stream.shutdown(Shutdown::Both) {
+                    warn!(
+                        NetworkSchema::new(&network_context),
+                        "Failed to terminate TCP stream to peer {} after pinging: {}",
+                        peer_id.short_str(),
+                        error
+                    );
+                }
+
+                return;
+            } else {
+                // Log an error if we failed to connect to the socket address
+                info!(
+                    NetworkSchema::new(&network_context),
+                    "Failed to ping peer {} at socket address {:?} after pinging",
+                    peer_id.short_str(),
+                    socket_address
+                );
+            }
+        }
+    })
 }
 
 /////////////////////
@@ -1058,13 +1349,27 @@ where
         }
     }
 
-    fn next_addr<'a>(&mut self, addrs: &'a Addresses) -> &'a NetworkAddress {
-        assert!(!addrs.is_empty());
+    /// Returns the address to dial (specified by the index) for this peer
+    fn get_addr_at_index<'a>(
+        &self,
+        addr_index: usize,
+        addrs: &'a Addresses,
+    ) -> Option<&'a NetworkAddress> {
+        addrs.get(addr_index % addrs.len())
+    }
 
-        let addr_idx = self.addr_idx;
+    /// Returns the current address to dial for this peer and updates
+    /// the internal state to point to the next address.
+    fn next_addr<'a>(&mut self, addrs: &'a Addresses) -> Option<&'a NetworkAddress> {
+        let curr_addr = self.get_addr_at_index(self.addr_idx, addrs);
         self.addr_idx = self.addr_idx.wrapping_add(1);
+        curr_addr
+    }
 
-        addrs.get(addr_idx % addrs.len()).unwrap()
+    /// Returns a random address to dial for this peer
+    fn random_addr<'a>(&self, addrs: &'a Addresses) -> Option<&'a NetworkAddress> {
+        let addr_index = ::rand_latest::thread_rng().gen_range(0..addrs.len());
+        self.get_addr_at_index(addr_index, addrs)
     }
 
     fn next_backoff_delay(&mut self, max_delay: Duration) -> Duration {

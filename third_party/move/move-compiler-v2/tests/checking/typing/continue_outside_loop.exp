@@ -1,4 +1,4 @@
-// ---- Model Dump
+// -- Model dump before bytecode pipeline
 module 0x8675309::M {
     private fun foo() {
         loop {
@@ -10,5 +10,4 @@ module 0x8675309::M {
         };
         continue
     }
-    spec fun $foo();
 } // end 0x8675309::M

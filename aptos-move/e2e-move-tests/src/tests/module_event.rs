@@ -45,7 +45,7 @@ fn test_module_event_enabled() {
         vec![bcs::to_bytes(&10u64).unwrap()],
     );
     let events = h.get_events();
-    assert_eq!(events.len(), 12);
+    assert_eq!(events.len(), 13);
     let my_event_tag = TypeTag::from_str("0xcafe::event::MyEvent").unwrap();
     let mut count = 0;
     for event in events.iter() {

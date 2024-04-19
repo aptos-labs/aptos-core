@@ -5,9 +5,10 @@ use aptos_aggregator::resolver::{AggregatorV1Resolver, DelayedFieldResolver};
 use aptos_table_natives::TableResolver;
 use aptos_types::{on_chain_config::ConfigStorage, state_store::state_key::StateKey};
 use aptos_vm_types::resolver::{
-    ExecutorView, ResourceGroupView, StateStorageView, StateValueMetadataResolver,
+    ExecutorView, ResourceGroupSize, ResourceGroupView, StateStorageView,
 };
 use bytes::Bytes;
+use move_binary_format::errors::{PartialVMError, PartialVMResult};
 use move_core_types::{language_storage::StructTag, resolver::MoveResolver};
 use std::collections::{BTreeMap, HashMap};
 
@@ -18,9 +19,8 @@ pub trait AptosMoveResolver:
     AggregatorV1Resolver
     + ConfigStorage
     + DelayedFieldResolver
-    + MoveResolver
+    + MoveResolver<PartialVMError>
     + ResourceGroupResolver
-    + StateValueMetadataResolver
     + StateStorageView
     + TableResolver
     + AsExecutorView
@@ -32,19 +32,19 @@ pub trait ResourceGroupResolver {
     fn release_resource_group_cache(&self)
         -> Option<HashMap<StateKey, BTreeMap<StructTag, Bytes>>>;
 
-    fn resource_group_size(&self, group_key: &StateKey) -> anyhow::Result<u64>;
+    fn resource_group_size(&self, group_key: &StateKey) -> PartialVMResult<ResourceGroupSize>;
 
     fn resource_size_in_group(
         &self,
         group_key: &StateKey,
         resource_tag: &StructTag,
-    ) -> anyhow::Result<u64>;
+    ) -> PartialVMResult<usize>;
 
     fn resource_exists_in_group(
         &self,
         group_key: &StateKey,
         resource_tag: &StructTag,
-    ) -> anyhow::Result<bool>;
+    ) -> PartialVMResult<bool>;
 }
 
 pub trait AsExecutorView {

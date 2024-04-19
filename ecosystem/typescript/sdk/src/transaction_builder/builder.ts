@@ -54,7 +54,10 @@ export type SigningFn = (txn: SigningMessage) => Ed25519Signature | MultiEd25519
 export class TransactionBuilder<F extends SigningFn> {
   protected readonly signingFunction: F;
 
-  constructor(signingFunction: F, public readonly rawTxnBuilder?: TransactionBuilderABI) {
+  constructor(
+    signingFunction: F,
+    public readonly rawTxnBuilder?: TransactionBuilderABI,
+  ) {
     this.signingFunction = signingFunction;
   }
 
@@ -355,7 +358,7 @@ export class TransactionBuilderRemoteABI {
               ({
                 fullName: `${abi!.address}::${abi!.name}::${ef.name}`,
                 ...ef,
-              } as Gen.MoveFunction & { fullName: string }),
+              }) as Gen.MoveFunction & { fullName: string },
           ),
       );
 

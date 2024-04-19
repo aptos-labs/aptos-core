@@ -390,6 +390,11 @@ pub struct Flags {
     #[clap(long = cli::WARN_OF_DEPRECATION_USE_IN_APTOS_LIBS_FLAG, default_value=warn_of_deprecation_use_in_aptos_libs_env_var_str())]
     warn_of_deprecation_use_in_aptos_libs: bool,
 
+    /// Show warnings about unused functions, fields, constants, etc.
+    /// Note that the current value of this constant is "Wunused"
+    #[clap(long = cli::WARN_UNUSED_FLAG, default_value="false")]
+    warn_unused: bool,
+
     /// Support v2 syntax (up to expansion phase)
     #[clap(long = cli::V2_FLAG)]
     v2: bool,
@@ -408,6 +413,7 @@ impl Flags {
             debug: debug_compiler_env_var(),
             warn_of_deprecation_use: move_compiler_warn_of_deprecation_use_env_var(),
             warn_of_deprecation_use_in_aptos_libs: warn_of_deprecation_use_in_aptos_libs_env_var(),
+            warn_unused: false,
             v2: false,
         }
     }
@@ -424,6 +430,7 @@ impl Flags {
             debug: debug_compiler_env_var(),
             warn_of_deprecation_use: move_compiler_warn_of_deprecation_use_env_var(),
             warn_of_deprecation_use_in_aptos_libs: warn_of_deprecation_use_in_aptos_libs_env_var(),
+            warn_unused: false,
             v2: false,
         }
     }
@@ -440,6 +447,7 @@ impl Flags {
             debug: debug_compiler_env_var(),
             warn_of_deprecation_use: move_compiler_warn_of_deprecation_use_env_var(),
             warn_of_deprecation_use_in_aptos_libs: warn_of_deprecation_use_in_aptos_libs_env_var(),
+            warn_unused: false,
             v2: false,
         }
     }
@@ -456,6 +464,7 @@ impl Flags {
             debug: debug_compiler_env_var(),
             warn_of_deprecation_use: move_compiler_warn_of_deprecation_use_env_var(),
             warn_of_deprecation_use_in_aptos_libs: warn_of_deprecation_use_in_aptos_libs_env_var(),
+            warn_unused: false,
             v2: false,
         }
     }
@@ -472,6 +481,7 @@ impl Flags {
             debug: false,
             warn_of_deprecation_use: move_compiler_warn_of_deprecation_use_env_var(),
             warn_of_deprecation_use_in_aptos_libs: warn_of_deprecation_use_in_aptos_libs_env_var(),
+            warn_unused: false,
             v2: true,
         }
     }
@@ -554,6 +564,17 @@ impl Flags {
     pub fn set_warn_of_deprecation_use_in_aptos_libs(self, new_value: bool) -> Self {
         Self {
             warn_of_deprecation_use_in_aptos_libs: new_value,
+            ..self
+        }
+    }
+
+    pub fn warn_unused(&self) -> bool {
+        self.warn_unused
+    }
+
+    pub fn set_warn_unused(self, new_value: bool) -> Self {
+        Self {
+            warn_unused: new_value,
             ..self
         }
     }

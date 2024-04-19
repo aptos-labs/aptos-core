@@ -6,7 +6,7 @@ use crate::common;
 use aptos_types::transaction::{
     ArgumentABI, EntryABI, EntryFunctionABI, TransactionScriptABI, TypeArgumentABI,
 };
-use heck::CamelCase;
+use heck::ToUpperCamelCase;
 use move_core_types::{
     account_address::AccountAddress,
     language_storage::{ModuleId, StructTag, TypeTag},
@@ -43,7 +43,6 @@ pub fn output(
     // generator. Disable those functiosn for now.
     let abis_vec = abis
         .iter()
-        .cloned()
         .filter(|abi| {
             if let EntryABI::EntryFunction(sf) = abi {
                 sf.module_name().name().as_str() != "code"
@@ -56,6 +55,7 @@ pub fn output(
                 true
             }
         })
+        .cloned()
         .collect::<Vec<_>>();
 
     let abis = abis_vec.as_slice();
@@ -162,7 +162,7 @@ where
                         } else {
                             "EntryFunctionCall".to_string()
                         },
-                        abi.name().to_camel_case(),
+                        abi.name().to_upper_camel_case(),
                     ],
                     crate::common::prepare_doc_string(abi.doc()),
                 )
@@ -217,14 +217,14 @@ func EncodeScript(call ScriptCall) aptostypes.Script {{"#
                     let params = std::iter::empty()
                         .chain(abi.ty_args().iter().map(TypeArgumentABI::name))
                         .chain(abi.args().iter().map(ArgumentABI::name))
-                        .map(|name| format!("call.{}", name.to_camel_case()))
+                        .map(|name| format!("call.{}", name.to_upper_camel_case()))
                         .collect::<Vec<_>>()
                         .join(", ");
                     writeln!(
                         self.out,
                         r#"case *ScriptCall__{0}:
                 return Encode{0}({1})"#,
-                        abi.name().to_camel_case(),
+                        abi.name().to_upper_camel_case(),
                         params,
                     )?;
                 }
@@ -249,15 +249,15 @@ func EncodeEntryFunction(call EntryFunctionCall) aptostypes.TransactionPayload {
                     let params = std::iter::empty()
                         .chain(abi.ty_args().iter().map(TypeArgumentABI::name))
                         .chain(abi.args().iter().map(ArgumentABI::name))
-                        .map(|name| format!("call.{}", name.to_camel_case()))
+                        .map(|name| format!("call.{}", name.to_upper_camel_case()))
                         .collect::<Vec<_>>()
                         .join(", ");
                     writeln!(
                         self.out,
                         r#"case *EntryFunctionCall__{0}{1}:
                 return Encode{0}{1}({2})"#,
-                        abi.module_name().name().to_string().to_camel_case(),
-                        abi.name().to_camel_case(),
+                        abi.module_name().name().to_string().to_upper_camel_case(),
+                        abi.name().to_upper_camel_case(),
                         params,
                     )?;
                 }
@@ -315,7 +315,7 @@ func DecodeEntryFunctionPayload(script aptostypes.TransactionPayload) (EntryFunc
             self.out,
             "\n{}\nfunc Encode{}({}) aptostypes.Script {{",
             Self::quote_doc(abi.doc()),
-            abi.name().to_camel_case(),
+            abi.name().to_upper_camel_case(),
             [
                 Self::quote_type_parameters(abi.ty_args()),
                 Self::quote_parameters(abi.args()),
@@ -344,8 +344,8 @@ func DecodeEntryFunctionPayload(script aptostypes.TransactionPayload) (EntryFunc
             self.out,
             "\n{}\nfunc Encode{}{}({}) aptostypes.TransactionPayload {{",
             Self::quote_doc(abi.doc()),
-            abi.module_name().name().to_string().to_camel_case(),
-            abi.name().to_camel_case(),
+            abi.module_name().name().to_string().to_upper_camel_case(),
+            abi.name().to_upper_camel_case(),
             [
                 Self::quote_type_parameters(abi.ty_args()),
                 Self::quote_parameters(abi.args()),
@@ -396,13 +396,13 @@ func DecodeEntryFunctionPayload(script aptostypes.TransactionPayload) (EntryFunc
         writeln!(
             self.out,
             "var call ScriptCall__{0}",
-            abi.name().to_camel_case(),
+            abi.name().to_upper_camel_case(),
         )?;
         for (index, ty_arg) in abi.ty_args().iter().enumerate() {
             writeln!(
                 self.out,
                 "call.{} = script.TyArgs[{}]",
-                ty_arg.name().to_camel_case(),
+                ty_arg.name().to_upper_camel_case(),
                 index,
             )?;
         }
@@ -417,7 +417,7 @@ func DecodeEntryFunctionPayload(script aptostypes.TransactionPayload) (EntryFunc
 "#,
                 common::mangle_type(arg.type_tag()),
                 index,
-                arg.name().to_camel_case(),
+                arg.name().to_upper_camel_case(),
             )?;
         }
         writeln!(self.out, "return &call, nil")?;
@@ -454,14 +454,14 @@ func DecodeEntryFunctionPayload(script aptostypes.TransactionPayload) (EntryFunc
         writeln!(
             self.out,
             "var call EntryFunctionCall__{0}{1}",
-            abi.module_name().name().to_string().to_camel_case(),
-            abi.name().to_camel_case(),
+            abi.module_name().name().to_string().to_upper_camel_case(),
+            abi.name().to_upper_camel_case(),
         )?;
         for (index, ty_arg) in abi.ty_args().iter().enumerate() {
             writeln!(
                 self.out,
                 "call.{} = script.Value.TyArgs[{}]",
-                ty_arg.name().to_camel_case(),
+                ty_arg.name().to_upper_camel_case(),
                 index,
             )?;
         }
@@ -513,7 +513,7 @@ deserializer.DecreaseContainerDepth()
 call.{1} = val
 "#,
                         Self::quote_type(arg.type_tag()),
-                        arg.name().to_camel_case()
+                        arg.name().to_upper_camel_case()
                     ),
                     _ => format!(
                         "bcs.NewDeserializer(script.Value.Args[{}]).Deserialize{}()",
@@ -532,7 +532,7 @@ if val, err := {}; err == nil {{
 }}
 "#,
                     decoding,
-                    arg.name().to_camel_case(),
+                    arg.name().to_upper_camel_case(),
                 )?;
             }
         }

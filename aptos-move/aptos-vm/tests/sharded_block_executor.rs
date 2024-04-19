@@ -192,7 +192,9 @@ mod test_utils {
         executor::FakeExecutor,
     };
     use aptos_types::{
-        block_executor::partitioner::PartitionedTransactions,
+        block_executor::{
+            config::BlockExecutorConfigFromOnchain, partitioner::PartitionedTransactions,
+        },
         transaction::{
             analyzed_transaction::AnalyzedTransaction,
             signature_verified_transaction::SignatureVerifiedTransaction, Transaction,
@@ -296,7 +298,7 @@ mod test_utils {
                 Arc::new(executor.data_store().clone()),
                 partitioned_txns.clone(),
                 2,
-                None,
+                BlockExecutorConfigFromOnchain::new_no_block_limit(),
             )
             .unwrap();
 
@@ -306,7 +308,7 @@ mod test_utils {
                 .map(|t| t.into_txn())
                 .collect();
         let unsharded_txn_output =
-            AptosVM::execute_block(&ordered_txns, executor.data_store(), None).unwrap();
+            AptosVM::execute_block_no_limit(&ordered_txns, executor.data_store()).unwrap();
         compare_txn_outputs(unsharded_txn_output, sharded_txn_output);
     }
 
@@ -350,12 +352,13 @@ mod test_utils {
                 Arc::new(executor.data_store().clone()),
                 partitioned_txns,
                 concurrency,
-                None,
+                BlockExecutorConfigFromOnchain::new_no_block_limit(),
             )
             .unwrap();
 
         let unsharded_txn_output =
-            AptosVM::execute_block(&execution_ordered_txns, executor.data_store(), None).unwrap();
+            AptosVM::execute_block_no_limit(&execution_ordered_txns, executor.data_store())
+                .unwrap();
         compare_txn_outputs(unsharded_txn_output, sharded_txn_output);
     }
 
@@ -403,12 +406,13 @@ mod test_utils {
                 Arc::new(executor.data_store().clone()),
                 partitioned_txns,
                 concurrency,
-                None,
+                BlockExecutorConfigFromOnchain::new_no_block_limit(),
             )
             .unwrap();
 
         let unsharded_txn_output =
-            AptosVM::execute_block(&execution_ordered_txns, executor.data_store(), None).unwrap();
+            AptosVM::execute_block_no_limit(&execution_ordered_txns, executor.data_store())
+                .unwrap();
         compare_txn_outputs(unsharded_txn_output, sharded_txn_output);
     }
 }

@@ -4,6 +4,7 @@
 
 pub mod compatibility_test;
 pub mod consensus_reliability_tests;
+pub mod dag_onchain_enable_test;
 pub mod forge_setup_test;
 pub mod framework_upgrade;
 pub mod fullnode_reboot_stress_test;
@@ -36,7 +37,10 @@ use aptos_rest_client::Client as RestClient;
 use aptos_sdk::{transaction_builder::TransactionFactory, types::PeerId};
 use futures::future::join_all;
 use rand::{rngs::StdRng, SeedableRng};
-use std::time::{Duration, Instant, SystemTime, UNIX_EPOCH};
+use std::{
+    fmt::Write,
+    time::{Duration, Instant, SystemTime, UNIX_EPOCH},
+};
 use tokio::runtime::Runtime;
 
 const WARMUP_DURATION_FRACTION: f32 = 0.07;
@@ -155,7 +159,7 @@ pub trait NetworkLoadTest: Test {
         Ok(())
     }
 
-    fn finish(&self, _swarm: &mut dyn Swarm) -> Result<()> {
+    fn finish(&self, _ctx: &mut NetworkContext) -> Result<()> {
         Ok(())
     }
 }
@@ -219,10 +223,9 @@ impl NetworkTest for dyn NetworkLoadTest {
             .block_on(ctx.swarm().get_client_with_newest_ledger_version())
             .context("no clients replied for end version")?;
 
-        self.finish(ctx.swarm())
-            .context("finish NetworkLoadTest ")?;
+        self.finish(ctx).context("finish NetworkLoadTest ")?;
 
-        for (_phase, phase_stats) in stats_by_phase.into_iter().enumerate() {
+        for phase_stats in stats_by_phase.into_iter() {
             ctx.check_for_success(
                 &phase_stats.emitter_stats,
                 phase_stats.actual_duration,
@@ -495,7 +498,7 @@ impl NetworkTest for CompositeNetworkTest {
         }
         self.test.run(ctx)?;
         for wrapper in &self.wrappers {
-            wrapper.finish(ctx.swarm())?;
+            wrapper.finish(ctx)?;
         }
         Ok(())
     }
@@ -505,4 +508,22 @@ impl Test for CompositeNetworkTest {
     fn name(&self) -> &'static str {
         "CompositeNetworkTest"
     }
+}
+
+pub(crate) fn generate_onchain_config_blob(data: &[u8]) -> String {
+    let mut buf = String::new();
+
+    write!(buf, "vector[").unwrap();
+    for (i, b) in data.iter().enumerate() {
+        if i % 20 == 0 {
+            if i > 0 {
+                writeln!(buf).unwrap();
+            }
+        } else {
+            write!(buf, " ").unwrap();
+        }
+        write!(buf, "{}u8,", b).unwrap();
+    }
+    write!(buf, "]").unwrap();
+    buf
 }

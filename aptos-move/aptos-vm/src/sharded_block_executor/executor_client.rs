@@ -1,9 +1,12 @@
 // Copyright © Aptos Foundation
 // SPDX-License-Identifier: Apache-2.0
 
-use aptos_state_view::StateView;
 use aptos_types::{
-    block_executor::partitioner::PartitionedTransactions, transaction::TransactionOutput,
+    block_executor::{
+        config::BlockExecutorConfigFromOnchain, partitioner::PartitionedTransactions,
+    },
+    state_store::StateView,
+    transaction::TransactionOutput,
 };
 use move_core_types::vm_status::VMStatus;
 use std::sync::Arc;
@@ -40,7 +43,7 @@ pub trait ExecutorClient<S: StateView + Sync + Send + 'static>: Send + Sync {
         state_view: Arc<S>,
         transactions: PartitionedTransactions,
         concurrency_level_per_shard: usize,
-        maybe_block_gas_limit: Option<u64>,
+        onchain_config: BlockExecutorConfigFromOnchain,
     ) -> Result<ShardedExecutionOutput, VMStatus>;
 
     fn shutdown(&mut self);

@@ -1,5 +1,5 @@
 
-<a name="0x1_from_bcs"></a>
+<a id="0x1_from_bcs"></a>
 
 # Module `0x1::from_bcs`
 
@@ -38,12 +38,12 @@ assert!(from_bcs::to_address(bcs::to_bytes(&@0xabcdef)) == @0xabcdef, 0);
 
 
 
-<a name="@Constants_0"></a>
+<a id="@Constants_0"></a>
 
 ## Constants
 
 
-<a name="0x1_from_bcs_EINVALID_UTF8"></a>
+<a id="0x1_from_bcs_EINVALID_UTF8"></a>
 
 UTF8 check failed in conversion from bytes to string
 
@@ -53,7 +53,7 @@ UTF8 check failed in conversion from bytes to string
 
 
 
-<a name="0x1_from_bcs_to_bool"></a>
+<a id="0x1_from_bcs_to_bool"></a>
 
 ## Function `to_bool`
 
@@ -77,7 +77,7 @@ UTF8 check failed in conversion from bytes to string
 
 </details>
 
-<a name="0x1_from_bcs_to_u8"></a>
+<a id="0x1_from_bcs_to_u8"></a>
 
 ## Function `to_u8`
 
@@ -101,7 +101,7 @@ UTF8 check failed in conversion from bytes to string
 
 </details>
 
-<a name="0x1_from_bcs_to_u16"></a>
+<a id="0x1_from_bcs_to_u16"></a>
 
 ## Function `to_u16`
 
@@ -125,7 +125,7 @@ UTF8 check failed in conversion from bytes to string
 
 </details>
 
-<a name="0x1_from_bcs_to_u32"></a>
+<a id="0x1_from_bcs_to_u32"></a>
 
 ## Function `to_u32`
 
@@ -149,7 +149,7 @@ UTF8 check failed in conversion from bytes to string
 
 </details>
 
-<a name="0x1_from_bcs_to_u64"></a>
+<a id="0x1_from_bcs_to_u64"></a>
 
 ## Function `to_u64`
 
@@ -173,7 +173,7 @@ UTF8 check failed in conversion from bytes to string
 
 </details>
 
-<a name="0x1_from_bcs_to_u128"></a>
+<a id="0x1_from_bcs_to_u128"></a>
 
 ## Function `to_u128`
 
@@ -197,7 +197,7 @@ UTF8 check failed in conversion from bytes to string
 
 </details>
 
-<a name="0x1_from_bcs_to_u256"></a>
+<a id="0x1_from_bcs_to_u256"></a>
 
 ## Function `to_u256`
 
@@ -221,7 +221,7 @@ UTF8 check failed in conversion from bytes to string
 
 </details>
 
-<a name="0x1_from_bcs_to_address"></a>
+<a id="0x1_from_bcs_to_address"></a>
 
 ## Function `to_address`
 
@@ -245,7 +245,7 @@ UTF8 check failed in conversion from bytes to string
 
 </details>
 
-<a name="0x1_from_bcs_to_bytes"></a>
+<a id="0x1_from_bcs_to_bytes"></a>
 
 ## Function `to_bytes`
 
@@ -269,7 +269,7 @@ UTF8 check failed in conversion from bytes to string
 
 </details>
 
-<a name="0x1_from_bcs_to_string"></a>
+<a id="0x1_from_bcs_to_string"></a>
 
 ## Function `to_string`
 
@@ -296,7 +296,7 @@ UTF8 check failed in conversion from bytes to string
 
 </details>
 
-<a name="0x1_from_bcs_from_bytes"></a>
+<a id="0x1_from_bcs_from_bytes"></a>
 
 ## Function `from_bytes`
 
@@ -323,17 +323,17 @@ owned.
 
 </details>
 
-<a name="@Specification_1"></a>
+<a id="@Specification_1"></a>
 
 ## Specification
 
 
 
-<a name="0x1_from_bcs_deserialize"></a>
+<a id="0x1_from_bcs_deserialize"></a>
 
 
 <pre><code><b>fun</b> <a href="from_bcs.md#0x1_from_bcs_deserialize">deserialize</a>&lt;T&gt;(bytes: <a href="../../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u8&gt;): T;
-<a name="0x1_from_bcs_deserializable"></a>
+<a id="0x1_from_bcs_deserializable"></a>
 <b>fun</b> <a href="from_bcs.md#0x1_from_bcs_deserializable">deserializable</a>&lt;T&gt;(bytes: <a href="../../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u8&gt;): bool;
 <b>axiom</b>&lt;T&gt; <b>forall</b> b1: <a href="../../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u8&gt;, b2: <a href="../../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u8&gt;:
     ( b1 == b2 ==&gt; <a href="from_bcs.md#0x1_from_bcs_deserializable">deserializable</a>&lt;T&gt;(b1) == <a href="from_bcs.md#0x1_from_bcs_deserializable">deserializable</a>&lt;T&gt;(b2) );
@@ -343,7 +343,7 @@ owned.
 
 
 
-<a name="@Specification_1_from_bytes"></a>
+<a id="@Specification_1_from_bytes"></a>
 
 ### Function `from_bytes`
 

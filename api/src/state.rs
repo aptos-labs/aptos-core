@@ -18,10 +18,9 @@ use aptos_api_types::{
     MoveModuleBytecode, MoveResource, MoveStructTag, MoveValue, RawStateValueRequest,
     RawTableItemRequest, TableItemRequest, VerifyInput, VerifyInputWithRecursion, U64,
 };
-use aptos_state_view::TStateView;
 use aptos_types::{
     access_path::AccessPath,
-    state_store::{state_key::StateKey, table::TableHandle},
+    state_store::{state_key::StateKey, table::TableHandle, TStateView},
 };
 use aptos_vm::data_cache::AsMoveResolver;
 use move_core_types::{
@@ -316,7 +315,10 @@ impl StateApi {
             AcceptType::Json => {
                 let resource = state_view
                     .as_move_resolver()
-                    .as_converter(self.context.db.clone())
+                    .as_converter(
+                        self.context.db.clone(),
+                        self.context.table_info_reader.clone(),
+                    )
                     .try_into_resource(&resource_type, &bytes)
                     .context("Failed to deserialize resource data retrieved from DB")
                     .map_err(|err| {
@@ -422,7 +424,10 @@ impl StateApi {
             .state_view(ledger_version.map(|inner| inner.0))?;
 
         let resolver = state_view.as_move_resolver();
-        let converter = resolver.as_converter(self.context.db.clone());
+        let converter = resolver.as_converter(
+            self.context.db.clone(),
+            self.context.table_info_reader.clone(),
+        );
 
         // Convert key to lookup version for DB
         let vm_key = converter
@@ -580,7 +585,7 @@ impl StateApi {
                         "StateKey({}) and Ledger version({})",
                         request.key, ledger_version
                     ),
-                    AptosErrorCode::TableItemNotFound,
+                    AptosErrorCode::StateValueNotFound,
                     &ledger_info,
                 )
             })?;

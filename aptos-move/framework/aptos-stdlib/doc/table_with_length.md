@@ -1,5 +1,5 @@
 
-<a name="0x1_table_with_length"></a>
+<a id="0x1_table_with_length"></a>
 
 # Module `0x1::table_with_length`
 
@@ -40,7 +40,7 @@ Extends Table and provides functions such as length and the ability to be destro
 
 
 
-<a name="0x1_table_with_length_TableWithLength"></a>
+<a id="0x1_table_with_length_TableWithLength"></a>
 
 ## Struct `TableWithLength`
 
@@ -74,12 +74,12 @@ Type of tables
 
 </details>
 
-<a name="@Constants_0"></a>
+<a id="@Constants_0"></a>
 
 ## Constants
 
 
-<a name="0x1_table_with_length_EALREADY_EXISTS"></a>
+<a id="0x1_table_with_length_EALREADY_EXISTS"></a>
 
 
 
@@ -88,7 +88,7 @@ Type of tables
 
 
 
-<a name="0x1_table_with_length_ENOT_EMPTY"></a>
+<a id="0x1_table_with_length_ENOT_EMPTY"></a>
 
 
 
@@ -97,7 +97,7 @@ Type of tables
 
 
 
-<a name="0x1_table_with_length_ENOT_FOUND"></a>
+<a id="0x1_table_with_length_ENOT_FOUND"></a>
 
 
 
@@ -106,7 +106,7 @@ Type of tables
 
 
 
-<a name="0x1_table_with_length_new"></a>
+<a id="0x1_table_with_length_new"></a>
 
 ## Function `new`
 
@@ -134,7 +134,7 @@ Create a new Table.
 
 </details>
 
-<a name="0x1_table_with_length_destroy_empty"></a>
+<a id="0x1_table_with_length_destroy_empty"></a>
 
 ## Function `destroy_empty`
 
@@ -161,7 +161,7 @@ Destroy a table. The table must be empty to succeed.
 
 </details>
 
-<a name="0x1_table_with_length_add"></a>
+<a id="0x1_table_with_length_add"></a>
 
 ## Function `add`
 
@@ -189,7 +189,7 @@ table, and cannot be discovered from it.
 
 </details>
 
-<a name="0x1_table_with_length_borrow"></a>
+<a id="0x1_table_with_length_borrow"></a>
 
 ## Function `borrow`
 
@@ -215,7 +215,7 @@ Aborts if there is no entry for <code>key</code>.
 
 </details>
 
-<a name="0x1_table_with_length_borrow_mut"></a>
+<a id="0x1_table_with_length_borrow_mut"></a>
 
 ## Function `borrow_mut`
 
@@ -241,7 +241,7 @@ Aborts if there is no entry for <code>key</code>.
 
 </details>
 
-<a name="0x1_table_with_length_length"></a>
+<a id="0x1_table_with_length_length"></a>
 
 ## Function `length`
 
@@ -266,7 +266,7 @@ Returns the length of the table, i.e. the number of entries.
 
 </details>
 
-<a name="0x1_table_with_length_empty"></a>
+<a id="0x1_table_with_length_empty"></a>
 
 ## Function `empty`
 
@@ -291,7 +291,7 @@ Returns true if this table is empty.
 
 </details>
 
-<a name="0x1_table_with_length_borrow_mut_with_default"></a>
+<a id="0x1_table_with_length_borrow_mut_with_default"></a>
 
 ## Function `borrow_mut_with_default`
 
@@ -323,7 +323,7 @@ Insert the pair (<code>key</code>, <code>default</code>) first if there is no en
 
 </details>
 
-<a name="0x1_table_with_length_upsert"></a>
+<a id="0x1_table_with_length_upsert"></a>
 
 ## Function `upsert`
 
@@ -354,7 +354,7 @@ update the value of the entry for <code>key</code> to <code>value</code> otherwi
 
 </details>
 
-<a name="0x1_table_with_length_remove"></a>
+<a id="0x1_table_with_length_remove"></a>
 
 ## Function `remove`
 
@@ -382,7 +382,7 @@ Aborts if there is no entry for <code>key</code>.
 
 </details>
 
-<a name="0x1_table_with_length_contains"></a>
+<a id="0x1_table_with_length_contains"></a>
 
 ## Function `contains`
 
@@ -407,12 +407,12 @@ Returns true iff <code><a href="table.md#0x1_table">table</a></code> contains an
 
 </details>
 
-<a name="@Specification_1"></a>
+<a id="@Specification_1"></a>
 
 ## Specification
 
 
-<a name="@Specification_1_TableWithLength"></a>
+<a id="@Specification_1_TableWithLength"></a>
 
 ### Struct `TableWithLength`
 
@@ -460,7 +460,7 @@ Returns true iff <code><a href="table.md#0x1_table">table</a></code> contains an
 
 
 
-<a name="@Specification_1_new"></a>
+<a id="@Specification_1_new"></a>
 
 ### Function `new`
 
@@ -476,7 +476,7 @@ Returns true iff <code><a href="table.md#0x1_table">table</a></code> contains an
 
 
 
-<a name="@Specification_1_destroy_empty"></a>
+<a id="@Specification_1_destroy_empty"></a>
 
 ### Function `destroy_empty`
 
@@ -492,7 +492,7 @@ Returns true iff <code><a href="table.md#0x1_table">table</a></code> contains an
 
 
 
-<a name="@Specification_1_add"></a>
+<a id="@Specification_1_add"></a>
 
 ### Function `add`
 
@@ -508,7 +508,7 @@ Returns true iff <code><a href="table.md#0x1_table">table</a></code> contains an
 
 
 
-<a name="@Specification_1_borrow"></a>
+<a id="@Specification_1_borrow"></a>
 
 ### Function `borrow`
 
@@ -524,7 +524,7 @@ Returns true iff <code><a href="table.md#0x1_table">table</a></code> contains an
 
 
 
-<a name="@Specification_1_borrow_mut"></a>
+<a id="@Specification_1_borrow_mut"></a>
 
 ### Function `borrow_mut`
 
@@ -540,7 +540,7 @@ Returns true iff <code><a href="table.md#0x1_table">table</a></code> contains an
 
 
 
-<a name="@Specification_1_length"></a>
+<a id="@Specification_1_length"></a>
 
 ### Function `length`
 
@@ -556,7 +556,7 @@ Returns true iff <code><a href="table.md#0x1_table">table</a></code> contains an
 
 
 
-<a name="@Specification_1_empty"></a>
+<a id="@Specification_1_empty"></a>
 
 ### Function `empty`
 
@@ -572,7 +572,7 @@ Returns true iff <code><a href="table.md#0x1_table">table</a></code> contains an
 
 
 
-<a name="@Specification_1_borrow_mut_with_default"></a>
+<a id="@Specification_1_borrow_mut_with_default"></a>
 
 ### Function `borrow_mut_with_default`
 
@@ -589,7 +589,7 @@ Returns true iff <code><a href="table.md#0x1_table">table</a></code> contains an
 
 
 
-<a name="@Specification_1_upsert"></a>
+<a id="@Specification_1_upsert"></a>
 
 ### Function `upsert`
 
@@ -605,7 +605,7 @@ Returns true iff <code><a href="table.md#0x1_table">table</a></code> contains an
 
 
 
-<a name="@Specification_1_remove"></a>
+<a id="@Specification_1_remove"></a>
 
 ### Function `remove`
 
@@ -621,7 +621,7 @@ Returns true iff <code><a href="table.md#0x1_table">table</a></code> contains an
 
 
 
-<a name="@Specification_1_contains"></a>
+<a id="@Specification_1_contains"></a>
 
 ### Function `contains`
 
@@ -638,7 +638,7 @@ Returns true iff <code><a href="table.md#0x1_table">table</a></code> contains an
 
 
 
-<a name="0x1_table_with_length_spec_len"></a>
+<a id="0x1_table_with_length_spec_len"></a>
 
 
 <pre><code><b>native</b> <b>fun</b> <a href="table_with_length.md#0x1_table_with_length_spec_len">spec_len</a>&lt;K, V&gt;(t: <a href="table_with_length.md#0x1_table_with_length_TableWithLength">TableWithLength</a>&lt;K, V&gt;): num;
@@ -647,7 +647,7 @@ Returns true iff <code><a href="table.md#0x1_table">table</a></code> contains an
 
 
 
-<a name="0x1_table_with_length_spec_contains"></a>
+<a id="0x1_table_with_length_spec_contains"></a>
 
 
 <pre><code><b>native</b> <b>fun</b> <a href="table_with_length.md#0x1_table_with_length_spec_contains">spec_contains</a>&lt;K, V&gt;(t: <a href="table_with_length.md#0x1_table_with_length_TableWithLength">TableWithLength</a>&lt;K, V&gt;, k: K): bool;
@@ -656,7 +656,7 @@ Returns true iff <code><a href="table.md#0x1_table">table</a></code> contains an
 
 
 
-<a name="0x1_table_with_length_spec_set"></a>
+<a id="0x1_table_with_length_spec_set"></a>
 
 
 <pre><code><b>native</b> <b>fun</b> <a href="table_with_length.md#0x1_table_with_length_spec_set">spec_set</a>&lt;K, V&gt;(t: <a href="table_with_length.md#0x1_table_with_length_TableWithLength">TableWithLength</a>&lt;K, V&gt;, k: K, v: V): <a href="table_with_length.md#0x1_table_with_length_TableWithLength">TableWithLength</a>&lt;K, V&gt;;
@@ -665,7 +665,7 @@ Returns true iff <code><a href="table.md#0x1_table">table</a></code> contains an
 
 
 
-<a name="0x1_table_with_length_spec_remove"></a>
+<a id="0x1_table_with_length_spec_remove"></a>
 
 
 <pre><code><b>native</b> <b>fun</b> <a href="table_with_length.md#0x1_table_with_length_spec_remove">spec_remove</a>&lt;K, V&gt;(t: <a href="table_with_length.md#0x1_table_with_length_TableWithLength">TableWithLength</a>&lt;K, V&gt;, k: K): <a href="table_with_length.md#0x1_table_with_length_TableWithLength">TableWithLength</a>&lt;K, V&gt;;
@@ -674,7 +674,7 @@ Returns true iff <code><a href="table.md#0x1_table">table</a></code> contains an
 
 
 
-<a name="0x1_table_with_length_spec_get"></a>
+<a id="0x1_table_with_length_spec_get"></a>
 
 
 <pre><code><b>native</b> <b>fun</b> <a href="table_with_length.md#0x1_table_with_length_spec_get">spec_get</a>&lt;K, V&gt;(t: <a href="table_with_length.md#0x1_table_with_length_TableWithLength">TableWithLength</a>&lt;K, V&gt;, k: K): V;

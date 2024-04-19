@@ -2,14 +2,12 @@
 // SPDX-License-Identifier: Apache-2.0
 
 use anyhow::ensure;
-use aptos_consensus_types::proof_of_store::{BatchId, BatchInfo};
-use aptos_crypto::{
-    hash::{CryptoHash, CryptoHasher},
-    HashValue,
+use aptos_consensus_types::{
+    common::BatchPayload,
+    proof_of_store::{BatchId, BatchInfo},
 };
-use aptos_crypto_derive::CryptoHasher;
-use aptos_types::{transaction::SignedTransaction, PeerId};
-use once_cell::sync::OnceCell;
+use aptos_crypto::{hash::CryptoHash, HashValue};
+use aptos_types::{ledger_info::LedgerInfoWithSignatures, transaction::SignedTransaction, PeerId};
 use serde::{Deserialize, Serialize};
 use std::{
     fmt::{Display, Formatter},
@@ -85,47 +83,19 @@ impl TryFrom<PersistedValue> for Batch {
     }
 }
 
-#[derive(Clone, Debug, Deserialize, Serialize, CryptoHasher)]
-pub struct BatchPayload {
-    author: PeerId,
-    txns: Vec<SignedTransaction>,
-    #[serde(skip)]
-    num_bytes: OnceCell<usize>,
-}
+#[cfg(test)]
+mod tests {
+    use aptos_config::config;
 
-impl CryptoHash for BatchPayload {
-    type Hasher = BatchPayloadHasher;
-
-    fn hash(&self) -> HashValue {
-        let mut state = Self::Hasher::new();
-        let bytes = bcs::to_bytes(&self).expect("Unable to serialize batch payload");
-        self.num_bytes.get_or_init(|| bytes.len());
-        state.update(&bytes);
-        state.finish()
-    }
-}
-
-impl BatchPayload {
-    pub fn new(author: PeerId, txns: Vec<SignedTransaction>) -> Self {
-        Self {
-            author,
-            txns,
-            num_bytes: OnceCell::new(),
-        }
-    }
-
-    pub fn into_transactions(self) -> Vec<SignedTransaction> {
-        self.txns
-    }
-
-    pub fn num_txns(&self) -> usize {
-        self.txns.len()
-    }
-
-    pub fn num_bytes(&self) -> usize {
-        *self
-            .num_bytes
-            .get_or_init(|| bcs::serialized_size(&self).expect("unable to serialize batch payload"))
+    #[test]
+    fn test_batch_payload_padding() {
+        use super::*;
+        let empty_batch_payload = BatchPayload::new(PeerId::random(), vec![]);
+        // We overestimate the ULEB128 encoding of the number of transactions as 128 bytes.
+        assert_eq!(
+            empty_batch_payload.num_bytes() + 127,
+            config::BATCH_PADDING_BYTES
+        );
     }
 }
 
@@ -163,7 +133,7 @@ impl Batch {
 
     pub fn verify(&self) -> anyhow::Result<()> {
         ensure!(
-            self.payload.author == self.author(),
+            self.payload.author() == self.author(),
             "Payload author doesn't match the info"
         );
         ensure!(
@@ -178,7 +148,7 @@ impl Batch {
             self.payload.num_bytes() as u64 == self.num_bytes(),
             "Payload num bytes doesn't match batch info"
         );
-        for txn in &self.payload.txns {
+        for txn in self.payload.txns() {
             ensure!(
                 txn.gas_unit_price() >= self.gas_bucket_start(),
                 "Payload gas unit price doesn't match batch info"
@@ -198,7 +168,7 @@ impl Batch {
     }
 
     pub fn into_transactions(self) -> Vec<SignedTransaction> {
-        self.payload.txns
+        self.payload.into_transactions()
     }
 
     pub fn batch_info(&self) -> &BatchInfo {
@@ -273,6 +243,12 @@ impl From<Batch> for PersistedValue {
         } = value;
         PersistedValue::new(batch_info, Some(payload.into_transactions()))
     }
+}
+
+#[derive(Clone, Debug, Deserialize, Serialize)]
+pub enum BatchResponse {
+    Batch(Batch),
+    NotFound(LedgerInfoWithSignatures),
 }
 
 #[derive(Clone, Debug, Deserialize, Serialize)]

@@ -126,13 +126,7 @@ error[E04010]: cannot infer type
    ┌─ tests/move_check/typing/eq_invalid.move:28:9
    │
 28 │         G2{} == G2{};
-   │         ^^^^ Could not infer this type. Try adding an annotation
-
-error[E04010]: cannot infer type
-   ┌─ tests/move_check/typing/eq_invalid.move:28:17
-   │
-28 │         G2{} == G2{};
-   │                 ^^^^ Could not infer this type. Try adding an annotation
+   │         ^^^^ Cannot infer the type parameter `T` for generic struct `0x8675309::M::G2`. Try providing a type parameter.
 
 error[E05001]: ability constraint not satisfied
    ┌─ tests/move_check/typing/eq_invalid.move:29:9

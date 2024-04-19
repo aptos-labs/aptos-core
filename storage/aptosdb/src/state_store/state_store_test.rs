@@ -4,10 +4,10 @@
 
 use super::*;
 use crate::{
-    jellyfish_merkle_node::JellyfishMerkleNodeSchema,
-    new_sharded_kv_schema_batch,
+    db::test_helper::{arb_state_kv_sets, update_store},
+    schema::jellyfish_merkle_node::JellyfishMerkleNodeSchema,
     state_restore::StateSnapshotRestore,
-    test_helper::{arb_state_kv_sets, update_store},
+    utils::new_sharded_kv_schema_batch,
     AptosDB,
 };
 use aptos_jellyfish_merkle::{
@@ -286,11 +286,7 @@ pub fn test_get_state_snapshot_before() {
 
     // hack: VersionData expected on every version, so duplicate the data at version 1
     let usage = store.get_usage(Some(0)).unwrap();
-    store
-        .ledger_db
-        .metadata_db()
-        .put::<VersionDataSchema>(&1, &usage.into())
-        .unwrap();
+    db.ledger_db.metadata_db().put_usage(1, usage).unwrap();
 
     // put in another version
     put_value_set(store, kv, 2, Some(0));

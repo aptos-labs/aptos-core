@@ -6,6 +6,7 @@ use crate::types::{
 };
 use anyhow::bail;
 use aptos_types::write_set::{TransactionWrite, WriteOpKind};
+use aptos_vm_types::{resolver::ResourceGroupSize, resource_group_adapter::group_size_as_sum};
 use claims::{assert_matches, assert_none, assert_some};
 use crossbeam::utils::CachePadded;
 use dashmap::DashMap;
@@ -97,7 +98,7 @@ impl<T: Hash + Clone + Debug + Eq + Serialize, V: TransactionWrite> VersionedGro
                         .get(&tag)
                         .expect("Reading twice from storage must be consistent");
                     if let ValueWithLayout::RawFromStorage(prev_v) = prev_v {
-                        assert!(v.bytes().map(|b| b.len()) == prev_v.bytes().map(|b| b.len()));
+                        assert_eq!(v.bytes().map(|b| b.len()), prev_v.bytes().map(|b| b.len()));
                     }
                 }
             },
@@ -196,7 +197,7 @@ impl<T: Hash + Clone + Debug + Eq + Serialize, V: TransactionWrite> VersionedGro
 
         if at_base_version {
             // base version is from storage and final - immediately treat as committed.
-            self.commit_idx(zero_idx)
+            self.commit_idx(zero_idx, true)
                 .expect("Marking storage version as committed must succeed");
         }
 
@@ -245,7 +246,11 @@ impl<T: Hash + Clone + Debug + Eq + Serialize, V: TransactionWrite> VersionedGro
     }
 
     // Records the latest committed op for each tag in the group (removed tags ar excluded).
-    fn commit_idx(&mut self, shifted_idx: ShiftedTxnIndex) -> anyhow::Result<()> {
+    fn commit_idx(
+        &mut self,
+        shifted_idx: ShiftedTxnIndex,
+        allow_new_modification: bool,
+    ) -> anyhow::Result<()> {
         use std::collections::hash_map::Entry::*;
         use WriteOpKind::*;
 
@@ -264,14 +269,16 @@ impl<T: Hash + Clone + Debug + Eq + Serialize, V: TransactionWrite> VersionedGro
                 (Vacant(entry), Creation) => {
                     entry.insert(v.clone());
                 },
+                (Vacant(entry), Modification) if allow_new_modification => {
+                    entry.insert(v.clone());
+                },
                 (Occupied(mut entry), Creation) if entry.get().write_op_kind() == Deletion => {
                     entry.insert(v.clone());
                 },
-                (_, _) => {
+                (e, _) => {
                     bail!(
-                        "WriteOp kind {:?} not consistent with previous value at tag {:?}",
+                        "[{shifted_idx:?}] WriteOp kind {:?} not consistent with previous value at tag {tag:?}, value: {e:?}",
                         v.write_op_kind(),
-                        tag
                     );
                 },
             }
@@ -326,7 +333,7 @@ impl<T: Hash + Clone + Debug + Eq + Serialize, V: TransactionWrite> VersionedGro
             })
     }
 
-    fn get_latest_group_size(&self, txn_idx: TxnIndex) -> Result<u64, MVGroupError> {
+    fn get_latest_group_size(&self, txn_idx: TxnIndex) -> Result<ResourceGroupSize, MVGroupError> {
         if !self
             .idx_to_update
             .contains_key(&ShiftedTxnIndex::zero_idx())
@@ -334,34 +341,27 @@ impl<T: Hash + Clone + Debug + Eq + Serialize, V: TransactionWrite> VersionedGro
             return Err(MVGroupError::Uninitialized);
         }
 
-        self.versioned_map
+        let sizes = self
+            .versioned_map
             .iter()
-            .try_fold(0_u64, |len, (tag, tree)| {
-                match tree
-                    .range(ShiftedTxnIndex::zero_idx()..ShiftedTxnIndex::new(txn_idx))
+            .flat_map(|(tag, tree)| {
+                tree.range(ShiftedTxnIndex::zero_idx()..ShiftedTxnIndex::new(txn_idx))
                     .next_back()
-                {
-                    Some((idx, entry)) => {
+                    .and_then(|(idx, entry)| {
                         if entry.flag == Flag::Estimate {
-                            Err(MVGroupError::Dependency(
+                            Some(Err(MVGroupError::Dependency(
                                 idx.idx().expect("May not depend on storage version"),
-                            ))
+                            )))
                         } else {
-                            match entry.value.bytes_len() {
-                                Some(bytes_len) => {
-                                    let delta = bytes_len as u64
-                                        + bcs::serialized_size(tag)
-                                            .map_err(|_| MVGroupError::TagSerializationError)?
-                                            as u64;
-                                    Ok(len + delta)
-                                },
-                                None => Ok(len),
-                            }
+                            entry
+                                .value
+                                .bytes_len()
+                                .map(|bytes_len| Ok((tag, bytes_len)))
                         }
-                    },
-                    None => Ok(len),
-                }
+                    })
             })
+            .collect::<Result<Vec<_>, MVGroupError>>()?;
+        group_size_as_sum(sizes.into_iter()).map_err(MVGroupError::TagSerializationError)
     }
 }
 
@@ -375,6 +375,10 @@ impl<
         Self {
             group_values: DashMap::new(),
         }
+    }
+
+    pub(crate) fn num_keys(&self) -> usize {
+        self.group_values.len()
     }
 
     pub fn set_raw_base_values(&self, key: K, base_values: impl IntoIterator<Item = (T, V)>) {
@@ -442,7 +446,7 @@ impl<
         key: &K,
         tag: &T,
         txn_idx: TxnIndex,
-    ) -> anyhow::Result<(Version, ValueWithLayout<V>), MVGroupError> {
+    ) -> Result<(Version, ValueWithLayout<V>), MVGroupError> {
         match self.group_values.get(key) {
             Some(g) => g.get_latest_tagged_value(tag, txn_idx),
             None => Err(MVGroupError::Uninitialized),
@@ -454,7 +458,11 @@ impl<
     /// marked as an estimate, a dependency is returned. Note: it would be possible to
     /// process estimated entry sizes, but would have to mark that if after the re-execution
     /// the entry size changes, then re-execution must reduce validation idx.
-    pub fn get_group_size(&self, key: &K, txn_idx: TxnIndex) -> Result<u64, MVGroupError> {
+    pub fn get_group_size(
+        &self,
+        key: &K,
+        txn_idx: TxnIndex,
+    ) -> Result<ResourceGroupSize, MVGroupError> {
         match self.group_values.get(key) {
             Some(g) => g.get_latest_group_size(txn_idx),
             None => Err(MVGroupError::Uninitialized),
@@ -481,7 +489,7 @@ impl<
     ) -> anyhow::Result<Vec<(T, ValueWithLayout<V>)>> {
         let mut v = self.group_values.get_mut(key).expect("Path must exist");
 
-        v.commit_idx(ShiftedTxnIndex::new(txn_idx))?;
+        v.commit_idx(ShiftedTxnIndex::new(txn_idx), false)?;
         Ok(v.get_committed_group())
     }
 
@@ -705,13 +713,19 @@ mod test {
         );
 
         let tag: usize = 5;
-        let tag_len = bcs::serialized_size(&tag).unwrap();
         let one_entry_len = TestValue::creation_with_len(1).bytes().unwrap().len();
         let two_entry_len = TestValue::creation_with_len(2).bytes().unwrap().len();
         let three_entry_len = TestValue::creation_with_len(3).bytes().unwrap().len();
         let four_entry_len = TestValue::creation_with_len(4).bytes().unwrap().len();
-        let exp_size = 2 * two_entry_len + 3 * one_entry_len + 5 * tag_len;
-        assert_ok_eq!(map.get_group_size(&ap, 12), exp_size as u64);
+        let exp_size = group_size_as_sum(vec![(&tag, two_entry_len); 2].into_iter().chain(vec![
+            (
+                &tag,
+                one_entry_len
+            );
+            3
+        ]))
+        .unwrap();
+        assert_ok_eq!(map.get_group_size(&ap, 12), exp_size);
 
         map.write(
             ap.clone(),
@@ -720,14 +734,21 @@ mod test {
             // tags 4, 5
             (4..6).map(|i| (i, (TestValue::creation_with_len(3), None))),
         );
-        let exp_size_12 = exp_size + 2 * three_entry_len + tag_len - one_entry_len;
-        assert_ok_eq!(map.get_group_size(&ap, 12), exp_size_12 as u64);
-        assert_ok_eq!(map.get_group_size(&ap, 10), exp_size as u64);
+        let exp_size_12 = group_size_as_sum(
+            vec![(&tag, one_entry_len); 2]
+                .into_iter()
+                .chain(vec![(&tag, two_entry_len); 2])
+                .chain(vec![(&tag, three_entry_len); 2]),
+        )
+        .unwrap();
+        assert_ok_eq!(map.get_group_size(&ap, 12), exp_size_12);
+        assert_ok_eq!(map.get_group_size(&ap, 10), exp_size);
 
         map.mark_estimate(&ap, 5);
         assert_matches!(map.get_group_size(&ap, 12), Err(Dependency(5)));
-        let exp_size_4 = 4 * (tag_len + one_entry_len);
-        assert_ok_eq!(map.get_group_size(&ap, 4), exp_size_4 as u64);
+        let exp_size_4 = group_size_as_sum(vec![(&tag, one_entry_len); 4].into_iter()).unwrap();
+
+        assert_ok_eq!(map.get_group_size(&ap, 4), exp_size_4);
 
         map.write(
             ap.clone(),
@@ -735,12 +756,20 @@ mod test {
             1,
             (0..2).map(|i| (i, (TestValue::creation_with_len(4), None))),
         );
-        let exp_size_7 = 2 * four_entry_len + 3 * one_entry_len + 5 * tag_len;
-        assert_ok_eq!(map.get_group_size(&ap, 7), exp_size_7 as u64);
+        let exp_size_7 = group_size_as_sum(vec![(&tag, one_entry_len); 3].into_iter().chain(vec![
+            (
+                &tag,
+                four_entry_len
+            );
+            2
+        ]))
+        .unwrap();
+
+        assert_ok_eq!(map.get_group_size(&ap, 7), exp_size_7);
         assert_matches!(map.get_group_size(&ap, 6), Err(Dependency(5)));
 
         map.remove(&ap, 5);
-        assert_ok_eq!(map.get_group_size(&ap, 6), exp_size_4 as u64);
+        assert_ok_eq!(map.get_group_size(&ap, 6), exp_size_4);
     }
 
     fn finalize_group_as_hashmap(

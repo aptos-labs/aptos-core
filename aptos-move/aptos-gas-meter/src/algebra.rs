@@ -2,10 +2,12 @@
 // SPDX-License-Identifier: Apache-2.0
 
 use crate::traits::GasAlgebra;
-use aptos_gas_algebra::{Fee, FeePerGasUnit, Gas, GasExpression, Octa};
+use aptos_gas_algebra::{Fee, FeePerGasUnit, Gas, GasExpression, NumBytes, NumModules, Octa};
 use aptos_gas_schedule::VMGasParameters;
 use aptos_logger::error;
-use aptos_vm_types::storage::StorageGasParameters;
+use aptos_vm_types::storage::{
+    io_pricing::IoPricing, space_pricing::DiskSpacePricing, StorageGasParameters,
+};
 use move_binary_format::errors::{PartialVMError, PartialVMResult};
 use move_core_types::{
     gas_algebra::{InternalGas, InternalGasUnit},
@@ -30,6 +32,9 @@ pub struct StandardGasAlgebra {
     storage_fee_in_internal_units: InternalGas,
     // The storage fee consumed by the storage operations.
     storage_fee_used: Fee,
+
+    num_dependencies: NumModules,
+    total_dependency_size: NumBytes,
 }
 
 impl StandardGasAlgebra {
@@ -51,6 +56,8 @@ impl StandardGasAlgebra {
             io_gas_used: 0.into(),
             storage_fee_in_internal_units: 0.into(),
             storage_fee_used: 0.into(),
+            num_dependencies: 0.into(),
+            total_dependency_size: 0.into(),
         }
     }
 }
@@ -83,8 +90,12 @@ impl GasAlgebra for StandardGasAlgebra {
         &self.vm_gas_params
     }
 
-    fn storage_gas_params(&self) -> &StorageGasParameters {
-        &self.storage_gas_params
+    fn io_pricing(&self) -> &IoPricing {
+        &self.storage_gas_params.io_pricing
+    }
+
+    fn disk_space_pricing(&self) -> &DiskSpacePricing {
+        &self.storage_gas_params.space_pricing
     }
 
     fn balance_internal(&self) -> InternalGas {
@@ -225,6 +236,21 @@ impl GasAlgebra for StandardGasAlgebra {
             return Err(PartialVMError::new(StatusCode::STORAGE_LIMIT_REACHED));
         }
 
+        Ok(())
+    }
+
+    fn count_dependency(&mut self, size: NumBytes) -> PartialVMResult<()> {
+        if self.feature_version >= 15 {
+            self.num_dependencies += 1.into();
+            self.total_dependency_size += size;
+
+            if self.num_dependencies > self.vm_gas_params.txn.max_num_dependencies {
+                return Err(PartialVMError::new(StatusCode::DEPENDENCY_LIMIT_REACHED));
+            }
+            if self.total_dependency_size > self.vm_gas_params.txn.max_total_dependency_size {
+                return Err(PartialVMError::new(StatusCode::DEPENDENCY_LIMIT_REACHED));
+            }
+        }
         Ok(())
     }
 

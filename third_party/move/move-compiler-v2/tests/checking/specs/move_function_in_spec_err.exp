@@ -1,0 +1,10 @@
+
+Diagnostics:
+error: specification expression cannot call impure Move function `change`
+   ┌─ tests/checking/specs/move_function_in_spec_err.move:25:20
+   │
+11 │         let ty = borrow_global_mut<TypeInfo>(target);
+   │                  ----------------------------------- in `change`: mutably borrows from global storage
+   ·
+25 │             assert change(account_address, account_address);
+   │                    ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ called here

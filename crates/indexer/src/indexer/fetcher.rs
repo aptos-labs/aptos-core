@@ -244,7 +244,7 @@ async fn fetch_nexts(
 
     let state_view = context.latest_state_view().unwrap();
     let resolver = state_view.as_move_resolver();
-    let converter = resolver.as_converter(context.db.clone());
+    let converter = resolver.as_converter(context.db.clone(), context.table_info_reader.clone());
 
     let mut transactions = vec![];
     for (ind, raw_txn) in raw_txns.into_iter().enumerate() {
@@ -252,7 +252,13 @@ async fn fetch_nexts(
         // Do not update block_height if first block is block metadata
         if ind > 0 {
             // Update the timestamp if the next block occurs
-            if let Some(txn) = raw_txn.transaction.try_as_block_metadata() {
+            if let Some(txn) = raw_txn.transaction.try_as_block_metadata_ext() {
+                timestamp = txn.timestamp_usecs();
+                epoch = txn.epoch();
+                epoch_bcs = aptos_api_types::U64::from(epoch);
+                block_height += 1;
+                block_height_bcs = aptos_api_types::U64::from(block_height);
+            } else if let Some(txn) = raw_txn.transaction.try_as_block_metadata() {
                 timestamp = txn.timestamp_usecs();
                 epoch = txn.epoch();
                 epoch_bcs = aptos_api_types::U64::from(epoch);
@@ -282,6 +288,10 @@ async fn fetch_nexts(
                     Transaction::StateCheckpointTransaction(ref mut sct) => {
                         sct.info.block_height = Some(block_height_bcs);
                         sct.info.epoch = Some(epoch_bcs);
+                    },
+                    Transaction::ValidatorTransaction(ref mut st) => {
+                        st.info.block_height = Some(block_height_bcs);
+                        st.info.epoch = Some(epoch_bcs);
                     },
                 };
                 txn

@@ -9,16 +9,16 @@ use crate::{
     monitor,
     network::{IncomingBlockRetrievalRequest, NetworkSender},
     network_interface::ConsensusMsg,
+    payload_manager::PayloadManager,
     persistent_liveness_storage::{LedgerRecoveryData, PersistentLivenessStorage, RecoveryData},
-    state_replication::StateComputer,
+    pipeline::execution_client::TExecutionClient,
 };
 use anyhow::{bail, Context};
 use aptos_consensus_types::{
     block::Block,
     block_retrieval::{
-        BlockRetrievalRequest, BlockRetrievalResponse, BlockRetrievalStatus,
-        MAX_BLOCKS_PER_REQUEST, NUM_PEERS_PER_RETRY, NUM_RETRIES, RETRY_INTERVAL_MSEC,
-        RPC_TIMEOUT_MSEC,
+        BlockRetrievalRequest, BlockRetrievalResponse, BlockRetrievalStatus, NUM_PEERS_PER_RETRY,
+        NUM_RETRIES, RETRY_INTERVAL_MSEC, RPC_TIMEOUT_MSEC,
     },
     common::Author,
     quorum_cert::QuorumCert,
@@ -49,9 +49,10 @@ impl BlockStore {
     /// Check if we're far away from this ledger info and need to sync.
     /// This ensures that the block referred by the ledger info is not in buffer manager.
     pub fn need_sync_for_ledger_info(&self, li: &LedgerInfoWithSignatures) -> bool {
+        // TODO move min gap to fallback (30) to config.
         (self.ordered_root().round() < li.commit_info().round()
             && !self.block_exists(li.commit_info().id()))
-            || self.commit_root().round() + 2 * self.vote_back_pressure_limit
+            || self.commit_root().round() + 30.max(2 * self.vote_back_pressure_limit)
                 < li.commit_info().round()
     }
 
@@ -117,7 +118,7 @@ impl BlockStore {
             _ => (),
         }
         if self.ordered_root().round() < qc.commit_info().round() {
-            self.commit(qc.clone()).await?;
+            self.send_for_execution(qc.clone()).await?;
             if qc.ends_epoch() {
                 retriever
                     .network
@@ -158,7 +159,7 @@ impl BlockStore {
         while let Some(block) = pending.pop() {
             let block_qc = block.quorum_cert().clone();
             self.insert_single_quorum_cert(block_qc)?;
-            self.execute_and_insert_block(block).await?;
+            self.insert_ordered_block(block).await?;
         }
         self.insert_single_quorum_cert(qc)
     }
@@ -184,7 +185,8 @@ impl BlockStore {
             &highest_commit_cert,
             retriever,
             self.storage.clone(),
-            self.state_computer.clone(),
+            self.execution_client.clone(),
+            self.payload_manager.clone(),
         )
         .await?
         .take();
@@ -213,7 +215,8 @@ impl BlockStore {
         highest_commit_cert: &'a QuorumCert,
         retriever: &'a mut BlockRetriever,
         storage: Arc<dyn PersistentLivenessStorage>,
-        state_computer: Arc<dyn StateComputer>,
+        execution_client: Arc<dyn TExecutionClient>,
+        payload_manager: Arc<PayloadManager>,
     ) -> anyhow::Result<RecoveryData> {
         info!(
             LogSchema::new(LogEvent::StateSync).remote_peer(retriever.preferred_peer),
@@ -295,6 +298,9 @@ impl BlockStore {
         assert_eq!(blocks.len(), quorum_certs.len());
         for (i, block) in blocks.iter().enumerate() {
             assert_eq!(block.id(), quorum_certs[i].certified_block().id());
+            if let Some(payload) = block.payload() {
+                payload_manager.prefetch_payload_data(payload, block.timestamp_usecs());
+            }
         }
 
         // Check early that recovery will succeed, and return before corrupting our state in case it will not.
@@ -321,7 +327,7 @@ impl BlockStore {
 
         storage.save_tree(blocks.clone(), quorum_certs.clone())?;
 
-        state_computer
+        execution_client
             .sync_to(highest_commit_cert.ledger_info().clone())
             .await?;
 
@@ -340,7 +346,7 @@ impl BlockStore {
     async fn sync_to_highest_commit_cert(
         &self,
         ledger_info: &LedgerInfoWithSignatures,
-        network: &NetworkSender,
+        network: &Arc<NetworkSender>,
     ) {
         // if the block exists between commit root and ordered root
         if self.commit_root().round() < ledger_info.commit_info().round()
@@ -398,21 +404,24 @@ impl BlockStore {
 
 /// BlockRetriever is used internally to retrieve blocks
 pub struct BlockRetriever {
-    network: NetworkSender,
+    network: Arc<NetworkSender>,
     preferred_peer: Author,
     validator_addresses: Vec<AccountAddress>,
+    max_blocks_to_request: u64,
 }
 
 impl BlockRetriever {
     pub fn new(
-        network: NetworkSender,
+        network: Arc<NetworkSender>,
         preferred_peer: Author,
         validator_addresses: Vec<AccountAddress>,
+        max_blocks_to_request: u64,
     ) -> Self {
         Self {
             network,
             preferred_peer,
             validator_addresses,
+            max_blocks_to_request,
         }
     }
 
@@ -519,7 +528,7 @@ impl BlockRetriever {
         let mut progress = 0;
         let mut last_block_id = block_id;
         let mut result_blocks: Vec<Block> = vec![];
-        let mut retrieve_batch_size = MAX_BLOCKS_PER_REQUEST;
+        let mut retrieve_batch_size = self.max_blocks_to_request;
         if peers.is_empty() {
             bail!("Failed to fetch block {}: no peers available", block_id);
         }

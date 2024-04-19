@@ -22,7 +22,6 @@ mod consensusdb;
 mod dag;
 mod epoch_manager;
 mod error;
-mod experimental;
 mod liveness;
 mod logging;
 mod metrics_safety_rules;
@@ -32,10 +31,14 @@ mod network_tests;
 mod payload_client;
 mod pending_votes;
 pub mod persistent_liveness_storage;
+mod pipeline;
 pub mod quorum_store;
+mod rand;
 mod recovery_manager;
 mod round_manager;
 mod state_computer;
+#[cfg(test)]
+mod state_computer_tests;
 mod state_replication;
 #[cfg(any(test, feature = "fuzzing"))]
 mod test_utils;
@@ -44,6 +47,7 @@ mod twins;
 mod txn_notifier;
 pub mod util;
 
+mod block_preparer;
 /// AptosBFT implementation
 pub mod consensus_provider;
 /// Required by the telemetry service
@@ -53,7 +57,6 @@ mod execution_pipeline;
 pub mod network_interface;
 mod payload_manager;
 mod qc_aggregator;
-mod sender_aware_shuffler;
 mod transaction_deduper;
 mod transaction_filter;
 mod transaction_shuffler;

@@ -17,13 +17,13 @@ provider "helm" {
 module "validator" {
   source = "../../aptos-node/gcp"
 
-  cluster_bootstrap = var.cluster_bootstrap
-  manage_via_tf     = var.manage_via_tf
+  manage_via_tf = var.manage_via_tf
 
   # Project config
-  project = var.project
-  zone    = var.zone
-  region  = var.region
+  project        = var.project
+  zone           = var.zone
+  region         = var.region
+  node_locations = var.node_locations
 
   # DNS
   zone_name     = var.zone_name # keep empty if you don't want a DNS name
@@ -51,26 +51,30 @@ module "validator" {
   gke_enable_node_autoprovisioning     = var.gke_enable_node_autoprovisioning
   gke_node_autoprovisioning_max_cpu    = var.gke_node_autoprovisioning_max_cpu
   gke_node_autoprovisioning_max_memory = var.gke_node_autoprovisioning_max_memory
-  gke_enable_autoscaling               = var.gke_enable_autoscaling
+  gke_autoscaling_profile              = var.gke_autoscaling_profile
   gke_autoscaling_max_node_count       = var.gke_autoscaling_max_node_count
 
   # Testnet config
   workspace_name_override = var.workspace_name_override
   # if forge enabled, standardize the helm release name for ease of operations
   helm_release_name_override = var.enable_forge ? "aptos-node" : ""
-  helm_values                = var.aptos_node_helm_values
+  helm_values                = local.merged_helm_values
   num_validators             = var.num_validators
   num_fullnode_groups        = var.num_fullnode_groups
 
   # Instance config
-  utility_instance_type   = var.utility_instance_type
-  validator_instance_type = var.validator_instance_type
+  default_disk_size_gb            = var.default_disk_size_gb
+  default_disk_type               = var.default_disk_type
+  create_nodepools                = var.create_nodepools
+  nodepool_sysctls                = var.nodepool_sysctls
+  core_instance_type              = var.core_instance_type
+  utility_instance_type           = var.utility_instance_type
+  validator_instance_type         = var.validator_instance_type
+  utility_instance_enable_taint   = var.utility_instance_enable_taint
+  validator_instance_enable_taint = var.validator_instance_enable_taint
 
-  # addons
-  enable_monitoring      = var.enable_monitoring
-  enable_node_exporter   = var.enable_prometheus_node_exporter
-  monitoring_helm_values = var.monitoring_helm_values
-
+  enable_clouddns        = var.enable_clouddns
+  enable_image_streaming = var.enable_image_streaming
   gke_maintenance_policy = var.gke_maintenance_policy
 }
 
@@ -84,10 +88,19 @@ locals {
   chain_id = var.enable_forge ? 4 : var.chain_id
 
   aptos_node_helm_prefix = var.enable_forge ? "aptos-node" : "${module.validator.helm_release_name}-aptos-node"
+
+  default_helm_values = {
+    cluster_name            = module.validator.gke_cluster_name
+    genesis_blob_upload_url = var.enable_forge ? "${google_cloudfunctions2_function.signed-url[0].service_config[0].uri}?cluster_name=${module.validator.gke_cluster_name}&era=${var.era}" : ""
+  }
+
+  merged_helm_values = merge(
+    local.default_helm_values,
+    var.aptos_node_helm_values
+  )
 }
-
-
 resource "helm_release" "genesis" {
+  count       = var.enable_genesis ? 1 : 0
   name        = "genesis"
   chart       = local.genesis_helm_chart_path
   max_history = 5
@@ -113,6 +126,8 @@ resource "helm_release" "genesis" {
           # internet facing network addresses for the fullnodes
           enable_onchain_discovery = var.zone_name != ""
         }
+        genesis_blob_upload_url = var.enable_forge ? "${google_cloudfunctions2_function.signed-url[0].service_config[0].uri}?cluster_name=${module.validator.gke_cluster_name}&era=${var.era}" : ""
+        cluster_name            = module.validator.gke_cluster_name
       }
     }),
     jsonencode(var.genesis_helm_values)

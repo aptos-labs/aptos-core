@@ -1,0 +1,50 @@
+// -- Model dump before bytecode pipeline
+module 0x42::M {
+    struct HasAbilities {
+        a: #1,
+    }
+    struct HasCopy {
+        a: #1,
+    }
+    struct HasDrop {
+        a: #1,
+    }
+    struct HasKey {
+        a: #1,
+    }
+    struct HasStore {
+        a: #1,
+    }
+    struct NoAbilities {
+        a: bool,
+    }
+    struct S1 {
+        a: #0,
+    }
+    struct S2 {
+        a: M::S1<M::HasAbilities<M::NoAbilities, u64>>,
+    }
+    struct S3 {
+        a: #0,
+        b: #1,
+        c: #2,
+        d: #3,
+    }
+    struct S4 {
+        a: M::S3<M::HasDrop<M::NoAbilities, u64>, M::HasCopy<M::NoAbilities, u64>, M::HasStore<M::NoAbilities, u64>, M::HasKey<M::NoAbilities, u64>>,
+    }
+    private fun f1<T>() {
+        Tuple()
+    }
+    private fun f2() {
+        M::f1<M::HasAbilities<M::NoAbilities, u64>>();
+        Tuple()
+    }
+    private fun f3<T1,T2,T3,T4>() {
+        Tuple()
+    }
+    private fun f4() {
+        M::f3<M::HasDrop<M::NoAbilities, u64>, M::HasCopy<M::NoAbilities, u64>, M::HasStore<M::NoAbilities, u64>, M::HasKey<M::NoAbilities, u64>>();
+        Tuple()
+    }
+} // end 0x42::M

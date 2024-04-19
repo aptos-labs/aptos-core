@@ -1,4 +1,109 @@
 spec aptos_framework::account {
+    /// <high-level-req>
+    /// No.: 1
+    /// Requirement: The initialization of the account module should result in the proper system initialization with valid
+    /// and consistent resources.
+    /// Criticality: High
+    /// Implementation: Initialization of the account module creates a valid address_map table and moves the resources
+    /// to the OriginatingAddress under the aptos_framework account.
+    /// Enforcement: Audited that the address_map table is created and populated correctly with the expected initial
+    /// values.
+    ///
+    /// No.: 2
+    /// Requirement: After successfully creating an account, the account resources should initialize with the default data,
+    /// ensuring the proper initialization of the account state.
+    /// Criticality: High
+    /// Implementation: Creating an account via the create_account function validates the state and moves a new account
+    /// resource under new_address.
+    /// Enforcement: Formally verified via [high-level-req-2](create_account).
+    ///
+    /// No.: 3
+    /// Requirement: Checking the existence of an account under a given address never results in an abort.
+    /// Criticality: Low
+    /// Implementation: The exists_at function returns a boolean value indicating the existence of an account under the
+    /// given address.
+    /// Enforcement: Formally verified by the [high-level-req-3](aborts_if) condition.
+    ///
+    /// No.: 4
+    /// Requirement: The account module maintains bounded sequence numbers for all accounts, guaranteeing they remain
+    /// within the specified limit.
+    /// Criticality: Medium
+    /// Implementation: The sequence number of an account may only increase up to MAX_U64 in a succeeding manner.
+    /// Enforcement: Formally verified via [high-level-req-4](increment_sequence_number) that it remains within the defined boundary of
+    /// MAX_U64.
+    ///
+    /// No.: 5
+    /// Requirement: Only the ed25519 and multied25519 signature schemes are permissible.
+    /// Criticality: Low
+    /// Implementation: Exclusively perform key rotation using either the ed25519 or multied25519 signature schemes.
+    /// Currently restricts the offering of rotation/signing capabilities to the ed25519 or multied25519 schemes.
+    /// Enforcement: Formally Verified: [high-level-req-5.1](rotate_authentication_key),
+    /// [high-level-req-5.2](offer_rotation_capability), and [high-level-req-5.3](offer_signer_capability).
+    /// Verified that it aborts if the account_scheme is not ED25519_SCHEME and not MULTI_ED25519_SCHEME. Audited
+    /// that the scheme enums correspond correctly to signature logic.
+    ///
+    /// No.: 6
+    /// Requirement: Exclusively permit the rotation of the authentication key of an account for the account owner or any
+    /// user who possesses rotation capabilities associated with that account.
+    /// Criticality: Critical
+    /// Implementation: In the rotate_authentication_key function, the authentication key derived from the
+    /// from_public_key_bytes should match the signer's current authentication key. Only the delegate_signer granted the
+    /// rotation capabilities may invoke the rotate_authentication_key_with_rotation_capability function.
+    /// Enforcement: Formally Verified via [high-level-req-6.1](rotate_authentication_key) and
+    /// [high-level-req-6.2](rotate_authentication_key_with_rotation_capability).
+    ///
+    /// No.: 7
+    /// Requirement: Only the owner of an account may offer or revoke the following capabilities: (1)
+    /// offer_rotation_capability, (2) offer_signer_capability, (3) revoke_rotation_capability, and (4)
+    /// revoke_signer_capability.
+    /// Criticality: Critical
+    /// Implementation: An account resource may only be modified by the owner of the account utilizing:
+    /// rotation_capability_offer, signer_capability_offer.
+    /// Enforcement: Formally verified via [high-level-req-7.1](offer_rotation_capability),
+    /// [high-level-req-7.2](offer_signer_capability), and [high-level-req-7.3](revoke_rotation_capability).
+    /// and [high-level-req-7.4](revoke_signer_capability).
+    ///
+    /// No.: 8
+    /// Requirement: The capability to create a signer for the account is exclusively reserved for either the account owner
+    /// or the account that has been granted the signing capabilities.
+    /// Criticality: Critical
+    /// Implementation: Signer creation for the account may only be successfully executed by explicitly granting the
+    /// signing capabilities with the create_authorized_signer function.
+    /// Enforcement: Formally verified via [high-level-req-8](create_authorized_signer).
+    ///
+    /// No.: 9
+    /// Requirement: Rotating the authentication key requires two valid signatures. With the private key of the current
+    /// authentication key. With the private key of the new authentication key.
+    /// Criticality: Critical
+    /// Implementation: The rotate_authentication_key verifies two signatures (current and new) before rotating to the
+    /// new key. The first signature ensures the user has the intended capability, and the second signature ensures that
+    /// the user owns the new key.
+    /// Enforcement: Formally verified via [high-level-req-9.1](rotate_authentication_key) and
+    /// [high-level-req-9.2](rotate_authentication_key_with_rotation_capability).
+    ///
+    /// No.: 10
+    /// Requirement: The rotation of the authentication key updates the account's authentication key with the newly supplied
+    /// one.
+    /// Criticality: High
+    /// Implementation: The auth_key may only update to the provided new_auth_key after verifying the signature.
+    /// Enforcement: Formally Verified in [high-level-req-10](rotate_authentication_key_internal) that the
+    /// authentication key of an account is modified to the provided authentication key if the signature verification
+    /// was successful.
+    ///
+    /// No.: 11
+    /// Requirement: The creation number is monotonically increasing.
+    /// Criticality: Low
+    /// Implementation: The guid_creation_num in the Account structure is monotonically increasing.
+    /// Enforcement: Formally Verified via [high-level-req-11](guid_creation_num).
+    ///
+    /// No.: 12
+    /// Requirement: The Account resource is persistent.
+    /// Criticality: Low
+    /// Implementation: The Account structure assigned to the address should be persistent.
+    /// Enforcement: Audited that the Account structure is persistent.
+    /// </high-level-req>
+    ///
+
     spec module {
         pragma verify = true;
         pragma aborts_if_is_strict;
@@ -11,8 +116,6 @@ spec aptos_framework::account {
         aborts_if !system_addresses::is_aptos_framework_address(aptos_addr);
         aborts_if exists<OriginatingAddress>(aptos_addr);
         ensures exists<OriginatingAddress>(aptos_addr);
-        // TODO: an compiler error is occur when using table::new()
-        //ensures global<OriginatingAddress>(aptos_addr).address_map == table::new();
     }
 
     /// Ensure that the account exists at the end of the call.
@@ -36,6 +139,7 @@ spec aptos_framework::account {
         include CreateAccountAbortsIf {addr: new_address};
         aborts_if new_address == @vm_reserved || new_address == @aptos_framework || new_address == @aptos_token;
         ensures signer::address_of(result) == new_address;
+        /// [high-level-req-2]
         ensures exists<Account>(new_address);
     }
 
@@ -48,6 +152,7 @@ spec aptos_framework::account {
     }
 
     spec exists_at {
+        /// [high-level-req-3]
         aborts_if false;
     }
 
@@ -74,6 +179,7 @@ spec aptos_framework::account {
     spec increment_sequence_number(addr: address) {
         let sequence_number = global<Account>(addr).sequence_number;
         aborts_if !exists<Account>(addr);
+        /// [high-level-req-4]
         aborts_if sequence_number == MAX_U64;
         modifies global<Account>(addr);
         let post post_sequence_number = global<Account>(addr).sequence_number;
@@ -89,6 +195,17 @@ spec aptos_framework::account {
     /// The length of new_auth_key is 32.
     spec rotate_authentication_key_internal(account: &signer, new_auth_key: vector<u8>) {
         let addr = signer::address_of(account);
+        /// [high-level-req-10]
+        let post account_resource = global<Account>(addr);
+        aborts_if !exists<Account>(addr);
+        aborts_if vector::length(new_auth_key) != 32;
+        modifies global<Account>(addr);
+        ensures account_resource.authentication_key == new_auth_key;
+    }
+
+    spec rotate_authentication_key_call(account: &signer, new_auth_key: vector<u8>) {
+        let addr = signer::address_of(account);
+        /// [high-level-req-10]
         let post account_resource = global<Account>(addr);
         aborts_if !exists<Account>(addr);
         aborts_if vector::length(new_auth_key) != 32;
@@ -125,7 +242,6 @@ spec aptos_framework::account {
             challenge
         );
         aborts_if scheme != ED25519_SCHEME && scheme != MULTI_ED25519_SCHEME;
-        ensures scheme == ED25519_SCHEME || scheme == MULTI_ED25519_SCHEME;
     }
 
     /// The Account existed under the signer
@@ -143,6 +259,7 @@ spec aptos_framework::account {
         let account_resource = global<Account>(addr);
         aborts_if !exists<Account>(addr);
 
+        /// [high-level-req-6.1]
         include from_scheme == ED25519_SCHEME ==> ed25519::NewUnvalidatedPublicKeyFromBytesAbortsIf { bytes: from_public_key_bytes };
         aborts_if from_scheme == ED25519_SCHEME && ({
             let expected_auth_key = ed25519::spec_public_key_bytes_to_authentication_key(from_public_key_bytes);
@@ -153,6 +270,8 @@ spec aptos_framework::account {
             let from_auth_key = multi_ed25519::spec_public_key_bytes_to_authentication_key(from_public_key_bytes);
             account_resource.authentication_key != from_auth_key
         });
+
+        /// [high-level-req-5.1]
         aborts_if from_scheme != ED25519_SCHEME && from_scheme != MULTI_ED25519_SCHEME;
 
         let curr_auth_key = from_bcs::deserialize<address>(account_resource.authentication_key);
@@ -165,11 +284,12 @@ spec aptos_framework::account {
             new_public_key: to_public_key_bytes,
         };
 
+        /// [high-level-req-9.1]
         include AssertValidRotationProofSignatureAndGetAuthKeyAbortsIf {
             scheme: from_scheme,
             public_key_bytes: from_public_key_bytes,
             signature: cap_rotate_key,
-            challenge: challenge,
+            challenge,
         };
 
         include AssertValidRotationProofSignatureAndGetAuthKeyAbortsIf {
@@ -195,6 +315,13 @@ spec aptos_framework::account {
 
         aborts_if curr_auth_key != new_auth_key && table::spec_contains(address_map, new_auth_key);
 
+        include UpdateAuthKeyAndOriginatingAddressTableAbortsIf {
+            originating_addr: addr,
+        };
+
+        let post auth_key = global<Account>(addr).authentication_key;
+        ensures auth_key == new_auth_key_vector;
+
     }
 
     spec rotate_authentication_key_with_rotation_capability(
@@ -216,12 +343,14 @@ spec aptos_framework::account {
             current_auth_key: curr_auth_key,
             new_public_key: new_public_key_bytes,
         };
+        /// [high-level-req-6.2]
         aborts_if !option::spec_contains(offerer_account_resource.rotation_capability_offer.for, delegate_address);
+        /// [high-level-req-9.1]
         include AssertValidRotationProofSignatureAndGetAuthKeyAbortsIf {
             scheme: new_scheme,
             public_key_bytes: new_public_key_bytes,
             signature: cap_update_table,
-            challenge: challenge,
+            challenge,
         };
 
         let new_auth_key_vector = spec_assert_valid_rotation_proof_signature_and_get_auth_key(new_scheme, new_public_key_bytes, cap_update_table, challenge);
@@ -237,6 +366,13 @@ spec aptos_framework::account {
         let new_auth_key = from_bcs::deserialize<address>(new_auth_key_vector);
 
         aborts_if curr_auth_key != new_auth_key && table::spec_contains(address_map, new_auth_key);
+        include UpdateAuthKeyAndOriginatingAddressTableAbortsIf {
+            originating_addr: rotation_cap_offerer_address,
+            account_resource: offerer_account_resource,
+        };
+
+        let post auth_key = global<Account>(rotation_cap_offerer_address).authentication_key;
+        ensures auth_key == new_auth_key_vector;
     }
 
     spec offer_rotation_capability(
@@ -283,9 +419,13 @@ spec aptos_framework::account {
             proof_challenge
         );
 
+        /// [high-level-req-5.2]
         aborts_if account_scheme != ED25519_SCHEME && account_scheme != MULTI_ED25519_SCHEME;
 
+        /// [high-level-req-7.1]
         modifies global<Account>(source_address);
+        let post offer_for = global<Account>(source_address).rotation_capability_offer.for;
+        ensures option::spec_borrow(offer_for) == recipient_address;
     }
 
     /// The Account existed under the signer.
@@ -332,9 +472,13 @@ spec aptos_framework::account {
             proof_challenge
         );
 
+        /// [high-level-req-5.3]
         aborts_if account_scheme != ED25519_SCHEME && account_scheme != MULTI_ED25519_SCHEME;
 
+        /// [high-level-req-7.2]
         modifies global<Account>(source_address);
+        let post offer_for = global<Account>(source_address).signer_capability_offer.for;
+        ensures option::spec_borrow(offer_for) == recipient_address;
     }
 
     spec is_signer_capability_offered(account_addr: address): bool {
@@ -371,6 +515,7 @@ spec aptos_framework::account {
 
     spec revoke_any_signer_capability(account: &signer) {
         modifies global<Account>(signer::address_of(account));
+        /// [high-level-req-7.4]
         aborts_if !exists<Account>(signer::address_of(account));
         let account_resource = global<Account>(signer::address_of(account));
         aborts_if !option::is_some(account_resource.signer_capability_offer.for);
@@ -384,20 +529,27 @@ spec aptos_framework::account {
         aborts_if !option::spec_contains(account_resource.rotation_capability_offer.for,to_be_revoked_address);
         modifies global<Account>(addr);
         ensures exists<Account>(to_be_revoked_address);
+        let post offer_for = global<Account>(addr).rotation_capability_offer.for;
+        ensures !option::spec_is_some(offer_for);
     }
 
     spec revoke_any_rotation_capability(account: &signer) {
-        modifies global<Account>(signer::address_of(account));
-        aborts_if !exists<Account>(signer::address_of(account));
-        let account_resource = global<Account>(signer::address_of(account));
+        let addr = signer::address_of(account);
+        modifies global<Account>(addr);
+        aborts_if !exists<Account>(addr);
+        let account_resource = global<Account>(addr);
+        /// [high-level-req-7.3]
         aborts_if !option::is_some(account_resource.rotation_capability_offer.for);
+        let post offer_for = global<Account>(addr).rotation_capability_offer.for;
+        ensures !option::spec_is_some(offer_for);
     }
 
     /// The Account existed under the signer.
     /// The value of signer_capability_offer.for of Account resource under the signer is offerer_address.
     spec create_authorized_signer(account: &signer, offerer_address: address): signer {
+        /// [high-level-req-8]
         include AccountContainsAddr{
-            account: account,
+            account,
             address: offerer_address,
         };
         modifies global<Account>(offerer_address);
@@ -411,6 +563,7 @@ spec aptos_framework::account {
         let addr = signer::address_of(account);
         let account_resource = global<Account>(address);
         aborts_if !exists<Account>(address);
+        /// [create_signer::high-level-spec-3]
         aborts_if !option::spec_contains(account_resource.signer_capability_offer.for,addr);
     }
 
@@ -435,6 +588,9 @@ spec aptos_framework::account {
         include !exists_at(resource_addr) ==> CreateAccountAbortsIf {addr: resource_addr};
 
         ensures signer::address_of(result_1) == resource_addr;
+        let post offer_for = global<Account>(resource_addr).signer_capability_offer.for;
+        ensures option::spec_borrow(offer_for) == resource_addr;
+        ensures result_2 == SignerCapability { account: resource_addr };
     }
 
     /// Check if the bytes of the new address is 32.
@@ -468,6 +624,7 @@ spec aptos_framework::account {
             account: account_signer,
         };
         modifies global<Account>(addr);
+        /// [high-level-req-11]
         ensures global<Account>(addr).guid_creation_num == old(global<Account>(addr).guid_creation_num) + 1;
     }
 

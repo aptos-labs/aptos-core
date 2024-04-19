@@ -1,4 +1,5 @@
 // Copyright © Aptos Foundation
+// SPDX-License-Identifier: Apache-2.0
 
 use crate::{
     block_executor::AptosTransactionOutput,
@@ -10,10 +11,9 @@ use crate::{
 use aptos_block_executor::txn_commit_hook::TransactionCommitHook;
 use aptos_logger::trace;
 use aptos_mvhashmap::types::TxnIndex;
-use aptos_state_view::StateView;
 use aptos_types::{
     block_executor::partitioner::{RoundId, ShardId, SubBlock, GLOBAL_ROUND_ID},
-    state_store::state_key::StateKey,
+    state_store::{state_key::StateKey, StateView},
     transaction::analyzed_transaction::AnalyzedTransaction,
     write_set::TransactionWrite,
 };

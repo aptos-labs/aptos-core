@@ -2,20 +2,19 @@
 // SPDX-License-Identifier: Apache-2.0
 
 use crate::{
+    ledger_db::{write_set_db::WriteSetDb, LedgerDb},
     pruner::{db_sub_pruner::DBSubPruner, pruner_utils::get_or_initialize_subpruner_progress},
     schema::db_metadata::{DbMetadataKey, DbMetadataSchema, DbMetadataValue},
-    TransactionStore,
 };
-use anyhow::Result;
 use aptos_logger::info;
-use aptos_schemadb::{SchemaBatch, DB};
+use aptos_schemadb::SchemaBatch;
+use aptos_storage_interface::Result;
 use aptos_types::transaction::Version;
 use std::sync::Arc;
 
 #[derive(Debug)]
 pub struct WriteSetPruner {
-    transaction_store: Arc<TransactionStore>,
-    write_set_db: Arc<DB>,
+    ledger_db: Arc<LedgerDb>,
 }
 
 impl DBSubPruner for WriteSetPruner {
@@ -25,32 +24,27 @@ impl DBSubPruner for WriteSetPruner {
 
     fn prune(&self, current_progress: Version, target_version: Version) -> Result<()> {
         let batch = SchemaBatch::new();
-        self.transaction_store
-            .prune_write_set(current_progress, target_version, &batch)?;
+        WriteSetDb::prune(current_progress, target_version, &batch)?;
         batch.put::<DbMetadataSchema>(
             &DbMetadataKey::WriteSetPrunerProgress,
             &DbMetadataValue::Version(target_version),
         )?;
-        self.write_set_db.write_schemas(batch)
+        self.ledger_db.write_set_db().write_schemas(batch)
     }
 }
 
 impl WriteSetPruner {
     pub(in crate::pruner) fn new(
-        transaction_store: Arc<TransactionStore>,
-        write_set_db: Arc<DB>,
+        ledger_db: Arc<LedgerDb>,
         metadata_progress: Version,
     ) -> Result<Self> {
         let progress = get_or_initialize_subpruner_progress(
-            &write_set_db,
+            ledger_db.write_set_db_raw(),
             &DbMetadataKey::WriteSetPrunerProgress,
             metadata_progress,
         )?;
 
-        let myself = WriteSetPruner {
-            transaction_store,
-            write_set_db,
-        };
+        let myself = WriteSetPruner { ledger_db };
 
         info!(
             progress = progress,

@@ -26,14 +26,16 @@ use aptos_experimental_runtimes::thread_manager::THREAD_MANAGER;
 use aptos_infallible::RwLock;
 use aptos_logger::prelude::*;
 use aptos_scratchpad::SparseMerkleTree;
-use aptos_state_view::StateViewId;
 use aptos_storage_interface::{
     async_proof_fetcher::AsyncProofFetcher, cached_state_view::CachedStateView, DbReaderWriter,
 };
 use aptos_types::{
-    block_executor::partitioner::{ExecutableBlock, ExecutableTransactions},
+    block_executor::{
+        config::BlockExecutorConfigFromOnchain,
+        partitioner::{ExecutableBlock, ExecutableTransactions},
+    },
     ledger_info::LedgerInfoWithSignatures,
-    state_store::state_value::StateValue,
+    state_store::{state_value::StateValue, StateViewId},
 };
 use aptos_vm::AptosVM;
 use fail::fail_point;
@@ -43,7 +45,7 @@ pub trait TransactionBlockExecutor: Send + Sync {
     fn execute_transaction_block(
         transactions: ExecutableTransactions,
         state_view: CachedStateView,
-        maybe_block_gas_limit: Option<u64>,
+        onchain_config: BlockExecutorConfigFromOnchain,
     ) -> Result<ChunkOutput>;
 }
 
@@ -51,13 +53,9 @@ impl TransactionBlockExecutor for AptosVM {
     fn execute_transaction_block(
         transactions: ExecutableTransactions,
         state_view: CachedStateView,
-        maybe_block_gas_limit: Option<u64>,
+        onchain_config: BlockExecutorConfigFromOnchain,
     ) -> Result<ChunkOutput> {
-        ChunkOutput::by_transaction_execution::<AptosVM>(
-            transactions,
-            state_view,
-            maybe_block_gas_limit,
-        )
+        ChunkOutput::by_transaction_execution::<AptosVM>(transactions, state_view, onchain_config)
     }
 }
 
@@ -115,14 +113,14 @@ where
         &self,
         block: ExecutableBlock,
         parent_block_id: HashValue,
-        maybe_block_gas_limit: Option<u64>,
+        onchain_config: BlockExecutorConfigFromOnchain,
     ) -> ExecutorResult<StateCheckpointOutput> {
         self.maybe_initialize()?;
         self.inner
             .read()
             .as_ref()
             .expect("BlockExecutor is not reset")
-            .execute_and_state_checkpoint(block, parent_block_id, maybe_block_gas_limit)
+            .execute_and_state_checkpoint(block, parent_block_id, onchain_config)
     }
 
     fn ledger_update(
@@ -193,7 +191,7 @@ where
         &self,
         block: ExecutableBlock,
         parent_block_id: HashValue,
-        maybe_block_gas_limit: Option<u64>,
+        onchain_config: BlockExecutorConfigFromOnchain,
     ) -> ExecutorResult<StateCheckpointOutput> {
         let _timer = APTOS_EXECUTOR_EXECUTE_BLOCK_SECONDS.start_timer();
         let ExecutableBlock {
@@ -246,7 +244,7 @@ where
                             "Injected error in vm_execute_block"
                         )))
                     });
-                    V::execute_transaction_block(transactions, state_view, maybe_block_gas_limit)?
+                    V::execute_transaction_block(transactions, state_view, onchain_config.clone())?
                 };
 
                 let _timer = APTOS_EXECUTOR_OTHER_TIMERS_SECONDS
@@ -254,10 +252,7 @@ where
                     .start_timer();
 
                 THREAD_MANAGER.get_exe_cpu_pool().install(|| {
-                    chunk_output.into_state_checkpoint_output(
-                        parent_output.state(),
-                        maybe_block_gas_limit.map(|_| block_id),
-                    )
+                    chunk_output.into_state_checkpoint_output(parent_output.state(), block_id)
                 })?
             };
 

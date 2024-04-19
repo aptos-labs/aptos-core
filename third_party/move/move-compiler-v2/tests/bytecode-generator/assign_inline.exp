@@ -1,0 +1,20 @@
+// -- Model dump before bytecode pipeline
+module 0x42::assign {
+    public fun main(): (u64, u64) {
+        Tuple(1, 3)
+    }
+} // end 0x42::assign
+
+============ initial bytecode ================
+
+[variant baseline]
+public fun assign::main(): (u64, u64) {
+     var $t0: u64
+     var $t1: u64
+  0: $t0 := 1
+  1: $t1 := 3
+  2: return ($t0, $t1)
+}
+
+
+============ bytecode verification succeeded ========

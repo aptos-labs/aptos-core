@@ -64,6 +64,21 @@ pub trait DataflowAnalysis: TransferFunctions {
         instrs: &[Bytecode],
         cfg: &StacklessControlFlowGraph,
     ) -> StateMap<Self::State> {
+        self.analyze_function_with_debug_print(initial_state, instrs, cfg, None)
+    }
+
+    fn analyze_function_with_debug_print(
+        &self,
+        initial_state: Self::State,
+        instrs: &[Bytecode],
+        cfg: &StacklessControlFlowGraph,
+        debug_printer: Option<&dyn Fn(&Self::State) -> String>,
+    ) -> StateMap<Self::State> {
+        let debug_print_state = |block_id: BlockId, prefix: &str, state: &Self::State| {
+            if let Some(p) = &debug_printer {
+                eprintln!("B{} {}: {}", block_id, prefix, p(state))
+            }
+        };
         let mut state_map: StateMap<Self::State> = StateMap::new();
         let mut work_list = VecDeque::new();
         work_list.push_back(cfg.entry_block());
@@ -73,13 +88,16 @@ pub trait DataflowAnalysis: TransferFunctions {
         });
         while let Some(block_id) = work_list.pop_front() {
             let pre = state_map.get(&block_id).expect("basic block").pre.clone();
+            debug_print_state(block_id, "pre", &pre);
             let post = self.execute_block(block_id, pre, instrs, cfg);
-
+            debug_print_state(block_id, "post", &post);
             // propagate postcondition of this block to successor blocks
             for next_block_id in cfg.successors(block_id) {
                 match state_map.get_mut(next_block_id) {
                     Some(next_block_res) => {
+                        debug_print_state(*next_block_id, "pre join", &next_block_res.pre);
                         let join_result = next_block_res.pre.join(&post);
+                        debug_print_state(*next_block_id, "post join", &next_block_res.pre);
                         match join_result {
                             JoinResult::Unchanged => {
                                 // Pre is the same after join. Reanalyzing this block would produce
@@ -144,5 +162,25 @@ pub trait DataflowAnalysis: TransferFunctions {
             }
         }
         result
+    }
+
+    /// Same as `state_per_instruction`, but ensures that any unreachable code offsets have
+    /// the default value of `A` in the resulting map.
+    fn state_per_instruction_with_default<A, F>(
+        &self,
+        state_map: StateMap<Self::State>,
+        instrs: &[Bytecode],
+        cfg: &StacklessControlFlowGraph,
+        f: F,
+    ) -> BTreeMap<CodeOffset, A>
+    where
+        F: FnMut(&Self::State, &Self::State) -> A,
+        A: Default,
+    {
+        let mut map = self.state_per_instruction(state_map, instrs, cfg, f);
+        for offset in 0..instrs.len() {
+            map.entry(offset as CodeOffset).or_default();
+        }
+        map
     }
 }

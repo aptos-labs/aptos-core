@@ -1,5 +1,5 @@
 
-<a name="0x1_state_storage"></a>
+<a id="0x1_state_storage"></a>
 
 # Module `0x1::state_storage`
 
@@ -15,6 +15,8 @@
 -  [Function `get_state_storage_usage_only_at_epoch_beginning`](#0x1_state_storage_get_state_storage_usage_only_at_epoch_beginning)
 -  [Function `on_reconfig`](#0x1_state_storage_on_reconfig)
 -  [Specification](#@Specification_1)
+    -  [High-level Requirements](#high-level-req)
+    -  [Module-level Specification](#module-level-spec)
     -  [Function `initialize`](#@Specification_1_initialize)
     -  [Function `on_new_block`](#@Specification_1_on_new_block)
     -  [Function `current_items_and_bytes`](#@Specification_1_current_items_and_bytes)
@@ -28,7 +30,7 @@
 
 
 
-<a name="0x1_state_storage_Usage"></a>
+<a id="0x1_state_storage_Usage"></a>
 
 ## Struct `Usage`
 
@@ -61,11 +63,11 @@
 
 </details>
 
-<a name="0x1_state_storage_StateStorageUsage"></a>
+<a id="0x1_state_storage_StateStorageUsage"></a>
 
 ## Resource `StateStorageUsage`
 
-This is updated at the beginning of each opoch, reflecting the storage
+This is updated at the beginning of each epoch, reflecting the storage
 usage after the last txn of the previous epoch is committed.
 
 
@@ -96,7 +98,7 @@ usage after the last txn of the previous epoch is committed.
 
 </details>
 
-<a name="0x1_state_storage_GasParameter"></a>
+<a id="0x1_state_storage_GasParameter"></a>
 
 ## Resource `GasParameter`
 
@@ -123,12 +125,12 @@ usage after the last txn of the previous epoch is committed.
 
 </details>
 
-<a name="@Constants_0"></a>
+<a id="@Constants_0"></a>
 
 ## Constants
 
 
-<a name="0x1_state_storage_ESTATE_STORAGE_USAGE"></a>
+<a id="0x1_state_storage_ESTATE_STORAGE_USAGE"></a>
 
 
 
@@ -137,7 +139,7 @@ usage after the last txn of the previous epoch is committed.
 
 
 
-<a name="0x1_state_storage_initialize"></a>
+<a id="0x1_state_storage_initialize"></a>
 
 ## Function `initialize`
 
@@ -172,7 +174,7 @@ usage after the last txn of the previous epoch is committed.
 
 </details>
 
-<a name="0x1_state_storage_on_new_block"></a>
+<a id="0x1_state_storage_on_new_block"></a>
 
 ## Function `on_new_block`
 
@@ -204,7 +206,7 @@ usage after the last txn of the previous epoch is committed.
 
 </details>
 
-<a name="0x1_state_storage_current_items_and_bytes"></a>
+<a id="0x1_state_storage_current_items_and_bytes"></a>
 
 ## Function `current_items_and_bytes`
 
@@ -233,7 +235,7 @@ usage after the last txn of the previous epoch is committed.
 
 </details>
 
-<a name="0x1_state_storage_get_state_storage_usage_only_at_epoch_beginning"></a>
+<a id="0x1_state_storage_get_state_storage_usage_only_at_epoch_beginning"></a>
 
 ## Function `get_state_storage_usage_only_at_epoch_beginning`
 
@@ -259,7 +261,7 @@ guarantees a fresh state view then.
 
 </details>
 
-<a name="0x1_state_storage_on_reconfig"></a>
+<a id="0x1_state_storage_on_reconfig"></a>
 
 ## Function `on_reconfig`
 
@@ -283,21 +285,82 @@ guarantees a fresh state view then.
 
 </details>
 
-<a name="@Specification_1"></a>
+<a id="@Specification_1"></a>
 
 ## Specification
 
 
 
+
+<a id="high-level-req"></a>
+
+### High-level Requirements
+
+<table>
+<tr>
+<th>No.</th><th>Requirement</th><th>Criticality</th><th>Implementation</th><th>Enforcement</th>
+</tr>
+
+<tr>
+<td>1</td>
+<td>Given the blockchain is in an operating state, the resources for tracking state storage usage and gas parameters must exist for the Aptos framework address.</td>
+<td>Critical</td>
+<td>The initialize function ensures only the Aptos framework address can call it.</td>
+<td>Formally verified via <a href="#high-level-req-1">module</a>.</td>
+</tr>
+
+<tr>
+<td>2</td>
+<td>During the initialization of the module, it is guaranteed that the resource for tracking state storage usage will be moved under the Aptos framework account with default initial values.</td>
+<td>Medium</td>
+<td>The resource for tracking state storage usage may only be initialized with specific values and published under the aptos_framework account.</td>
+<td>Formally verified via <a href="#high-level-req-2">initialize</a>.</td>
+</tr>
+
+<tr>
+<td>3</td>
+<td>The initialization function is only called once, during genesis.</td>
+<td>Medium</td>
+<td>The initialize function ensures StateStorageUsage does not already exist.</td>
+<td>Formally verified via <a href="#high-level-req-3">initialize</a>.</td>
+</tr>
+
+<tr>
+<td>4</td>
+<td>During the initialization of the module, it is guaranteed that the resource for tracking state storage usage will be moved under the Aptos framework account with default initial values.</td>
+<td>Medium</td>
+<td>The resource for tracking state storage usage may only be initialized with specific values and published under the aptos_framework account.</td>
+<td>Formally verified via <a href="#high-level-req-4">initialize</a>.</td>
+</tr>
+
+<tr>
+<td>5</td>
+<td>The structure for tracking state storage usage should exist for it to be updated at the beginning of each new block and for retrieving the values of structure members.</td>
+<td>Medium</td>
+<td>The functions on_new_block and current_items_and_bytes verify that the StateStorageUsage structure exists before performing any further operations.</td>
+<td>Formally Verified via <a href="#high-level-req-5.1">current_items_and_bytes</a>, <a href="#high-level-req-5.2">on_new_block</a>, and the <a href="#high-level-req-5.3">global invariant</a>.</td>
+</tr>
+
+</table>
+
+
+
+
+<a id="module-level-spec"></a>
+
+### Module-level Specification
+
+
 <pre><code><b>pragma</b> verify = <b>true</b>;
 <b>pragma</b> aborts_if_is_strict;
+// This enforces <a id="high-level-req-1" href="#high-level-req">high-level requirement 1</a> and <a id="high-level-req-5.3" href="#high-level-req">high-level requirement 5</a>:
 <b>invariant</b> [suspendable] <a href="chain_status.md#0x1_chain_status_is_operating">chain_status::is_operating</a>() ==&gt; <b>exists</b>&lt;<a href="state_storage.md#0x1_state_storage_StateStorageUsage">StateStorageUsage</a>&gt;(@aptos_framework);
 <b>invariant</b> [suspendable] <a href="chain_status.md#0x1_chain_status_is_operating">chain_status::is_operating</a>() ==&gt; <b>exists</b>&lt;<a href="state_storage.md#0x1_state_storage_GasParameter">GasParameter</a>&gt;(@aptos_framework);
 </code></pre>
 
 
 
-<a name="@Specification_1_initialize"></a>
+<a id="@Specification_1_initialize"></a>
 
 ### Function `initialize`
 
@@ -311,16 +374,19 @@ aborts if StateStorageUsage already exists.
 
 
 <pre><code><b>let</b> addr = <a href="../../aptos-stdlib/../move-stdlib/doc/signer.md#0x1_signer_address_of">signer::address_of</a>(aptos_framework);
+// This enforces <a id="high-level-req-4" href="#high-level-req">high-level requirement 4</a>:
 <b>aborts_if</b> !<a href="system_addresses.md#0x1_system_addresses_is_aptos_framework_address">system_addresses::is_aptos_framework_address</a>(addr);
+// This enforces <a id="high-level-req-3" href="#high-level-req">high-level requirement 3</a>:
 <b>aborts_if</b> <b>exists</b>&lt;<a href="state_storage.md#0x1_state_storage_StateStorageUsage">StateStorageUsage</a>&gt;(@aptos_framework);
 <b>ensures</b> <b>exists</b>&lt;<a href="state_storage.md#0x1_state_storage_StateStorageUsage">StateStorageUsage</a>&gt;(@aptos_framework);
 <b>let</b> <b>post</b> state_usage = <b>global</b>&lt;<a href="state_storage.md#0x1_state_storage_StateStorageUsage">StateStorageUsage</a>&gt;(@aptos_framework);
+// This enforces <a id="high-level-req-2" href="#high-level-req">high-level requirement 2</a>:
 <b>ensures</b> state_usage.epoch == 0 && state_usage.usage.bytes == 0 && state_usage.usage.items == 0;
 </code></pre>
 
 
 
-<a name="@Specification_1_on_new_block"></a>
+<a id="@Specification_1_on_new_block"></a>
 
 ### Function `on_new_block`
 
@@ -331,14 +397,15 @@ aborts if StateStorageUsage already exists.
 
 
 
-<pre><code><b>requires</b> <a href="chain_status.md#0x1_chain_status_is_operating">chain_status::is_operating</a>();
+<pre><code>// This enforces <a id="high-level-req-5.2" href="#high-level-req">high-level requirement 5</a>:
+<b>requires</b> <a href="chain_status.md#0x1_chain_status_is_operating">chain_status::is_operating</a>();
 <b>aborts_if</b> <b>false</b>;
 <b>ensures</b> epoch == <b>global</b>&lt;<a href="state_storage.md#0x1_state_storage_StateStorageUsage">StateStorageUsage</a>&gt;(@aptos_framework).epoch;
 </code></pre>
 
 
 
-<a name="@Specification_1_current_items_and_bytes"></a>
+<a id="@Specification_1_current_items_and_bytes"></a>
 
 ### Function `current_items_and_bytes`
 
@@ -349,12 +416,13 @@ aborts if StateStorageUsage already exists.
 
 
 
-<pre><code><b>aborts_if</b> !<b>exists</b>&lt;<a href="state_storage.md#0x1_state_storage_StateStorageUsage">StateStorageUsage</a>&gt;(@aptos_framework);
+<pre><code>// This enforces <a id="high-level-req-5.1" href="#high-level-req">high-level requirement 5</a>:
+<b>aborts_if</b> !<b>exists</b>&lt;<a href="state_storage.md#0x1_state_storage_StateStorageUsage">StateStorageUsage</a>&gt;(@aptos_framework);
 </code></pre>
 
 
 
-<a name="@Specification_1_get_state_storage_usage_only_at_epoch_beginning"></a>
+<a id="@Specification_1_get_state_storage_usage_only_at_epoch_beginning"></a>
 
 ### Function `get_state_storage_usage_only_at_epoch_beginning`
 
@@ -370,7 +438,7 @@ aborts if StateStorageUsage already exists.
 
 
 
-<a name="@Specification_1_on_reconfig"></a>
+<a id="@Specification_1_on_reconfig"></a>
 
 ### Function `on_reconfig`
 

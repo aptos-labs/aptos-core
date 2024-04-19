@@ -7,6 +7,7 @@ use crate::{
 };
 use aptos_api::context::Context;
 use aptos_config::config::NodeConfig;
+use aptos_db_indexer::table_info_reader::TableInfoReader;
 use aptos_logger::info;
 use aptos_mempool::MempoolClientSender;
 use aptos_protos::{
@@ -34,6 +35,7 @@ pub fn bootstrap(
     chain_id: ChainId,
     db: Arc<dyn DbReader>,
     mp_sender: MempoolClientSender,
+    table_info_reader: Option<Arc<dyn TableInfoReader>>,
 ) -> Option<Runtime> {
     if !config.indexer_grpc.enabled {
         return None;
@@ -50,7 +52,13 @@ pub fn bootstrap(
     let output_batch_size = node_config.indexer_grpc.output_batch_size;
 
     runtime.spawn(async move {
-        let context = Arc::new(Context::new(chain_id, db, mp_sender, node_config));
+        let context = Arc::new(Context::new(
+            chain_id,
+            db,
+            mp_sender,
+            node_config,
+            table_info_reader,
+        ));
         let service_context = ServiceContext {
             context: context.clone(),
             processor_task_count,
@@ -83,11 +91,18 @@ pub fn bootstrap(
             .add_service(reflection_service_clone);
 
         let router = match use_data_service_interface {
-            false => tonic_server.add_service(FullnodeDataServer::new(server)),
+            false => {
+                let svc = FullnodeDataServer::new(server)
+                    .send_compressed(CompressionEncoding::Gzip)
+                    .accept_compressed(CompressionEncoding::Gzip)
+                    .accept_compressed(CompressionEncoding::Zstd);
+                tonic_server.add_service(svc)
+            },
             true => {
                 let svc = RawDataServer::new(localnet_data_server)
                     .send_compressed(CompressionEncoding::Gzip)
-                    .accept_compressed(CompressionEncoding::Gzip);
+                    .accept_compressed(CompressionEncoding::Gzip)
+                    .accept_compressed(CompressionEncoding::Zstd);
                 tonic_server.add_service(svc)
             },
         };

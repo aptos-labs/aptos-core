@@ -197,7 +197,10 @@ impl GlobalConfig {
             from_yaml(&String::from_utf8(read_from_file(path.as_path())?)?)
         } else {
             // If we don't have a config, let's load the default
-            Ok(GlobalConfig::default())
+            // Let's create the file if it doesn't exist
+            let config = GlobalConfig::default();
+            config.save()?;
+            Ok(config)
         }
     }
 

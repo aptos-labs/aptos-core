@@ -40,8 +40,8 @@ use aptos_types::{
     on_chain_config::ValidatorSet,
     transaction::{
         ExecutionStatus, RawTransaction, Script, SignedTransaction, Transaction,
-        TransactionListWithProof, TransactionOutput, TransactionOutputListWithProof,
-        TransactionPayload, TransactionStatus,
+        TransactionAuxiliaryData, TransactionListWithProof, TransactionOutput,
+        TransactionOutputListWithProof, TransactionPayload, TransactionStatus,
     },
     validator_verifier::ValidatorVerifier,
     write_set::WriteSet,
@@ -285,6 +285,7 @@ fn create_test_transaction_output() -> TransactionOutput {
         vec![],
         0,
         TransactionStatus::Keep(ExecutionStatus::MiscellaneousError(None)),
+        TransactionAuxiliaryData::default(),
     )
 }
 
@@ -298,10 +299,10 @@ pub fn configure_network_chunk_limit(
 ) -> StorageServiceConfig {
     let max_network_chunk_bytes = if fallback_to_transactions {
         // Network limit is only big enough for the transaction list
-        bcs::to_bytes(&transaction_list_with_proof).unwrap().len() as u64 + 1
+        bcs::serialized_size(&transaction_list_with_proof).unwrap() as u64 + 1
     } else {
         // Network limit is big enough for the output list
-        bcs::to_bytes(&output_list_with_proof).unwrap().len() as u64 + 1
+        bcs::serialized_size(&output_list_with_proof).unwrap() as u64 + 1
     };
     StorageServiceConfig {
         max_network_chunk_bytes,

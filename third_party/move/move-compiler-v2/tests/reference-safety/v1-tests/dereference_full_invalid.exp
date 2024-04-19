@@ -1,0 +1,19 @@
+
+Diagnostics:
+error: mutable reference in local `x` requires exclusive access but is borrowed
+   ┌─ tests/reference-safety/v1-tests/dereference_full_invalid.move:13:9
+   │
+13 │         *x;
+   │         ^^ requirement enforced here
+14 │         *y;
+   │         -- conflicting reference `y` used here
+
+error: mutable reference in local `x` requires exclusive access but is borrowed
+   ┌─ tests/reference-safety/v1-tests/dereference_full_invalid.move:18:9
+   │
+17 │         let y = id_mut(x);
+   │                 --------- previous mutable call result
+18 │         *x;
+   │         ^^ requirement enforced here
+19 │         *y;
+   │         -- conflicting reference `y` used here

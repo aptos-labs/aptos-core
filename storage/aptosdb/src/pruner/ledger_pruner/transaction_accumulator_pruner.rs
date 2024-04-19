@@ -2,20 +2,19 @@
 // SPDX-License-Identifier: Apache-2.0
 
 use crate::{
+    ledger_db::{transaction_accumulator_db::TransactionAccumulatorDb, LedgerDb},
     pruner::{db_sub_pruner::DBSubPruner, pruner_utils::get_or_initialize_subpruner_progress},
     schema::db_metadata::{DbMetadataKey, DbMetadataSchema, DbMetadataValue},
-    TransactionStore,
 };
-use anyhow::Result;
 use aptos_logger::info;
-use aptos_schemadb::{SchemaBatch, DB};
+use aptos_schemadb::SchemaBatch;
+use aptos_storage_interface::Result;
 use aptos_types::transaction::Version;
 use std::sync::Arc;
 
 #[derive(Debug)]
 pub struct TransactionAccumulatorPruner {
-    transaction_store: Arc<TransactionStore>,
-    transaction_accumulator_db: Arc<DB>,
+    ledger_db: Arc<LedgerDb>,
 }
 
 impl DBSubPruner for TransactionAccumulatorPruner {
@@ -25,35 +24,29 @@ impl DBSubPruner for TransactionAccumulatorPruner {
 
     fn prune(&self, current_progress: Version, target_version: Version) -> Result<()> {
         let batch = SchemaBatch::new();
-        self.transaction_store.prune_transaction_accumulator(
-            current_progress,
-            target_version,
-            &batch,
-        )?;
+        TransactionAccumulatorDb::prune(current_progress, target_version, &batch)?;
         batch.put::<DbMetadataSchema>(
             &DbMetadataKey::TransactionAccumulatorPrunerProgress,
             &DbMetadataValue::Version(target_version),
         )?;
-        self.transaction_accumulator_db.write_schemas(batch)
+        self.ledger_db
+            .transaction_accumulator_db()
+            .write_schemas(batch)
     }
 }
 
 impl TransactionAccumulatorPruner {
     pub(in crate::pruner) fn new(
-        transaction_store: Arc<TransactionStore>,
-        transaction_accumulator_db: Arc<DB>,
+        ledger_db: Arc<LedgerDb>,
         metadata_progress: Version,
     ) -> Result<Self> {
         let progress = get_or_initialize_subpruner_progress(
-            &transaction_accumulator_db,
+            ledger_db.transaction_accumulator_db_raw(),
             &DbMetadataKey::TransactionAccumulatorPrunerProgress,
             metadata_progress,
         )?;
 
-        let myself = TransactionAccumulatorPruner {
-            transaction_store,
-            transaction_accumulator_db,
-        };
+        let myself = TransactionAccumulatorPruner { ledger_db };
 
         info!(
             progress = progress,

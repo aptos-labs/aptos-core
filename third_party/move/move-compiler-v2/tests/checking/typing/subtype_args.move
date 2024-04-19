@@ -19,4 +19,10 @@ module 0x8675309::M {
         mut_imm(&mut 0, &mut 0);
         imm_imm(&mut 0, &mut 0);
     }
+
+    inline fun t2(f: |&u64, &mut u64|) {
+        f(&mut 0, &mut 0);
+        f(&0, &mut 0);
+    }
+
 }

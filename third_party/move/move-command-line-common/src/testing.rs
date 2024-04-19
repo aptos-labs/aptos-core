@@ -8,6 +8,8 @@ use crate::env::read_bool_env_var;
 pub const OUT_EXT: &str = "out";
 /// Extension for expected output files
 pub const EXP_EXT: &str = "exp";
+/// Extension for expected output files compiled by v2
+pub const EXP_EXT_V2: &str = "exp.v2";
 
 /// If any of these env vars is set, the test harness should overwrite
 /// the existing .exp files with the output instead of checking
@@ -15,6 +17,9 @@ pub const EXP_EXT: &str = "exp";
 pub const UPDATE_BASELINE: &str = "UPDATE_BASELINE";
 pub const UPBL: &str = "UPBL";
 pub const UB: &str = "UB";
+
+/// Env variable to enable compiler v2 in tests
+pub const MOVE_COMPILER_V2: &str = "MOVE_COMPILER_V2";
 
 pub const PRETTY: &str = "PRETTY";
 pub const FILTER: &str = "FILTER";

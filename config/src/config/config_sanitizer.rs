@@ -6,7 +6,7 @@ use crate::config::{
     utils::{are_failpoints_enabled, get_config_name},
     AdminServiceConfig, ApiConfig, BaseConfig, ConsensusConfig, DagConsensusConfig, Error,
     ExecutionConfig, IndexerGrpcConfig, InspectionServiceConfig, LoggerConfig, MempoolConfig,
-    NetbenchConfig, NodeConfig, PeerMonitoringServiceConfig, StateSyncConfig, StorageConfig,
+    NetbenchConfig, NodeConfig, StateSyncConfig, StorageConfig,
 };
 use aptos_types::chain_id::ChainId;
 use std::collections::HashSet;
@@ -41,6 +41,11 @@ impl ConfigSanitizer for NodeConfig {
         node_type: NodeType,
         chain_id: Option<ChainId>,
     ) -> Result<(), Error> {
+        // If config sanitization is disabled, don't do anything!
+        if node_config.node_startup.skip_config_sanitizer {
+            return Ok(());
+        }
+
         // Sanitize all of the sub-configs
         AdminServiceConfig::sanitize(node_config, node_type, chain_id)?;
         ApiConfig::sanitize(node_config, node_type, chain_id)?;
@@ -55,7 +60,6 @@ impl ConfigSanitizer for NodeConfig {
         LoggerConfig::sanitize(node_config, node_type, chain_id)?;
         MempoolConfig::sanitize(node_config, node_type, chain_id)?;
         NetbenchConfig::sanitize(node_config, node_type, chain_id)?;
-        PeerMonitoringServiceConfig::sanitize(node_config, node_type, chain_id)?;
         StateSyncConfig::sanitize(node_config, node_type, chain_id)?;
         StorageConfig::sanitize(node_config, node_type, chain_id)?;
         sanitize_validator_network_config(node_config, node_type, chain_id)?;
@@ -197,7 +201,40 @@ fn sanitize_validator_network_config(
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::{config::NetworkConfig, network_id::NetworkId};
+    use crate::{
+        config::{node_startup_config::NodeStartupConfig, NetworkConfig},
+        network_id::NetworkId,
+    };
+
+    #[test]
+    fn test_disable_config_sanitizer() {
+        // Create a default node config (with sanitization enabled)
+        let mut node_config = NodeConfig::default();
+
+        // Set a bad node config for mainnet
+        node_config.execution.paranoid_hot_potato_verification = false;
+
+        // Sanitize the config and verify the sanitizer fails
+        let error =
+            NodeConfig::sanitize(&node_config, NodeType::Validator, Some(ChainId::mainnet()))
+                .unwrap_err();
+        assert!(matches!(error, Error::ConfigSanitizerFailed(_, _)));
+
+        // Create a node config with the sanitizer disabled
+        let mut node_config = NodeConfig {
+            node_startup: NodeStartupConfig {
+                skip_config_sanitizer: true,
+                ..Default::default()
+            },
+            ..Default::default()
+        };
+
+        // Set a bad node config for mainnet
+        node_config.execution.paranoid_hot_potato_verification = false;
+
+        // Sanitize the config and verify the sanitizer passes
+        NodeConfig::sanitize(&node_config, NodeType::Validator, Some(ChainId::mainnet())).unwrap();
+    }
 
     #[test]
     fn test_sanitize_missing_pfn_network_configs() {

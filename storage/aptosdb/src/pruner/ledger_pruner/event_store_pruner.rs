@@ -2,20 +2,19 @@
 // SPDX-License-Identifier: Apache-2.0
 
 use crate::{
+    ledger_db::LedgerDb,
     pruner::{db_sub_pruner::DBSubPruner, pruner_utils::get_or_initialize_subpruner_progress},
     schema::db_metadata::{DbMetadataKey, DbMetadataSchema, DbMetadataValue},
-    EventStore,
 };
-use anyhow::Result;
 use aptos_logger::info;
-use aptos_schemadb::{SchemaBatch, DB};
+use aptos_schemadb::SchemaBatch;
+use aptos_storage_interface::Result;
 use aptos_types::transaction::Version;
 use std::sync::Arc;
 
 #[derive(Debug)]
 pub struct EventStorePruner {
-    event_store: Arc<EventStore>,
-    event_db: Arc<DB>,
+    ledger_db: Arc<LedgerDb>,
 }
 
 impl DBSubPruner for EventStorePruner {
@@ -25,32 +24,29 @@ impl DBSubPruner for EventStorePruner {
 
     fn prune(&self, current_progress: Version, target_version: Version) -> Result<()> {
         let batch = SchemaBatch::new();
-        self.event_store
+        self.ledger_db
+            .event_db()
             .prune_events(current_progress, target_version, &batch)?;
         batch.put::<DbMetadataSchema>(
             &DbMetadataKey::EventPrunerProgress,
             &DbMetadataValue::Version(target_version),
         )?;
-        self.event_db.write_schemas(batch)
+        self.ledger_db.event_db().write_schemas(batch)
     }
 }
 
 impl EventStorePruner {
     pub(in crate::pruner) fn new(
-        event_store: Arc<EventStore>,
-        event_db: Arc<DB>,
+        ledger_db: Arc<LedgerDb>,
         metadata_progress: Version,
     ) -> Result<Self> {
         let progress = get_or_initialize_subpruner_progress(
-            &event_db,
+            ledger_db.event_db_raw(),
             &DbMetadataKey::EventPrunerProgress,
             metadata_progress,
         )?;
 
-        let myself = EventStorePruner {
-            event_store,
-            event_db,
-        };
+        let myself = EventStorePruner { ledger_db };
 
         info!(
             progress = progress,

@@ -416,7 +416,7 @@ object "A2_M" {
                     }
                     case 9 {
                         // label L3
-                        // destroy($t12)
+                        // drop($t12)
                         // $t19 := 1
                         $t19 := 1
                         // $t1 := +($t1, $t19)
@@ -716,7 +716,7 @@ object "A2_M" {
                     }
                     case 9 {
                         // label L3
-                        // destroy($t11)
+                        // drop($t11)
                         // $t18 := 1
                         $t18 := 1
                         // $t1 := +($t1, $t18)
@@ -815,7 +815,7 @@ object "A2_M" {
                     }
                     case 9 {
                         // label L3
-                        // destroy($t12)
+                        // drop($t12)
                         // $t19 := 1
                         $t19 := 1
                         // $t1 := +($t1, $t19)
@@ -914,7 +914,7 @@ object "A2_M" {
                     }
                     case 9 {
                         // label L3
-                        // destroy($t12)
+                        // drop($t12)
                         // $t19 := 1
                         $t19 := 1
                         // $t1 := +($t1, $t19)
@@ -1241,7 +1241,7 @@ object "A2_M" {
                     }
                     case 9 {
                         // label L3
-                        // destroy($t12)
+                        // drop($t12)
                         // $t19 := 1
                         $t19 := 1
                         // $t1 := +($t1, $t19)

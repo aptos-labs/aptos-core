@@ -4,6 +4,7 @@
 
 #![forbid(unsafe_code)]
 
+#[macro_export]
 macro_rules! debug_write {
     ($($toks: tt)*) => {
         write!($($toks)*).map_err(|_|
@@ -13,6 +14,7 @@ macro_rules! debug_write {
     };
 }
 
+#[macro_export]
 macro_rules! debug_writeln {
     ($($toks: tt)*) => {
         writeln!($($toks)*).map_err(|_|
@@ -22,10 +24,12 @@ macro_rules! debug_writeln {
     };
 }
 
+pub mod delayed_values;
 pub mod gas;
 pub mod loaded_data;
 pub mod natives;
-pub mod value_transformation;
+pub mod value_serde;
+pub mod value_traversal;
 pub mod values;
 pub mod views;
 

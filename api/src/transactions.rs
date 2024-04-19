@@ -6,15 +6,16 @@ use crate::{
     accept_type::AcceptType,
     accounts::Account,
     bcs_payload::Bcs,
-    context::{api_spawn_blocking, Context},
+    context::{api_spawn_blocking, Context, FunctionStats},
     failpoint::fail_point_poem,
-    generate_error_response, generate_success_response,
+    generate_error_response, generate_success_response, metrics,
+    metrics::WAIT_TRANSACTION_GAUGE,
     page::Page,
     response::{
         api_disabled, api_forbidden, transaction_not_found_by_hash,
         transaction_not_found_by_version, version_pruned, BadRequestError, BasicError,
         BasicErrorWith404, BasicResponse, BasicResponseStatus, BasicResult, BasicResultWith404,
-        InsufficientStorageError, InternalError,
+        ForbiddenError, InsufficientStorageError, InternalError,
     },
     ApiTags,
 };
@@ -37,14 +38,14 @@ use aptos_types::{
     },
     vm_status::StatusCode,
 };
-use aptos_vm::{data_cache::AsMoveResolver, AptosVM};
+use aptos_vm::{data_cache::AsMoveResolver, AptosSimulationVM};
 use move_core_types::vm_status::VMStatus;
 use poem_openapi::{
     param::{Path, Query},
     payload::Json,
     ApiRequest, OpenApi,
 };
-use std::sync::Arc;
+use std::{sync::Arc, time::Duration};
 
 generate_success_response!(SubmitTransactionResponse, (202, Accepted));
 
@@ -207,6 +208,73 @@ impl TransactionsApi {
             .check_api_output_enabled("Get transactions by hash", &accept_type)?;
         self.get_transaction_by_hash_inner(&accept_type, txn_hash.0)
             .await
+    }
+
+    /// Wait for transaction by hash
+    ///
+    /// Same as /transactions/by_hash, but will wait for a pending transaction to be committed. To be used as a long
+    /// poll optimization by clients, to reduce latency caused by polling. The "long" poll is generally a second or
+    /// less but dictated by the server; the client must deal with the result as if the request was a normal
+    /// /transactions/by_hash request, e.g., by retrying if the transaction is pending.
+    #[oai(
+        path = "/transactions/wait_by_hash/:txn_hash",
+        method = "get",
+        operation_id = "wait_transaction_by_hash",
+        tag = "ApiTags::Transactions"
+    )]
+    async fn wait_transaction_by_hash(
+        &self,
+        accept_type: AcceptType,
+        /// Hash of transaction to retrieve
+        txn_hash: Path<HashValue>,
+        // TODO: Use a new request type that can't return 507.
+    ) -> BasicResultWith404<Transaction> {
+        fail_point_poem("endpoint_wait_transaction_by_hash")?;
+        self.context
+            .check_api_output_enabled("Get transactions by hash", &accept_type)?;
+
+        // Short poll if the active connections are too high
+        if self
+            .context
+            .wait_for_hash_active_connections
+            .fetch_add(1, std::sync::atomic::Ordering::Relaxed)
+            >= self
+                .context
+                .node_config
+                .api
+                .wait_by_hash_max_active_connections
+        {
+            self.context
+                .wait_for_hash_active_connections
+                .fetch_sub(1, std::sync::atomic::Ordering::Relaxed);
+            metrics::WAIT_TRANSACTION_POLL_TIME
+                .with_label_values(&["short"])
+                .observe(0.0);
+            return self
+                .get_transaction_by_hash_inner(&accept_type, txn_hash.0)
+                .await;
+        }
+
+        let start_time = std::time::Instant::now();
+        WAIT_TRANSACTION_GAUGE.inc();
+
+        let result = self
+            .wait_transaction_by_hash_inner(
+                &accept_type,
+                txn_hash.0,
+                self.context.node_config.api.wait_by_hash_timeout_ms,
+                self.context.node_config.api.wait_by_hash_poll_interval_ms,
+            )
+            .await;
+
+        WAIT_TRANSACTION_GAUGE.dec();
+        self.context
+            .wait_for_hash_active_connections
+            .fetch_sub(1, std::sync::atomic::Ordering::Relaxed);
+        metrics::WAIT_TRANSACTION_POLL_TIME
+            .with_label_values(&["long"])
+            .observe(start_time.elapsed().as_secs_f64());
+        result
     }
 
     /// Get transaction by version
@@ -443,6 +511,21 @@ impl TransactionsApi {
             let ledger_info = context.get_latest_ledger_info()?;
             let mut signed_transaction = api.get_signed_transaction(&ledger_info, data)?;
 
+            // Confirm the simulation filter allows the transaction. We use HashValue::zero()
+            // here for the block ID because we don't allow filtering by block ID for the
+            // simulation filters. See the ConfigSanitizer for ApiConfig.
+            if !context.node_config.api.simulation_filter.allows(
+                aptos_crypto::HashValue::zero(),
+                ledger_info.timestamp(),
+                &signed_transaction,
+            ) {
+                return Err(SubmitTransactionError::forbidden_with_code(
+                    "Transaction not allowed by simulation filter",
+                    AptosErrorCode::InvalidInput,
+                    &ledger_info,
+                ));
+            }
+
             let estimated_gas_unit_price = match (
                 estimate_gas_unit_price.0.unwrap_or_default(),
                 estimate_prioritized_gas_unit_price.0.unwrap_or_default(),
@@ -565,6 +648,22 @@ impl TransactionsApi {
         api_spawn_blocking(move || api.get_signing_message(&accept_type, data.0)).await
     }
 
+    pub fn log_gas_estimation(gas_estimation: &GasEstimation) {
+        metrics::GAS_ESTIMATE
+            .with_label_values(&[metrics::GAS_ESTIMATE_CURRENT])
+            .observe(gas_estimation.gas_estimate as f64);
+        if let Some(deprioritized) = gas_estimation.deprioritized_gas_estimate {
+            metrics::GAS_ESTIMATE
+                .with_label_values(&[metrics::GAS_ESTIMATE_DEPRIORITIZED])
+                .observe(deprioritized as f64);
+        }
+        if let Some(prioritized) = gas_estimation.prioritized_gas_estimate {
+            metrics::GAS_ESTIMATE
+                .with_label_values(&[metrics::GAS_ESTIMATE_PRIORITIZED])
+                .observe(prioritized as f64);
+        }
+    }
+
     /// Estimate gas price
     ///
     /// Gives an estimate of the gas unit price required to get a transaction on chain in a
@@ -593,6 +692,7 @@ impl TransactionsApi {
         api_spawn_blocking(move || {
             let latest_ledger_info = context.get_latest_ledger_info()?;
             let gas_estimation = context.estimate_gas_price(&latest_ledger_info)?;
+            Self::log_gas_estimation(&gas_estimation);
 
             match accept_type {
                 AcceptType::Json => BasicResponse::try_from_json((
@@ -654,6 +754,49 @@ impl TransactionsApi {
             AcceptType::Bcs => {
                 BasicResponse::try_from_bcs((data, &latest_ledger_info, BasicResponseStatus::Ok))
             },
+        }
+    }
+
+    async fn wait_transaction_by_hash_inner(
+        &self,
+        accept_type: &AcceptType,
+        hash: HashValue,
+        wait_by_hash_timeout_ms: u64,
+        wait_by_hash_poll_interval_ms: u64,
+    ) -> BasicResultWith404<Transaction> {
+        let start_time = std::time::Instant::now();
+        loop {
+            let context = self.context.clone();
+            let accept_type = accept_type.clone();
+
+            let ledger_info = api_spawn_blocking(move || context.get_latest_ledger_info()).await?;
+
+            let txn_data = self
+                .get_by_hash(hash.into(), &ledger_info)
+                .await
+                .context(format!("Failed to get transaction by hash {}", hash))
+                .map_err(|err| {
+                    BasicErrorWith404::internal_with_code(
+                        err,
+                        AptosErrorCode::InternalError,
+                        &ledger_info,
+                    )
+                })?
+                .context(format!("Failed to find transaction with hash: {}", hash))
+                .map_err(|_| transaction_not_found_by_hash(hash, &ledger_info))?;
+
+            if let TransactionData::Pending(_) = txn_data {
+                if (start_time.elapsed().as_millis() as u64) < wait_by_hash_timeout_ms {
+                    tokio::time::sleep(Duration::from_millis(wait_by_hash_poll_interval_ms)).await;
+                    continue;
+                }
+            }
+
+            let api = self.clone();
+            return api_spawn_blocking(move || {
+                api.get_transaction_inner(&accept_type, txn_data, &ledger_info)
+            })
+            .await;
         }
     }
 
@@ -730,7 +873,10 @@ impl TransactionsApi {
                         let timestamp =
                             self.context.get_block_timestamp(ledger_info, txn.version)?;
                         resolver
-                            .as_converter(self.context.db.clone())
+                            .as_converter(
+                                self.context.db.clone(),
+                                self.context.table_info_reader.clone(),
+                            )
                             .try_into_onchain_transaction(timestamp, txn)
                             .context("Failed to convert on chain transaction to Transaction")
                             .map_err(|err| {
@@ -742,7 +888,10 @@ impl TransactionsApi {
                             })?
                     },
                     TransactionData::Pending(txn) => resolver
-                        .as_converter(self.context.db.clone())
+                        .as_converter(
+                            self.context.db.clone(),
+                            self.context.table_info_reader.clone(),
+                        )
                         .try_into_pending_transaction(*txn)
                         .context("Failed to convert on pending transaction to Transaction")
                         .map_err(|err| {
@@ -903,8 +1052,15 @@ impl TransactionsApi {
                         }
                     },
 
-                    // Deprecated. Will be removed in the future.
-                    TransactionPayload::ModuleBundle(_) => {},
+                    // Deprecated. To avoid panics when malicios users submit this
+                    // payload, return an error.
+                    TransactionPayload::ModuleBundle(_) => {
+                        return Err(SubmitTransactionError::bad_request_with_code(
+                            "Module bundle payload has been removed",
+                            AptosErrorCode::InvalidInput,
+                            ledger_info,
+                        ))
+                    },
                 }
                 // TODO: Verify script args?
 
@@ -914,7 +1070,10 @@ impl TransactionsApi {
                 .context
                 .latest_state_view_poem(ledger_info)?
                 .as_move_resolver()
-                .as_converter(self.context.db.clone())
+                .as_converter(
+                    self.context.db.clone(),
+                    self.context.table_info_reader.clone(),
+                )
                 .try_into_signed_transaction_poem(data.0, self.context.chain_id())
                 .context("Failed to create SignedTransaction from SubmitTransactionRequest")
                 .map_err(|err| {
@@ -993,7 +1152,7 @@ impl TransactionsApi {
                 .map(|(index, txn)| {
                     self.context
                         .latest_state_view_poem(ledger_info)?.as_move_resolver()
-                        .as_converter(self.context.db.clone())
+                        .as_converter(self.context.db.clone(), self.context.table_info_reader.clone())
                         .try_into_signed_transaction_poem(txn, self.context.chain_id())
                         .context(format!("Failed to create SignedTransaction from SubmitTransactionRequest at position {}", index))
                         .map_err(|err| {
@@ -1085,7 +1244,7 @@ impl TransactionsApi {
 
                     // We provide the pending transaction so that users have the hash associated
                     let pending_txn = resolver
-                            .as_converter(self.context.db.clone())
+                            .as_converter(self.context.db.clone(), self.context.table_info_reader.clone())
                             .try_into_pending_transaction_poem(txn)
                             .context("Failed to build PendingTransaction from mempool response, even though it said the request was accepted")
                             .map_err(|err| SubmitTransactionError::internal_with_code(
@@ -1180,10 +1339,11 @@ impl TransactionsApi {
         ledger_info: LedgerInfo,
         txn: SignedTransaction,
     ) -> SimulateTransactionResult<Vec<UserTransaction>> {
-        // Transactions shouldn't have a valid signature or this could be used to attack
+        // The caller must ensure that the signature is not valid, as otherwise
+        // a malicious actor could execute the transaction without their knowledge
         if txn.verify_signature().is_ok() {
             return Err(SubmitTransactionError::bad_request_with_code(
-                "Simulated transactions must have a non-valid signature",
+                "Simulated transactions must not have a valid signature",
                 AptosErrorCode::InvalidInput,
                 &ledger_info,
             ));
@@ -1191,7 +1351,8 @@ impl TransactionsApi {
 
         // Simulate transaction
         let state_view = self.context.latest_state_view_poem(&ledger_info)?;
-        let (vm_status, output) = AptosVM::simulate_signed_transaction(&txn, &state_view);
+        let (vm_status, output) =
+            AptosSimulationVM::create_vm_and_simulate_signed_transaction(&txn, &state_view);
         let version = ledger_info.version();
 
         // Ensure that all known statuses return their values in the output (even if they aren't supposed to)
@@ -1200,6 +1361,34 @@ impl TransactionsApi {
             TransactionStatus::Discard(status) => ExecutionStatus::MiscellaneousError(Some(status)),
             _ => ExecutionStatus::MiscellaneousError(None),
         };
+
+        let stats_key = match txn.payload() {
+            TransactionPayload::Script(_) => {
+                format!("Script::{}", txn.clone().committed_hash()).to_string()
+            },
+            TransactionPayload::ModuleBundle(_) => "ModuleBundle::unknown".to_string(),
+            TransactionPayload::EntryFunction(entry_function) => FunctionStats::function_to_key(
+                entry_function.module(),
+                &entry_function.function().into(),
+            ),
+            TransactionPayload::Multisig(multisig) => {
+                if let Some(payload) = &multisig.transaction_payload {
+                    match payload {
+                        MultisigTransactionPayload::EntryFunction(entry_function) => {
+                            FunctionStats::function_to_key(
+                                entry_function.module(),
+                                &entry_function.function().into(),
+                            )
+                        },
+                    }
+                } else {
+                    "Multisig::unknown".to_string()
+                }
+            },
+        };
+        self.context
+            .simulate_txn_stats()
+            .increment(stats_key, output.gas_used());
 
         // Build up a transaction from the outputs
         // All state hashes are invalid, and will be filled with 0s
@@ -1243,7 +1432,8 @@ impl TransactionsApi {
                                     message: Some(msg), ..
                                 } => {
                                     txn.info.vm_status +=
-                                        format!("\nExecution failed with status: {}", msg).as_str();
+                                        format!("\nExecution failed with message: {}", msg)
+                                            .as_str();
                                 },
                                 _ => (),
                             }
@@ -1288,7 +1478,10 @@ impl TransactionsApi {
         let state_view = self.context.latest_state_view_poem(&ledger_info)?;
         let resolver = state_view.as_move_resolver();
         let raw_txn: RawTransaction = resolver
-            .as_converter(self.context.db.clone())
+            .as_converter(
+                self.context.db.clone(),
+                self.context.table_info_reader.clone(),
+            )
             .try_into_raw_transaction_poem(request.transaction, self.context.chain_id())
             .context("The given transaction is invalid")
             .map_err(|err| {

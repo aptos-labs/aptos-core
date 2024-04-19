@@ -27,7 +27,10 @@ use aptos_keygen::KeyGen;
 use aptos_logger::prelude::*;
 use aptos_types::{
     chain_id::ChainId,
-    on_chain_config::{GasScheduleV2, OnChainConsensusConfig, OnChainExecutionConfig},
+    on_chain_config::{
+        Features, GasScheduleV2, OnChainConsensusConfig, OnChainExecutionConfig,
+        OnChainJWKConsensusConfig, OnChainRandomnessConfig,
+    },
     transaction::Transaction,
     waypoint::Waypoint,
 };
@@ -431,6 +434,9 @@ pub struct GenesisConfiguration {
     pub consensus_config: OnChainConsensusConfig,
     pub execution_config: OnChainExecutionConfig,
     pub gas_schedule: GasScheduleV2,
+    pub initial_features_override: Option<Features>,
+    pub randomness_config_override: Option<OnChainRandomnessConfig>,
+    pub jwk_consensus_config_override: Option<OnChainJWKConsensusConfig>,
 }
 
 pub type InitConfigFn = Arc<dyn Fn(usize, &mut NodeConfig, &mut NodeConfig) + Send + Sync>;
@@ -645,9 +651,12 @@ impl Builder {
             voting_power_increase_limit: 50,
             employee_vesting_start: None,
             employee_vesting_period_duration: None,
-            consensus_config: OnChainConsensusConfig::default(),
+            consensus_config: OnChainConsensusConfig::default_for_genesis(),
             execution_config: OnChainExecutionConfig::default_for_genesis(),
             gas_schedule: default_gas_schedule(),
+            initial_features_override: None,
+            randomness_config_override: None,
+            jwk_consensus_config_override: None,
         };
         if let Some(init_genesis_config) = &self.init_genesis_config {
             (init_genesis_config)(&mut genesis_config);

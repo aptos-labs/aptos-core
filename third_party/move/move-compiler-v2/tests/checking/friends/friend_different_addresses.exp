@@ -1,0 +1,7 @@
+
+Diagnostics:
+error: friend modules of `0xc0ffee::m` must have the same address, but the declared friend module `0xdeadbeef::n` has a different address
+  ┌─ tests/checking/friends/friend_different_addresses.move:2:5
+  │
+2 │     friend 0xdeadbeef::n;
+  │     ^^^^^^^^^^^^^^^^^^^^^

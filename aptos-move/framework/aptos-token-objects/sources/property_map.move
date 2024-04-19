@@ -9,7 +9,7 @@ module aptos_token_objects::property_map {
     use aptos_std::from_bcs;
     use aptos_std::simple_map::{Self, SimpleMap};
     use aptos_std::type_info;
-    use aptos_framework::object::{Self, ConstructorRef, Object};
+    use aptos_framework::object::{Self, ConstructorRef, Object, ExtendRef, ObjectCore};
 
     // Errors
     /// The property map does not exist
@@ -68,6 +68,11 @@ module aptos_token_objects::property_map {
 
     public fun init(ref: &ConstructorRef, container: PropertyMap) {
         let signer = object::generate_signer(ref);
+        move_to(&signer, container);
+    }
+
+    public fun extend(ref: &ExtendRef, container: PropertyMap) {
+        let signer = object::generate_signer_for_extending(ref);
         move_to(&signer, container);
     }
 
@@ -343,81 +348,13 @@ module aptos_token_objects::property_map {
         let constructor_ref = object::create_named_object(creator, b"");
         let object = object::object_from_constructor_ref<object::ObjectCore>(&constructor_ref);
 
-        let input = prepare_input(
-            vector[
-                string::utf8(b"bool"),
-                string::utf8(b"u8"),
-                string::utf8(b"u16"),
-                string::utf8(b"u32"),
-                string::utf8(b"u64"),
-                string::utf8(b"u128"),
-                string::utf8(b"u256"),
-                string::utf8(b"vector<u8>"),
-                string::utf8(b"0x1::string::String"),
-            ],
-            vector[
-                string::utf8(b"bool"),
-                string::utf8(b"u8"),
-                string::utf8(b"u16"),
-                string::utf8(b"u32"),
-                string::utf8(b"u64"),
-                string::utf8(b"u128"),
-                string::utf8(b"u256"),
-                string::utf8(b"vector<u8>"),
-                string::utf8(b"0x1::string::String"),
-            ],
-            vector[
-                bcs::to_bytes<bool>(&true),
-                bcs::to_bytes<u8>(&0x12),
-                bcs::to_bytes<u16>(&0x1234),
-                bcs::to_bytes<u32>(&0x12345678),
-                bcs::to_bytes<u64>(&0x1234567812345678),
-                bcs::to_bytes<u128>(&0x12345678123456781234567812345678),
-                bcs::to_bytes<u256>(&0x1234567812345678123456781234567812345678123456781234567812345678),
-                bcs::to_bytes<vector<u8>>(&vector[0x01]),
-                bcs::to_bytes<String>(&string::utf8(b"a")),
-            ],
-        );
+        let input = end_to_end_input();
         init(&constructor_ref, input);
         let mutator = generate_mutator_ref(&constructor_ref);
 
-        assert!(read_bool(&object, &string::utf8(b"bool")), 0);
-        assert!(read_u8(&object, &string::utf8(b"u8")) == 0x12, 1);
-        assert!(read_u16(&object, &string::utf8(b"u16")) == 0x1234, 2);
-        assert!(read_u32(&object, &string::utf8(b"u32")) == 0x12345678, 3);
-        assert!(read_u64(&object, &string::utf8(b"u64")) == 0x1234567812345678, 4);
-        assert!(read_u128(&object, &string::utf8(b"u128")) == 0x12345678123456781234567812345678, 5);
-        assert!(
-            read_u256(
-                &object,
-                &string::utf8(b"u256")
-            ) == 0x1234567812345678123456781234567812345678123456781234567812345678,
-            6
-        );
-        assert!(read_bytes(&object, &string::utf8(b"vector<u8>")) == vector[0x01], 7);
-        assert!(read_string(&object, &string::utf8(b"0x1::string::String")) == string::utf8(b"a"), 8);
+        assert_end_to_end_input(object);
 
-        assert!(length(&object) == 9, 9);
-
-        update_typed<bool>(&mutator, &string::utf8(b"bool"), false);
-        update_typed<u8>(&mutator, &string::utf8(b"u8"), 0x21);
-        update_typed<u16>(&mutator, &string::utf8(b"u16"), 0x22);
-        update_typed<u32>(&mutator, &string::utf8(b"u32"), 0x23);
-        update_typed<u64>(&mutator, &string::utf8(b"u64"), 0x24);
-        update_typed<u128>(&mutator, &string::utf8(b"u128"), 0x25);
-        update_typed<u256>(&mutator, &string::utf8(b"u256"), 0x26);
-        update_typed<vector<u8>>(&mutator, &string::utf8(b"vector<u8>"), vector[0x02]);
-        update_typed<String>(&mutator, &string::utf8(b"0x1::string::String"), string::utf8(b"ha"));
-
-        assert!(!read_bool(&object, &string::utf8(b"bool")), 10);
-        assert!(read_u8(&object, &string::utf8(b"u8")) == 0x21, 11);
-        assert!(read_u16(&object, &string::utf8(b"u16")) == 0x22, 12);
-        assert!(read_u32(&object, &string::utf8(b"u32")) == 0x23, 13);
-        assert!(read_u64(&object, &string::utf8(b"u64")) == 0x24, 14);
-        assert!(read_u128(&object, &string::utf8(b"u128")) == 0x25, 15);
-        assert!(read_u256(&object, &string::utf8(b"u256")) == 0x26, 16);
-        assert!(read_bytes(&object, &string::utf8(b"vector<u8>")) == vector[0x02], 17);
-        assert!(read_string(&object, &string::utf8(b"0x1::string::String")) == string::utf8(b"ha"), 18);
+        test_end_to_end_update_typed(&mutator, &object);
 
         assert!(length(&object) == 9, 19);
 
@@ -433,25 +370,7 @@ module aptos_token_objects::property_map {
 
         assert!(length(&object) == 0, 20);
 
-        add_typed<bool>(&mutator, string::utf8(b"bool"), false);
-        add_typed<u8>(&mutator, string::utf8(b"u8"), 0x21);
-        add_typed<u16>(&mutator, string::utf8(b"u16"), 0x22);
-        add_typed<u32>(&mutator, string::utf8(b"u32"), 0x23);
-        add_typed<u64>(&mutator, string::utf8(b"u64"), 0x24);
-        add_typed<u128>(&mutator, string::utf8(b"u128"), 0x25);
-        add_typed<u256>(&mutator, string::utf8(b"u256"), 0x26);
-        add_typed<vector<u8>>(&mutator, string::utf8(b"vector<u8>"), vector[0x02]);
-        add_typed<String>(&mutator, string::utf8(b"0x1::string::String"), string::utf8(b"ha"));
-
-        assert!(!read_bool(&object, &string::utf8(b"bool")), 21);
-        assert!(read_u8(&object, &string::utf8(b"u8")) == 0x21, 22);
-        assert!(read_u16(&object, &string::utf8(b"u16")) == 0x22, 23);
-        assert!(read_u32(&object, &string::utf8(b"u32")) == 0x23, 24);
-        assert!(read_u64(&object, &string::utf8(b"u64")) == 0x24, 25);
-        assert!(read_u128(&object, &string::utf8(b"u128")) == 0x25, 26);
-        assert!(read_u256(&object, &string::utf8(b"u256")) == 0x26, 27);
-        assert!(read_bytes(&object, &string::utf8(b"vector<u8>")) == vector[0x02], 28);
-        assert!(read_string(&object, &string::utf8(b"0x1::string::String")) == string::utf8(b"ha"), 29);
+        test_end_to_end_add_typed(&mutator, &object);
 
         assert!(length(&object) == 9, 30);
 
@@ -546,6 +465,101 @@ module aptos_token_objects::property_map {
         assert!(read_string(&object, &string::utf8(b"0x1::string::String")) == string::utf8(b"ha"), 18);
     }
 
+    #[test_only]
+    fun test_end_to_end_update_typed(mutator: &MutatorRef, object: &Object<object::ObjectCore>) acquires PropertyMap {
+        update_typed<bool>(mutator, &string::utf8(b"bool"), false);
+        update_typed<u8>(mutator, &string::utf8(b"u8"), 0x21);
+        update_typed<u16>(mutator, &string::utf8(b"u16"), 0x22);
+        update_typed<u32>(mutator, &string::utf8(b"u32"), 0x23);
+        update_typed<u64>(mutator, &string::utf8(b"u64"), 0x24);
+        update_typed<u128>(mutator, &string::utf8(b"u128"), 0x25);
+        update_typed<u256>(mutator, &string::utf8(b"u256"), 0x26);
+        update_typed<vector<u8>>(mutator, &string::utf8(b"vector<u8>"), vector[0x02]);
+        update_typed<String>(mutator, &string::utf8(b"0x1::string::String"), string::utf8(b"ha"));
+
+        assert!(!read_bool(object, &string::utf8(b"bool")), 10);
+        assert!(read_u8(object, &string::utf8(b"u8")) == 0x21, 11);
+        assert!(read_u16(object, &string::utf8(b"u16")) == 0x22, 12);
+        assert!(read_u32(object, &string::utf8(b"u32")) == 0x23, 13);
+        assert!(read_u64(object, &string::utf8(b"u64")) == 0x24, 14);
+        assert!(read_u128(object, &string::utf8(b"u128")) == 0x25, 15);
+        assert!(read_u256(object, &string::utf8(b"u256")) == 0x26, 16);
+        assert!(read_bytes(object, &string::utf8(b"vector<u8>")) == vector[0x02], 17);
+        assert!(read_string(object, &string::utf8(b"0x1::string::String")) == string::utf8(b"ha"), 18);
+    }
+
+    #[test_only]
+    fun test_end_to_end_add_typed(mutator: &MutatorRef, object: &Object<object::ObjectCore>) acquires PropertyMap {
+        add_typed<bool>(mutator, string::utf8(b"bool"), false);
+        add_typed<u8>(mutator, string::utf8(b"u8"), 0x21);
+        add_typed<u16>(mutator, string::utf8(b"u16"), 0x22);
+        add_typed<u32>(mutator, string::utf8(b"u32"), 0x23);
+        add_typed<u64>(mutator, string::utf8(b"u64"), 0x24);
+        add_typed<u128>(mutator, string::utf8(b"u128"), 0x25);
+        add_typed<u256>(mutator, string::utf8(b"u256"), 0x26);
+        add_typed<vector<u8>>(mutator, string::utf8(b"vector<u8>"), vector[0x02]);
+        add_typed<String>(mutator, string::utf8(b"0x1::string::String"), string::utf8(b"ha"));
+
+        assert!(!read_bool(object, &string::utf8(b"bool")), 21);
+        assert!(read_u8(object, &string::utf8(b"u8")) == 0x21, 22);
+        assert!(read_u16(object, &string::utf8(b"u16")) == 0x22, 23);
+        assert!(read_u32(object, &string::utf8(b"u32")) == 0x23, 24);
+        assert!(read_u64(object, &string::utf8(b"u64")) == 0x24, 25);
+        assert!(read_u128(object, &string::utf8(b"u128")) == 0x25, 26);
+        assert!(read_u256(object, &string::utf8(b"u256")) == 0x26, 27);
+        assert!(read_bytes(object, &string::utf8(b"vector<u8>")) == vector[0x02], 28);
+        assert!(read_string(object, &string::utf8(b"0x1::string::String")) == string::utf8(b"ha"), 29);
+    }
+
+    #[test(creator = @0x123)]
+    fun test_extend_property_map(creator: &signer) acquires PropertyMap {
+        let constructor_ref = object::create_named_object(creator, b"");
+        let extend_ref = object::generate_extend_ref(&constructor_ref);
+        extend(&extend_ref, end_to_end_input());
+
+        let object = object::object_from_constructor_ref<ObjectCore>(&constructor_ref);
+        assert_end_to_end_input(object);
+    }
+
+    #[test_only]
+    fun end_to_end_input(): PropertyMap {
+        prepare_input(
+            vector[
+                string::utf8(b"bool"),
+                string::utf8(b"u8"),
+                string::utf8(b"u16"),
+                string::utf8(b"u32"),
+                string::utf8(b"u64"),
+                string::utf8(b"u128"),
+                string::utf8(b"u256"),
+                string::utf8(b"vector<u8>"),
+                string::utf8(b"0x1::string::String"),
+            ],
+            vector[
+                string::utf8(b"bool"),
+                string::utf8(b"u8"),
+                string::utf8(b"u16"),
+                string::utf8(b"u32"),
+                string::utf8(b"u64"),
+                string::utf8(b"u128"),
+                string::utf8(b"u256"),
+                string::utf8(b"vector<u8>"),
+                string::utf8(b"0x1::string::String"),
+            ],
+            vector[
+                bcs::to_bytes<bool>(&true),
+                bcs::to_bytes<u8>(&0x12),
+                bcs::to_bytes<u16>(&0x1234),
+                bcs::to_bytes<u32>(&0x12345678),
+                bcs::to_bytes<u64>(&0x1234567812345678),
+                bcs::to_bytes<u128>(&0x12345678123456781234567812345678),
+                bcs::to_bytes<u256>(&0x1234567812345678123456781234567812345678123456781234567812345678),
+                bcs::to_bytes<vector<u8>>(&vector[0x01]),
+                bcs::to_bytes<String>(&string::utf8(b"a")),
+            ],
+        )
+    }
+
     #[test(creator = @0x123)]
     #[expected_failure(abort_code = 0x10001, location = aptos_std::from_bcs)]
     fun test_invalid_init(creator: &signer) {
@@ -630,5 +644,25 @@ module aptos_token_objects::property_map {
         );
         init(&constructor_ref, input);
         read_u8(&object, &string::utf8(b"bool"));
+    }
+
+    fun assert_end_to_end_input(object: Object<ObjectCore>) acquires PropertyMap {
+        assert!(read_bool(&object, &string::utf8(b"bool")), 0);
+        assert!(read_u8(&object, &string::utf8(b"u8")) == 0x12, 1);
+        assert!(read_u16(&object, &string::utf8(b"u16")) == 0x1234, 2);
+        assert!(read_u32(&object, &string::utf8(b"u32")) == 0x12345678, 3);
+        assert!(read_u64(&object, &string::utf8(b"u64")) == 0x1234567812345678, 4);
+        assert!(read_u128(&object, &string::utf8(b"u128")) == 0x12345678123456781234567812345678, 5);
+        assert!(
+            read_u256(
+                &object,
+                &string::utf8(b"u256")
+            ) == 0x1234567812345678123456781234567812345678123456781234567812345678,
+            6
+        );
+        assert!(read_bytes(&object, &string::utf8(b"vector<u8>")) == vector[0x01], 7);
+        assert!(read_string(&object, &string::utf8(b"0x1::string::String")) == string::utf8(b"a"), 8);
+
+        assert!(length(&object) == 9, 9);
     }
 }

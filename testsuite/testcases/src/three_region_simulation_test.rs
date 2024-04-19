@@ -85,18 +85,19 @@ impl NetworkLoadTest for ThreeRegionSameCloudSimulationTest {
         // inject network delay
         let delay = create_three_region_swarm_network_delay(ctx.swarm());
         let chaos = SwarmChaos::Delay(delay);
-        ctx.swarm().inject_chaos(chaos)?;
+        ctx.runtime.block_on(ctx.swarm.inject_chaos(chaos))?;
 
         // inject bandwidth limit
         let bandwidth = create_bandwidth_limit();
         let chaos = SwarmChaos::Bandwidth(bandwidth);
-        ctx.swarm().inject_chaos(chaos)?;
+        ctx.runtime.block_on(ctx.swarm.inject_chaos(chaos))?;
 
         Ok(LoadDestination::FullnodesOtherwiseValidators)
     }
 
-    fn finish(&self, swarm: &mut dyn Swarm) -> anyhow::Result<()> {
-        swarm.remove_all_chaos()
+    fn finish(&self, ctx: &mut NetworkContext) -> anyhow::Result<()> {
+        ctx.runtime.block_on(ctx.swarm.remove_all_chaos())?;
+        Ok(())
     }
 }
 

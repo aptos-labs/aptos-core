@@ -4,12 +4,13 @@
 use crate::{error::Error, metrics::increment_network_frame_overflow};
 use aptos_config::config::StorageServiceConfig;
 use aptos_logger::debug;
-use aptos_storage_interface::DbReader;
+use aptos_storage_interface::{AptosDbError, DbReader, Result as StorageResult};
 use aptos_storage_service_types::responses::{
     CompleteDataRange, DataResponse, DataSummary, TransactionOrOutputListWithProof,
 };
 use aptos_types::{
     epoch_change::EpochChangeProof,
+    ledger_info::LedgerInfoWithSignatures,
     state_store::state_value::StateValueChunkWithProof,
     transaction::{TransactionListWithProof, TransactionOutputListWithProof, Version},
 };
@@ -100,6 +101,9 @@ pub struct StorageReader {
 
 impl StorageReader {
     pub fn new(config: StorageServiceConfig, storage: Arc<dyn DbReader>) -> Self {
+        // Create a timed storage reader
+        let storage = Arc::new(TimedStorageReader::new(storage));
+
         Self { config, storage }
     }
 
@@ -494,6 +498,87 @@ impl StorageReaderInterface for StorageReader {
             version, start_index, end_index
         )))
     }
+}
+
+// A simple macro that wraps each storage read call with a timer
+macro_rules! timed_read {
+    ($(
+        $(#[$($attr:meta)*])*
+        fn $name:ident(&self $(, $arg: ident : $ty: ty $(,)?)*) -> $return_type:ty;
+    )+) => {
+        $(
+            $(#[$($attr)*])*
+            fn $name(&self, $($arg: $ty),*) -> $return_type {
+                let read_operation = || {
+                    self.storage.$name($($arg),*).map_err(|e| e.into())
+                };
+                let result = crate::utils::execute_and_time_duration(
+                    &crate::metrics::STORAGE_DB_READ_LATENCY,
+                    None,
+                    Some(stringify!($name).into()),
+                    read_operation,
+                    None,
+                );
+                result.map_err(|e| AptosDbError::Other(e.to_string()))
+            }
+        )+
+    };
+}
+
+/// A simple wrapper around a DbReader that implements and
+/// times the required interface calls.
+pub struct TimedStorageReader {
+    storage: Arc<dyn DbReader>,
+}
+
+impl TimedStorageReader {
+    pub fn new(storage: Arc<dyn DbReader>) -> Self {
+        Self { storage }
+    }
+}
+
+impl DbReader for TimedStorageReader {
+    timed_read!(
+        fn is_state_merkle_pruner_enabled(&self) -> StorageResult<bool>;
+
+        fn get_epoch_snapshot_prune_window(&self) -> StorageResult<usize>;
+
+        fn get_first_txn_version(&self) -> StorageResult<Option<Version>>;
+
+        fn get_first_write_set_version(&self) -> StorageResult<Option<Version>>;
+
+        fn get_latest_ledger_info(&self) -> StorageResult<LedgerInfoWithSignatures>;
+
+        fn get_transactions(
+            &self,
+            start_version: Version,
+            batch_size: u64,
+            ledger_version: Version,
+            fetch_events: bool,
+        ) -> StorageResult<TransactionListWithProof>;
+
+        fn get_epoch_ending_ledger_infos(
+            &self,
+            start_epoch: u64,
+            end_epoch: u64,
+        ) -> StorageResult<EpochChangeProof>;
+
+        fn get_transaction_outputs(
+            &self,
+            start_version: Version,
+            limit: u64,
+            ledger_version: Version,
+        ) -> StorageResult<TransactionOutputListWithProof>;
+
+        fn get_state_leaf_count(&self, version: Version) -> StorageResult<usize>;
+
+        fn get_state_value_chunk_with_proof(
+            &self,
+            version: Version,
+            start_idx: usize,
+            chunk_size: usize,
+        ) -> StorageResult<StateValueChunkWithProof>;
+    );
 }
 
 /// Calculate `(start..=end).len()`. Returns an error if `end < start` or

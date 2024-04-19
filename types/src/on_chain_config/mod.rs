@@ -6,10 +6,12 @@ use crate::{
     access_path::AccessPath,
     account_config::CORE_CODE_ADDRESS,
     event::{EventHandle, EventKey},
+    state_store::{state_key::StateKey, StateView},
 };
 use anyhow::{format_err, Result};
 use bytes::Bytes;
 use move_core_types::{
+    account_address::AccountAddress,
     ident_str,
     identifier::{IdentStr, Identifier},
     language_storage::StructTag,
@@ -22,9 +24,12 @@ mod approved_execution_hashes;
 mod aptos_features;
 mod aptos_version;
 mod chain_id;
+mod commit_history;
 mod consensus_config;
 mod execution_config;
 mod gas_schedule;
+mod jwk_consensus_config;
+mod randomness_config;
 mod timed_features;
 mod timestamp;
 mod transaction_fee;
@@ -34,17 +39,23 @@ pub use self::{
     approved_execution_hashes::ApprovedExecutionHashes,
     aptos_features::*,
     aptos_version::{
-        Version, APTOS_MAX_KNOWN_VERSION, APTOS_VERSION_2, APTOS_VERSION_3, APTOS_VERSION_4,
+        AptosVersion, APTOS_MAX_KNOWN_VERSION, APTOS_VERSION_2, APTOS_VERSION_3, APTOS_VERSION_4,
     },
+    commit_history::CommitHistoryResource,
     consensus_config::{
-        ConsensusConfigV1, DagConsensusConfigV1, LeaderReputationType, OnChainConsensusConfig,
-        ProposerAndVoterConfig, ProposerElectionType,
+        AnchorElectionMode, ConsensusAlgorithmConfig, ConsensusConfigV1, DagConsensusConfigV1,
+        LeaderReputationType, OnChainConsensusConfig, ProposerAndVoterConfig, ProposerElectionType,
+        ValidatorTxnConfig,
     },
     execution_config::{
-        ExecutionConfigV1, ExecutionConfigV2, OnChainExecutionConfig, TransactionDeduperType,
-        TransactionShufflerType,
+        BlockGasLimitType, ExecutionConfigV1, ExecutionConfigV2, ExecutionConfigV4,
+        OnChainExecutionConfig, TransactionDeduperType, TransactionShufflerType,
     },
     gas_schedule::{GasSchedule, GasScheduleV2, StorageGasSchedule},
+    jwk_consensus_config::{
+        ConfigV1 as JWKConsensusConfigV1, OIDCProvider, OnChainJWKConsensusConfig,
+    },
+    randomness_config::{OnChainRandomnessConfig, RandomnessConfigMoveStruct},
     timed_features::{TimedFeatureFlag, TimedFeatureOverride, TimedFeatures, TimedFeaturesBuilder},
     timestamp::CurrentTimeMicroseconds,
     transaction_fee::TransactionFeeBurnCap,
@@ -124,7 +135,7 @@ impl<P: OnChainConfigProvider> OnChainConfigPayload<P> {
 
 /// Trait to be implemented by a storage type from which to read on-chain configs
 pub trait ConfigStorage {
-    fn fetch_config(&self, access_path: AccessPath) -> Option<Bytes>;
+    fn fetch_config_bytes(&self, state_key: &StateKey) -> Option<Bytes>;
 }
 
 /// Trait to be implemented by a Rust struct representation of an on-chain config
@@ -159,23 +170,32 @@ pub trait OnChainConfig: Send + Sync + DeserializeOwned {
         Self::deserialize_default_impl(bytes)
     }
 
+    /// TODO: This does not work if `T`'s reflection on the Move side is using resource groups.
     fn fetch_config<T>(storage: &T) -> Option<Self>
     where
         T: ConfigStorage + ?Sized,
     {
-        let access_path = Self::access_path().ok()?;
-        match storage.fetch_config(access_path) {
+        match storage.fetch_config_bytes(&StateKey::resource(Self::address(), &Self::struct_tag()))
+        {
             Some(bytes) => Self::deserialize_into_config(&bytes).ok(),
             None => None,
         }
     }
 
-    fn access_path() -> anyhow::Result<AccessPath> {
-        access_path_for_config(Self::CONFIG_ID)
+    fn address() -> &'static AccountAddress {
+        &CORE_CODE_ADDRESS
     }
 
     fn struct_tag() -> StructTag {
         struct_tag_for_config(Self::CONFIG_ID)
+    }
+}
+
+impl<S: StateView> ConfigStorage for S {
+    fn fetch_config_bytes(&self, state_key: &StateKey) -> Option<Bytes> {
+        self.get_state_value(state_key)
+            .ok()?
+            .map(|s| s.bytes().clone())
     }
 }
 

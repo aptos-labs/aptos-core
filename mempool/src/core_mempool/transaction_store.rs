@@ -250,9 +250,7 @@ impl TransactionStore {
 
         self.clean_committed_transactions(&address, acc_seq_num);
 
-        self.transactions
-            .entry(address)
-            .or_insert_with(AccountTransactions::new);
+        self.transactions.entry(address).or_default();
 
         if let Some(txns) = self.transactions.get_mut(&address) {
             // capacity check
@@ -379,9 +377,10 @@ impl TransactionStore {
     fn log_ready_transaction(
         ranking_score: u64,
         bucket: &str,
-        insertion_info: InsertionInfo,
+        insertion_info: &mut InsertionInfo,
         broadcast_ready: bool,
     ) {
+        insertion_info.ready_time = SystemTime::now();
         if let Ok(time_delta) = SystemTime::now().duration_since(insertion_info.insertion_time) {
             let submitted_by = insertion_info.submitted_by_label();
             if broadcast_ready {
@@ -445,7 +444,7 @@ impl TransactionStore {
                     Self::log_ready_transaction(
                         txn.ranking_score,
                         self.timeline_index.get_bucket(txn.ranking_score),
-                        txn.insertion_info,
+                        &mut txn.insertion_info,
                         process_broadcast_ready,
                     );
                 }
@@ -462,7 +461,6 @@ impl TransactionStore {
                     TimelineState::Ready(_) => {},
                     _ => {
                         self.parking_lot_index.insert(txn);
-                        txn.was_parked = true;
                         parking_lot_txns += 1;
                     },
                 }
@@ -606,7 +604,7 @@ impl TransactionStore {
                         }
                         let bucket = self.timeline_index.get_bucket(txn.ranking_score);
                         Mempool::log_txn_latency(
-                            txn.insertion_info,
+                            &txn.insertion_info,
                             bucket,
                             BROADCAST_BATCHED_LABEL,
                         );
@@ -720,7 +718,6 @@ impl TransactionStore {
                 // mark all following txns as non-ready, i.e. park them
                 for (_, t) in txns.range_mut((park_range_start, park_range_end)) {
                     self.parking_lot_index.insert(t);
-                    t.was_parked = true;
                     self.priority_index.remove(t);
                     self.timeline_index.remove(t);
                     if let TimelineState::Ready(_) = t.timeline_state {

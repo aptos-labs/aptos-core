@@ -2,14 +2,13 @@
 // Parts of the project are originally copyright © Meta Platforms, Inc.
 // SPDX-License-Identifier: Apache-2.0
 
-use aptos_crypto::{ed25519::Ed25519PrivateKey, HashValue, PrivateKey};
+use aptos_crypto::HashValue;
 use aptos_gas_algebra::{FeePerGasUnit, Gas, NumBytes};
 use aptos_types::{
     account_address::AccountAddress,
     chain_id::ChainId,
-    transaction::{authenticator::AuthenticationKey, SignedTransaction, TransactionPayload},
+    transaction::{SignedTransaction, TransactionPayload},
 };
-use std::convert::TryFrom;
 
 pub struct TransactionMetadata {
     pub sender: AccountAddress,
@@ -26,6 +25,7 @@ pub struct TransactionMetadata {
     pub chain_id: ChainId,
     pub script_hash: Vec<u8>,
     pub script_size: NumBytes,
+    pub required_deposit: Option<u64>,
 }
 
 impl TransactionMetadata {
@@ -56,13 +56,15 @@ impl TransactionMetadata {
                 TransactionPayload::EntryFunction(_) => vec![],
                 TransactionPayload::Multisig(_) => vec![],
 
-                // Deprecated. Will be removed in the future.
+                // Deprecated. Return an empty vec because we cannot do anything
+                // else here, only `unreachable!` otherwise.
                 TransactionPayload::ModuleBundle(_) => vec![],
             },
             script_size: match txn.payload() {
                 TransactionPayload::Script(s) => (s.code().len() as u64).into(),
                 _ => NumBytes::zero(),
             },
+            required_deposit: None,
         }
     }
 
@@ -117,30 +119,10 @@ impl TransactionMetadata {
     }
 
     pub fn is_multi_agent(&self) -> bool {
-        !(self.secondary_signers.is_empty() && self.fee_payer.is_none())
+        !self.secondary_signers.is_empty() || self.fee_payer.is_some()
     }
-}
 
-impl Default for TransactionMetadata {
-    fn default() -> Self {
-        let mut buf = [0u8; Ed25519PrivateKey::LENGTH];
-        buf[Ed25519PrivateKey::LENGTH - 1] = 1;
-        let public_key = Ed25519PrivateKey::try_from(&buf[..]).unwrap().public_key();
-        TransactionMetadata {
-            sender: AccountAddress::ZERO,
-            authentication_key: AuthenticationKey::ed25519(&public_key).to_vec(),
-            secondary_signers: vec![],
-            secondary_authentication_keys: vec![],
-            sequence_number: 0,
-            fee_payer: None,
-            fee_payer_authentication_key: None,
-            max_gas_amount: 100_000_000.into(),
-            gas_unit_price: 0.into(),
-            transaction_size: 0.into(),
-            expiration_timestamp_secs: 0,
-            chain_id: ChainId::test(),
-            script_hash: vec![],
-            script_size: NumBytes::zero(),
-        }
+    pub fn set_required_deposit(&mut self, required_deposit: Option<u64>) {
+        self.required_deposit = required_deposit;
     }
 }

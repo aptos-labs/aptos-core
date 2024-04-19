@@ -1,0 +1,25 @@
+// -- Model dump before bytecode pipeline
+module 0x42::mathtest {
+} // end 0x42::mathtest
+module 0x42::mathtest2 {
+    use 0x42::mathtest; // resolved as: 0x42::mathtest
+} // end 0x42::mathtest2
+module 0x42::mathtest3 {
+    use 0x42::mathtest2; // resolved as: 0x42::mathtest2
+} // end 0x42::mathtest3
+module 0x42::test {
+    use 0x42::mathtest; // resolved as: 0x42::mathtest
+    use 0x42::mathtest2; // resolved as: 0x42::mathtest2
+    use 0x42::mathtest3; // resolved as: 0x42::mathtest3
+    private fun test_nested_mul_div() {
+        if true {
+          Tuple()
+        } else {
+          Abort(0)
+        };
+        Tuple()
+    }
+} // end 0x42::test
+
+
+============ bytecode verification succeeded ========

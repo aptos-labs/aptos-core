@@ -1,0 +1,33 @@
+// -- Model dump before bytecode pipeline
+module 0x8675::M {
+    public fun test(): u64 {
+        M::test1(10)
+    }
+    private fun test1(r: u64): u64 {
+        {
+          let t: u64 = r;
+          {
+            let t2: u64 = 0;
+            loop {
+              if Gt<u64>(r, 0) {
+                {
+                  let x: u64 = r;
+                  r: u64 = Sub<u64>(r, 1);
+                  t2: u64 = Add<u64>(t2, x);
+                  Tuple()
+                }
+              } else {
+                break
+              }
+            };
+            {
+              let t3: u64 = Add<u64>(Add<u64>(r, t), t2);
+              t3
+            }
+          }
+        }
+    }
+} // end 0x8675::M
+
+
+============ bytecode verification succeeded ========

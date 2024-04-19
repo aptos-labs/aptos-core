@@ -28,7 +28,7 @@ helm upgrade --install vector --namespace vector --create-namespace ./ --values 
 |-----|------|---------|-------------|
 | image.pullPolicy | string | `"IfNotPresent"` |  |
 | image.repository | string | `"timberio/vector"` |  |
-| image.tag | string | `"0.24.X-distroless-libc"` |  |
+| image.tag | string | `"0.34.X-distroless-libc"` |  |
 | k8sCluster | string | `"my_blockchain_cluster"` | human readible name of the kubernetes cluster this is being deployed to. This will be added as field `k8s.cluster=<cluster_name>` into each log event |
 | loggingSinks | object | `{}` | Choose any (you can choose multiple) logging sinks supported by vector as found here https://vector.dev/docs/reference/configuration/sinks/ |
 | secretVars | object | `{}` | secret environment variables to pass to the deployment |

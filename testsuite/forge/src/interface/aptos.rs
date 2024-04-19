@@ -14,7 +14,10 @@ use aptos_sdk::{
         account_address::AccountAddress,
         account_config::CORE_CODE_ADDRESS,
         chain_id::ChainId,
-        transaction::{authenticator::AuthenticationKey, SignedTransaction},
+        transaction::{
+            authenticator::{AnyPublicKey, AuthenticationKey},
+            SignedTransaction,
+        },
         LocalAccount,
     },
 };
@@ -165,6 +168,22 @@ impl<'t> AptosPublicInfo<'t> {
         Ok(())
     }
 
+    pub async fn create_user_account_with_any_key(
+        &mut self,
+        pubkey: &AnyPublicKey,
+    ) -> Result<AccountAddress> {
+        let auth_key = AuthenticationKey::any_key(pubkey.clone());
+        let create_account_txn =
+            self.root_account
+                .sign_with_transaction_builder(self.transaction_factory().payload(
+                    aptos_stdlib::aptos_account_create_account(auth_key.account_address()),
+                ));
+        self.rest_client
+            .submit_and_wait(&create_account_txn)
+            .await?;
+        Ok(auth_key.account_address())
+    }
+
     pub async fn mint(&mut self, addr: AccountAddress, amount: u64) -> Result<()> {
         let mint_txn = self.root_account.sign_with_transaction_builder(
             self.transaction_factory()
@@ -292,20 +311,33 @@ pub async fn reconfig(
     let aptos_version = client.get_aptos_version().await.unwrap();
     let current = aptos_version.into_inner();
     let current_version = *current.major.inner();
-    let txn = root_account.sign_with_transaction_builder(
-        transaction_factory
-            .clone()
-            .payload(aptos_stdlib::version_set_version(current_version + 1)),
-    );
-    submit_and_wait_reconfig(client, txn).await
+    let txns = vec![
+        root_account.sign_with_transaction_builder(transaction_factory.clone().payload(
+            aptos_stdlib::version_set_for_next_epoch(current_version + 1),
+        )),
+        root_account.sign_with_transaction_builder(
+            transaction_factory
+                .clone()
+                .payload(aptos_stdlib::aptos_governance_force_end_epoch_test_only()),
+        ),
+    ];
+
+    submit_and_wait_reconfig(client, txns).await
 }
 
-pub async fn submit_and_wait_reconfig(client: &RestClient, txn: SignedTransaction) -> State {
+pub async fn submit_and_wait_reconfig(
+    client: &RestClient,
+    mut txns: Vec<SignedTransaction>,
+) -> State {
     let state = client.get_ledger_information().await.unwrap().into_inner();
-    let result = client.submit_and_wait(&txn).await;
+    let last_txn = txns.pop().unwrap();
+    for txn in txns {
+        let _ = client.submit(&txn).await;
+    }
+    let result = client.submit_and_wait(&last_txn).await;
     if let Err(e) = result {
         let last_transactions = client
-            .get_account_transactions(txn.sender(), None, None)
+            .get_account_transactions(last_txn.sender(), None, None)
             .await
             .map(|result| {
                 result
@@ -326,8 +358,8 @@ pub async fn submit_and_wait_reconfig(client: &RestClient, txn: SignedTransactio
 
         panic!(
             "Couldn't execute {:?}, for account {:?}, error {:?}, last account transactions: {:?}",
-            txn,
-            txn.sender(),
+            last_txn,
+            last_txn.sender(),
             e,
             last_transactions.unwrap_or_default()
         )

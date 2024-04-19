@@ -1,0 +1,28 @@
+
+Diagnostics:
+error: function `0x42::m::bar` cannot be called from function `0x42::n::test` because module `0x42::n` is not a `friend` of `0x42::m`
+   ┌─ tests/checking/unused/private_call_2.move:7:24
+   │
+ 4 │         bar()
+   │         ----- called here
+   ·
+ 7 │     public(friend) fun bar(): u64 { 42 }
+   │                        ^^^ callee
+   ·
+14 │         m::foo();
+   │         -------- from a call inlined at this callsite
+   ·
+25 │         assert!(o::foo() == 42, 1);
+   │                 -------- from a call inlined at this callsite
+
+error: function `0x42::o::bar` cannot be called from function `0x42::n::test` because it is private to module `0x42::o`
+   ┌─ tests/checking/unused/private_call_2.move:18:9
+   │
+15 │     bar()
+   │     ----- called here
+   ·
+18 │     fun bar(): u64 { 42 }
+   │         ^^^ callee
+   ·
+25 │         assert!(o::foo() == 42, 1);
+   │                 -------- from a call inlined at this callsite

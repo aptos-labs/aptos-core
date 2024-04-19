@@ -2,17 +2,24 @@
 // Copyright (c) The Move Contributors
 // SPDX-License-Identifier: Apache-2.0
 
+use super::ModuleStorageAdapter;
 use crate::{
-    loader::{Loader, Module, Resolver, ScriptHash},
+    loader::{
+        access_specifier_loader::load_access_specifier, Loader, Module, Resolver, ScriptHash,
+    },
     native_functions::{NativeFunction, NativeFunctions, UnboxedNativeFunction},
 };
 use move_binary_format::{
     access::ModuleAccess,
+    binary_views::BinaryIndexedView,
     errors::{PartialVMError, PartialVMResult},
     file_format::{AbilitySet, Bytecode, CompiledModule, FunctionDefinitionIndex, Visibility},
 };
 use move_core_types::{identifier::Identifier, language_storage::ModuleId, vm_status::StatusCode};
-use move_vm_types::loaded_data::runtime_types::Type;
+use move_vm_types::loaded_data::{
+    runtime_access_specifier::AccessSpecifier,
+    runtime_types::{StructIdentifier, Type},
+};
 use std::{fmt::Debug, sync::Arc};
 
 // A simple wrapper for the "owner" of the function (Module or Script)
@@ -40,6 +47,7 @@ pub(crate) struct Function {
     pub(crate) return_types: Vec<Type>,
     pub(crate) local_types: Vec<Type>,
     pub(crate) parameter_types: Vec<Type>,
+    pub(crate) access_specifier: AccessSpecifier,
 }
 
 // This struct must be treated as an identifier for a function and not somehow relying on
@@ -64,7 +72,8 @@ impl Function {
         index: FunctionDefinitionIndex,
         module: &CompiledModule,
         signature_table: &[Vec<Type>],
-    ) -> Self {
+        struct_names: &[StructIdentifier],
+    ) -> PartialVMResult<Self> {
         let def = module.function_def_at(index);
         let handle = module.function_handle_at(def.function);
         let name = module.identifier_at(handle.name).to_owned();
@@ -101,9 +110,16 @@ impl Function {
             vec![]
         };
 
+        let access_specifier = load_access_specifier(
+            BinaryIndexedView::Module(module),
+            signature_table,
+            struct_names,
+            &handle.access_specifiers,
+        )?;
+
         let parameter_types = signature_table[handle.parameters.0 as usize].clone();
 
-        Self {
+        Ok(Self {
             file_format_version: module.version(),
             index,
             code,
@@ -116,7 +132,8 @@ impl Function {
             local_types,
             return_types,
             parameter_types,
-        }
+            access_specifier,
+        })
     }
 
     #[allow(unused)]
@@ -135,17 +152,21 @@ impl Function {
         self.index
     }
 
-    pub(crate) fn get_resolver<'a>(&self, loader: &'a Loader) -> Resolver<'a> {
+    pub(crate) fn get_resolver<'a>(
+        &self,
+        loader: &'a Loader,
+        module_store: &'a ModuleStorageAdapter,
+    ) -> Resolver<'a> {
         match &self.scope {
             Scope::Module(module_id) => {
-                let module = loader
-                    .get_module(module_id)
+                let module = module_store
+                    .module_at(module_id)
                     .expect("ModuleId on Function must exist");
-                Resolver::for_module(loader, module)
+                Resolver::for_module(loader, module_store, module)
             },
             Scope::Script(script_hash) => {
                 let script = loader.get_script(script_hash);
-                Resolver::for_script(loader, script)
+                Resolver::for_script(loader, module_store, script)
             },
         }
     }

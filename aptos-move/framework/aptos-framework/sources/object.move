@@ -1,4 +1,4 @@
-/// This defines the Move object model with the the following properties:
+/// This defines the Move object model with the following properties:
 /// - Simplified storage interface that supports a heterogeneous collection of resources to be
 ///   stored together. This enables data types to share a common core data layer (e.g., tokens),
 ///   while having richer extensions (e.g., concert ticket, sword).
@@ -158,6 +158,14 @@ module aptos_framework::object {
 
     /// Emitted whenever the object's owner field is changed.
     struct TransferEvent has drop, store {
+        object: address,
+        from: address,
+        to: address,
+    }
+
+    #[event]
+    /// Emitted whenever the object's owner field is changed.
+    struct Transfer has drop, store {
         object: address,
         from: address,
         to: address,
@@ -431,6 +439,15 @@ module aptos_framework::object {
             object.owner == ref.owner,
             error::permission_denied(ENOT_OBJECT_OWNER),
         );
+        if (std::features::module_event_migration_enabled()) {
+            event::emit(
+                Transfer {
+                    object: ref.self,
+                    from: object.owner,
+                    to,
+                },
+            );
+        };
         event::emit_event(
             &mut object.transfer_events,
             TransferEvent {
@@ -478,6 +495,13 @@ module aptos_framework::object {
     inline fun transfer_raw_inner(object: address, to: address) acquires ObjectCore {
         let object_core = borrow_global_mut<ObjectCore>(object);
         if (object_core.owner != to) {
+            event::emit(
+                Transfer {
+                    object,
+                    from: object_core.owner,
+                    to,
+                },
+            );
             event::emit_event(
                 &mut object_core.transfer_events,
                 TransferEvent {
@@ -517,18 +541,11 @@ module aptos_framework::object {
 
         let current_address = object.owner;
         let count = 0;
-        while ({
-            spec {
-                invariant count < MAXIMUM_OBJECT_NESTING;
-                invariant forall i in 0..count:
-                    exists<ObjectCore>(current_address) && global<ObjectCore>(current_address).allow_ungated_transfer;
-                // invariant forall i in 0..count:
-                //     current_address == get_transfer_address(global<ObjectCore>(destination).owner, i);
+        while (owner != current_address) {
+            count = count + 1;
+            if (std::features::max_object_nesting_check_enabled()) {
+                assert!(count < MAXIMUM_OBJECT_NESTING, error::out_of_range(EMAXIMUM_NESTING))
             };
-            owner != current_address
-        }) {
-            let count = count + 1;
-            assert!(count < MAXIMUM_OBJECT_NESTING, error::out_of_range(EMAXIMUM_NESTING));
             // At this point, the first object exists and so the more likely case is that the
             // object's owner is not an object. So we return a more sensible error.
             assert!(
@@ -608,16 +625,11 @@ module aptos_framework::object {
         let current_address = object.owner;
 
         let count = 0;
-        while ({
-            spec {
-                invariant count < MAXIMUM_OBJECT_NESTING;
-                invariant forall i in 0..count:
-                    owner != current_address && exists<ObjectCore>(current_address);
+        while (owner != current_address) {
+            count = count + 1;
+            if (std::features::max_object_nesting_check_enabled()) {
+                assert!(count < MAXIMUM_OBJECT_NESTING, error::out_of_range(EMAXIMUM_NESTING))
             };
-            owner != current_address
-        }) {
-            let count = count + 1;
-            assert!(count < MAXIMUM_OBJECT_NESTING, error::out_of_range(EMAXIMUM_NESTING));
             if (!exists<ObjectCore>(current_address)) {
                 return false
             };
@@ -746,7 +758,7 @@ module aptos_framework::object {
     fun test_correct_auid(fx: signer) {
         use std::features;
         let feature = features::get_auids();
-        features::change_feature_flags(&fx, vector[feature], vector[]);
+        features::change_feature_flags_for_testing(&fx, vector[feature], vector[]);
 
         let auid1 = aptos_framework::transaction_context::generate_auid_address();
         let bytes = aptos_framework::transaction_context::get_transaction_hash();
@@ -800,5 +812,111 @@ module aptos_framework::object {
     fun test_unburn_object_not_burnt_should_fail(creator: &signer) acquires ObjectCore, TombStone {
         let (_, hero) = create_hero(creator);
         unburn(creator, hero);
+    }
+
+    #[test_only]
+    fun create_simple_object(creator: &signer, seed: vector<u8>): Object<ObjectCore> {
+        object_from_constructor_ref<ObjectCore>(&create_named_object(creator, seed))
+    }
+
+    #[test(creator = @0x123)]
+    #[expected_failure(abort_code = 131078, location = Self)]
+    fun test_exceeding_maximum_object_nesting_owns_should_fail(creator: &signer) acquires ObjectCore {
+        use std::features;
+        let feature = features::get_max_object_nesting_check_feature();
+        let fx = account::create_signer_for_test(@0x1);
+        features::change_feature_flags_for_testing(&fx, vector[feature], vector[]);
+
+        let obj1 = create_simple_object(creator, b"1");
+        let obj2 = create_simple_object(creator, b"2");
+        let obj3 = create_simple_object(creator, b"3");
+        let obj4 = create_simple_object(creator, b"4");
+        let obj5 = create_simple_object(creator, b"5");
+        let obj6 = create_simple_object(creator, b"6");
+        let obj7 = create_simple_object(creator, b"7");
+        let obj8 = create_simple_object(creator, b"8");
+        let obj9 = create_simple_object(creator, b"9");
+
+        transfer(creator, obj1, object_address(&obj2));
+        transfer(creator, obj2, object_address(&obj3));
+        transfer(creator, obj3, object_address(&obj4));
+        transfer(creator, obj4, object_address(&obj5));
+        transfer(creator, obj5, object_address(&obj6));
+        transfer(creator, obj6, object_address(&obj7));
+        transfer(creator, obj7, object_address(&obj8));
+        transfer(creator, obj8, object_address(&obj9));
+
+        assert!(owns(obj9, signer::address_of(creator)), 1);
+        assert!(owns(obj8, signer::address_of(creator)), 1);
+        assert!(owns(obj7, signer::address_of(creator)), 1);
+        assert!(owns(obj6, signer::address_of(creator)), 1);
+        assert!(owns(obj5, signer::address_of(creator)), 1);
+        assert!(owns(obj4, signer::address_of(creator)), 1);
+        assert!(owns(obj3, signer::address_of(creator)), 1);
+        assert!(owns(obj2, signer::address_of(creator)), 1);
+
+        // Calling `owns` should fail as the nesting is too deep.
+        assert!(owns(obj1, signer::address_of(creator)), 1);
+    }
+
+    #[test(creator = @0x123)]
+    #[expected_failure(abort_code = 131078, location = Self)]
+    fun test_exceeding_maximum_object_nesting_transfer_should_fail(creator: &signer) acquires ObjectCore {
+        use std::features;
+        let feature = features::get_max_object_nesting_check_feature();
+        let fx = account::create_signer_for_test(@0x1);
+        features::change_feature_flags_for_testing(&fx, vector[feature], vector[]);
+
+        let obj1 = create_simple_object(creator, b"1");
+        let obj2 = create_simple_object(creator, b"2");
+        let obj3 = create_simple_object(creator, b"3");
+        let obj4 = create_simple_object(creator, b"4");
+        let obj5 = create_simple_object(creator, b"5");
+        let obj6 = create_simple_object(creator, b"6");
+        let obj7 = create_simple_object(creator, b"7");
+        let obj8 = create_simple_object(creator, b"8");
+        let obj9 = create_simple_object(creator, b"9");
+
+        transfer(creator, obj1, object_address(&obj2));
+        transfer(creator, obj2, object_address(&obj3));
+        transfer(creator, obj3, object_address(&obj4));
+        transfer(creator, obj4, object_address(&obj5));
+        transfer(creator, obj5, object_address(&obj6));
+        transfer(creator, obj6, object_address(&obj7));
+        transfer(creator, obj7, object_address(&obj8));
+        transfer(creator, obj8, object_address(&obj9));
+
+        // This should fail as the nesting is too deep.
+        transfer(creator, obj1, @0x1);
+    }
+
+    #[test(creator = @0x123)]
+    #[expected_failure(abort_code = 131078, location = Self)]
+    fun test_cyclic_ownership_transfer_should_fail(creator: &signer) acquires ObjectCore {
+        use std::features;
+        let feature = features::get_max_object_nesting_check_feature();
+        let fx = account::create_signer_for_test(@0x1);
+        features::change_feature_flags_for_testing(&fx, vector[feature], vector[]);
+
+        let obj1 = create_simple_object(creator, b"1");
+        // This creates a cycle (self-loop) in ownership.
+        transfer(creator, obj1, object_address(&obj1));
+        // This should fails as the ownership is cyclic.
+        transfer(creator, obj1, object_address(&obj1));
+    }
+
+    #[test(creator = @0x123)]
+    #[expected_failure(abort_code = 131078, location = Self)]
+    fun test_cyclic_ownership_owns_should_fail(creator: &signer) acquires ObjectCore {
+        use std::features;
+        let feature = features::get_max_object_nesting_check_feature();
+        let fx = account::create_signer_for_test(@0x1);
+        features::change_feature_flags_for_testing(&fx, vector[feature], vector[]);
+
+        let obj1 = create_simple_object(creator, b"1");
+        // This creates a cycle (self-loop) in ownership.
+        transfer(creator, obj1, object_address(&obj1));
+        // This should fails as the ownership is cyclic.
+        let _ = owns(obj1, signer::address_of(creator));
     }
 }

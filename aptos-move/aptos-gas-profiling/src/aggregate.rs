@@ -25,6 +25,8 @@ pub struct AggregatedExecutionGasEvents {
 
     // TODO: Make this more strongly typed?
     pub ops: Vec<(String, usize, InternalGas)>,
+    pub transaction_write: InternalGas,
+    pub event_writes: Vec<(String, usize, InternalGas)>,
     pub storage_reads: Vec<(String, usize, InternalGas)>,
     pub storage_writes: Vec<(String, usize, InternalGas)>,
 }
@@ -73,6 +75,7 @@ impl ExecutionAndIOCosts {
         let mut ops = BTreeMap::new();
         let mut storage_reads = BTreeMap::new();
         let mut storage_writes = BTreeMap::new();
+        let mut event_writes = BTreeMap::new();
 
         for event in self.gas_events() {
             match event {
@@ -100,7 +103,16 @@ impl ExecutionAndIOCosts {
                     ty,
                     cost,
                 } => insert_or_add(&mut storage_reads, format!("{}", ty), *cost),
+                CreateTy { cost } => insert_or_add(&mut ops, "create_ty".to_string(), *cost),
             }
+        }
+
+        for event in &self.events_transient {
+            insert_or_add(
+                &mut event_writes,
+                format!("{}", Render(&event.ty)),
+                event.cost,
+            );
         }
 
         for write in &self.write_set_transient {
@@ -122,6 +134,8 @@ impl ExecutionAndIOCosts {
             total: self.total,
 
             ops: into_sorted_vec(ops),
+            transaction_write: self.transaction_transient.unwrap_or_else(|| 0.into()),
+            event_writes: into_sorted_vec(event_writes),
             storage_reads: into_sorted_vec(storage_reads),
             storage_writes: into_sorted_vec(storage_writes),
         }

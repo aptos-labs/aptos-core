@@ -3,13 +3,14 @@
 // SPDX-License-Identifier: Apache-2.0
 
 use aptos_cached_packages::aptos_stdlib;
-use aptos_forge::{reconfig, LocalSwarm, NodeExt, Swarm};
+use aptos_forge::{reconfig, LocalSwarm, NodeExt, Swarm, SwarmExt};
 use aptos_rest_client::Client as RestClient;
 use aptos_sdk::{
     transaction_builder::TransactionFactory,
     types::{transaction::SignedTransaction, LocalAccount},
 };
 use rand::random;
+use std::time::Duration;
 
 pub const MAX_CATCH_UP_WAIT_SECS: u64 = 180; // The max time we'll wait for nodes to catch up
 pub const MAX_CONNECTIVITY_WAIT_SECS: u64 = 180; // The max time we'll wait for nodes to gain connectivity
@@ -18,6 +19,67 @@ pub const MAX_HEALTHY_WAIT_SECS: u64 = 120; // The max time we'll wait for nodes
 pub async fn create_and_fund_account(swarm: &'_ mut dyn Swarm, amount: u64) -> LocalAccount {
     let mut info = swarm.aptos_public_info();
     info.create_and_fund_user_account(amount).await.unwrap()
+}
+
+/// Creates and funds two test accounts
+pub async fn create_test_accounts(swarm: &mut LocalSwarm) -> (LocalAccount, LocalAccount) {
+    let token_amount = 1000;
+    let account_0 = create_and_fund_account(swarm, token_amount).await;
+    let account_1 = create_and_fund_account(swarm, token_amount).await;
+    (account_0, account_1)
+}
+
+/// Executes transactions using the given transaction factory, client and
+/// accounts. If `execute_epoch_changes` is true, also execute transactions to
+/// force reconfigurations.
+pub async fn execute_transactions(
+    swarm: &mut LocalSwarm,
+    client: &RestClient,
+    sender: &mut LocalAccount,
+    receiver: &LocalAccount,
+    execute_epoch_changes: bool,
+) {
+    // Execute several transactions
+    let num_transfers = 10;
+    let transaction_factory = swarm.chain_info().transaction_factory();
+    if execute_epoch_changes {
+        transfer_and_maybe_reconfig(
+            client,
+            &transaction_factory,
+            swarm.chain_info().root_account,
+            sender,
+            receiver,
+            num_transfers,
+        )
+        .await;
+    } else {
+        for _ in 0..num_transfers {
+            // Execute simple transfer transactions
+            transfer_coins(client, &transaction_factory, sender, receiver, 1).await;
+        }
+    }
+
+    // Always ensure that at least one reconfiguration transaction is executed
+    if !execute_epoch_changes {
+        aptos_forge::reconfig(
+            client,
+            &transaction_factory,
+            swarm.chain_info().root_account,
+        )
+        .await;
+    }
+}
+
+/// Executes transactions and waits for all nodes to catch up
+pub async fn execute_transactions_and_wait(
+    swarm: &mut LocalSwarm,
+    client: &RestClient,
+    sender: &mut LocalAccount,
+    receiver: &LocalAccount,
+    epoch_changes: bool,
+) {
+    execute_transactions(swarm, client, sender, receiver, epoch_changes).await;
+    wait_for_all_nodes(swarm).await;
 }
 
 pub async fn transfer_coins_non_blocking(
@@ -78,34 +140,6 @@ pub async fn assert_balance(client: &RestClient, account: &LocalAccount, balance
     assert_eq!(on_chain_balance.get(), balance);
 }
 
-/// This module provides useful functions for operating, handling and managing
-/// AptosSwarm instances. It is particularly useful for working with tests that
-/// require a SmokeTestEnvironment, as it provides a generic interface across
-/// AptosSwarms, regardless of if the swarm is a validator swarm, validator full
-/// node swarm, or a public full node swarm.
-#[cfg(test)]
-pub mod swarm_utils {
-    use aptos_config::config::{NodeConfig, SecureBackend, WaypointConfig};
-    use aptos_secure_storage::{KVStorage, Storage};
-    use aptos_types::waypoint::Waypoint;
-
-    pub fn insert_waypoint(node_config: &mut NodeConfig, waypoint: Waypoint) {
-        node_config.base.waypoint = WaypointConfig::FromConfig(waypoint);
-
-        let f = |backend: &SecureBackend| {
-            let mut storage: Storage = backend.into();
-            storage
-                .set(aptos_global_constants::WAYPOINT, waypoint)
-                .expect("Unable to write waypoint");
-            storage
-                .set(aptos_global_constants::GENESIS_WAYPOINT, waypoint)
-                .expect("Unable to write waypoint");
-        };
-        let backend = &node_config.consensus.safety_rules.backend;
-        f(backend);
-    }
-}
-
 /// This helper function creates 3 new accounts, mints funds, transfers funds
 /// between the accounts and verifies that these operations succeed.
 pub async fn check_create_mint_transfer(swarm: &mut LocalSwarm) {
@@ -133,4 +167,40 @@ pub async fn check_create_mint_transfer_node(swarm: &mut LocalSwarm, idx: usize)
     // Create account 2, mint 15 coins and check balance
     let account_2 = info.create_and_fund_user_account(15).await.unwrap();
     assert_balance(&client, &account_2, 15).await;
+}
+
+/// Waits for all nodes to catch up
+pub async fn wait_for_all_nodes(swarm: &mut LocalSwarm) {
+    swarm
+        .wait_for_all_nodes_to_catchup(Duration::from_secs(MAX_CATCH_UP_WAIT_SECS))
+        .await
+        .unwrap();
+}
+
+/// This module provides useful functions for operating, handling and managing
+/// AptosSwarm instances. It is particularly useful for working with tests that
+/// require a SmokeTestEnvironment, as it provides a generic interface across
+/// AptosSwarms, regardless of if the swarm is a validator swarm, validator full
+/// node swarm, or a public full node swarm.
+#[cfg(test)]
+pub mod swarm_utils {
+    use aptos_config::config::{NodeConfig, SecureBackend, WaypointConfig};
+    use aptos_secure_storage::{KVStorage, Storage};
+    use aptos_types::waypoint::Waypoint;
+
+    pub fn insert_waypoint(node_config: &mut NodeConfig, waypoint: Waypoint) {
+        node_config.base.waypoint = WaypointConfig::FromConfig(waypoint);
+
+        let f = |backend: &SecureBackend| {
+            let mut storage: Storage = backend.into();
+            storage
+                .set(aptos_global_constants::WAYPOINT, waypoint)
+                .expect("Unable to write waypoint");
+            storage
+                .set(aptos_global_constants::GENESIS_WAYPOINT, waypoint)
+                .expect("Unable to write waypoint");
+        };
+        let backend = &node_config.consensus.safety_rules.backend;
+        f(backend);
+    }
 }

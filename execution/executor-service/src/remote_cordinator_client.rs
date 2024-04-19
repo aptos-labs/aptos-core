@@ -98,12 +98,12 @@ impl CoordinatorClient<RemoteStateViewClient> for RemoteCoordinatorClient {
                         self.state_view_client.init_for_block(state_keys);
                         drop(init_prefetch_timer);
 
-                        let (sub_blocks, concurrency, gas_limit) = command.into();
+                        let (sub_blocks, concurrency, onchain_config) = command.into();
                         ExecutorShardCommand::ExecuteSubBlocks(
                             self.state_view_client.clone(),
                             sub_blocks,
                             concurrency,
-                            gas_limit,
+                            onchain_config,
                         )
                     },
                 }

@@ -12,6 +12,16 @@ import Long from "long";
 import _m0 from "protobufjs/minimal";
 import { Transaction } from "../../transaction/v1/transaction";
 
+/** This is for storage only. */
+export interface TransactionsInStorage {
+  /** Required; transactions data. */
+  transactions?:
+    | Transaction[]
+    | undefined;
+  /** Required; chain id. */
+  startingVersion?: bigint | undefined;
+}
+
 export interface GetTransactionsRequest {
   /** Required; start version of current stream. */
   startingVersion?:
@@ -41,6 +51,121 @@ export interface TransactionsResponse {
   chainId?: bigint | undefined;
 }
 
+function createBaseTransactionsInStorage(): TransactionsInStorage {
+  return { transactions: [], startingVersion: undefined };
+}
+
+export const TransactionsInStorage = {
+  encode(message: TransactionsInStorage, writer: _m0.Writer = _m0.Writer.create()): _m0.Writer {
+    if (message.transactions !== undefined && message.transactions.length !== 0) {
+      for (const v of message.transactions) {
+        Transaction.encode(v!, writer.uint32(10).fork()).ldelim();
+      }
+    }
+    if (message.startingVersion !== undefined) {
+      if (BigInt.asUintN(64, message.startingVersion) !== message.startingVersion) {
+        throw new globalThis.Error("value provided for field message.startingVersion of type uint64 too large");
+      }
+      writer.uint32(16).uint64(message.startingVersion.toString());
+    }
+    return writer;
+  },
+
+  decode(input: _m0.Reader | Uint8Array, length?: number): TransactionsInStorage {
+    const reader = input instanceof _m0.Reader ? input : _m0.Reader.create(input);
+    let end = length === undefined ? reader.len : reader.pos + length;
+    const message = createBaseTransactionsInStorage();
+    while (reader.pos < end) {
+      const tag = reader.uint32();
+      switch (tag >>> 3) {
+        case 1:
+          if (tag !== 10) {
+            break;
+          }
+
+          message.transactions!.push(Transaction.decode(reader, reader.uint32()));
+          continue;
+        case 2:
+          if (tag !== 16) {
+            break;
+          }
+
+          message.startingVersion = longToBigint(reader.uint64() as Long);
+          continue;
+      }
+      if ((tag & 7) === 4 || tag === 0) {
+        break;
+      }
+      reader.skipType(tag & 7);
+    }
+    return message;
+  },
+
+  // encodeTransform encodes a source of message objects.
+  // Transform<TransactionsInStorage, Uint8Array>
+  async *encodeTransform(
+    source:
+      | AsyncIterable<TransactionsInStorage | TransactionsInStorage[]>
+      | Iterable<TransactionsInStorage | TransactionsInStorage[]>,
+  ): AsyncIterable<Uint8Array> {
+    for await (const pkt of source) {
+      if (globalThis.Array.isArray(pkt)) {
+        for (const p of (pkt as any)) {
+          yield* [TransactionsInStorage.encode(p).finish()];
+        }
+      } else {
+        yield* [TransactionsInStorage.encode(pkt as any).finish()];
+      }
+    }
+  },
+
+  // decodeTransform decodes a source of encoded messages.
+  // Transform<Uint8Array, TransactionsInStorage>
+  async *decodeTransform(
+    source: AsyncIterable<Uint8Array | Uint8Array[]> | Iterable<Uint8Array | Uint8Array[]>,
+  ): AsyncIterable<TransactionsInStorage> {
+    for await (const pkt of source) {
+      if (globalThis.Array.isArray(pkt)) {
+        for (const p of (pkt as any)) {
+          yield* [TransactionsInStorage.decode(p)];
+        }
+      } else {
+        yield* [TransactionsInStorage.decode(pkt as any)];
+      }
+    }
+  },
+
+  fromJSON(object: any): TransactionsInStorage {
+    return {
+      transactions: globalThis.Array.isArray(object?.transactions)
+        ? object.transactions.map((e: any) => Transaction.fromJSON(e))
+        : [],
+      startingVersion: isSet(object.startingVersion) ? BigInt(object.startingVersion) : undefined,
+    };
+  },
+
+  toJSON(message: TransactionsInStorage): unknown {
+    const obj: any = {};
+    if (message.transactions?.length) {
+      obj.transactions = message.transactions.map((e) => Transaction.toJSON(e));
+    }
+    if (message.startingVersion !== undefined) {
+      obj.startingVersion = message.startingVersion.toString();
+    }
+    return obj;
+  },
+
+  create(base?: DeepPartial<TransactionsInStorage>): TransactionsInStorage {
+    return TransactionsInStorage.fromPartial(base ?? {});
+  },
+  fromPartial(object: DeepPartial<TransactionsInStorage>): TransactionsInStorage {
+    const message = createBaseTransactionsInStorage();
+    message.transactions = object.transactions?.map((e) => Transaction.fromPartial(e)) || [];
+    message.startingVersion = object.startingVersion ?? undefined;
+    return message;
+  },
+};
+
 function createBaseGetTransactionsRequest(): GetTransactionsRequest {
   return { startingVersion: undefined, transactionsCount: undefined, batchSize: undefined };
 }
@@ -49,19 +174,19 @@ export const GetTransactionsRequest = {
   encode(message: GetTransactionsRequest, writer: _m0.Writer = _m0.Writer.create()): _m0.Writer {
     if (message.startingVersion !== undefined) {
       if (BigInt.asUintN(64, message.startingVersion) !== message.startingVersion) {
-        throw new Error("value provided for field message.startingVersion of type uint64 too large");
+        throw new globalThis.Error("value provided for field message.startingVersion of type uint64 too large");
       }
       writer.uint32(8).uint64(message.startingVersion.toString());
     }
     if (message.transactionsCount !== undefined) {
       if (BigInt.asUintN(64, message.transactionsCount) !== message.transactionsCount) {
-        throw new Error("value provided for field message.transactionsCount of type uint64 too large");
+        throw new globalThis.Error("value provided for field message.transactionsCount of type uint64 too large");
       }
       writer.uint32(16).uint64(message.transactionsCount.toString());
     }
     if (message.batchSize !== undefined) {
       if (BigInt.asUintN(64, message.batchSize) !== message.batchSize) {
-        throw new Error("value provided for field message.batchSize of type uint64 too large");
+        throw new globalThis.Error("value provided for field message.batchSize of type uint64 too large");
       }
       writer.uint32(24).uint64(message.batchSize.toString());
     }
@@ -186,7 +311,7 @@ export const TransactionsResponse = {
     }
     if (message.chainId !== undefined) {
       if (BigInt.asUintN(64, message.chainId) !== message.chainId) {
-        throw new Error("value provided for field message.chainId of type uint64 too large");
+        throw new globalThis.Error("value provided for field message.chainId of type uint64 too large");
       }
       writer.uint32(16).uint64(message.chainId.toString());
     }
@@ -323,6 +448,7 @@ export interface RawDataClient extends Client {
 export const RawDataClient = makeGenericClientConstructor(RawDataService, "aptos.indexer.v1.RawData") as unknown as {
   new (address: string, credentials: ChannelCredentials, options?: Partial<ClientOptions>): RawDataClient;
   service: typeof RawDataService;
+  serviceName: string;
 };
 
 type Builtin = Date | Function | Uint8Array | string | number | boolean | bigint | undefined;

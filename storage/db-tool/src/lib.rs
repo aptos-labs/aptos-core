@@ -14,6 +14,7 @@ mod utils;
 
 use anyhow::Result;
 use aptos_db::db_debugger;
+use aptos_logger::info;
 use clap::Parser;
 
 #[derive(Parser)]
@@ -42,8 +43,12 @@ impl DBTool {
             DBTool::Backup(cmd) => cmd.run().await,
             DBTool::BackupMaintenance(cmd) => cmd.run().await,
             DBTool::Bootstrap(cmd) => cmd.run(),
-            DBTool::Debug(cmd) => cmd.run(),
-            DBTool::ReplayVerify(cmd) => cmd.run().await,
+            DBTool::Debug(cmd) => Ok(cmd.run()?),
+            DBTool::ReplayVerify(cmd) => {
+                let ret = cmd.run().await;
+                info!("Replay verify result: {:?}", ret);
+                ret
+            },
             DBTool::Restore(cmd) => cmd.run().await,
         }
     }

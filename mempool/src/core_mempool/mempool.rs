@@ -26,6 +26,7 @@ use aptos_types::{
 };
 use std::{
     collections::{BTreeMap, HashMap, HashSet},
+    sync::atomic::Ordering,
     time::{Duration, Instant, SystemTime},
 };
 
@@ -84,7 +85,7 @@ impl Mempool {
             is_rejected = true,
             label = reason_label,
         );
-        self.log_latency(*sender, sequence_number, reason_label);
+        self.log_commit_rejected_latency(*sender, sequence_number, reason_label);
         if let Some(ranking_score) = self.transactions.get_ranking_score(sender, sequence_number) {
             counters::core_mempool_txn_ranking_score(
                 counters::REMOVE_LABEL,
@@ -119,7 +120,7 @@ impl Mempool {
     }
 
     pub(crate) fn log_txn_latency(
-        insertion_info: InsertionInfo,
+        insertion_info: &InsertionInfo,
         bucket: &str,
         stage: &'static str,
     ) {
@@ -133,12 +134,61 @@ impl Mempool {
         }
     }
 
-    fn log_latency(&self, account: AccountAddress, sequence_number: u64, stage: &'static str) {
-        if let Some((&insertion_info, bucket)) = self
+    fn log_consensus_pulled_latency(&self, account: AccountAddress, sequence_number: u64) {
+        if let Some((insertion_info, bucket)) = self
+            .transactions
+            .get_insertion_info_and_bucket(&account, sequence_number)
+        {
+            let prev_count = insertion_info
+                .consensus_pulled_counter
+                .fetch_add(1, Ordering::Relaxed);
+            Self::log_txn_latency(insertion_info, bucket, counters::CONSENSUS_PULLED_LABEL);
+            counters::CORE_MEMPOOL_TXN_CONSENSUS_PULLED.observe((prev_count + 1) as f64);
+        }
+    }
+
+    fn log_commit_rejected_latency(
+        &self,
+        account: AccountAddress,
+        sequence_number: u64,
+        stage: &'static str,
+    ) {
+        if let Some((insertion_info, bucket)) = self
             .transactions
             .get_insertion_info_and_bucket(&account, sequence_number)
         {
             Self::log_txn_latency(insertion_info, bucket, stage);
+        }
+    }
+
+    fn log_commit_and_parked_latency(insertion_info: &InsertionInfo, bucket: &str) {
+        let parked_duration = if let Some(park_time) = insertion_info.park_time {
+            let parked_duration = insertion_info
+                .ready_time
+                .duration_since(park_time)
+                .unwrap_or(Duration::ZERO);
+            counters::core_mempool_txn_commit_latency(
+                counters::PARKED_TIME_LABEL,
+                insertion_info.submitted_by_label(),
+                bucket,
+                parked_duration,
+            );
+            parked_duration
+        } else {
+            Duration::ZERO
+        };
+
+        if let Ok(commit_duration) = SystemTime::now().duration_since(insertion_info.insertion_time)
+        {
+            let commit_minus_parked = commit_duration
+                .checked_sub(parked_duration)
+                .unwrap_or(Duration::ZERO);
+            counters::core_mempool_txn_commit_latency(
+                counters::NON_PARKED_COMMIT_ACCEPTED_LABEL,
+                insertion_info.submitted_by_label(),
+                bucket,
+                commit_minus_parked,
+            );
         }
     }
 
@@ -148,11 +198,12 @@ impl Mempool {
         sequence_number: u64,
         block_timestamp: Duration,
     ) {
-        if let Some((&insertion_info, bucket)) = self
+        if let Some((insertion_info, bucket)) = self
             .transactions
             .get_insertion_info_and_bucket(&account, sequence_number)
         {
             Self::log_txn_latency(insertion_info, bucket, counters::COMMIT_ACCEPTED_LABEL);
+            Self::log_commit_and_parked_latency(insertion_info, bucket);
 
             let insertion_timestamp =
                 aptos_infallible::duration_since_epoch_at(&insertion_info.insertion_time);
@@ -328,13 +379,16 @@ impl Mempool {
                 .transactions
                 .get_with_ranking_score(&txn_pointer.sender, txn_pointer.sequence_number)
             {
-                let txn_size = txn.raw_txn_bytes_len();
-                if total_bytes + txn_size > max_bytes as usize {
+                let txn_size = txn.txn_bytes_len() as u64;
+                if total_bytes + txn_size > max_bytes {
                     full_bytes = true;
                     break;
                 }
                 total_bytes += txn_size;
                 block.push(txn);
+                if total_bytes == max_bytes {
+                    full_bytes = true;
+                }
                 counters::core_mempool_txn_ranking_score(
                     counters::CONSENSUS_PULLED_LABEL,
                     counters::CONSENSUS_PULLED_LABEL,
@@ -390,11 +444,7 @@ impl Mempool {
         counters::mempool_service_transactions(counters::GET_BLOCK_LABEL, block.len());
         counters::MEMPOOL_SERVICE_BYTES_GET_BLOCK.observe(total_bytes as f64);
         for transaction in &block {
-            self.log_latency(
-                transaction.sender(),
-                transaction.sequence_number(),
-                counters::CONSENSUS_PULLED_LABEL,
-            );
+            self.log_consensus_pulled_latency(transaction.sender(), transaction.sequence_number());
         }
         block
     }

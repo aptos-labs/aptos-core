@@ -13,13 +13,16 @@ use crate::{
         TransactionOutputsWithProofRequest, TransactionsOrOutputsWithProofRequest,
         TransactionsWithProofRequest,
     },
+    dynamic_prefetching::DynamicPrefetchingState,
     error::Error,
     logging::{LogEntry, LogEvent, LogSchema},
     metrics,
     metrics::{increment_counter, increment_counter_multiple_labels, start_timer},
     stream_engine::{DataStreamEngine, StreamEngine},
     streaming_client::{NotificationFeedback, StreamRequest},
+    streaming_service::StreamUpdateNotification,
 };
+use aptos_channels::aptos_channel;
 use aptos_config::config::{AptosDataClientConfig, DataStreamingServiceConfig};
 use aptos_data_client::{
     global_summary::{AdvertisedData, GlobalDataSummary},
@@ -77,6 +80,10 @@ pub struct DataStream<T> {
     // The engine for this data stream
     stream_engine: StreamEngine,
 
+    // The stream update notifier (to notify the streaming service that
+    // the stream has been updated, e.g., data is now ready to be processed).
+    stream_update_notifier: aptos_channel::Sender<(), StreamUpdateNotification>,
+
     // The current queue of data client requests and pending responses. When the
     // request at the head of the queue completes (i.e., we receive a response),
     // a data notification can be created and sent along the stream.
@@ -113,6 +120,9 @@ pub struct DataStream<T> {
 
     // The time service to track elapsed time (e.g., during stream lag checks)
     time_service: TimeService,
+
+    // The dynamic prefetching state (if enabled)
+    dynamic_prefetching_state: DynamicPrefetchingState,
 }
 
 impl<T: AptosDataClientInterface + Send + Clone + 'static> DataStream<T> {
@@ -121,6 +131,7 @@ impl<T: AptosDataClientInterface + Send + Clone + 'static> DataStream<T> {
         data_stream_config: DataStreamingServiceConfig,
         data_stream_id: DataStreamId,
         stream_request: &StreamRequest,
+        stream_update_notifier: aptos_channel::Sender<(), StreamUpdateNotification>,
         aptos_data_client: T,
         notification_id_generator: Arc<U64IdGenerator>,
         advertised_data: &AdvertisedData,
@@ -134,6 +145,10 @@ impl<T: AptosDataClientInterface + Send + Clone + 'static> DataStream<T> {
         // Create a new stream engine
         let stream_engine = StreamEngine::new(data_stream_config, stream_request, advertised_data)?;
 
+        // Create the dynamic prefetching state
+        let dynamic_prefetching_state =
+            DynamicPrefetchingState::new(data_stream_config, time_service.clone());
+
         // Create a new data stream
         let data_stream = Self {
             data_client_config,
@@ -141,6 +156,7 @@ impl<T: AptosDataClientInterface + Send + Clone + 'static> DataStream<T> {
             data_stream_id,
             aptos_data_client,
             stream_engine,
+            stream_update_notifier,
             sent_data_requests: None,
             spawned_tasks: vec![],
             notifications_to_responses: BTreeMap::new(),
@@ -151,6 +167,7 @@ impl<T: AptosDataClientInterface + Send + Clone + 'static> DataStream<T> {
             send_failure: false,
             subscription_stream_lag: None,
             time_service,
+            dynamic_prefetching_state,
         };
 
         Ok((data_stream, data_stream_listener))
@@ -247,38 +264,38 @@ impl<T: AptosDataClientInterface + Send + Clone + 'static> DataStream<T> {
         Ok(())
     }
 
-    /// Returns the maximum number of concurrent requests that can be executing
-    /// at any given time.
-    fn get_max_concurrent_requests(&self) -> u64 {
-        match self.stream_engine {
-            StreamEngine::StateStreamEngine(_) => {
-                self.streaming_service_config.max_concurrent_state_requests
-            },
-            _ => self.streaming_service_config.max_concurrent_requests,
-        }
-    }
-
-    /// Creates and sends a batch of aptos data client requests to the network
+    /// Creates and sends a batch of data client requests to the network
     fn create_and_send_client_requests(
         &mut self,
         global_data_summary: &GlobalDataSummary,
     ) -> Result<(), Error> {
-        // Determine how many requests (at most) can be sent to the network
-        let num_sent_requests = self.get_sent_data_requests()?.len() as u64;
-        let max_concurrent_requests = self.get_max_concurrent_requests();
-        let max_num_requests_to_send = max_concurrent_requests
-            .checked_sub(num_sent_requests)
-            .ok_or_else(|| {
-                Error::IntegerOverflow("Max number of requests to send has overflown!".into())
-            })?;
+        // Calculate the number of in-flight requests (i.e., requests that haven't completed)
+        let num_pending_requests = self.get_num_pending_data_requests()?;
+        let num_complete_pending_requests = self.get_num_complete_pending_requests()?;
+        let num_in_flight_requests =
+            num_pending_requests.saturating_sub(num_complete_pending_requests);
 
-        // Send the client requests
+        // Calculate the max number of requests that can be sent now
+        let max_pending_requests = self.streaming_service_config.max_pending_requests;
+        let max_num_requests_to_send = max_pending_requests.saturating_sub(num_pending_requests);
+
+        // Send the client requests iff we have enough room in the queue
         if max_num_requests_to_send > 0 {
+            // Get the max number of in-flight requests from the prefetching state
+            let max_in_flight_requests = self
+                .dynamic_prefetching_state
+                .get_max_concurrent_requests(&self.stream_engine);
+
+            // Create the client requests
             let client_requests = self.stream_engine.create_data_client_requests(
                 max_num_requests_to_send,
+                max_in_flight_requests,
+                num_in_flight_requests,
                 global_data_summary,
                 self.notification_id_generator.clone(),
             )?;
+
+            // Add the client requests to the sent data requests queue
             for client_request in &client_requests {
                 // Send the client request
                 let pending_client_response =
@@ -289,6 +306,7 @@ impl<T: AptosDataClientInterface + Send + Clone + 'static> DataStream<T> {
                     .push_back(pending_client_response);
             }
 
+            // Log the number of sent data requests
             sample!(
                 SampleRate::Duration(Duration::from_secs(SENT_REQUESTS_LOG_FREQ_SECS)),
                 debug!(
@@ -303,8 +321,9 @@ impl<T: AptosDataClientInterface + Send + Clone + 'static> DataStream<T> {
             );
         }
 
-        // Update the counters for the pending response queue
-        metrics::set_pending_data_responses(self.get_sent_data_requests()?.len());
+        // Update the counters for the complete and pending responses
+        metrics::set_complete_pending_data_responses(num_complete_pending_requests);
+        metrics::set_pending_data_responses(self.get_num_pending_data_requests()?);
 
         Ok(())
     }
@@ -362,18 +381,23 @@ impl<T: AptosDataClientInterface + Send + Clone + 'static> DataStream<T> {
 
         // Send the request to the network
         let join_handle = spawn_request_task(
+            self.data_stream_id,
             data_client_request,
             self.aptos_data_client.clone(),
             pending_client_response.clone(),
             request_timeout_ms,
+            self.stream_update_notifier.clone(),
         );
         self.spawned_tasks.push(join_handle);
 
         pending_client_response
     }
 
-    // TODO(joshlind): this function shouldn't be blocking when trying to send! If there are
-    // multiple streams, a single blocked stream could cause them all to block.
+    // TODO(joshlind): this function shouldn't be blocking when trying to send.
+    // If there are multiple streams, a single blocked stream could cause them
+    // all to block. This is acceptable for now (because there is only ever
+    // a single stream in use by the driver) but it should be fixed if we want
+    // to generalize this for multiple streams.
     async fn send_data_notification(
         &mut self,
         data_notification: DataNotification,
@@ -402,10 +426,7 @@ impl<T: AptosDataClientInterface + Send + Clone + 'static> DataStream<T> {
     async fn send_end_of_stream_notification(&mut self) -> Result<(), Error> {
         // Create end of stream notification
         let notification_id = self.notification_id_generator.next();
-        let data_notification = DataNotification {
-            notification_id,
-            data_payload: DataPayload::EndOfStream,
-        };
+        let data_notification = DataNotification::new(notification_id, DataPayload::EndOfStream);
 
         // Send the data notification
         info!(
@@ -434,85 +455,89 @@ impl<T: AptosDataClientInterface + Send + Clone + 'static> DataStream<T> {
             return Ok(()); // There's nothing left to do
         }
 
-        // Process any ready data responses
-        for _ in 0..self.get_max_concurrent_requests() {
-            if let Some(pending_response) = self.pop_pending_response_queue()? {
-                // Get the client request and response information
-                let maybe_client_response = pending_response.lock().client_response.take();
-                let client_response = maybe_client_response.ok_or_else(|| {
-                    Error::UnexpectedErrorEncountered("The client response should be ready!".into())
-                })?;
-                let client_request = &pending_response.lock().client_request.clone();
+        // Continuously process any ready data responses
+        while let Some(pending_response) = self.pop_pending_response_queue()? {
+            // Get the client request and response information
+            let maybe_client_response = pending_response.lock().client_response.take();
+            let client_response = maybe_client_response.ok_or_else(|| {
+                Error::UnexpectedErrorEncountered("The client response should be ready!".into())
+            })?;
+            let client_request = &pending_response.lock().client_request.clone();
 
-                // Process the client response
-                match client_response {
-                    Ok(client_response) => {
-                        // Sanity check and process the response
-                        if sanity_check_client_response_type(client_request, &client_response) {
-                            // The response is valid, send the data notification to the client
-                            let client_response_payload = client_response.payload.clone();
-                            self.send_data_notification_to_client(client_request, client_response)
-                                .await?;
-
-                            // If the response wasn't enough to satisfy the original request (e.g.,
-                            // it was truncated), missing data should be requested.
-                            match self
-                                .request_missing_data(client_request, &client_response_payload)
-                            {
-                                Ok(missing_data_requested) => {
-                                    if missing_data_requested {
-                                        break; // We're now head of line blocked on the missing data
-                                    }
-                                },
-                                Err(error) => {
-                                    warn!(LogSchema::new(LogEntry::ReceivedDataResponse)
-                                        .stream_id(self.data_stream_id)
-                                        .event(LogEvent::Error)
-                                        .error(&error)
-                                        .message(
-                                            "Failed to determine if missing data was requested!"
-                                        ));
-                                },
-                            }
-
-                            // If the request was a subscription request and the subscription
-                            // stream is lagging behind the data advertisements, the stream
-                            // engine should be notified (e.g., so that it can catch up).
-                            if client_request.is_subscription_request() {
-                                if let Err(error) = self.check_subscription_stream_lag(
-                                    &global_data_summary,
-                                    &client_response_payload,
-                                ) {
-                                    self.notify_new_data_request_error(client_request, error)?;
-                                    break; // We're now head of line blocked on the failed stream
+            // Process the client response
+            match client_response {
+                Ok(client_response) => {
+                    // Sanity check and process the response
+                    if sanity_check_client_response_type(client_request, &client_response) {
+                        // If the response wasn't enough to satisfy the original request (e.g.,
+                        // it was truncated), missing data should be requested.
+                        let mut head_of_line_blocked = false;
+                        match self.request_missing_data(client_request, &client_response.payload) {
+                            Ok(missing_data_requested) => {
+                                if missing_data_requested {
+                                    head_of_line_blocked = true; // We're now head of line blocked on the missing data
                                 }
+                            },
+                            Err(error) => {
+                                warn!(LogSchema::new(LogEntry::ReceivedDataResponse)
+                                    .stream_id(self.data_stream_id)
+                                    .event(LogEvent::Error)
+                                    .error(&error)
+                                    .message("Failed to determine if missing data was requested!"));
+                            },
+                        }
+
+                        // If the request was a subscription request and the subscription
+                        // stream is lagging behind the data advertisements, the stream
+                        // engine should be notified (e.g., so that it can catch up).
+                        if client_request.is_subscription_request() {
+                            if let Err(error) = self.check_subscription_stream_lag(
+                                &global_data_summary,
+                                &client_response.payload,
+                            ) {
+                                self.notify_new_data_request_error(client_request, error)?;
+                                head_of_line_blocked = true; // We're now head of line blocked on the failed stream
                             }
-                        } else {
-                            // The sanity check failed
-                            self.handle_sanity_check_failure(
-                                client_request,
-                                &client_response.context,
-                            )?;
-                            break; // We're now head of line blocked on the failed request
                         }
-                    },
-                    Err(error) => {
-                        // Handle the error depending on the request type
-                        if client_request.is_subscription_request()
-                            || client_request.is_optimistic_fetch_request()
-                        {
-                            // The request was for new data. We should notify the
-                            // stream engine and clear the requests queue.
-                            self.notify_new_data_request_error(client_request, error)?;
-                        } else {
-                            // Otherwise, we should handle the error and simply retry
-                            self.handle_data_client_error(client_request, &error)?;
+
+                        // The response is valid, send the data notification to the client
+                        self.send_data_notification_to_client(client_request, client_response)
+                            .await?;
+
+                        // If the request is for specific data, increase the prefetching limit.
+                        // Note: we don't increase the limit for new data requests because
+                        // those don't invoke the prefetcher (as we're already up-to-date).
+                        if !client_request.is_new_data_request() {
+                            self.dynamic_prefetching_state
+                                .increase_max_concurrent_requests();
                         }
+
+                        // If we're head of line blocked, we should return early
+                        if head_of_line_blocked {
+                            break;
+                        }
+                    } else {
+                        // The sanity check failed
+                        self.handle_sanity_check_failure(client_request, &client_response.context)?;
                         break; // We're now head of line blocked on the failed request
-                    },
-                }
-            } else {
-                break; // The first response hasn't arrived yet
+                    }
+                },
+                Err(error) => {
+                    // Handle the error depending on the request type
+                    if client_request.is_new_data_request() {
+                        // The request was for new data. We should notify the
+                        // stream engine and clear the requests queue.
+                        self.notify_new_data_request_error(client_request, error)?;
+                    } else {
+                        // Decrease the prefetching limit on an error
+                        self.dynamic_prefetching_state
+                            .decrease_max_concurrent_requests();
+
+                        // Handle the error and simply retry
+                        self.handle_data_client_error(client_request, &error)?;
+                    }
+                    break; // We're now head of line blocked on the failed request
+                },
             }
         }
 
@@ -686,6 +711,7 @@ impl<T: AptosDataClientInterface + Send + Clone + 'static> DataStream<T> {
         data_client_request: &DataClientRequest,
         data_client_error: &aptos_data_client::error::Error,
     ) -> Result<(), Error> {
+        // Log the error
         warn!(LogSchema::new(LogEntry::ReceivedDataResponse)
             .stream_id(self.data_stream_id)
             .event(LogEvent::Error)
@@ -752,6 +778,13 @@ impl<T: AptosDataClientInterface + Send + Clone + 'static> DataStream<T> {
                 self.notification_id_generator.clone(),
             )?
         {
+            // Update the metrics for the data notification send latency
+            metrics::observe_duration(
+                &metrics::DATA_NOTIFICATION_SEND_LATENCY,
+                data_client_request.get_label(),
+                response_context.creation_time,
+            );
+
             // Save the response context for this notification ID
             let notification_id = data_notification.notification_id;
             self.insert_notification_response_mapping(notification_id, response_context)?;
@@ -849,6 +882,28 @@ impl<T: AptosDataClientInterface + Send + Clone + 'static> DataStream<T> {
             )));
         }
         Ok(())
+    }
+
+    /// Returns the number of pending requests in the sent data requests queue
+    /// that have already completed (i.e., are no longer in-flight).
+    fn get_num_complete_pending_requests(&mut self) -> Result<u64, Error> {
+        let mut num_complete_pending_requests = 0;
+        for sent_data_request in self.get_sent_data_requests()? {
+            if let Some(client_response) = sent_data_request.lock().client_response.as_ref() {
+                if client_response.is_ok() {
+                    // Only count successful responses as complete. Failures will be retried
+                    num_complete_pending_requests += 1;
+                }
+            }
+        }
+        Ok(num_complete_pending_requests)
+    }
+
+    /// Returns the number of pending requests in the sent data requests queue
+    fn get_num_pending_data_requests(&mut self) -> Result<u64, Error> {
+        let pending_data_requests = self.get_sent_data_requests()?;
+        let num_pending_data_requests = pending_data_requests.len() as u64;
+        Ok(num_pending_data_requests)
     }
 
     /// Assumes the caller has already verified that `sent_data_requests` has
@@ -1352,10 +1407,12 @@ fn extract_response_error(
 }
 
 fn spawn_request_task<T: AptosDataClientInterface + Send + Clone + 'static>(
+    data_stream_id: DataStreamId,
     data_client_request: DataClientRequest,
     aptos_data_client: T,
     pending_response: PendingClientResponse,
     request_timeout_ms: u64,
+    stream_update_notifier: aptos_channel::Sender<(), StreamUpdateNotification>,
 ) -> JoinHandle<()> {
     // Update the requests sent counter
     increment_counter(
@@ -1454,6 +1511,10 @@ fn spawn_request_task<T: AptosDataClientInterface + Send + Clone + 'static>(
 
         // Save the response
         pending_response.lock().client_response = Some(client_response);
+
+        // Send a notification via the stream update notifier
+        let stream_update_notification = StreamUpdateNotification::new(data_stream_id);
+        let _ = stream_update_notifier.push((), stream_update_notification);
     })
 }
 
@@ -1668,4 +1729,65 @@ async fn subscribe_to_transactions_or_outputs_with_proof<
     );
     let (context, payload) = client_response.await?.into_parts();
     Ok(Response::new(context, ResponsePayload::try_from(payload)?))
+}
+
+#[cfg(test)]
+mod test {
+    use super::*;
+    use crate::tests::utils::MockAptosDataClient;
+    use aptos_channels::message_queues::QueueStyle;
+    use futures::StreamExt;
+    use tokio::time::timeout;
+
+    #[tokio::test]
+    async fn completed_request_notifies_streaming_service() {
+        // Create a data client request
+        let data_client_request =
+            DataClientRequest::NumberOfStates(NumberOfStatesRequest { version: 0 });
+
+        // Create a mock data client
+        let data_client_config = AptosDataClientConfig::default();
+        let aptos_data_client =
+            MockAptosDataClient::new(data_client_config, true, false, true, true);
+
+        // Create a new pending client response
+        let pending_client_response = Arc::new(Mutex::new(Box::new(
+            data_notification::PendingClientResponse::new(data_client_request.clone()),
+        )));
+
+        // Create a stream update notifier and listener
+        let (stream_update_notifier, mut stream_update_listener) =
+            aptos_channel::new(QueueStyle::LIFO, 1, None);
+
+        // Verify the request is still pending (the request hasn't been sent yet)
+        assert!(pending_client_response.lock().client_response.is_none());
+
+        // Spawn the request task
+        let data_stream_id = 10101;
+        let join_handle = spawn_request_task(
+            data_stream_id,
+            data_client_request,
+            aptos_data_client,
+            pending_client_response.clone(),
+            1000,
+            stream_update_notifier.clone(),
+        );
+
+        // Wait for the request to complete
+        join_handle.await.unwrap();
+
+        // Verify the request was completed and we now have a response
+        assert!(pending_client_response.lock().client_response.is_some());
+
+        // Verify that a stream update notification is received
+        match timeout(Duration::from_secs(5), stream_update_listener.next()).await {
+            Ok(Some(stream_update_notification)) => {
+                assert_eq!(stream_update_notification.data_stream_id, data_stream_id);
+            },
+            result => panic!(
+                "Stream update notification was not received! Result: {:?}",
+                result
+            ),
+        }
+    }
 }

@@ -154,7 +154,7 @@ object "A2_M" {
                         $t4 := v
                         // $t5 := ExternalResult::unwrap<Evm::Unit>($t4)
                         $t5 := A2_ExternalResult_unwrap$A2_Evm_Unit$($t4)
-                        // destroy($t5)
+                        // drop($t5)
                         $Free($t5, 1)
                         // goto L0
                         $block := 3

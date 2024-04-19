@@ -25,38 +25,6 @@ error: error happens when parsing the signature
 19 │ │     }
    │ ╰─────^
 
-error: error happens when parsing a simple type
-   ┌─ tests/test-dispatcher/signature-parsing-test/baseline/parsing_failure/IllegalTypeList.move:87:5
-   │
-87 │ ╭     fun illegal_address_1(_x: address) : u64 {
-88 │ │         0
-89 │ │     }
-   │ ╰─────^
-
-error: error happens when parsing a simple type
-   ┌─ tests/test-dispatcher/signature-parsing-test/baseline/parsing_failure/IllegalTypeList.move:92:5
-   │
-92 │ ╭     fun illegal_address_2(x: address) : address {
-93 │ │         x
-94 │ │     }
-   │ ╰─────^
-
-error: error happens when parsing a simple type
-   ┌─ tests/test-dispatcher/signature-parsing-test/baseline/parsing_failure/IllegalTypeList.move:77:5
-   │
-77 │ ╭     fun illegal_bytes_1(_v: vector<u8>) : u64 {
-78 │ │         0
-79 │ │     }
-   │ ╰─────^
-
-error: error happens when parsing a simple type
-   ┌─ tests/test-dispatcher/signature-parsing-test/baseline/parsing_failure/IllegalTypeList.move:82:5
-   │
-82 │ ╭     fun illegal_bytes_2(_v: vector<u8>) : u64 {
-83 │ │         0
-84 │ │     }
-   │ ╰─────^
-
 error: error happens when parsing the return types in the signature
    ┌─ tests/test-dispatcher/signature-parsing-test/baseline/parsing_failure/IllegalTypeList.move:24:5
    │
@@ -76,6 +44,38 @@ error: error happens when parsing the return types in the signature
    │
 32 │ ╭     fun illegal_char_3() {
 33 │ │     }
+   │ ╰─────^
+
+error: error happens when parsing the return types in the signature
+   ┌─ tests/test-dispatcher/signature-parsing-test/baseline/parsing_failure/IllegalTypeList.move:36:5
+   │
+36 │ ╭     fun no_bracket() : u64 {
+37 │ │         0
+38 │ │     }
+   │ ╰─────^
+
+error: error happens when parsing a simple type
+   ┌─ tests/test-dispatcher/signature-parsing-test/baseline/parsing_failure/IllegalTypeList.move:43:5
+   │
+43 │ ╭     fun illegal_int_1(_x: u8) : u64 {
+44 │ │         0
+45 │ │     }
+   │ ╰─────^
+
+error: error happens when parsing a simple type
+   ┌─ tests/test-dispatcher/signature-parsing-test/baseline/parsing_failure/IllegalTypeList.move:48:5
+   │
+48 │ ╭     fun illegal_int_2(_x: u8) : u64 {
+49 │ │         0
+50 │ │     }
+   │ ╰─────^
+
+error: error happens when parsing a simple type
+   ┌─ tests/test-dispatcher/signature-parsing-test/baseline/parsing_failure/IllegalTypeList.move:53:5
+   │
+53 │ ╭     fun illegal_int_3(_x: u8) : u64 {
+54 │ │         0
+55 │ │     }
    │ ╰─────^
 
 error: error happens when parsing a simple type
@@ -109,33 +109,33 @@ error: error happens when parsing the signature
    │ ╰─────^
 
 error: error happens when parsing a simple type
-   ┌─ tests/test-dispatcher/signature-parsing-test/baseline/parsing_failure/IllegalTypeList.move:43:5
+   ┌─ tests/test-dispatcher/signature-parsing-test/baseline/parsing_failure/IllegalTypeList.move:77:5
    │
-43 │ ╭     fun illegal_int_1(_x: u8) : u64 {
-44 │ │         0
-45 │ │     }
+77 │ ╭     fun illegal_bytes_1(_v: vector<u8>) : u64 {
+78 │ │         0
+79 │ │     }
    │ ╰─────^
 
 error: error happens when parsing a simple type
-   ┌─ tests/test-dispatcher/signature-parsing-test/baseline/parsing_failure/IllegalTypeList.move:48:5
+   ┌─ tests/test-dispatcher/signature-parsing-test/baseline/parsing_failure/IllegalTypeList.move:82:5
    │
-48 │ ╭     fun illegal_int_2(_x: u8) : u64 {
-49 │ │         0
-50 │ │     }
+82 │ ╭     fun illegal_bytes_2(_v: vector<u8>) : u64 {
+83 │ │         0
+84 │ │     }
    │ ╰─────^
 
 error: error happens when parsing a simple type
-   ┌─ tests/test-dispatcher/signature-parsing-test/baseline/parsing_failure/IllegalTypeList.move:53:5
+   ┌─ tests/test-dispatcher/signature-parsing-test/baseline/parsing_failure/IllegalTypeList.move:87:5
    │
-53 │ ╭     fun illegal_int_3(_x: u8) : u64 {
-54 │ │         0
-55 │ │     }
+87 │ ╭     fun illegal_address_1(_x: address) : u64 {
+88 │ │         0
+89 │ │     }
    │ ╰─────^
 
-error: error happens when parsing the return types in the signature
-   ┌─ tests/test-dispatcher/signature-parsing-test/baseline/parsing_failure/IllegalTypeList.move:36:5
+error: error happens when parsing a simple type
+   ┌─ tests/test-dispatcher/signature-parsing-test/baseline/parsing_failure/IllegalTypeList.move:92:5
    │
-36 │ ╭     fun no_bracket() : u64 {
-37 │ │         0
-38 │ │     }
+92 │ ╭     fun illegal_address_2(x: address) : address {
+93 │ │         x
+94 │ │     }
    │ ╰─────^

@@ -6,10 +6,9 @@ use crate::{
     quorum_store::{
         batch_store::BatchReader,
         proof_coordinator::{ProofCoordinator, ProofCoordinatorCommand},
-        tests::utils::create_vec_signed_transactions,
         types::Batch,
     },
-    test_utils::mock_quorum_store_sender::MockQuorumStoreSender,
+    test_utils::{create_vec_signed_transactions, mock_quorum_store_sender::MockQuorumStoreSender},
 };
 use aptos_consensus_types::proof_of_store::{
     BatchId, ProofOfStore, SignedBatchInfo, SignedBatchInfoMsg,
@@ -19,6 +18,7 @@ use aptos_executor_types::ExecutorResult;
 use aptos_types::{
     transaction::SignedTransaction, validator_verifier::random_validator_verifier, PeerId,
 };
+use mini_moka::sync::Cache;
 use std::sync::Arc;
 use tokio::sync::{mpsc::channel, oneshot::Receiver};
 
@@ -32,7 +32,11 @@ impl BatchReader for MockBatchReader {
     }
 
     fn get_batch(&self, _proof: ProofOfStore) -> Receiver<ExecutorResult<Vec<SignedTransaction>>> {
-        unimplemented!();
+        unimplemented!()
+    }
+
+    fn update_certified_timestamp(&self, _certified_time: u64) {
+        unimplemented!()
     }
 }
 
@@ -41,6 +45,7 @@ async fn test_proof_coordinator_basic() {
     aptos_logger::Logger::init_for_testing();
     let (signers, verifier) = random_validator_verifier(4, None, true);
     let (tx, _rx) = channel(100);
+    let proof_cache = Cache::builder().build();
     let proof_coordinator = ProofCoordinator::new(
         100,
         signers[0].author(),
@@ -48,6 +53,8 @@ async fn test_proof_coordinator_basic() {
             peer: signers[0].author(),
         }),
         tx,
+        proof_cache.clone(),
+        true,
     );
     let (proof_coordinator_tx, proof_coordinator_rx) = channel(100);
     let (tx, mut rx) = channel(100);
@@ -75,7 +82,7 @@ async fn test_proof_coordinator_basic() {
         msg => panic!("Expected LocalProof but received: {:?}", msg),
     };
     // check normal path
-    assert!(proof_msg.verify(100, &verifier).is_ok());
+    assert!(proof_msg.verify(100, &verifier, &proof_cache).is_ok());
     let proofs = proof_msg.take();
     assert_eq!(proofs[0].digest(), digest);
 }

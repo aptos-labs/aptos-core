@@ -17,7 +17,7 @@ use move_model::{
         CONDITION_SUSPENDABLE_PROP, DELEGATE_INVARIANTS_TO_CALLER_PRAGMA,
         DISABLE_INVARIANTS_IN_BODY_PRAGMA, VERIFY_PRAGMA,
     },
-    ty::{TypeUnificationAdapter, Variance},
+    ty::{NoUnificationContext, TypeUnificationAdapter, Variance},
 };
 use move_stackless_bytecode::{
     function_target::{FunctionData, FunctionTarget},
@@ -349,6 +349,14 @@ impl FunctionTargetProcessor for VerificationAnalysisProcessor {
 impl VerificationAnalysisProcessor {
     /// Check whether the function falls within the verification scope given in the options
     fn is_within_verification_scope(fun_env: &FunctionEnv) -> bool {
+        if fun_env.is_test_only()
+            || fun_env.is_intrinsic()
+            || fun_env.is_native()
+            || fun_env.is_inline()
+        {
+            // do not verify any of these function types
+            return false;
+        }
         let env = fun_env.module_env.env;
         let options = ProverOptions::get(env);
         match &options.verify_scope {
@@ -584,7 +592,11 @@ impl VerificationAnalysisProcessor {
                     }
                     let adapter =
                         TypeUnificationAdapter::new_vec(&fun_mem.inst, &inv_mem.inst, true, true);
-                    let rel = adapter.unify(Variance::SpecVariance, /* shallow_subst */ false);
+                    let rel = adapter.unify(
+                        &mut NoUnificationContext,
+                        Variance::SpecVariance,
+                        /* shallow_subst */ false,
+                    );
                     if rel.is_some() {
                         inv_accessed.insert(inv.id);
 

@@ -7,7 +7,7 @@ use crate::{
     borrow_analysis,
     function_target_pipeline::FunctionVariant,
     livevar_analysis, reaching_def_analysis,
-    stackless_bytecode::{AttrId, Bytecode, Label},
+    stackless_bytecode::{AttrId, Bytecode, Label, Operation},
 };
 use itertools::Itertools;
 use move_binary_format::file_format::{CodeOffset, Visibility};
@@ -15,6 +15,7 @@ use move_model::{
     ast::{Exp, ExpData, Spec, TempIndex},
     model::{
         FunId, FunctionEnv, GlobalEnv, Loc, ModuleEnv, QualifiedId, QualifiedInstId, StructId,
+        TypeParameter,
     },
     symbol::{Symbol, SymbolPool},
     ty::{Type, TypeDisplayContext},
@@ -87,6 +88,8 @@ pub struct FunctionData {
     pub modify_targets: BTreeMap<QualifiedId<StructId>, Vec<Exp>>,
     /// The number of ghost type parameters introduced in order to instantiate related invariants
     pub ghost_type_param_count: usize,
+    /// A map for temporaries to associated name, if available.
+    pub local_names: BTreeMap<TempIndex, Symbol>,
 }
 
 impl<'env> FunctionTarget<'env> {
@@ -170,6 +173,11 @@ impl<'env> FunctionTarget<'env> {
         self.func_env.is_mutating()
     }
 
+    /// Returns the type parameters of this function.
+    pub fn get_type_parameters(&self) -> Vec<TypeParameter> {
+        self.func_env.get_type_parameters()
+    }
+
     /// Returns the number of type parameters associated with this function, this includes both
     /// the defined type parameters and the ghost type parameters.
     ///
@@ -207,9 +215,16 @@ impl<'env> FunctionTarget<'env> {
     /// Get the name to be used for a local. If the local has a user name, use that for naming,
     /// otherwise generate a unique name.
     pub fn get_local_name(&self, idx: usize) -> Symbol {
-        self.func_env
-            .get_local_name(idx)
-            .expect("compiled module available")
+        if let Some(name) = self.data.local_names.get(&idx) {
+            *name
+        } else {
+            self.func_env.get_local_name(idx)
+        }
+    }
+
+    /// Get a raw name for a local, using its index.
+    pub fn get_local_raw_name(&self, idx: TempIndex) -> Symbol {
+        self.global_env().symbol_pool().make(&format!("$t{}", idx))
     }
 
     /// Return true if this local has a user name.
@@ -247,6 +262,25 @@ impl<'env> FunctionTarget<'env> {
         self.func_env
             .is_temporary(idx)
             .expect("compiled module available")
+    }
+
+    /// Returns a printable name for a local. If the local is a temporary which has
+    /// no name, returns `local`, otherwise `local <name>`. The returned value
+    /// should produce correct English whether a name is available or not.
+    pub fn get_local_name_for_error_message(&self, temp: TempIndex) -> String {
+        if let Some(sym) = self.data.local_names.get(&temp) {
+            format!("local `{}`", sym.display(self.global_env().symbol_pool()))
+        } else {
+            "value".to_owned()
+        }
+    }
+
+    /// Returns a name for a local if it is printable
+    pub fn get_local_name_opt(&self, temp: TempIndex) -> Option<String> {
+        self.data
+            .local_names
+            .get(&temp)
+            .map(|sym| sym.display(self.global_env().symbol_pool()).to_string())
     }
 
     /// Gets the type of the local at index. This must use an index in the range as determined by
@@ -347,12 +381,55 @@ impl<'env> FunctionTarget<'env> {
         res
     }
 
+    /// Get the set of locals which need to be pinned (cannot be eliminated) as they are borrowed
+    /// from or used in specs. If `include_drop` is true, we also include temps which are dropped.
+    pub fn get_pinned_temps(&self, include_drop: bool) -> BTreeSet<TempIndex> {
+        let mut result = BTreeSet::new();
+        for bc in self.get_bytecode() {
+            match bc {
+                Bytecode::Call(_, _, Operation::BorrowLoc, args, _) => {
+                    result.insert(args[0]);
+                },
+                Bytecode::Call(_, _, Operation::Drop, args, _) if include_drop => {
+                    result.insert(args[0]);
+                },
+                Bytecode::SpecBlock(_, spec) => {
+                    // All Temporaries used in specs need to be pinned.
+                    result.append(&mut spec.used_temporaries());
+                },
+                Bytecode::Prop(_, _, exp) => {
+                    result.append(&mut exp.used_temporaries());
+                },
+                _ => {},
+            }
+        }
+        result
+    }
+
+    /// Returns all the mentioned locals (in non-spec-only bytecode instructions).
+    pub fn get_mentioned_locals(&self) -> BTreeSet<TempIndex> {
+        let mut res = BTreeSet::new();
+        for bc in self.get_bytecode() {
+            if bc.is_spec_only() {
+                continue;
+            }
+            bc.sources()
+                .iter()
+                .chain(bc.dests().iter())
+                .for_each(|local| {
+                    res.insert(*local);
+                });
+        }
+        res
+    }
+
     /// Pretty print a bytecode instruction with offset, comments, annotations, and VC information.
     pub fn pretty_print_bytecode(
         &self,
         label_offsets: &BTreeMap<Label, CodeOffset>,
         offset: usize,
         code: &Bytecode,
+        verbose: bool,
     ) -> String {
         let mut texts = vec![];
 
@@ -360,6 +437,14 @@ impl<'env> FunctionTarget<'env> {
         let attr_id = code.get_attr_id();
         if let Some(comment) = self.get_debug_comment(attr_id) {
             texts.push(format!("     # {}", comment));
+        }
+
+        // add location
+        if verbose {
+            texts.push(format!(
+                "     # {}",
+                self.get_bytecode_loc(attr_id).display(self.global_env())
+            ));
         }
 
         // add annotations
@@ -412,6 +497,7 @@ impl FunctionData {
         acquires_global_resources: Vec<StructId>,
         loop_unrolling: BTreeMap<AttrId, usize>,
         loop_invariants: BTreeSet<AttrId>,
+        local_names: BTreeMap<TempIndex, Symbol>,
     ) -> Self {
         let modify_targets = func_env.get_modify_targets();
         FunctionData {
@@ -430,6 +516,7 @@ impl FunctionData {
             name_to_index,
             modify_targets,
             ghost_type_param_count: 0,
+            local_names,
         }
     }
 
@@ -640,17 +727,25 @@ impl<'env> fmt::Display for FunctionTarget<'env> {
             writeln!(f, ";")?;
         } else {
             writeln!(f, " {{")?;
+            let verification = self.data.variant.is_verified();
+            let mentioned_locals = self.get_mentioned_locals();
             for i in self.get_parameter_count()..self.get_local_count() {
                 write!(f, "     var ")?;
                 write_decl(f, i)?;
+                if !verification && !mentioned_locals.contains(&i) {
+                    // We do not display unused annotation in verification mode.
+                    write!(f, " [unused]")?;
+                }
                 writeln!(f)?;
             }
             let label_offsets = Bytecode::label_offsets(self.get_bytecode());
             for (offset, code) in self.get_bytecode().iter().enumerate() {
+                // use `f.alternate()` to determine verbose print; its activated by `{:#}` instead of `{}`
+                // in the format string
                 writeln!(
                     f,
                     "{}",
-                    self.pretty_print_bytecode(&label_offsets, offset, code)
+                    self.pretty_print_bytecode(&label_offsets, offset, code, f.alternate())
                 )?;
             }
             writeln!(f, "}}")?;

@@ -21,6 +21,7 @@ use crate::{
     spec_translator::SpecTranslator,
 };
 use codespan::LineIndex;
+use codespan_reporting::diagnostic::Severity;
 use itertools::Itertools;
 #[allow(unused_imports)]
 use log::{debug, info, log, warn, Level};
@@ -49,7 +50,7 @@ use move_stackless_bytecode::{
     function_target::FunctionTarget,
     function_target_pipeline::{FunctionTargetsHolder, FunctionVariant, VerificationFlavor},
     stackless_bytecode::{
-        AbortAction, BorrowEdge, BorrowNode, Bytecode, Constant, HavocKind, IndexEdgeKind,
+        AbortAction, AttrId, BorrowEdge, BorrowNode, Bytecode, Constant, HavocKind, IndexEdgeKind,
         Operation, PropKind,
     },
 };
@@ -268,7 +269,8 @@ impl<'env> BoogieTranslator<'env> {
             }
 
             for ref fun_env in module_env.get_functions() {
-                if fun_env.is_native_or_intrinsic() || fun_env.is_inline() {
+                if fun_env.is_native_or_intrinsic() || fun_env.is_inline() || fun_env.is_test_only()
+                {
                     continue;
                 }
                 for (variant, ref fun_target) in self.targets.get_targets(fun_env) {
@@ -1117,7 +1119,7 @@ impl<'env> FunctionTranslator<'env> {
             Call(_, dests, oper, srcs, aa) => {
                 use Operation::*;
                 match oper {
-                    FreezeRef => unreachable!(),
+                    FreezeRef(_) => unreachable!(),
                     UnpackRef | UnpackRefDeep | PackRef | PackRefDeep => {
                         // No effect
                     },
@@ -1470,6 +1472,7 @@ impl<'env> FunctionTranslator<'env> {
                         let src_str = str_local(srcs[0]);
                         let dest_str = str_local(dests[0]);
                         let struct_env = env.get_module(*mid).into_struct(*sid);
+                        self.check_intrinsic_select(attr_id, &struct_env);
                         let field_env = &struct_env.get_field_by_offset(*field_offset);
                         let field_sel = boogie_field_sel(field_env);
                         emitln!(
@@ -1487,6 +1490,7 @@ impl<'env> FunctionTranslator<'env> {
                         let mut src_str = str_local(src);
                         let dest_str = str_local(dests[0]);
                         let struct_env = env.get_module(*mid).into_struct(*sid);
+                        self.check_intrinsic_select(attr_id, &struct_env);
                         let field_env = &struct_env.get_field_by_offset(*field_offset);
                         let field_sel = boogie_field_sel(field_env);
                         if self.get_local_type(src).is_reference() {
@@ -2176,7 +2180,7 @@ impl<'env> FunctionTranslator<'env> {
                     Uninit => {
                         emitln!(writer, "assume $t{}->l == $Uninitialized();", srcs[0]);
                     },
-                    Destroy => {},
+                    Drop | Release => {},
                     TraceLocal(idx) => {
                         let num_oper = global_state
                             .get_temp_index_oper(mid, fid, srcs[0], baseline_flag)
@@ -2242,6 +2246,11 @@ impl<'env> FunctionTranslator<'env> {
                 emitln!(writer, "return;")
             },
             Nop(..) => {},
+            SpecBlock(..) => {
+                // spec blocks should only appear in bytecode during compilation
+                // to Move bytecode, so bail out.
+                panic!("unexpected spec block")
+            },
         }
         emitln!(writer);
     }
@@ -2308,6 +2317,18 @@ impl<'env> FunctionTranslator<'env> {
                     update
                 );
             },
+        }
+    }
+
+    fn check_intrinsic_select(&self, attr_id: AttrId, struct_env: &StructEnv) {
+        if struct_env.is_intrinsic() && self.fun_target.global_env().generated_by_v2() {
+            // There is code in the framework which produces this warning.
+            // Only report if we are running v2.
+            self.parent.env.diag(
+                Severity::Warning,
+                &self.fun_target.get_bytecode_loc(attr_id),
+                "cannot select field of intrinsic struct",
+            )
         }
     }
 

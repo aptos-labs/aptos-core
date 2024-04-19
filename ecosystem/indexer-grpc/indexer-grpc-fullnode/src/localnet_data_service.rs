@@ -2,7 +2,7 @@
 // SPDX-License-Identifier: Apache-2.0
 
 use crate::{stream_coordinator::IndexerStreamCoordinator, ServiceContext};
-use aptos_logger::error;
+use aptos_logger::{error, info};
 use aptos_protos::{
     indexer::v1::{raw_data_server::RawData, GetTransactionsRequest, TransactionsResponse},
     internal::fullnode::v1::transactions_from_node_response,
@@ -63,6 +63,14 @@ impl RawData for LocalnetDataService {
             loop {
                 // Processes and sends batch of transactions to client
                 let results = coordinator.process_next_batch().await;
+                if results.is_empty() {
+                    info!(
+                        start_version = starting_version,
+                        chain_id = ledger_chain_id,
+                        "[Indexer Fullnode] Client disconnected."
+                    );
+                    break;
+                }
                 let max_version = match IndexerStreamCoordinator::get_max_batch_version(results) {
                     Ok(max_version) => max_version,
                     Err(e) => {

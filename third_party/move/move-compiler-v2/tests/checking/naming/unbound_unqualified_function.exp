@@ -11,3 +11,9 @@ error: no function named `bar` found
   │
 4 │         let x = bar();
   │                 ^^^^^
+
+error: no function named `bar` found
+  ┌─ tests/checking/naming/unbound_unqualified_function.move:5:10
+  │
+5 │         *bar() = 0;
+  │          ^^^^^

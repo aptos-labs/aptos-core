@@ -20,6 +20,7 @@ use getrandom::getrandom;
 use module_generation::generate_module;
 use move_binary_format::{
     access::ModuleAccess,
+    errors::PartialVMError,
     file_format::{
         AbilitySet, CompiledModule, FunctionDefinitionIndex, SignatureToken, StructHandleIndex,
     },
@@ -132,7 +133,7 @@ fn execute_function_in_module(
     idx: FunctionDefinitionIndex,
     ty_args: Vec<TypeTag>,
     args: Vec<Vec<u8>>,
-    storage: &impl MoveResolver,
+    storage: &impl MoveResolver<PartialVMError>,
 ) -> Result<(), VMStatus> {
     let module_id = module.self_id();
     let entry_name = {

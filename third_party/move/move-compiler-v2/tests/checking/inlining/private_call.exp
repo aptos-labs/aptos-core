@@ -1,0 +1,13 @@
+
+Diagnostics:
+error: function `0x42::m::bar` cannot be called from function `0x42::n::test` because it is private to module `0x42::m`
+   ┌─ tests/checking/inlining/private_call.move:7:9
+   │
+ 4 │         bar()
+   │         ----- called here
+   ·
+ 7 │     fun bar(): u64 { 42 }
+   │         ^^^ callee
+   ·
+14 │         assert!(m::foo() == 42, 1);
+   │                 -------- from a call inlined at this callsite

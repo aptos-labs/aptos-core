@@ -230,7 +230,8 @@ impl RunConfig {
     /// run by the Aptos CLI.
     pub fn build_for_cli(
         api_url: Url,
-        faucet_port: u16,
+        listen_address: String,
+        listen_port: u16,
         funder_key: FunderKeyEnum,
         do_not_delegate: bool,
         chain_id: Option<ChainId>,
@@ -241,8 +242,8 @@ impl RunConfig {
         };
         Self {
             server_config: ServerConfig {
-                listen_address: "0.0.0.0".to_string(),
-                listen_port: faucet_port,
+                listen_address,
+                listen_port,
                 api_path_base: "".to_string(),
             },
             metrics_server_config: MetricsServerConfig {
@@ -344,6 +345,7 @@ impl RunSimple {
             .context("Failed to load private key")?;
         let run_config = RunConfig::build_for_cli(
             self.api_connection_config.node_url.clone(),
+            self.listen_address.clone(),
             self.listen_port,
             FunderKeyEnum::Key(ConfigKey::new(key)),
             self.do_not_delegate,
@@ -604,14 +606,14 @@ mod test {
 
     #[tokio::test(flavor = "multi_thread", worker_threads = 2)]
     async fn test_redis_ratelimiter() -> Result<()> {
-        // Assert that a local testnet is alive.
+        // Assert that a localnet is alive.
         let aptos_node_api_client = aptos_sdk::rest_client::Client::new(
             reqwest::Url::from_str("http://127.0.0.1:8080").unwrap(),
         );
         aptos_node_api_client
             .get_index_bcs()
             .await
-            .context("Local testnet API couldn't be reached at port 8080, have you started one?")?;
+            .context("Localnet API couldn't be reached at port 8080, have you started one?")?;
 
         init();
         let config_content = include_str!("../../../configs/testing_redis.yaml");
@@ -687,7 +689,7 @@ mod test {
         // Create it on chain using the prod devnet faucet. We fund it with
         // exactly the minimum funds set in the config.
         let account_address =
-            AuthenticationKey::ed25519(&private_key.public_key()).derived_address();
+            AuthenticationKey::ed25519(&private_key.public_key()).account_address();
         unwrap_reqwest_result(
             reqwest::Client::new()
                 .post("https://faucet.devnet.aptoslabs.com/fund")
@@ -767,14 +769,14 @@ mod test {
 
     #[tokio::test(flavor = "multi_thread", worker_threads = 2)]
     async fn test_mint_funder() -> Result<()> {
-        // Assert that a local testnet is alive.
+        // Assert that a localnet is alive.
         let aptos_node_api_client = aptos_sdk::rest_client::Client::new(
             reqwest::Url::from_str("http://127.0.0.1:8080").unwrap(),
         );
         aptos_node_api_client
             .get_index_bcs()
             .await
-            .context("Local testnet API couldn't be reached at port 8080, have you started one?")?;
+            .context("Localnet API couldn't be reached at port 8080, have you started one?")?;
 
         init();
         let (port, _handle) = {
@@ -829,14 +831,14 @@ mod test {
 
     #[tokio::test(flavor = "multi_thread", worker_threads = 2)]
     async fn test_mint_funder_wait_for_txns() -> Result<()> {
-        // Assert that a local testnet is alive.
+        // Assert that a localnet is alive.
         let aptos_node_api_client = aptos_sdk::rest_client::Client::new(
             reqwest::Url::from_str("http://127.0.0.1:8080").unwrap(),
         );
         aptos_node_api_client
             .get_index_bcs()
             .await
-            .context("Local testnet API couldn't be reached at port 8080, have you started one?")?;
+            .context("Localnet API couldn't be reached at port 8080, have you started one?")?;
 
         init();
         let (port, _handle) = {
@@ -889,14 +891,14 @@ mod test {
     async fn test_maximum_amount_with_bypass() -> Result<()> {
         make_auth_tokens_file(&["test_token"])?;
 
-        // Assert that a local testnet is alive.
+        // Assert that a localnet is alive.
         let aptos_node_api_client = aptos_sdk::rest_client::Client::new(
             reqwest::Url::from_str("http://127.0.0.1:8080").unwrap(),
         );
         aptos_node_api_client
             .get_index_bcs()
             .await
-            .context("Local testnet API couldn't be reached at port 8080, have you started one?")?;
+            .context("Localnet API couldn't be reached at port 8080, have you started one?")?;
 
         init();
         let (port, _handle) = {

@@ -5,12 +5,12 @@ task 0 'print-bytecode'. lines 1-14:
 module cafe.Nop {
 
 
-nop_valid() {
+nop_valid() /* def_idx: 0 */ {
 B0:
 	0: Nop
 	1: Ret
 }
-nop_invalid() {
+nop_invalid() /* def_idx: 1 */ {
 B0:
 	0: Nop
 	1: Pop

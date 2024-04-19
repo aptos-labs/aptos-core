@@ -1,5 +1,5 @@
 
-<a name="0x1_smart_table"></a>
+<a id="0x1_smart_table"></a>
 
 # Module `0x1::smart_table`
 
@@ -76,7 +76,7 @@ it tolerates collisions.
 
 
 
-<a name="0x1_smart_table_Entry"></a>
+<a id="0x1_smart_table_Entry"></a>
 
 ## Struct `Entry`
 
@@ -116,7 +116,7 @@ SmartTable entry contains both the key and value.
 
 </details>
 
-<a name="0x1_smart_table_SmartTable"></a>
+<a id="0x1_smart_table_SmartTable"></a>
 
 ## Struct `SmartTable`
 
@@ -173,12 +173,12 @@ SmartTable entry contains both the key and value.
 
 </details>
 
-<a name="@Constants_0"></a>
+<a id="@Constants_0"></a>
 
 ## Constants
 
 
-<a name="0x1_smart_table_ENOT_EMPTY"></a>
+<a id="0x1_smart_table_ENOT_EMPTY"></a>
 
 Cannot destroy non-empty hashmap
 
@@ -188,7 +188,7 @@ Cannot destroy non-empty hashmap
 
 
 
-<a name="0x1_smart_table_ENOT_FOUND"></a>
+<a id="0x1_smart_table_ENOT_FOUND"></a>
 
 Key not found in the smart table
 
@@ -198,7 +198,7 @@ Key not found in the smart table
 
 
 
-<a name="0x1_smart_table_EALREADY_EXIST"></a>
+<a id="0x1_smart_table_EALREADY_EXIST"></a>
 
 Key already exists
 
@@ -208,7 +208,7 @@ Key already exists
 
 
 
-<a name="0x1_smart_table_EEXCEED_MAX_BUCKET_SIZE"></a>
+<a id="0x1_smart_table_EEXCEED_MAX_BUCKET_SIZE"></a>
 
 Invalid target bucket size.
 
@@ -218,7 +218,7 @@ Invalid target bucket size.
 
 
 
-<a name="0x1_smart_table_EINVALID_LOAD_THRESHOLD_PERCENT"></a>
+<a id="0x1_smart_table_EINVALID_LOAD_THRESHOLD_PERCENT"></a>
 
 Invalid load threshold percent to trigger split.
 
@@ -228,7 +228,7 @@ Invalid load threshold percent to trigger split.
 
 
 
-<a name="0x1_smart_table_EINVALID_TARGET_BUCKET_SIZE"></a>
+<a id="0x1_smart_table_EINVALID_TARGET_BUCKET_SIZE"></a>
 
 Invalid target bucket size.
 
@@ -238,7 +238,7 @@ Invalid target bucket size.
 
 
 
-<a name="0x1_smart_table_EZERO_CAPACITY"></a>
+<a id="0x1_smart_table_EZERO_CAPACITY"></a>
 
 Smart table capacity must be larger than 0
 
@@ -248,7 +248,7 @@ Smart table capacity must be larger than 0
 
 
 
-<a name="0x1_smart_table_new"></a>
+<a id="0x1_smart_table_new"></a>
 
 ## Function `new`
 
@@ -273,7 +273,7 @@ Create an empty SmartTable with default configurations.
 
 </details>
 
-<a name="0x1_smart_table_new_with_config"></a>
+<a id="0x1_smart_table_new_with_config"></a>
 
 ## Function `new_with_config`
 
@@ -327,7 +327,7 @@ dynamically assgined by the contract code.
 
 </details>
 
-<a name="0x1_smart_table_destroy_empty"></a>
+<a id="0x1_smart_table_destroy_empty"></a>
 
 ## Function `destroy_empty`
 
@@ -360,7 +360,7 @@ Aborts if it's not empty.
 
 </details>
 
-<a name="0x1_smart_table_destroy"></a>
+<a id="0x1_smart_table_destroy"></a>
 
 ## Function `destroy`
 
@@ -386,7 +386,7 @@ Destroy a table completely when V has <code>drop</code>.
 
 </details>
 
-<a name="0x1_smart_table_clear"></a>
+<a id="0x1_smart_table_clear"></a>
 
 ## Function `clear`
 
@@ -419,7 +419,7 @@ Clear a table completely when T has <code>drop</code>.
 
 </details>
 
-<a name="0x1_smart_table_add"></a>
+<a id="0x1_smart_table_add"></a>
 
 ## Function `add`
 
@@ -467,7 +467,7 @@ Note: This method may occasionally cost much more gas when triggering bucket spl
 
 </details>
 
-<a name="0x1_smart_table_add_all"></a>
+<a id="0x1_smart_table_add_all"></a>
 
 ## Function `add_all`
 
@@ -492,7 +492,7 @@ Add multiple key/value pairs to the smart table. The keys must not already exist
 
 </details>
 
-<a name="0x1_smart_table_unzip_entries"></a>
+<a id="0x1_smart_table_unzip_entries"></a>
 
 ## Function `unzip_entries`
 
@@ -523,7 +523,7 @@ Add multiple key/value pairs to the smart table. The keys must not already exist
 
 </details>
 
-<a name="0x1_smart_table_to_simple_map"></a>
+<a id="0x1_smart_table_to_simple_map"></a>
 
 ## Function `to_simple_map`
 
@@ -559,7 +559,7 @@ Disclaimer: This function may be costly as the smart table may be huge in size. 
 
 </details>
 
-<a name="0x1_smart_table_split_one_bucket"></a>
+<a id="0x1_smart_table_split_one_bucket"></a>
 
 ## Function `split_one_bucket`
 
@@ -599,7 +599,7 @@ Decide which is the next bucket to split and split it into two with the elements
 
 </details>
 
-<a name="0x1_smart_table_bucket_index"></a>
+<a id="0x1_smart_table_bucket_index"></a>
 
 ## Function `bucket_index`
 
@@ -633,7 +633,7 @@ bucket index compared to the index of the next bucket to split.
 
 </details>
 
-<a name="0x1_smart_table_borrow"></a>
+<a id="0x1_smart_table_borrow"></a>
 
 ## Function `borrow`
 
@@ -670,7 +670,7 @@ Aborts if there is no entry for <code>key</code>.
 
 </details>
 
-<a name="0x1_smart_table_borrow_with_default"></a>
+<a id="0x1_smart_table_borrow_with_default"></a>
 
 ## Function `borrow_with_default`
 
@@ -700,7 +700,7 @@ Returns specified default value if there is no entry for <code>key</code>.
 
 </details>
 
-<a name="0x1_smart_table_borrow_mut"></a>
+<a id="0x1_smart_table_borrow_mut"></a>
 
 ## Function `borrow_mut`
 
@@ -737,7 +737,7 @@ Aborts if there is no entry for <code>key</code>.
 
 </details>
 
-<a name="0x1_smart_table_borrow_mut_with_default"></a>
+<a id="0x1_smart_table_borrow_mut_with_default"></a>
 
 ## Function `borrow_mut_with_default`
 
@@ -770,7 +770,7 @@ Insert the pair (<code>key</code>, <code>default</code>) first if there is no en
 
 </details>
 
-<a name="0x1_smart_table_contains"></a>
+<a id="0x1_smart_table_contains"></a>
 
 ## Function `contains`
 
@@ -801,7 +801,7 @@ Returns true iff <code><a href="table.md#0x1_table">table</a></code> contains an
 
 </details>
 
-<a name="0x1_smart_table_remove"></a>
+<a id="0x1_smart_table_remove"></a>
 
 ## Function `remove`
 
@@ -840,7 +840,7 @@ Aborts if there is no entry for <code>key</code>.
 
 </details>
 
-<a name="0x1_smart_table_upsert"></a>
+<a id="0x1_smart_table_upsert"></a>
 
 ## Function `upsert`
 
@@ -871,7 +871,7 @@ update the value of the entry for <code>key</code> to <code>value</code> otherwi
 
 </details>
 
-<a name="0x1_smart_table_length"></a>
+<a id="0x1_smart_table_length"></a>
 
 ## Function `length`
 
@@ -896,7 +896,7 @@ Returns the length of the table, i.e. the number of entries.
 
 </details>
 
-<a name="0x1_smart_table_load_factor"></a>
+<a id="0x1_smart_table_load_factor"></a>
 
 ## Function `load_factor`
 
@@ -921,7 +921,7 @@ Return the load factor of the hashtable.
 
 </details>
 
-<a name="0x1_smart_table_update_split_load_threshold"></a>
+<a id="0x1_smart_table_update_split_load_threshold"></a>
 
 ## Function `update_split_load_threshold`
 
@@ -950,7 +950,7 @@ Update <code>split_load_threshold</code>.
 
 </details>
 
-<a name="0x1_smart_table_update_target_bucket_size"></a>
+<a id="0x1_smart_table_update_target_bucket_size"></a>
 
 ## Function `update_target_bucket_size`
 
@@ -976,14 +976,14 @@ Update <code>target_bucket_size</code>.
 
 </details>
 
-<a name="0x1_smart_table_for_each_ref"></a>
+<a id="0x1_smart_table_for_each_ref"></a>
 
 ## Function `for_each_ref`
 
 Apply the function to a reference of each key-value pair in the table.
 
 
-<pre><code><b>public</b> <b>fun</b> <a href="smart_table.md#0x1_smart_table_for_each_ref">for_each_ref</a>&lt;K, V&gt;(<a href="table.md#0x1_table">table</a>: &<a href="smart_table.md#0x1_smart_table_SmartTable">smart_table::SmartTable</a>&lt;K, V&gt;, f: |(&K, &V)|())
+<pre><code><b>public</b> <b>fun</b> <a href="smart_table.md#0x1_smart_table_for_each_ref">for_each_ref</a>&lt;K, V&gt;(<a href="table.md#0x1_table">table</a>: &<a href="smart_table.md#0x1_smart_table_SmartTable">smart_table::SmartTable</a>&lt;K, V&gt;, f: |(&K, &V)|)
 </code></pre>
 
 
@@ -1011,14 +1011,14 @@ Apply the function to a reference of each key-value pair in the table.
 
 </details>
 
-<a name="0x1_smart_table_for_each_mut"></a>
+<a id="0x1_smart_table_for_each_mut"></a>
 
 ## Function `for_each_mut`
 
 Apply the function to a mutable reference of each key-value pair in the table.
 
 
-<pre><code><b>public</b> <b>fun</b> <a href="smart_table.md#0x1_smart_table_for_each_mut">for_each_mut</a>&lt;K, V&gt;(<a href="table.md#0x1_table">table</a>: &<b>mut</b> <a href="smart_table.md#0x1_smart_table_SmartTable">smart_table::SmartTable</a>&lt;K, V&gt;, f: |(&K, &<b>mut</b> V)|())
+<pre><code><b>public</b> <b>fun</b> <a href="smart_table.md#0x1_smart_table_for_each_mut">for_each_mut</a>&lt;K, V&gt;(<a href="table.md#0x1_table">table</a>: &<b>mut</b> <a href="smart_table.md#0x1_smart_table_SmartTable">smart_table::SmartTable</a>&lt;K, V&gt;, f: |(&K, &<b>mut</b> V)|)
 </code></pre>
 
 
@@ -1046,7 +1046,7 @@ Apply the function to a mutable reference of each key-value pair in the table.
 
 </details>
 
-<a name="0x1_smart_table_map_ref"></a>
+<a id="0x1_smart_table_map_ref"></a>
 
 ## Function `map_ref`
 
@@ -1076,7 +1076,7 @@ Map the function over the references of key-value pairs in the table without mod
 
 </details>
 
-<a name="0x1_smart_table_any"></a>
+<a id="0x1_smart_table_any"></a>
 
 ## Function `any`
 
@@ -1114,7 +1114,7 @@ Return true if any key-value pair in the table satisfies the predicate.
 
 </details>
 
-<a name="0x1_smart_table_borrow_kv"></a>
+<a id="0x1_smart_table_borrow_kv"></a>
 
 ## Function `borrow_kv`
 
@@ -1138,7 +1138,7 @@ Return true if any key-value pair in the table satisfies the predicate.
 
 </details>
 
-<a name="0x1_smart_table_borrow_kv_mut"></a>
+<a id="0x1_smart_table_borrow_kv_mut"></a>
 
 ## Function `borrow_kv_mut`
 
@@ -1162,7 +1162,7 @@ Return true if any key-value pair in the table satisfies the predicate.
 
 </details>
 
-<a name="0x1_smart_table_num_buckets"></a>
+<a id="0x1_smart_table_num_buckets"></a>
 
 ## Function `num_buckets`
 
@@ -1186,7 +1186,7 @@ Return true if any key-value pair in the table satisfies the predicate.
 
 </details>
 
-<a name="0x1_smart_table_borrow_buckets"></a>
+<a id="0x1_smart_table_borrow_buckets"></a>
 
 ## Function `borrow_buckets`
 
@@ -1210,7 +1210,7 @@ Return true if any key-value pair in the table satisfies the predicate.
 
 </details>
 
-<a name="0x1_smart_table_borrow_buckets_mut"></a>
+<a id="0x1_smart_table_borrow_buckets_mut"></a>
 
 ## Function `borrow_buckets_mut`
 
@@ -1234,12 +1234,12 @@ Return true if any key-value pair in the table satisfies the predicate.
 
 </details>
 
-<a name="@Specification_1"></a>
+<a id="@Specification_1"></a>
 
 ## Specification
 
 
-<a name="@Specification_1_SmartTable"></a>
+<a id="@Specification_1_SmartTable"></a>
 
 ### Struct `SmartTable`
 
@@ -1310,7 +1310,7 @@ map_spec_has_key = spec_contains;
 
 
 
-<a name="@Specification_1_new_with_config"></a>
+<a id="@Specification_1_new_with_config"></a>
 
 ### Function `new_with_config`
 
@@ -1326,7 +1326,7 @@ map_spec_has_key = spec_contains;
 
 
 
-<a name="@Specification_1_destroy"></a>
+<a id="@Specification_1_destroy"></a>
 
 ### Function `destroy`
 
@@ -1342,7 +1342,7 @@ map_spec_has_key = spec_contains;
 
 
 
-<a name="@Specification_1_clear"></a>
+<a id="@Specification_1_clear"></a>
 
 ### Function `clear`
 
@@ -1358,7 +1358,7 @@ map_spec_has_key = spec_contains;
 
 
 
-<a name="@Specification_1_add_all"></a>
+<a id="@Specification_1_add_all"></a>
 
 ### Function `add_all`
 
@@ -1374,7 +1374,7 @@ map_spec_has_key = spec_contains;
 
 
 
-<a name="@Specification_1_to_simple_map"></a>
+<a id="@Specification_1_to_simple_map"></a>
 
 ### Function `to_simple_map`
 
@@ -1390,7 +1390,7 @@ map_spec_has_key = spec_contains;
 
 
 
-<a name="@Specification_1_split_one_bucket"></a>
+<a id="@Specification_1_split_one_bucket"></a>
 
 ### Function `split_one_bucket`
 
@@ -1406,7 +1406,7 @@ map_spec_has_key = spec_contains;
 
 
 
-<a name="@Specification_1_bucket_index"></a>
+<a id="@Specification_1_bucket_index"></a>
 
 ### Function `bucket_index`
 
@@ -1422,7 +1422,7 @@ map_spec_has_key = spec_contains;
 
 
 
-<a name="@Specification_1_borrow_with_default"></a>
+<a id="@Specification_1_borrow_with_default"></a>
 
 ### Function `borrow_with_default`
 
@@ -1438,7 +1438,7 @@ map_spec_has_key = spec_contains;
 
 
 
-<a name="@Specification_1_load_factor"></a>
+<a id="@Specification_1_load_factor"></a>
 
 ### Function `load_factor`
 
@@ -1454,7 +1454,7 @@ map_spec_has_key = spec_contains;
 
 
 
-<a name="@Specification_1_update_split_load_threshold"></a>
+<a id="@Specification_1_update_split_load_threshold"></a>
 
 ### Function `update_split_load_threshold`
 
@@ -1470,7 +1470,7 @@ map_spec_has_key = spec_contains;
 
 
 
-<a name="@Specification_1_update_target_bucket_size"></a>
+<a id="@Specification_1_update_target_bucket_size"></a>
 
 ### Function `update_target_bucket_size`
 
@@ -1486,7 +1486,7 @@ map_spec_has_key = spec_contains;
 
 
 
-<a name="@Specification_1_borrow_kv"></a>
+<a id="@Specification_1_borrow_kv"></a>
 
 ### Function `borrow_kv`
 
@@ -1502,7 +1502,7 @@ map_spec_has_key = spec_contains;
 
 
 
-<a name="@Specification_1_borrow_kv_mut"></a>
+<a id="@Specification_1_borrow_kv_mut"></a>
 
 ### Function `borrow_kv_mut`
 
@@ -1518,7 +1518,7 @@ map_spec_has_key = spec_contains;
 
 
 
-<a name="@Specification_1_num_buckets"></a>
+<a id="@Specification_1_num_buckets"></a>
 
 ### Function `num_buckets`
 
@@ -1534,7 +1534,7 @@ map_spec_has_key = spec_contains;
 
 
 
-<a name="@Specification_1_borrow_buckets"></a>
+<a id="@Specification_1_borrow_buckets"></a>
 
 ### Function `borrow_buckets`
 
@@ -1550,7 +1550,7 @@ map_spec_has_key = spec_contains;
 
 
 
-<a name="@Specification_1_borrow_buckets_mut"></a>
+<a id="@Specification_1_borrow_buckets_mut"></a>
 
 ### Function `borrow_buckets_mut`
 
@@ -1567,7 +1567,7 @@ map_spec_has_key = spec_contains;
 
 
 
-<a name="0x1_smart_table_spec_len"></a>
+<a id="0x1_smart_table_spec_len"></a>
 
 
 <pre><code><b>native</b> <b>fun</b> <a href="smart_table.md#0x1_smart_table_spec_len">spec_len</a>&lt;K, V&gt;(t: <a href="smart_table.md#0x1_smart_table_SmartTable">SmartTable</a>&lt;K, V&gt;): num;
@@ -1576,7 +1576,7 @@ map_spec_has_key = spec_contains;
 
 
 
-<a name="0x1_smart_table_spec_contains"></a>
+<a id="0x1_smart_table_spec_contains"></a>
 
 
 <pre><code><b>native</b> <b>fun</b> <a href="smart_table.md#0x1_smart_table_spec_contains">spec_contains</a>&lt;K, V&gt;(t: <a href="smart_table.md#0x1_smart_table_SmartTable">SmartTable</a>&lt;K, V&gt;, k: K): bool;
@@ -1585,7 +1585,7 @@ map_spec_has_key = spec_contains;
 
 
 
-<a name="0x1_smart_table_spec_set"></a>
+<a id="0x1_smart_table_spec_set"></a>
 
 
 <pre><code><b>native</b> <b>fun</b> <a href="smart_table.md#0x1_smart_table_spec_set">spec_set</a>&lt;K, V&gt;(t: <a href="smart_table.md#0x1_smart_table_SmartTable">SmartTable</a>&lt;K, V&gt;, k: K, v: V): <a href="smart_table.md#0x1_smart_table_SmartTable">SmartTable</a>&lt;K, V&gt;;
@@ -1594,7 +1594,7 @@ map_spec_has_key = spec_contains;
 
 
 
-<a name="0x1_smart_table_spec_remove"></a>
+<a id="0x1_smart_table_spec_remove"></a>
 
 
 <pre><code><b>native</b> <b>fun</b> <a href="smart_table.md#0x1_smart_table_spec_remove">spec_remove</a>&lt;K, V&gt;(t: <a href="smart_table.md#0x1_smart_table_SmartTable">SmartTable</a>&lt;K, V&gt;, k: K): <a href="smart_table.md#0x1_smart_table_SmartTable">SmartTable</a>&lt;K, V&gt;;
@@ -1603,7 +1603,7 @@ map_spec_has_key = spec_contains;
 
 
 
-<a name="0x1_smart_table_spec_get"></a>
+<a id="0x1_smart_table_spec_get"></a>
 
 
 <pre><code><b>native</b> <b>fun</b> <a href="smart_table.md#0x1_smart_table_spec_get">spec_get</a>&lt;K, V&gt;(t: <a href="smart_table.md#0x1_smart_table_SmartTable">SmartTable</a>&lt;K, V&gt;, k: K): V;

@@ -290,7 +290,10 @@ export class ModuleId {
    * @param address The account address.
    * @param name The name of the module under the account at "address".
    */
-  constructor(public readonly address: AccountAddress, public readonly name: Identifier) {}
+  constructor(
+    public readonly address: AccountAddress,
+    public readonly name: Identifier,
+  ) {}
 
   /**
    * Converts a string literal to a ModuleId
@@ -349,7 +352,10 @@ export class SignedTransaction {
    *   Authenticator has 3 flavors: single signature, multi-signature and multi-agent.
    *   @see authenticator.ts for details.
    */
-  constructor(public readonly raw_txn: RawTransaction, public readonly authenticator: TransactionAuthenticator) {}
+  constructor(
+    public readonly raw_txn: RawTransaction,
+    public readonly authenticator: TransactionAuthenticator,
+  ) {}
 
   serialize(serializer: Serializer): void {
     this.raw_txn.serialize(serializer);

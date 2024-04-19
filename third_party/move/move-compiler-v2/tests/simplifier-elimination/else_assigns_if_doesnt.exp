@@ -1,0 +1,33 @@
+// -- Model dump before bytecode pipeline
+module <SELF>_0 {
+    private fun main() {
+        {
+          let x: u64;
+          {
+            let y: u64;
+            if true {
+              y: u64 = 0;
+              Tuple()
+            } else {
+              x: u64 = 42;
+              x;
+              Tuple()
+            };
+            if Eq<u64>(y, 0) {
+              Tuple()
+            } else {
+              Abort(42)
+            };
+            Tuple()
+          }
+        }
+    }
+} // end <SELF>_0
+
+
+Diagnostics:
+error: use of possibly unassigned local `y`
+   ┌─ tests/simplifier-elimination/else_assigns_if_doesnt.move:11:13
+   │
+11 │     assert!(y == 0, 42);
+   │             ^^^^^^

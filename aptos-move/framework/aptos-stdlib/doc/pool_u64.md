@@ -1,5 +1,5 @@
 
-<a name="0x1_pool_u64"></a>
+<a id="0x1_pool_u64"></a>
 
 # Module `0x1::pool_u64`
 
@@ -66,7 +66,7 @@ shares left.
 
 
 
-<a name="0x1_pool_u64_Pool"></a>
+<a id="0x1_pool_u64_Pool"></a>
 
 ## Struct `Pool`
 
@@ -123,12 +123,12 @@ shares left.
 
 </details>
 
-<a name="@Constants_0"></a>
+<a id="@Constants_0"></a>
 
 ## Constants
 
 
-<a name="0x1_pool_u64_MAX_U64"></a>
+<a id="0x1_pool_u64_MAX_U64"></a>
 
 
 
@@ -137,7 +137,7 @@ shares left.
 
 
 
-<a name="0x1_pool_u64_EINSUFFICIENT_SHARES"></a>
+<a id="0x1_pool_u64_EINSUFFICIENT_SHARES"></a>
 
 Cannot redeem more shares than the shareholder has in the pool.
 
@@ -147,7 +147,7 @@ Cannot redeem more shares than the shareholder has in the pool.
 
 
 
-<a name="0x1_pool_u64_EPOOL_IS_NOT_EMPTY"></a>
+<a id="0x1_pool_u64_EPOOL_IS_NOT_EMPTY"></a>
 
 Cannot destroy non-empty pool.
 
@@ -157,7 +157,7 @@ Cannot destroy non-empty pool.
 
 
 
-<a name="0x1_pool_u64_EPOOL_TOTAL_COINS_OVERFLOW"></a>
+<a id="0x1_pool_u64_EPOOL_TOTAL_COINS_OVERFLOW"></a>
 
 Pool's total coins cannot exceed u64.max.
 
@@ -167,7 +167,7 @@ Pool's total coins cannot exceed u64.max.
 
 
 
-<a name="0x1_pool_u64_EPOOL_TOTAL_SHARES_OVERFLOW"></a>
+<a id="0x1_pool_u64_EPOOL_TOTAL_SHARES_OVERFLOW"></a>
 
 Pool's total shares cannot exceed u64.max.
 
@@ -177,7 +177,7 @@ Pool's total shares cannot exceed u64.max.
 
 
 
-<a name="0x1_pool_u64_ESHAREHOLDER_NOT_FOUND"></a>
+<a id="0x1_pool_u64_ESHAREHOLDER_NOT_FOUND"></a>
 
 Shareholder not present in pool.
 
@@ -187,7 +187,7 @@ Shareholder not present in pool.
 
 
 
-<a name="0x1_pool_u64_ESHAREHOLDER_SHARES_OVERFLOW"></a>
+<a id="0x1_pool_u64_ESHAREHOLDER_SHARES_OVERFLOW"></a>
 
 Shareholder cannot have more than u64.max shares.
 
@@ -197,7 +197,7 @@ Shareholder cannot have more than u64.max shares.
 
 
 
-<a name="0x1_pool_u64_ETOO_MANY_SHAREHOLDERS"></a>
+<a id="0x1_pool_u64_ETOO_MANY_SHAREHOLDERS"></a>
 
 There are too many shareholders in the pool.
 
@@ -207,7 +207,7 @@ There are too many shareholders in the pool.
 
 
 
-<a name="0x1_pool_u64_new"></a>
+<a id="0x1_pool_u64_new"></a>
 
 ## Function `new`
 
@@ -233,7 +233,7 @@ Create a new pool.
 
 </details>
 
-<a name="0x1_pool_u64_create"></a>
+<a id="0x1_pool_u64_create"></a>
 
 ## Function `create`
 
@@ -260,7 +260,7 @@ Create a new pool.
 
 </details>
 
-<a name="0x1_pool_u64_create_with_scaling_factor"></a>
+<a id="0x1_pool_u64_create_with_scaling_factor"></a>
 
 ## Function `create_with_scaling_factor`
 
@@ -292,7 +292,7 @@ Create a new pool with custom <code>scaling_factor</code>.
 
 </details>
 
-<a name="0x1_pool_u64_destroy_empty"></a>
+<a id="0x1_pool_u64_destroy_empty"></a>
 
 ## Function `destroy_empty`
 
@@ -325,7 +325,7 @@ Destroy an empty pool. This will fail if the pool has any balance of coins.
 
 </details>
 
-<a name="0x1_pool_u64_total_coins"></a>
+<a id="0x1_pool_u64_total_coins"></a>
 
 ## Function `total_coins`
 
@@ -350,7 +350,7 @@ Return <code>pool</code>'s total balance of coins.
 
 </details>
 
-<a name="0x1_pool_u64_total_shares"></a>
+<a id="0x1_pool_u64_total_shares"></a>
 
 ## Function `total_shares`
 
@@ -375,7 +375,7 @@ Return the total number of shares across all shareholders in <code>pool</code>.
 
 </details>
 
-<a name="0x1_pool_u64_contains"></a>
+<a id="0x1_pool_u64_contains"></a>
 
 ## Function `contains`
 
@@ -400,7 +400,7 @@ Return true if <code>shareholder</code> is in <code>pool</code>.
 
 </details>
 
-<a name="0x1_pool_u64_shares"></a>
+<a id="0x1_pool_u64_shares"></a>
 
 ## Function `shares`
 
@@ -429,7 +429,7 @@ Return the number of shares of <code>stakeholder</code> in <code>pool</code>.
 
 </details>
 
-<a name="0x1_pool_u64_balance"></a>
+<a id="0x1_pool_u64_balance"></a>
 
 ## Function `balance`
 
@@ -455,7 +455,7 @@ Return the balance in coins of <code>shareholder</code> in <code>pool.</code>
 
 </details>
 
-<a name="0x1_pool_u64_shareholders"></a>
+<a id="0x1_pool_u64_shareholders"></a>
 
 ## Function `shareholders`
 
@@ -480,7 +480,7 @@ Return the list of shareholders in <code>pool</code>.
 
 </details>
 
-<a name="0x1_pool_u64_shareholders_count"></a>
+<a id="0x1_pool_u64_shareholders_count"></a>
 
 ## Function `shareholders_count`
 
@@ -505,7 +505,7 @@ Return the number of shareholders in <code>pool</code>.
 
 </details>
 
-<a name="0x1_pool_u64_update_total_coins"></a>
+<a id="0x1_pool_u64_update_total_coins"></a>
 
 ## Function `update_total_coins`
 
@@ -530,7 +530,7 @@ Update <code>pool</code>'s total balance of coins.
 
 </details>
 
-<a name="0x1_pool_u64_buy_in"></a>
+<a id="0x1_pool_u64_buy_in"></a>
 
 ## Function `buy_in`
 
@@ -564,7 +564,7 @@ Allow an existing or new shareholder to add their coins to the pool in exchange 
 
 </details>
 
-<a name="0x1_pool_u64_add_shares"></a>
+<a id="0x1_pool_u64_add_shares"></a>
 
 ## Function `add_shares`
 
@@ -608,7 +608,7 @@ This would dilute other shareholders if the pool's balance of coins didn't chang
 
 </details>
 
-<a name="0x1_pool_u64_redeem_shares"></a>
+<a id="0x1_pool_u64_redeem_shares"></a>
 
 ## Function `redeem_shares`
 
@@ -643,7 +643,7 @@ Allow <code>shareholder</code> to redeem their shares in <code>pool</code> for c
 
 </details>
 
-<a name="0x1_pool_u64_transfer_shares"></a>
+<a id="0x1_pool_u64_transfer_shares"></a>
 
 ## Function `transfer_shares`
 
@@ -678,7 +678,7 @@ Transfer shares from <code>shareholder_1</code> to <code>shareholder_2</code>.
 
 </details>
 
-<a name="0x1_pool_u64_deduct_shares"></a>
+<a id="0x1_pool_u64_deduct_shares"></a>
 
 ## Function `deduct_shares`
 
@@ -717,7 +717,7 @@ Directly deduct <code>shareholder</code>'s number of shares in <code>pool</code>
 
 </details>
 
-<a name="0x1_pool_u64_amount_to_shares"></a>
+<a id="0x1_pool_u64_amount_to_shares"></a>
 
 ## Function `amount_to_shares`
 
@@ -743,7 +743,7 @@ Return the number of new shares <code>coins_amount</code> can buy in <code>pool<
 
 </details>
 
-<a name="0x1_pool_u64_amount_to_shares_with_total_coins"></a>
+<a id="0x1_pool_u64_amount_to_shares_with_total_coins"></a>
 
 ## Function `amount_to_shares_with_total_coins`
 
@@ -779,7 +779,7 @@ Return the number of new shares <code>coins_amount</code> can buy in <code>pool<
 
 </details>
 
-<a name="0x1_pool_u64_shares_to_amount"></a>
+<a id="0x1_pool_u64_shares_to_amount"></a>
 
 ## Function `shares_to_amount`
 
@@ -805,7 +805,7 @@ Return the number of coins <code>shares</code> are worth in <code>pool</code>.
 
 </details>
 
-<a name="0x1_pool_u64_shares_to_amount_with_total_coins"></a>
+<a id="0x1_pool_u64_shares_to_amount_with_total_coins"></a>
 
 ## Function `shares_to_amount_with_total_coins`
 
@@ -839,7 +839,7 @@ Return the number of coins <code>shares</code> are worth in <code>pool</code> wi
 
 </details>
 
-<a name="0x1_pool_u64_multiply_then_divide"></a>
+<a id="0x1_pool_u64_multiply_then_divide"></a>
 
 ## Function `multiply_then_divide`
 
@@ -864,7 +864,7 @@ Return the number of coins <code>shares</code> are worth in <code>pool</code> wi
 
 </details>
 
-<a name="0x1_pool_u64_to_u128"></a>
+<a id="0x1_pool_u64_to_u128"></a>
 
 ## Function `to_u128`
 
@@ -888,7 +888,7 @@ Return the number of coins <code>shares</code> are worth in <code>pool</code> wi
 
 </details>
 
-<a name="@Specification_1"></a>
+<a id="@Specification_1"></a>
 
 ## Specification
 
@@ -899,7 +899,7 @@ Return the number of coins <code>shares</code> are worth in <code>pool</code> wi
 
 
 
-<a name="@Specification_1_Pool"></a>
+<a id="@Specification_1_Pool"></a>
 
 ### Struct `Pool`
 
@@ -959,7 +959,7 @@ Return the number of coins <code>shares</code> are worth in <code>pool</code> wi
 
 
 
-<a name="0x1_pool_u64_spec_contains"></a>
+<a id="0x1_pool_u64_spec_contains"></a>
 
 
 <pre><code><b>fun</b> <a href="pool_u64.md#0x1_pool_u64_spec_contains">spec_contains</a>(pool: <a href="pool_u64.md#0x1_pool_u64_Pool">Pool</a>, shareholder: <b>address</b>): bool {
@@ -969,7 +969,7 @@ Return the number of coins <code>shares</code> are worth in <code>pool</code> wi
 
 
 
-<a name="@Specification_1_contains"></a>
+<a id="@Specification_1_contains"></a>
 
 ### Function `contains`
 
@@ -987,7 +987,7 @@ Return the number of coins <code>shares</code> are worth in <code>pool</code> wi
 
 
 
-<a name="0x1_pool_u64_spec_shares"></a>
+<a id="0x1_pool_u64_spec_shares"></a>
 
 
 <pre><code><b>fun</b> <a href="pool_u64.md#0x1_pool_u64_spec_shares">spec_shares</a>(pool: <a href="pool_u64.md#0x1_pool_u64_Pool">Pool</a>, shareholder: <b>address</b>): u64 {
@@ -1002,7 +1002,7 @@ Return the number of coins <code>shares</code> are worth in <code>pool</code> wi
 
 
 
-<a name="@Specification_1_shares"></a>
+<a id="@Specification_1_shares"></a>
 
 ### Function `shares`
 
@@ -1019,7 +1019,7 @@ Return the number of coins <code>shares</code> are worth in <code>pool</code> wi
 
 
 
-<a name="@Specification_1_balance"></a>
+<a id="@Specification_1_balance"></a>
 
 ### Function `balance`
 
@@ -1038,7 +1038,7 @@ Return the number of coins <code>shares</code> are worth in <code>pool</code> wi
 
 
 
-<a name="@Specification_1_buy_in"></a>
+<a id="@Specification_1_buy_in"></a>
 
 ### Function `buy_in`
 
@@ -1061,7 +1061,7 @@ Return the number of coins <code>shares</code> are worth in <code>pool</code> wi
 
 
 
-<a name="@Specification_1_add_shares"></a>
+<a id="@Specification_1_add_shares"></a>
 
 ### Function `add_shares`
 
@@ -1082,7 +1082,7 @@ Return the number of coins <code>shares</code> are worth in <code>pool</code> wi
 
 
 
-<a name="0x1_pool_u64_AddSharesAbortsIf"></a>
+<a id="0x1_pool_u64_AddSharesAbortsIf"></a>
 
 
 <pre><code><b>schema</b> <a href="pool_u64.md#0x1_pool_u64_AddSharesAbortsIf">AddSharesAbortsIf</a> {
@@ -1099,7 +1099,7 @@ Return the number of coins <code>shares</code> are worth in <code>pool</code> wi
 
 
 
-<a name="0x1_pool_u64_AddSharesEnsures"></a>
+<a id="0x1_pool_u64_AddSharesEnsures"></a>
 
 
 <pre><code><b>schema</b> <a href="pool_u64.md#0x1_pool_u64_AddSharesEnsures">AddSharesEnsures</a> {
@@ -1120,7 +1120,7 @@ Return the number of coins <code>shares</code> are worth in <code>pool</code> wi
 
 
 
-<a name="0x1_pool_u64_spec_amount_to_shares_with_total_coins"></a>
+<a id="0x1_pool_u64_spec_amount_to_shares_with_total_coins"></a>
 
 
 <pre><code><b>fun</b> <a href="pool_u64.md#0x1_pool_u64_spec_amount_to_shares_with_total_coins">spec_amount_to_shares_with_total_coins</a>(pool: <a href="pool_u64.md#0x1_pool_u64_Pool">Pool</a>, coins_amount: u64, total_coins: u64): u64 {
@@ -1135,7 +1135,7 @@ Return the number of coins <code>shares</code> are worth in <code>pool</code> wi
 
 
 
-<a name="@Specification_1_redeem_shares"></a>
+<a id="@Specification_1_redeem_shares"></a>
 
 ### Function `redeem_shares`
 
@@ -1159,7 +1159,7 @@ Return the number of coins <code>shares</code> are worth in <code>pool</code> wi
 
 
 
-<a name="@Specification_1_transfer_shares"></a>
+<a id="@Specification_1_transfer_shares"></a>
 
 ### Function `transfer_shares`
 
@@ -1177,7 +1177,7 @@ Return the number of coins <code>shares</code> are worth in <code>pool</code> wi
 
 
 
-<a name="@Specification_1_deduct_shares"></a>
+<a id="@Specification_1_deduct_shares"></a>
 
 ### Function `deduct_shares`
 
@@ -1199,7 +1199,7 @@ Return the number of coins <code>shares</code> are worth in <code>pool</code> wi
 
 
 
-<a name="0x1_pool_u64_DeductSharesEnsures"></a>
+<a id="0x1_pool_u64_DeductSharesEnsures"></a>
 
 
 <pre><code><b>schema</b> <a href="pool_u64.md#0x1_pool_u64_DeductSharesEnsures">DeductSharesEnsures</a> {
@@ -1215,7 +1215,7 @@ Return the number of coins <code>shares</code> are worth in <code>pool</code> wi
 
 
 
-<a name="@Specification_1_amount_to_shares_with_total_coins"></a>
+<a id="@Specification_1_amount_to_shares_with_total_coins"></a>
 
 ### Function `amount_to_shares_with_total_coins`
 
@@ -1236,7 +1236,7 @@ Return the number of coins <code>shares</code> are worth in <code>pool</code> wi
 
 
 
-<a name="@Specification_1_shares_to_amount_with_total_coins"></a>
+<a id="@Specification_1_shares_to_amount_with_total_coins"></a>
 
 ### Function `shares_to_amount_with_total_coins`
 
@@ -1255,7 +1255,7 @@ Return the number of coins <code>shares</code> are worth in <code>pool</code> wi
 
 
 
-<a name="0x1_pool_u64_spec_shares_to_amount_with_total_coins"></a>
+<a id="0x1_pool_u64_spec_shares_to_amount_with_total_coins"></a>
 
 
 <pre><code><b>fun</b> <a href="pool_u64.md#0x1_pool_u64_spec_shares_to_amount_with_total_coins">spec_shares_to_amount_with_total_coins</a>(pool: <a href="pool_u64.md#0x1_pool_u64_Pool">Pool</a>, shares: u64, total_coins: u64): u64 {
@@ -1270,7 +1270,7 @@ Return the number of coins <code>shares</code> are worth in <code>pool</code> wi
 
 
 
-<a name="@Specification_1_multiply_then_divide"></a>
+<a id="@Specification_1_multiply_then_divide"></a>
 
 ### Function `multiply_then_divide`
 

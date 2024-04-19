@@ -101,7 +101,7 @@ impl<'a, 'b, 'c, 'd> SafeNativeContext<'a, 'b, 'c, 'd> {
 
     /// Returns a reference to the struct representing on-chain features.
     pub fn get_feature_flags(&self) -> &Features {
-        self.features.deref()
+        self.features
     }
 
     /// Checks if the timed feature corresponding to the given flag is enabled.

@@ -19,9 +19,11 @@ use std::{
 /// Represents the abstract outcome of a join.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum JoinResult {
-    /// The left operand subsumes the right operand: L union R == L.
+    /// The left operand remains unchanged when joined with the right operand,
+    /// i.e., the L.join(R) operation leaves L unchanged.
     Unchanged,
-    /// The left operand does not subsume the right one and was changed as part of the join.
+    /// The left operand changes when joined with the right operand,
+    /// i.e., the L.join(R) operation changes L.
     Changed,
 }
 
@@ -39,7 +41,6 @@ impl JoinResult {
 
 /// A trait to be implemented by domains which support a join.
 pub trait AbstractDomain {
-    // TODO: would be cool to add a derive(Join) macro for this
     fn join(&mut self, other: &Self) -> JoinResult;
 }
 
@@ -124,6 +125,9 @@ impl<E: Ord + Clone> std::iter::IntoIterator for SetDomain<E> {
 
 impl<E: Ord + Clone> AbstractDomain for SetDomain<E> {
     fn join(&mut self, other: &Self) -> JoinResult {
+        if self.ptr_eq(other) {
+            return JoinResult::Unchanged;
+        }
         let mut change = JoinResult::Unchanged;
         for e in other.iter() {
             if self.insert(e.clone()).is_none() {
@@ -153,6 +157,12 @@ impl<E: Ord + Clone> SetDomain<E> {
     /// Implements is_disjoint which is not available in OrdSet
     pub fn is_disjoint(&self, other: &Self) -> bool {
         self.iter().all(move |e| !other.contains(e))
+    }
+
+    /// Implements string formatting. Not using Display because of context dependent element
+    /// display.
+    pub fn to_string(&self, to_str: impl Fn(&E) -> String) -> String {
+        format!("{{{}}}", self.0.iter().map(to_str).join(","))
     }
 }
 
@@ -229,6 +239,9 @@ impl<K: Ord + Clone, V: AbstractDomain + Clone> std::iter::IntoIterator for MapD
 
 impl<K: Ord + Clone, V: AbstractDomain + Clone> AbstractDomain for MapDomain<K, V> {
     fn join(&mut self, other: &Self) -> JoinResult {
+        if self.ptr_eq(other) {
+            return JoinResult::Unchanged;
+        }
         let mut change = JoinResult::Unchanged;
         for (k, v) in other.iter() {
             change = change.combine(self.insert_join(k.clone(), v.clone()));
@@ -262,6 +275,22 @@ impl<K: Ord + Clone, V: AbstractDomain + Clone> MapDomain<K, V> {
                 v
             });
         change
+    }
+
+    /// Implements string formatting. Not using Display because of context dependent element
+    /// display.
+    pub fn to_string(
+        &self,
+        k_to_str: impl Fn(&K) -> String,
+        v_to_str: impl Fn(&V) -> String,
+    ) -> String {
+        format!(
+            "{{{}}}",
+            self.0
+                .iter()
+                .map(|(k, v)| format!("{}={}", k_to_str(k), v_to_str(v)))
+                .join(",")
+        )
     }
 }
 

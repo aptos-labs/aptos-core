@@ -1,0 +1,40 @@
+// -- Model dump before bytecode pipeline
+module 0x42::move_function_in_spec {
+    struct TypeInfo {
+        account_address: address,
+    }
+    private fun foo<T>() {
+        {
+          let type_info: move_function_in_spec::TypeInfo = move_function_in_spec::type_of<T>();
+          {
+            let account_address: address = select move_function_in_spec::TypeInfo.account_address<move_function_in_spec::TypeInfo>(type_info);
+            spec {
+              assert move_function_in_spec::$no_change(account_address, account_address);
+              assert Eq<address>(account_address, select move_function_in_spec::TypeInfo.account_address<move_function_in_spec::TypeInfo>(move_function_in_spec::$type_of<#0>()));
+            }
+            ;
+            Tuple()
+          }
+        }
+    }
+    public fun no_change(target: address,new_addr: address): bool
+        acquires move_function_in_spec::TypeInfo(*)
+     {
+        {
+          let ty: &move_function_in_spec::TypeInfo = BorrowGlobal(Immutable)<move_function_in_spec::TypeInfo>(target);
+          Eq<address>(select move_function_in_spec::TypeInfo.account_address<&move_function_in_spec::TypeInfo>(ty), new_addr)
+        }
+    }
+    public fun type_of<T>(): move_function_in_spec::TypeInfo {
+        Abort(1)
+    }
+    spec fun $no_change(target: address,new_addr: address): bool {
+        {
+          let ty: &move_function_in_spec::TypeInfo = global<move_function_in_spec::TypeInfo>(target);
+          Eq<address>(select move_function_in_spec::TypeInfo.account_address<move_function_in_spec::TypeInfo>(ty), new_addr)
+        }
+    }
+    spec fun $type_of<T>(): move_function_in_spec::TypeInfo {
+        Tuple()
+    }
+} // end 0x42::move_function_in_spec

@@ -1,5 +1,5 @@
 {
-  "resource_version": 288,
+  "resource_version": 385,
   "metadata": {
     "version": 3,
     "sources": [
@@ -93,7 +93,10 @@
               {
                 "role": "anonymous",
                 "permission": {
-                  "columns": ["account_address", "transaction_version"],
+                  "columns": [
+                    "account_address",
+                    "transaction_version"
+                  ],
                   "filter": {},
                   "limit": 100,
                   "allow_aggregations": true
@@ -209,7 +212,10 @@
               {
                 "role": "anonymous",
                 "permission": {
-                  "columns": ["account_address", "transaction_version"],
+                  "columns": [
+                    "account_address",
+                    "transaction_version"
+                  ],
                   "filter": {},
                   "limit": 100,
                   "allow_aggregations": true
@@ -288,7 +294,10 @@
               {
                 "role": "anonymous",
                 "permission": {
-                  "columns": ["address", "transaction_version"],
+                  "columns": [
+                    "address",
+                    "transaction_version"
+                  ],
                   "filter": {},
                   "limit": 100,
                   "allow_aggregations": true
@@ -725,6 +734,7 @@
               "name": "current_collections_v2",
               "schema": "public"
             },
+            "object_relationships": [],
             "select_permissions": [
               {
                 "role": "anonymous",
@@ -1394,6 +1404,32 @@
           },
           {
             "table": {
+              "name": "delegated_staking_pool_balances",
+              "schema": "public"
+            },
+            "select_permissions": [
+              {
+                "role": "anonymous",
+                "permission": {
+                  "columns": [
+                    "active_table_handle",
+                    "inactive_table_handle",
+                    "operator_commission_percentage",
+                    "staking_pool_address",
+                    "total_coins",
+                    "total_shares",
+                    "transaction_version"
+                  ],
+                  "filter": {},
+                  "limit": 100,
+                  "allow_aggregations": true
+                },
+                "comment": ""
+              }
+            ]
+          },
+          {
+            "table": {
               "name": "delegated_staking_pools",
               "schema": "public"
             },
@@ -1469,7 +1505,10 @@
               {
                 "role": "anonymous",
                 "permission": {
-                  "columns": ["delegator_address", "pool_address"],
+                  "columns": [
+                    "delegator_address",
+                    "pool_address"
+                  ],
                   "filter": {},
                   "limit": 100,
                   "allow_aggregations": true
@@ -1608,7 +1647,10 @@
               {
                 "role": "anonymous",
                 "permission": {
-                  "columns": ["db", "is_indexer_up"],
+                  "columns": [
+                    "db",
+                    "is_indexer_up"
+                  ],
                   "filter": {},
                   "limit": 100
                 }
@@ -1624,7 +1666,9 @@
               {
                 "role": "anonymous",
                 "permission": {
-                  "columns": ["chain_id"],
+                  "columns": [
+                    "chain_id"
+                  ],
                   "filter": {}
                 }
               }
@@ -1639,7 +1683,10 @@
               {
                 "role": "anonymous",
                 "permission": {
-                  "columns": ["address", "transaction_version"],
+                  "columns": [
+                    "address",
+                    "transaction_version"
+                  ],
                   "filter": {},
                   "limit": 100,
                   "allow_aggregations": true
@@ -1656,7 +1703,10 @@
               {
                 "role": "anonymous",
                 "permission": {
-                  "columns": ["num_active_delegator", "pool_address"],
+                  "columns": [
+                    "num_active_delegator",
+                    "pool_address"
+                  ],
                   "filter": {},
                   "limit": 100
                 }
@@ -1674,6 +1724,7 @@
                 "permission": {
                   "columns": [
                     "last_success_version",
+                    "last_transaction_timestamp",
                     "last_updated",
                     "processor"
                   ],
@@ -1740,7 +1791,11 @@
               {
                 "role": "anonymous",
                 "permission": {
-                  "columns": ["handle", "key_type", "value_type"],
+                  "columns": [
+                    "handle",
+                    "key_type",
+                    "value_type"
+                  ],
                   "filter": {},
                   "limit": 100
                 }
@@ -2054,7 +2109,7 @@
           "queries": [
             {
               "name": "Latest Processor Status",
-              "query": "query LatestProcessorStatus {\n  processor_status {\n    processor\n    last_updated\n    last_success_version\n  }\n}"
+              "query": "query LatestProcessorStatus {\n  processor_status {\n    processor\n    last_updated\n    last_success_version\n    last_transaction_timestamp\n  }\n}"
             }
           ]
         }
@@ -2077,7 +2132,9 @@
             "query_name": "Latest Processor Status"
           }
         },
-        "methods": ["GET"],
+        "methods": [
+          "GET"
+        ],
         "name": "Latest Processor Status",
         "url": "get_lastest_processor_status"
       }

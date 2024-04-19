@@ -6,7 +6,7 @@ use crate::{
     core_mempool::{CoreMempool, MempoolTransaction, SubmittedBy, TimelineState},
     tests::common::{
         add_signed_txn, add_txn, add_txns_to_mempool, setup_mempool,
-        setup_mempool_with_broadcast_buckets, TestTransaction,
+        setup_mempool_with_broadcast_buckets, txn_bytes_len, TestTransaction,
     },
 };
 use aptos_config::config::NodeConfig;
@@ -774,10 +774,14 @@ fn test_bytes_limit() {
     }
     let get_all = pool.get_batch(100, 100 * 1024, true, false, btreemap![]);
     assert_eq!(get_all.len(), 100);
-    let txn_size = get_all[0].raw_txn_bytes_len() as u64;
+    let txn_size = get_all[0].txn_bytes_len() as u64;
     let limit = 10;
     let hit_limit = pool.get_batch(100, txn_size * limit, true, false, btreemap![]);
     assert_eq!(hit_limit.len(), limit as usize);
+    let hit_limit = pool.get_batch(100, txn_size * limit + 1, true, false, btreemap![]);
+    assert_eq!(hit_limit.len(), limit as usize);
+    let hit_limit = pool.get_batch(100, txn_size * limit - 1, true, false, btreemap![]);
+    assert_eq!(hit_limit.len(), limit as usize - 1);
 }
 
 #[test]
@@ -833,15 +837,56 @@ fn test_not_return_non_full() {
     let mut config = NodeConfig::generate_random_config();
     config.mempool.capacity = 2;
     let mut pool = CoreMempool::new(&config);
-    add_txn(&mut pool, TestTransaction::new(0, 0, 1)).unwrap();
+    let txn_0 = TestTransaction::new(0, 0, 1);
+    let txn_1 = TestTransaction::new(0, 1, 1);
+    let txn_num = 2;
+    let txn_bytes = txn_bytes_len(txn_0.clone()) + txn_bytes_len(txn_1.clone());
+    add_txn(&mut pool, txn_0).unwrap();
+    add_txn(&mut pool, txn_1).unwrap();
 
+    // doesn't hit any limits
     let batch = pool.get_batch(10, 10240, true, false, btreemap![]);
-    assert_eq!(batch.len(), 1);
+    assert_eq!(batch.len(), 2);
 
     let batch = pool.get_batch(10, 10240, false, false, btreemap![]);
     assert_eq!(batch.len(), 0);
 
-    let batch = pool.get_batch(1, 10240, false, false, btreemap![]);
+    // reaches or close to max_txns
+    let batch = pool.get_batch(txn_num + 1, 10240, false, false, btreemap![]);
+    assert_eq!(batch.len(), 0);
+
+    let batch = pool.get_batch(txn_num, 10240, false, false, btreemap![]);
+    assert_eq!(batch.len(), 2);
+
+    let batch = pool.get_batch(txn_num - 1, 10240, false, false, btreemap![]);
+    assert_eq!(batch.len(), 1);
+
+    let batch = pool.get_batch(txn_num + 1, 10240, true, false, btreemap![]);
+    assert_eq!(batch.len(), 2);
+
+    let batch = pool.get_batch(txn_num, 10240, true, false, btreemap![]);
+    assert_eq!(batch.len(), 2);
+
+    let batch = pool.get_batch(txn_num - 1, 10240, true, false, btreemap![]);
+    assert_eq!(batch.len(), 1);
+
+    // reaches or close to max_bytes
+    let batch = pool.get_batch(10, txn_bytes + 1, false, false, btreemap![]);
+    assert_eq!(batch.len(), 0);
+
+    let batch = pool.get_batch(10, txn_bytes, false, false, btreemap![]);
+    assert_eq!(batch.len(), 2);
+
+    let batch = pool.get_batch(10, txn_bytes - 1, false, false, btreemap![]);
+    assert_eq!(batch.len(), 1);
+
+    let batch = pool.get_batch(10, txn_bytes + 1, true, false, btreemap![]);
+    assert_eq!(batch.len(), 2);
+
+    let batch = pool.get_batch(10, txn_bytes, true, false, btreemap![]);
+    assert_eq!(batch.len(), 2);
+
+    let batch = pool.get_batch(10, txn_bytes - 1, true, false, btreemap![]);
     assert_eq!(batch.len(), 1);
 }
 

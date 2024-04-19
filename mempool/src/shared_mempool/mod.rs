@@ -3,7 +3,7 @@
 // SPDX-License-Identifier: Apache-2.0
 
 pub mod network;
-pub use network::MempoolSyncMsg;
+mod priority;
 mod runtime;
 pub(crate) mod types;
 pub use runtime::bootstrap;

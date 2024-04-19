@@ -2,6 +2,7 @@
 // Parts of the project are originally copyright © Meta Platforms, Inc.
 // SPDX-License-Identifier: Apache-2.0
 
+use super::transaction_filter_type::{Filter, Matcher};
 use crate::{
     config::{
         config_sanitizer::ConfigSanitizer, gas_estimation_config::GasEstimationConfig,
@@ -9,7 +10,7 @@ use crate::{
     },
     utils,
 };
-use aptos_types::chain_id::ChainId;
+use aptos_types::{account_address::AccountAddress, chain_id::ChainId};
 use serde::{Deserialize, Serialize};
 use std::net::SocketAddr;
 
@@ -72,6 +73,20 @@ pub struct ApiConfig {
     pub runtime_worker_multiplier: usize,
     /// Configs for computing unit gas price estimation
     pub gas_estimation: GasEstimationConfig,
+    /// Periodically call gas estimation
+    pub periodic_gas_estimation_ms: Option<u64>,
+    /// Configuration to filter simulation requests.
+    pub simulation_filter: Filter,
+    /// Configuration to filter view function requests.
+    pub view_filter: ViewFilter,
+    /// Periodically log stats for view function and simulate transaction usage
+    pub periodic_function_stats_sec: Option<u64>,
+    /// The time wait_by_hash will wait before returning 404.
+    pub wait_by_hash_timeout_ms: u64,
+    /// The interval at which wait_by_hash will poll the storage for the transaction.
+    pub wait_by_hash_poll_interval_ms: u64,
+    /// The number of active wait_by_hash requests that can be active at any given time.
+    pub wait_by_hash_max_active_connections: usize,
 }
 
 const DEFAULT_ADDRESS: &str = "127.0.0.1";
@@ -116,6 +131,13 @@ impl Default for ApiConfig {
             max_runtime_workers: None,
             runtime_worker_multiplier: 2,
             gas_estimation: GasEstimationConfig::default(),
+            periodic_gas_estimation_ms: Some(30_000),
+            simulation_filter: Filter::default(),
+            view_filter: ViewFilter::default(),
+            periodic_function_stats_sec: Some(60),
+            wait_by_hash_timeout_ms: 1_000,
+            wait_by_hash_poll_interval_ms: 20,
+            wait_by_hash_max_active_connections: 100,
         }
     }
 }
@@ -165,10 +187,62 @@ impl ConfigSanitizer for ApiConfig {
             ));
         }
 
+        // We don't support Block ID based simulation filters.
+        for rule in api_config.simulation_filter.rules() {
+            if let Matcher::BlockId(_) = rule.matcher() {
+                return Err(Error::ConfigSanitizerFailed(
+                    sanitizer_name,
+                    "Block ID based simulation filters are not supported!".into(),
+                ));
+            }
+        }
+
         // Sanitize the gas estimation config
         GasEstimationConfig::sanitize(node_config, node_type, chain_id)?;
 
         Ok(())
+    }
+}
+
+// This is necessary because we can't import the EntryFunctionId type from the API types.
+#[derive(Clone, Debug, Deserialize, PartialEq, Eq, Serialize)]
+#[serde(rename_all = "snake_case")]
+pub struct ViewFunctionId {
+    pub address: AccountAddress,
+    pub module: String,
+    pub function_name: String,
+}
+
+// We just accept Strings here because we can't import EntryFunctionId. We sanitize
+// the values later.
+#[derive(Clone, Debug, Deserialize, PartialEq, Eq, Serialize)]
+#[serde(rename_all = "snake_case")]
+pub enum ViewFilter {
+    /// Allowlist of functions. If a function is not found here, the API will refuse to
+    /// service the view / simulation request.
+    Allowlist(Vec<ViewFunctionId>),
+    /// Blocklist of functions. If a function is found here, the API will refuse to
+    /// service the view / simulation request.
+    Blocklist(Vec<ViewFunctionId>),
+}
+
+impl Default for ViewFilter {
+    fn default() -> Self {
+        ViewFilter::Blocklist(vec![])
+    }
+}
+
+impl ViewFilter {
+    /// Returns true if the given function is allowed by the filter.
+    pub fn allows(&self, address: &AccountAddress, module: &str, function: &str) -> bool {
+        match self {
+            ViewFilter::Allowlist(ids) => ids.iter().any(|id| {
+                &id.address == address && id.module == module && id.function_name == function
+            }),
+            ViewFilter::Blocklist(ids) => !ids.iter().any(|id| {
+                &id.address == address && id.module == module && id.function_name == function
+            }),
+        }
     }
 }
 

@@ -2,7 +2,6 @@
 // SPDX-License-Identifier: Apache-2.0
 
 use crate::{
-    aggregator::DelayedFieldID,
     contract_event::ContractEvent,
     state_store::state_key::StateKey,
     transaction::{BlockExecutableTransaction, Transaction},
@@ -10,6 +9,7 @@ use crate::{
 };
 use aptos_crypto::{hash::CryptoHash, HashValue};
 use move_core_types::{account_address::AccountAddress, language_storage::StructTag};
+use move_vm_types::delayed_values::delayed_field_id::DelayedFieldID;
 use serde::{Deserialize, Serialize};
 use std::fmt::Debug;
 
@@ -65,6 +65,15 @@ impl BlockExecutableTransaction for SignatureVerifiedTransaction {
     type Key = StateKey;
     type Tag = StructTag;
     type Value = WriteOp;
+
+    fn user_txn_bytes_len(&self) -> usize {
+        match self {
+            SignatureVerifiedTransaction::Valid(Transaction::UserTransaction(txn)) => {
+                txn.txn_bytes_len()
+            },
+            _ => 0,
+        }
+    }
 }
 
 impl From<Transaction> for SignatureVerifiedTransaction {

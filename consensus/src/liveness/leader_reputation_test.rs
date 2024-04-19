@@ -483,7 +483,10 @@ impl MockDbReader {
 }
 
 impl DbReader for MockDbReader {
-    fn get_latest_block_events(&self, num_events: usize) -> anyhow::Result<Vec<EventWithVersion>> {
+    fn get_latest_block_events(
+        &self,
+        num_events: usize,
+    ) -> aptos_storage_interface::Result<Vec<EventWithVersion>> {
         *self.fetched.lock() += 1;
         let events = self.events.lock();
         // println!("Events {:?}", *events);
@@ -496,7 +499,7 @@ impl DbReader for MockDbReader {
     }
 
     /// Returns the latest version, error on on non-bootstrapped DB.
-    fn get_latest_version(&self) -> anyhow::Result<Version> {
+    fn get_latest_version(&self) -> aptos_storage_interface::Result<Version> {
         let version = *self.idx.lock();
         let mut to_add = self.to_add_event_after_call.lock();
         if let Some((epoch, round)) = *to_add {
@@ -508,7 +511,10 @@ impl DbReader for MockDbReader {
 
     /// Gets the transaction accumulator root hash at specified version.
     /// Caller must guarantee the version is not greater than the latest version.
-    fn get_accumulator_root_hash(&self, _version: Version) -> anyhow::Result<HashValue> {
+    fn get_accumulator_root_hash(
+        &self,
+        _version: Version,
+    ) -> aptos_storage_interface::Result<HashValue> {
         Ok(HashValue::zero())
     }
 }

@@ -9,7 +9,7 @@ use crate::{
 };
 use anyhow::{anyhow, format_err};
 use aptos_config::config::NodeConfig;
-use aptos_db::{LEDGER_DB_NAME, STATE_MERKLE_DB_NAME};
+use aptos_db::common::{LEDGER_DB_NAME, STATE_MERKLE_DB_NAME};
 use aptos_logger::info;
 use aptos_rest_client::Client as RestClient;
 use aptos_sdk::types::PeerId;

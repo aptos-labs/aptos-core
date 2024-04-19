@@ -14,7 +14,7 @@
 use crate::options::ProverOptions;
 use move_model::{
     ast,
-    ast::{ConditionKind, Exp, ExpData, QuantKind, TempIndex},
+    ast::{ConditionKind, Exp, ExpData, QuantKind, RewriteResult, TempIndex},
     exp_generator::ExpGenerator,
     model::{FunctionEnv, Loc, NodeId, StructEnv},
     pragmas::{INTRINSIC_FUN_MAP_SPEC_GET, INTRINSIC_TYPE_MAP},
@@ -136,9 +136,9 @@ impl<'a> Instrumenter<'a> {
                             .builder
                             .mk_join_opt_bool(ast::Operation::And, Some(e), inv)
                             .unwrap();
-                        Ok(e)
+                        RewriteResult::Rewritten(e)
                     } else {
-                        Err(e)
+                        RewriteResult::Unchanged(e)
                     }
                 };
                 let exp = ExpData::rewrite(exp, &mut rewriter);
@@ -253,10 +253,10 @@ impl<'a> Instrumenter<'a> {
             // an empty argument list. It is guaranteed that this uniquely identifies the
             // target, as any other `Select` will have exactly one argument.
             let exp_rewriter = &mut |e: Exp| match e.as_ref() {
-                Call(id, oper @ Select(..), args) if args.is_empty() => {
-                    Ok(Call(*id, oper.to_owned(), vec![value.clone()]).into_exp())
-                },
-                _ => Err(e),
+                Call(id, oper @ Select(..), args) if args.is_empty() => RewriteResult::Rewritten(
+                    Call(*id, oper.to_owned(), vec![value.clone()]).into_exp(),
+                ),
+                _ => RewriteResult::Unchanged(e),
             };
             // Also instantiate types.
             let env = self.builder.global_env();

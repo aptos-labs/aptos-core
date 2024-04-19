@@ -13,12 +13,10 @@ repository = { workspace = true }
 rust-version = { workspace = true }
 
 [dependencies]
-anyhow = { workspace = true }
 aptos-cached-packages =  { workspace = true }
 aptos-crypto = { workspace = true }
 aptos-framework =  { workspace = true }
 aptos-gas-schedule = { workspace = true } 
-aptos-state-view = { workspace = true }
 aptos-types = { workspace = true }
 aptos-vm = { workspace = true }
 aptos-vm-types = { workspace = true }

@@ -12,6 +12,8 @@ use crate::{
 };
 use aptos_crypto_derive::{DeserializeKey, SerializeKey, SilentDebug, SilentDisplay};
 use core::convert::TryFrom;
+use curve25519_dalek::{edwards::CompressedEdwardsY, scalar::Scalar};
+use ed25519_dalek::ExpandedSecretKey;
 #[cfg(any(test, feature = "fuzzing"))]
 use proptest::prelude::*;
 use serde::Serialize;
@@ -38,7 +40,7 @@ pub struct Ed25519PublicKey(pub(crate) ed25519_dalek::PublicKey);
 
 impl Ed25519PrivateKey {
     /// The length of the Ed25519PrivateKey
-    pub const LENGTH: usize = ed25519_dalek::SECRET_KEY_LENGTH;
+    pub const LENGTH: usize = ED25519_PRIVATE_KEY_LENGTH;
 
     /// Serialize an Ed25519PrivateKey.
     pub fn to_bytes(&self) -> [u8; ED25519_PRIVATE_KEY_LENGTH] {
@@ -65,9 +67,22 @@ impl Ed25519PrivateKey {
         let sig = expanded_secret_key.sign(message.as_ref(), &public_key.0);
         Ed25519Signature(sig)
     }
+
+    /// Derive the actual scalar represented by the secret key.
+    /// TODO: We are temporarily breaking the abstraction here and exposing the SK scalar. In the future, we should add traits for encryption inside aptos-crypto so that we can both sign and decrypt with an Ed25519PrivateKey.
+    pub fn derive_scalar(&self) -> Scalar {
+        let expanded_bytes = ExpandedSecretKey::from(&self.0).to_bytes();
+        let bits = expanded_bytes[..32]
+            .try_into()
+            .expect("converting [u8; 64] to [u8; 32] should work");
+        Scalar::from_bits(bits).reduce()
+    }
 }
 
 impl Ed25519PublicKey {
+    /// The maximum size in bytes.
+    pub const LENGTH: usize = ED25519_PUBLIC_KEY_LENGTH;
+
     /// Serialize an Ed25519PublicKey.
     pub fn to_bytes(&self) -> [u8; ED25519_PUBLIC_KEY_LENGTH] {
         self.0.to_bytes()
@@ -121,6 +136,12 @@ impl Ed25519PublicKey {
             .to_edwards(sign)
             .ok_or(CryptoMaterialError::DeserializationError)?;
         Ed25519PublicKey::try_from(&ed_point.compress().as_bytes()[..])
+    }
+
+    /// Derive the actual curve point represented by the public key.
+    pub fn to_compressed_edwards_y(&self) -> CompressedEdwardsY {
+        let bytes = self.to_bytes();
+        CompressedEdwardsY::from_slice(bytes.as_slice())
     }
 }
 

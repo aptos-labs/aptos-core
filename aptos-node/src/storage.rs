@@ -18,7 +18,13 @@ pub(crate) fn maybe_apply_genesis(
     db_rw: &DbReaderWriter,
     node_config: &NodeConfig,
 ) -> Result<Option<LedgerInfoWithSignatures>> {
-    let genesis_waypoint = node_config.base.waypoint.genesis_waypoint();
+    // We read from the storage genesis waypoint and fallback to the node config one if it is none
+    let genesis_waypoint = node_config
+        .execution
+        .genesis_waypoint
+        .as_ref()
+        .unwrap_or(&node_config.base.waypoint)
+        .genesis_waypoint();
     if let Some(genesis) = get_genesis_txn(node_config) {
         let ledger_info_opt = maybe_bootstrap::<AptosVM>(db_rw, genesis, genesis_waypoint)
             .map_err(|err| anyhow!("DB failed to bootstrap {}", err))?;
@@ -81,10 +87,10 @@ pub(crate) fn bootstrap_db(
 pub(crate) fn bootstrap_db(
     node_config: &NodeConfig,
 ) -> Result<(Arc<dyn DbReader>, DbReaderWriter, Option<Runtime>)> {
-    use aptos_db::fake_aptosdb::FakeAptosDB;
+    use aptos_db::db::fake_aptosdb::FakeAptosDB;
 
     let aptos_db = AptosDB::open(
-        &node_config.storage.dir(),
+        node_config.storage.get_dir_paths(),
         false, /* readonly */
         node_config.storage.storage_pruner_config,
         node_config.storage.rocksdb_configs,
@@ -140,7 +146,7 @@ fn create_rocksdb_checkpoint_and_change_working_dir(
 /// the various handles.
 pub fn initialize_database_and_checkpoints(
     node_config: &mut NodeConfig,
-) -> Result<(Arc<dyn DbReader>, DbReaderWriter, Option<Runtime>, Waypoint)> {
+) -> Result<(DbReaderWriter, Option<Runtime>, Waypoint)> {
     // If required, create RocksDB checkpoints and change the working directory.
     // This is test-only.
     if let Some(working_dir) = node_config.base.working_dir.clone() {
@@ -149,7 +155,7 @@ pub fn initialize_database_and_checkpoints(
 
     // Open the database
     let instant = Instant::now();
-    let (aptos_db, db_rw, backup_service) = bootstrap_db(node_config)?;
+    let (_aptos_db, db_rw, backup_service) = bootstrap_db(node_config)?;
 
     // Log the duration to open storage
     debug!(
@@ -158,7 +164,6 @@ pub fn initialize_database_and_checkpoints(
     );
 
     Ok((
-        aptos_db,
         db_rw,
         backup_service,
         node_config.base.waypoint.genesis_waypoint(),

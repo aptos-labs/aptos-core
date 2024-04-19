@@ -20,6 +20,9 @@ module aptos_framework::transaction_fee {
     /// The burn percentage is out of range [0, 100].
     const EINVALID_BURN_PERCENTAGE: u64 = 3;
 
+    /// No longer supported.
+    const ENO_LONGER_SUPPORTED: u64 = 4;
+
     /// Stores burn capability to burn the gas fees.
     struct AptosCoinCapabilities has key {
         burn_cap: BurnCapability<AptosCoin>,
@@ -232,10 +235,9 @@ module aptos_framework::transaction_fee {
         move_to(aptos_framework, AptosCoinMintCapability { mint_cap })
     }
 
-    // Will be deleted after the mint cap is copied on both mainnet and testnet. New networks will get it from genesis.
-    public fun initialize_storage_refund(aptos_framework: &signer) {
-        let mint_cap = stake::copy_aptos_coin_mint_cap_for_storage_refund();
-        store_aptos_coin_mint_cap(aptos_framework, mint_cap);
+    #[deprecated]
+    public fun initialize_storage_refund(_: &signer) {
+        abort error::not_implemented(ENO_LONGER_SUPPORTED)
     }
 
     // Called by the VM after epilogue.

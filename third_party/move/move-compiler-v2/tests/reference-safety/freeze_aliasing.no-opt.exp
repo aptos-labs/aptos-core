@@ -1,0 +1,20 @@
+
+Diagnostics:
+error: cannot freeze local `y`  since multiple mutable references exist
+  ┌─ tests/reference-safety/freeze_aliasing.move:7:18
+  │
+5 │         let r = &mut x;
+  │                 ------ conflicting mutable local borrow
+6 │         let y = &mut x;
+  │                 ------ originating mutable local borrow
+7 │         let _z = freeze(y);
+  │                  ^^^^^^^^^ frozen here
+
+error: cannot implicitly freeze local `r` since other mutable usages for this reference exist
+   ┌─ tests/reference-safety/freeze_aliasing.move:31:48
+   │
+31 │         *vector::borrow_mut(r, *vector::borrow(r, 1)) = 4;
+   │          --------------------------------------^-----
+   │          │                                     │
+   │          │                                     implicitly frozen here
+   │          used here

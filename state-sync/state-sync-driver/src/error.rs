@@ -45,6 +45,8 @@ pub enum Error {
     VerificationError(String),
     #[error("Unexpected error: {0}")]
     UnexpectedError(String),
+    #[error("Failed to verify waypoint satisfiability: {0}")]
+    UnsatisfiableWaypoint(String),
 }
 
 impl Error {
@@ -69,6 +71,7 @@ impl Error {
             Error::SyncedBeyondTarget(_, _) => "synced_beyond_target",
             Error::VerificationError(_) => "verification_error",
             Error::UnexpectedError(_) => "unexpected_error",
+            Error::UnsatisfiableWaypoint(_) => "unsatisfiable_waypoint",
         }
     }
 }

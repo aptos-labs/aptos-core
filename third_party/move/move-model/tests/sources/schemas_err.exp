@@ -1,4 +1,4 @@
-error: undeclared `M::x`
+error: undeclared `x`
   ┌─ tests/sources/schemas_err.move:4:17
   │
 4 │         ensures x > 0;
@@ -22,29 +22,41 @@ error: `wrong` not declared in schema
 19 │         include WrongTypeArgsIncluded<num>{wrong: 1};
    │                                            ^^^^^
 
-error: expected `num` but found `bool`
+error: expected `num` but found a value of type `bool`
    ┌─ tests/sources/schemas_err.move:24:47
    │
 24 │         include WrongTypeArgsIncluded<num>{x: y};
    │                                               ^
 
-error: expected `bool` but found `num`
+error: expected `bool` but found a value of type `num`
    ┌─ tests/sources/schemas_err.move:28:48
    │
 28 │         include WrongTypeArgsIncluded<bool>{x: 1 + 2};
    │                                                ^^^^^
 
-error: expected `bool` but found `num` (for `x` included from schema)
+error: variable `x` bound by schema inclusion expected to have type `bool` but provided was `num`
    ┌─ tests/sources/schemas_err.move:33:17
    │
 33 │         include WronglyTypedVarIncluded;
    │                 ^^^^^^^^^^^^^^^^^^^^^^^
 
-error: expected `bool` but found `num` (for `x` included from schema)
+error: variable `x` bound by schema inclusion expected to have type `bool` but provided was `num`
    ┌─ tests/sources/schemas_err.move:41:17
    │
 41 │         include WronglyTypedInstantiationIncluded<num>;
    │                 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+error: `y` cannot be matched to an existing name in inclusion context
+   ┌─ tests/sources/schemas_err.move:52:17
+   │
+52 │         include UndeclaredVarInInclude;
+   │                 ^^^^^^^^^^^^^^^^^^^^^^
+
+error: `requires` not allowed in struct context (included from schema)
+   ┌─ tests/sources/schemas_err.move:70:9
+   │
+70 │         include Condition;
+   │         ^^^^^^^^^^^^^^^^^^
 
 error: cyclic schema dependency: Cycle1 -> Cycle2 -> Cycle3 -> Cycle1
    ┌─ tests/sources/schemas_err.move:80:17
@@ -52,7 +64,7 @@ error: cyclic schema dependency: Cycle1 -> Cycle2 -> Cycle3 -> Cycle1
 80 │         include Cycle1;
    │                 ^^^^^^
 
-error: expected `bool` but found `u256`
+error: expected `bool` but found a value of type `u256`
    ┌─ tests/sources/schemas_err.move:84:17
    │
 84 │         include 22 ==> Condition;
@@ -69,15 +81,3 @@ error: expression construct not supported for schemas
    │
 86 │         include Condition || Condition;
    │                 ^^^^^^^^^^^^^^^^^^^^^^
-
-error: `y` cannot be matched to an existing name in inclusion context
-   ┌─ tests/sources/schemas_err.move:52:17
-   │
-52 │         include UndeclaredVarInInclude;
-   │                 ^^^^^^^^^^^^^^^^^^^^^^
-
-error: `requires` not allowed in struct context (included from schema)
-   ┌─ tests/sources/schemas_err.move:70:9
-   │
-70 │         include Condition;
-   │         ^^^^^^^^^^^^^^^^^^

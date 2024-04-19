@@ -5,25 +5,24 @@
 use anyhow::format_err;
 use aptos_crypto::HashValue;
 use aptos_gas_schedule::{MiscGasParameters, NativeGasParameters, LATEST_GAS_FEATURE_VERSION};
-use aptos_state_view::StateView;
 use aptos_types::{
     account_address::AccountAddress,
     account_config::{self, aptos_test_root_address},
     on_chain_config::{Features, TimedFeaturesBuilder},
+    state_store::StateView,
     transaction::{ChangeSet, Script, Version},
 };
 use aptos_vm::{
     data_cache::AsMoveResolver,
     move_vm_ext::{MoveVmExt, SessionExt, SessionId},
 };
-use aptos_vm_types::storage::ChangeSetConfigs;
+use aptos_vm_types::storage::change_set_configs::ChangeSetConfigs;
 use move_core_types::{
     identifier::Identifier,
     language_storage::{ModuleId, TypeTag},
     transaction_argument::convert_txn_args,
     value::{serialize_values, MoveValue},
 };
-use move_vm_runtime::session::SerializedReturnValues;
 use move_vm_types::gas::UnmeteredGasMeter;
 
 pub struct GenesisSession<'r, 'l>(SessionExt<'r, 'l>);
@@ -57,11 +56,7 @@ impl<'r, 'l> GenesisSession<'r, 'l> {
             });
     }
 
-    pub fn exec_script(
-        &mut self,
-        sender: AccountAddress,
-        script: &Script,
-    ) -> SerializedReturnValues {
+    pub fn exec_script(&mut self, sender: AccountAddress, script: &Script) {
         let mut temp = vec![sender.to_vec()];
         temp.extend(convert_txn_args(script.args()));
         self.0
@@ -118,6 +113,7 @@ where
         Features::default(),
         TimedFeaturesBuilder::enable_all().build(),
         &resolver,
+        false,
     )
     .unwrap();
     let change_set = {
@@ -130,10 +126,9 @@ where
         session.enable_reconfiguration();
         session
             .0
-            .finish(
-                &mut (),
-                &ChangeSetConfigs::unlimited_at_gas_feature_version(LATEST_GAS_FEATURE_VERSION),
-            )
+            .finish(&ChangeSetConfigs::unlimited_at_gas_feature_version(
+                LATEST_GAS_FEATURE_VERSION,
+            ))
             .map_err(|err| format_err!("Unexpected VM Error: {:?}", err))
             .unwrap()
     };

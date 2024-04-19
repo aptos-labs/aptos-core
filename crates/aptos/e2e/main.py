@@ -4,9 +4,9 @@
 # SPDX-License-Identifier: Apache-2.0
 
 """
-This script is how we orchestrate running a local testnet and then running CLI tests against it. There are two different CLIs used for this:
+This script is how we orchestrate running a localnet and then running CLI tests against it. There are two different CLIs used for this:
 
-1. Base: For running the local testnet. This is what the --base-network flag and all other flags starting with --base are for.
+1. Base: For running the localnet. This is what the --base-network flag and all other flags starting with --base are for.
 2. Test: The CLI that we're testing. This is what the --test-cli-tag / --test-cli-path and all other flags starting with --test are for.
 
 Example (testing CLI in image):
@@ -15,7 +15,7 @@ Example (testing CLI in image):
 Example (testing locally built CLI binary):
   python3 main.py --base-network devnet --test-cli-path ~/aptos-core/target/release/aptos
 
-This means, run the CLI test suite using a CLI built from mainnet_0431e2251d0b42920d89a52c63439f7b9eda6ac3 against a local testnet built from the testnet branch of aptos-core.
+This means, run the CLI test suite using a CLI built from mainnet_0431e2251d0b42920d89a52c63439f7b9eda6ac3 against a localnet built from the testnet branch of aptos-core.
 
 Example (using a different image repo):
   See ~/.github/workflows/cli-e2e-tests.yaml
@@ -25,7 +25,9 @@ When the test suite is complete, it will tell you which tests passed and which f
 
 import argparse
 import logging
+import os
 import pathlib
+import platform
 import shutil
 import sys
 
@@ -89,7 +91,7 @@ def parse_args():
         "--image-repo-with-project",
         default="aptoslabs",
         help=(
-            "What docker image repo (+ project) to use for the local testnet. "
+            "What docker image repo (+ project) to use for the localnet. "
             "By default we use Docker Hub: %(default)s (so, just aptoslabs for the "
             "project since Docker Hub is the implied default repo). If you want to "
             "specify a different repo, it might look like this: "
@@ -101,7 +103,7 @@ def parse_args():
         required=True,
         type=Network,
         choices=list(Network),
-        help="What branch the Aptos CLI used for the local testnet should be built from",
+        help="What branch the Aptos CLI used for the localnet should be built from",
     )
     parser.add_argument(
         "--base-startup-timeout",
@@ -126,7 +128,7 @@ def parse_args():
     parser.add_argument(
         "--no-pull-always",
         action="store_true",
-        help='If set, do not set "--pull always" when running the local testnet. Necessary for using local images.',
+        help='If set, do not set "--pull always" when running the localnet. Necessary for using local images.',
     )
     args = parser.parse_args()
     return args
@@ -193,13 +195,23 @@ def main():
     shutil.rmtree(args.working_directory, ignore_errors=True)
     pathlib.Path(args.working_directory).mkdir(parents=True, exist_ok=True)
 
+    # If we're on Mac and DOCKER_DEFAULT_PLATFORM is not already set, set it to
+    # linux/amd64 since we only publish images for that platform.
+    if platform.system().lower() == "darwin" and platform.processor().lower().startswith("arm"):
+        if not os.environ.get("DOCKER_DEFAULT_PLATFORM"):
+            os.environ["DOCKER_DEFAULT_PLATFORM"] = "linux/amd64"
+            LOG.info(
+                "Detected ARM Mac and DOCKER_DEFAULT_PLATFORM was not set, setting it "
+                "to linux/amd64"
+            )
+
     # Run a node + faucet and wait for them to start up.
     container_name = run_node(
         args.base_network, args.image_repo_with_project, not args.no_pull_always
     )
 
     # We run these in a try finally so that if something goes wrong, such as the
-    # local testnet not starting up correctly or some unexpected error in the
+    # localnet not starting up correctly or some unexpected error in the
     # test framework, we still stop the node + faucet.
     try:
         wait_for_startup(container_name, args.base_startup_timeout)

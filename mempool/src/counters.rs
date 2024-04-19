@@ -5,8 +5,9 @@
 use aptos_config::network_id::{NetworkId, PeerNetworkId};
 use aptos_metrics_core::{
     exponential_buckets, histogram_opts, op_counters::DurationHistogram, register_histogram,
-    register_histogram_vec, register_int_counter, register_int_counter_vec, register_int_gauge_vec,
-    Histogram, HistogramTimer, HistogramVec, IntCounter, IntCounterVec, IntGauge, IntGaugeVec,
+    register_histogram_vec, register_int_counter, register_int_counter_vec, register_int_gauge,
+    register_int_gauge_vec, Histogram, HistogramTimer, HistogramVec, IntCounter, IntCounterVec,
+    IntGauge, IntGaugeVec,
 };
 use aptos_short_hex_str::AsShortHexStr;
 use once_cell::sync::Lazy;
@@ -32,6 +33,8 @@ pub const CONSENSUS_READY_LABEL: &str = "consensus_ready";
 pub const CONSENSUS_PULLED_LABEL: &str = "consensus_pulled";
 pub const BROADCAST_READY_LABEL: &str = "broadcast_ready";
 pub const BROADCAST_BATCHED_LABEL: &str = "broadcast_batched";
+pub const PARKED_TIME_LABEL: &str = "parked_time";
+pub const NON_PARKED_COMMIT_ACCEPTED_LABEL: &str = "non_park_commit_accepted";
 
 // Core mempool GC type labels
 pub const GC_SYSTEM_TTL_LABEL: &str = "system_ttl";
@@ -110,26 +113,14 @@ const RANKING_SCORE_BUCKETS: &[f64] = &[
     10000.0, 14678.0, 21544.0, 31623.0, 46416.0, 68129.0, 100000.0, 146780.0, 215443.0,
 ];
 
+const TXN_CONSENSUS_PULLED_BUCKETS: &[f64] = &[1.0, 2.0, 3.0, 4.0, 5.0, 10.0, 25.0, 50.0, 100.0];
+
 static TRANSACTION_COUNT_BUCKETS: Lazy<Vec<f64>> = Lazy::new(|| {
     exponential_buckets(
         /*start=*/ 1.5, /*factor=*/ 1.5, /*count=*/ 20,
     )
     .unwrap()
 });
-
-#[cfg(test)]
-mod test {
-    use crate::counters::RANKING_SCORE_BUCKETS;
-
-    #[test]
-    fn generate_ranking_score_buckets() {
-        let buckets: Vec<f64> = (0..21)
-            .map(|n| 100.0 * (10.0_f64.powf(n as f64 / 6.0)))
-            .map(|f| f.round())
-            .collect();
-        assert_eq!(RANKING_SCORE_BUCKETS, &buckets);
-    }
-}
 
 /// Counter tracking size of various indices in core mempool
 pub static CORE_MEMPOOL_INDEX_SIZE: Lazy<IntGaugeVec> = Lazy::new(|| {
@@ -263,6 +254,15 @@ pub static CORE_MEMPOOL_GC_LATENCY: Lazy<HistogramVec> = Lazy::new(|| {
         "aptos_core_mempool_gc_latency",
         "How long a transaction stayed in core mempool before garbage-collected",
         &["type", "status"]
+    )
+    .unwrap()
+});
+
+pub static CORE_MEMPOOL_TXN_CONSENSUS_PULLED: Lazy<Histogram> = Lazy::new(|| {
+    register_histogram!(
+        "aptos_core_mempool_txn_consensus_pulled",
+        "Number of times a txn was pulled from core mempool by consensus",
+        TXN_CONSENSUS_PULLED_BUCKETS.to_vec()
     )
     .unwrap()
 });
@@ -430,6 +430,19 @@ pub fn shared_mempool_pending_broadcasts(peer: &PeerNetworkId) -> IntGauge {
         peer.network_id().as_str(),
         peer.peer_id().short_str().as_str(),
     ])
+}
+
+/// Counter tracking the number of peers that changed priority in shared mempool
+pub static SHARED_MEMPOOL_PRIORITY_CHANGE_COUNT: Lazy<IntGauge> = Lazy::new(|| {
+    register_int_gauge!(
+        "aptos_shared_mempool_priority_change_count",
+        "Number of peers that changed priority in shared mempool",
+    )
+    .unwrap()
+});
+
+pub fn shared_mempool_priority_change_count(change_count: i64) {
+    SHARED_MEMPOOL_PRIORITY_CHANGE_COUNT.set(change_count);
 }
 
 static SHARED_MEMPOOL_TRANSACTIONS_PROCESSED: Lazy<IntCounterVec> = Lazy::new(|| {
@@ -616,3 +629,17 @@ pub static MAIN_LOOP: Lazy<DurationHistogram> = Lazy::new(|| {
         .unwrap(),
     )
 });
+
+#[cfg(test)]
+mod test {
+    use crate::counters::RANKING_SCORE_BUCKETS;
+
+    #[test]
+    fn generate_ranking_score_buckets() {
+        let buckets: Vec<f64> = (0..21)
+            .map(|n| 100.0 * (10.0_f64.powf(n as f64 / 6.0)))
+            .map(|f| f.round())
+            .collect();
+        assert_eq!(RANKING_SCORE_BUCKETS, &buckets);
+    }
+}

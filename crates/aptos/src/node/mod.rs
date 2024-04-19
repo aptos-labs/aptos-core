@@ -4,7 +4,7 @@
 pub mod analyze;
 pub mod local_testnet;
 
-use self::local_testnet::RunLocalTestnet;
+use self::local_testnet::RunLocalnet;
 use crate::{
     common::{
         types::{
@@ -76,7 +76,8 @@ pub enum NodeTool {
     ShowValidatorConfig(ShowValidatorConfig),
     ShowValidatorSet(ShowValidatorSet),
     ShowValidatorStake(ShowValidatorStake),
-    RunLocalTestnet(RunLocalTestnet),
+    #[clap(aliases = &["run-local-testnet"])]
+    RunLocalnet(RunLocalnet),
     UpdateConsensusKey(UpdateConsensusKey),
     UpdateValidatorNetworkAddresses(UpdateValidatorNetworkAddresses),
 }
@@ -100,7 +101,7 @@ impl NodeTool {
             ShowValidatorSet(tool) => tool.execute_serialized().await,
             ShowValidatorStake(tool) => tool.execute_serialized().await,
             ShowValidatorConfig(tool) => tool.execute_serialized().await,
-            RunLocalTestnet(tool) => tool
+            RunLocalnet(tool) => tool
                 .execute_serialized_without_logger()
                 .await
                 .map(|_| "".to_string()),
@@ -1435,6 +1436,7 @@ impl Time {
     pub fn new(time: Duration) -> Self {
         let date_time =
             NaiveDateTime::from_timestamp_opt(time.as_secs() as i64, time.subsec_nanos()).unwrap();
+        #[allow(deprecated)]
         let utc_time = DateTime::from_utc(date_time, Utc);
         // TODO: Allow configurable time zone
         Self {

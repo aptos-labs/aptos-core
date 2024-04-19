@@ -1,4 +1,28 @@
 spec aptos_framework::transaction_validation {
+    /// <high-level-req>
+    /// No.: 1
+    /// Requirement: The sender of a transaction should have sufficient coin balance to pay the transaction fee.
+    /// Criticality: High
+    /// Implementation: The prologue_common function asserts that the transaction sender has enough coin balance to be
+    /// paid as the max_transaction_fee.
+    /// Enforcement: Formally verified via [high-level-req-1](PrologueCommonAbortsIf). Moreover, the native transaction validation patterns have been manually audited.
+    ///
+    /// No.: 2
+    /// Requirement: All secondary signer addresses are verified to be authentic through a validation process.
+    /// Criticality: Critical
+    /// Implementation: The function multi_agent_script_prologue ensures that each secondary signer address undergoes
+    /// authentication validation, including verification of account existence and authentication key matching,
+    /// confirming their authenticity.
+    /// Enforcement: Formally verified via [high-level-req-2](multi_agent_script_prologue). Moreover, the native transaction validation patterns have been manually audited.
+    ///
+    /// No.: 3
+    /// Requirement: After successful execution, base the transaction fee on the configuration set by the features library.
+    /// Criticality: High
+    /// Implementation: The epilogue function collects the transaction fee for either redistribution or burning based on
+    /// the feature::collect_and_distribute_gas_fees result.
+    /// Enforcement: Formally Verified via [high-level-req-3](epilogue). Moreover, the native transaction validation patterns have been manually audited.
+    /// </high-level-req>
+    ///
     spec module {
         pragma verify = true;
         pragma aborts_if_is_strict;
@@ -69,6 +93,7 @@ spec aptos_framework::transaction_validation {
         aborts_if max_transaction_fee > MAX_U64;
         aborts_if !exists<CoinStore<AptosCoin>>(gas_payer);
         // property 1: The sender of a transaction should have sufficient coin balance to pay the transaction fee.
+        /// [high-level-req-1]
         aborts_if !(global<CoinStore<AptosCoin>>(gas_payer).coin.value >= max_transaction_fee);
     }
 
@@ -82,22 +107,8 @@ spec aptos_framework::transaction_validation {
         txn_expiration_time: u64,
         chain_id: u8,
     ) {
-        include PrologueCommonAbortsIf;
-    }
 
-    spec module_prologue(
-        sender: signer,
-        txn_sequence_number: u64,
-        txn_public_key: vector<u8>,
-        txn_gas_price: u64,
-        txn_max_gas_units: u64,
-        txn_expiration_time: u64,
-        chain_id: u8,
-    ) {
-        include PrologueCommonAbortsIf {
-            gas_payer: signer::address_of(sender),
-            txn_authentication_key: txn_public_key
-        };
+        include PrologueCommonAbortsIf;
     }
 
     spec script_prologue(
@@ -126,6 +137,7 @@ spec aptos_framework::transaction_validation {
 
         // If any account does not exist, or public key hash does not match, abort.
         // property 2: All secondary signer addresses are verified to be authentic through a validation process.
+        /// [high-level-req-2]
         aborts_if exists i in 0..num_secondary_signers:
             !account::exists_at(secondary_signer_addresses[i])
                 || secondary_signer_public_key_hashes[i] !=
@@ -279,6 +291,7 @@ spec aptos_framework::transaction_validation {
         let aggr_val = aggregator::spec_aggregator_get_val(aggr);
         let aggr_lim = aggregator::spec_get_limit(aggr);
 
+        /// [high-level-req-3]
         aborts_if collect_fee_enabled && !exists<CollectedFeesPerBlock>(@aptos_framework);
         aborts_if collect_fee_enabled && transaction_fee_amount > 0 && aggr_val + transaction_fee_amount > aggr_lim;
 
@@ -320,6 +333,29 @@ spec aptos_framework::transaction_validation {
         let aptos_addr = type_info::type_of<AptosCoin>().account_address;
         aborts_if (amount_to_mint != 0) && !exists<coin::CoinInfo<AptosCoin>>(aptos_addr);
         include coin::CoinAddAbortsIf<AptosCoin> { amount: amount_to_mint };
+    }
 
+    spec collect_deposit {
+        pragma verify = false;
+    }
+
+    spec return_deposit {
+        pragma verify = false;
+    }
+
+    spec fee_payer_script_prologue_collect_deposit {
+        pragma verify = false;
+    }
+
+    spec script_prologue_collect_deposit {
+        pragma verify = false;
+    }
+
+    spec epilogue_gas_payer_return_deposit {
+        pragma verify = false;
+    }
+
+    spec epilogue_return_deposit {
+        pragma verify = false;
     }
 }

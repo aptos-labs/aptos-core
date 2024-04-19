@@ -496,7 +496,14 @@ fn serialize_function_handle(
     serialize_ability_sets(binary, &function_handle.type_parameters)?;
     if major_version >= VERSION_7 {
         serialize_access_specifiers(binary, &function_handle.access_specifiers)
-    } else if function_handle.access_specifiers.is_some() {
+    } else if function_handle.access_specifiers.is_some()
+        && function_handle
+            .access_specifiers
+            .as_ref()
+            .unwrap()
+            .iter()
+            .any(|sp| !sp.is_old_style_acquires())
+    {
         Err(anyhow!(
             "Access specifiers not supported in bytecode version {}",
             major_version

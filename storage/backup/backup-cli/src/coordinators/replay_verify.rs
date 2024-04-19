@@ -16,6 +16,7 @@ use anyhow::Result;
 use aptos_db::backup::restore_handler::RestoreHandler;
 use aptos_executor_types::VerifyExecutionMode;
 use aptos_logger::prelude::*;
+use aptos_storage_interface::AptosDbError;
 use aptos_types::{on_chain_config::TimedFeatureOverride, transaction::Version};
 use aptos_vm::AptosVM;
 use std::sync::Arc;
@@ -31,6 +32,12 @@ pub enum ReplayError {
 
 impl From<anyhow::Error> for ReplayError {
     fn from(error: anyhow::Error) -> Self {
+        ReplayError::OtherError(error.to_string())
+    }
+}
+
+impl From<AptosDbError> for ReplayError {
+    fn from(error: AptosDbError) -> Self {
         ReplayError::OtherError(error.to_string())
     }
 }
@@ -144,6 +151,9 @@ impl ReplayVerifyCoordinator {
             );
         }
 
+        // Once it begins replay, we want to directly start from the version that failed
+        let save_start_version = (next_txn_version > 0).then_some(next_txn_version);
+
         next_txn_version = std::cmp::max(next_txn_version, snapshot_version.map_or(0, |v| v + 1));
 
         let transactions = metadata_view.select_transaction_backups(
@@ -185,7 +195,7 @@ impl ReplayVerifyCoordinator {
                 .into_iter()
                 .map(|t| t.manifest)
                 .collect::<Vec<_>>(),
-            None,
+            save_start_version,
             Some((next_txn_version, false)), /* replay_from_version */
             None,                            /* epoch_history */
             self.verify_execution_mode.clone(),

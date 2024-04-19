@@ -21,7 +21,7 @@ use aptos_network::{
         interface::{NetworkClient, NetworkServiceEvents},
         storage::PeersAndMetadata,
     },
-    peer_manager::{conn_notifs_channel, ConnectionRequestSender, PeerManagerRequestSender},
+    peer_manager::{ConnectionRequestSender, PeerManagerRequestSender},
     protocols::{
         network::{NetworkEvents, NetworkSender, NewNetworkEvents, NewNetworkSender},
         wire::handshake::v1::ProtocolId::MempoolDirectSend,
@@ -42,11 +42,11 @@ use std::{
     collections::{BTreeMap, HashMap},
     sync::Arc,
 };
-use tokio::runtime::{Handle, Runtime};
+use tokio::runtime::Handle;
 
 /// Mock of a running instance of shared mempool.
 pub struct MockSharedMempool {
-    _runtime: Option<Runtime>,
+    _runtime: Option<Handle>,
     _handle: Option<Handle>,
     pub ac_client: MempoolClientSender,
     pub mempool: Arc<Mutex<CoreMempool>>,
@@ -59,21 +59,30 @@ impl MockSharedMempool {
     /// Returns the runtime on which the shared mempool is running
     /// and the channel through which shared mempool receives client events.
     pub fn new() -> Self {
-        let runtime = aptos_runtimes::spawn_named_runtime("shared-mem".into(), None);
-        let _entered_runtime = runtime.enter();
+        // Create the shared mempool
         let (ac_client, mempool, quorum_store_sender, mempool_notifier) = Self::start(
-            runtime.handle(),
+            &Handle::current(),
             &DbReaderWriter::new(MockDbReaderWriter),
             MockVMValidator,
         );
         Self {
-            _runtime: Some(runtime),
+            _runtime: Some(Handle::current()),
             _handle: None,
             ac_client,
             mempool,
             consensus_to_mempool_sender: quorum_store_sender,
             mempool_notifier,
         }
+    }
+
+    /// Creates a mock shared mempool and runtime
+    pub fn new_with_runtime() -> Self {
+        // Create a runtime
+        let runtime = aptos_runtimes::spawn_named_runtime("shared-mem".into(), None);
+        let _entered_runtime = runtime.enter();
+
+        // Create and return the shared mempool
+        Self::new()
     }
 
     /// Creates a mock of a running instance of shared mempool inside a tokio runtime;
@@ -112,16 +121,15 @@ impl MockSharedMempool {
         let (network_reqs_tx, _network_reqs_rx) = aptos_channel::new(QueueStyle::FIFO, 8, None);
         let (connection_reqs_tx, _) = aptos_channel::new(QueueStyle::FIFO, 8, None);
         let (_network_notifs_tx, network_notifs_rx) = aptos_channel::new(QueueStyle::FIFO, 8, None);
-        let (_, conn_notifs_rx) = conn_notifs_channel::new();
         let network_sender = NetworkSender::new(
             PeerManagerRequestSender::new(network_reqs_tx),
             ConnectionRequestSender::new(connection_reqs_tx),
         );
-        let network_events = NetworkEvents::new(network_notifs_rx, conn_notifs_rx, None);
+        let network_events = NetworkEvents::new(network_notifs_rx, None);
         let (ac_client, client_events) = mpsc::channel(1_024);
         let (quorum_store_sender, quorum_store_receiver) = mpsc::channel(1_024);
         let (mempool_notifier, mempool_listener) =
-            aptos_mempool_notifications::new_mempool_notifier_listener_pair();
+            aptos_mempool_notifications::new_mempool_notifier_listener_pair(100);
         let (reconfig_sender, reconfig_events) = aptos_channel::new(QueueStyle::LIFO, 1, None);
         let reconfig_event_subscriber = ReconfigNotificationListener {
             notification_receiver: reconfig_events,

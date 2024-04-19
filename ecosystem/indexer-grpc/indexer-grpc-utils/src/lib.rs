@@ -2,9 +2,12 @@
 // SPDX-License-Identifier: Apache-2.0
 
 pub mod cache_operator;
+pub mod compression_util;
 pub mod config;
 pub mod constants;
+pub mod counters;
 pub mod file_store_operator;
+pub mod in_memory_cache;
 pub mod types;
 
 use anyhow::{Context, Result};
@@ -15,9 +18,16 @@ use aptos_protos::{
 };
 use prost::Message;
 use std::time::Duration;
+use tonic::codec::CompressionEncoding;
 use url::Url;
 
 pub type GrpcClientType = FullnodeDataClient<tonic::transport::Channel>;
+
+/// The default file storage format is JsonBase64UncompressedProto.
+/// This is only used in file store metadata for backward compatibility.
+pub fn default_file_storage_format() -> compression_util::StorageFormat {
+    compression_util::StorageFormat::JsonBase64UncompressedProto
+}
 
 /// Create a gRPC client with exponential backoff.
 pub async fn create_grpc_client(address: Url) -> GrpcClientType {
@@ -30,7 +40,10 @@ pub async fn create_grpc_client(address: Url) -> GrpcClientType {
                 );
                 Ok(client
                     .max_decoding_message_size(usize::MAX)
-                    .max_encoding_message_size(usize::MAX))
+                    .max_encoding_message_size(usize::MAX)
+                    .send_compressed(CompressionEncoding::Gzip)
+                    .accept_compressed(CompressionEncoding::Gzip)
+                    .accept_compressed(CompressionEncoding::Zstd))
             },
             Err(e) => {
                 tracing::error!(
@@ -82,21 +95,6 @@ pub async fn create_data_service_grpc_client(
     Ok(client)
 }
 
-// (Protobuf encoded transaction, version)
-pub type EncodedTransactionWithVersion = (String, u64);
-/// Build the EncodedTransactionWithVersion from the encoded transactions and starting version.
-#[inline]
-pub fn build_protobuf_encoded_transaction_wrappers(
-    encoded_transactions: Vec<String>,
-    starting_version: u64,
-) -> Vec<EncodedTransactionWithVersion> {
-    encoded_transactions
-        .into_iter()
-        .enumerate()
-        .map(|(ind, encoded_transaction)| (encoded_transaction, starting_version + ind as u64))
-        .collect()
-}
-
 pub fn time_diff_since_pb_timestamp_in_secs(timestamp: &Timestamp) -> f64 {
     let current_timestamp = std::time::SystemTime::now()
         .duration_since(std::time::UNIX_EPOCH)
@@ -104,6 +102,22 @@ pub fn time_diff_since_pb_timestamp_in_secs(timestamp: &Timestamp) -> f64 {
         .as_secs_f64();
     let transaction_time = timestamp.seconds as f64 + timestamp.nanos as f64 * 1e-9;
     current_timestamp - transaction_time
+}
+
+/// Convert the protobuf timestamp to ISO format
+pub fn timestamp_to_iso(timestamp: &Timestamp) -> String {
+    let dt = parse_timestamp(timestamp, 0);
+    dt.format("%Y-%m-%dT%H:%M:%S%.9fZ").to_string()
+}
+
+/// Convert the protobuf timestamp to unixtime
+pub fn timestamp_to_unixtime(timestamp: &Timestamp) -> f64 {
+    timestamp.seconds as f64 + timestamp.nanos as f64 * 1e-9
+}
+
+pub fn parse_timestamp(ts: &Timestamp, version: i64) -> chrono::NaiveDateTime {
+    chrono::NaiveDateTime::from_timestamp_opt(ts.seconds, ts.nanos as u32)
+        .unwrap_or_else(|| panic!("Could not parse timestamp {:?} for version {}", ts, version))
 }
 
 /// Chunk transactions into chunks with chunk size less than or equal to chunk_size.

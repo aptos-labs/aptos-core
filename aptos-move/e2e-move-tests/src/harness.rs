@@ -1,23 +1,22 @@
 // Copyright © Aptos Foundation
 // SPDX-License-Identifier: Apache-2.0
 
-use crate::{assert_success, AptosPackageHooks};
-use anyhow::Error;
+use crate::{assert_success, build_package, AptosPackageHooks};
 use aptos_cached_packages::aptos_stdlib;
-use aptos_crypto::{ed25519::Ed25519PrivateKey, PrivateKey, Uniform};
 use aptos_framework::{natives::code::PackageMetadata, BuildOptions, BuiltPackage};
 use aptos_gas_profiling::TransactionGasLog;
 use aptos_gas_schedule::{
     AptosGasParameters, FromOnChainGasSchedule, InitialGasSchedule, ToOnChainGasSchedule,
 };
 use aptos_language_e2e_tests::{
-    account::{Account, AccountData},
+    account::{Account, AccountData, TransactionBuilder},
     executor::FakeExecutor,
 };
 use aptos_types::{
     access_path::AccessPath,
     account_address::AccountAddress,
     account_config::{AccountResource, CoinStoreResource, CORE_CODE_ADDRESS},
+    chain_id::ChainId,
     contract_event::ContractEvent,
     move_utils::MemberId,
     on_chain_config::{FeatureFlag, GasScheduleV2, OnChainConfig},
@@ -27,10 +26,11 @@ use aptos_types::{
     },
     transaction::{
         EntryFunction, Script, SignedTransaction, TransactionArgument, TransactionOutput,
-        TransactionPayload, TransactionStatus,
+        TransactionPayload, TransactionStatus, ViewFunctionOutput,
     },
 };
 use aptos_vm::{data_cache::AsMoveResolver, AptosVM};
+use claims::assert_ok;
 use move_core_types::{
     language_storage::{StructTag, TypeTag},
     move_resource::MoveStructType,
@@ -40,10 +40,6 @@ use move_package::package_hooks::register_package_hooks;
 use once_cell::sync::Lazy;
 use project_root::get_project_root;
 use proptest::strategy::{BoxedStrategy, Just, Strategy};
-use rand::{
-    rngs::{OsRng, StdRng},
-    Rng, SeedableRng,
-};
 use serde::{de::DeserializeOwned, Serialize};
 use std::{
     collections::{BTreeMap, HashMap},
@@ -80,7 +76,8 @@ pub struct MoveHarness {
     /// The last counted transaction sequence number, by account address.
     txn_seq_no: BTreeMap<AccountAddress, u64>,
 
-    default_gas_unit_price: u64,
+    pub default_gas_unit_price: u64,
+    max_gas_per_txn: u64,
 }
 
 #[derive(Debug, Clone, Copy, Eq, PartialEq)]
@@ -91,6 +88,8 @@ pub enum BlockSplit {
 }
 
 impl MoveHarness {
+    const DEFAULT_MAX_GAS_PER_TXN: u64 = 2_000_000;
+
     /// Creates a new harness.
     pub fn new() -> Self {
         register_package_hooks(Box::new(AptosPackageHooks {}));
@@ -98,6 +97,7 @@ impl MoveHarness {
             executor: FakeExecutor::from_head_genesis(),
             txn_seq_no: BTreeMap::default(),
             default_gas_unit_price: DEFAULT_GAS_UNIT_PRICE,
+            max_gas_per_txn: Self::DEFAULT_MAX_GAS_PER_TXN,
         }
     }
 
@@ -107,6 +107,7 @@ impl MoveHarness {
             executor,
             txn_seq_no: BTreeMap::default(),
             default_gas_unit_price: DEFAULT_GAS_UNIT_PRICE,
+            max_gas_per_txn: Self::DEFAULT_MAX_GAS_PER_TXN,
         }
     }
 
@@ -116,6 +117,7 @@ impl MoveHarness {
             executor: FakeExecutor::from_head_genesis_with_count(count),
             txn_seq_no: BTreeMap::default(),
             default_gas_unit_price: DEFAULT_GAS_UNIT_PRICE,
+            max_gas_per_txn: Self::DEFAULT_MAX_GAS_PER_TXN,
         }
     }
 
@@ -125,6 +127,7 @@ impl MoveHarness {
             executor: FakeExecutor::from_testnet_genesis(),
             txn_seq_no: BTreeMap::default(),
             default_gas_unit_price: DEFAULT_GAS_UNIT_PRICE,
+            max_gas_per_txn: Self::DEFAULT_MAX_GAS_PER_TXN,
         }
     }
 
@@ -143,7 +146,15 @@ impl MoveHarness {
             executor: FakeExecutor::from_mainnet_genesis(),
             txn_seq_no: BTreeMap::default(),
             default_gas_unit_price: DEFAULT_GAS_UNIT_PRICE,
+            max_gas_per_txn: Self::DEFAULT_MAX_GAS_PER_TXN,
         }
+    }
+
+    pub fn store_and_fund_account(&mut self, acc: &Account, balance: u64, seq_num: u64) -> Account {
+        let data = AccountData::with_account(acc.clone(), balance, seq_num);
+        self.executor.add_account_data(&data);
+        self.txn_seq_no.insert(*acc.address(), seq_num);
+        data.account().clone()
     }
 
     /// Creates an account for the given static address. This address needs to be static so
@@ -152,23 +163,13 @@ impl MoveHarness {
         // The below will use the genesis keypair but that should be fine.
         let acc = Account::new_genesis_account(addr);
         // Mint the account 10M Aptos coins (with 8 decimals).
-        let data = AccountData::with_account(acc, 1_000_000_000_000_000, 10);
-        self.executor.add_account_data(&data);
-        self.txn_seq_no.insert(addr, 10);
-        data.account().clone()
+        self.store_and_fund_account(&acc, 1_000_000_000_000_000, 10)
     }
 
     // Creates an account with a randomly generated address and key pair
     pub fn new_account_with_key_pair(&mut self) -> Account {
-        let mut rng = StdRng::from_seed(OsRng.gen());
-
-        let privkey = Ed25519PrivateKey::generate(&mut rng);
-        let pubkey = privkey.public_key();
-        let acc = Account::with_keypair(privkey, pubkey);
-        let data = AccountData::with_account(acc.clone(), 1_000_000_000_000_000, 0);
-        self.executor.add_account_data(&data);
-        self.txn_seq_no.insert(*acc.address(), 0);
-        data.account().clone()
+        // Mint the account 10M Aptos coins (with 8 decimals).
+        self.store_and_fund_account(&Account::new(), 1_000_000_000_000_000, 0)
     }
 
     pub fn new_account_with_balance_and_sequence_number(
@@ -176,15 +177,7 @@ impl MoveHarness {
         balance: u64,
         sequence_number: u64,
     ) -> Account {
-        let mut rng = StdRng::from_seed(OsRng.gen());
-
-        let privkey = Ed25519PrivateKey::generate(&mut rng);
-        let pubkey = privkey.public_key();
-        let acc = Account::with_keypair(privkey, pubkey);
-        let data = AccountData::with_account(acc.clone(), balance, sequence_number);
-        self.executor.add_account_data(&data);
-        self.txn_seq_no.insert(*acc.address(), sequence_number);
-        data.account().clone()
+        self.store_and_fund_account(&Account::new(), balance, sequence_number)
     }
 
     /// Gets the account where the Aptos framework is installed (0x1).
@@ -231,12 +224,26 @@ impl MoveHarness {
         result
     }
 
-    /// Creates a transaction, based on provided payload.
-    pub fn create_transaction_payload(
+    /// Runs a block of signed transactions. On success, applies the write set.
+    pub fn run_block_get_output(
+        &mut self,
+        txn_block: Vec<SignedTransaction>,
+    ) -> Vec<TransactionOutput> {
+        let result = assert_ok!(self.executor.execute_block(txn_block));
+        for output in &result {
+            if matches!(output.status(), TransactionStatus::Keep(_)) {
+                self.executor.apply_write_set(output.write_set());
+            }
+        }
+        result
+    }
+
+    /// Creates a transaction without signing it
+    pub fn create_transaction_without_sign(
         &mut self,
         account: &Account,
         payload: TransactionPayload,
-    ) -> SignedTransaction {
+    ) -> TransactionBuilder {
         let on_chain_seq_no = self.sequence_number(account.address());
         let seq_no_ref = self.txn_seq_no.get_mut(account.address()).unwrap();
         let seq_no = std::cmp::max(on_chain_seq_no, *seq_no_ref);
@@ -244,9 +251,30 @@ impl MoveHarness {
         account
             .transaction()
             .sequence_number(seq_no)
-            .max_gas_amount(2_000_000)
+            .max_gas_amount(self.max_gas_per_txn)
             .gas_unit_price(self.default_gas_unit_price)
             .payload(payload)
+    }
+
+    /// Creates a transaction, based on provided payload.
+    /// The chain_id is by default for test
+    pub fn create_transaction_payload(
+        &mut self,
+        account: &Account,
+        payload: TransactionPayload,
+    ) -> SignedTransaction {
+        self.create_transaction_without_sign(account, payload)
+            .sign()
+    }
+
+    /// Creates a transaction to be sent to mainnet
+    pub fn create_transaction_payload_mainnet(
+        &mut self,
+        account: &Account,
+        payload: TransactionPayload,
+    ) -> SignedTransaction {
+        self.create_transaction_without_sign(account, payload)
+            .chain_id(ChainId::mainnet())
             .sign()
     }
 
@@ -258,6 +286,17 @@ impl MoveHarness {
         payload: TransactionPayload,
     ) -> TransactionStatus {
         let txn = self.create_transaction_payload(account, payload);
+        self.run(txn)
+    }
+
+    /// Runs a transaction sent to mainnet
+    pub fn run_transaction_payload_mainnet(
+        &mut self,
+        account: &Account,
+        payload: TransactionPayload,
+    ) -> TransactionStatus {
+        let txn = self.create_transaction_payload_mainnet(account, payload);
+        assert!(self.chain_id_is_mainnet(&CORE_CODE_ADDRESS));
         self.run(txn)
     }
 
@@ -373,6 +412,56 @@ impl MoveHarness {
         )
     }
 
+    /// Creates a transaction which publishes the passed already-built Move Package to an object,
+    /// on behalf of the given account.
+    ///
+    /// The passed function allows to manipulate the generated metadata for testing purposes.
+    pub fn create_object_code_deployment_built_package(
+        &mut self,
+        account: &Account,
+        package: &BuiltPackage,
+        mut patch_metadata: impl FnMut(&mut PackageMetadata),
+    ) -> SignedTransaction {
+        let code = package.extract_code();
+        let mut metadata = package
+            .extract_metadata()
+            .expect("extracting package metadata must succeed");
+        patch_metadata(&mut metadata);
+        self.create_transaction_payload(
+            account,
+            aptos_stdlib::object_code_deployment_publish(
+                bcs::to_bytes(&metadata).expect("PackageMetadata has BCS"),
+                code,
+            ),
+        )
+    }
+
+    /// Creates a transaction which upgrades the passed already-built Move Package,
+    /// on behalf of the given account.
+    ///
+    /// The passed function allows to manipulate the generated for testing purposes.
+    pub fn create_object_code_upgrade_built_package(
+        &mut self,
+        account: &Account,
+        package: &BuiltPackage,
+        mut patch_metadata: impl FnMut(&mut PackageMetadata),
+        code_object: AccountAddress,
+    ) -> SignedTransaction {
+        let code = package.extract_code();
+        let mut metadata = package
+            .extract_metadata()
+            .expect("extracting package metadata must succeed");
+        patch_metadata(&mut metadata);
+        self.create_transaction_payload(
+            account,
+            aptos_stdlib::object_code_deployment_upgrade(
+                bcs::to_bytes(&metadata).expect("PackageMetadata has BCS"),
+                code,
+                code_object,
+            ),
+        )
+    }
+
     /// Creates a transaction which publishes the Move Package found at the given path on behalf
     /// of the given account.
     ///
@@ -384,9 +473,39 @@ impl MoveHarness {
         options: Option<BuildOptions>,
         patch_metadata: impl FnMut(&mut PackageMetadata),
     ) -> SignedTransaction {
-        let package = BuiltPackage::build(path.to_owned(), options.unwrap_or_default())
+        let package = build_package(path.to_owned(), options.unwrap_or_default())
             .expect("building package must succeed");
         self.create_publish_built_package(account, &package, patch_metadata)
+    }
+
+    pub fn create_object_code_upgrade_package(
+        &mut self,
+        account: &Account,
+        path: &Path,
+        options: BuildOptions,
+        patch_metadata: impl FnMut(&mut PackageMetadata),
+        code_object: AccountAddress,
+    ) -> SignedTransaction {
+        let package =
+            build_package(path.to_owned(), options).expect("building package must succeed");
+        self.create_object_code_upgrade_built_package(
+            account,
+            &package,
+            patch_metadata,
+            code_object,
+        )
+    }
+
+    pub fn create_object_code_deployment_package(
+        &mut self,
+        account: &Account,
+        path: &Path,
+        options: BuildOptions,
+        patch_metadata: impl FnMut(&mut PackageMetadata),
+    ) -> SignedTransaction {
+        let package =
+            build_package(path.to_owned(), options).expect("building package must succeed");
+        self.create_object_code_deployment_built_package(account, &package, patch_metadata)
     }
 
     pub fn create_publish_package_cache_building(
@@ -399,10 +518,7 @@ impl MoveHarness {
             let mut cache = CACHED_BUILT_PACKAGES.lock().unwrap();
 
             Arc::clone(cache.entry(path.to_owned()).or_insert_with(|| {
-                Arc::new(BuiltPackage::build(
-                    path.to_owned(),
-                    BuildOptions::default(),
-                ))
+                Arc::new(build_package(path.to_owned(), BuildOptions::default()))
             }))
         };
         let package_ref = package_arc
@@ -425,6 +541,46 @@ impl MoveHarness {
     /// Runs transaction which publishes the Move Package.
     pub fn publish_package(&mut self, account: &Account, path: &Path) -> TransactionStatus {
         let txn = self.create_publish_package(account, path, None, |_| {});
+        self.run(txn)
+    }
+
+    /// Runs the transaction which publishes the Move Package to an object.
+    pub fn object_code_deployment_package(
+        &mut self,
+        account: &Account,
+        path: &Path,
+        options: BuildOptions,
+    ) -> TransactionStatus {
+        let txn = self.create_object_code_deployment_package(account, path, options, |_| {});
+        self.run(txn)
+    }
+
+    /// Creates a transaction which publishes the passed already-built Move Package to an object,
+    /// on behalf of the given account.
+    ///
+    /// The passed function allows to manipulate the generated metadata for testing purposes.
+    pub fn object_code_upgrade_package(
+        &mut self,
+        account: &Account,
+        path: &Path,
+        options: BuildOptions,
+        code_object: AccountAddress,
+    ) -> TransactionStatus {
+        let txn =
+            self.create_object_code_upgrade_package(account, path, options, |_| {}, code_object);
+        self.run(txn)
+    }
+
+    /// Marks all the packages in the `code_object` as immutable.
+    pub fn object_code_freeze_code_object(
+        &mut self,
+        account: &Account,
+        code_object: AccountAddress,
+    ) -> TransactionStatus {
+        let txn = self.create_transaction_payload(
+            account,
+            aptos_stdlib::object_code_deployment_freeze_code_object(code_object),
+        );
         self.run(txn)
     }
 
@@ -532,6 +688,7 @@ impl MoveHarness {
     }
 
     /// Reads the resource data `T`.
+    /// WARNING: Does not work with resource groups (because set_resource does not work?).
     pub fn read_resource<T: DeserializeOwned>(
         &self,
         addr: &AccountAddress,
@@ -548,7 +705,7 @@ impl MoveHarness {
         &self,
         addr: &AccountAddress,
         struct_tag: StructTag,
-    ) -> Option<Option<StateValueMetadata>> {
+    ) -> Option<StateValueMetadata> {
         self.read_state_value(&StateKey::access_path(
             AccessPath::resource_access_path(*addr, struct_tag).expect("access path in test"),
         ))
@@ -591,6 +748,7 @@ impl MoveHarness {
     }
 
     /// Write the resource data `T`.
+    /// WARNING: Does not work with resource groups.
     pub fn set_resource<T: Serialize>(
         &mut self,
         addr: AccountAddress,
@@ -609,7 +767,7 @@ impl MoveHarness {
         let enabled = enabled.into_iter().map(|f| f as u64).collect::<Vec<_>>();
         let disabled = disabled.into_iter().map(|f| f as u64).collect::<Vec<_>>();
         self.executor
-            .exec("features", "change_feature_flags", vec![], vec![
+            .exec("features", "change_feature_flags_internal", vec![], vec![
                 MoveValue::Signer(*acc.address())
                     .simple_serialize()
                     .unwrap(),
@@ -618,8 +776,7 @@ impl MoveHarness {
             ]);
     }
 
-    /// Increase maximal transaction size.
-    pub fn increase_transaction_size(&mut self) {
+    fn override_one_gas_param(&mut self, param: &str, param_value: u64) {
         // TODO: The AptosGasParameters::zeros() schedule doesn't do what we want, so
         // explicitly manipulating gas entries. Wasn't obvious from the gas code how to
         // do this differently then below, so perhaps improve this...
@@ -628,8 +785,8 @@ impl MoveHarness {
         let entries = entries
             .into_iter()
             .map(|(name, val)| {
-                if name == "txn.max_transaction_size_in_bytes" {
-                    (name, 1000 * 1024)
+                if name == param {
+                    (name, param_value)
                 } else {
                     (name, val)
                 }
@@ -640,15 +797,29 @@ impl MoveHarness {
             entries,
         };
         let schedule_bytes = bcs::to_bytes(&gas_schedule).expect("bcs");
+        let core_signer_arg = MoveValue::Signer(AccountAddress::ONE)
+            .simple_serialize()
+            .unwrap();
         self.executor
-            .exec("gas_schedule", "set_gas_schedule", vec![], vec![
-                MoveValue::Signer(AccountAddress::ONE)
-                    .simple_serialize()
-                    .unwrap(),
+            .exec("gas_schedule", "set_for_next_epoch", vec![], vec![
+                core_signer_arg.clone(),
                 MoveValue::vector_u8(schedule_bytes)
                     .simple_serialize()
                     .unwrap(),
             ]);
+        self.executor
+            .exec("aptos_governance", "force_end_epoch", vec![], vec![
+                core_signer_arg,
+            ]);
+    }
+
+    pub fn modify_gas_scaling(&mut self, gas_scaling_factor: u64) {
+        self.override_one_gas_param("txn.gas_unit_scaling_factor", gas_scaling_factor);
+    }
+
+    /// Increase maximal transaction size.
+    pub fn increase_transaction_size(&mut self) {
+        self.override_one_gas_param("txn.max_transaction_size_in_bytes", 1000 * 1024);
     }
 
     pub fn sequence_number(&self, addr: &AccountAddress) -> u64 {
@@ -657,10 +828,14 @@ impl MoveHarness {
             .sequence_number()
     }
 
+    fn chain_id_is_mainnet(&self, addr: &AccountAddress) -> bool {
+        self.read_resource::<ChainId>(addr, ChainId::struct_tag())
+            .unwrap()
+            .is_mainnet()
+    }
+
     pub fn modify_gas_schedule_raw(&mut self, modify: impl FnOnce(&mut GasScheduleV2)) {
-        let mut gas_schedule: GasScheduleV2 = self
-            .read_resource(&CORE_CODE_ADDRESS, GasScheduleV2::struct_tag())
-            .unwrap();
+        let mut gas_schedule = self.get_gas_schedule();
         modify(&mut gas_schedule);
         self.set_resource(
             CORE_CODE_ADDRESS,
@@ -670,15 +845,7 @@ impl MoveHarness {
     }
 
     pub fn modify_gas_schedule(&mut self, modify: impl FnOnce(&mut AptosGasParameters)) {
-        let gas_schedule: GasScheduleV2 = self
-            .read_resource(&CORE_CODE_ADDRESS, GasScheduleV2::struct_tag())
-            .unwrap();
-        let feature_version = gas_schedule.feature_version;
-        let mut gas_params = AptosGasParameters::from_on_chain_gas_schedule(
-            &gas_schedule.to_btree_map(),
-            feature_version,
-        )
-        .unwrap();
+        let (feature_version, mut gas_params) = self.get_gas_params();
         modify(&mut gas_params);
         self.set_resource(
             CORE_CODE_ADDRESS,
@@ -690,8 +857,27 @@ impl MoveHarness {
         );
     }
 
+    pub fn get_gas_params(&self) -> (u64, AptosGasParameters) {
+        let gas_schedule: GasScheduleV2 = self.get_gas_schedule();
+        let feature_version = gas_schedule.feature_version;
+        let params = AptosGasParameters::from_on_chain_gas_schedule(
+            &gas_schedule.to_btree_map(),
+            feature_version,
+        )
+        .unwrap();
+        (feature_version, params)
+    }
+
+    pub fn get_gas_schedule(&self) -> GasScheduleV2 {
+        self.read_resource(&CORE_CODE_ADDRESS, GasScheduleV2::struct_tag())
+            .unwrap()
+    }
+
     pub fn new_vm(&self) -> AptosVM {
-        AptosVM::new(&self.executor.data_store().as_move_resolver())
+        AptosVM::new(
+            &self.executor.data_store().as_move_resolver(),
+            /*override_is_delayed_field_optimization_capable=*/ None,
+        )
     }
 
     pub fn set_default_gas_unit_price(&mut self, gas_unit_price: u64) {
@@ -703,7 +889,7 @@ impl MoveHarness {
         fun: MemberId,
         type_args: Vec<TypeTag>,
         arguments: Vec<Vec<u8>>,
-    ) -> Result<Vec<Vec<u8>>, Error> {
+    ) -> ViewFunctionOutput {
         self.executor
             .execute_view_function(fun.module_id, fun.member_id, type_args, arguments)
     }
@@ -719,12 +905,12 @@ impl MoveHarness {
         &mut self,
         block_split: BlockSplit,
         txn_block: Vec<(u64, SignedTransaction)>,
-    ) -> Vec<TransactionStatus> {
+    ) -> Vec<TransactionOutput> {
         fn run_and_check_block(
             harness: &mut MoveHarness,
             txn_block: Vec<(u64, SignedTransaction)>,
             offset: usize,
-        ) -> Vec<TransactionStatus> {
+        ) -> Vec<TransactionOutput> {
             use crate::assert_abort_ref;
 
             if txn_block.is_empty() {
@@ -736,24 +922,24 @@ impl MoveHarness {
                 offset,
                 txns.len()
             );
-            let outputs = harness.run_block(txns);
-            for (idx, (error, status)) in errors.into_iter().zip(outputs.iter()).enumerate() {
+            let outputs = harness.run_block_get_output(txns);
+            for (idx, (error, output)) in errors.into_iter().zip(outputs.iter()).enumerate() {
                 if error == SUCCESS {
                     assert_success!(
-                        status.clone(),
+                        output.status().clone(),
                         "Didn't succeed on txn {}, with block starting at {}",
                         idx + offset,
                         offset,
                     );
                 } else {
                     assert_abort_ref!(
-                        status,
+                        output.status(),
                         error,
-                        "Error code missmatch on txn {} that should've failed, with block starting at {}. Expected {}, got {:?}",
+                        "Error code mismatch on txn {} that should've failed, with block starting at {}. Expected {}, got {:?}",
                         idx + offset,
                         offset,
                         error,
-                        status,
+                        output.status(),
                     );
                 }
             }
@@ -789,11 +975,15 @@ impl MoveHarness {
             },
         }
     }
+
+    pub fn set_max_gas_per_txn(&mut self, max_gas_per_txn: u64) {
+        self.max_gas_per_txn = max_gas_per_txn
+    }
 }
 
 impl BlockSplit {
     pub fn arbitrary(len: usize) -> BoxedStrategy<BlockSplit> {
-        // skip last choice if lenght is not big enough for it.
+        // skip last choice if length is not big enough for it.
         (0..(if len > 1 { 3 } else { 2 }))
             .prop_flat_map(move |enum_type| {
                 // making running a test with a full block likely
@@ -869,12 +1059,29 @@ macro_rules! assert_success {
     }};
 }
 
+/// Helper to assert transaction resulted in OUT_OF_GAS error
+#[macro_export]
+macro_rules! assert_out_of_gas {
+    ($s:expr $(,)?) => {{
+        assert_eq!($s, aptos_types::transaction::TransactionStatus::Keep(
+            aptos_types::transaction::ExecutionStatus::OutOfGas))
+    }};
+    ($s:expr, $($arg:tt)+) => {{
+        assert_eq!(
+            $s,
+            aptos_types::transaction::TransactionStatus::Keep(
+                aptos_types::transaction::ExecutionStatus::OutOfGas),
+            $($arg)+
+        )
+    }};
+}
+
 /// Helper to assert transaction aborts.
 /// TODO merge/replace with assert_abort_ref
 #[macro_export]
 macro_rules! assert_abort {
     // identity needs to be before pattern (both with and without message),
-    // as if we pass variable - it matches the pattern arm, but value is not used, but overriden.
+    // as if we pass variable - it matches the pattern arm, but value is not used, but overridden.
     // Opposite order and test_asserts_variable_used / test_asserts_variable_used_with_message tests
     // would fail
     ($s:expr, $c:ident $(,)?) => {{
@@ -924,7 +1131,7 @@ macro_rules! assert_abort {
 #[macro_export]
 macro_rules! assert_abort_ref {
     // identity needs to be before pattern (both with and without message),
-    // as if we pass variable - it matches the pattern arm, but value is not used, but overriden.
+    // as if we pass variable - it matches the pattern arm, but value is not used, but overridden.
     // Opposite order and test_asserts_variable_used / test_asserts_variable_used_with_message tests
     // would fail
     ($s:expr, $c:ident $(,)?) => {{

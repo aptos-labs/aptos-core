@@ -8,26 +8,28 @@ use crate::{
     access_path::AccessPath,
     account_address::{self, AccountAddress},
     account_config::{AccountResource, CoinStoreResource},
-    account_state::AccountState,
     aggregate_signature::PartialSignatures,
     block_info::{BlockInfo, Round},
     block_metadata::BlockMetadata,
+    block_metadata_ext::BlockMetadataExt,
     chain_id::ChainId,
     contract_event::ContractEvent,
+    dkg::{DKGTranscript, DKGTranscriptMetadata},
     epoch_state::EpochState,
     event::{EventHandle, EventKey},
     ledger_info::{generate_ledger_info_with_sig, LedgerInfo, LedgerInfoWithSignatures},
-    on_chain_config::ValidatorSet,
+    on_chain_config::{Features, ValidatorSet},
     proof::TransactionInfoListWithProof,
     state_store::{state_key::StateKey, state_value::StateValue},
     transaction::{
-        ChangeSet, ExecutionStatus, Module, ModuleBundle, RawTransaction, Script,
-        SignatureCheckedTransaction, SignedTransaction, Transaction, TransactionArgument,
+        ChangeSet, ExecutionStatus, Module, RawTransaction, Script, SignatureCheckedTransaction,
+        SignedTransaction, Transaction, TransactionArgument, TransactionAuxiliaryData,
         TransactionInfo, TransactionListWithProof, TransactionPayload, TransactionStatus,
         TransactionToCommit, Version, WriteSetPayload,
     },
     validator_info::ValidatorInfo,
     validator_signer::ValidatorSigner,
+    validator_txn::ValidatorTransaction,
     validator_verifier::{ValidatorConsensusInfo, ValidatorVerifier},
     vm_status::VMStatus,
     write_set::{WriteOp, WriteSet, WriteSetMut},
@@ -52,17 +54,16 @@ use proptest_derive::Arbitrary;
 use serde_json::Value;
 use std::{
     collections::{BTreeMap, BTreeSet, HashMap},
-    convert::TryFrom,
     iter::Iterator,
 };
 
 impl WriteOp {
     pub fn value_strategy() -> impl Strategy<Value = Self> {
-        vec(any::<u8>(), 0..64).prop_map(|bytes| WriteOp::Modification(bytes.into()))
+        vec(any::<u8>(), 0..64).prop_map(|bytes| WriteOp::legacy_modification(bytes.into()))
     }
 
     pub fn deletion_strategy() -> impl Strategy<Value = Self> {
-        Just(WriteOp::Deletion)
+        Just(WriteOp::legacy_deletion())
     }
 }
 
@@ -364,15 +365,9 @@ fn new_raw_transaction(
 ) -> RawTransaction {
     let chain_id = ChainId::test();
     match payload {
-        TransactionPayload::ModuleBundle(module) => RawTransaction::new_module_bundle(
-            sender,
-            sequence_number,
-            module,
-            max_gas_amount,
-            gas_unit_price,
-            expiration_time_secs,
-            chain_id,
-        ),
+        TransactionPayload::ModuleBundle(_) => {
+            unreachable!("Module bundle payload has been removed")
+        },
         TransactionPayload::Script(script) => RawTransaction::new_script(
             sender,
             sequence_number,
@@ -419,12 +414,6 @@ impl SignatureCheckedTransaction {
         keypair_strategy: impl Strategy<Value = KeyPair<Ed25519PrivateKey, Ed25519PublicKey>>,
     ) -> impl Strategy<Value = Self> {
         Self::strategy_impl(keypair_strategy, TransactionPayload::script_strategy())
-    }
-
-    pub fn module_strategy(
-        keypair_strategy: impl Strategy<Value = KeyPair<Ed25519PrivateKey, Ed25519PublicKey>>,
-    ) -> impl Strategy<Value = Self> {
-        Self::strategy_impl(keypair_strategy, TransactionPayload::module_strategy())
     }
 
     fn strategy_impl(
@@ -481,6 +470,7 @@ impl Arbitrary for SignatureCheckedTransaction {
     type Strategy = BoxedStrategy<Self>;
 
     fn arbitrary_with(_args: ()) -> Self::Strategy {
+        // Right now only script transaction payloads are generated!
         Self::strategy_impl(ed25519::keypair_strategy(), any::<TransactionPayload>()).boxed()
     }
 }
@@ -501,16 +491,12 @@ impl TransactionPayload {
     pub fn script_strategy() -> impl Strategy<Value = Self> {
         any::<Script>().prop_map(TransactionPayload::Script)
     }
-
-    pub fn module_strategy() -> impl Strategy<Value = Self> {
-        any::<Module>()
-            .prop_map(|module| TransactionPayload::ModuleBundle(ModuleBundle::from(module)))
-    }
 }
 
 prop_compose! {
     fn arb_transaction_status()(vm_status in any::<VMStatus>()) -> TransactionStatus {
-        vm_status.into()
+        let (txn_status, _) = TransactionStatus::from_vm_status(vm_status, true, &Features::default());
+        txn_status
     }
 }
 
@@ -534,12 +520,8 @@ impl Arbitrary for TransactionPayload {
     type Strategy = BoxedStrategy<Self>;
 
     fn arbitrary_with(_args: ()) -> Self::Strategy {
-        // Most transactions in practice will be programs, but other parts of the system should
-        // at least not choke on write set strategies so introduce them with decent probability.
-        // The figures below are probability weights.
         prop_oneof![
             4 => Self::script_strategy(),
-            1 => Self::module_strategy(),
         ]
         .boxed()
     }
@@ -694,13 +676,26 @@ pub struct AccountStateGen {
 }
 
 impl AccountStateGen {
-    pub fn materialize(self, account_index: Index, universe: &AccountInfoUniverse) -> AccountState {
-        let address = universe.get_account_info(account_index).address;
+    pub fn materialize(
+        self,
+        account_index: Index,
+        universe: &AccountInfoUniverse,
+    ) -> impl IntoIterator<Item = (StateKey, Vec<u8>)> {
+        let address = &universe.get_account_info(account_index).address;
         let account_resource = self
             .account_resource_gen
             .materialize(account_index, universe);
         let balance_resource = self.balance_resource_gen.materialize();
-        AccountState::try_from((address, &account_resource, &balance_resource)).unwrap()
+        vec![
+            (
+                StateKey::resource_typed::<AccountResource>(address),
+                bcs::to_bytes(&account_resource).unwrap(),
+            ),
+            (
+                StateKey::resource_typed::<CoinStoreResource>(address),
+                bcs::to_bytes(&balance_resource).unwrap(),
+            ),
+        ]
     }
 }
 
@@ -800,20 +795,17 @@ impl TransactionToCommitGen {
             .account_state_gens
             .into_iter()
             .flat_map(|(index, account_gen)| {
-                let address = universe.get_account_info(index).address;
-                account_gen
-                    .materialize(index, universe)
-                    .into_resource_iter()
-                    .map(move |(key, value)| {
-                        let state_key = StateKey::access_path(AccessPath::new(address, key));
+                account_gen.materialize(index, universe).into_iter().map(
+                    move |(state_key, value)| {
                         (
                             (
                                 state_key.clone(),
                                 Some(StateValue::new_legacy(Bytes::copy_from_slice(&value))),
                             ),
-                            (state_key, WriteOp::Modification(value.into())),
+                            (state_key, WriteOp::legacy_modification(value.into())),
                         )
-                    })
+                    },
+                )
             })
             .unzip();
         let mut sharded_state_updates = arr![HashMap::new(); 16];
@@ -828,6 +820,7 @@ impl TransactionToCommitGen {
             WriteSetMut::new(write_set).freeze().expect("Cannot fail"),
             events,
             false, /* event_gen never generates reconfig events */
+            TransactionAuxiliaryData::default(),
         )
     }
 
@@ -966,6 +959,46 @@ impl Arbitrary for BlockMetadata {
                         previous_block_votes,
                         failed_proposer_indices,
                         timestamp,
+                    )
+                },
+            )
+            .boxed()
+    }
+}
+
+impl Arbitrary for BlockMetadataExt {
+    type Parameters = SizeRange;
+    type Strategy = BoxedStrategy<Self>;
+
+    fn arbitrary_with(num_validators_range: Self::Parameters) -> Self::Strategy {
+        (
+            any::<HashValue>(),
+            any::<u64>(),
+            any::<u64>(),
+            any::<AccountAddress>(),
+            prop::collection::vec(any::<u8>(), num_validators_range.clone()),
+            prop::collection::vec(any::<u32>(), num_validators_range),
+            any::<u64>(),
+        )
+            .prop_map(
+                |(
+                    id,
+                    epoch,
+                    round,
+                    proposer,
+                    previous_block_votes,
+                    failed_proposer_indices,
+                    timestamp,
+                )| {
+                    BlockMetadataExt::new_v1(
+                        id,
+                        epoch,
+                        round,
+                        proposer,
+                        previous_block_votes,
+                        failed_proposer_indices,
+                        timestamp,
+                        None,
                     )
                 },
             )
@@ -1142,6 +1175,7 @@ impl BlockGen {
             WriteSet::default(),
             Vec::new(),
             false,
+            TransactionAuxiliaryData::default(),
         ));
 
         // materialize ledger info
@@ -1210,6 +1244,26 @@ impl Arbitrary for ValidatorVerifier {
     fn arbitrary_with(_args: Self::Parameters) -> Self::Strategy {
         vec(any::<ValidatorConsensusInfo>(), 1..1000)
             .prop_map(ValidatorVerifier::new)
+            .boxed()
+    }
+}
+
+#[cfg(any(test, feature = "fuzzing"))]
+impl Arbitrary for ValidatorTransaction {
+    type Parameters = SizeRange;
+    type Strategy = BoxedStrategy<Self>;
+
+    fn arbitrary_with(_args: Self::Parameters) -> Self::Strategy {
+        (any::<Vec<u8>>())
+            .prop_map(|payload| {
+                ValidatorTransaction::DKGResult(DKGTranscript {
+                    metadata: DKGTranscriptMetadata {
+                        epoch: 0,
+                        author: AccountAddress::ZERO,
+                    },
+                    transcript_bytes: payload,
+                })
+            })
             .boxed()
     }
 }

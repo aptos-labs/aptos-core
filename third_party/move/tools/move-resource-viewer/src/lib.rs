@@ -17,7 +17,7 @@ use move_core_types::{
     account_address::AccountAddress,
     identifier::{IdentStr, Identifier},
     language_storage::{ModuleId, StructTag, TypeTag},
-    resolver::MoveResolver,
+    resolver::ModuleResolver,
     u256,
     value::{MoveStruct, MoveTypeLayout, MoveValue},
     vm_status::VMStatus,
@@ -83,20 +83,17 @@ pub struct MoveValueAnnotator<'a, T: ?Sized> {
     cache: Resolver<'a, T>,
 }
 
-impl<'a, T: MoveResolver + ?Sized> MoveValueAnnotator<'a, T> {
+impl<'a, T: ModuleResolver + ?Sized> MoveValueAnnotator<'a, T> {
     pub fn new(view: &'a T) -> Self {
         Self {
             cache: Resolver::new(view),
         }
     }
 
-    // TODO
-    pub fn get_resource_bytes(&self, addr: &AccountAddress, tag: &StructTag) -> Option<Vec<u8>> {
-        self.cache
-            .state
-            .get_resource(addr, tag)
-            .ok()?
-            .map(|b| b.to_vec())
+    pub fn new_with_max_bytecode_version(view: &'a T, max_bytecode_version: u32) -> Self {
+        Self {
+            cache: Resolver::new_with_max_bytecode_version(view, max_bytecode_version),
+        }
     }
 
     pub fn get_module(&self, module: &ModuleId) -> Result<Rc<CompiledModule>> {

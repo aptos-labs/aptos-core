@@ -4,7 +4,6 @@
 
 use anyhow::Result;
 use aptos_logger::info;
-use aptos_state_view::{account_with_state_view::AsAccountWithStateView, StateView};
 use aptos_storage_interface::{
     cached_state_view::CachedDbStateView,
     state_view::{DbStateView, LatestDbStateCheckpointView},
@@ -12,7 +11,8 @@ use aptos_storage_interface::{
 };
 use aptos_types::{
     account_address::AccountAddress,
-    account_view::AccountView,
+    account_config::AccountResource,
+    state_store::{MoveResourceExt, StateView},
     transaction::{SignedTransaction, VMValidatorResult},
 };
 use aptos_vm::{data_cache::AsMoveResolver, AptosVM};
@@ -55,7 +55,10 @@ impl VMValidator {
             AdapterLogSchema::new(state_view.id(), 0),
             "AptosVM created for Validation"
         );
-        AptosVM::new(&state_view.as_move_resolver())
+        AptosVM::new(
+            &state_view.as_move_resolver(),
+            /*override_is_delayed_field_optimization_capable=*/ None,
+        )
     }
 
     pub fn new(db_reader: Arc<dyn DbReader>) -> Self {
@@ -113,9 +116,7 @@ pub fn get_account_sequence_number(
         ))
     });
 
-    let account_state_view = state_view.as_account_with_state_view(&address);
-
-    match account_state_view.get_account_resource()? {
+    match AccountResource::fetch_move_resource(state_view, &address)? {
         Some(account_resource) => Ok(account_resource.sequence_number()),
         None => Ok(0),
     }

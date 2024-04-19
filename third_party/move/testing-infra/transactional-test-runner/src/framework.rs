@@ -42,6 +42,7 @@ use move_core_types::{
 };
 use move_disassembler::disassembler::{Disassembler, DisassemblerOptions};
 use move_ir_types::location::Spanned;
+use move_model::metadata::LanguageVersion;
 use move_symbol_pool::Symbol;
 use move_vm_runtime::session::SerializedReturnValues;
 use once_cell::sync::Lazy;
@@ -150,7 +151,7 @@ pub trait MoveTestAdapter<'a>: Sized {
         args: Vec<<<Self as MoveTestAdapter<'a>>::ExtraValueArgs as ParsableValue>::ConcreteValue>,
         gas_budget: Option<u64>,
         extra: Self::ExtraRunArgs,
-    ) -> Result<(Option<String>, SerializedReturnValues)>;
+    ) -> Result<Option<String>>;
     fn call_function(
         &mut self,
         module: &ModuleId,
@@ -196,15 +197,23 @@ pub trait MoveTestAdapter<'a>: Sized {
         let data_path = data.path().to_str().unwrap();
         let run_config = self.run_config();
         let state = self.compiled_state();
-        let (named_addr_opt, module, warnings_opt) = match syntax {
+        let (named_addr_opt, module, warnings_opt) = match (syntax, run_config) {
             // Run the V2 compiler if requested
-            SyntaxChoice::Source if run_config == TestRunConfig::CompilerV2 => {
+            (
+                SyntaxChoice::Source,
+                TestRunConfig::CompilerV2 {
+                    language_version,
+                    v2_experiments,
+                },
+            ) => {
                 let ((module, _), warning_opt) = compile_source_unit_v2(
                     state.pre_compiled_deps,
                     state.named_address_mapping.clone(),
                     &state.source_files().cloned().collect::<Vec<_>>(),
                     data_path.to_owned(),
                     self.known_attributes(),
+                    language_version,
+                    v2_experiments,
                 )?;
                 if let Some(module) = module {
                     (None, module, warning_opt)
@@ -213,7 +222,7 @@ pub trait MoveTestAdapter<'a>: Sized {
                 }
             },
             // In all other cases, run V1
-            SyntaxChoice::Source => {
+            (SyntaxChoice::Source, _) => {
                 let (unit, warnings_opt) = compile_source_unit(
                     state.pre_compiled_deps,
                     state.named_address_mapping.clone(),
@@ -237,7 +246,7 @@ pub trait MoveTestAdapter<'a>: Sized {
                 };
                 (named_addr_opt, module, warnings_opt)
             },
-            SyntaxChoice::IR => {
+            (SyntaxChoice::IR, _) => {
                 let module = compile_ir_module(state.dep_modules(), data_path)?;
                 (None, module, None)
             },
@@ -262,15 +271,23 @@ pub trait MoveTestAdapter<'a>: Sized {
         let data_path = data.path().to_str().unwrap();
         let run_config = self.run_config();
         let state = self.compiled_state();
-        let (script, warning_opt) = match syntax {
+        let (script, warning_opt) = match (syntax, run_config) {
             // Run the V2 compiler if requested.
-            SyntaxChoice::Source if run_config == TestRunConfig::CompilerV2 => {
+            (
+                SyntaxChoice::Source,
+                TestRunConfig::CompilerV2 {
+                    language_version,
+                    v2_experiments,
+                },
+            ) => {
                 let ((_, script), warning_opt) = compile_source_unit_v2(
                     state.pre_compiled_deps,
                     state.named_address_mapping.clone(),
                     &state.source_files().cloned().collect::<Vec<_>>(),
                     data_path.to_owned(),
                     self.known_attributes(),
+                    language_version,
+                    v2_experiments,
                 )?;
                 if let Some(script) = script {
                     (script, warning_opt)
@@ -279,7 +296,7 @@ pub trait MoveTestAdapter<'a>: Sized {
                 }
             },
             // In all other Source cases, run the V1 compiler
-            SyntaxChoice::Source => {
+            (SyntaxChoice::Source, _) => {
                 let (unit, warning_opt) = compile_source_unit(
                     state.pre_compiled_deps,
                     state.named_address_mapping.clone(),
@@ -295,7 +312,7 @@ pub trait MoveTestAdapter<'a>: Sized {
                     ),
                 }
             },
-            SyntaxChoice::IR => (compile_ir_script(state.dep_modules(), data_path)?, None),
+            (SyntaxChoice::IR, _) => (compile_ir_script(state.dep_modules(), data_path)?, None),
         };
         Ok((script, warning_opt))
     }
@@ -410,10 +427,8 @@ pub trait MoveTestAdapter<'a>: Sized {
                 };
                 let args = self.compiled_state().resolve_args(args)?;
                 let type_args = self.compiled_state().resolve_type_args(type_args)?;
-                let (mut output, return_values) =
+                let mut output =
                     self.execute_script(script, type_args, signers, args, gas_budget, extra_args)?;
-                let rendered_return_value = display_return_values(return_values);
-                output = merge_output(output, rendered_return_value);
                 if print_bytecode {
                     output = merge_output(output, printed);
                 }
@@ -670,6 +685,8 @@ fn compile_source_unit_v2(
     deps: &[String],
     path: String,
     known_attributes: &BTreeSet<String>,
+    language_version: LanguageVersion,
+    experiments: Vec<(String, bool)>,
 ) -> Result<(
     (Option<CompiledModule>, Option<CompiledScript>),
     Option<String>,
@@ -686,12 +703,14 @@ fn compile_source_unit_v2(
                     .map(|p| p.to_string_lossy().to_string())
             })
             .collect();
+        remove_sub_dirs(&mut dirs);
         dirs.extend(deps.iter().cloned());
         dirs.into_iter().collect()
     } else {
         deps.to_vec()
     };
-    let options = move_compiler_v2::Options {
+
+    let mut options = move_compiler_v2::Options {
         sources: vec![path],
         dependencies: deps,
         named_address_mapping: named_address_mapping
@@ -699,8 +718,12 @@ fn compile_source_unit_v2(
             .map(|(alias, addr)| format!("{}={}", alias, addr))
             .collect(),
         known_attributes: known_attributes.clone(),
+        language_version: Some(language_version),
         ..move_compiler_v2::Options::default()
     };
+    for (exp, value) in experiments {
+        options = options.set_experiment(exp, value)
+    }
     let mut error_writer = termcolor::Buffer::no_color();
     let result = move_compiler_v2::run_move_compiler(&mut error_writer, options);
     let error_str = String::from_utf8_lossy(&error_writer.into_inner()).to_string();
@@ -718,6 +741,17 @@ fn compile_source_unit_v2(
         Ok((unit, None))
     } else {
         Ok((unit, Some(error_str)))
+    }
+}
+
+fn remove_sub_dirs(dirs: &mut BTreeSet<String>) {
+    for dir in dirs.clone() {
+        for other_dir in dirs.clone() {
+            if dir != other_dir && dir.starts_with(&other_dir) {
+                dirs.remove(&dir);
+                break;
+            }
+        }
     }
 }
 
@@ -804,6 +838,7 @@ pub fn run_test_impl<'a, Adapter>(
     config: TestRunConfig,
     path: &Path,
     fully_compiled_program_opt: Option<&'a FullyCompiledProgram>,
+    exp_suffix: &Option<String>,
 ) -> Result<(), Box<dyn std::error::Error>>
 where
     Adapter: MoveTestAdapter<'a>,
@@ -822,13 +857,20 @@ where
     };
 
     // Construct a sequence of compiler runs based on the given config.
-    let (runs, comparison_mode) = if config == TestRunConfig::ComparisonV1V2 {
+    let (runs, comparison_mode) = if let TestRunConfig::ComparisonV1V2 {
+        language_version,
+        v2_experiments,
+    } = config.clone()
+    {
         (
-            vec![TestRunConfig::CompilerV1, TestRunConfig::CompilerV2],
+            vec![TestRunConfig::CompilerV1, TestRunConfig::CompilerV2 {
+                language_version,
+                v2_experiments,
+            }],
             true,
         )
     } else {
-        (vec![config], false) // either V1 or V2
+        (vec![config.clone()], false) // either V1 or V2
     };
     let mut last_output = String::new();
     let mut bytecode_print_output = BTreeMap::<TestRunConfig, String>::new();
@@ -868,7 +910,7 @@ where
         let (mut adapter, result_opt) = Adapter::init(
             default_syntax,
             comparison_mode,
-            run_config,
+            run_config.clone(),
             fully_compiled_program_opt,
             init_opt,
         );
@@ -884,7 +926,7 @@ where
         });
         while let Some(m) = BYTECODE_REX.find(&output) {
             bytecode_print_output
-                .entry(run_config)
+                .entry(run_config.clone())
                 .or_default()
                 .push_str(&output.drain(m.range()).collect::<String>());
         }
@@ -893,12 +935,12 @@ where
         if !last_output.is_empty() && last_output != output {
             let diff = format_diff_no_color(&last_output, &output);
             let output = format!("comparison between v1 and v2 failed:\n{}", diff);
-            handle_expected_output(path, output)?;
+            handle_expected_output(path, output, exp_suffix)?;
             return Ok(());
         }
         last_output = output
     }
-    if config == TestRunConfig::ComparisonV1V2 {
+    if matches!(config, TestRunConfig::ComparisonV1V2 { .. }) {
         // Indicate in output that we passed comparison test
         last_output += "\n==> Compiler v2 delivered same results!\n"
     }
@@ -908,13 +950,13 @@ where
             "\n>>> {} {{\n{}\n}}\n",
             match config {
                 TestRunConfig::CompilerV1 => "V1 Compiler",
-                TestRunConfig::CompilerV2 => "V2 Compiler",
+                TestRunConfig::CompilerV2 { .. } => "V2 Compiler",
                 _ => panic!("unexpected test config"),
             },
             out
         );
     }
-    handle_expected_output(path, last_output)?;
+    handle_expected_output(path, last_output, exp_suffix)?;
     Ok(())
 }
 
@@ -957,10 +999,18 @@ fn handle_known_task<'a, Adapter: MoveTestAdapter<'a>>(
     .unwrap();
 }
 
-fn handle_expected_output(test_path: &Path, output: impl AsRef<str>) -> Result<()> {
+fn handle_expected_output(
+    test_path: &Path,
+    output: impl AsRef<str>,
+    exp_suffix: &Option<String>,
+) -> Result<()> {
     let output = output.as_ref();
     assert!(!output.is_empty());
-    let exp_path = test_path.with_extension(EXP_EXT);
+    let exp_path = if let Some(suffix) = exp_suffix {
+        test_path.with_extension(suffix)
+    } else {
+        test_path.with_extension(EXP_EXT)
+    };
 
     if read_env_update_baseline() {
         std::fs::write(exp_path, output).unwrap();

@@ -4,18 +4,18 @@
 #![forbid(unsafe_code)]
 
 use crate::{
-    db_metadata::{DbMetadataKey, DbMetadataSchema, DbMetadataValue},
+    common::NUM_STATE_SHARDS,
     db_options::{gen_state_kv_cfds, state_kv_db_column_families},
     metrics::OTHER_TIMERS_SECONDS,
+    schema::db_metadata::{DbMetadataKey, DbMetadataSchema, DbMetadataValue},
     utils::truncation_helper::{get_state_kv_commit_progress, truncate_state_kv_db_shards},
-    NUM_STATE_SHARDS,
 };
-use anyhow::Result;
 use aptos_config::config::{RocksdbConfig, RocksdbConfigs, StorageDirPaths};
 use aptos_experimental_runtimes::thread_manager::THREAD_MANAGER;
 use aptos_logger::prelude::info;
 use aptos_rocksdb_options::gen_rocksdb_options;
 use aptos_schemadb::{SchemaBatch, DB};
+use aptos_storage_interface::Result;
 use aptos_types::transaction::Version;
 use arr_macro::arr;
 use std::{

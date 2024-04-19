@@ -35,6 +35,7 @@ use aptos_temppath::TempPath;
 use aptos_types::{
     account_address::{create_multisig_account_address, AccountAddress},
     aggregate_signature::AggregateSignature,
+    block_executor::config::BlockExecutorConfigFromOnchain,
     block_info::BlockInfo,
     block_metadata::BlockMetadata,
     chain_id::ChainId,
@@ -50,7 +51,7 @@ use bytes::Bytes;
 use hyper::{HeaderMap, Response};
 use rand::SeedableRng;
 use serde_json::{json, Value};
-use std::{boxed::Box, iter::once, net::SocketAddr, path::PathBuf, sync::Arc, time::Duration};
+use std::{boxed::Box, net::SocketAddr, path::PathBuf, sync::Arc, time::Duration};
 use warp::{http::header::CONTENT_TYPE, Filter, Rejection, Reply};
 use warp_reverse_proxy::reverse_proxy_filter;
 
@@ -144,6 +145,7 @@ pub fn new_test_context(
         db.clone(),
         mempool.ac_client.clone(),
         node_config.clone(),
+        None, /* table info reader */
     );
 
     // Configure the testing depending on which API version we're testing.
@@ -395,6 +397,7 @@ impl TestContext {
                 "type": "multisig_payload",
                 "multisig_address": multisig_account.to_hex_literal(),
                 "transaction_payload": {
+                    "type": "entry_function_payload",
                     "function": function,
                     "type_arguments": type_args,
                     "arguments": args
@@ -603,7 +606,6 @@ impl TestContext {
                     .cloned()
                     .map(Transaction::UserTransaction),
             )
-            .chain(once(Transaction::StateCheckpoint(metadata.id())))
             .collect();
 
         // Check that txn execution was successful.
@@ -613,17 +615,13 @@ impl TestContext {
             .execute_block(
                 (metadata.id(), into_signature_verified_block(txns.clone())).into(),
                 parent_id,
-                None,
+                BlockExecutorConfigFromOnchain::new_no_block_limit(),
             )
             .unwrap();
-        let mut compute_status = result.compute_status().clone();
+        let compute_status = result.compute_status_for_input_txns().clone();
         assert_eq!(compute_status.len(), txns.len(), "{:?}", result);
-        if matches!(compute_status.last(), Some(TransactionStatus::Retry)) {
-            // a state checkpoint txn can be Retry if prefixed by a write set txn
-            compute_status.pop();
-        }
         // But the rest of the txns must be Kept.
-        for st in result.compute_status() {
+        for st in compute_status {
             match st {
                 TransactionStatus::Discard(st) => panic!("transaction is discarded: {:?}", st),
                 TransactionStatus::Retry => panic!("should not retry"),
@@ -634,13 +632,14 @@ impl TestContext {
         self.executor
             .commit_blocks(
                 vec![metadata.id()],
-                self.new_ledger_info(&metadata, result.root_hash(), txns.len()),
+                // StateCheckpoint/BlockEpilogue is added on top of the input transactions.
+                self.new_ledger_info(&metadata, result.root_hash(), txns.len() + 1),
             )
             .unwrap();
 
         self.mempool
             .mempool_notifier
-            .notify_new_commit(txns, timestamp, 1000)
+            .notify_new_commit(txns, timestamp)
             .await
             .unwrap();
     }
@@ -824,6 +823,7 @@ impl TestContext {
                 "type": "multisig_payload",
                 "multisig_address": multisig_account.to_hex_literal(),
                 "transaction_payload": {
+                    "type": "entry_function_payload",
                     "function": function,
                     "type_arguments": type_args,
                     "arguments": args

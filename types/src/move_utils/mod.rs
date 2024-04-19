@@ -38,3 +38,5 @@ impl FromStr for MemberId {
         parse_member_id(s)
     }
 }
+
+pub mod as_move_value;

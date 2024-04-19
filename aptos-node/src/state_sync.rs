@@ -10,7 +10,8 @@ use aptos_data_streaming_service::{
     streaming_service::DataStreamingService,
 };
 use aptos_event_notifications::{
-    DbBackedOnChainConfig, EventSubscriptionService, ReconfigNotificationListener,
+    DbBackedOnChainConfig, EventNotificationListener, EventSubscriptionService,
+    ReconfigNotificationListener,
 };
 use aptos_executor::chunk_executor::ChunkExecutor;
 use aptos_infallible::RwLock;
@@ -45,6 +46,14 @@ pub fn create_event_subscription_service(
     EventSubscriptionService,
     ReconfigNotificationListener<DbBackedOnChainConfig>,
     Option<ReconfigNotificationListener<DbBackedOnChainConfig>>,
+    Option<(
+        ReconfigNotificationListener<DbBackedOnChainConfig>,
+        EventNotificationListener,
+    )>, // (reconfig_events, dkg_start_events) for DKG
+    Option<(
+        ReconfigNotificationListener<DbBackedOnChainConfig>,
+        EventNotificationListener,
+    )>, // (reconfig_events, jwk_updated_events) for JWK consensus
 ) {
     // Create the event subscription service
     let mut event_subscription_service =
@@ -66,10 +75,36 @@ pub fn create_event_subscription_service(
         None
     };
 
+    let dkg_subscriptions = if node_config.base.role.is_validator() {
+        let reconfig_events = event_subscription_service
+            .subscribe_to_reconfigurations()
+            .expect("DKG must subscribe to reconfigurations");
+        let dkg_start_events = event_subscription_service
+            .subscribe_to_events(vec![], vec!["0x1::dkg::DKGStartEvent".to_string()])
+            .expect("Consensus must subscribe to DKG events");
+        Some((reconfig_events, dkg_start_events))
+    } else {
+        None
+    };
+
+    let jwk_consensus_subscriptions = if node_config.base.role.is_validator() {
+        let reconfig_events = event_subscription_service
+            .subscribe_to_reconfigurations()
+            .expect("JWK consensus must subscribe to reconfigurations");
+        let jwk_updated_events = event_subscription_service
+            .subscribe_to_events(vec![], vec!["0x1::jwks::ObservedJWKsUpdated".to_string()])
+            .expect("JWK consensus must subscribe to DKG events");
+        Some((reconfig_events, jwk_updated_events))
+    } else {
+        None
+    };
+
     (
         event_subscription_service,
         mempool_reconfig_subscription,
         consensus_reconfig_subscription,
+        dkg_subscriptions,
+        jwk_consensus_subscriptions,
     )
 }
 
@@ -96,8 +131,9 @@ pub fn start_state_sync_and_get_notification_handles(
         setup_aptos_data_client(node_config, network_client, db_rw.reader.clone())?;
 
     // Start the data streaming service
+    let state_sync_config = node_config.state_sync;
     let (streaming_service_client, streaming_service_runtime) =
-        setup_data_streaming_service(node_config.state_sync, aptos_data_client.clone())?;
+        setup_data_streaming_service(state_sync_config, aptos_data_client.clone())?;
 
     // Create the chunk executor and persistent storage
     let chunk_executor = Arc::new(ChunkExecutor::<AptosVM>::new(db_rw.clone()));
@@ -105,11 +141,14 @@ pub fn start_state_sync_and_get_notification_handles(
 
     // Create notification senders and listeners for mempool, consensus and the storage service
     let (mempool_notifier, mempool_listener) =
-        aptos_mempool_notifications::new_mempool_notifier_listener_pair();
+        aptos_mempool_notifications::new_mempool_notifier_listener_pair(
+            state_sync_config
+                .state_sync_driver
+                .max_pending_mempool_notifications,
+        );
     let (consensus_notifier, consensus_listener) =
         aptos_consensus_notifications::new_consensus_notifier_listener_pair(
-            node_config
-                .state_sync
+            state_sync_config
                 .state_sync_driver
                 .commit_notification_timeout_ms,
         );
@@ -118,7 +157,7 @@ pub fn start_state_sync_and_get_notification_handles(
 
     // Start the state sync storage service
     let storage_service_runtime = setup_state_sync_storage_service(
-        node_config.state_sync,
+        state_sync_config,
         peers_and_metadata,
         network_service_events,
         &db_rw,

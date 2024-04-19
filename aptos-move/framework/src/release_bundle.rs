@@ -308,7 +308,7 @@ impl ReleasePackage {
             emitln!(writer, "proposal_id,");
             emitln!(writer, "@{},", for_address);
             emit!(writer, "vector[");
-            for (_, b) in next_execution_hash.iter().enumerate() {
+            for b in next_execution_hash.iter() {
                 emit!(writer, "{}u8,", b);
             }
             emitln!(writer, "],");

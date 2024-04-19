@@ -23,4 +23,5 @@ thiserror = { workspace = true }
 aptos-crypto = { workspace = true }
 aptos-types = { workspace = true }
 bcs = { workspace = true }
+rand = { workspace = true }
 serde = { workspace = true }

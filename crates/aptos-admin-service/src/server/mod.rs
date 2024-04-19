@@ -2,7 +2,7 @@
 // SPDX-License-Identifier: Apache-2.0
 
 use crate::server::utils::reply_with_status;
-use aptos_config::config::NodeConfig;
+use aptos_config::config::{AuthenticationConfig, NodeConfig};
 use aptos_consensus::{
     persistent_liveness_storage::StorageWriteProxy, quorum_store::quorum_store_db::QuorumStoreDB,
 };
@@ -14,6 +14,7 @@ use hyper::{
     Body, Request, Response, Server, StatusCode,
 };
 use std::{
+    collections::HashMap,
     convert::Infallible,
     net::{SocketAddr, ToSocketAddrs},
     sync::Arc,
@@ -22,13 +23,15 @@ use tokio::runtime::Runtime;
 
 mod consensus;
 #[cfg(target_os = "linux")]
-mod profiling;
+pub mod profiling;
 #[cfg(target_os = "linux")]
 mod thread_dump;
 mod utils;
 
 #[derive(Default)]
 pub struct Context {
+    authentication_configs: Vec<AuthenticationConfig>,
+
     aptos_db: RwLock<Option<Arc<DbReaderWriter>>>,
     consensus_db: RwLock<Option<Arc<StorageWriteProxy>>>,
     quorum_store_db: RwLock<Option<Arc<QuorumStoreDB>>>,
@@ -79,7 +82,10 @@ impl AdminService {
 
         let admin_service = Self {
             runtime,
-            context: Default::default(),
+            context: Arc::new(Context {
+                authentication_configs: node_config.admin_service.authentication_configs.clone(),
+                ..Default::default()
+            }),
         };
 
         // TODO(grao): Consider support enabling the service through an authenticated request.
@@ -131,6 +137,36 @@ impl AdminService {
                 "AdminService is not enabled.",
             ));
         }
+
+        let mut authenticated = false;
+        if context.authentication_configs.is_empty() {
+            authenticated = true;
+        } else {
+            for authentication_config in &context.authentication_configs {
+                match authentication_config {
+                    AuthenticationConfig::PasscodeSha256(passcode_sha256) => {
+                        let query = req.uri().query().unwrap_or("");
+                        let query_pairs: HashMap<_, _> =
+                            url::form_urlencoded::parse(query.as_bytes()).collect();
+                        let passcode: Option<String> =
+                            query_pairs.get("passcode").map(|p| p.to_string());
+                        if let Some(passcode) = passcode {
+                            if sha256::digest(passcode) == *passcode_sha256 {
+                                authenticated = true;
+                            }
+                        }
+                    },
+                }
+            }
+        };
+
+        if !authenticated {
+            return Ok(reply_with_status(
+                StatusCode::NETWORK_AUTHENTICATION_REQUIRED,
+                format!("{} endpoint requires authentication.", req.uri().path()),
+            ));
+        }
+
         match (req.method().clone(), req.uri().path()) {
             #[cfg(target_os = "linux")]
             (hyper::Method::GET, "/profilez") => profiling::handle_cpu_profiling_request(req).await,

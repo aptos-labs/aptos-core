@@ -11,8 +11,8 @@ use crate::{
     state_kv_db::StateKvDb,
     utils::get_progress,
 };
-use anyhow::Result;
 use aptos_schemadb::{ReadOptions, SchemaBatch};
+use aptos_storage_interface::Result;
 use aptos_types::transaction::Version;
 use std::sync::Arc;
 

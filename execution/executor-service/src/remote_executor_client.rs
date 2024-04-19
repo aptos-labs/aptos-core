@@ -7,10 +7,13 @@ use crate::{
 };
 use aptos_logger::{info, trace};
 use aptos_secure_net::network_controller::{Message, NetworkController};
-use aptos_state_view::StateView;
 use aptos_storage_interface::cached_state_view::CachedStateView;
 use aptos_types::{
-    block_executor::partitioner::PartitionedTransactions, transaction::TransactionOutput,
+    block_executor::{
+        config::BlockExecutorConfigFromOnchain, partitioner::PartitionedTransactions,
+    },
+    state_store::StateView,
+    transaction::TransactionOutput,
     vm_status::VMStatus,
 };
 use aptos_vm::sharded_block_executor::{
@@ -180,7 +183,7 @@ impl<S: StateView + Sync + Send + 'static> ExecutorClient<S> for RemoteExecutorC
         state_view: Arc<S>,
         transactions: PartitionedTransactions,
         concurrency_level_per_shard: usize,
-        maybe_block_gas_limit: Option<u64>,
+        onchain_config: BlockExecutorConfigFromOnchain,
     ) -> Result<ShardedExecutionOutput, VMStatus> {
         trace!("RemoteExecutorClient Sending block to shards");
         self.state_view_service.set_state_view(state_view);
@@ -193,7 +196,7 @@ impl<S: StateView + Sync + Send + 'static> ExecutorClient<S> for RemoteExecutorC
             let execution_request = RemoteExecutionRequest::ExecuteBlock(ExecuteBlockCommand {
                 sub_blocks,
                 concurrency_level: concurrency_level_per_shard,
-                maybe_block_gas_limit,
+                onchain_config: onchain_config.clone(),
             });
 
             senders[shard_id]

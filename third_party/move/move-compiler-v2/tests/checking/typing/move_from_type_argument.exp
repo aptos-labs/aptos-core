@@ -1,0 +1,17 @@
+// -- Model dump before bytecode pipeline
+module 0x42::m {
+    struct A {
+        addr: address,
+    }
+    public fun foo(input: address): address
+        acquires m::A(*)
+     {
+        {
+          let a: m::A = MoveFrom<m::A>(input);
+          {
+            let m::A{ addr: addr: address }: m::A = a;
+            addr
+          }
+        }
+    }
+} // end 0x42::m

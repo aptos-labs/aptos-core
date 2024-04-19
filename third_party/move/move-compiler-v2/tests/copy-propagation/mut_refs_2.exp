@@ -1,0 +1,69 @@
+============ initial bytecode ================
+
+[variant baseline]
+fun m::test($t0: m::S): u64 {
+     var $t1: u64
+     var $t2: m::S
+     var $t3: m::S
+     var $t4: &mut u64
+     var $t5: &mut m::S
+     var $t6: u64
+     var $t7: &m::S
+     var $t8: &u64
+  0: $t2 := infer($t0)
+  1: $t3 := infer($t2)
+  2: $t5 := borrow_local($t2)
+  3: $t4 := borrow_field<m::S>.a($t5)
+  4: $t6 := 0
+  5: write_ref($t4, $t6)
+  6: $t7 := borrow_local($t3)
+  7: $t8 := borrow_field<m::S>.a($t7)
+  8: $t1 := read_ref($t8)
+  9: return $t1
+}
+
+
+Diagnostics:
+error: local `p` of type `m::S` does not have the `copy` ability
+   ┌─ tests/copy-propagation/mut_refs_2.move:10:17
+   │
+10 │         let q = p;
+   │                 ^ copy needed here because value is still in use
+11 │         let ref = &mut p.a;
+   │                        - used here
+
+error: local `p` of type `m::S` does not have the `drop` ability
+   ┌─ tests/copy-propagation/mut_refs_2.move:11:24
+   │
+11 │         let ref = &mut p.a;
+   │                        ^ still borrowed but will be implicitly dropped later since it is no longer used
+
+error: local `q` of type `m::S` does not have the `drop` ability
+   ┌─ tests/copy-propagation/mut_refs_2.move:13:9
+   │
+13 │         q.a
+   │         ^ still borrowed but will be implicitly dropped later since it is no longer used
+
+============ after DeadStoreElimination: ================
+
+[variant baseline]
+fun m::test($t0: m::S): u64 {
+     var $t1: u64
+     var $t2: m::S
+     var $t3: m::S
+     var $t4: &mut u64
+     var $t5: &mut m::S
+     var $t6: u64
+     var $t7: &m::S
+     var $t8: &u64
+  0: $t2 := move($t0)
+  1: $t3 := copy($t2)
+  2: $t5 := borrow_local($t2)
+  3: $t4 := borrow_field<m::S>.a($t5)
+  4: $t6 := 0
+  5: write_ref($t4, $t6)
+  6: $t7 := borrow_local($t3)
+  7: $t8 := borrow_field<m::S>.a($t7)
+  8: $t1 := read_ref($t8)
+  9: return $t1
+}

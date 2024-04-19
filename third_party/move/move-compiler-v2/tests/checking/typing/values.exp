@@ -1,4 +1,4 @@
-// ---- Model Dump
+// -- Model dump before bytecode pipeline
 module 0x8675309::M {
     private fun t() {
         0x1;
@@ -8,5 +8,4 @@ module 0x8675309::M {
         false;
         Tuple()
     }
-    spec fun $t();
 } // end 0x8675309::M

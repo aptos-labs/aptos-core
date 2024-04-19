@@ -1,0 +1,31 @@
+
+Diagnostics:
+error: mutable reference in local `s` requires exclusive access but is borrowed
+   ┌─ tests/reference-safety/v1-tests/dereference_combo_invalid.move:13:9
+   │
+12 │         if (cond) f = &mut s.f else f = &mut other.f;
+   │                       -------- previous mutable field borrow
+13 │         *s;
+   │         ^^ requirement enforced here
+14 │         *f;
+   │         -- conflicting reference `f` used here
+
+error: mutable reference in local `s` requires exclusive access but is borrowed
+   ┌─ tests/reference-safety/v1-tests/dereference_combo_invalid.move:20:9
+   │
+19 │         if (cond) f = &mut s.f else f = &mut s.g;
+   │                       --------          -------- previous mutable field borrow
+   │                       │
+   │                       previous mutable field borrow
+20 │         *s;
+   │         ^^ requirement enforced here
+21 │         *f;
+   │         -- conflicting reference `f` used here
+
+error: mutable reference in local `s` requires exclusive access but is borrowed
+   ┌─ tests/reference-safety/v1-tests/dereference_combo_invalid.move:27:9
+   │
+27 │         *s;
+   │         ^^ requirement enforced here
+28 │         *x;
+   │         -- conflicting reference `x` used here

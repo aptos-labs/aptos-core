@@ -1,11 +1,5 @@
 ### Project config
 
-variable "cluster_bootstrap" {
-  description = "Set when bootstrapping a new cluster"
-  type        = bool
-  default     = false
-}
-
 variable "project" {
   description = "GCP project"
   type        = string
@@ -19,20 +13,30 @@ variable "region" {
 variable "zone" {
   description = "GCP zone suffix"
   type        = string
+  default     = "" # if empty, it's a regional cluster
+}
+
+variable "node_locations" {
+  description = "List of node locations"
+  type        = list(string)
+  default     = [] # if empty, let GCP choose
 }
 
 variable "era" {
   description = "Chain era, used to start a clean chain"
+  type        = number
   default     = 1
 }
 
 variable "chain_id" {
   description = "Aptos chain ID"
+  type        = string
   default     = "TESTING"
 }
 
 variable "chain_name" {
   description = "Aptos chain name"
+  type        = string
   default     = "testnet"
 }
 
@@ -43,11 +47,13 @@ variable "validator_name" {
 
 variable "image_tag" {
   description = "Docker image tag for Aptos node"
+  type        = string
   default     = "devnet"
 }
 
 variable "helm_chart" {
   description = "Path to aptos-validator Helm chart file"
+  type        = string
   default     = ""
 }
 
@@ -59,73 +65,13 @@ variable "helm_values" {
 
 variable "helm_values_file" {
   description = "Path to file containing values for Helm chart"
+  type        = string
   default     = ""
-}
-
-variable "k8s_api_sources" {
-  description = "List of CIDR subnets which can access the Kubernetes API endpoint"
-  default     = ["0.0.0.0/0"]
-}
-
-variable "node_pool_sizes" {
-  type        = map(number)
-  default     = {}
-  description = "Override the number of nodes in the specified pool"
-}
-
-variable "utility_instance_type" {
-  description = "Instance type used for utilities"
-  default     = "n2-standard-8"
-}
-
-variable "utility_instance_num" {
-  description = "Number of instances for utilities"
-  default     = 1
-}
-
-variable "utility_instance_enable_taint" {
-  description = "Whether to taint the instances in the utility nodegroup"
-  default     = false
-}
-
-variable "utility_instance_disk_size_gb" {
-  description = "Disk size for utility instances"
-  default     = 20
-}
-
-variable "validator_instance_type" {
-  description = "Instance type used for validator and fullnodes"
-  default     = "n2-standard-32"
-}
-
-variable "validator_instance_num" {
-  description = "Number of instances used for validator and fullnodes"
-  default     = 2
-}
-
-variable "validator_instance_enable_taint" {
-  description = "Whether to taint instances in the validator nodegroup"
-  default     = false
-}
-
-variable "validator_instance_disk_size_gb" {
-  description = "Disk size for validator instances"
-  default     = 20
-}
-
-variable "enable_logger" {
-  description = "Enable logger helm chart"
-  default     = false
-}
-
-variable "logger_helm_values" {
-  description = "Map of values to pass to logger Helm"
-  type        = any
-  default     = {}
 }
 
 variable "enable_monitoring" {
   description = "Enable monitoring helm chart"
+  type        = bool
   default     = false
 }
 
@@ -135,19 +81,27 @@ variable "monitoring_helm_values" {
   default     = {}
 }
 
-variable "enable_node_exporter" {
-  description = "Enable Prometheus node exporter helm chart"
+variable "enable_prometheus_node_exporter" {
+  description = "Enable prometheus-node-exporter within monitoring helm chart"
+  type        = bool
   default     = false
 }
 
-variable "node_exporter_helm_values" {
-  description = "Map of values to pass to node exporter Helm"
-  type        = any
-  default     = {}
+variable "enable_kube_state_metrics" {
+  description = "Enable kube-state-metrics within monitoring helm chart"
+  type        = bool
+  default     = false
+}
+
+variable "k8s_api_sources" {
+  description = "List of CIDR subnets which can access the Kubernetes API endpoint"
+  type        = list(string)
+  default     = ["0.0.0.0/0"]
 }
 
 variable "manage_via_tf" {
   description = "Whether to manage the aptos-node k8s workload via Terraform. If set to false, the helm_release resource will still be created and updated when values change, but it may not be updated on every apply"
+  type        = bool
   default     = true
 }
 
@@ -155,70 +109,149 @@ variable "manage_via_tf" {
 
 variable "zone_name" {
   description = "Zone name of GCP Cloud DNS zone to create records in"
+  type        = string
   default     = ""
 }
 
 variable "zone_project" {
   description = "GCP project which the DNS zone is in (if different)"
+  type        = string
   default     = ""
 }
 
 variable "workspace_dns" {
   description = "Include Terraform workspace name in DNS records"
+  type        = bool
   default     = true
 }
 
 variable "record_name" {
   description = "DNS record name to use (<workspace> is replaced with the TF workspace name)"
+  type        = string
   default     = "<workspace>.aptos"
 }
 
 variable "create_dns_records" {
   description = "Creates DNS records in var.zone_name that point to k8s service, as opposed to using external-dns or other means"
+  type        = bool
   default     = true
 }
 
 variable "dns_ttl" {
   description = "Time-to-Live for the Validator and Fullnode DNS records"
+  type        = number
   default     = 300
 }
 
-### Autoscaling
+### Node pools and Autoscaling
 
-variable "gke_enable_node_autoprovisioning" {
-  description = "Enable node autoprovisioning for GKE cluster. See https://cloud.google.com/kubernetes-engine/docs/how-to/node-auto-provisioning"
-  default     = false
+variable "node_pool_sizes" {
+  type        = map(number)
+  default     = {}
+  description = "Override the number of nodes in the specified pool"
 }
 
-variable "gke_node_autoprovisioning_max_cpu" {
-  description = "Maximum CPU utilization for GKE node_autoprovisioning"
-  default     = 10
+variable "instance_disk_sizes" {
+  type        = map(number)
+  default     = {}
+  description = "Override the disk size in the specified pool"
 }
 
-variable "gke_node_autoprovisioning_max_memory" {
-  description = "Maximum memory utilization for GKE node_autoprovisioning"
+variable "default_disk_size_gb" {
+  description = "Default disk size for nodes"
+  type        = number
   default     = 100
 }
 
-variable "gke_enable_autoscaling" {
-  description = "Enable autoscaling for the nodepools in the GKE cluster. See https://cloud.google.com/kubernetes-engine/docs/concepts/cluster-autoscaler"
+variable "default_disk_type" {
+  description = "Default disk type for nodes"
+  type        = string
+  default     = "pd-standard"
+}
+
+variable "create_nodepools" {
+  description = "Create managed nodepools"
+  type        = bool
   default     = true
+}
+
+variable "nodepool_sysctls" {
+  description = "Sysctls to set on nodepools"
+  type        = map(string)
+  default     = {}
+}
+
+variable "core_instance_type" {
+  description = "Instance type used for core pods"
+  type        = string
+  default     = "e2-medium"
+}
+
+variable "utility_instance_type" {
+  description = "Instance type used for utility pods"
+  type        = string
+  default     = "e2-standard-8"
+}
+
+variable "validator_instance_type" {
+  description = "Instance type used for validator and fullnodes"
+  type        = string
+  default     = "t2d-standard-16"
+}
+
+variable "utility_instance_enable_taint" {
+  description = "Whether to taint instances in the utilities nodegroup"
+  type        = bool
+  default     = false
+}
+
+variable "validator_instance_enable_taint" {
+  description = "Whether to taint instances in the validator nodegroup"
+  type        = bool
+  default     = false
+}
+
+variable "gke_enable_node_autoprovisioning" {
+  description = "Enable GKE node autoprovisioning"
+  type        = bool
+  default     = true
+}
+
+variable "gke_node_autoprovisioning_max_cpu" {
+  description = "Maximum CPU allocation for GKE node autoprovisioning"
+  type        = number
+  default     = 500
+}
+
+variable "gke_node_autoprovisioning_max_memory" {
+  description = "Maximum memory allocation for GKE node autoprovisioning"
+  type        = number
+  default     = 2000
+}
+
+variable "gke_autoscaling_profile" {
+  description = "Autoscaling profile for GKE cluster. See https://cloud.google.com/kubernetes-engine/docs/concepts/cluster-autoscaler#autoscaling_profiles"
+  type        = string
+  default     = "OPTIMIZE_UTILIZATION"
 }
 
 variable "gke_autoscaling_max_node_count" {
   description = "Maximum number of nodes for GKE nodepool autoscaling"
-  default     = 10
+  type        = number
+  default     = 250
 }
 
 ### Naming overrides
 
 variable "helm_release_name_override" {
   description = "If set, overrides the name of the aptos-node helm chart"
+  type        = string
   default     = ""
 }
 
 variable "workspace_name_override" {
   description = "If specified, overrides the usage of Terraform workspace for naming purposes"
+  type        = string
   default     = ""
 }
 
@@ -226,18 +259,33 @@ variable "workspace_name_override" {
 
 variable "cluster_ipv4_cidr_block" {
   description = "The IP address range of the container pods in this cluster, in CIDR notation. See https://registry.terraform.io/providers/hashicorp/google/latest/docs/resources/container_cluster#cluster_ipv4_cidr_block"
+  type        = string
   default     = ""
+}
+
+variable "enable_clouddns" {
+  description = "Enable CloudDNS (Google-managed cluster DNS)"
+  type        = bool
+  default     = false
+}
+
+variable "enable_image_streaming" {
+  description = "Enable image streaming (GCFS)"
+  type        = bool
+  default     = false
 }
 
 ### Helm
 
 variable "num_validators" {
   description = "The number of validator nodes to create"
+  type        = number
   default     = 1
 }
 
 variable "num_fullnode_groups" {
   description = "The number of fullnode groups to create"
+  type        = number
   default     = 1
 }
 

@@ -1,9 +1,52 @@
 spec aptos_framework::object {
-
+    /// <high-level-req>
+    /// No.: 1
+    /// Requirement: It's not possible to create an object twice on the same address.
+    /// Criticality: Critical
+    /// Implementation: The create_object_internal function includes an assertion to ensure that the object being
+    /// created does not already exist at the specified address.
+    /// Enforcement: Formally verified via [high-level-req-1](create_object_internal).
+    ///
+    /// No.: 2
+    /// Requirement: Only its owner may transfer an object.
+    /// Criticality: Critical
+    /// Implementation: The transfer function mandates that the transaction be signed by the owner's address, ensuring
+    /// that only the rightful owner may initiate the object transfer.
+    /// Enforcement: Audited that it aborts if anyone other than the owner attempts to transfer.
+    ///
+    /// No.: 3
+    /// Requirement: The indirect owner of an object may transfer the object.
+    /// Criticality: Medium
+    /// Implementation: The owns function evaluates to true when the given address possesses either direct or indirect
+    /// ownership of the specified object.
+    /// Enforcement: Audited that it aborts if address transferring is not indirect owner.
+    ///
+    /// No.: 4
+    /// Requirement: Objects may never change the address which houses them.
+    /// Criticality: Low
+    /// Implementation: After creating an object, transfers to another owner may occur. However, the address which
+    /// stores the object may not be changed.
+    /// Enforcement: This is implied by [high-level-req](high-level requirement 1).
+    ///
+    /// No.: 5
+    /// Requirement: If an ungated transfer is disabled on an object in an indirect ownership chain, a transfer should not
+    /// occur.
+    /// Criticality: Medium
+    /// Implementation: Calling disable_ungated_transfer disables direct transfer, and only TransferRef may trigger
+    /// transfers. The transfer_with_ref function is called.
+    /// Enforcement: Formally verified via [high-level-req-5](transfer_with_ref).
+    ///
+    /// No.: 6
+    /// Requirement: Object addresses must not overlap with other addresses in different domains.
+    /// Criticality: Critical
+    /// Implementation: The current addressing scheme with suffixes does not conflict with any existing addresses,
+    /// such as resource accounts. The GUID space is explicitly separated to ensure this doesn't happen.
+    /// Enforcement: This is true by construction if one correctly ensures the usage of INIT_GUID_CREATION_NUM during
+    /// the creation of GUID.
+    /// </high-level-req>
+    ///
     spec module {
         pragma aborts_if_is_strict;
-        //ghost variable
-        global g_roll: u8;
     }
 
     spec fun spec_exists_at<T: key>(object: address): bool;
@@ -19,54 +62,50 @@ spec aptos_framework::object {
         ensures result == Object<T> { inner: object };
     }
 
-    spec create_object(owner_address: address): ConstructorRef{
-        use std::features;
+    spec create_object(owner_address: address): ConstructorRef {
         pragma aborts_if_is_partial;
 
         let unique_address = transaction_context::spec_generate_unique_address();
-        aborts_if !features::spec_is_enabled(features::APTOS_UNIQUE_IDENTIFIERS);
         aborts_if exists<ObjectCore>(unique_address);
 
         ensures exists<ObjectCore>(unique_address);
         ensures global<ObjectCore>(unique_address) == ObjectCore {
-                guid_creation_num: INIT_GUID_CREATION_NUM + 1,
-                owner: owner_address,
-                allow_ungated_transfer: true,
-                transfer_events: event::EventHandle {
-                    counter: 0,
-                    guid: guid::GUID {
-                        id: guid::ID {
-                            creation_num: INIT_GUID_CREATION_NUM,
-                            addr: unique_address,
-                        }
+            guid_creation_num: INIT_GUID_CREATION_NUM + 1,
+            owner: owner_address,
+            allow_ungated_transfer: true,
+            transfer_events: event::EventHandle {
+                counter: 0,
+                guid: guid::GUID {
+                    id: guid::ID {
+                        creation_num: INIT_GUID_CREATION_NUM,
+                        addr: unique_address,
                     }
                 }
+            }
         };
         ensures result == ConstructorRef { self: unique_address, can_delete: true };
     }
 
-    spec create_sticky_object(owner_address: address): ConstructorRef{
-        use std::features;
+    spec create_sticky_object(owner_address: address): ConstructorRef {
         pragma aborts_if_is_partial;
 
         let unique_address = transaction_context::spec_generate_unique_address();
-        aborts_if !features::spec_is_enabled(features::APTOS_UNIQUE_IDENTIFIERS);
         aborts_if exists<ObjectCore>(unique_address);
 
         ensures exists<ObjectCore>(unique_address);
         ensures global<ObjectCore>(unique_address) == ObjectCore {
-                guid_creation_num: INIT_GUID_CREATION_NUM + 1,
-                owner: owner_address,
-                allow_ungated_transfer: true,
-                transfer_events: event::EventHandle {
-                    counter: 0,
-                    guid: guid::GUID {
-                        id: guid::ID {
-                            creation_num: INIT_GUID_CREATION_NUM,
-                            addr: unique_address,
-                        }
+            guid_creation_num: INIT_GUID_CREATION_NUM + 1,
+            owner: owner_address,
+            allow_ungated_transfer: true,
+            transfer_events: event::EventHandle {
+                counter: 0,
+                guid: guid::GUID {
+                    id: guid::ID {
+                        creation_num: INIT_GUID_CREATION_NUM,
+                        addr: unique_address,
                     }
                 }
+            }
         };
         ensures result == ConstructorRef { self: unique_address, can_delete: false };
     }
@@ -110,18 +149,18 @@ spec aptos_framework::object {
 
         ensures exists<ObjectCore>(obj_addr);
         ensures global<ObjectCore>(obj_addr) == ObjectCore {
-                guid_creation_num: INIT_GUID_CREATION_NUM + 1,
-                owner: creator_address,
-                allow_ungated_transfer: true,
-                transfer_events: event::EventHandle {
-                    counter: 0,
-                    guid: guid::GUID {
-                        id: guid::ID {
-                            creation_num: INIT_GUID_CREATION_NUM,
-                            addr: obj_addr,
-                        }
+            guid_creation_num: INIT_GUID_CREATION_NUM + 1,
+            owner: creator_address,
+            allow_ungated_transfer: true,
+            transfer_events: event::EventHandle {
+                counter: 0,
+                guid: guid::GUID {
+                    id: guid::ID {
+                        creation_num: INIT_GUID_CREATION_NUM,
+                        addr: obj_addr,
                     }
                 }
+            }
         };
         ensures result == ConstructorRef { self: obj_addr, can_delete: false };
     }
@@ -132,18 +171,18 @@ spec aptos_framework::object {
 
         ensures exists<ObjectCore>(obj_addr);
         ensures global<ObjectCore>(obj_addr) == ObjectCore {
-                guid_creation_num: INIT_GUID_CREATION_NUM + 1,
-                owner: creator_address,
-                allow_ungated_transfer: true,
-                transfer_events: event::EventHandle {
-                    counter: 0,
-                    guid: guid::GUID {
-                        id: guid::ID {
-                            creation_num: INIT_GUID_CREATION_NUM,
-                            addr: obj_addr,
-                        }
+            guid_creation_num: INIT_GUID_CREATION_NUM + 1,
+            owner: creator_address,
+            allow_ungated_transfer: true,
+            transfer_events: event::EventHandle {
+                counter: 0,
+                guid: guid::GUID {
+                    id: guid::ID {
+                        creation_num: INIT_GUID_CREATION_NUM,
+                        addr: obj_addr,
                     }
                 }
+            }
         };
         ensures result == ConstructorRef { self: obj_addr, can_delete: false };
     }
@@ -171,26 +210,28 @@ spec aptos_framework::object {
         aborts_if exists<ObjectCore>(obj_addr);
         aborts_if !from_bcs::deserializable<address>(hash_bytes);
 
-        ensures global<account::Account>(addr).guid_creation_num == old(global<account::Account>(addr)).guid_creation_num + 1;
+        ensures global<account::Account>(addr).guid_creation_num == old(
+            global<account::Account>(addr)
+        ).guid_creation_num + 1;
         ensures exists<ObjectCore>(obj_addr);
         ensures global<ObjectCore>(obj_addr) == ObjectCore {
-                guid_creation_num: INIT_GUID_CREATION_NUM + 1,
-                owner: addr,
-                allow_ungated_transfer: true,
-                transfer_events: event::EventHandle {
-                    counter: 0,
-                    guid: guid::GUID {
-                        id: guid::ID {
-                            creation_num: INIT_GUID_CREATION_NUM,
-                            addr: obj_addr,
-                        }
+            guid_creation_num: INIT_GUID_CREATION_NUM + 1,
+            owner: addr,
+            allow_ungated_transfer: true,
+            transfer_events: event::EventHandle {
+                counter: 0,
+                guid: guid::GUID {
+                    id: guid::ID {
+                        creation_num: INIT_GUID_CREATION_NUM,
+                        addr: obj_addr,
                     }
                 }
+            }
         };
         ensures result == ConstructorRef { self: obj_addr, can_delete: true };
     }
 
-    spec create_object_from_object(creator: &signer): ConstructorRef{
+    spec create_object_from_object(creator: &signer): ConstructorRef {
         aborts_if !exists<ObjectCore>(signer::address_of(creator));
         //Guid properties
         let object_data = global<ObjectCore>(signer::address_of(creator));
@@ -215,18 +256,18 @@ spec aptos_framework::object {
         ensures global<ObjectCore>(addr).guid_creation_num == old(global<ObjectCore>(addr)).guid_creation_num + 1;
         ensures exists<ObjectCore>(obj_addr);
         ensures global<ObjectCore>(obj_addr) == ObjectCore {
-                guid_creation_num: INIT_GUID_CREATION_NUM + 1,
-                owner: addr,
-                allow_ungated_transfer: true,
-                transfer_events: event::EventHandle {
-                    counter: 0,
-                    guid: guid::GUID {
-                        id: guid::ID {
-                            creation_num: INIT_GUID_CREATION_NUM,
-                            addr: obj_addr,
-                        }
+            guid_creation_num: INIT_GUID_CREATION_NUM + 1,
+            owner: addr,
+            allow_ungated_transfer: true,
+            transfer_events: event::EventHandle {
+                counter: 0,
+                guid: guid::GUID {
+                    id: guid::ID {
+                        creation_num: INIT_GUID_CREATION_NUM,
+                        addr: obj_addr,
                     }
                 }
+            }
         };
         ensures result == ConstructorRef { self: obj_addr, can_delete: true };
     }
@@ -241,32 +282,33 @@ spec aptos_framework::object {
 
         ensures exists<ObjectCore>(obj_addr);
         ensures global<ObjectCore>(obj_addr) == ObjectCore {
-                guid_creation_num: INIT_GUID_CREATION_NUM + 1,
-                owner: creator_address,
-                allow_ungated_transfer: true,
-                transfer_events: event::EventHandle {
-                    counter: 0,
-                    guid: guid::GUID {
-                        id: guid::ID {
-                            creation_num: INIT_GUID_CREATION_NUM,
-                            addr: obj_addr,
-                        }
+            guid_creation_num: INIT_GUID_CREATION_NUM + 1,
+            owner: creator_address,
+            allow_ungated_transfer: true,
+            transfer_events: event::EventHandle {
+                counter: 0,
+                guid: guid::GUID {
+                    id: guid::ID {
+                        creation_num: INIT_GUID_CREATION_NUM,
+                        addr: obj_addr,
                     }
                 }
+            }
         };
         ensures result == ConstructorRef { self: obj_addr, can_delete: true };
     }
 
     spec create_object_internal(
-        creator_address: address,
-        object: address,
-        can_delete: bool,
+    creator_address: address,
+    object: address,
+    can_delete: bool,
     ): ConstructorRef {
         // property 1: Creating an object twice on the same address must never occur.
+        /// [high-level-req-1]
         aborts_if exists<ObjectCore>(object);
         ensures exists<ObjectCore>(object);
         // property 6: Object addresses must not overlap with other addresses in different domains.
-        ensures global<ObjectCore>(object).guid_creation_num ==  INIT_GUID_CREATION_NUM + 1;
+        ensures global<ObjectCore>(object).guid_creation_num == INIT_GUID_CREATION_NUM + 1;
         ensures result == ConstructorRef { self: object, can_delete };
     }
 
@@ -286,7 +328,7 @@ spec aptos_framework::object {
         ensures result == Object<T> { inner: ref.self };
     }
 
-    spec create_guid(object: &signer): guid::GUID{
+    spec create_guid(object: &signer): guid::GUID {
         aborts_if !exists<ObjectCore>(signer::address_of(object));
         //Guid properties
         let object_data = global<ObjectCore>(signer::address_of(object));
@@ -301,8 +343,8 @@ spec aptos_framework::object {
     }
 
     spec new_event_handle<T: drop + store>(
-        object: &signer,
-    ): event::EventHandle<T>{
+    object: &signer,
+    ): event::EventHandle<T> {
         aborts_if !exists<ObjectCore>(signer::address_of(object));
         //Guid properties
         let object_data = global<ObjectCore>(signer::address_of(object));
@@ -345,17 +387,18 @@ spec aptos_framework::object {
         };
     }
 
-    spec transfer_with_ref(ref: LinearTransferRef, to: address){
+    spec transfer_with_ref(ref: LinearTransferRef, to: address) {
         let object = global<ObjectCore>(ref.self);
         aborts_if !exists<ObjectCore>(ref.self);
+        /// [high-level-req-5]
         aborts_if object.owner != ref.owner;
         ensures global<ObjectCore>(ref.self).owner == to;
     }
 
     spec transfer_call(
-        owner: &signer,
-        object: address,
-        to: address,
+    owner: &signer,
+    object: address,
+    to: address,
     ) {
         pragma aborts_if_is_partial;
         // TODO: Verify the link list loop in verify_ungated_and_descendant
@@ -365,9 +408,9 @@ spec aptos_framework::object {
     }
 
     spec transfer<T: key>(
-        owner: &signer,
-        object: Object<T>,
-        to: address,
+    owner: &signer,
+    object: Object<T>,
+    to: address,
     ) {
         pragma aborts_if_is_partial;
         // TODO: Verify the link list loop in verify_ungated_and_descendant
@@ -378,9 +421,9 @@ spec aptos_framework::object {
     }
 
     spec transfer_raw(
-        owner: &signer,
-        object: address,
-        to: address,
+    owner: &signer,
+    object: address,
+    to: address,
     ) {
         pragma aborts_if_is_partial;
         // TODO: Verify the link list loop in verify_ungated_and_descendant
@@ -390,10 +433,10 @@ spec aptos_framework::object {
     }
 
     spec transfer_to_object<O: key, T: key> (
-        owner: &signer,
-        object: Object<O>,
-        to: Object<T>,
-    ){
+    owner: &signer,
+    object: Object<O>,
+    to: Object<T>,
+    ) {
         pragma aborts_if_is_partial;
         // TODO: Verify the link list loop in verify_ungated_and_descendant
         let owner_address = signer::address_of(owner);
@@ -448,17 +491,18 @@ spec aptos_framework::object {
         ensures result == global<ObjectCore>(object.inner).allow_ungated_transfer;
     }
 
-    spec is_owner<T: key>(object: Object<T>, owner: address): bool{
+    spec is_owner<T: key>(object: Object<T>, owner: address): bool {
         aborts_if !exists<ObjectCore>(object.inner);
         ensures result == (global<ObjectCore>(object.inner).owner == owner);
     }
 
-    spec owner<T: key>(object: Object<T>): address{
+    spec owner<T: key>(object: Object<T>): address {
         aborts_if !exists<ObjectCore>(object.inner);
         ensures result == global<ObjectCore>(object.inner).owner;
     }
 
     spec owns<T: key>(object: Object<T>, owner: address): bool {
+        pragma aborts_if_is_partial;
         let current_address_0 = object.inner;
         let object_0 = global<ObjectCore>(current_address_0);
         let current_address = object_0.owner;
@@ -472,5 +516,4 @@ spec aptos_framework::object {
     spec fun spec_create_user_derived_object_address(source: address, derive_from: address): address;
 
     spec fun spec_create_guid_object_address(source: address, creation_num: u64): address;
-
 }

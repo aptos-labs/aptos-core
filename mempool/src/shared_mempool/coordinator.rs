@@ -20,7 +20,7 @@ use aptos_bounded_executor::BoundedExecutor;
 use aptos_config::network_id::{NetworkId, PeerNetworkId};
 use aptos_consensus_types::common::TransactionSummary;
 use aptos_event_notifications::ReconfigNotificationListener;
-use aptos_infallible::Mutex;
+use aptos_infallible::{Mutex, RwLock};
 use aptos_logger::prelude::*;
 use aptos_mempool_notifications::{MempoolCommitNotification, MempoolNotificationListener};
 use aptos_network::{
@@ -51,7 +51,7 @@ pub(crate) async fn coordinator<NetworkClient, TransactionValidator, ConfigProvi
     network_service_events: NetworkServiceEvents<MempoolSyncMsg>,
     mut client_events: MempoolEventsReceiver,
     mut quorum_store_requests: mpsc::Receiver<QuorumStoreRequest>,
-    mut mempool_listener: MempoolNotificationListener,
+    mempool_listener: MempoolNotificationListener,
     mut mempool_reconfig_events: ReconfigNotificationListener<ConfigProvider>,
     peer_update_interval_ms: u64,
     peers_and_metadata: Arc<PeersAndMetadata>,
@@ -75,6 +75,9 @@ pub(crate) async fn coordinator<NetworkClient, TransactionValidator, ConfigProvi
     let mut scheduled_broadcasts = FuturesUnordered::new();
     let mut update_peers_interval =
         tokio::time::interval(Duration::from_millis(peer_update_interval_ms));
+
+    // Spawn a dedicated task to handle commit notifications from state sync
+    spawn_commit_notification_handler(&smp, mempool_listener);
 
     // Use a BoundedExecutor to restrict only `workers_available` concurrent
     // worker tasks that can process incoming transactions.
@@ -101,9 +104,6 @@ pub(crate) async fn coordinator<NetworkClient, TransactionValidator, ConfigProvi
             msg = quorum_store_requests.select_next_some() => {
                 tasks::process_quorum_store_request(&smp, msg);
             },
-            msg = mempool_listener.select_next_some() => {
-                handle_commit_notification(&mut smp, msg, &mut mempool_listener);
-            },
             reconfig_notification = mempool_reconfig_events.select_next_some() => {
                 handle_mempool_reconfig_event(&mut smp, &bounded_executor, reconfig_notification.on_chain_configs).await;
             },
@@ -123,6 +123,24 @@ pub(crate) async fn coordinator<NetworkClient, TransactionValidator, ConfigProvi
         LogEntry::CoordinatorRuntime,
         LogEvent::Terminated
     ));
+}
+
+/// Spawn a task to handle commit notifications from state sync
+fn spawn_commit_notification_handler<NetworkClient, TransactionValidator>(
+    smp: &SharedMempool<NetworkClient, TransactionValidator>,
+    mut mempool_listener: MempoolNotificationListener,
+) where
+    NetworkClient: NetworkClientInterface<MempoolSyncMsg> + 'static,
+    TransactionValidator: TransactionValidation + 'static,
+{
+    let mempool = smp.mempool.clone();
+    let mempool_validator = smp.validator.clone();
+
+    tokio::spawn(async move {
+        while let Some(commit_notification) = mempool_listener.next().await {
+            handle_commit_notification(&mempool, &mempool_validator, commit_notification);
+        }
+    });
 }
 
 /// Spawn a task for processing `MempoolClientRequest`s from a client such as API service
@@ -182,12 +200,11 @@ async fn handle_client_request<NetworkClient, TransactionValidator>(
 
 /// Handle removing committed transactions from local mempool immediately.  This should be done
 /// immediately to ensure broadcasts of committed transactions stop as soon as possible.
-fn handle_commit_notification<NetworkClient, TransactionValidator>(
-    smp: &mut SharedMempool<NetworkClient, TransactionValidator>,
+fn handle_commit_notification<TransactionValidator>(
+    mempool: &Arc<Mutex<CoreMempool>>,
+    mempool_validator: &Arc<RwLock<TransactionValidator>>,
     msg: MempoolCommitNotification,
-    mempool_listener: &mut MempoolNotificationListener,
 ) where
-    NetworkClient: NetworkClientInterface<MempoolSyncMsg>,
     TransactionValidator: TransactionValidation,
 {
     debug!(
@@ -203,7 +220,7 @@ fn handle_commit_notification<NetworkClient, TransactionValidator>(
         msg.transactions.len(),
     );
     process_committed_transactions(
-        &smp.mempool,
+        mempool,
         msg.transactions
             .iter()
             .map(|txn| TransactionSummary {
@@ -213,18 +230,13 @@ fn handle_commit_notification<NetworkClient, TransactionValidator>(
             .collect(),
         msg.block_timestamp_usecs,
     );
-    smp.validator.write().notify_commit();
-    let counter_result = if mempool_listener.ack_commit_notification(msg).is_err() {
-        error!(LogSchema::event_log(
-            LogEntry::StateSyncCommit,
-            LogEvent::CallbackFail
-        ));
-        counters::REQUEST_FAIL_LABEL
-    } else {
-        counters::REQUEST_SUCCESS_LABEL
-    };
+    mempool_validator.write().notify_commit();
     let latency = start_time.elapsed();
-    counters::mempool_service_latency(counters::COMMIT_STATE_SYNC_LABEL, counter_result, latency);
+    counters::mempool_service_latency(
+        counters::COMMIT_STATE_SYNC_LABEL,
+        counters::REQUEST_SUCCESS_LABEL,
+        latency,
+    );
 }
 
 /// Spawn a task to restart the transaction validator with the new reconfig data.
@@ -253,9 +265,7 @@ async fn handle_mempool_reconfig_event<NetworkClient, TransactionValidator, Conf
         .await;
 }
 
-/// Handles all NewPeer, LostPeer, and network messages.
-/// - NewPeer events start new automatic broadcasts if the peer is upstream. If the peer is not upstream, we ignore it.
-/// - LostPeer events disable the upstream peer, which will cancel ongoing broadcasts.
+/// Handles all network messages.
 /// - Network messages follow a simple Request/Response framework to accept new transactions
 /// TODO: Move to RPC off of DirectSend
 async fn handle_network_event<NetworkClient, TransactionValidator>(
@@ -268,12 +278,6 @@ async fn handle_network_event<NetworkClient, TransactionValidator>(
     TransactionValidator: TransactionValidation + 'static,
 {
     match event {
-        Event::NewPeer(_) => {
-            // TODO: remove Event
-        },
-        Event::LostPeer(_) => {
-            // TODO: remove Event
-        },
         Event::Message(peer_id, msg) => {
             counters::shared_mempool_event_inc("message");
             match msg {

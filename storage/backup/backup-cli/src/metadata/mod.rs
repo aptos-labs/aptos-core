@@ -227,7 +227,7 @@ impl PartialEq<Self> for CompactionTimestampsMeta {
 
 impl PartialOrd<Self> for CompactionTimestampsMeta {
     fn partial_cmp(&self, other: &Self) -> Option<Ordering> {
-        self.file_compacted_at.partial_cmp(&other.file_compacted_at)
+        Some(self.cmp(other))
     }
 }
 

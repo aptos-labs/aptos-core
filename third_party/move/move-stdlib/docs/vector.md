@@ -1,5 +1,5 @@
 
-<a name="0x1_vector"></a>
+<a id="0x1_vector"></a>
 
 # Module `0x1::vector`
 
@@ -32,12 +32,6 @@ the return on investment didn't seem worth it for these simple functions.
 -  [Function `index_of`](#0x1_vector_index_of)
 -  [Function `remove`](#0x1_vector_remove)
 -  [Function `swap_remove`](#0x1_vector_swap_remove)
--  [Function `for_each`](#0x1_vector_for_each)
--  [Function `for_each_ref`](#0x1_vector_for_each_ref)
--  [Function `for_each_mut`](#0x1_vector_for_each_mut)
--  [Function `fold`](#0x1_vector_fold)
--  [Function `map`](#0x1_vector_map)
--  [Function `filter`](#0x1_vector_filter)
 -  [Module Specification](#@Module_Specification_1)
     -  [Helper Functions](#@Helper_Functions_2)
 
@@ -46,12 +40,12 @@ the return on investment didn't seem worth it for these simple functions.
 
 
 
-<a name="@Constants_0"></a>
+<a id="@Constants_0"></a>
 
 ## Constants
 
 
-<a name="0x1_vector_EINDEX_OUT_OF_BOUNDS"></a>
+<a id="0x1_vector_EINDEX_OUT_OF_BOUNDS"></a>
 
 The index into the vector is out of bounds
 
@@ -61,7 +55,7 @@ The index into the vector is out of bounds
 
 
 
-<a name="0x1_vector_empty"></a>
+<a id="0x1_vector_empty"></a>
 
 ## Function `empty`
 
@@ -85,7 +79,7 @@ Create an empty vector.
 
 </details>
 
-<a name="0x1_vector_length"></a>
+<a id="0x1_vector_length"></a>
 
 ## Function `length`
 
@@ -109,7 +103,7 @@ Return the length of the vector.
 
 </details>
 
-<a name="0x1_vector_borrow"></a>
+<a id="0x1_vector_borrow"></a>
 
 ## Function `borrow`
 
@@ -134,7 +128,7 @@ Aborts if <code>i</code> is out of bounds.
 
 </details>
 
-<a name="0x1_vector_push_back"></a>
+<a id="0x1_vector_push_back"></a>
 
 ## Function `push_back`
 
@@ -158,7 +152,7 @@ Add element <code>e</code> to the end of the vector <code>v</code>.
 
 </details>
 
-<a name="0x1_vector_borrow_mut"></a>
+<a id="0x1_vector_borrow_mut"></a>
 
 ## Function `borrow_mut`
 
@@ -183,7 +177,7 @@ Aborts if <code>i</code> is out of bounds.
 
 </details>
 
-<a name="0x1_vector_pop_back"></a>
+<a id="0x1_vector_pop_back"></a>
 
 ## Function `pop_back`
 
@@ -208,7 +202,7 @@ Aborts if <code>v</code> is empty.
 
 </details>
 
-<a name="0x1_vector_destroy_empty"></a>
+<a id="0x1_vector_destroy_empty"></a>
 
 ## Function `destroy_empty`
 
@@ -233,7 +227,7 @@ Aborts if <code>v</code> is not empty.
 
 </details>
 
-<a name="0x1_vector_swap"></a>
+<a id="0x1_vector_swap"></a>
 
 ## Function `swap`
 
@@ -258,7 +252,7 @@ Aborts if <code>i</code> or <code>j</code> is out of bounds.
 
 </details>
 
-<a name="0x1_vector_singleton"></a>
+<a id="0x1_vector_singleton"></a>
 
 ## Function `singleton`
 
@@ -298,7 +292,7 @@ Return an vector of size one containing element <code>e</code>.
 
 </details>
 
-<a name="0x1_vector_reverse"></a>
+<a id="0x1_vector_reverse"></a>
 
 ## Function `reverse`
 
@@ -316,7 +310,7 @@ Reverses the order of the elements in the vector <code>v</code> in place.
 
 <pre><code><b>public</b> <b>fun</b> <a href="vector.md#0x1_vector_reverse">reverse</a>&lt;Element&gt;(v: &<b>mut</b> <a href="vector.md#0x1_vector">vector</a>&lt;Element&gt;) {
     <b>let</b> len = <a href="vector.md#0x1_vector_length">length</a>(v);
-    <b>if</b> (len == 0) <b>return</b> ();
+    <b>if</b> (len == 0) <b>return</b>;
 
     <b>let</b> front_index = 0;
     <b>let</b> back_index = len -1;
@@ -344,7 +338,7 @@ Reverses the order of the elements in the vector <code>v</code> in place.
 
 </details>
 
-<a name="0x1_vector_append"></a>
+<a id="0x1_vector_append"></a>
 
 ## Function `append`
 
@@ -383,7 +377,7 @@ Pushes all of the elements of the <code>other</code> vector into the <code>lhs</
 
 </details>
 
-<a name="0x1_vector_is_empty"></a>
+<a id="0x1_vector_is_empty"></a>
 
 ## Function `is_empty`
 
@@ -420,7 +414,7 @@ Return <code><b>true</b></code> if the vector <code>v</code> has no elements and
 
 </details>
 
-<a name="0x1_vector_contains"></a>
+<a id="0x1_vector_contains"></a>
 
 ## Function `contains`
 
@@ -464,7 +458,7 @@ Otherwise, returns false.
 
 </details>
 
-<a name="0x1_vector_index_of"></a>
+<a id="0x1_vector_index_of"></a>
 
 ## Function `index_of`
 
@@ -508,7 +502,7 @@ Otherwise, returns <code>(<b>false</b>, 0)</code>.
 
 </details>
 
-<a name="0x1_vector_remove"></a>
+<a id="0x1_vector_remove"></a>
 
 ## Function `remove`
 
@@ -553,7 +547,7 @@ Aborts if <code>i</code> is out of bounds.
 
 </details>
 
-<a name="0x1_vector_swap_remove"></a>
+<a id="0x1_vector_swap_remove"></a>
 
 ## Function `swap_remove`
 
@@ -595,194 +589,13 @@ Aborts if <code>i</code> is out of bounds.
 
 </details>
 
-<a name="0x1_vector_for_each"></a>
-
-## Function `for_each`
-
-Apply the function to each element in the vector, consuming it.
-
-
-<pre><code><b>public</b> <b>fun</b> <a href="vector.md#0x1_vector_for_each">for_each</a>&lt;Element&gt;(v: <a href="vector.md#0x1_vector">vector</a>&lt;Element&gt;, f: |Element|())
-</code></pre>
-
-
-
-<details>
-<summary>Implementation</summary>
-
-
-<pre><code><b>public</b> inline <b>fun</b> <a href="vector.md#0x1_vector_for_each">for_each</a>&lt;Element&gt;(v: <a href="vector.md#0x1_vector">vector</a>&lt;Element&gt;, f: |Element|) {
-    <a href="vector.md#0x1_vector_reverse">reverse</a>(&<b>mut</b> v); // We need <b>to</b> reverse the <a href="vector.md#0x1_vector">vector</a> <b>to</b> consume it efficiently
-    <b>while</b> (!<a href="vector.md#0x1_vector_is_empty">is_empty</a>(&v)) {
-        <b>let</b> e = <a href="vector.md#0x1_vector_pop_back">pop_back</a>(&<b>mut</b> v);
-        f(e);
-    };
-}
-</code></pre>
-
-
-
-</details>
-
-<a name="0x1_vector_for_each_ref"></a>
-
-## Function `for_each_ref`
-
-Apply the function to a reference of each element in the vector.
-
-
-<pre><code><b>public</b> <b>fun</b> <a href="vector.md#0x1_vector_for_each_ref">for_each_ref</a>&lt;Element&gt;(v: &<a href="vector.md#0x1_vector">vector</a>&lt;Element&gt;, f: |&Element|())
-</code></pre>
-
-
-
-<details>
-<summary>Implementation</summary>
-
-
-<pre><code><b>public</b> inline <b>fun</b> <a href="vector.md#0x1_vector_for_each_ref">for_each_ref</a>&lt;Element&gt;(v: &<a href="vector.md#0x1_vector">vector</a>&lt;Element&gt;, f: |&Element|) {
-    <b>let</b> i = 0;
-    <b>while</b> (i &lt; <a href="vector.md#0x1_vector_length">length</a>(v)) {
-        f(<a href="vector.md#0x1_vector_borrow">borrow</a>(v, i));
-        i = i + 1
-    }
-}
-</code></pre>
-
-
-
-</details>
-
-<a name="0x1_vector_for_each_mut"></a>
-
-## Function `for_each_mut`
-
-Apply the function to a mutable reference to each element in the vector.
-
-
-<pre><code><b>public</b> <b>fun</b> <a href="vector.md#0x1_vector_for_each_mut">for_each_mut</a>&lt;Element&gt;(v: &<b>mut</b> <a href="vector.md#0x1_vector">vector</a>&lt;Element&gt;, f: |&<b>mut</b> Element|())
-</code></pre>
-
-
-
-<details>
-<summary>Implementation</summary>
-
-
-<pre><code><b>public</b> inline <b>fun</b> <a href="vector.md#0x1_vector_for_each_mut">for_each_mut</a>&lt;Element&gt;(v: &<b>mut</b> <a href="vector.md#0x1_vector">vector</a>&lt;Element&gt;, f: |&<b>mut</b> Element|) {
-    <b>let</b> i = 0;
-    <b>while</b> (i &lt; <a href="vector.md#0x1_vector_length">length</a>(v)) {
-        f(<a href="vector.md#0x1_vector_borrow_mut">borrow_mut</a>(v, i));
-        i = i + 1
-    }
-}
-</code></pre>
-
-
-
-</details>
-
-<a name="0x1_vector_fold"></a>
-
-## Function `fold`
-
-Fold the function over the elements. For example, <code><a href="vector.md#0x1_vector_fold">fold</a>(<a href="vector.md#0x1_vector">vector</a>[1,2,3], 0, f)</code> will execute
-<code>f(f(f(0, 1), 2), 3)</code>
-
-
-<pre><code><b>public</b> <b>fun</b> <a href="vector.md#0x1_vector_fold">fold</a>&lt;Accumulator, Element&gt;(v: <a href="vector.md#0x1_vector">vector</a>&lt;Element&gt;, init: Accumulator, f: |(Accumulator, Element)|Accumulator): Accumulator
-</code></pre>
-
-
-
-<details>
-<summary>Implementation</summary>
-
-
-<pre><code><b>public</b> inline <b>fun</b> <a href="vector.md#0x1_vector_fold">fold</a>&lt;Accumulator, Element&gt;(
-    v: <a href="vector.md#0x1_vector">vector</a>&lt;Element&gt;,
-    init: Accumulator,
-    f: |Accumulator,Element|Accumulator
-): Accumulator {
-    <b>let</b> accu = init;
-    <a href="vector.md#0x1_vector_for_each">for_each</a>(v, |elem| accu = f(accu, elem));
-    accu
-}
-</code></pre>
-
-
-
-</details>
-
-<a name="0x1_vector_map"></a>
-
-## Function `map`
-
-Map the function over the elements of the vector, producing a new vector.
-
-
-<pre><code><b>public</b> <b>fun</b> <a href="vector.md#0x1_vector_map">map</a>&lt;Element, NewElement&gt;(v: <a href="vector.md#0x1_vector">vector</a>&lt;Element&gt;, f: |Element|NewElement): <a href="vector.md#0x1_vector">vector</a>&lt;NewElement&gt;
-</code></pre>
-
-
-
-<details>
-<summary>Implementation</summary>
-
-
-<pre><code><b>public</b> inline <b>fun</b> <a href="vector.md#0x1_vector_map">map</a>&lt;Element, NewElement&gt;(
-    v: <a href="vector.md#0x1_vector">vector</a>&lt;Element&gt;,
-    f: |Element|NewElement
-): <a href="vector.md#0x1_vector">vector</a>&lt;NewElement&gt; {
-    <b>let</b> result = <a href="vector.md#0x1_vector">vector</a>&lt;NewElement&gt;[];
-    <a href="vector.md#0x1_vector_for_each">for_each</a>(v, |elem| <a href="vector.md#0x1_vector_push_back">push_back</a>(&<b>mut</b> result, f(elem)));
-    result
-}
-</code></pre>
-
-
-
-</details>
-
-<a name="0x1_vector_filter"></a>
-
-## Function `filter`
-
-Filter the vector using the boolean function, removing all elements for which <code>p(e)</code> is not true.
-
-
-<pre><code><b>public</b> <b>fun</b> <a href="vector.md#0x1_vector_filter">filter</a>&lt;Element: drop&gt;(v: <a href="vector.md#0x1_vector">vector</a>&lt;Element&gt;, p: |&Element|bool): <a href="vector.md#0x1_vector">vector</a>&lt;Element&gt;
-</code></pre>
-
-
-
-<details>
-<summary>Implementation</summary>
-
-
-<pre><code><b>public</b> inline <b>fun</b> <a href="vector.md#0x1_vector_filter">filter</a>&lt;Element:drop&gt;(
-    v: <a href="vector.md#0x1_vector">vector</a>&lt;Element&gt;,
-    p: |&Element|bool
-): <a href="vector.md#0x1_vector">vector</a>&lt;Element&gt; {
-    <b>let</b> result = <a href="vector.md#0x1_vector">vector</a>&lt;Element&gt;[];
-    <a href="vector.md#0x1_vector_for_each">for_each</a>(v, |elem| {
-        <b>if</b> (p(&elem)) <a href="vector.md#0x1_vector_push_back">push_back</a>(&<b>mut</b> result, elem);
-    });
-    result
-}
-</code></pre>
-
-
-
-</details>
-
-<a name="@Module_Specification_1"></a>
+<a id="@Module_Specification_1"></a>
 
 ## Module Specification
 
 
 
-<a name="@Helper_Functions_2"></a>
+<a id="@Helper_Functions_2"></a>
 
 ### Helper Functions
 
@@ -790,7 +603,7 @@ Filter the vector using the boolean function, removing all elements for which <c
 Check if <code>v1</code> is equal to the result of adding <code>e</code> at the end of <code>v2</code>
 
 
-<a name="0x1_vector_eq_push_back"></a>
+<a id="0x1_vector_eq_push_back"></a>
 
 
 <pre><code><b>fun</b> <a href="vector.md#0x1_vector_eq_push_back">eq_push_back</a>&lt;Element&gt;(v1: <a href="vector.md#0x1_vector">vector</a>&lt;Element&gt;, v2: <a href="vector.md#0x1_vector">vector</a>&lt;Element&gt;, e: Element): bool {
@@ -804,7 +617,7 @@ Check if <code>v1</code> is equal to the result of adding <code>e</code> at the 
 Check if <code>v</code> is equal to the result of concatenating <code>v1</code> and <code>v2</code>
 
 
-<a name="0x1_vector_eq_append"></a>
+<a id="0x1_vector_eq_append"></a>
 
 
 <pre><code><b>fun</b> <a href="vector.md#0x1_vector_eq_append">eq_append</a>&lt;Element&gt;(v: <a href="vector.md#0x1_vector">vector</a>&lt;Element&gt;, v1: <a href="vector.md#0x1_vector">vector</a>&lt;Element&gt;, v2: <a href="vector.md#0x1_vector">vector</a>&lt;Element&gt;): bool {
@@ -818,7 +631,7 @@ Check if <code>v</code> is equal to the result of concatenating <code>v1</code> 
 Check <code>v1</code> is equal to the result of removing the first element of <code>v2</code>
 
 
-<a name="0x1_vector_eq_pop_front"></a>
+<a id="0x1_vector_eq_pop_front"></a>
 
 
 <pre><code><b>fun</b> <a href="vector.md#0x1_vector_eq_pop_front">eq_pop_front</a>&lt;Element&gt;(v1: <a href="vector.md#0x1_vector">vector</a>&lt;Element&gt;, v2: <a href="vector.md#0x1_vector">vector</a>&lt;Element&gt;): bool {
@@ -831,7 +644,7 @@ Check <code>v1</code> is equal to the result of removing the first element of <c
 Check that <code>v1</code> is equal to the result of removing the element at index <code>i</code> from <code>v2</code>.
 
 
-<a name="0x1_vector_eq_remove_elem_at_index"></a>
+<a id="0x1_vector_eq_remove_elem_at_index"></a>
 
 
 <pre><code><b>fun</b> <a href="vector.md#0x1_vector_eq_remove_elem_at_index">eq_remove_elem_at_index</a>&lt;Element&gt;(i: u64, v1: <a href="vector.md#0x1_vector">vector</a>&lt;Element&gt;, v2: <a href="vector.md#0x1_vector">vector</a>&lt;Element&gt;): bool {

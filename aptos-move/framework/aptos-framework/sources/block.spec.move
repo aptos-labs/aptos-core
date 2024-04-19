@@ -1,34 +1,82 @@
 spec aptos_framework::block {
+    /// <high-level-req>
+    /// No.: 1
+    /// Requirement: During the module's initialization, it guarantees that the BlockResource resource moves under the
+    /// Aptos framework account with initial values.
+    /// Criticality: High
+    /// Implementation: The initialize function is responsible for setting up the initial state of the module, ensuring
+    /// that the following conditions are met (1) the BlockResource resource is created, indicating its existence within
+    /// the module's context, and moved under the Aptos framework account, (2) the block height is set to zero during
+    /// initialization, and (3) the epoch interval is greater than zero.
+    /// Enforcement: Formally Verified via [high-level-req-1](Initialize).
+    ///
+    /// No.: 2
+    /// Requirement: Only the Aptos framework address may execute the following functionalities: (1) initialize
+    /// BlockResource, and (2) update the epoch interval.
+    /// Criticality: Critical
+    /// Implementation: The initialize and  update_epoch_interval_microsecs functions ensure that only aptos_framework
+    /// can call them.
+    /// Enforcement: Formally Verified via [high-level-req-2.1](Initialize) and [high-level-req-2.2](update_epoch_interval_microsecs).
+    ///
+    /// No.: 3
+    /// Requirement: When updating the epoch interval, its value must be greater than zero and BlockResource must exist.
+    /// Criticality: High
+    /// Implementation: The update_epoch_interval_microsecs function asserts that new_epoch_interval is greater than
+    /// zero and updates BlockResource's state.
+    /// Enforcement: Formally verified via [high-level-req-3.1](UpdateEpochIntervalMicrosecs) and [high-level-req-3.2](epoch_interval).
+    ///
+    /// No.: 4
+    /// Requirement: Only a valid proposer or the virtual machine is authorized to produce blocks.
+    /// Criticality: Critical
+    /// Implementation: During the execution of the block_prologue function, the validity of the proposer address is
+    /// verified when setting the metadata for the current block.
+    /// Enforcement: Formally Verified via [high-level-req-4](block_prologue).
+    ///
+    /// No.: 5
+    /// Requirement: While emitting a new block event, the number of them is equal to the current block height.
+    /// Criticality: Medium
+    /// Implementation: The emit_new_block_event function asserts that the number of new block events equals the current
+    /// block height.
+    /// Enforcement: Formally Verified via [high-level-req-5](emit_new_block_event).
+    /// </high-level-req>
+    ///
     spec module {
         use aptos_framework::chain_status;
         // After genesis, `BlockResource` exist.
         invariant [suspendable] chain_status::is_operating() ==> exists<BlockResource>(@aptos_framework);
+        // After genesis, `CommitHistory` exist.
+        invariant [suspendable] chain_status::is_operating() ==> exists<CommitHistory>(@aptos_framework);
     }
 
     spec BlockResource {
+        /// [high-level-req-3.2]
         invariant epoch_interval > 0;
     }
 
+    spec CommitHistory {
+        invariant max_capacity > 0;
+    }
+
+    spec block_prologue_common {
+        pragma verify_duration_estimate = 1000; // TODO: set because of timeout (property proved)
+        include BlockRequirement;
+        aborts_if false;
+    }
+
     spec block_prologue {
-        use aptos_framework::chain_status;
-        use aptos_framework::coin::CoinInfo;
-        use aptos_framework::aptos_coin::AptosCoin;
-        use aptos_framework::transaction_fee;
-        use aptos_framework::staking_config;
 
-        pragma verify_duration_estimate = 120; // TODO: set because of timeout (property proved)
-
-        requires chain_status::is_operating();
-        requires system_addresses::is_vm(vm);
-        requires proposer == @vm_reserved || stake::spec_is_current_epoch_validator(proposer);
+        pragma verify_duration_estimate = 1000; // TODO: set because of timeout (property proved)
         requires timestamp >= reconfiguration::last_reconfiguration_time();
-        requires (proposer == @vm_reserved) ==> (timestamp::spec_now_microseconds() == timestamp);
-        requires (proposer != @vm_reserved) ==> (timestamp::spec_now_microseconds() < timestamp);
-        requires exists<stake::ValidatorFees>(@aptos_framework);
-        requires exists<CoinInfo<AptosCoin>>(@aptos_framework);
-        include transaction_fee::RequiresCollectedFeesPerValueLeqBlockAptosSupply;
-        include staking_config::StakingRewardsConfigRequirement;
+        include BlockRequirement;
+        aborts_if false;
+    }
 
+    spec block_prologue_ext {
+        pragma verify_duration_estimate = 1000; // TODO: set because of timeout (property proved)
+        requires timestamp >= reconfiguration::last_reconfiguration_time();
+        include BlockRequirement;
+        include stake::ResourceRequirement;
+        include stake::GetReconfigStartTimeRequirement;
         aborts_if false;
     }
 
@@ -52,6 +100,7 @@ spec aptos_framework::block {
         requires system_addresses::is_vm(vm);
         requires (proposer == @vm_reserved) ==> (timestamp::spec_now_microseconds() == timestamp);
         requires (proposer != @vm_reserved) ==> (timestamp::spec_now_microseconds() < timestamp);
+        /// [high-level-req-5]
         requires event::counter(event_handle) == new_block_event.height;
 
         aborts_if false;
@@ -65,6 +114,7 @@ spec aptos_framework::block {
     /// The number of new events created does not exceed MAX_U64.
     spec initialize(aptos_framework: &signer, epoch_interval_microsecs: u64) {
         use std::signer;
+        /// [high-level-req-1]
         include Initialize;
         include NewEventHandle;
 
@@ -73,16 +123,47 @@ spec aptos_framework::block {
         aborts_if account.guid_creation_num + 2 >= account::MAX_GUID_CREATION_NUM;
     }
 
+    spec schema BlockRequirement {
+        use aptos_framework::chain_status;
+        use aptos_framework::coin::CoinInfo;
+        use aptos_framework::aptos_coin::AptosCoin;
+        use aptos_framework::transaction_fee;
+        use aptos_framework::staking_config;
+
+        vm: signer;
+        hash: address;
+        epoch: u64;
+        round: u64;
+        proposer: address;
+        failed_proposer_indices: vector<u64>;
+        previous_block_votes_bitvec: vector<u8>;
+        timestamp: u64;
+
+        requires chain_status::is_operating();
+        requires system_addresses::is_vm(vm);
+        /// [high-level-req-4]
+        requires proposer == @vm_reserved || stake::spec_is_current_epoch_validator(proposer);
+        requires (proposer == @vm_reserved) ==> (timestamp::spec_now_microseconds() == timestamp);
+        requires (proposer != @vm_reserved) ==> (timestamp::spec_now_microseconds() < timestamp);
+        requires exists<stake::ValidatorFees>(@aptos_framework);
+        requires exists<CoinInfo<AptosCoin>>(@aptos_framework);
+        include transaction_fee::RequiresCollectedFeesPerValueLeqBlockAptosSupply;
+        include staking_config::StakingRewardsConfigRequirement;
+    }
+
     spec schema Initialize {
         use std::signer;
         aptos_framework: signer;
         epoch_interval_microsecs: u64;
 
         let addr = signer::address_of(aptos_framework);
+        /// [high-level-req-2.1]
         aborts_if addr != @aptos_framework;
-        aborts_if epoch_interval_microsecs <= 0;
+        aborts_if epoch_interval_microsecs == 0;
         aborts_if exists<BlockResource>(addr);
+        aborts_if exists<CommitHistory>(addr);
         ensures exists<BlockResource>(addr);
+        ensures exists<CommitHistory>(addr);
         ensures global<BlockResource>(addr).height == 0;
     }
 
@@ -103,6 +184,7 @@ spec aptos_framework::block {
         aptos_framework: &signer,
         new_epoch_interval: u64,
     ) {
+        /// [high-level-req-3.1]
         include UpdateEpochIntervalMicrosecs;
     }
 
@@ -113,8 +195,9 @@ spec aptos_framework::block {
 
         let addr = signer::address_of(aptos_framework);
 
+        /// [high-level-req-2.2]
         aborts_if addr != @aptos_framework;
-        aborts_if new_epoch_interval <= 0;
+        aborts_if new_epoch_interval == 0;
         aborts_if !exists<BlockResource>(addr);
         let post block_resource = global<BlockResource>(addr);
         ensures block_resource.epoch_interval == new_epoch_interval;
@@ -133,6 +216,8 @@ spec aptos_framework::block {
     /// The Configuration existed under the @aptos_framework.
     /// The CurrentTimeMicroseconds existed under the @aptos_framework.
     spec emit_writeset_block_event(vm_signer: &signer, fake_block_hash: address) {
+        use aptos_framework::chain_status;
+        requires chain_status::is_operating();
         include EmitWritesetBlockEvent;
     }
 

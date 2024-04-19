@@ -5,13 +5,14 @@
 use crate::{
     counters,
     epoch_manager::EpochManager,
-    experimental::buffer_manager::OrderedBlocks,
     network::NetworkTask,
     network_interface::{ConsensusNetworkClient, DIRECT_SEND, RPC},
     network_tests::{NetworkPlayground, TwinId},
     payload_manager::PayloadManager,
+    pipeline::buffer_manager::OrderedBlocks,
     quorum_store::quorum_store_db::MockQuorumStoreDB,
-    test_utils::{MockStateComputer, MockStorage},
+    rand::rand_gen::storage::in_memory::InMemRandDb,
+    test_utils::{mock_execution_client::MockExecutionClient, MockStorage},
     util::time_service::ClockTimeService,
 };
 use aptos_bounded_executor::BoundedExecutor;
@@ -26,7 +27,7 @@ use aptos_event_notifications::{ReconfigNotification, ReconfigNotificationListen
 use aptos_mempool::mocks::MockSharedMempool;
 use aptos_network::{
     application::interface::{NetworkClient, NetworkServiceEvents},
-    peer_manager::{conn_notifs_channel, ConnectionRequestSender, PeerManagerRequestSender},
+    peer_manager::{ConnectionRequestSender, PeerManagerRequestSender},
     protocols::{
         network,
         network::{NetworkEvents, NewNetworkEvents, NewNetworkSender},
@@ -47,6 +48,7 @@ use aptos_types::{
     validator_info::ValidatorInfo,
     waypoint::Waypoint,
 };
+use aptos_validator_transaction_pool::VTxnPoolState;
 use futures::{channel::mpsc, StreamExt};
 use maplit::hashmap;
 use std::{collections::HashMap, iter::FromIterator, sync::Arc};
@@ -73,6 +75,7 @@ impl SMRNode {
         consensus_config: OnChainConsensusConfig,
         storage: Arc<MockStorage>,
         twin_id: TwinId,
+        vtxn_pool: VTxnPoolState,
     ) -> Self {
         // Create a runtime for the twin
         let thread_name = format!("twin-{}", twin_id.id);
@@ -84,7 +87,6 @@ impl SMRNode {
         let (connection_reqs_tx, _) = aptos_channel::new(QueueStyle::FIFO, 8, None);
         let (consensus_tx, consensus_rx) = aptos_channel::new(QueueStyle::FIFO, 8, None);
         let (_conn_mgr_reqs_tx, conn_mgr_reqs_rx) = aptos_channels::new_test(8);
-        let (_, conn_notifs_channel) = conn_notifs_channel::new();
         let network_sender = network::NetworkSender::new(
             PeerManagerRequestSender::new(network_reqs_tx),
             ConnectionRequestSender::new(connection_reqs_tx),
@@ -96,7 +98,7 @@ impl SMRNode {
             playground.peer_protocols(),
         );
         let consensus_network_client = ConsensusNetworkClient::new(network_client);
-        let network_events = NetworkEvents::new(consensus_rx, conn_notifs_channel, None);
+        let network_events = NetworkEvents::new(consensus_rx, None);
         let network_service_events =
             NetworkServiceEvents::new(hashmap! {NetworkId::Validator => network_events});
 
@@ -106,7 +108,8 @@ impl SMRNode {
         let (ordered_blocks_tx, mut ordered_blocks_events) = mpsc::unbounded::<OrderedBlocks>();
         let shared_mempool = MockSharedMempool::new();
         let (quorum_store_to_mempool_sender, _) = mpsc::channel(1_024);
-        let state_computer = Arc::new(MockStateComputer::new(
+
+        let execution_client = Arc::new(MockExecutionClient::new(
             state_sync_client,
             ordered_blocks_tx,
             Arc::clone(&storage),
@@ -140,7 +143,7 @@ impl SMRNode {
         let (timeout_sender, timeout_receiver) =
             aptos_channels::new(1_024, &counters::PENDING_ROUND_TIMEOUTS);
         let (self_sender, self_receiver) =
-            aptos_channels::new(1_024, &counters::PENDING_SELF_MESSAGES);
+            aptos_channels::new_unbounded(&counters::PENDING_SELF_MESSAGES);
 
         let quorum_store_storage = Arc::new(MockQuorumStoreDB::new());
         let bounded_executor = BoundedExecutor::new(2, playground.handle());
@@ -152,12 +155,14 @@ impl SMRNode {
             consensus_network_client,
             timeout_sender,
             quorum_store_to_mempool_sender,
-            state_computer.clone(),
+            execution_client.clone(),
             storage.clone(),
             quorum_store_storage,
             reconfig_listener,
             bounded_executor,
             aptos_time_service::TimeService::real(),
+            vtxn_pool,
+            Arc::new(InMemRandDb::new()),
         );
         let (network_task, network_receiver) =
             NetworkTask::new(network_service_events, self_receiver);
@@ -170,7 +175,7 @@ impl SMRNode {
             loop {
                 let ordered_blocks = ordered_blocks_events.next().await.unwrap();
                 let commit = ordered_blocks.ordered_proof.clone();
-                state_computer
+                execution_client
                     .commit_to_storage(ordered_blocks)
                     .await
                     .unwrap();
@@ -283,12 +288,14 @@ impl SMRNode {
                 ..ConsensusConfigV1::default()
             });
 
+            let vtxn_pool = VTxnPoolState::default();
             smr_nodes.push(Self::start(
                 playground,
                 config,
                 consensus_config,
                 storage,
                 twin_id,
+                vtxn_pool,
             ));
         }
         smr_nodes

@@ -148,6 +148,10 @@ impl VMError {
         self.0.major_status
     }
 
+    pub fn set_major_status(&mut self, major_status: StatusCode) {
+        self.0.major_status = major_status;
+    }
+
     pub fn sub_status(&self) -> Option<u64> {
         self.0.sub_status
     }
@@ -437,6 +441,10 @@ impl PartialVMError {
         self.0.major_status
     }
 
+    pub fn sub_status(&self) -> Option<u64> {
+        self.0.sub_status
+    }
+
     pub fn with_sub_status(mut self, sub_status: u64) -> Self {
         debug_assert!(self.0.sub_status.is_none());
         self.0.sub_status = Some(sub_status);
@@ -487,7 +495,7 @@ impl PartialVMError {
         self
     }
 
-    /// Append the message `message` to the message field of the VM status, and insert a seperator
+    /// Append the message `message` to the message field of the VM status, and insert a separator
     /// if the original message is non-empty.
     pub fn append_message_with_separator(
         mut self,

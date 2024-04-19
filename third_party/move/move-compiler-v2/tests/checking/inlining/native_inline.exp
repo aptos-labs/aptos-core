@@ -1,0 +1,7 @@
+
+Diagnostics:
+error: Inline function `foo` must not be native
+  ┌─ tests/checking/inlining/native_inline.move:3:5
+  │
+3 │     public native inline fun foo();
+  │     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^

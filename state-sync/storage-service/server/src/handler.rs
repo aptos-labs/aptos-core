@@ -14,9 +14,11 @@ use crate::{
     optimistic_fetch::OptimisticFetchRequest,
     storage::StorageReaderInterface,
     subscription::{SubscriptionRequest, SubscriptionStreamRequests},
+    utils,
 };
 use aptos_config::{config::StorageServiceConfig, network_id::PeerNetworkId};
-use aptos_logger::{debug, error, sample, sample::SampleRate, trace, warn};
+use aptos_logger::{debug, sample, sample::SampleRate, trace, warn};
+use aptos_network::protocols::wire::handshake::v1::ProtocolId;
 use aptos_storage_service_types::{
     requests::{
         DataRequest, EpochEndingLedgerInfoRequest, StateValuesWithProofRequest,
@@ -36,7 +38,7 @@ use mini_moka::sync::Cache;
 use std::{sync::Arc, time::Duration};
 
 /// Storage server constants
-const INVALID_REQUEST_LOG_FREQUENCY_SECS: u64 = 5; // The frequency to log invalid requests (secs)
+const ERROR_LOG_FREQUENCY_SECS: u64 = 5; // The frequency to log errors
 const STORAGE_SERVER_VERSION: u64 = 1;
 const SUMMARY_LOG_FREQUENCY_SECS: u64 = 5; // The frequency to log the storage server summary (secs)
 
@@ -81,9 +83,18 @@ impl<T: StorageReaderInterface> Handler<T> {
         &self,
         storage_service_config: StorageServiceConfig,
         peer_network_id: PeerNetworkId,
+        protocol_id: ProtocolId,
         request: StorageServiceRequest,
         response_sender: ResponseSender,
     ) {
+        // Log the request
+        trace!(LogSchema::new(LogEntry::ReceivedStorageRequest)
+            .request(&request)
+            .message(&format!(
+                "Received storage request. Peer: {:?}, protocol: {:?}.",
+                peer_network_id, protocol_id,
+            )));
+
         // Update the request count
         increment_counter(
             &metrics::STORAGE_REQUESTS_RECEIVED,
@@ -120,55 +131,61 @@ impl<T: StorageReaderInterface> Handler<T> {
         request: StorageServiceRequest,
         optimistic_fetch_related: bool,
     ) -> aptos_storage_service_types::Result<StorageServiceResponse> {
-        // Time the request processing
-        let _timer = metrics::start_timer(
+        // Process the request and time the operation
+        let process_request = || {
+            // Process the request and handle any errors
+            match self.validate_and_handle_request(peer_network_id, &request) {
+                Err(error) => {
+                    // Update the error counter
+                    increment_counter(
+                        &metrics::STORAGE_ERRORS_ENCOUNTERED,
+                        peer_network_id.network_id(),
+                        error.get_label().into(),
+                    );
+
+                    // Periodically log the failure
+                    sample!(
+                            SampleRate::Duration(Duration::from_secs(ERROR_LOG_FREQUENCY_SECS)),
+                            warn!(LogSchema::new(LogEntry::StorageServiceError)
+                                .error(&error)
+                                .peer_network_id(peer_network_id)
+                                .request(&request)
+                                .optimistic_fetch_related(optimistic_fetch_related)
+                        );
+                    );
+
+                    // Return the error
+                    Err(error)
+                },
+                Ok(response) => {
+                    // Update the successful response counter
+                    increment_counter(
+                        &metrics::STORAGE_RESPONSES_SENT,
+                        peer_network_id.network_id(),
+                        response.get_label(),
+                    );
+
+                    // Return the response
+                    Ok(response)
+                },
+            }
+        };
+        let process_result = utils::execute_and_time_duration(
             &metrics::STORAGE_REQUEST_PROCESSING_LATENCY,
-            peer_network_id.network_id(),
-            request.get_label(),
+            Some((peer_network_id, &request)),
+            None,
+            process_request,
+            None,
         );
 
-        // Process the request and handle any errors
-        match self.validate_and_handle_request(peer_network_id, &request) {
-            Err(error) => {
-                // Update the error counter
-                increment_counter(
-                    &metrics::STORAGE_ERRORS_ENCOUNTERED,
-                    peer_network_id.network_id(),
-                    error.get_label().into(),
-                );
-
-                // Periodically log the validation failure
-                sample!(
-                        SampleRate::Duration(Duration::from_secs(INVALID_REQUEST_LOG_FREQUENCY_SECS)),
-                        error!(LogSchema::new(LogEntry::StorageServiceError)
-                            .error(&error)
-                            .peer_network_id(peer_network_id)
-                            .request(&request)
-                            .optimistic_fetch_related(optimistic_fetch_related)
-                    );
-                );
-
-                // Return an appropriate response to the client
-                match error {
-                    Error::InvalidRequest(error) => Err(StorageServiceError::InvalidRequest(error)),
-                    Error::TooManyInvalidRequests(error) => {
-                        Err(StorageServiceError::TooManyInvalidRequests(error))
-                    },
-                    error => Err(StorageServiceError::InternalError(error.to_string())),
-                }
+        // Transform the request error into a storage service error (for the client)
+        process_result.map_err(|error| match error {
+            Error::InvalidRequest(error) => StorageServiceError::InvalidRequest(error),
+            Error::TooManyInvalidRequests(error) => {
+                StorageServiceError::TooManyInvalidRequests(error)
             },
-            Ok(response) => {
-                // Update the successful response counter
-                increment_counter(
-                    &metrics::STORAGE_RESPONSES_SENT,
-                    peer_network_id.network_id(),
-                    response.get_label(),
-                );
-
-                // Return the response
-                Ok(response)
-            },
-        }
+            error => StorageServiceError::InternalError(error.to_string()),
+        })
     }
 
     /// Validate the request and only handle it if the moderator allows
@@ -229,7 +246,7 @@ impl<T: StorageReaderInterface> Handler<T> {
             .is_some()
         {
             sample!(
-                SampleRate::Duration(Duration::from_secs(INVALID_REQUEST_LOG_FREQUENCY_SECS)),
+                SampleRate::Duration(Duration::from_secs(ERROR_LOG_FREQUENCY_SECS)),
                 warn!(LogSchema::new(LogEntry::OptimisticFetchRequest)
                     .error(&Error::InvalidRequest(
                         "An active optimistic fetch was already found for the peer!".into()
@@ -329,7 +346,7 @@ impl<T: StorageReaderInterface> Handler<T> {
     ) {
         // Something went wrong when adding the request to the stream
         sample!(
-            SampleRate::Duration(Duration::from_secs(INVALID_REQUEST_LOG_FREQUENCY_SECS)),
+            SampleRate::Duration(Duration::from_secs(ERROR_LOG_FREQUENCY_SECS)),
             warn!(LogSchema::new(LogEntry::SubscriptionRequest)
                 .error(&error)
                 .peer_network_id(&peer_network_id)
@@ -355,6 +372,7 @@ impl<T: StorageReaderInterface> Handler<T> {
         peer_network_id: &PeerNetworkId,
         request: &StorageServiceRequest,
     ) -> aptos_storage_service_types::Result<StorageServiceResponse, Error> {
+        // Increment the LRU cache probe counter
         increment_counter(
             &metrics::LRU_CACHE_EVENT,
             peer_network_id.network_id(),
@@ -371,15 +389,8 @@ impl<T: StorageReaderInterface> Handler<T> {
             return Ok(response.clone());
         }
 
-        // Otherwise, we need to fetch the data from storage. Start the timer.
-        let _timer = metrics::start_timer(
-            &metrics::STORAGE_FETCH_PROCESSING_LATENCY,
-            peer_network_id.network_id(),
-            request.get_label(),
-        );
-
-        // Fetch the data response from storage
-        let data_response = match &request.data_request {
+        // Otherwise, fetch the data from storage and time the operation
+        let fetch_data_response = || match &request.data_request {
             DataRequest::GetStateValuesWithProof(request) => {
                 self.get_state_value_chunk_with_proof(request)
             },
@@ -402,13 +413,33 @@ impl<T: StorageReaderInterface> Handler<T> {
                 "Received an unexpected request: {:?}",
                 request
             ))),
-        }?;
-        let storage_response = StorageServiceResponse::new(data_response, request.use_compression)?;
+        };
+        let data_response = utils::execute_and_time_duration(
+            &metrics::STORAGE_FETCH_PROCESSING_LATENCY,
+            Some((peer_network_id, request)),
+            None,
+            fetch_data_response,
+            None,
+        )?;
 
-        // Cache the response before returning
+        // Create the storage response and time the operation
+        let create_storage_response = || {
+            StorageServiceResponse::new(data_response, request.use_compression)
+                .map_err(|error| error.into())
+        };
+        let storage_response = utils::execute_and_time_duration(
+            &metrics::STORAGE_RESPONSE_CREATION_LATENCY,
+            Some((peer_network_id, request)),
+            None,
+            create_storage_response,
+            None,
+        )?;
+
+        // Create and cache the storage response
         self.lru_response_cache
             .insert(request.clone(), storage_response.clone());
 
+        // Return the storage response
         Ok(storage_response)
     }
 

@@ -171,13 +171,13 @@ async fn test_data_stream_transactions_with_target() {
     drive_progress(&mut continuous_syncer, &sync_request).await;
 
     // Send an invalid output along the stream
-    let data_notification = DataNotification {
+    let data_notification = DataNotification::new(
         notification_id,
-        data_payload: DataPayload::ContinuousTransactionOutputsWithProof(
+        DataPayload::ContinuousTransactionOutputsWithProof(
             create_epoch_ending_ledger_info(),
             TransactionOutputListWithProof::new_empty(),
         ),
-    };
+    );
     notification_sender_1.send(data_notification).await.unwrap();
 
     // Drive progress again and ensure we get a verification error
@@ -250,13 +250,13 @@ async fn test_data_stream_transaction_outputs() {
     let mut transaction_output_with_proof = TransactionOutputListWithProof::new_empty();
     transaction_output_with_proof.first_transaction_output_version =
         Some(current_synced_version - 1);
-    let data_notification = DataNotification {
+    let data_notification = DataNotification::new(
         notification_id,
-        data_payload: DataPayload::ContinuousTransactionOutputsWithProof(
+        DataPayload::ContinuousTransactionOutputsWithProof(
             create_epoch_ending_ledger_info(),
             transaction_output_with_proof,
         ),
-    };
+    );
     notification_sender_1.send(data_notification).await.unwrap();
 
     // Drive progress again and ensure we get a verification error
@@ -331,13 +331,13 @@ async fn test_data_stream_transactions_or_outputs_with_target() {
     drive_progress(&mut continuous_syncer, &sync_request).await;
 
     // Send an invalid output along the stream
-    let data_notification = DataNotification {
+    let data_notification = DataNotification::new(
         notification_id,
-        data_payload: DataPayload::ContinuousTransactionOutputsWithProof(
+        DataPayload::ContinuousTransactionOutputsWithProof(
             create_epoch_ending_ledger_info(),
             TransactionOutputListWithProof::new_empty(),
         ),
-    };
+    );
     notification_sender_1.send(data_notification).await.unwrap();
 
     // Drive progress again and ensure we get a verification error

@@ -5,7 +5,7 @@
 pub mod codes;
 
 use crate::{
-    command_line::COLOR_MODE_ENV_VAR,
+    command_line::{COLOR_MODE_ENV_VAR, MOVE_COMPILER_DEBUG_ENV_VAR},
     diagnostics::codes::{DiagnosticCode, DiagnosticInfo, Severity},
 };
 use codespan_reporting::{
@@ -17,10 +17,15 @@ use codespan_reporting::{
         Config,
     },
 };
-use move_command_line_common::{env::read_env_var, files::FileHash};
+use move_command_line_common::{
+    env::{read_bool_env_var, read_env_var},
+    files::FileHash,
+};
 use move_ir_types::location::*;
 use move_symbol_pool::Symbol;
+use once_cell::sync::Lazy;
 use std::{
+    backtrace::{Backtrace, BacktraceStatus},
     collections::{BTreeMap, HashMap, HashSet},
     iter::FromIterator,
     ops::Range,
@@ -278,14 +283,34 @@ impl Diagnostic {
         secondary_labels: impl IntoIterator<Item = (Loc, impl ToString)>,
         notes: impl IntoIterator<Item = impl ToString>,
     ) -> Self {
+        let info = code.into_info();
+        let label = Diagnostic::add_backtrace(
+            &label.to_string(),
+            false, /*info.severity() == Severity::Bug*/
+        );
         Diagnostic {
-            info: code.into_info(),
+            info,
             primary_label: (loc, label.to_string()),
             secondary_labels: secondary_labels
                 .into_iter()
                 .map(|(loc, msg)| (loc, msg.to_string()))
                 .collect(),
             notes: notes.into_iter().map(|msg| msg.to_string()).collect(),
+        }
+    }
+
+    fn add_backtrace(msg: &str, is_bug: bool) -> String {
+        static DEBUG_COMPILER: Lazy<bool> =
+            Lazy::new(|| read_bool_env_var(MOVE_COMPILER_DEBUG_ENV_VAR));
+        if is_bug || *DEBUG_COMPILER {
+            let bt = Backtrace::capture();
+            if BacktraceStatus::Captured == bt.status() {
+                format!("{}\nBacktrace: {:#?}", msg, bt)
+            } else {
+                msg.to_owned()
+            }
+        } else {
+            msg.to_owned()
         }
     }
 

@@ -12,15 +12,14 @@ use crate::{
     builder::builtins,
     intrinsics::IntrinsicDecl,
     model::{
-        FunId, FunctionKind, GlobalEnv, Loc, ModuleId, Parameter, QualifiedId, SpecFunId,
-        SpecVarId, StructId, TypeParameter,
+        FunId, FunctionKind, GlobalEnv, Loc, ModuleId, Parameter, QualifiedId, QualifiedInstId,
+        SpecFunId, SpecVarId, StructId, TypeParameter,
     },
     symbol::Symbol,
-    ty::{Constraint, Type},
+    ty::{Constraint, Type, TypeDisplayContext},
+    well_known,
 };
 use codespan_reporting::diagnostic::Severity;
-#[allow(unused_imports)]
-use log::{debug, info, warn};
 use move_binary_format::file_format::{AbilitySet, Visibility};
 use move_compiler::{expansion::ast as EA, parser::ast as PA, shared::NumericalAddress};
 use move_core_types::account_address::AccountAddress;
@@ -34,7 +33,7 @@ use std::collections::{BTreeMap, BTreeSet};
 pub(crate) struct ModelBuilder<'env> {
     /// The global environment we are building.
     pub env: &'env mut GlobalEnv,
-    /// A symbol table for specification functions. Because of overloading, and entry can
+    /// A symbol table for specification functions. Because of overloading, an entry can
     /// contain multiple functions.
     pub spec_fun_table: BTreeMap<QualifiedSymbol, Vec<SpecOrBuiltinFunEntry>>,
     /// A symbol table for specification variables.
@@ -51,10 +50,11 @@ pub(crate) struct ModelBuilder<'env> {
     pub reverse_struct_table: BTreeMap<(ModuleId, StructId), QualifiedSymbol>,
     /// A symbol table for functions.
     pub fun_table: BTreeMap<QualifiedSymbol, FunEntry>,
+    /// A mapping from simple names of receiver functions for the builtin vector type to full names
+    /// which can be used to index `fun_table`.
+    pub vector_receiver_functions: BTreeMap<Symbol, QualifiedSymbol>,
     /// A symbol table for constants.
     pub const_table: BTreeMap<QualifiedSymbol, ConstEntry>,
-    /// A call graph mapping callers to callees that are Move functions.
-    pub move_fun_call_graph: BTreeMap<QualifiedId<SpecFunId>, BTreeSet<QualifiedId<SpecFunId>>>,
     /// A list of intrinsic declarations
     pub intrinsics: Vec<IntrinsicDecl>,
     /// A module lookup table from names to their ids.
@@ -121,12 +121,16 @@ pub(crate) struct StructEntry {
     pub abilities: AbilitySet,
     pub fields: Option<BTreeMap<Symbol, (Loc, usize, Type)>>,
     pub attributes: Vec<Attribute>,
+    /// Maps simple function names to the qualified symbols of receiver functions. The
+    /// symbol can be used to index the global function table.
+    pub receiver_functions: BTreeMap<Symbol, QualifiedSymbol>,
 }
 
 /// A declaration of a function.
 #[derive(Debug, Clone)]
 pub(crate) struct FunEntry {
-    pub loc: Loc,
+    pub loc: Loc,      // location of the entire function span
+    pub name_loc: Loc, // location of just the function name
     pub module_id: ModuleId,
     pub fun_id: FunId,
     pub visibility: Visibility,
@@ -135,7 +139,6 @@ pub(crate) struct FunEntry {
     pub type_params: Vec<TypeParameter>,
     pub params: Vec<Parameter>,
     pub result_type: Type,
-    pub is_pure: bool,
     pub attributes: Vec<Attribute>,
     pub inline_specs: BTreeMap<EA::SpecId, EA::SpecBlock>,
 }
@@ -159,6 +162,16 @@ impl AnyFunEntry {
             AnyFunEntry::SpecOrBuiltin(e) => e.oper.clone(),
             AnyFunEntry::UserFun(e) => Operation::MoveFunction(e.module_id, e.fun_id),
         }
+    }
+
+    pub fn is_equality_on_ref(&self) -> bool {
+        matches!(self.get_operation(), Operation::Eq | Operation::Neq)
+            && self.get_signature().1[0].1.is_reference()
+    }
+
+    pub fn is_equality_on_non_ref(&self) -> bool {
+        matches!(self.get_operation(), Operation::Eq | Operation::Neq)
+            && !self.get_signature().1[0].1.is_reference()
     }
 }
 
@@ -194,8 +207,8 @@ impl<'env> ModelBuilder<'env> {
             struct_table: BTreeMap::new(),
             reverse_struct_table: BTreeMap::new(),
             fun_table: BTreeMap::new(),
+            vector_receiver_functions: BTreeMap::new(),
             const_table: BTreeMap::new(),
-            move_fun_call_graph: BTreeMap::new(),
             intrinsics: Vec::new(),
             module_table: BTreeMap::new(),
         };
@@ -218,17 +231,41 @@ impl<'env> ModelBuilder<'env> {
         self.env.error_with_notes(at, msg, notes)
     }
 
+    /// Shortcut for a diagnosis note.
+    pub fn note(&mut self, loc: &Loc, msg: &str) {
+        self.env.diag(Severity::Note, loc, msg)
+    }
+
+    /// Constructs a type display context used to visualize types in error messages.
+    pub(crate) fn type_display_context(&self) -> TypeDisplayContext<'_> {
+        TypeDisplayContext {
+            env: self.env,
+            type_param_names: None,
+            subs_opt: None,
+            // For types which are not yet in the GlobalEnv
+            builder_struct_table: Some(&self.reverse_struct_table),
+            module_name: None,
+            display_type_vars: false,
+        }
+    }
+
     /// Defines a spec function, adding it to the spec fun table.
     pub fn define_spec_or_builtin_fun(
         &mut self,
         name: QualifiedSymbol,
         entry: SpecOrBuiltinFunEntry,
     ) {
+        if self.fun_table.contains_key(&name) {
+            self.env.error(
+                &entry.loc,
+                &format!(
+                    "name clash between specification and Move function `{}`",
+                    name.symbol.display(self.env.symbol_pool())
+                ),
+            );
+        }
         // TODO: check whether overloads are distinguishable
-        self.spec_fun_table
-            .entry(name)
-            .or_insert_with(Vec::new)
-            .push(entry);
+        self.spec_fun_table.entry(name).or_default().push(entry);
     }
 
     /// Defines a spec variable.
@@ -251,7 +288,7 @@ impl<'env> ModelBuilder<'env> {
         if let Some(old) = self.spec_var_table.insert(name.clone(), entry) {
             let var_name = name.display(self.env);
             self.error(loc, &format!("duplicate declaration of `{}`", var_name));
-            self.error(&old.loc, &format!("previous declaration of `{}`", var_name));
+            self.note(&old.loc, &format!("previous declaration of `{}`", var_name));
         }
     }
 
@@ -308,6 +345,7 @@ impl<'env> ModelBuilder<'env> {
             abilities,
             type_params,
             fields,
+            receiver_functions: BTreeMap::new(),
         };
         self.struct_table.insert(name.clone(), entry);
         self.reverse_struct_table
@@ -316,6 +354,96 @@ impl<'env> ModelBuilder<'env> {
 
     /// Defines a function.
     pub fn define_fun(&mut self, name: QualifiedSymbol, entry: FunEntry) {
+        // Add to receiver functions of type if applicable
+        if let Some(param) = entry.params.first() {
+            let self_sym = self.env.symbol_pool.make(well_known::RECEIVER_PARAM_NAME);
+            if param.0 == self_sym && !param.1.is_error() {
+                // Receiver function. Check whether the parameter has the right type.
+                let base_type = param.1.skip_reference();
+                let type_ctx = || {
+                    let mut ctx = self.type_display_context();
+                    ctx.type_param_names = Some(entry.type_params.iter().map(|p| p.0).collect());
+                    ctx
+                };
+                let diag = |reason: &str| {
+                    self.env.diag(
+                        Severity::Warning,
+                        &entry.name_loc,
+                        &format!(
+                            "parameter name `{}` indicates a receiver function but \
+                        the type `{}` {}. Consider using a different name.",
+                            well_known::RECEIVER_PARAM_NAME,
+                            base_type.display(&type_ctx()),
+                            reason
+                        ),
+                    )
+                };
+                let check_generics = |tys: &[Type]| {
+                    // TODO(#12221): Determine whether we may want to relax this check
+                    let mut seen = BTreeSet::new();
+                    for ty in tys {
+                        if !matches!(ty, Type::TypeParameter(_)) {
+                            diag(&format!(
+                                "must only use type parameters \
+                            but instead uses `{}`",
+                                ty.display(&type_ctx())
+                            ))
+                        } else if !seen.insert(ty) {
+                            // We cannot repeat type parameters
+                            diag(&format!(
+                                "cannot use type parameter `{}` more than once",
+                                ty.display(&type_ctx())
+                            ))
+                        }
+                    }
+                };
+                match &base_type {
+                    Type::Struct(mid, sid, inst) => {
+                        // The struct should be defined in the same module as the function. Otherwise it will
+                        // be ignored. Warn about this.
+                        // TODO(#12219): we would like to error but can't because of downwards compatibility
+                        if &entry.module_id != mid {
+                            diag(
+                                "is declared outside of this module \
+                            and new receiver functions cannot be added",
+                            )
+                        } else {
+                            // The instantiation must be fully generic.
+                            check_generics(inst);
+                            // At this point, there cannot be any other function in the module of the type
+                            // which has the same name, as function overloading in a module is not allowed.
+                            // We insert an entry which allows us to redirect from the simple name the FQN
+                            // for indexing the global function table.
+                            let struct_entry = self.lookup_struct_entry_mut(mid.qualified(*sid));
+                            struct_entry
+                                .receiver_functions
+                                .insert(name.symbol, name.clone());
+                        }
+                    },
+                    Type::Vector(elem_ty) => {
+                        // Vector receiver functions can only be defined in the well-known vector module
+                        if name.module_name.addr() != &self.env.get_stdlib_address()
+                            || name.module_name.name()
+                                != self.env.symbol_pool.make(well_known::VECTOR_MODULE)
+                        {
+                            diag(
+                                "is associated with the standard vector module \
+                                and new receiver functions cannot be added",
+                            )
+                        } else {
+                            // See above  for structs
+                            check_generics(&[*elem_ty.clone()]);
+                            self.vector_receiver_functions
+                                .insert(name.symbol, name.clone());
+                        }
+                    },
+                    _ => diag(
+                        "is not suitable for receiver functions. \
+                    Only structs and vectors can have receiver functions",
+                    ),
+                }
+            }
+        }
         self.fun_table.insert(name, entry);
     }
 
@@ -353,6 +481,59 @@ impl<'env> ModelBuilder<'env> {
                 );
                 Type::Error
             })
+    }
+
+    /// Looks up the fields of a structure, with instantiated field types.
+    pub fn lookup_struct_fields(&self, id: &QualifiedInstId<StructId>) -> BTreeMap<Symbol, Type> {
+        let entry = self.lookup_struct_entry(id.to_qualified_id());
+        entry
+            .fields
+            .as_ref()
+            .map(|f| {
+                f.iter()
+                    .map(|(n, (_, _, field_ty))| (*n, field_ty.instantiate(&id.inst)))
+                    .collect::<BTreeMap<_, _>>()
+            })
+            .unwrap_or_default()
+    }
+
+    /// Looks up a receiver function for a given type.
+    pub fn lookup_receiver_function(&self, ty: &Type, name: Symbol) -> Option<&FunEntry> {
+        let qualified_fun_name = match ty.skip_reference() {
+            Type::Struct(mid, sid, _) => self
+                .lookup_struct_entry(mid.qualified(*sid))
+                .receiver_functions
+                .get(&name),
+            Type::Vector(_) => self.vector_receiver_functions.get(&name),
+            _ => None,
+        };
+        qualified_fun_name.and_then(|qn| self.fun_table.get(qn))
+    }
+
+    /// Looks up the StructEntry for a qualified id.
+    pub fn lookup_struct_entry(&self, id: QualifiedId<StructId>) -> &StructEntry {
+        let struct_name = self.get_struct_name(id);
+        self.struct_table
+            .get(struct_name)
+            .expect("invalid Type::Struct")
+    }
+
+    /// Looks up the StructEntry for a qualified id for mutation.
+    pub fn lookup_struct_entry_mut(&mut self, id: QualifiedId<StructId>) -> &mut StructEntry {
+        let struct_name = self
+            .reverse_struct_table
+            .get(&(id.module_id, id.id))
+            .expect("invalid Type::Struct");
+        self.struct_table
+            .get_mut(struct_name)
+            .expect("invalid Type::Struct")
+    }
+
+    /// Gets the name of the struct
+    pub fn get_struct_name(&self, qid: QualifiedId<StructId>) -> &QualifiedSymbol {
+        self.reverse_struct_table
+            .get(&(qid.module_id, qid.id))
+            .expect("invalid Type::Struct")
     }
 
     // Generate warnings about unused schemas.
@@ -402,11 +583,6 @@ impl<'env> ModelBuilder<'env> {
         self.env.symbol_pool().make("old")
     }
 
-    /// Returns the symbol for the builtin Move function `assert`.
-    pub fn assert_symbol(&self) -> Symbol {
-        self.env.symbol_pool().make("assert")
-    }
-
     /// Returns the name for the pseudo builtin module.
     pub fn builtin_module(&self) -> ModuleName {
         ModuleName::new(
@@ -418,34 +594,6 @@ impl<'env> ModelBuilder<'env> {
     /// Adds a spec function to used_spec_funs set.
     pub fn add_used_spec_fun(&mut self, qid: QualifiedId<SpecFunId>) {
         self.env.used_spec_funs.insert(qid);
-        self.propagate_move_fun_usage(qid);
-    }
-
-    /// Adds an edge from the caller to the callee to the Move fun call graph. The callee is
-    /// is instantiated in dependency of the type parameters of the caller.
-    pub fn add_edge_to_move_fun_call_graph(
-        &mut self,
-        caller: QualifiedId<SpecFunId>,
-        callee: QualifiedId<SpecFunId>,
-    ) {
-        self.move_fun_call_graph
-            .entry(caller)
-            .or_default()
-            .insert(callee);
-    }
-
-    /// Runs DFS to propagate the usage of Move functions from callers
-    /// to callees on the call graph.
-    pub fn propagate_move_fun_usage(&mut self, qid: QualifiedId<SpecFunId>) {
-        if let Some(neighbors) = self.move_fun_call_graph.get(&qid) {
-            neighbors.clone().iter().for_each(|n| {
-                if self.env.used_spec_funs.insert(*n) {
-                    // If the callee's usage has not been recorded, recursively
-                    // propagate the usage to the callee's callees, and so on.
-                    self.propagate_move_fun_usage(*n);
-                }
-            });
-        }
     }
 
     /// Pass model-level information to the global env

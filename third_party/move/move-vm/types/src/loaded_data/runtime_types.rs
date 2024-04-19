@@ -2,7 +2,10 @@
 // Copyright (c) The Move Contributors
 // SPDX-License-Identifier: Apache-2.0
 
+#![allow(clippy::non_canonical_partial_ord_impl)]
+
 use derivative::Derivative;
+use itertools::Itertools;
 use move_binary_format::{
     errors::{PartialVMError, PartialVMResult},
     file_format::{
@@ -14,7 +17,15 @@ use move_core_types::{
     vm_status::StatusCode,
 };
 use smallbitvec::SmallBitVec;
-use std::{cmp::max, collections::BTreeMap, fmt::Debug, sync::Arc};
+use smallvec::{smallvec, SmallVec};
+use std::{
+    cell::RefCell,
+    cmp::max,
+    collections::{btree_map, BTreeMap},
+    fmt,
+    fmt::Debug,
+};
+use triomphe::Arc as TriompheArc;
 
 pub const TYPE_DEPTH_MAX: usize = 256;
 
@@ -113,12 +124,14 @@ impl DepthFormula {
 
 #[derive(Debug, Clone, Eq, Hash, PartialEq)]
 pub struct StructType {
+    pub idx: StructNameIndex,
     pub fields: Vec<Type>,
     pub field_names: Vec<Identifier>,
     pub phantom_ty_args_mask: SmallBitVec,
     pub abilities: AbilitySet,
     pub type_parameters: Vec<StructTypeParameter>,
-    pub name: Arc<StructIdentifier>,
+    pub name: Identifier,
+    pub module: ModuleId,
 }
 
 impl StructType {
@@ -156,7 +169,7 @@ impl StructType {
 }
 
 #[derive(Debug, Copy, Clone, Eq, Hash, Ord, PartialEq, PartialOrd)]
-pub struct CachedStructIndex(pub usize);
+pub struct StructNameIndex(pub usize);
 
 #[derive(Debug, Clone, Eq, Hash, Ord, PartialEq, PartialOrd)]
 pub struct StructIdentifier {
@@ -172,14 +185,14 @@ pub enum Type {
     U128,
     Address,
     Signer,
-    Vector(Box<Type>),
+    Vector(TriompheArc<Type>),
     Struct {
-        name: Arc<StructIdentifier>,
+        idx: StructNameIndex,
         ability: AbilityInfo,
     },
     StructInstantiation {
-        name: Arc<StructIdentifier>,
-        ty_args: Arc<Vec<Type>>,
+        idx: StructNameIndex,
+        ty_args: TriompheArc<Vec<Type>>,
         ability: AbilityInfo,
     },
     Reference(Box<Type>),
@@ -188,6 +201,48 @@ pub enum Type {
     U16,
     U32,
     U256,
+}
+
+pub struct TypePreorderTraversalIter<'a> {
+    stack: SmallVec<[&'a Type; 32]>,
+}
+
+impl<'a> Iterator for TypePreorderTraversalIter<'a> {
+    type Item = &'a Type;
+
+    fn next(&mut self) -> Option<Self::Item> {
+        use Type::*;
+
+        match self.stack.pop() {
+            Some(ty) => {
+                match ty {
+                    Signer
+                    | Bool
+                    | Address
+                    | U8
+                    | U16
+                    | U32
+                    | U64
+                    | U128
+                    | U256
+                    | Struct { .. }
+                    | TyParam(..) => (),
+
+                    Reference(ty) | MutableReference(ty) => {
+                        self.stack.push(ty);
+                    },
+
+                    Vector(ty) => {
+                        self.stack.push(ty);
+                    },
+
+                    StructInstantiation { ty_args, .. } => self.stack.extend(ty_args.iter().rev()),
+                }
+                Some(ty)
+            },
+            None => None,
+        }
+    }
 }
 
 // Cache for the ability of struct. They will be ignored when comparing equality or Ord as they are just used for caching purpose.
@@ -253,17 +308,17 @@ impl Type {
             Type::U256 => Type::U256,
             Type::Address => Type::Address,
             Type::Signer => Type::Signer,
-            Type::Vector(ty) => Type::Vector(Box::new(ty.apply_subst(subst, depth + 1)?)),
+            Type::Vector(ty) => Type::Vector(TriompheArc::new(ty.apply_subst(subst, depth + 1)?)),
             Type::Reference(ty) => Type::Reference(Box::new(ty.apply_subst(subst, depth + 1)?)),
             Type::MutableReference(ty) => {
                 Type::MutableReference(Box::new(ty.apply_subst(subst, depth + 1)?))
             },
-            Type::Struct { name, ability } => Type::Struct {
-                name: name.clone(),
+            Type::Struct { idx, ability } => Type::Struct {
+                idx: *idx,
                 ability: ability.clone(),
             },
             Type::StructInstantiation {
-                name,
+                idx,
                 ty_args: instantiation,
                 ability,
             } => {
@@ -272,8 +327,8 @@ impl Type {
                     inst.push(ty.apply_subst(subst, depth + 1)?)
                 }
                 Type::StructInstantiation {
-                    name: name.clone(),
-                    ty_args: Arc::new(inst),
+                    idx: *idx,
+                    ty_args: TriompheArc::new(inst),
                     ability: ability.clone(),
                 }
             },
@@ -309,9 +364,8 @@ impl Type {
             TyParam(_) | Bool | U8 | U16 | U32 | U64 | U128 | U256 | Address | Signer => {
                 Self::LEGACY_BASE_MEMORY_SIZE
             },
-            Vector(ty) | Reference(ty) | MutableReference(ty) => {
-                Self::LEGACY_BASE_MEMORY_SIZE + ty.size()
-            },
+            Reference(ty) | MutableReference(ty) => Self::LEGACY_BASE_MEMORY_SIZE + ty.size(),
+            Vector(ty) => Self::LEGACY_BASE_MEMORY_SIZE + ty.size(),
             Struct { .. } => Self::LEGACY_BASE_MEMORY_SIZE,
             StructInstantiation { ty_args: tys, .. } => tys
                 .iter()
@@ -332,7 +386,7 @@ impl Type {
             S::U128 => L::U128,
             S::U256 => L::U256,
             S::Address => L::Address,
-            S::Vector(inner) => L::Vector(Box::new(Self::from_const_signature(inner)?)),
+            S::Vector(inner) => L::Vector(TriompheArc::new(Self::from_const_signature(inner)?)),
             // Not yet supported
             S::Struct(_) | S::StructInstantiation(_, _) => {
                 return Err(
@@ -452,6 +506,191 @@ impl Type {
                     type_argument_abilities,
                 )
             },
+        }
+    }
+
+    pub fn preorder_traversal(&self) -> TypePreorderTraversalIter<'_> {
+        TypePreorderTraversalIter {
+            stack: smallvec![self],
+        }
+    }
+
+    /// Returns the number of nodes the type has.
+    ///
+    /// For example
+    ///   - `u64` has one node
+    ///   - `vector<u64>` has two nodes -- one for the vector and one for the element type u64.
+    ///   - `Foo<u64, Bar<u8, bool>>` has 5 nodes.
+    pub fn num_nodes(&self) -> usize {
+        self.preorder_traversal().count()
+    }
+
+    /// Calculates the number of nodes in the substituted type.
+    pub fn num_nodes_in_subst(&self, ty_args: &[Type]) -> PartialVMResult<usize> {
+        use Type::*;
+
+        thread_local! {
+            static CACHE: RefCell<BTreeMap<usize, usize>> = RefCell::new(BTreeMap::new());
+        }
+
+        CACHE.with(|cache| {
+            let mut cache = cache.borrow_mut();
+            cache.clear();
+            let mut num_nodes_in_arg = |idx: usize| -> PartialVMResult<usize> {
+                Ok(match cache.entry(idx) {
+                    btree_map::Entry::Occupied(entry) => *entry.into_mut(),
+                    btree_map::Entry::Vacant(entry) => {
+                        let ty = ty_args.get(idx).ok_or_else(|| {
+                            PartialVMError::new(StatusCode::UNKNOWN_INVARIANT_VIOLATION_ERROR)
+                                .with_message(format!(
+                                "type substitution failed: index out of bounds -- len {} got {}",
+                                ty_args.len(),
+                                idx
+                            ))
+                        })?;
+                        *entry.insert(ty.num_nodes())
+                    },
+                })
+            };
+
+            let mut n = 0;
+            for ty in self.preorder_traversal() {
+                match ty {
+                    TyParam(idx) => {
+                        n += num_nodes_in_arg(*idx as usize)?;
+                    },
+                    Address
+                    | Bool
+                    | Signer
+                    | U8
+                    | U16
+                    | U32
+                    | U64
+                    | U128
+                    | U256
+                    | Vector(..)
+                    | Struct { .. }
+                    | Reference(..)
+                    | MutableReference(..)
+                    | StructInstantiation { .. } => n += 1,
+                }
+            }
+
+            Ok(n)
+        })
+    }
+}
+
+impl fmt::Display for StructIdentifier {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(
+            f,
+            "{}::{}",
+            self.module.short_str_lossless(),
+            self.name.as_str()
+        )
+    }
+}
+
+impl fmt::Display for Type {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        use Type::*;
+        match self {
+            Bool => f.write_str("bool"),
+            U8 => f.write_str("u8"),
+            U16 => f.write_str("u16"),
+            U32 => f.write_str("u32"),
+            U64 => f.write_str("u64"),
+            U128 => f.write_str("u128"),
+            U256 => f.write_str("u256"),
+            Address => f.write_str("address"),
+            Signer => f.write_str("signer"),
+            Vector(et) => write!(f, "vector<{}>", et),
+            Struct { idx, ability: _ } => write!(f, "s#{}", idx.0),
+            StructInstantiation {
+                idx,
+                ty_args,
+                ability: _,
+            } => write!(
+                f,
+                "s#{}<{}>",
+                idx.0,
+                ty_args.iter().map(|t| t.to_string()).join(",")
+            ),
+            Reference(t) => write!(f, "&{}", t),
+            MutableReference(t) => write!(f, "&mut {}", t),
+            TyParam(no) => write!(f, "_{}", no),
+        }
+    }
+}
+
+#[cfg(test)]
+mod unit_tests {
+    use super::*;
+
+    fn struct_inst_for_test(ty_args: Vec<Type>) -> Type {
+        Type::StructInstantiation {
+            idx: StructNameIndex(0),
+            ability: AbilityInfo::struct_(AbilitySet::EMPTY),
+            ty_args: TriompheArc::new(ty_args),
+        }
+    }
+
+    fn struct_for_test() -> Type {
+        Type::Struct {
+            idx: StructNameIndex(0),
+            ability: AbilityInfo::struct_(AbilitySet::EMPTY),
+        }
+    }
+
+    #[test]
+    fn test_num_nodes_in_type() {
+        use Type::*;
+
+        let cases = [
+            (U8, 1),
+            (Vector(TriompheArc::new(U8)), 2),
+            (Vector(TriompheArc::new(Vector(TriompheArc::new(U8)))), 3),
+            (Reference(Box::new(Bool)), 2),
+            (TyParam(0), 1),
+            (struct_for_test(), 1),
+            (struct_inst_for_test(vec![U8, U8]), 3),
+            (
+                struct_inst_for_test(vec![U8, struct_inst_for_test(vec![Bool, Bool, Bool]), U8]),
+                7,
+            ),
+        ];
+
+        for (ty, expected) in cases {
+            assert_eq!(ty.num_nodes(), expected);
+        }
+    }
+
+    #[test]
+    fn test_num_nodes_in_subst() {
+        use Type::*;
+
+        let cases: Vec<(Type, Vec<Type>, usize)> = vec![
+            (TyParam(0), vec![Bool], 1),
+            (TyParam(0), vec![Vector(TriompheArc::new(Bool))], 2),
+            (Bool, vec![], 1),
+            (
+                struct_inst_for_test(vec![TyParam(0), TyParam(0)]),
+                vec![Vector(TriompheArc::new(Bool))],
+                5,
+            ),
+            (
+                struct_inst_for_test(vec![TyParam(0), TyParam(1)]),
+                vec![
+                    Vector(TriompheArc::new(Bool)),
+                    Vector(TriompheArc::new(Vector(TriompheArc::new(Bool)))),
+                ],
+                6,
+            ),
+        ];
+
+        for (ty, ty_args, expected) in cases {
+            assert_eq!(ty.num_nodes_in_subst(&ty_args).unwrap(), expected);
         }
     }
 }

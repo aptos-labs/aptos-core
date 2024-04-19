@@ -351,7 +351,10 @@ impl Account {
                     .latest_state_view_poem(&self.latest_ledger_info)?;
                 let converted_resources = state_view
                     .as_move_resolver()
-                    .as_converter(self.context.db.clone())
+                    .as_converter(
+                        self.context.db.clone(),
+                        self.context.table_info_reader.clone(),
+                    )
                     .try_into_resources(resources.iter().map(|(k, v)| (k.clone(), v.as_slice())))
                     .context("Failed to build move resource response from data in DB")
                     .map_err(|err| {
@@ -545,7 +548,10 @@ impl Account {
             })?;
 
         resolver
-            .as_converter(self.context.db.clone())
+            .as_converter(
+                self.context.db.clone(),
+                self.context.table_info_reader.clone(),
+            )
             .move_struct_fields(resource_type, &bytes)
             .context("Failed to convert move structs from storage")
             .map_err(|err| {

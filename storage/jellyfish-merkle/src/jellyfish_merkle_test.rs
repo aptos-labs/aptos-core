@@ -611,13 +611,12 @@ fn test_non_existence() {
 fn test_missing_root() {
     let db = MockTreeStore::<ValueBlob>::default();
     let tree = JellyfishMerkleTree::new(&db);
-    let err = tree
-        .get_with_proof(HashValue::random(), 0)
-        .err()
-        .unwrap()
-        .downcast::<MissingRootError>()
-        .unwrap();
-    assert_eq!(err.version, 0);
+    let err = tree.get_with_proof(HashValue::random(), 0).err().unwrap();
+    if let AptosDbError::MissingRootError(version) = err {
+        assert_eq!(version, 0);
+    } else {
+        panic!("Unexpected error: {:?}", err);
+    }
 }
 
 fn many_keys_get_proof_and_verify_tree_root(seed: &[u8], num_keys: usize) {

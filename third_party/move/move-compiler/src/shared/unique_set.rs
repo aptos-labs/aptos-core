@@ -120,7 +120,7 @@ impl<T: TName> Eq for UniqueSet<T> {}
 
 impl<T: TName> PartialOrd for UniqueSet<T> {
     fn partial_cmp(&self, other: &UniqueSet<T>) -> Option<Ordering> {
-        (self.0).0.keys().partial_cmp((other.0).0.keys())
+        Some(self.cmp(other))
     }
 }
 

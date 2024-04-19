@@ -1,0 +1,19 @@
+
+Diagnostics:
+error: function `0xdeadbeef::M::bar` cannot be called from function `0xdeadbeef::Q::calls_bar` because module `0xdeadbeef::Q` is not a `friend` of `0xdeadbeef::M`
+   ┌─ tests/checking/visibility-checker/call_friend_only.move:9:24
+   │
+ 9 │     public(friend) fun bar(): u64 { foo() }
+   │                        ^^^ callee
+   ·
+46 │         M::id(5) + bar()
+   │                    ----- called here
+
+error: function `0xdeadbeef::M::id` cannot be called from function `0xdeadbeef::Q::calls_bar` because module `0xdeadbeef::Q` is not a `friend` of `0xdeadbeef::M`
+   ┌─ tests/checking/visibility-checker/call_friend_only.move:10:24
+   │
+10 │     public(friend) fun id<T>(x: T): T { x  }
+   │                        ^^ callee
+   ·
+46 │         M::id(5) + bar()
+   │         -------- called here

@@ -1,5 +1,5 @@
 
-<a name="0x1_copyable_any"></a>
+<a id="0x1_copyable_any"></a>
 
 # Module `0x1::copyable_any`
 
@@ -25,7 +25,7 @@
 
 
 
-<a name="0x1_copyable_any_Any"></a>
+<a id="0x1_copyable_any_Any"></a>
 
 ## Struct `Any`
 
@@ -59,12 +59,12 @@ The same as <code><a href="any.md#0x1_any_Any">any::Any</a></code> but with the 
 
 </details>
 
-<a name="@Constants_0"></a>
+<a id="@Constants_0"></a>
 
 ## Constants
 
 
-<a name="0x1_copyable_any_ETYPE_MISMATCH"></a>
+<a id="0x1_copyable_any_ETYPE_MISMATCH"></a>
 
 The type provided for <code>unpack</code> is not the same as was given for <code>pack</code>.
 
@@ -74,7 +74,7 @@ The type provided for <code>unpack</code> is not the same as was given for <code
 
 
 
-<a name="0x1_copyable_any_pack"></a>
+<a id="0x1_copyable_any_pack"></a>
 
 ## Function `pack`
 
@@ -103,7 +103,7 @@ also required from <code>T</code>.
 
 </details>
 
-<a name="0x1_copyable_any_unpack"></a>
+<a id="0x1_copyable_any_unpack"></a>
 
 ## Function `unpack`
 
@@ -129,7 +129,7 @@ Unpack a value from the <code><a href="copyable_any.md#0x1_copyable_any_Any">Any
 
 </details>
 
-<a name="0x1_copyable_any_type_name"></a>
+<a id="0x1_copyable_any_type_name"></a>
 
 ## Function `type_name`
 
@@ -154,12 +154,12 @@ Returns the type name of this Any
 
 </details>
 
-<a name="@Specification_1"></a>
+<a id="@Specification_1"></a>
 
 ## Specification
 
 
-<a name="@Specification_1_pack"></a>
+<a id="@Specification_1_pack"></a>
 
 ### Function `pack`
 
@@ -171,15 +171,17 @@ Returns the type name of this Any
 
 
 <pre><code><b>aborts_if</b> <b>false</b>;
+<b>pragma</b> opaque;
 <b>ensures</b> result == <a href="copyable_any.md#0x1_copyable_any_Any">Any</a> {
     type_name: <a href="type_info.md#0x1_type_info_type_name">type_info::type_name</a>&lt;T&gt;(),
     data: <a href="../../move-stdlib/doc/bcs.md#0x1_bcs_serialize">bcs::serialize</a>&lt;T&gt;(x)
 };
+<b>ensures</b> [abstract] <a href="from_bcs.md#0x1_from_bcs_deserializable">from_bcs::deserializable</a>&lt;T&gt;(result.data);
 </code></pre>
 
 
 
-<a name="@Specification_1_unpack"></a>
+<a id="@Specification_1_unpack"></a>
 
 ### Function `unpack`
 
@@ -190,14 +192,26 @@ Returns the type name of this Any
 
 
 
-<pre><code><b>aborts_if</b> <a href="type_info.md#0x1_type_info_type_name">type_info::type_name</a>&lt;T&gt;() != x.type_name;
-<b>aborts_if</b> !<a href="from_bcs.md#0x1_from_bcs_deserializable">from_bcs::deserializable</a>&lt;T&gt;(x.data);
+<pre><code><b>include</b> <a href="copyable_any.md#0x1_copyable_any_UnpackAbortsIf">UnpackAbortsIf</a>&lt;T&gt;;
 <b>ensures</b> result == <a href="from_bcs.md#0x1_from_bcs_deserialize">from_bcs::deserialize</a>&lt;T&gt;(x.data);
 </code></pre>
 
 
 
-<a name="@Specification_1_type_name"></a>
+
+<a id="0x1_copyable_any_UnpackAbortsIf"></a>
+
+
+<pre><code><b>schema</b> <a href="copyable_any.md#0x1_copyable_any_UnpackAbortsIf">UnpackAbortsIf</a>&lt;T&gt; {
+    x: <a href="copyable_any.md#0x1_copyable_any_Any">Any</a>;
+    <b>aborts_if</b> <a href="type_info.md#0x1_type_info_type_name">type_info::type_name</a>&lt;T&gt;() != x.type_name;
+    <b>aborts_if</b> !<a href="from_bcs.md#0x1_from_bcs_deserializable">from_bcs::deserializable</a>&lt;T&gt;(x.data);
+}
+</code></pre>
+
+
+
+<a id="@Specification_1_type_name"></a>
 
 ### Function `type_name`
 

@@ -14,7 +14,7 @@ mod process;
 mod remote_service;
 mod safety_rules;
 mod safety_rules_2chain;
-mod safety_rules_manager;
+pub mod safety_rules_manager;
 mod serializer;
 mod t_safety_rules;
 mod thread;

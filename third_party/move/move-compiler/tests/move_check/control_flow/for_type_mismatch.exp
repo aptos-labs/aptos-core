@@ -1,0 +1,28 @@
+error[E04007]: incompatible types
+  ┌─ tests/move_check/control_flow/for_type_mismatch.move:5:9
+  │    
+5 │ ╭ ╭         for (i in true..false) {
+  │                       ---- Found: 'bool'. It is not compatible with the other type.
+6 │ │ │             x = x + 1;
+7 │ │ │         };
+  │ ╰─│─────────^ Incompatible arguments to '+'
+  │   ╰─────────' Found: integer. It is not compatible with the other type.
+
+error[E04003]: built-in operation not supported
+  ┌─ tests/move_check/control_flow/for_type_mismatch.move:5:9
+  │  
+5 │ ╭         for (i in true..false) {
+  │                     ---- Found: 'bool'. But expected: 'u8', 'u16', 'u32', 'u64', 'u128', 'u256'
+6 │ │             x = x + 1;
+7 │ │         };
+  │ ╰─────────^ Invalid argument to '+'
+
+error[E04003]: built-in operation not supported
+  ┌─ tests/move_check/control_flow/for_type_mismatch.move:5:9
+  │  
+5 │ ╭         for (i in true..false) {
+  │                     ---- Found: 'bool'. But expected: 'u8', 'u16', 'u32', 'u64', 'u128', 'u256'
+6 │ │             x = x + 1;
+7 │ │         };
+  │ ╰─────────^ Invalid argument to '<'
+

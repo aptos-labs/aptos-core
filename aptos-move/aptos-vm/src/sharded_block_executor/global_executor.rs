@@ -5,9 +5,12 @@ use crate::sharded_block_executor::{
     local_executor_shard::GlobalCrossShardClient, sharded_executor_service::ShardedExecutorService,
 };
 use aptos_logger::trace;
-use aptos_state_view::StateView;
 use aptos_types::{
-    block_executor::partitioner::{TransactionWithDependencies, GLOBAL_ROUND_ID},
+    block_executor::{
+        config::{BlockExecutorConfig, BlockExecutorConfigFromOnchain, BlockExecutorLocalConfig},
+        partitioner::{TransactionWithDependencies, GLOBAL_ROUND_ID},
+    },
+    state_store::StateView,
     transaction::{analyzed_transaction::AnalyzedTransaction, TransactionOutput},
 };
 use move_core_types::vm_status::VMStatus;
@@ -42,7 +45,7 @@ impl<S: StateView + Sync + Send + 'static> GlobalExecutor<S> {
         &self,
         transactions: Vec<TransactionWithDependencies<AnalyzedTransaction>>,
         state_view: &S,
-        maybe_block_gas_limit: Option<u64>,
+        onchain_config: BlockExecutorConfigFromOnchain,
     ) -> Result<Vec<TransactionOutput>, VMStatus> {
         trace!("executing the last round in global executor",);
         if transactions.is_empty() {
@@ -56,8 +59,14 @@ impl<S: StateView + Sync + Send + 'static> GlobalExecutor<S> {
             None,
             GLOBAL_ROUND_ID,
             state_view,
-            self.concurrency_level,
-            maybe_block_gas_limit,
+            BlockExecutorConfig {
+                local: BlockExecutorLocalConfig {
+                    concurrency_level: self.concurrency_level,
+                    allow_fallback: true,
+                    discard_failed_blocks: false,
+                },
+                onchain: onchain_config,
+            },
         )
     }
 

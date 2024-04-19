@@ -4,7 +4,7 @@
 mod check_range_proof;
 mod check_txn_info_hashes;
 
-use anyhow::Result;
+use aptos_storage_interface::Result;
 
 #[derive(clap::Subcommand)]
 #[clap(about = "Check the ledger.")]

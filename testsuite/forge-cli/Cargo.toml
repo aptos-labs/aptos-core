@@ -17,7 +17,6 @@ anyhow = { workspace = true }
 aptos-cached-packages = { workspace = true }
 aptos-config = { workspace = true }
 aptos-forge = { workspace = true }
-aptos-framework = { workspace = true }
 aptos-global-constants = { workspace = true }
 aptos-logger = { workspace = true }
 aptos-rest-client = { workspace = true }
@@ -27,6 +26,7 @@ async-trait = { workspace = true }
 chrono = { workspace = true }
 clap = { workspace = true }
 futures = { workspace = true }
+once_cell = { workspace = true }
 rand = { workspace = true }
 random_word = { workspace = true }
 reqwest = { workspace = true }

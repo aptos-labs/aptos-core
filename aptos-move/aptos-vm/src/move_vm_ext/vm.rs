@@ -7,6 +7,7 @@ use aptos_framework::natives::{
     code::NativeCodeContext,
     cryptography::{algebra::AlgebraContext, ristretto255_point::NativeRistrettoPointContext},
     event::NativeEventContext,
+    randomness::RandomnessContext,
     state_storage::NativeStateStorageContext,
     transaction_context::NativeTransactionContext,
 };
@@ -14,7 +15,10 @@ use aptos_gas_algebra::DynamicExpression;
 use aptos_gas_schedule::{MiscGasParameters, NativeGasParameters};
 use aptos_native_interface::SafeNativeBuilder;
 use aptos_table_natives::NativeTableContext;
-use aptos_types::on_chain_config::{FeatureFlag, Features, TimedFeatureFlag, TimedFeatures};
+use aptos_types::{
+    chain_id::ChainId,
+    on_chain_config::{FeatureFlag, Features, TimedFeatureFlag, TimedFeatures},
+};
 use move_binary_format::{
     deserializer::DeserializerConfig,
     errors::VMResult,
@@ -25,12 +29,12 @@ use move_bytecode_verifier::VerifierConfig;
 use move_vm_runtime::{
     config::VMConfig, move_vm::MoveVM, native_extensions::NativeContextExtensions,
 };
-use std::{ops::Deref, sync::Arc};
+use std::ops::Deref;
 
 pub struct MoveVmExt {
     inner: MoveVM,
     chain_id: u8,
-    features: Arc<Features>,
+    features: Features,
 }
 
 pub fn get_max_binary_format_version(
@@ -69,6 +73,7 @@ impl MoveVmExt {
         timed_features: TimedFeatures,
         gas_hook: Option<F>,
         resolver: &impl AptosMoveResolver,
+        aggregator_v2_type_tagging: bool,
     ) -> VMResult<Self>
     where
         F: Fn(DynamicExpression) + Send + Sync + 'static,
@@ -96,10 +101,6 @@ impl MoveVmExt {
             type_base_cost = 100;
             type_byte_cost = 1;
         }
-
-        // If aggregator execution is enabled, we need to tag aggregator_v2 types,
-        // so they can be exchanged with identifiers during VM execution.
-        let aggregator_v2_type_tagging = features.is_aggregator_v2_delayed_fields_enabled();
 
         let mut builder = SafeNativeBuilder::new(
             gas_feature_version,
@@ -134,7 +135,7 @@ impl MoveVmExt {
                 resolver,
             )?,
             chain_id,
-            features: Arc::new(features),
+            features,
         })
     }
 
@@ -146,6 +147,7 @@ impl MoveVmExt {
         features: Features,
         timed_features: TimedFeatures,
         resolver: &impl AptosMoveResolver,
+        aggregator_v2_type_tagging: bool,
     ) -> VMResult<Self> {
         Self::new_impl::<fn(DynamicExpression)>(
             native_gas_params,
@@ -156,6 +158,7 @@ impl MoveVmExt {
             timed_features,
             None,
             resolver,
+            aggregator_v2_type_tagging,
         )
     }
 
@@ -168,6 +171,7 @@ impl MoveVmExt {
         timed_features: TimedFeatures,
         gas_hook: Option<F>,
         resolver: &impl AptosMoveResolver,
+        aggregator_v2_type_tagging: bool,
     ) -> VMResult<Self>
     where
         F: Fn(DynamicExpression) + Send + Sync + 'static,
@@ -181,6 +185,7 @@ impl MoveVmExt {
             timed_features,
             gas_hook,
             resolver,
+            aggregator_v2_type_tagging,
         )
     }
 
@@ -200,29 +205,10 @@ impl MoveVmExt {
         extensions.add(NativeRistrettoPointContext::new());
         extensions.add(AlgebraContext::new());
         extensions.add(NativeAggregatorContext::new(txn_hash, resolver, resolver));
-
-        let script_hash = match session_id {
-            SessionId::Txn {
-                sender: _,
-                sequence_number: _,
-                script_hash,
-            }
-            | SessionId::Prologue {
-                sender: _,
-                sequence_number: _,
-                script_hash,
-            }
-            | SessionId::Epilogue {
-                sender: _,
-                sequence_number: _,
-                script_hash,
-            } => script_hash,
-            _ => vec![],
-        };
-
+        extensions.add(RandomnessContext::new());
         extensions.add(NativeTransactionContext::new(
             txn_hash.to_vec(),
-            script_hash,
+            session_id.into_script_hash(),
             self.chain_id,
         ));
         extensions.add(NativeCodeContext::default());
@@ -236,8 +222,16 @@ impl MoveVmExt {
         SessionExt::new(
             self.inner.new_session_with_extensions(resolver, extensions),
             resolver,
-            self.features.clone(),
+            self.features.is_storage_slot_metadata_enabled(),
         )
+    }
+
+    pub(crate) fn features(&self) -> &Features {
+        &self.features
+    }
+
+    pub fn chain_id(&self) -> ChainId {
+        ChainId::new(self.chain_id)
     }
 }
 

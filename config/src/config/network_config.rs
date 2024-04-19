@@ -42,7 +42,7 @@ pub const PING_FAILURES_TOLERATED: u64 = 3;
 pub const CONNECTIVITY_CHECK_INTERVAL_MS: u64 = 5000;
 pub const MAX_CONCURRENT_NETWORK_REQS: usize = 100;
 pub const MAX_CONNECTION_DELAY_MS: u64 = 60_000; /* 1 minute */
-pub const MAX_FULLNODE_OUTBOUND_CONNECTIONS: usize = 4;
+pub const MAX_FULLNODE_OUTBOUND_CONNECTIONS: usize = 6;
 pub const MAX_INBOUND_CONNECTIONS: usize = 100;
 pub const MAX_MESSAGE_METADATA_SIZE: usize = 128 * 1024; /* 128 KiB: a buffer for metadata that might be added to messages by networking */
 pub const MESSAGE_PADDING_SIZE: usize = 2 * 1024 * 1024; /* 2 MiB: a safety buffer to allow messages to get larger during serialization */
@@ -125,6 +125,8 @@ pub struct NetworkConfig {
     pub max_message_size: usize,
     /// The maximum number of parallel message deserialization tasks that can run (per application)
     pub max_parallel_deserialization_tasks: Option<usize>,
+    /// Whether or not to enable latency aware peer dialing
+    pub enable_latency_aware_dialing: bool,
 }
 
 impl Default for NetworkConfig {
@@ -166,6 +168,7 @@ impl NetworkConfig {
             outbound_rx_buffer_size_bytes: None,
             outbound_tx_buffer_size_bytes: None,
             max_parallel_deserialization_tasks: None,
+            enable_latency_aware_dialing: true,
         };
 
         // Configure the number of parallel deserialization tasks
@@ -278,7 +281,7 @@ impl NetworkConfig {
                 let mut rng = StdRng::from_seed(OsRng.gen());
                 let key = x25519::PrivateKey::generate(&mut rng);
                 let peer_id = from_identity_public_key(key.public_key());
-                self.identity = Identity::from_config(key, peer_id);
+                self.identity = Identity::from_config_auto_generated(key, peer_id);
             },
             Identity::FromConfig(config) => {
                 if config.peer_id == PeerId::ZERO {

@@ -31,7 +31,6 @@ aptos-metrics-core = { workspace = true }
 aptos-move-stdlib = { workspace = true }
 aptos-mvhashmap = { workspace = true }
 aptos-native-interface = { workspace = true }
-aptos-state-view = { workspace = true }
 aptos-table-natives = { workspace = true }
 aptos-types = { workspace = true }
 aptos-utils = { workspace = true }
@@ -41,11 +40,11 @@ bcs = { workspace = true }
 bytes = { workspace = true }
 claims = { workspace = true }
 crossbeam-channel = { workspace = true }
-dashmap = { workspace = true }
+derive_more = { workspace = true }
 fail = { workspace = true }
 futures = { workspace = true }
+hex = { workspace = true }
 move-binary-format = { workspace = true }
-move-bytecode-utils = { workspace = true }
 move-bytecode-verifier = { workspace = true }
 move-core-types = { workspace = true }
 move-unit-test = { workspace = true, optional = true }
@@ -57,20 +56,17 @@ ouroboros = { workspace = true }
 rand = { workspace = true }
 rayon = { workspace = true }
 serde = { workspace = true }
-serde_json = { workspace = true }
-smallvec = { workspace = true }
-tracing = { workspace = true }
 
 [dev-dependencies]
 aptos-aggregator = { workspace = true, features = ["testing"] }
 aptos-language-e2e-tests = { workspace = true }
-aptos-types = { workspace = true }
+aptos-types = { workspace = true, features = ["fuzzing"] }
 claims = { workspace = true }
 proptest = { workspace = true }
 rand_core = { workspace = true }
 
 [features]
 default = []
-fuzzing = ["move-core-types/fuzzing", "move-binary-format/fuzzing", "move-vm-types/fuzzing", "aptos-framework/fuzzing"]
+fuzzing = ["move-core-types/fuzzing", "move-binary-format/fuzzing", "move-vm-types/fuzzing", "aptos-framework/fuzzing", "aptos-types/fuzzing"]
 failpoints = ["fail/failpoints", "move-vm-runtime/failpoints"]
 testing = ["move-unit-test", "aptos-framework/testing"]

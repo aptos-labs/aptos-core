@@ -35,7 +35,7 @@ object "A2_M" {
                 let y, $t2, $t3, $t4, $t5, $t6
                 // ($t2, $t3) := M::g($t0)
                 $t2, $t3 := A2_M_g(x)
-                // destroy($t2)
+                // drop($t2)
                 // $t4 := 1
                 $t4 := 1
                 // $t5 := -($t3, $t4)

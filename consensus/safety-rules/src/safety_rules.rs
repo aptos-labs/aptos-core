@@ -431,7 +431,7 @@ where
             v
         })
         .map_err(|err| {
-            error!(log_cb(SafetyLogSchema::new(log_entry, LogEvent::Error)).error(&err));
+            warn!(log_cb(SafetyLogSchema::new(log_entry, LogEvent::Error)).error(&err));
             counters::increment_query(log_entry.as_str(), "error");
             err
         })

@@ -1,10 +1,11 @@
 // Copyright © Aptos Foundation
+// SPDX-License-Identifier: Apache-2.0
 
 #[cfg(feature = "testing")]
 use crate::{
     natives::cryptography::algebra::{
-        AlgebraContext, Structure, BLS12381_GT_GENERATOR, E_TOO_MUCH_MEMORY_USED,
-        MEMORY_LIMIT_IN_BYTES,
+        AlgebraContext, Structure, BLS12381_GT_GENERATOR, BN254_GT_GENERATOR,
+        E_TOO_MUCH_MEMORY_USED, MEMORY_LIMIT_IN_BYTES,
     },
     structure_from_ty_arg,
 };
@@ -72,6 +73,30 @@ pub fn rand_insecure_internal(
             let k = ark_bls12_381::Fr::rand(&mut test_rng());
             let k_bigint: ark_ff::BigInteger256 = k.into();
             let element = BLS12381_GT_GENERATOR.pow(k_bigint);
+            match store_element!(context, element) {
+                Ok(handle) => Ok(smallvec![Value::u64(handle as u64)]),
+                Err(abort_code) => Err(SafeNativeError::Abort { abort_code }),
+            }
+        },
+        Some(Structure::BN254Fr) => {
+            ark_rand_internal!(context, ark_bn254::Fr)
+        },
+        Some(Structure::BN254Fq) => {
+            ark_rand_internal!(context, ark_bn254::Fq)
+        },
+        Some(Structure::BN254Fq12) => {
+            ark_rand_internal!(context, ark_bn254::Fq12)
+        },
+        Some(Structure::BN254G1) => {
+            ark_rand_internal!(context, ark_bn254::G1Projective)
+        },
+        Some(Structure::BN254G2) => {
+            ark_rand_internal!(context, ark_bn254::G2Projective)
+        },
+        Some(Structure::BN254Gt) => {
+            let k = ark_bn254::Fr::rand(&mut test_rng());
+            let k_bigint: ark_ff::BigInteger256 = k.into();
+            let element = BN254_GT_GENERATOR.pow(k_bigint);
             match store_element!(context, element) {
                 Ok(handle) => Ok(smallvec![Value::u64(handle as u64)]),
                 Err(abort_code) => Err(SafeNativeError::Abort { abort_code }),

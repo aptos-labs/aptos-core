@@ -13,6 +13,8 @@ use move_compiler::{
     unit_test::{plan_builder::construct_test_plan, TestPlan},
     PASS_CFGIR,
 };
+use move_compiler_v2::plan_builder as plan_builder_v2;
+use move_core_types::effects::ChangeSet;
 use move_coverage::coverage_map::{output_map_to_file, CoverageMap};
 use move_package::{
     compilation::{build_plan::BuildPlan, compiled_package::build_and_report_v2_driver},
@@ -31,6 +33,7 @@ use std::{
     collections::HashMap,
     fs,
     io::Write,
+    ops::Deref,
     path::{Path, PathBuf},
     process::ExitStatus,
 };
@@ -95,6 +98,7 @@ impl Test {
         path: Option<PathBuf>,
         config: BuildConfig,
         natives: Vec<NativeFunctionRecord>,
+        genesis: ChangeSet,
         cost_table: Option<CostTable>,
     ) -> anyhow::Result<()> {
         let rerooted_path = reroot_path(path)?;
@@ -132,6 +136,7 @@ impl Test {
             config,
             unit_test_config,
             natives,
+            genesis,
             cost_table,
             compute_coverage,
             &mut std::io::stdout(),
@@ -157,11 +162,14 @@ pub fn run_move_unit_tests<W: Write + Send>(
     mut build_config: move_package::BuildConfig,
     mut unit_test_config: UnitTestingConfig,
     natives: Vec<NativeFunctionRecord>,
+    genesis: ChangeSet,
     cost_table: Option<CostTable>,
     compute_coverage: bool,
     writer: &mut W,
 ) -> Result<UnitTestResult> {
     let mut test_plan = None;
+    let mut test_plan_v2 = None;
+
     build_config.test_mode = true;
     build_config.dev_mode = true;
     build_config.generate_move_model = test_validation::needs_validation();
@@ -231,9 +239,18 @@ pub fn run_move_unit_tests<W: Write + Send>(
 
             let (units, _) = diagnostics::unwrap_or_report_diagnostics(&files, compilation_result);
             test_plan = Some((built_test_plan, files.clone(), units.clone()));
-            Ok((files, units))
+            Ok((files, units, None))
         },
-        build_and_report_v2_driver,
+        |options| {
+            let (files, units, opt_env) = build_and_report_v2_driver(options).unwrap();
+            let env = opt_env.expect("v2 driver should return env");
+            let root_package_in_model = env.symbol_pool().make(root_package.deref());
+            let built_test_plan =
+                plan_builder_v2::construct_test_plan(&env, Some(root_package_in_model));
+
+            test_plan_v2 = Some((built_test_plan, files.clone(), units.clone()));
+            Ok((files, units, Some(env)))
+        },
     )?;
 
     // If configured, run extra validation
@@ -251,6 +268,12 @@ pub fn run_move_unit_tests<W: Write + Send>(
             }
         }
     }
+
+    let test_plan = if test_plan.is_some() {
+        test_plan
+    } else {
+        test_plan_v2
+    };
 
     let (test_plan, mut files, units) = test_plan.unwrap();
     files.extend(dep_file_map);
@@ -279,7 +302,7 @@ pub fn run_move_unit_tests<W: Write + Send>(
     // Run the tests. If any of the tests fail, then we don't produce a coverage report, so cleanup
     // the trace files.
     if !unit_test_config
-        .run_and_report_unit_tests(test_plan, Some(natives), cost_table, writer)
+        .run_and_report_unit_tests(test_plan, Some(natives), Some(genesis), cost_table, writer)
         .unwrap()
         .1
     {

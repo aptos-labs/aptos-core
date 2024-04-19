@@ -101,18 +101,15 @@
 //!             +-----------------------------+
 //! ```
 
-#[cfg(test)]
-mod tests;
-
-mod access_path_cache;
 #[macro_use]
 pub mod counters;
 pub mod data_cache;
 
 pub mod aptos_vm;
-mod aptos_vm_impl;
 pub mod block_executor;
 mod errors;
+pub mod gas;
+mod keyless_validation;
 pub mod move_vm_ext;
 pub mod natives;
 pub mod sharded_block_executor;
@@ -120,16 +117,19 @@ pub mod system_module_names;
 pub mod testing;
 pub mod transaction_metadata;
 mod transaction_validation;
-mod verifier;
+pub mod validator_txns;
+pub mod verifier;
 
-pub use crate::aptos_vm::AptosVM;
+pub use crate::aptos_vm::{AptosSimulationVM, AptosVM};
 use crate::sharded_block_executor::{executor_client::ExecutorClient, ShardedBlockExecutor};
-use aptos_state_view::StateView;
 use aptos_types::{
-    block_executor::partitioner::PartitionedTransactions,
+    block_executor::{
+        config::BlockExecutorConfigFromOnchain, partitioner::PartitionedTransactions,
+    },
+    state_store::StateView,
     transaction::{
-        signature_verified_transaction::SignatureVerifiedTransaction, SignedTransaction,
-        TransactionOutput, VMValidatorResult,
+        signature_verified_transaction::SignatureVerifiedTransaction, BlockOutput,
+        SignedTransaction, TransactionOutput, VMValidatorResult,
     },
     vm_status::VMStatus,
 };
@@ -157,23 +157,28 @@ pub trait VMExecutor: Send + Sync {
     fn execute_block(
         transactions: &[SignatureVerifiedTransaction],
         state_view: &(impl StateView + Sync),
-        maybe_block_gas_limit: Option<u64>,
-    ) -> Result<Vec<TransactionOutput>, VMStatus>;
+        onchain_config: BlockExecutorConfigFromOnchain,
+    ) -> Result<BlockOutput<TransactionOutput>, VMStatus>;
+
+    /// Executes a block of transactions and returns output for each one of them,
+    /// Without applying any block limit
+    fn execute_block_no_limit(
+        transactions: &[SignatureVerifiedTransaction],
+        state_view: &(impl StateView + Sync),
+    ) -> Result<Vec<TransactionOutput>, VMStatus> {
+        Self::execute_block(
+            transactions,
+            state_view,
+            BlockExecutorConfigFromOnchain::new_no_block_limit(),
+        )
+        .map(BlockOutput::into_transaction_outputs_forced)
+    }
 
     /// Executes a block of transactions using a sharded block executor and returns the results.
     fn execute_block_sharded<S: StateView + Sync + Send + 'static, E: ExecutorClient<S>>(
         sharded_block_executor: &ShardedBlockExecutor<S, E>,
         transactions: PartitionedTransactions,
         state_view: Arc<S>,
-        maybe_block_gas_limit: Option<u64>,
+        onchain_config: BlockExecutorConfigFromOnchain,
     ) -> Result<Vec<TransactionOutput>, VMStatus>;
 }
-
-/*
-/// Get the AccessPath to a resource stored under `address` with type name `tag`
-/// DNS
-fn create_access_path(address: AccountAddress, tag: StructTag) -> anyhow::Result<AccessPath> {
-    let resource_tag = ResourceKey::new(address, tag);
-    AccessPath::resource_access_path(resource_tag)
-}
- */

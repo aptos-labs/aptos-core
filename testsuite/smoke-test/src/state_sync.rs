@@ -5,18 +5,17 @@
 use crate::{
     smoke_test_environment::{new_local_swarm_with_aptos, SwarmBuilder},
     test_utils::{
-        create_and_fund_account, transfer_and_maybe_reconfig, transfer_coins,
-        MAX_CATCH_UP_WAIT_SECS, MAX_HEALTHY_WAIT_SECS,
+        create_test_accounts, execute_transactions, execute_transactions_and_wait,
+        wait_for_all_nodes, MAX_CATCH_UP_WAIT_SECS, MAX_HEALTHY_WAIT_SECS,
     },
 };
 use aptos_config::config::{
     BootstrappingMode, ContinuousSyncingMode, NodeConfig, OverrideNodeConfig,
 };
 use aptos_db::AptosDB;
-use aptos_forge::{LocalNode, LocalSwarm, Node, NodeExt, Swarm, SwarmExt};
+use aptos_forge::{LocalNode, LocalSwarm, Node, NodeExt, Swarm};
 use aptos_inspection_service::inspection_client::InspectionClient;
 use aptos_rest_client::Client as RestClient;
-use aptos_sdk::types::LocalAccount;
 use aptos_storage_interface::DbReader;
 use aptos_types::{
     account_address::AccountAddress,
@@ -778,10 +777,7 @@ async fn test_validator_sync_and_participate(fast_sync: bool, epoch_changes: boo
             let consensus_config = match genesis_config.consensus_config.clone() {
                 OnChainConsensusConfig::V1(consensus_config) => consensus_config,
                 OnChainConsensusConfig::V2(consensus_config) => consensus_config,
-                config => unimplemented!(
-                    "This test requires a V1 or V2 consensus config, but got: {:?}",
-                    config
-                ),
+                OnChainConsensusConfig::V3 { alg, .. } => alg.unwrap_jolteon_config_v1().clone(),
             };
             let leader_reputation_type = match &consensus_config.proposer_election_type {
                 ProposerElectionType::LeaderReputation(leader_reputation_type) => {
@@ -916,75 +912,6 @@ pub async fn test_all_validator_failures(mut swarm: LocalSwarm) {
         true,
     )
     .await;
-}
-
-/// Executes transactions using the given transaction factory, client and
-/// accounts. If `execute_epoch_changes` is true, also execute transactions to
-/// force reconfigurations.
-async fn execute_transactions(
-    swarm: &mut LocalSwarm,
-    client: &RestClient,
-    sender: &mut LocalAccount,
-    receiver: &LocalAccount,
-    execute_epoch_changes: bool,
-) {
-    // Execute several transactions
-    let num_transfers = 10;
-    let transaction_factory = swarm.chain_info().transaction_factory();
-    if execute_epoch_changes {
-        transfer_and_maybe_reconfig(
-            client,
-            &transaction_factory,
-            swarm.chain_info().root_account,
-            sender,
-            receiver,
-            num_transfers,
-        )
-        .await;
-    } else {
-        for _ in 0..num_transfers {
-            // Execute simple transfer transactions
-            transfer_coins(client, &transaction_factory, sender, receiver, 1).await;
-        }
-    }
-
-    // Always ensure that at least one reconfiguration transaction is executed
-    if !execute_epoch_changes {
-        aptos_forge::reconfig(
-            client,
-            &transaction_factory,
-            swarm.chain_info().root_account,
-        )
-        .await;
-    }
-}
-
-/// Executes transactions and waits for all nodes to catch up
-async fn execute_transactions_and_wait(
-    swarm: &mut LocalSwarm,
-    client: &RestClient,
-    sender: &mut LocalAccount,
-    receiver: &LocalAccount,
-    epoch_changes: bool,
-) {
-    execute_transactions(swarm, client, sender, receiver, epoch_changes).await;
-    wait_for_all_nodes(swarm).await;
-}
-
-/// Waits for all nodes to catch up
-async fn wait_for_all_nodes(swarm: &mut LocalSwarm) {
-    swarm
-        .wait_for_all_nodes_to_catchup(Duration::from_secs(MAX_CATCH_UP_WAIT_SECS))
-        .await
-        .unwrap();
-}
-
-/// Creates and funds two test accounts
-async fn create_test_accounts(swarm: &mut LocalSwarm) -> (LocalAccount, LocalAccount) {
-    let token_amount = 1000;
-    let account_0 = create_and_fund_account(swarm, token_amount).await;
-    let account_1 = create_and_fund_account(swarm, token_amount).await;
-    (account_0, account_1)
 }
 
 /// Stops the specified fullnode and deletes storage

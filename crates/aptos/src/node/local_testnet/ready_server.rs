@@ -1,7 +1,7 @@
 // Copyright © Aptos Foundation
 // SPDX-License-Identifier: Apache-2.0
 
-use super::{health_checker::HealthChecker, traits::ServiceManager, RunLocalTestnet};
+use super::{health_checker::HealthChecker, traits::ServiceManager, RunLocalnet};
 use anyhow::Result;
 use async_trait::async_trait;
 use clap::Parser;
@@ -22,13 +22,13 @@ use std::{
 };
 use tokio::time::timeout;
 
-/// Args related to running a ready server in the local testnet. The ready server lets
-/// users / clients check that if all the services in the local testnet are ready
+/// Args related to running a ready server in the localnet. The ready server lets
+/// users / clients check that if all the services in the localnet are ready
 /// without having to ping each service individually.
 #[derive(Debug, Clone, Parser)]
 pub struct ReadyServerArgs {
     /// The port to run the ready server. This exposes an endpoint at `/` that you can
-    /// use to check if the entire local testnet is ready.
+    /// use to check if the entire localnet is ready.
     #[clap(long, default_value_t = 8070)]
     pub ready_server_listen_port: u16,
 }
@@ -36,13 +36,19 @@ pub struct ReadyServerArgs {
 #[derive(Clone, Debug)]
 pub struct ReadyServerManager {
     config: ReadyServerArgs,
+    bind_to: Ipv4Addr,
     health_checkers: HashSet<HealthChecker>,
 }
 
 impl ReadyServerManager {
-    pub fn new(args: &RunLocalTestnet, health_checkers: HashSet<HealthChecker>) -> Result<Self> {
+    pub fn new(
+        args: &RunLocalnet,
+        bind_to: Ipv4Addr,
+        health_checkers: HashSet<HealthChecker>,
+    ) -> Result<Self> {
         Ok(ReadyServerManager {
             config: args.ready_server_args.clone(),
+            bind_to,
             health_checkers,
         })
     }
@@ -65,7 +71,7 @@ impl ServiceManager for ReadyServerManager {
     }
 
     async fn run_service(self: Box<ReadyServerManager>) -> Result<()> {
-        run_ready_server(self.health_checkers, self.config).await
+        run_ready_server(self.health_checkers, self.config, self.bind_to).await
     }
 }
 
@@ -74,13 +80,14 @@ impl ServiceManager for ReadyServerManager {
 pub async fn run_ready_server(
     health_checkers: HashSet<HealthChecker>,
     config: ReadyServerArgs,
+    bind_to: Ipv4Addr,
 ) -> Result<()> {
     let app = Route::new()
         .at("/", get(root))
         .data(HealthCheckers { health_checkers })
         .with(Tracing);
     Server::new(TcpListener::bind(SocketAddrV4::new(
-        Ipv4Addr::new(0, 0, 0, 0),
+        bind_to,
         config.ready_server_listen_port,
     )))
     .name("ready-server")

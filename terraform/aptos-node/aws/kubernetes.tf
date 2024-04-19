@@ -1,13 +1,13 @@
 provider "kubernetes" {
   host                   = aws_eks_cluster.aptos.endpoint
-  cluster_ca_certificate = base64decode(aws_eks_cluster.aptos.certificate_authority.0.data)
+  cluster_ca_certificate = base64decode(aws_eks_cluster.aptos.certificate_authority[0].data)
   token                  = data.aws_eks_cluster_auth.aptos.token
 }
 
 provider "helm" {
   kubernetes {
     host                   = aws_eks_cluster.aptos.endpoint
-    cluster_ca_certificate = base64decode(aws_eks_cluster.aptos.certificate_authority.0.data)
+    cluster_ca_certificate = base64decode(aws_eks_cluster.aptos.certificate_authority[0].data)
     token                  = data.aws_eks_cluster_auth.aptos.token
   }
 }
@@ -16,9 +16,8 @@ locals {
   kubeconfig = "/tmp/kube.config.${md5(timestamp())}"
 
   # helm chart paths
-  monitoring_helm_chart_path = "${path.module}/../../helm/monitoring"
-  logger_helm_chart_path     = "${path.module}/../../helm/logger"
   aptos_node_helm_chart_path = var.helm_chart != "" ? var.helm_chart : "${path.module}/../../helm/aptos-node"
+  monitoring_helm_chart_path = "${path.module}/../../helm/monitoring"
 }
 
 resource "null_resource" "delete-gp2" {
@@ -43,7 +42,7 @@ resource "kubernetes_storage_class" "gp3" {
     type = "gp3"
   }
 
-  depends_on = [null_resource.delete-gp2, aws_eks_addon.aws-ebs-csi-driver]
+  depends_on = [null_resource.delete-gp2]
 }
 
 resource "kubernetes_storage_class" "io1" {
@@ -70,25 +69,6 @@ resource "kubernetes_storage_class" "io2" {
   }
 }
 
-resource "kubernetes_namespace" "tigera-operator" {
-  metadata {
-    annotations = {
-      name = "tigera-operator"
-    }
-
-    name = "tigera-operator"
-  }
-}
-
-resource "helm_release" "calico" {
-  count      = var.enable_calico ? 1 : 0
-  name       = "calico"
-  repository = "https://docs.tigera.io/calico/charts"
-  chart      = "tigera-operator"
-  version    = "3.26.0"
-  namespace  = "tigera-operator"
-}
-
 locals {
   helm_values = jsonencode({
     numValidators     = var.num_validators
@@ -113,7 +93,6 @@ locals {
         value  = "validators"
         effect = "NoExecute"
       }]
-      remoteLogAddress = var.enable_logger ? "${helm_release.logger[0].name}-aptos-logger.${helm_release.logger[0].namespace}.svc:5044" : null
     }
     fullnode = {
       storage = {
@@ -168,80 +147,6 @@ resource "helm_release" "validator" {
       name  = "chart_sha1"
       value = sha1(join("", [for f in fileset(local.aptos_node_helm_chart_path, "**") : filesha1("${local.aptos_node_helm_chart_path}/${f}")]))
     }
-  }
-}
-
-resource "helm_release" "logger" {
-  count       = var.enable_logger ? 1 : 0
-  name        = "${local.helm_release_name}-log"
-  chart       = local.logger_helm_chart_path
-  max_history = 5
-  wait        = false
-
-  values = [
-    jsonencode({
-      logger = {
-        name = "aptos-logger"
-      }
-      chain = {
-        name = var.chain_name
-      }
-      serviceAccount = {
-        create = false
-        # this name must match the serviceaccount created by the aptos-node helm chart
-        name = local.helm_release_name == "aptos-node" ? "aptos-node-validator" : "${local.helm_release_name}-aptos-node-validator"
-      }
-    }),
-    jsonencode(var.logger_helm_values),
-  ]
-
-  # inspired by https://stackoverflow.com/a/66501021 to trigger redeployment whenever any of the charts file contents change.
-  set {
-    name  = "chart_sha1"
-    value = sha1(join("", [for f in fileset(local.logger_helm_chart_path, "**") : filesha1("${local.logger_helm_chart_path}/${f}")]))
-  }
-}
-
-
-resource "helm_release" "monitoring" {
-  count       = var.enable_monitoring ? 1 : 0
-  name        = "${local.helm_release_name}-mon"
-  chart       = local.monitoring_helm_chart_path
-  max_history = 5
-  wait        = false
-
-  values = [
-    jsonencode({
-      chain = {
-        name = var.chain_name
-      }
-      validator = {
-        name = var.validator_name
-      }
-      service = {
-        domain = local.domain
-      }
-      monitoring = {
-        prometheus = {
-          storage = {
-            class = kubernetes_storage_class.gp3.metadata[0].name
-          }
-        }
-      }
-      kube-state-metrics = {
-        enabled = var.enable_kube_state_metrics
-      }
-      prometheus-node-exporter = {
-        enabled = var.enable_prometheus_node_exporter
-      }
-    }),
-    jsonencode(var.monitoring_helm_values),
-  ]
-
-  # inspired by https://stackoverflow.com/a/66501021 to trigger redeployment whenever any of the charts file contents change.
-  set {
-    name  = "chart_sha1"
-    value = sha1(join("", [for f in fileset(local.monitoring_helm_chart_path, "**") : filesha1("${local.monitoring_helm_chart_path}/${f}")]))
   }
 }
 
@@ -348,5 +253,47 @@ resource "kubernetes_config_map" "aws-auth" {
         groups   = ["debuggers"]
       }],
     ))
+  }
+}
+
+resource "helm_release" "monitoring" {
+  count       = var.enable_monitoring ? 1 : 0
+  name        = "${local.helm_release_name}-mon"
+  chart       = local.monitoring_helm_chart_path
+  max_history = 5
+  wait        = false
+
+  values = [
+    jsonencode({
+      chain = {
+        name = var.chain_name
+      }
+      validator = {
+        name = var.validator_name
+      }
+      service = {
+        domain = local.domain
+      }
+      monitoring = {
+        prometheus = {
+          storage = {
+            class = kubernetes_storage_class.gp3.metadata[0].name
+          }
+        }
+      }
+      kube-state-metrics = {
+        enabled = var.enable_kube_state_metrics
+      }
+      prometheus-node-exporter = {
+        enabled = var.enable_prometheus_node_exporter
+      }
+    }),
+    jsonencode(var.monitoring_helm_values),
+  ]
+
+  # inspired by https://stackoverflow.com/a/66501021 to trigger redeployment whenever any of the charts file contents change.
+  set {
+    name  = "chart_sha1"
+    value = sha1(join("", [for f in fileset(local.monitoring_helm_chart_path, "**") : filesha1("${local.monitoring_helm_chart_path}/${f}")]))
   }
 }

@@ -1,6 +1,8 @@
 // Copyright © Aptos Foundation
+// SPDX-License-Identifier: Apache-2.0
 
-use crate::{stream_coordinator::IndexerStreamCoordinator, ServiceContext};
+use crate::{counters::CHANNEL_SIZE, stream_coordinator::IndexerStreamCoordinator, ServiceContext};
+use aptos_indexer_grpc_utils::counters::{log_grpc_step_fullnode, IndexerGrpcStep};
 use aptos_logger::{error, info};
 use aptos_moving_average::MovingAverage;
 use aptos_protos::internal::fullnode::v1::{
@@ -25,6 +27,7 @@ pub const DEFAULT_NUM_RETRIES: usize = 3;
 pub const RETRY_TIME_MILLIS: u64 = 100;
 const TRANSACTION_CHANNEL_SIZE: usize = 35;
 const DEFAULT_EMIT_SIZE: usize = 1000;
+const SERVICE_TYPE: &str = "indexer_fullnode";
 
 #[tonic::async_trait]
 impl FullnodeData for FullnodeDataService {
@@ -74,23 +77,39 @@ impl FullnodeData for FullnodeDataService {
             match tx.send(Result::<_, Status>::Ok(init_status)).await {
                 Ok(_) => {
                     // TODO: Add request details later
-                    info!("[indexer-grpc] Init connection");
+                    info!(
+                        start_version = starting_version,
+                        chain_id = ledger_chain_id,
+                        service_type = SERVICE_TYPE,
+                        "[Indexer Fullnode] Init connection"
+                    );
                 },
                 Err(_) => {
-                    panic!("[indexer-grpc] Unable to initialize stream");
+                    panic!("[Indexer Fullnode] Unable to initialize stream");
                 },
             }
             let mut base: u64 = 0;
             loop {
+                let start_time = std::time::Instant::now();
                 // Processes and sends batch of transactions to client
                 let results = coordinator.process_next_batch().await;
+                if results.is_empty() {
+                    info!(
+                        start_version = starting_version,
+                        chain_id = ledger_chain_id,
+                        "[Indexer Fullnode] Client disconnected."
+                    );
+                    break;
+                }
                 let max_version = match IndexerStreamCoordinator::get_max_batch_version(results) {
                     Ok(max_version) => max_version,
                     Err(e) => {
-                        error!("[indexer-grpc] Error sending to stream: {}", e);
+                        error!("[Indexer Fullnode] Error sending to stream: {}", e);
                         break;
                     },
                 };
+                let highest_known_version = coordinator.highest_known_version;
+
                 // send end batch message (each batch) upon success of the entire batch
                 // client can use the start and end version to ensure that there are no gaps
                 // end loop if this message fails to send because otherwise the client can't validate
@@ -100,6 +119,10 @@ impl FullnodeData for FullnodeDataService {
                     Some(max_version),
                     ledger_chain_id,
                 );
+                let channel_size = TRANSACTION_CHANNEL_SIZE - tx.capacity();
+                CHANNEL_SIZE
+                    .with_label_values(&["2"])
+                    .set(channel_size as i64);
                 match tx.send(Result::<_, Status>::Ok(batch_end_status)).await {
                     Ok(_) => {
                         // tps logging
@@ -108,17 +131,20 @@ impl FullnodeData for FullnodeDataService {
                         if base != new_base {
                             base = new_base;
 
-                            info!(
-                                batch_start_version = coordinator.current_version,
-                                batch_end_version = max_version,
-                                versions_processed = ma.sum(),
-                                tps = (ma.avg() * 1000.0) as u64,
-                                "[indexer-grpc] Sent batch successfully"
+                            log_grpc_step_fullnode(
+                                IndexerGrpcStep::FullnodeProcessedBatch,
+                                Some(coordinator.current_version as i64),
+                                Some(max_version as i64),
+                                None,
+                                Some(highest_known_version as i64),
+                                Some(ma.avg() * 1000.0),
+                                Some(start_time.elapsed().as_secs_f64()),
+                                Some((max_version - coordinator.current_version + 1) as i64),
                             );
                         }
                     },
                     Err(_) => {
-                        aptos_logger::warn!("[indexer-grpc] Unable to send end batch status");
+                        aptos_logger::warn!("[Indexer Fullnode] Unable to send end batch status");
                         break;
                     },
                 }

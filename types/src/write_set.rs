@@ -5,15 +5,18 @@
 //! For each transaction the VM executes, the VM will output a `WriteSet` that contains each access
 //! path it updates. For each access path, the VM can either give its new value or delete it.
 
-use crate::state_store::{
-    state_key::StateKey,
-    state_value::{StateValue, StateValueMetadata, StateValueMetadataKind},
+use crate::{
+    state_store::{
+        state_key::StateKey,
+        state_value::{PersistedStateValueMetadata, StateValue, StateValueMetadata},
+    },
+    write_set::WriteOp::{Creation, Deletion, Modification},
 };
-use anyhow::{bail, Result};
+use anyhow::{bail, ensure, Result};
 use aptos_crypto_derive::{BCSCryptoHash, CryptoHasher};
 use bytes::Bytes;
 use once_cell::sync::Lazy;
-use serde::{Deserialize, Serialize};
+use serde::{Deserialize, Deserializer, Serialize, Serializer};
 use std::{
     collections::{btree_map, BTreeMap},
     fmt::Debug,
@@ -41,25 +44,96 @@ pub enum WriteOpKind {
     Deletion,
 }
 
-#[derive(Clone, Eq, Hash, PartialEq, Serialize, Deserialize)]
-pub enum WriteOp {
+#[derive(Serialize, Deserialize)]
+#[serde(rename = "WriteOp")]
+enum PersistedWriteOp {
     Creation(Bytes),
     Modification(Bytes),
     Deletion,
     CreationWithMetadata {
         data: Bytes,
-        metadata: StateValueMetadata,
+        metadata: PersistedStateValueMetadata,
     },
     ModificationWithMetadata {
         data: Bytes,
-        metadata: StateValueMetadata,
+        metadata: PersistedStateValueMetadata,
     },
     DeletionWithMetadata {
+        metadata: PersistedStateValueMetadata,
+    },
+}
+
+impl PersistedWriteOp {
+    fn into_in_mem_form(self) -> WriteOp {
+        use PersistedWriteOp::*;
+
+        match self {
+            Creation(data) => WriteOp::Creation {
+                data,
+                metadata: StateValueMetadata::none(),
+            },
+            Modification(data) => WriteOp::Modification {
+                data,
+                metadata: StateValueMetadata::none(),
+            },
+            Deletion => WriteOp::Deletion {
+                metadata: StateValueMetadata::none(),
+            },
+            CreationWithMetadata { data, metadata } => WriteOp::Creation {
+                data,
+                metadata: metadata.into_in_mem_form(),
+            },
+            ModificationWithMetadata { data, metadata } => WriteOp::Modification {
+                data,
+                metadata: metadata.into_in_mem_form(),
+            },
+            DeletionWithMetadata { metadata } => WriteOp::Deletion {
+                metadata: metadata.into_in_mem_form(),
+            },
+        }
+    }
+}
+
+#[derive(Clone, Eq, Hash, PartialEq)]
+pub enum WriteOp {
+    Creation {
+        data: Bytes,
+        metadata: StateValueMetadata,
+    },
+    Modification {
+        data: Bytes,
+        metadata: StateValueMetadata,
+    },
+    Deletion {
         metadata: StateValueMetadata,
     },
 }
 
 impl WriteOp {
+    fn to_persistable(&self) -> PersistedWriteOp {
+        use PersistedWriteOp::*;
+
+        let metadata = self.metadata().clone().into_persistable();
+        match metadata {
+            None => match self {
+                WriteOp::Creation { data, .. } => Creation(data.clone()),
+                WriteOp::Modification { data, .. } => Modification(data.clone()),
+                WriteOp::Deletion { .. } => Deletion,
+            },
+            Some(metadata) => match self {
+                WriteOp::Creation { data, .. } => CreationWithMetadata {
+                    data: data.clone(),
+                    metadata,
+                },
+                WriteOp::Modification { data, .. } => ModificationWithMetadata {
+                    data: data.clone(),
+                    metadata,
+                },
+                WriteOp::Deletion { .. } => DeletionWithMetadata { metadata },
+            },
+        }
+    }
+
     /// Merges two write ops on the same state item.
     ///
     /// returns `false` if the result indicates no op has happened -- that's when the first op
@@ -67,79 +141,167 @@ impl WriteOp {
     pub fn squash(op: &mut Self, other: Self) -> Result<bool> {
         use WriteOp::*;
 
-        // n.b. With write sets from multiple sessions being squashed together, it's possible
-        //   to see two ops carrying different metadata (or one with it the other without)
-        //   due to deleting in one session and recreating in another. The original metadata
-        //   shouldn't change due to the squash.
-        // And because the deposit or refund happens after all squashing is finished, it's
-        // not a concern of fairness.
-
         match (&op, other) {
-            (
-                Modification(_)
-                | ModificationWithMetadata { .. }
-                | Creation(_)
-                | CreationWithMetadata { .. },
-                Creation(_) | CreationWithMetadata {..},
-            ) // create existing
-            | (
-                Deletion | DeletionWithMetadata {..},
-                Deletion | DeletionWithMetadata {..} | Modification(_) | ModificationWithMetadata { .. },
-            ) // delete or modify already deleted
+            (Modification { .. } | Creation { .. }, Creation { .. }) // create existing
+            | (Deletion { .. }, Modification { .. } | Deletion { .. }) // delete or modify already deleted
             => {
-                bail!(
-                    "The given change sets cannot be squashed",
-                )
+                bail!("The given change sets cannot be squashed")
             },
-            (Modification(_), Modification(data) | ModificationWithMetadata {data, ..}) => *op = Modification(data),
-            (ModificationWithMetadata{metadata, ..}, Modification(data) | ModificationWithMetadata{data, ..}) => {
-                *op = ModificationWithMetadata{data, metadata: metadata.clone()}
+            (Creation {metadata: old_meta, .. } , Modification {data, metadata}) => {
+                Self::ensure_metadata_compatible(old_meta, &metadata)?;
+
+                *op = Creation {
+                    data,
+                    metadata,
+                };
             },
-            (Creation(_), Modification(data) | ModificationWithMetadata {data, ..} ) => {
-                *op = Creation(data)
+            (Modification{metadata: old_meta, .. } , Modification {data, metadata}) => {
+                Self::ensure_metadata_compatible(old_meta, &metadata)?;
+
+                *op = Modification {
+                    data,
+                    metadata,
+                };
             },
-            (CreationWithMetadata{metadata , ..}, Modification(data) | ModificationWithMetadata{data, ..}) => {
-                *op = CreationWithMetadata{data, metadata: metadata.clone()}
+            (Modification {metadata: old_meta, ..}, Deletion {metadata}) => {
+                Self::ensure_metadata_compatible(old_meta, &metadata)?;
+
+                *op = Deletion {
+                    metadata,
+                }
             },
-            (Modification(_) , Deletion | DeletionWithMetadata {..}) => {
-                *op = Deletion
+            (Deletion {metadata}, Creation {data, ..}) => {
+                // n.b. With write sets from multiple sessions being squashed together, it's possible
+                //   to see two ops carrying different metadata (or one with it the other without)
+                //   due to deleting in one session and recreating in another. The original metadata
+                //   shouldn't change due to the squash.
+                // And because the deposit or refund happens after all squashing is finished, it's
+                // not a concern of fairness.
+                *op = Modification {
+                    data,
+                    metadata: metadata.clone(),
+                }
             },
-            (ModificationWithMetadata{metadata, ..} , Deletion | DeletionWithMetadata {..}) => {
-                *op = DeletionWithMetadata {metadata: metadata.clone()}
-            },
-            (Deletion, Creation(data) | CreationWithMetadata {data, ..}) => {
-                *op = Modification(data)
-            },
-            (DeletionWithMetadata {metadata, ..}, Creation(data) | CreationWithMetadata {data, ..}) => {
-                *op = ModificationWithMetadata{data, metadata: metadata.clone()}
-            },
-            (Creation(_) | CreationWithMetadata {..}, Deletion | DeletionWithMetadata {..}) => {
+            (Creation { metadata: old_meta, .. }, Deletion { metadata }) => {
+                Self::ensure_metadata_compatible(old_meta, &metadata)?;
+
                 return Ok(false)
             },
         }
         Ok(true)
     }
 
+    fn ensure_metadata_compatible(
+        old: &StateValueMetadata,
+        new: &StateValueMetadata,
+    ) -> Result<()> {
+        // Write ops shouldn't be squashed after the second one is charged for fees, which might
+        // result in metadata change (bytes_deposit increase, for example).
+        ensure!(
+            old == new,
+            "Squashing incompatible metadata: old:{old:?}, new:{new:?}",
+        );
+        Ok(())
+    }
+
     pub fn bytes(&self) -> Option<&Bytes> {
         use WriteOp::*;
 
         match self {
-            Creation(data)
-            | CreationWithMetadata { data, .. }
-            | Modification(data)
-            | ModificationWithMetadata { data, .. } => Some(data),
-            Deletion | DeletionWithMetadata { .. } => None,
+            Creation { data, .. } | Modification { data, .. } => Some(data),
+            Deletion { .. } => None,
         }
     }
 
-    pub fn metadata(&self) -> Option<&StateValueMetadata> {
+    pub fn size(&self) -> usize {
         use WriteOp::*;
 
         match self {
-            Creation(_) | Modification(_) | Deletion => None,
-            CreationWithMetadata { metadata, .. }
-            | ModificationWithMetadata { metadata, .. }
-            | DeletionWithMetadata { metadata, .. } => Some(metadata),
+            Creation { data, .. } | Modification { data, .. } => data.len(),
+            Deletion { .. } => 0,
+        }
+    }
+
+    pub fn metadata(&self) -> &StateValueMetadata {
+        use WriteOp::*;
+
+        match self {
+            Creation { metadata, .. } | Modification { metadata, .. } | Deletion { metadata } => {
+                metadata
+            },
+        }
+    }
+
+    pub fn get_metadata_mut(&mut self) -> &mut StateValueMetadata {
+        use WriteOp::*;
+
+        match self {
+            Creation { metadata, .. } | Modification { metadata, .. } | Deletion { metadata } => {
+                metadata
+            },
+        }
+    }
+
+    pub fn into_metadata(self) -> StateValueMetadata {
+        match self {
+            Creation { metadata, .. } | Modification { metadata, .. } | Deletion { metadata } => {
+                metadata
+            },
+        }
+    }
+
+    pub fn legacy_creation(data: Bytes) -> Self {
+        Self::Creation {
+            data,
+            metadata: StateValueMetadata::none(),
+        }
+    }
+
+    pub fn legacy_modification(data: Bytes) -> Self {
+        Self::Modification {
+            data,
+            metadata: StateValueMetadata::none(),
+        }
+    }
+
+    pub fn legacy_deletion() -> Self {
+        Self::Deletion {
+            metadata: StateValueMetadata::none(),
+        }
+    }
+}
+
+impl<'de> Deserialize<'de> for WriteOp {
+    fn deserialize<D>(deserializer: D) -> std::result::Result<Self, D::Error>
+    where
+        D: Deserializer<'de>,
+    {
+        PersistedWriteOp::deserialize(deserializer).map(|persisted| persisted.into_in_mem_form())
+    }
+}
+
+impl Serialize for WriteOp {
+    fn serialize<S>(&self, serializer: S) -> std::result::Result<S::Ok, S::Error>
+    where
+        S: Serializer,
+    {
+        self.to_persistable().serialize(serializer)
+    }
+}
+
+pub enum WriteOpSize {
+    Creation { write_len: u64 },
+    Modification { write_len: u64 },
+    Deletion,
+}
+
+impl WriteOpSize {
+    pub fn write_len(&self) -> Option<u64> {
+        match self {
+            WriteOpSize::Creation { write_len } | WriteOpSize::Modification { write_len } => {
+                Some(*write_len)
+            },
+            WriteOpSize::Deletion => None,
         }
     }
 }
@@ -153,7 +315,7 @@ pub trait TransactionWrite: Debug {
     // Returns metadata that would be observed by a read following the 'self' write.
     // Provided as a separate method to avoid the clone in as_state_value method
     // (although default implementation below does just that).
-    fn as_state_value_metadata(&self) -> Option<StateValueMetadataKind> {
+    fn as_state_value_metadata(&self) -> Option<StateValueMetadata> {
         self.as_state_value()
             .map(|state_value| state_value.into_metadata())
     }
@@ -161,9 +323,10 @@ pub trait TransactionWrite: Debug {
     // Often, the contents of W:TransactionWrite are converted to Option<StateValue>, e.g.
     // to emulate reading from storage after W has been applied. However, in some contexts,
     // it is also helpful to convert a StateValue to a potential instance of W that would
-    // have the desired effect. This allows e.g. to store certain sentinel elements of
-    // type W in data-structures (happens in MVHashMap). If there are several instances of
-    // W that correspond to maybe_state_value, an arbitrary one may be provided.
+    // have the desired effect. This allows e.g. storing sentinel elements of type W in
+    // data-structures (notably in MVHashMap). The kind of W will be Modification and not
+    // Creation, but o.w. if there are several instances of W that correspond to the
+    // provided maybe_state_value, an arbitrary one may be provided.
     fn from_state_value(maybe_state_value: Option<StateValue>) -> Self;
 
     fn extract_raw_bytes(&self) -> Option<Bytes> {
@@ -193,12 +356,18 @@ pub trait TransactionWrite: Debug {
 
     fn set_bytes(&mut self, bytes: Bytes);
 
-    /// Convert a `self`, which was read (containing DelayedField exchanges) in a current
-    /// transaction, to a modification write, in which we can then exchange DelayedField
-    /// identifiers into their final values, to produce a write operation.
-    fn convert_read_to_modification(&self) -> Option<Self>
-    where
-        Self: Sized;
+    fn write_op_size(&self) -> WriteOpSize {
+        use WriteOpKind::*;
+        match self.write_op_kind() {
+            Creation => WriteOpSize::Creation {
+                write_len: self.bytes().unwrap().len() as u64,
+            },
+            Modification => WriteOpSize::Modification {
+                write_len: self.bytes().unwrap().len() as u64,
+            },
+            Deletion { .. } => WriteOpSize::Deletion,
+        }
+    }
 }
 
 impl TransactionWrite for WriteOp {
@@ -207,36 +376,32 @@ impl TransactionWrite for WriteOp {
     }
 
     fn as_state_value(&self) -> Option<StateValue> {
-        self.bytes().map(|bytes| match self.metadata() {
-            None => StateValue::new_legacy(bytes.clone()),
-            Some(metadata) => StateValue::new_with_metadata(bytes.clone(), metadata.clone()),
-        })
+        self.bytes()
+            .map(|bytes| StateValue::new_with_metadata(bytes.clone(), self.metadata().clone()))
     }
 
     // Note that even if WriteOp is DeletionWithMetadata, the method returns None, as a later
     // read would not read the metadata of the deletion op.
-    fn as_state_value_metadata(&self) -> Option<StateValueMetadataKind> {
-        self.bytes().map(|_| self.metadata().cloned())
+    fn as_state_value_metadata(&self) -> Option<StateValueMetadata> {
+        self.bytes().map(|_| self.metadata().clone())
     }
 
     fn from_state_value(maybe_state_value: Option<StateValue>) -> Self {
-        match maybe_state_value.map(|state_value| state_value.into()) {
-            None => WriteOp::Deletion,
-            Some((None, bytes)) => WriteOp::Creation(bytes),
-            Some((Some(metadata), bytes)) => WriteOp::CreationWithMetadata {
-                data: bytes,
-                metadata,
+        match maybe_state_value {
+            None => Self::legacy_deletion(),
+            Some(state_value) => {
+                let (metadata, data) = state_value.unpack();
+                Self::Modification { data, metadata }
             },
         }
     }
 
     fn write_op_kind(&self) -> WriteOpKind {
+        use WriteOpKind::*;
         match self {
-            WriteOp::Creation(_) | WriteOp::CreationWithMetadata { .. } => WriteOpKind::Creation,
-            WriteOp::Modification(_) | WriteOp::ModificationWithMetadata { .. } => {
-                WriteOpKind::Modification
-            },
-            WriteOp::Deletion | WriteOp::DeletionWithMetadata { .. } => WriteOpKind::Deletion,
+            WriteOp::Creation { .. } => Creation,
+            WriteOp::Modification { .. } => Modification,
+            WriteOp::Deletion { .. } => Deletion,
         }
     }
 
@@ -244,66 +409,34 @@ impl TransactionWrite for WriteOp {
         use WriteOp::*;
 
         match self {
-            Creation(data) | CreationWithMetadata { data, .. } => *data = bytes,
-            Modification(data) | ModificationWithMetadata { data, .. } => *data = bytes,
-            Deletion | DeletionWithMetadata { .. } => (),
-        }
-    }
-
-    fn convert_read_to_modification(&self) -> Option<Self> {
-        use WriteOp::*;
-
-        match self {
-            Creation(data) | Modification(data) => Some(Modification(data.clone())),
-            CreationWithMetadata { data, metadata }
-            | ModificationWithMetadata { data, metadata } => Some(ModificationWithMetadata {
-                data: data.clone(),
-                metadata: metadata.clone(),
-            }),
-            // Deletion don't have data to become modification.
-            Deletion | DeletionWithMetadata { .. } => None,
+            Creation { data, .. } | Modification { data, .. } => *data = bytes,
+            Deletion { .. } => (),
         }
     }
 }
 
+#[allow(clippy::format_collect)]
 impl std::fmt::Debug for WriteOp {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match self {
-            WriteOp::Modification(value) => write!(
+            Creation { data, metadata } => write!(
                 f,
-                "Modification({})",
-                value
-                    .iter()
-                    .map(|byte| format!("{:02x}", byte))
-                    .collect::<String>()
-            ),
-            WriteOp::Creation(value) => write!(
-                f,
-                "Creation({})",
-                value
-                    .iter()
-                    .map(|byte| format!("{:02x}", byte))
-                    .collect::<String>()
-            ),
-            WriteOp::Deletion => write!(f, "Deletion"),
-            WriteOp::CreationWithMetadata { data, metadata } => write!(
-                f,
-                "CreationWithMetadata({}, metadata:{:?})",
+                "Creation({}, metadata:{:?})",
                 data.iter()
                     .map(|byte| format!("{:02x}", byte))
                     .collect::<String>(),
                 metadata,
             ),
-            WriteOp::ModificationWithMetadata { data, metadata } => write!(
+            Modification { data, metadata } => write!(
                 f,
-                "ModificationWithMetadata({}, metadata:{:?})",
+                "Modification({}, metadata:{:?})",
                 data.iter()
                     .map(|byte| format!("{:02x}", byte))
                     .collect::<String>(),
                 metadata,
             ),
-            WriteOp::DeletionWithMetadata { metadata } => {
-                write!(f, "DeletionWithMetadata(metadata:{:?})", metadata,)
+            Deletion { metadata } => {
+                write!(f, "Deletion(metadata:{:?})", metadata,)
             },
         }
     }
@@ -390,7 +523,7 @@ impl WriteSetV0 {
             .write_set
             .insert(
                 TOTAL_SUPPLY_STATE_KEY.clone(),
-                WriteOp::Modification(bcs::to_bytes(&value).unwrap().into())
+                WriteOp::legacy_modification(bcs::to_bytes(&value).unwrap().into())
             )
             .is_some());
     }
@@ -462,7 +595,7 @@ impl WriteSetMut {
     }
 }
 
-impl ::std::iter::FromIterator<(StateKey, WriteOp)> for WriteSetMut {
+impl FromIterator<(StateKey, WriteOp)> for WriteSetMut {
     fn from_iter<I: IntoIterator<Item = (StateKey, WriteOp)>>(iter: I) -> Self {
         let mut ws = WriteSetMut::default();
         for write in iter {
@@ -483,7 +616,7 @@ impl<'a> IntoIterator for &'a WriteSet {
     }
 }
 
-impl ::std::iter::IntoIterator for WriteSet {
+impl IntoIterator for WriteSet {
     type IntoIter = btree_map::IntoIter<StateKey, WriteOp>;
     type Item = (StateKey, WriteOp);
 

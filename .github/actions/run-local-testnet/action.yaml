@@ -10,7 +10,7 @@ inputs:
     required: true
   WITH_INDEXER_API:
     description: "If true, run an indexer API as well"
-    default: "false"
+    required: true
 
 runs:
   using: composite
@@ -33,9 +33,9 @@ runs:
         --detach ${{ inputs.GCP_DOCKER_ARTIFACT_REPO }}/tools:${{ inputs.IMAGE_TAG }} \
         aptos node run-local-testnet \
         --test-dir /testnet \
-        ${{ inputs.WITH_INDEXER_API == 'true' && '--with-indexer-api' }}
-      shell: bash
+        ${{ inputs.WITH_INDEXER_API == 'true' && '--with-indexer-api' || ' ' }}
 
+      shell: bash
 
     # Install node + npm.
     - uses: actions/setup-node@v3

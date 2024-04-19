@@ -1,0 +1,7 @@
+
+Diagnostics:
+error: friend modules of `0x3::M` must have the same address, but the declared friend module `0x2::M` has a different address
+  ┌─ tests/checking/friends/v1-tests/friend_decl_out_of_account_addr.move:7:5
+  │
+7 │     friend 0x2::M;
+  │     ^^^^^^^^^^^^^^

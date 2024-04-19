@@ -1,5 +1,5 @@
 
-<a name="0x1_smart_vector"></a>
+<a id="0x1_smart_vector"></a>
 
 # Module `0x1::smart_vector`
 
@@ -71,7 +71,7 @@
 
 
 
-<a name="0x1_smart_vector_SmartVector"></a>
+<a id="0x1_smart_vector_SmartVector"></a>
 
 ## Struct `SmartVector`
 
@@ -119,12 +119,12 @@ so small that inline_vec vector can hold all the data.
 
 </details>
 
-<a name="@Constants_0"></a>
+<a id="@Constants_0"></a>
 
 ## Constants
 
 
-<a name="0x1_smart_vector_EINDEX_OUT_OF_BOUNDS"></a>
+<a id="0x1_smart_vector_EINDEX_OUT_OF_BOUNDS"></a>
 
 Vector index is out of bounds
 
@@ -134,7 +134,7 @@ Vector index is out of bounds
 
 
 
-<a name="0x1_smart_vector_EVECTOR_EMPTY"></a>
+<a id="0x1_smart_vector_EVECTOR_EMPTY"></a>
 
 Cannot pop back from an empty vector
 
@@ -144,7 +144,7 @@ Cannot pop back from an empty vector
 
 
 
-<a name="0x1_smart_vector_EVECTOR_NOT_EMPTY"></a>
+<a id="0x1_smart_vector_EVECTOR_NOT_EMPTY"></a>
 
 Cannot destroy a non-empty vector
 
@@ -154,7 +154,7 @@ Cannot destroy a non-empty vector
 
 
 
-<a name="0x1_smart_vector_EZERO_BUCKET_SIZE"></a>
+<a id="0x1_smart_vector_EZERO_BUCKET_SIZE"></a>
 
 bucket_size cannot be 0
 
@@ -164,7 +164,7 @@ bucket_size cannot be 0
 
 
 
-<a name="0x1_smart_vector_ESMART_VECTORS_LENGTH_MISMATCH"></a>
+<a id="0x1_smart_vector_ESMART_VECTORS_LENGTH_MISMATCH"></a>
 
 The length of the smart vectors are not equal.
 
@@ -174,7 +174,7 @@ The length of the smart vectors are not equal.
 
 
 
-<a name="0x1_smart_vector_new"></a>
+<a id="0x1_smart_vector_new"></a>
 
 ## Function `new`
 
@@ -202,7 +202,7 @@ This is exactly the same as empty() but is more standardized as all other data s
 
 </details>
 
-<a name="0x1_smart_vector_empty"></a>
+<a id="0x1_smart_vector_empty"></a>
 
 ## Function `empty`
 
@@ -234,7 +234,7 @@ inaccurate.
 
 </details>
 
-<a name="0x1_smart_vector_empty_with_config"></a>
+<a id="0x1_smart_vector_empty_with_config"></a>
 
 ## Function `empty_with_config`
 
@@ -266,7 +266,7 @@ When inline_capacity = 0, SmartVector degrades to a wrapper of BigVector.
 
 </details>
 
-<a name="0x1_smart_vector_singleton"></a>
+<a id="0x1_smart_vector_singleton"></a>
 
 ## Function `singleton`
 
@@ -293,7 +293,7 @@ Create a vector of length 1 containing the passed in T.
 
 </details>
 
-<a name="0x1_smart_vector_destroy_empty"></a>
+<a id="0x1_smart_vector_destroy_empty"></a>
 
 ## Function `destroy_empty`
 
@@ -322,7 +322,7 @@ Aborts if <code>v</code> is not empty.
 
 </details>
 
-<a name="0x1_smart_vector_destroy"></a>
+<a id="0x1_smart_vector_destroy"></a>
 
 ## Function `destroy`
 
@@ -348,7 +348,7 @@ Destroy a vector completely when T has <code>drop</code>.
 
 </details>
 
-<a name="0x1_smart_vector_clear"></a>
+<a id="0x1_smart_vector_clear"></a>
 
 ## Function `clear`
 
@@ -376,7 +376,7 @@ Clear a vector completely when T has <code>drop</code>.
 
 </details>
 
-<a name="0x1_smart_vector_borrow"></a>
+<a id="0x1_smart_vector_borrow"></a>
 
 ## Function `borrow`
 
@@ -408,7 +408,7 @@ Aborts if <code>i</code> is out of bounds.
 
 </details>
 
-<a name="0x1_smart_vector_borrow_mut"></a>
+<a id="0x1_smart_vector_borrow_mut"></a>
 
 ## Function `borrow_mut`
 
@@ -440,7 +440,7 @@ Aborts if <code>i</code> is out of bounds.
 
 </details>
 
-<a name="0x1_smart_vector_append"></a>
+<a id="0x1_smart_vector_append"></a>
 
 ## Function `append`
 
@@ -478,7 +478,7 @@ Disclaimer: This function may be costly. Use it at your own discretion.
 
 </details>
 
-<a name="0x1_smart_vector_add_all"></a>
+<a id="0x1_smart_vector_add_all"></a>
 
 ## Function `add_all`
 
@@ -503,7 +503,7 @@ Add multiple values to the vector at once.
 
 </details>
 
-<a name="0x1_smart_vector_to_vector"></a>
+<a id="0x1_smart_vector_to_vector"></a>
 
 ## Function `to_vector`
 
@@ -535,7 +535,7 @@ Disclaimer: This function may be costly as the smart vector may be huge in size.
 
 </details>
 
-<a name="0x1_smart_vector_push_back"></a>
+<a id="0x1_smart_vector_push_back"></a>
 
 ## Function `push_back`
 
@@ -581,7 +581,7 @@ This operation will cost more gas when it adds new bucket.
 
 </details>
 
-<a name="0x1_smart_vector_pop_back"></a>
+<a id="0x1_smart_vector_pop_back"></a>
 
 ## Function `pop_back`
 
@@ -620,7 +620,7 @@ Aborts if <code>v</code> is empty.
 
 </details>
 
-<a name="0x1_smart_vector_remove"></a>
+<a id="0x1_smart_vector_remove"></a>
 
 ## Function `remove`
 
@@ -662,7 +662,7 @@ Disclaimer: This function may be costly. Use it at your own discretion.
 
 </details>
 
-<a name="0x1_smart_vector_swap_remove"></a>
+<a id="0x1_smart_vector_swap_remove"></a>
 
 ## Function `swap_remove`
 
@@ -715,7 +715,7 @@ Aborts if <code>i</code> is out of bounds.
 
 </details>
 
-<a name="0x1_smart_vector_swap"></a>
+<a id="0x1_smart_vector_swap"></a>
 
 ## Function `swap`
 
@@ -760,7 +760,7 @@ for v.
 
 </details>
 
-<a name="0x1_smart_vector_reverse"></a>
+<a id="0x1_smart_vector_reverse"></a>
 
 ## Function `reverse`
 
@@ -813,7 +813,7 @@ Disclaimer: This function may be costly. Use it at your own discretion.
 
 </details>
 
-<a name="0x1_smart_vector_index_of"></a>
+<a id="0x1_smart_vector_index_of"></a>
 
 ## Function `index_of`
 
@@ -848,7 +848,7 @@ Disclaimer: This function may be costly. Use it at your own discretion.
 
 </details>
 
-<a name="0x1_smart_vector_contains"></a>
+<a id="0x1_smart_vector_contains"></a>
 
 ## Function `contains`
 
@@ -876,7 +876,7 @@ Disclaimer: This function may be costly. Use it at your own discretion.
 
 </details>
 
-<a name="0x1_smart_vector_length"></a>
+<a id="0x1_smart_vector_length"></a>
 
 ## Function `length`
 
@@ -905,7 +905,7 @@ Return the length of the vector.
 
 </details>
 
-<a name="0x1_smart_vector_is_empty"></a>
+<a id="0x1_smart_vector_is_empty"></a>
 
 ## Function `is_empty`
 
@@ -930,14 +930,14 @@ Return <code><b>true</b></code> if the vector <code>v</code> has no Ts and <code
 
 </details>
 
-<a name="0x1_smart_vector_for_each"></a>
+<a id="0x1_smart_vector_for_each"></a>
 
 ## Function `for_each`
 
 Apply the function to each T in the vector, consuming it.
 
 
-<pre><code><b>public</b> <b>fun</b> <a href="smart_vector.md#0x1_smart_vector_for_each">for_each</a>&lt;T: store&gt;(v: <a href="smart_vector.md#0x1_smart_vector_SmartVector">smart_vector::SmartVector</a>&lt;T&gt;, f: |T|())
+<pre><code><b>public</b> <b>fun</b> <a href="smart_vector.md#0x1_smart_vector_for_each">for_each</a>&lt;T: store&gt;(v: <a href="smart_vector.md#0x1_smart_vector_SmartVector">smart_vector::SmartVector</a>&lt;T&gt;, f: |T|)
 </code></pre>
 
 
@@ -956,14 +956,14 @@ Apply the function to each T in the vector, consuming it.
 
 </details>
 
-<a name="0x1_smart_vector_for_each_reverse"></a>
+<a id="0x1_smart_vector_for_each_reverse"></a>
 
 ## Function `for_each_reverse`
 
 Apply the function to each T in the vector, consuming it.
 
 
-<pre><code><b>public</b> <b>fun</b> <a href="smart_vector.md#0x1_smart_vector_for_each_reverse">for_each_reverse</a>&lt;T&gt;(v: <a href="smart_vector.md#0x1_smart_vector_SmartVector">smart_vector::SmartVector</a>&lt;T&gt;, f: |T|())
+<pre><code><b>public</b> <b>fun</b> <a href="smart_vector.md#0x1_smart_vector_for_each_reverse">for_each_reverse</a>&lt;T&gt;(v: <a href="smart_vector.md#0x1_smart_vector_SmartVector">smart_vector::SmartVector</a>&lt;T&gt;, f: |T|)
 </code></pre>
 
 
@@ -986,14 +986,14 @@ Apply the function to each T in the vector, consuming it.
 
 </details>
 
-<a name="0x1_smart_vector_for_each_ref"></a>
+<a id="0x1_smart_vector_for_each_ref"></a>
 
 ## Function `for_each_ref`
 
 Apply the function to a reference of each T in the vector.
 
 
-<pre><code><b>public</b> <b>fun</b> <a href="smart_vector.md#0x1_smart_vector_for_each_ref">for_each_ref</a>&lt;T&gt;(v: &<a href="smart_vector.md#0x1_smart_vector_SmartVector">smart_vector::SmartVector</a>&lt;T&gt;, f: |&T|())
+<pre><code><b>public</b> <b>fun</b> <a href="smart_vector.md#0x1_smart_vector_for_each_ref">for_each_ref</a>&lt;T&gt;(v: &<a href="smart_vector.md#0x1_smart_vector_SmartVector">smart_vector::SmartVector</a>&lt;T&gt;, f: |&T|)
 </code></pre>
 
 
@@ -1016,14 +1016,14 @@ Apply the function to a reference of each T in the vector.
 
 </details>
 
-<a name="0x1_smart_vector_for_each_mut"></a>
+<a id="0x1_smart_vector_for_each_mut"></a>
 
 ## Function `for_each_mut`
 
 Apply the function to a mutable reference to each T in the vector.
 
 
-<pre><code><b>public</b> <b>fun</b> <a href="smart_vector.md#0x1_smart_vector_for_each_mut">for_each_mut</a>&lt;T&gt;(v: &<b>mut</b> <a href="smart_vector.md#0x1_smart_vector_SmartVector">smart_vector::SmartVector</a>&lt;T&gt;, f: |&<b>mut</b> T|())
+<pre><code><b>public</b> <b>fun</b> <a href="smart_vector.md#0x1_smart_vector_for_each_mut">for_each_mut</a>&lt;T&gt;(v: &<b>mut</b> <a href="smart_vector.md#0x1_smart_vector_SmartVector">smart_vector::SmartVector</a>&lt;T&gt;, f: |&<b>mut</b> T|)
 </code></pre>
 
 
@@ -1046,14 +1046,14 @@ Apply the function to a mutable reference to each T in the vector.
 
 </details>
 
-<a name="0x1_smart_vector_enumerate_ref"></a>
+<a id="0x1_smart_vector_enumerate_ref"></a>
 
 ## Function `enumerate_ref`
 
 Apply the function to a reference of each T in the vector with its index.
 
 
-<pre><code><b>public</b> <b>fun</b> <a href="smart_vector.md#0x1_smart_vector_enumerate_ref">enumerate_ref</a>&lt;T&gt;(v: &<a href="smart_vector.md#0x1_smart_vector_SmartVector">smart_vector::SmartVector</a>&lt;T&gt;, f: |(u64, &T)|())
+<pre><code><b>public</b> <b>fun</b> <a href="smart_vector.md#0x1_smart_vector_enumerate_ref">enumerate_ref</a>&lt;T&gt;(v: &<a href="smart_vector.md#0x1_smart_vector_SmartVector">smart_vector::SmartVector</a>&lt;T&gt;, f: |(u64, &T)|)
 </code></pre>
 
 
@@ -1076,14 +1076,14 @@ Apply the function to a reference of each T in the vector with its index.
 
 </details>
 
-<a name="0x1_smart_vector_enumerate_mut"></a>
+<a id="0x1_smart_vector_enumerate_mut"></a>
 
 ## Function `enumerate_mut`
 
 Apply the function to a mutable reference of each T in the vector with its index.
 
 
-<pre><code><b>public</b> <b>fun</b> <a href="smart_vector.md#0x1_smart_vector_enumerate_mut">enumerate_mut</a>&lt;T&gt;(v: &<b>mut</b> <a href="smart_vector.md#0x1_smart_vector_SmartVector">smart_vector::SmartVector</a>&lt;T&gt;, f: |(u64, &<b>mut</b> T)|())
+<pre><code><b>public</b> <b>fun</b> <a href="smart_vector.md#0x1_smart_vector_enumerate_mut">enumerate_mut</a>&lt;T&gt;(v: &<b>mut</b> <a href="smart_vector.md#0x1_smart_vector_SmartVector">smart_vector::SmartVector</a>&lt;T&gt;, f: |(u64, &<b>mut</b> T)|)
 </code></pre>
 
 
@@ -1106,7 +1106,7 @@ Apply the function to a mutable reference of each T in the vector with its index
 
 </details>
 
-<a name="0x1_smart_vector_fold"></a>
+<a id="0x1_smart_vector_fold"></a>
 
 ## Function `fold`
 
@@ -1138,7 +1138,7 @@ Fold the function over the Ts. For example, <code><a href="smart_vector.md#0x1_s
 
 </details>
 
-<a name="0x1_smart_vector_foldr"></a>
+<a id="0x1_smart_vector_foldr"></a>
 
 ## Function `foldr`
 
@@ -1170,7 +1170,7 @@ Fold right like fold above but working right to left. For example, <code><a href
 
 </details>
 
-<a name="0x1_smart_vector_map_ref"></a>
+<a id="0x1_smart_vector_map_ref"></a>
 
 ## Function `map_ref`
 
@@ -1201,7 +1201,7 @@ original vector.
 
 </details>
 
-<a name="0x1_smart_vector_map"></a>
+<a id="0x1_smart_vector_map"></a>
 
 ## Function `map`
 
@@ -1231,7 +1231,7 @@ Map the function over the Ts of the vector, producing a new vector.
 
 </details>
 
-<a name="0x1_smart_vector_filter"></a>
+<a id="0x1_smart_vector_filter"></a>
 
 ## Function `filter`
 
@@ -1263,13 +1263,13 @@ Filter the vector using the boolean function, removing all Ts for which <code>p(
 
 </details>
 
-<a name="0x1_smart_vector_zip"></a>
+<a id="0x1_smart_vector_zip"></a>
 
 ## Function `zip`
 
 
 
-<pre><code><b>public</b> <b>fun</b> <a href="smart_vector.md#0x1_smart_vector_zip">zip</a>&lt;T1: store, T2: store&gt;(v1: <a href="smart_vector.md#0x1_smart_vector_SmartVector">smart_vector::SmartVector</a>&lt;T1&gt;, v2: <a href="smart_vector.md#0x1_smart_vector_SmartVector">smart_vector::SmartVector</a>&lt;T2&gt;, f: |(T1, T2)|())
+<pre><code><b>public</b> <b>fun</b> <a href="smart_vector.md#0x1_smart_vector_zip">zip</a>&lt;T1: store, T2: store&gt;(v1: <a href="smart_vector.md#0x1_smart_vector_SmartVector">smart_vector::SmartVector</a>&lt;T1&gt;, v2: <a href="smart_vector.md#0x1_smart_vector_SmartVector">smart_vector::SmartVector</a>&lt;T2&gt;, f: |(T1, T2)|)
 </code></pre>
 
 
@@ -1290,7 +1290,7 @@ Filter the vector using the boolean function, removing all Ts for which <code>p(
 
 </details>
 
-<a name="0x1_smart_vector_zip_reverse"></a>
+<a id="0x1_smart_vector_zip_reverse"></a>
 
 ## Function `zip_reverse`
 
@@ -1298,7 +1298,7 @@ Apply the function to each pair of elements in the two given vectors in the reve
 This errors out if the vectors are not of the same length.
 
 
-<pre><code><b>public</b> <b>fun</b> <a href="smart_vector.md#0x1_smart_vector_zip_reverse">zip_reverse</a>&lt;T1, T2&gt;(v1: <a href="smart_vector.md#0x1_smart_vector_SmartVector">smart_vector::SmartVector</a>&lt;T1&gt;, v2: <a href="smart_vector.md#0x1_smart_vector_SmartVector">smart_vector::SmartVector</a>&lt;T2&gt;, f: |(T1, T2)|())
+<pre><code><b>public</b> <b>fun</b> <a href="smart_vector.md#0x1_smart_vector_zip_reverse">zip_reverse</a>&lt;T1, T2&gt;(v1: <a href="smart_vector.md#0x1_smart_vector_SmartVector">smart_vector::SmartVector</a>&lt;T1&gt;, v2: <a href="smart_vector.md#0x1_smart_vector_SmartVector">smart_vector::SmartVector</a>&lt;T2&gt;, f: |(T1, T2)|)
 </code></pre>
 
 
@@ -1329,7 +1329,7 @@ This errors out if the vectors are not of the same length.
 
 </details>
 
-<a name="0x1_smart_vector_zip_ref"></a>
+<a id="0x1_smart_vector_zip_ref"></a>
 
 ## Function `zip_ref`
 
@@ -1337,7 +1337,7 @@ Apply the function to the references of each pair of elements in the two given v
 This errors out if the vectors are not of the same length.
 
 
-<pre><code><b>public</b> <b>fun</b> <a href="smart_vector.md#0x1_smart_vector_zip_ref">zip_ref</a>&lt;T1, T2&gt;(v1: &<a href="smart_vector.md#0x1_smart_vector_SmartVector">smart_vector::SmartVector</a>&lt;T1&gt;, v2: &<a href="smart_vector.md#0x1_smart_vector_SmartVector">smart_vector::SmartVector</a>&lt;T2&gt;, f: |(&T1, &T2)|())
+<pre><code><b>public</b> <b>fun</b> <a href="smart_vector.md#0x1_smart_vector_zip_ref">zip_ref</a>&lt;T1, T2&gt;(v1: &<a href="smart_vector.md#0x1_smart_vector_SmartVector">smart_vector::SmartVector</a>&lt;T1&gt;, v2: &<a href="smart_vector.md#0x1_smart_vector_SmartVector">smart_vector::SmartVector</a>&lt;T2&gt;, f: |(&T1, &T2)|)
 </code></pre>
 
 
@@ -1367,7 +1367,7 @@ This errors out if the vectors are not of the same length.
 
 </details>
 
-<a name="0x1_smart_vector_zip_mut"></a>
+<a id="0x1_smart_vector_zip_mut"></a>
 
 ## Function `zip_mut`
 
@@ -1375,7 +1375,7 @@ Apply the function to mutable references to each pair of elements in the two giv
 This errors out if the vectors are not of the same length.
 
 
-<pre><code><b>public</b> <b>fun</b> <a href="smart_vector.md#0x1_smart_vector_zip_mut">zip_mut</a>&lt;T1, T2&gt;(v1: &<b>mut</b> <a href="smart_vector.md#0x1_smart_vector_SmartVector">smart_vector::SmartVector</a>&lt;T1&gt;, v2: &<b>mut</b> <a href="smart_vector.md#0x1_smart_vector_SmartVector">smart_vector::SmartVector</a>&lt;T2&gt;, f: |(&<b>mut</b> T1, &<b>mut</b> T2)|())
+<pre><code><b>public</b> <b>fun</b> <a href="smart_vector.md#0x1_smart_vector_zip_mut">zip_mut</a>&lt;T1, T2&gt;(v1: &<b>mut</b> <a href="smart_vector.md#0x1_smart_vector_SmartVector">smart_vector::SmartVector</a>&lt;T1&gt;, v2: &<b>mut</b> <a href="smart_vector.md#0x1_smart_vector_SmartVector">smart_vector::SmartVector</a>&lt;T2&gt;, f: |(&<b>mut</b> T1, &<b>mut</b> T2)|)
 </code></pre>
 
 
@@ -1405,7 +1405,7 @@ This errors out if the vectors are not of the same length.
 
 </details>
 
-<a name="0x1_smart_vector_zip_map"></a>
+<a id="0x1_smart_vector_zip_map"></a>
 
 ## Function `zip_map`
 
@@ -1440,7 +1440,7 @@ Map the function over the element pairs of the two vectors, producing a new vect
 
 </details>
 
-<a name="0x1_smart_vector_zip_map_ref"></a>
+<a id="0x1_smart_vector_zip_map_ref"></a>
 
 ## Function `zip_map_ref`
 
@@ -1476,12 +1476,12 @@ values without modifying the original vectors.
 
 </details>
 
-<a name="@Specification_1"></a>
+<a id="@Specification_1"></a>
 
 ## Specification
 
 
-<a name="@Specification_1_SmartVector"></a>
+<a id="@Specification_1_SmartVector"></a>
 
 ### Struct `SmartVector`
 
@@ -1530,7 +1530,7 @@ values without modifying the original vectors.
 
 
 
-<a name="@Specification_1_empty"></a>
+<a id="@Specification_1_empty"></a>
 
 ### Function `empty`
 
@@ -1547,7 +1547,7 @@ values without modifying the original vectors.
 
 
 
-<a name="@Specification_1_empty_with_config"></a>
+<a id="@Specification_1_empty_with_config"></a>
 
 ### Function `empty_with_config`
 
@@ -1563,7 +1563,7 @@ values without modifying the original vectors.
 
 
 
-<a name="@Specification_1_destroy_empty"></a>
+<a id="@Specification_1_destroy_empty"></a>
 
 ### Function `destroy_empty`
 
@@ -1581,7 +1581,7 @@ values without modifying the original vectors.
 
 
 
-<a name="@Specification_1_borrow"></a>
+<a id="@Specification_1_borrow"></a>
 
 ### Function `borrow`
 
@@ -1600,7 +1600,7 @@ values without modifying the original vectors.
 
 
 
-<a name="@Specification_1_append"></a>
+<a id="@Specification_1_append"></a>
 
 ### Function `append`
 
@@ -1616,7 +1616,7 @@ values without modifying the original vectors.
 
 
 
-<a name="@Specification_1_push_back"></a>
+<a id="@Specification_1_push_back"></a>
 
 ### Function `push_back`
 
@@ -1632,7 +1632,7 @@ values without modifying the original vectors.
 
 
 
-<a name="@Specification_1_pop_back"></a>
+<a id="@Specification_1_pop_back"></a>
 
 ### Function `pop_back`
 
@@ -1656,7 +1656,7 @@ values without modifying the original vectors.
 
 
 
-<a name="@Specification_1_remove"></a>
+<a id="@Specification_1_remove"></a>
 
 ### Function `remove`
 
@@ -1672,7 +1672,7 @@ values without modifying the original vectors.
 
 
 
-<a name="@Specification_1_swap_remove"></a>
+<a id="@Specification_1_swap_remove"></a>
 
 ### Function `swap_remove`
 
@@ -1693,7 +1693,7 @@ values without modifying the original vectors.
 
 
 
-<a name="@Specification_1_swap"></a>
+<a id="@Specification_1_swap"></a>
 
 ### Function `swap`
 
@@ -1709,7 +1709,7 @@ values without modifying the original vectors.
 
 
 
-<a name="@Specification_1_length"></a>
+<a id="@Specification_1_length"></a>
 
 ### Function `length`
 

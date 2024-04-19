@@ -24,7 +24,7 @@ jobs:
   rust-unit-coverage:
     if: |
       contains(github.event.pull_request.labels.*.name, 'CICD:run-coverage') ||
-      ${{ github.event_name == 'schedule' && github.ref_name == 'main' }}
+      (github.event_name == 'schedule' && github.ref_name == 'main')
     # Note the tests run slowly due to instrutmentation. It takes CI 10 hrs
     timeout-minutes: 720
     runs-on: high-perf-docker
@@ -49,7 +49,7 @@ jobs:
   rust-smoke-coverage:
     if: |
       contains(github.event.pull_request.labels.*.name, 'CICD:run-coverage') ||
-      ${{ github.event_name == 'schedule' && github.ref_name == 'main' }}
+      (github.event_name == 'schedule' && github.ref_name == 'main')
     timeout-minutes: 240
     runs-on: high-perf-docker
     steps:
@@ -71,9 +71,13 @@ jobs:
           path: lcov_smoke.info
 
   upload-to-codecov:
-    if: (contains(github.event.pull_request.labels.*.name, 'CICD:run-coverage') || ${{ github.event_name }} == 'schedule') && !cancelled()
+    if: |
+      contains(github.event.pull_request.labels.*.name, 'CICD:run-coverage') ||
+      (github.event_name == 'schedule' && github.ref_name == 'main')
+      && !cancelled()
     needs: [ rust-unit-coverage, rust-smoke-coverage ]
     runs-on: ubuntu-latest
+    continue-on-error: true # Don't fail if the codecov upload fails
     steps:
       - uses: actions/checkout@v3
       - uses: actions/download-artifact@v3

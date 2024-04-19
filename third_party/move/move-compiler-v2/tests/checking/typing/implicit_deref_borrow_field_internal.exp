@@ -1,13 +1,18 @@
 
 Diagnostics:
-error: field `f` of struct `X::S` is private to its module
-   ┌─ tests/checking/typing/implicit_deref_borrow_field_internal.move:13:17
+error: Invalid operation: access of the field `f` on type `X::S` can only be done within the defining module `0x2::X`
+   ┌─ tests/checking/typing/implicit_deref_borrow_field_internal.move:12:9
    │
+12 │     fun t0() {
+   │         ^^
 13 │         (X::s().f: u64);
-   │                 ^
+   │          -------- accessed here
 
-error: field `f` of struct `X::S` is private to its module
-   ┌─ tests/checking/typing/implicit_deref_borrow_field_internal.move:15:12
+error: Invalid operation: access of the field `f` on type `X::S` can only be done within the defining module `0x2::X`
+   ┌─ tests/checking/typing/implicit_deref_borrow_field_internal.move:12:9
    │
+12 │     fun t0() {
+   │         ^^
+   ·
 15 │         (s.f: u64);
-   │            ^
+   │          --- accessed here

@@ -27,12 +27,16 @@ use aptos_executor::{
 use aptos_experimental_runtimes::thread_manager::THREAD_MANAGER;
 use aptos_infallible::Mutex;
 use aptos_metrics_core::TimerHelper;
-use aptos_state_view::StateView;
 use aptos_storage_interface::cached_state_view::CachedStateView;
 use aptos_types::{
-    block_executor::partitioner::{ExecutableTransactions, PartitionedTransactions},
+    block_executor::{
+        config::BlockExecutorConfigFromOnchain,
+        partitioner::{ExecutableTransactions, PartitionedTransactions},
+    },
+    state_store::StateView,
     transaction::{
-        signature_verified_transaction::SignatureVerifiedTransaction, TransactionOutput,
+        signature_verified_transaction::SignatureVerifiedTransaction, BlockOutput,
+        TransactionOutput,
     },
 };
 use aptos_vm::{
@@ -48,8 +52,8 @@ impl VMExecutor for PtxBlockExecutor {
     fn execute_block(
         transactions: &[SignatureVerifiedTransaction],
         state_view: &(impl StateView + Sync),
-        _maybe_block_gas_limit: Option<u64>,
-    ) -> Result<Vec<TransactionOutput>, VMStatus> {
+        _onchain_config: BlockExecutorConfigFromOnchain,
+    ) -> Result<BlockOutput<TransactionOutput>, VMStatus> {
         let _timer = TIMER.timer_with(&["block_total"]);
 
         let concurrency_level = AptosVM::get_concurrency_level();
@@ -97,14 +101,14 @@ impl VMExecutor for PtxBlockExecutor {
             ret_clone.lock().replace(txn_outputs);
         });
         let ret = ret.lock().take().unwrap();
-        Ok(ret)
+        Ok(BlockOutput::new(ret))
     }
 
     fn execute_block_sharded<S: StateView + Sync + Send + 'static, E: ExecutorClient<S>>(
         _sharded_block_executor: &ShardedBlockExecutor<S, E>,
         _transactions: PartitionedTransactions,
         _state_view: Arc<S>,
-        _maybe_block_gas_limit: Option<u64>,
+        _onchain_config: BlockExecutorConfigFromOnchain,
     ) -> Result<Vec<TransactionOutput>, VMStatus> {
         unimplemented!()
     }
@@ -114,12 +118,12 @@ impl TransactionBlockExecutor for PtxBlockExecutor {
     fn execute_transaction_block(
         transactions: ExecutableTransactions,
         state_view: CachedStateView,
-        maybe_block_gas_limit: Option<u64>,
+        onchain_config: BlockExecutorConfigFromOnchain,
     ) -> anyhow::Result<ChunkOutput> {
         ChunkOutput::by_transaction_execution::<PtxBlockExecutor>(
             transactions,
             state_view,
-            maybe_block_gas_limit,
+            onchain_config,
         )
     }
 }

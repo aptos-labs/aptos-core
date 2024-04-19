@@ -265,7 +265,7 @@ module guild::guild {
         use std::features;
 
         let feature = features::get_auids();
-        features::change_feature_flags(&fx, vector[feature], vector[]);
+        features::change_feature_flags_for_testing(&fx, vector[feature], vector[]);
 
         // This test assumes that the creator's address is equal to @token_objects.
         assert!(signer::address_of(admin) == @guild, 0);
