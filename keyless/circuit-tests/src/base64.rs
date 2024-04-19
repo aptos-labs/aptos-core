@@ -42,6 +42,7 @@ fn base64_decode_test() {
         .pad(&config)
         .unwrap();
     let result = circuit_handle.gen_witness(circuit_input_signals);
+    println!("result={:?}", result);
     assert!(result.is_ok());
 }
 

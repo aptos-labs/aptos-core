@@ -1,6 +1,8 @@
 // Copyright © Aptos Foundation
 // SPDX-License-Identifier: Apache-2.0
 
+extern crate core;
+
 use anyhow::ensure;
 use aptos_keyless_common::input_processing::{
     circuit_input_signals::{CircuitInputSignals, Padded},
@@ -13,6 +15,8 @@ use tempfile::{tempdir, NamedTempFile, TempDir};
 mod base64;
 #[cfg(test)]
 mod packing;
+#[cfg(test)]
+mod sha;
 #[cfg(test)]
 mod arrays;
 

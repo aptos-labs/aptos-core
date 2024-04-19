@@ -19,8 +19,11 @@ pub enum CircuitInputSignal {
 }
 
 pub struct Unpadded;
+
+#[derive(Debug)]
 pub struct Padded;
 
+#[derive(Debug)]
 pub struct CircuitInputSignals<T> {
     signals: BTreeMap<String, CircuitInputSignal>,
     t: PhantomData<T>,
@@ -54,6 +57,11 @@ impl CircuitInputSignals<Unpadded> {
             CircuitInputSignal::U64(signal_value as u64),
         );
         self
+    }
+
+    pub fn bits_input(self, signal_name: &str, signal_value: &[bool]) -> Self {
+        let bytes: Vec<u8> = signal_value.iter().map(|&val| val as u8).collect();
+        self.bytes_input(signal_name, bytes.as_slice())
     }
 
     pub fn str_input(mut self, signal_name: &str, signal_value: &str) -> Self {
