@@ -265,9 +265,9 @@ impl BlockStore {
 
         assert_eq!(
             blocks.first().expect("blocks are empty").id(),
-            highest_qc.commit_info().id(),
+            highest_qc.certified_block().id(),
             "Expecting in the retrieval response, first block should be {}, but got {}",
-            highest_qc.commit_info().id(),
+            highest_qc.certified_block().id(),
             blocks.first().expect("blocks are empty").id(),
         );
 
