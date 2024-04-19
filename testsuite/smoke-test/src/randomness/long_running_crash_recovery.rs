@@ -36,11 +36,6 @@ async fn long_running_crash_recovery() {
     let client_endpoint = swarm.validators().nth(0).unwrap().rest_api_endpoint();
     let rest_cli = Client::new(client_endpoint.clone());
 
-    swarm
-        .wait_for_all_nodes_to_catchup_to_epoch(3, Duration::from_secs(epoch_duration_secs * 2))
-        .await
-        .expect("Waited too long for epoch 3.");
-
     let mut rng = thread_rng();
     let mut validator_power_status_vec = vec![true; 4];
     let mut num_iterations = 0;
