@@ -630,6 +630,32 @@ impl<T: Transaction> CapturedReads<T> {
         })
     }
 
+    pub(crate) fn partially_validate_delayed_field_reads(
+        &self,
+        delayed_fields: &dyn TVersionedDelayedFieldView<T::Identifier>,
+        idx_to_validate: TxnIndex,
+    ) -> Result<bool, PanicError> {
+        if self.speculative_failure {
+            return Ok(false);
+        }
+
+        use MVDelayedFieldsError::*;
+        for (id, read_value) in &self.delayed_field_reads {
+            if let DelayedFieldRead::Value { value, .. } = read_value {
+                match delayed_fields.read(id, idx_to_validate) {
+                    Ok(current_value) => if value != &current_value {
+                        return Ok(false);
+                    },
+                    Err(PanicOr::CodeInvariantError(msg)) => return Err(code_invariant_error(msg)),
+                    Err(PanicOr::Or(NotFound | Dependency(_) | DeltaApplicationFailure)) => {
+                        return Ok(false);
+                    },
+                }
+            }
+        }
+        Ok(true)
+    }
+
     // This validation needs to be called at commit time
     // (as it internally uses read_latest_committed_value to get the current value).
     pub(crate) fn validate_delayed_field_reads(
