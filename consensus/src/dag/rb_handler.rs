@@ -225,7 +225,7 @@ impl NodeBroadcastHandler {
             // because they are already GC'ed
             if current_round > lowest_round {
                 if let Some(tx) = &self.missing_parent_tx {
-                    tx.send(node.clone()).expect("must send");
+                    tx.send(node.clone()).ok();
                 }
                 if let Err(err) = self.fetch_requester.request_for_node(node) {
                     FETCH_ENQUEUE_FAILURES.with_label_values(&[&"node"]).inc();
