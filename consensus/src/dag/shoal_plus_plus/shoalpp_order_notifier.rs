@@ -73,13 +73,11 @@ impl ShoalppOrderNotifier {
             idx,
             dag_external_round,
         } = block_info;
-
-        let anchor = ordered_nodes.last().unwrap();
-        assert!(anchor.round() > self.sent_to_commit_anchor_rounds[dag_id as usize]);
-
+        assert!(dag_external_round > self.sent_to_commit_anchor_rounds[dag_id as usize]);
         self.sent_to_commit_anchor_rounds[dag_id as usize] = dag_external_round;
         let block_round = self.sent_to_commit_anchor_rounds.iter().sum();
 
+        let anchor = ordered_nodes.last().unwrap();
         let epoch = anchor.epoch();
         let timestamp = anchor.metadata().timestamp();
         let parent_timestamp = self.parent_block_info.timestamp_usecs();
