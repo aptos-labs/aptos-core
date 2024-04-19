@@ -635,7 +635,10 @@ impl SubmitVote {
                 .args
                 .txn_options
                 .view(ViewFunction {
-                    module: ModuleId::new(AccountAddress::ONE, ident_str!("voting").to_owned()),
+                    module: ModuleId::new(
+                        AccountAddress::ONE,
+                        ident_str!("aptos_governance").to_owned(),
+                    ),
                     function: ident_str!("get_remaining_voting_power").to_owned(),
                     ty_args: vec![],
                     args: vec![

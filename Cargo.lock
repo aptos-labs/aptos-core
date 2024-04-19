@@ -307,7 +307,6 @@ dependencies = [
  "move-symbol-pool",
  "move-unit-test",
  "move-vm-runtime",
- "once_cell",
  "pathsearch",
  "poem",
  "processor",
