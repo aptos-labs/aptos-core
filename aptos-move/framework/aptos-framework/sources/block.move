@@ -233,9 +233,6 @@ module aptos_framework::block {
     ) acquires BlockResource, CommitHistory {
         let epoch_interval = block_prologue_common(&vm, hash, epoch, round, proposer, failed_proposer_indices, previous_block_votes_bitvec, timestamp);
         randomness::on_new_block(&vm, epoch, round, option::none());
-        if (timestamp - reconfiguration::last_reconfiguration_time() >= epoch_interval) {
-            reconfiguration::reconfigure();
-        };
     }
 
     /// `block_prologue()` but trigger reconfiguration with DKG after epoch timed out.
@@ -261,10 +258,6 @@ module aptos_framework::block {
             timestamp
         );
         randomness::on_new_block(&vm, epoch, round, randomness_seed);
-
-        if (timestamp - reconfiguration::last_reconfiguration_time() >= epoch_interval) {
-            reconfiguration_with_dkg::try_start();
-        };
     }
 
     #[view]
