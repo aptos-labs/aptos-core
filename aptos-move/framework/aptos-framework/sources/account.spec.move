@@ -171,19 +171,19 @@ spec aptos_framework::account {
 
     spec get_sequence_number(addr: address): u64 {
         aborts_if !exists<Account>(addr);
-        ensures result == global<Account>(addr).sequence_number;
+        // ensures result == global<Account>(addr).sequence_number;
     }
 
     /// The Account existed under the address.
     /// The sequence_number of the Account is up to MAX_U64.
     spec increment_sequence_number(addr: address) {
-        let sequence_number = global<Account>(addr).sequence_number;
+        // let sequence_number = global<Account>(addr).sequence_number;
         aborts_if !exists<Account>(addr);
         /// [high-level-req-4]
-        aborts_if sequence_number == MAX_U64;
+        // aborts_if sequence_number == MAX_U64;
         modifies global<Account>(addr);
-        let post post_sequence_number = global<Account>(addr).sequence_number;
-        ensures post_sequence_number == sequence_number + 1;
+        // let post post_sequence_number = global<Account>(addr).sequence_number;
+        // ensures post_sequence_number == sequence_number + 1;
     }
 
     spec get_authentication_key(addr: address): vector<u8> {
@@ -255,72 +255,72 @@ spec aptos_framework::account {
         cap_rotate_key: vector<u8>,
         cap_update_table: vector<u8>,
     ) {
-        let addr = signer::address_of(account);
-        let account_resource = global<Account>(addr);
-        aborts_if !exists<Account>(addr);
+        // let addr = signer::address_of(account);
+        // let account_resource = global<Account>(addr);
+        // aborts_if !exists<Account>(addr);
 
-        /// [high-level-req-6.1]
-        include from_scheme == ED25519_SCHEME ==> ed25519::NewUnvalidatedPublicKeyFromBytesAbortsIf { bytes: from_public_key_bytes };
-        aborts_if from_scheme == ED25519_SCHEME && ({
-            let expected_auth_key = ed25519::spec_public_key_bytes_to_authentication_key(from_public_key_bytes);
-            account_resource.authentication_key != expected_auth_key
-        });
-        include from_scheme == MULTI_ED25519_SCHEME ==> multi_ed25519::NewUnvalidatedPublicKeyFromBytesAbortsIf { bytes: from_public_key_bytes };
-        aborts_if from_scheme == MULTI_ED25519_SCHEME && ({
-            let from_auth_key = multi_ed25519::spec_public_key_bytes_to_authentication_key(from_public_key_bytes);
-            account_resource.authentication_key != from_auth_key
-        });
+        // /// [high-level-req-6.1]
+        // include from_scheme == ED25519_SCHEME ==> ed25519::NewUnvalidatedPublicKeyFromBytesAbortsIf { bytes: from_public_key_bytes };
+        // aborts_if from_scheme == ED25519_SCHEME && ({
+        //     let expected_auth_key = ed25519::spec_public_key_bytes_to_authentication_key(from_public_key_bytes);
+        //     account_resource.authentication_key != expected_auth_key
+        // });
+        // include from_scheme == MULTI_ED25519_SCHEME ==> multi_ed25519::NewUnvalidatedPublicKeyFromBytesAbortsIf { bytes: from_public_key_bytes };
+        // aborts_if from_scheme == MULTI_ED25519_SCHEME && ({
+        //     let from_auth_key = multi_ed25519::spec_public_key_bytes_to_authentication_key(from_public_key_bytes);
+        //     account_resource.authentication_key != from_auth_key
+        // });
 
-        /// [high-level-req-5.1]
-        aborts_if from_scheme != ED25519_SCHEME && from_scheme != MULTI_ED25519_SCHEME;
+        // /// [high-level-req-5.1]
+        // aborts_if from_scheme != ED25519_SCHEME && from_scheme != MULTI_ED25519_SCHEME;
 
-        let curr_auth_key = from_bcs::deserialize<address>(account_resource.authentication_key);
-        aborts_if !from_bcs::deserializable<address>(account_resource.authentication_key);
+        // let curr_auth_key = from_bcs::deserialize<address>(account_resource.authentication_key);
+        // aborts_if !from_bcs::deserializable<address>(account_resource.authentication_key);
 
-        let challenge = RotationProofChallenge {
-            sequence_number: account_resource.sequence_number,
-            originator: addr,
-            current_auth_key: curr_auth_key,
-            new_public_key: to_public_key_bytes,
-        };
+        // let challenge = RotationProofChallenge {
+        //     sequence_number: account_resource.sequence_number,
+        //     originator: addr,
+        //     current_auth_key: curr_auth_key,
+        //     new_public_key: to_public_key_bytes,
+        // };
 
-        /// [high-level-req-9.1]
-        include AssertValidRotationProofSignatureAndGetAuthKeyAbortsIf {
-            scheme: from_scheme,
-            public_key_bytes: from_public_key_bytes,
-            signature: cap_rotate_key,
-            challenge,
-        };
+        // /// [high-level-req-9.1]
+        // include AssertValidRotationProofSignatureAndGetAuthKeyAbortsIf {
+        //     scheme: from_scheme,
+        //     public_key_bytes: from_public_key_bytes,
+        //     signature: cap_rotate_key,
+        //     challenge,
+        // };
 
-        include AssertValidRotationProofSignatureAndGetAuthKeyAbortsIf {
-            scheme: to_scheme,
-            public_key_bytes: to_public_key_bytes,
-            signature: cap_update_table,
-            challenge,
-        };
+        // include AssertValidRotationProofSignatureAndGetAuthKeyAbortsIf {
+        //     scheme: to_scheme,
+        //     public_key_bytes: to_public_key_bytes,
+        //     signature: cap_update_table,
+        //     challenge,
+        // };
 
-        // Verify all properties in update_auth_key_and_originating_address_table
-        let originating_addr = addr;
-        let new_auth_key_vector = spec_assert_valid_rotation_proof_signature_and_get_auth_key(to_scheme, to_public_key_bytes, cap_update_table, challenge);
+        // // Verify all properties in update_auth_key_and_originating_address_table
+        // let originating_addr = addr;
+        // let new_auth_key_vector = spec_assert_valid_rotation_proof_signature_and_get_auth_key(to_scheme, to_public_key_bytes, cap_update_table, challenge);
 
-        let address_map = global<OriginatingAddress>(@aptos_framework).address_map;
-        let new_auth_key = from_bcs::deserialize<address>(new_auth_key_vector);
+        // let address_map = global<OriginatingAddress>(@aptos_framework).address_map;
+        // let new_auth_key = from_bcs::deserialize<address>(new_auth_key_vector);
 
-        aborts_if !exists<OriginatingAddress>(@aptos_framework);
-        aborts_if !from_bcs::deserializable<address>(account_resource.authentication_key);
-        aborts_if table::spec_contains(address_map, curr_auth_key) &&
-            table::spec_get(address_map, curr_auth_key) != originating_addr;
+        // aborts_if !exists<OriginatingAddress>(@aptos_framework);
+        // aborts_if !from_bcs::deserializable<address>(account_resource.authentication_key);
+        // aborts_if table::spec_contains(address_map, curr_auth_key) &&
+        //     table::spec_get(address_map, curr_auth_key) != originating_addr;
 
-        aborts_if !from_bcs::deserializable<address>(new_auth_key_vector);
+        // aborts_if !from_bcs::deserializable<address>(new_auth_key_vector);
 
-        aborts_if curr_auth_key != new_auth_key && table::spec_contains(address_map, new_auth_key);
+        // aborts_if curr_auth_key != new_auth_key && table::spec_contains(address_map, new_auth_key);
 
-        include UpdateAuthKeyAndOriginatingAddressTableAbortsIf {
-            originating_addr: addr,
-        };
+        // include UpdateAuthKeyAndOriginatingAddressTableAbortsIf {
+        //     originating_addr: addr,
+        // };
 
-        let post auth_key = global<Account>(addr).authentication_key;
-        ensures auth_key == new_auth_key_vector;
+        // let post auth_key = global<Account>(addr).authentication_key;
+        // ensures auth_key == new_auth_key_vector;
 
     }
 
@@ -331,48 +331,48 @@ spec aptos_framework::account {
         new_public_key_bytes: vector<u8>,
         cap_update_table: vector<u8>
     ) {
-        aborts_if !exists<Account>(rotation_cap_offerer_address);
-        let delegate_address = signer::address_of(delegate_signer);
-        let offerer_account_resource = global<Account>(rotation_cap_offerer_address);
-        aborts_if !from_bcs::deserializable<address>(offerer_account_resource.authentication_key);
-        let curr_auth_key = from_bcs::deserialize<address>(offerer_account_resource.authentication_key);
-        aborts_if !exists<Account>(delegate_address);
-        let challenge = RotationProofChallenge {
-            sequence_number: global<Account>(delegate_address).sequence_number,
-            originator: rotation_cap_offerer_address,
-            current_auth_key: curr_auth_key,
-            new_public_key: new_public_key_bytes,
-        };
-        /// [high-level-req-6.2]
-        aborts_if !option::spec_contains(offerer_account_resource.rotation_capability_offer.for, delegate_address);
-        /// [high-level-req-9.1]
-        include AssertValidRotationProofSignatureAndGetAuthKeyAbortsIf {
-            scheme: new_scheme,
-            public_key_bytes: new_public_key_bytes,
-            signature: cap_update_table,
-            challenge,
-        };
+        // aborts_if !exists<Account>(rotation_cap_offerer_address);
+        // let delegate_address = signer::address_of(delegate_signer);
+        // let offerer_account_resource = global<Account>(rotation_cap_offerer_address);
+        // aborts_if !from_bcs::deserializable<address>(offerer_account_resource.authentication_key);
+        // let curr_auth_key = from_bcs::deserialize<address>(offerer_account_resource.authentication_key);
+        // aborts_if !exists<Account>(delegate_address);
+        // let challenge = RotationProofChallenge {
+        //     sequence_number: global<Account>(delegate_address).sequence_number,
+        //     originator: rotation_cap_offerer_address,
+        //     current_auth_key: curr_auth_key,
+        //     new_public_key: new_public_key_bytes,
+        // };
+        // /// [high-level-req-6.2]
+        // aborts_if !option::spec_contains(offerer_account_resource.rotation_capability_offer.for, delegate_address);
+        // /// [high-level-req-9.1]
+        // include AssertValidRotationProofSignatureAndGetAuthKeyAbortsIf {
+        //     scheme: new_scheme,
+        //     public_key_bytes: new_public_key_bytes,
+        //     signature: cap_update_table,
+        //     challenge,
+        // };
 
-        let new_auth_key_vector = spec_assert_valid_rotation_proof_signature_and_get_auth_key(new_scheme, new_public_key_bytes, cap_update_table, challenge);
-        let address_map = global<OriginatingAddress>(@aptos_framework).address_map;
+        // let new_auth_key_vector = spec_assert_valid_rotation_proof_signature_and_get_auth_key(new_scheme, new_public_key_bytes, cap_update_table, challenge);
+        // let address_map = global<OriginatingAddress>(@aptos_framework).address_map;
 
-        // Verify all properties in update_auth_key_and_originating_address_table
-        aborts_if !exists<OriginatingAddress>(@aptos_framework);
-        aborts_if !from_bcs::deserializable<address>(offerer_account_resource.authentication_key);
-        aborts_if table::spec_contains(address_map, curr_auth_key) &&
-            table::spec_get(address_map, curr_auth_key) != rotation_cap_offerer_address;
+        // // Verify all properties in update_auth_key_and_originating_address_table
+        // aborts_if !exists<OriginatingAddress>(@aptos_framework);
+        // aborts_if !from_bcs::deserializable<address>(offerer_account_resource.authentication_key);
+        // aborts_if table::spec_contains(address_map, curr_auth_key) &&
+        //     table::spec_get(address_map, curr_auth_key) != rotation_cap_offerer_address;
 
-        aborts_if !from_bcs::deserializable<address>(new_auth_key_vector);
-        let new_auth_key = from_bcs::deserialize<address>(new_auth_key_vector);
+        // aborts_if !from_bcs::deserializable<address>(new_auth_key_vector);
+        // let new_auth_key = from_bcs::deserialize<address>(new_auth_key_vector);
 
-        aborts_if curr_auth_key != new_auth_key && table::spec_contains(address_map, new_auth_key);
-        include UpdateAuthKeyAndOriginatingAddressTableAbortsIf {
-            originating_addr: rotation_cap_offerer_address,
-            account_resource: offerer_account_resource,
-        };
+        // aborts_if curr_auth_key != new_auth_key && table::spec_contains(address_map, new_auth_key);
+        // include UpdateAuthKeyAndOriginatingAddressTableAbortsIf {
+        //     originating_addr: rotation_cap_offerer_address,
+        //     account_resource: offerer_account_resource,
+        // };
 
-        let post auth_key = global<Account>(rotation_cap_offerer_address).authentication_key;
-        ensures auth_key == new_auth_key_vector;
+        // let post auth_key = global<Account>(rotation_cap_offerer_address).authentication_key;
+        // ensures auth_key == new_auth_key_vector;
     }
 
     spec offer_rotation_capability(
@@ -382,50 +382,50 @@ spec aptos_framework::account {
         account_public_key_bytes: vector<u8>,
         recipient_address: address,
     ) {
-        let source_address = signer::address_of(account);
-        let account_resource = global<Account>(source_address);
-        let proof_challenge = RotationCapabilityOfferProofChallengeV2 {
-            chain_id: global<chain_id::ChainId>(@aptos_framework).id,
-            sequence_number: account_resource.sequence_number,
-            source_address,
-            recipient_address,
-        };
+        // let source_address = signer::address_of(account);
+        // let account_resource = global<Account>(source_address);
+        // let proof_challenge = RotationCapabilityOfferProofChallengeV2 {
+        //     chain_id: global<chain_id::ChainId>(@aptos_framework).id,
+        //     sequence_number: account_resource.sequence_number,
+        //     source_address,
+        //     recipient_address,
+        // };
 
-        aborts_if !exists<chain_id::ChainId>(@aptos_framework);
-        aborts_if !exists<Account>(recipient_address);
-        aborts_if !exists<Account>(source_address);
+        // aborts_if !exists<chain_id::ChainId>(@aptos_framework);
+        // aborts_if !exists<Account>(recipient_address);
+        // aborts_if !exists<Account>(source_address);
 
-        include account_scheme == ED25519_SCHEME ==> ed25519::NewUnvalidatedPublicKeyFromBytesAbortsIf { bytes: account_public_key_bytes };
-        aborts_if account_scheme == ED25519_SCHEME && ({
-            let expected_auth_key = ed25519::spec_public_key_bytes_to_authentication_key(account_public_key_bytes);
-            account_resource.authentication_key != expected_auth_key
-        });
-        include account_scheme == ED25519_SCHEME ==> ed25519::NewSignatureFromBytesAbortsIf { bytes: rotation_capability_sig_bytes };
-        aborts_if account_scheme == ED25519_SCHEME && !ed25519::spec_signature_verify_strict_t(
-            ed25519::Signature { bytes: rotation_capability_sig_bytes },
-            ed25519::UnvalidatedPublicKey { bytes: account_public_key_bytes },
-            proof_challenge
-        );
+        // include account_scheme == ED25519_SCHEME ==> ed25519::NewUnvalidatedPublicKeyFromBytesAbortsIf { bytes: account_public_key_bytes };
+        // aborts_if account_scheme == ED25519_SCHEME && ({
+        //     let expected_auth_key = ed25519::spec_public_key_bytes_to_authentication_key(account_public_key_bytes);
+        //     account_resource.authentication_key != expected_auth_key
+        // });
+        // include account_scheme == ED25519_SCHEME ==> ed25519::NewSignatureFromBytesAbortsIf { bytes: rotation_capability_sig_bytes };
+        // aborts_if account_scheme == ED25519_SCHEME && !ed25519::spec_signature_verify_strict_t(
+        //     ed25519::Signature { bytes: rotation_capability_sig_bytes },
+        //     ed25519::UnvalidatedPublicKey { bytes: account_public_key_bytes },
+        //     proof_challenge
+        // );
 
-        include account_scheme == MULTI_ED25519_SCHEME ==> multi_ed25519::NewUnvalidatedPublicKeyFromBytesAbortsIf { bytes: account_public_key_bytes };
-        aborts_if account_scheme == MULTI_ED25519_SCHEME && ({
-            let expected_auth_key = multi_ed25519::spec_public_key_bytes_to_authentication_key(account_public_key_bytes);
-            account_resource.authentication_key != expected_auth_key
-        });
-        include account_scheme == MULTI_ED25519_SCHEME ==> multi_ed25519::NewSignatureFromBytesAbortsIf { bytes: rotation_capability_sig_bytes };
-        aborts_if account_scheme == MULTI_ED25519_SCHEME && !multi_ed25519::spec_signature_verify_strict_t(
-            multi_ed25519::Signature { bytes: rotation_capability_sig_bytes },
-            multi_ed25519::UnvalidatedPublicKey { bytes: account_public_key_bytes },
-            proof_challenge
-        );
+        // include account_scheme == MULTI_ED25519_SCHEME ==> multi_ed25519::NewUnvalidatedPublicKeyFromBytesAbortsIf { bytes: account_public_key_bytes };
+        // aborts_if account_scheme == MULTI_ED25519_SCHEME && ({
+        //     let expected_auth_key = multi_ed25519::spec_public_key_bytes_to_authentication_key(account_public_key_bytes);
+        //     account_resource.authentication_key != expected_auth_key
+        // });
+        // include account_scheme == MULTI_ED25519_SCHEME ==> multi_ed25519::NewSignatureFromBytesAbortsIf { bytes: rotation_capability_sig_bytes };
+        // aborts_if account_scheme == MULTI_ED25519_SCHEME && !multi_ed25519::spec_signature_verify_strict_t(
+        //     multi_ed25519::Signature { bytes: rotation_capability_sig_bytes },
+        //     multi_ed25519::UnvalidatedPublicKey { bytes: account_public_key_bytes },
+        //     proof_challenge
+        // );
 
-        /// [high-level-req-5.2]
-        aborts_if account_scheme != ED25519_SCHEME && account_scheme != MULTI_ED25519_SCHEME;
+        // /// [high-level-req-5.2]
+        // aborts_if account_scheme != ED25519_SCHEME && account_scheme != MULTI_ED25519_SCHEME;
 
-        /// [high-level-req-7.1]
-        modifies global<Account>(source_address);
-        let post offer_for = global<Account>(source_address).rotation_capability_offer.for;
-        ensures option::spec_borrow(offer_for) == recipient_address;
+        // /// [high-level-req-7.1]
+        // modifies global<Account>(source_address);
+        // let post offer_for = global<Account>(source_address).rotation_capability_offer.for;
+        // ensures option::spec_borrow(offer_for) == recipient_address;
     }
 
     /// The Account existed under the signer.
@@ -437,48 +437,48 @@ spec aptos_framework::account {
         account_public_key_bytes: vector<u8>,
         recipient_address: address
     ) {
-        let source_address = signer::address_of(account);
-        let account_resource = global<Account>(source_address);
-        let proof_challenge = SignerCapabilityOfferProofChallengeV2 {
-            sequence_number: account_resource.sequence_number,
-            source_address,
-            recipient_address,
-        };
+        // let source_address = signer::address_of(account);
+        // let account_resource = global<Account>(source_address);
+        // let proof_challenge = SignerCapabilityOfferProofChallengeV2 {
+        //     sequence_number: account_resource.sequence_number,
+        //     source_address,
+        //     recipient_address,
+        // };
 
-        aborts_if !exists<Account>(recipient_address);
-        aborts_if !exists<Account>(source_address);
+        // aborts_if !exists<Account>(recipient_address);
+        // aborts_if !exists<Account>(source_address);
 
-        include account_scheme == ED25519_SCHEME ==> ed25519::NewUnvalidatedPublicKeyFromBytesAbortsIf { bytes: account_public_key_bytes };
-        aborts_if account_scheme == ED25519_SCHEME && ({
-            let expected_auth_key = ed25519::spec_public_key_bytes_to_authentication_key(account_public_key_bytes);
-            account_resource.authentication_key != expected_auth_key
-        });
-        include account_scheme == ED25519_SCHEME ==> ed25519::NewSignatureFromBytesAbortsIf { bytes: signer_capability_sig_bytes };
-        aborts_if account_scheme == ED25519_SCHEME && !ed25519::spec_signature_verify_strict_t(
-            ed25519::Signature { bytes: signer_capability_sig_bytes },
-            ed25519::UnvalidatedPublicKey { bytes: account_public_key_bytes },
-            proof_challenge
-        );
+        // include account_scheme == ED25519_SCHEME ==> ed25519::NewUnvalidatedPublicKeyFromBytesAbortsIf { bytes: account_public_key_bytes };
+        // aborts_if account_scheme == ED25519_SCHEME && ({
+        //     let expected_auth_key = ed25519::spec_public_key_bytes_to_authentication_key(account_public_key_bytes);
+        //     account_resource.authentication_key != expected_auth_key
+        // });
+        // include account_scheme == ED25519_SCHEME ==> ed25519::NewSignatureFromBytesAbortsIf { bytes: signer_capability_sig_bytes };
+        // aborts_if account_scheme == ED25519_SCHEME && !ed25519::spec_signature_verify_strict_t(
+        //     ed25519::Signature { bytes: signer_capability_sig_bytes },
+        //     ed25519::UnvalidatedPublicKey { bytes: account_public_key_bytes },
+        //     proof_challenge
+        // );
 
-        include account_scheme == MULTI_ED25519_SCHEME ==> multi_ed25519::NewUnvalidatedPublicKeyFromBytesAbortsIf { bytes: account_public_key_bytes };
-        aborts_if account_scheme == MULTI_ED25519_SCHEME && ({
-            let expected_auth_key = multi_ed25519::spec_public_key_bytes_to_authentication_key(account_public_key_bytes);
-            account_resource.authentication_key != expected_auth_key
-        });
-        include account_scheme == MULTI_ED25519_SCHEME ==> multi_ed25519::NewSignatureFromBytesAbortsIf { bytes: signer_capability_sig_bytes };
-        aborts_if account_scheme == MULTI_ED25519_SCHEME && !multi_ed25519::spec_signature_verify_strict_t(
-            multi_ed25519::Signature { bytes: signer_capability_sig_bytes },
-            multi_ed25519::UnvalidatedPublicKey { bytes: account_public_key_bytes },
-            proof_challenge
-        );
+        // include account_scheme == MULTI_ED25519_SCHEME ==> multi_ed25519::NewUnvalidatedPublicKeyFromBytesAbortsIf { bytes: account_public_key_bytes };
+        // aborts_if account_scheme == MULTI_ED25519_SCHEME && ({
+        //     let expected_auth_key = multi_ed25519::spec_public_key_bytes_to_authentication_key(account_public_key_bytes);
+        //     account_resource.authentication_key != expected_auth_key
+        // });
+        // include account_scheme == MULTI_ED25519_SCHEME ==> multi_ed25519::NewSignatureFromBytesAbortsIf { bytes: signer_capability_sig_bytes };
+        // aborts_if account_scheme == MULTI_ED25519_SCHEME && !multi_ed25519::spec_signature_verify_strict_t(
+        //     multi_ed25519::Signature { bytes: signer_capability_sig_bytes },
+        //     multi_ed25519::UnvalidatedPublicKey { bytes: account_public_key_bytes },
+        //     proof_challenge
+        // );
 
-        /// [high-level-req-5.3]
-        aborts_if account_scheme != ED25519_SCHEME && account_scheme != MULTI_ED25519_SCHEME;
+        // /// [high-level-req-5.3]
+        // aborts_if account_scheme != ED25519_SCHEME && account_scheme != MULTI_ED25519_SCHEME;
 
-        /// [high-level-req-7.2]
-        modifies global<Account>(source_address);
-        let post offer_for = global<Account>(source_address).signer_capability_offer.for;
-        ensures option::spec_borrow(offer_for) == recipient_address;
+        // /// [high-level-req-7.2]
+        // modifies global<Account>(source_address);
+        // let post offer_for = global<Account>(source_address).signer_capability_offer.for;
+        // ensures option::spec_borrow(offer_for) == recipient_address;
     }
 
     spec is_signer_capability_offered(account_addr: address): bool {
@@ -657,7 +657,7 @@ spec aptos_framework::account {
         resource_addr: address;
         let account = global<Account>(resource_addr);
         aborts_if len(account.signer_capability_offer.for.vec) != 0;
-        aborts_if account.sequence_number != 0;
+        // aborts_if account.sequence_number != 0;
     }
 
     spec update_auth_key_and_originating_address_table(

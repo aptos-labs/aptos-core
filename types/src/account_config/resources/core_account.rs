@@ -16,9 +16,25 @@ use serde::{Deserialize, Serialize};
 /// This is not how the Account is represented in the VM but it's a convenient representation.
 #[derive(Debug, Eq, PartialEq, Serialize, Deserialize)]
 #[cfg_attr(any(test, feature = "fuzzing"), derive(Arbitrary))]
+pub struct AggregatorResource {
+    value: u64,
+    max_value: u64,
+}
+
+impl AggregatorResource {
+    /// Constructs an Account resource.
+    pub fn new(value: u64) -> Self {
+        AggregatorResource { value, max_value: u64::MAX }
+    }
+}
+
+/// A Rust representation of an Account resource.
+/// This is not how the Account is represented in the VM but it's a convenient representation.
+#[derive(Debug, Eq, PartialEq, Serialize, Deserialize)]
+#[cfg_attr(any(test, feature = "fuzzing"), derive(Arbitrary))]
 pub struct AccountResource {
     authentication_key: Vec<u8>,
-    sequence_number: u64,
+    sequence_number: AggregatorResource,
     guid_creation_num: u64,
     coin_register_events: EventHandle,
     key_rotation_events: EventHandle,
@@ -36,7 +52,7 @@ impl AccountResource {
     ) -> Self {
         AccountResource {
             authentication_key,
-            sequence_number,
+            sequence_number: AggregatorResource::new(sequence_number),
             guid_creation_num: 0,
             coin_register_events,
             key_rotation_events,
@@ -47,7 +63,7 @@ impl AccountResource {
 
     /// Return the sequence_number field for the given AccountResource
     pub fn sequence_number(&self) -> u64 {
-        self.sequence_number
+        self.sequence_number.value
     }
 
     /// Return the authentication_key field for the given AccountResource

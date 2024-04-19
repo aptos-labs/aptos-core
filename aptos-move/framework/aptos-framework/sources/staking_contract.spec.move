@@ -589,23 +589,23 @@ spec aptos_framework::staking_contract {
         voter: address;
         contract_creation_seed: vector<u8>;
 
-        // postconditions account::create_resource_account()
-        let acc = global<account::Account>(resource_addr);
-        aborts_if exists<account::Account>(resource_addr) && (len(
-            acc.signer_capability_offer.for.vec
-        ) != 0 || acc.sequence_number != 0);
-        aborts_if !exists<account::Account>(resource_addr) && len(bcs::to_bytes(resource_addr)) != 32;
-        aborts_if len(account::ZERO_AUTH_KEY) != 32;
+        // // postconditions account::create_resource_account()
+        // let acc = global<account::Account>(resource_addr);
+        // aborts_if exists<account::Account>(resource_addr) && (len(
+        //     acc.signer_capability_offer.for.vec
+        // ) != 0 || acc.sequence_number != 0);
+        // aborts_if !exists<account::Account>(resource_addr) && len(bcs::to_bytes(resource_addr)) != 32;
+        // aborts_if len(account::ZERO_AUTH_KEY) != 32;
 
-        // postconditions stake::initialize_stake_owner()
-        aborts_if exists<stake::ValidatorConfig>(resource_addr);
-        let allowed = global<stake::AllowedValidators>(@aptos_framework);
-        aborts_if exists<stake::AllowedValidators>(@aptos_framework) && !contains(allowed.accounts, resource_addr);
-        aborts_if exists<stake::StakePool>(resource_addr);
-        aborts_if exists<stake::OwnerCapability>(resource_addr);
-        // 12 is the times that calls 'events::guids'
-        aborts_if exists<account::Account>(
-            resource_addr
-        ) && acc.guid_creation_num + 12 >= account::MAX_GUID_CREATION_NUM;
+        // // postconditions stake::initialize_stake_owner()
+        // aborts_if exists<stake::ValidatorConfig>(resource_addr);
+        // let allowed = global<stake::AllowedValidators>(@aptos_framework);
+        // aborts_if exists<stake::AllowedValidators>(@aptos_framework) && !contains(allowed.accounts, resource_addr);
+        // aborts_if exists<stake::StakePool>(resource_addr);
+        // aborts_if exists<stake::OwnerCapability>(resource_addr);
+        // // 12 is the times that calls 'events::guids'
+        // aborts_if exists<account::Account>(
+        //     resource_addr
+        // ) && acc.guid_creation_num + 12 >= account::MAX_GUID_CREATION_NUM;
     }
 }

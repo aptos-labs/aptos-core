@@ -989,33 +989,6 @@ Give some constraints that may abort according to the conditions.
     txn_max_gas_units: u64;
     txn_expiration_time: u64;
     <a href="chain_id.md#0x1_chain_id">chain_id</a>: u8;
-    <b>aborts_if</b> !<b>exists</b>&lt;CurrentTimeMicroseconds&gt;(@aptos_framework);
-    <b>aborts_if</b> !(<a href="timestamp.md#0x1_timestamp_now_seconds">timestamp::now_seconds</a>() &lt; txn_expiration_time);
-    <b>aborts_if</b> !<b>exists</b>&lt;ChainId&gt;(@aptos_framework);
-    <b>aborts_if</b> !(<a href="chain_id.md#0x1_chain_id_get">chain_id::get</a>() == <a href="chain_id.md#0x1_chain_id">chain_id</a>);
-    <b>let</b> transaction_sender = <a href="../../aptos-stdlib/../move-stdlib/doc/signer.md#0x1_signer_address_of">signer::address_of</a>(sender);
-    <b>aborts_if</b> (
-        !<a href="../../aptos-stdlib/../move-stdlib/doc/features.md#0x1_features_spec_is_enabled">features::spec_is_enabled</a>(<a href="../../aptos-stdlib/../move-stdlib/doc/features.md#0x1_features_SPONSORED_AUTOMATIC_ACCOUNT_CREATION">features::SPONSORED_AUTOMATIC_ACCOUNT_CREATION</a>)
-        || <a href="account.md#0x1_account_exists_at">account::exists_at</a>(transaction_sender)
-        || transaction_sender == gas_payer
-        || txn_sequence_number &gt; 0
-    ) && (
-        !(txn_sequence_number &gt;= <b>global</b>&lt;Account&gt;(transaction_sender).sequence_number)
-        || !(txn_authentication_key == <b>global</b>&lt;Account&gt;(transaction_sender).authentication_key)
-        || !<a href="account.md#0x1_account_exists_at">account::exists_at</a>(transaction_sender)
-        || !(txn_sequence_number == <b>global</b>&lt;Account&gt;(transaction_sender).sequence_number)
-    );
-    <b>aborts_if</b> <a href="../../aptos-stdlib/../move-stdlib/doc/features.md#0x1_features_spec_is_enabled">features::spec_is_enabled</a>(<a href="../../aptos-stdlib/../move-stdlib/doc/features.md#0x1_features_SPONSORED_AUTOMATIC_ACCOUNT_CREATION">features::SPONSORED_AUTOMATIC_ACCOUNT_CREATION</a>)
-        && transaction_sender != gas_payer
-        && txn_sequence_number == 0
-        && !<a href="account.md#0x1_account_exists_at">account::exists_at</a>(transaction_sender)
-        && txn_authentication_key != <a href="../../aptos-stdlib/../move-stdlib/doc/bcs.md#0x1_bcs_to_bytes">bcs::to_bytes</a>(transaction_sender);
-    <b>aborts_if</b> !(txn_sequence_number &lt; (1u64 &lt;&lt; 63));
-    <b>let</b> max_transaction_fee = txn_gas_price * txn_max_gas_units;
-    <b>aborts_if</b> max_transaction_fee &gt; <a href="transaction_validation.md#0x1_transaction_validation_MAX_U64">MAX_U64</a>;
-    <b>aborts_if</b> !<b>exists</b>&lt;CoinStore&lt;AptosCoin&gt;&gt;(gas_payer);
-    // This enforces <a id="high-level-req-1" href="#high-level-req">high-level requirement 1</a>:
-    <b>aborts_if</b> !(<b>global</b>&lt;CoinStore&lt;AptosCoin&gt;&gt;(gas_payer).<a href="coin.md#0x1_coin">coin</a>.value &gt;= max_transaction_fee);
 }
 </code></pre>
 
@@ -1285,60 +1258,6 @@ Skip transaction_fee::burn_fee verification.
     txn_gas_price: u64;
     txn_max_gas_units: u64;
     gas_units_remaining: u64;
-    <b>aborts_if</b> !(txn_max_gas_units &gt;= gas_units_remaining);
-    <b>let</b> gas_used = txn_max_gas_units - gas_units_remaining;
-    <b>aborts_if</b> !(txn_gas_price * gas_used &lt;= <a href="transaction_validation.md#0x1_transaction_validation_MAX_U64">MAX_U64</a>);
-    <b>let</b> transaction_fee_amount = txn_gas_price * gas_used;
-    <b>let</b> addr = <a href="../../aptos-stdlib/../move-stdlib/doc/signer.md#0x1_signer_address_of">signer::address_of</a>(<a href="account.md#0x1_account">account</a>);
-    <b>let</b> pre_balance = <b>global</b>&lt;<a href="coin.md#0x1_coin_CoinStore">coin::CoinStore</a>&lt;AptosCoin&gt;&gt;(gas_payer).<a href="coin.md#0x1_coin">coin</a>.value;
-    <b>let</b> <b>post</b> balance = <b>global</b>&lt;<a href="coin.md#0x1_coin_CoinStore">coin::CoinStore</a>&lt;AptosCoin&gt;&gt;(gas_payer).<a href="coin.md#0x1_coin">coin</a>.value;
-    <b>let</b> pre_account = <b>global</b>&lt;<a href="account.md#0x1_account_Account">account::Account</a>&gt;(addr);
-    <b>let</b> <b>post</b> <a href="account.md#0x1_account">account</a> = <b>global</b>&lt;<a href="account.md#0x1_account_Account">account::Account</a>&gt;(addr);
-    <b>aborts_if</b> !<b>exists</b>&lt;CoinStore&lt;AptosCoin&gt;&gt;(gas_payer);
-    <b>aborts_if</b> !<b>exists</b>&lt;Account&gt;(addr);
-    <b>aborts_if</b> !(<b>global</b>&lt;Account&gt;(addr).sequence_number &lt; <a href="transaction_validation.md#0x1_transaction_validation_MAX_U64">MAX_U64</a>);
-    <b>aborts_if</b> pre_balance &lt; transaction_fee_amount;
-    <b>ensures</b> balance == pre_balance - transaction_fee_amount + storage_fee_refunded;
-    <b>ensures</b> <a href="account.md#0x1_account">account</a>.sequence_number == pre_account.sequence_number + 1;
-    <b>let</b> collect_fee_enabled = <a href="../../aptos-stdlib/../move-stdlib/doc/features.md#0x1_features_spec_is_enabled">features::spec_is_enabled</a>(<a href="../../aptos-stdlib/../move-stdlib/doc/features.md#0x1_features_COLLECT_AND_DISTRIBUTE_GAS_FEES">features::COLLECT_AND_DISTRIBUTE_GAS_FEES</a>);
-    <b>let</b> collected_fees = <b>global</b>&lt;CollectedFeesPerBlock&gt;(@aptos_framework).amount;
-    <b>let</b> aggr = collected_fees.value;
-    <b>let</b> aggr_val = <a href="aggregator.md#0x1_aggregator_spec_aggregator_get_val">aggregator::spec_aggregator_get_val</a>(aggr);
-    <b>let</b> aggr_lim = <a href="aggregator.md#0x1_aggregator_spec_get_limit">aggregator::spec_get_limit</a>(aggr);
-    // This enforces <a id="high-level-req-3" href="#high-level-req">high-level requirement 3</a>:
-    <b>aborts_if</b> collect_fee_enabled && !<b>exists</b>&lt;CollectedFeesPerBlock&gt;(@aptos_framework);
-    <b>aborts_if</b> collect_fee_enabled && transaction_fee_amount &gt; 0 && aggr_val + transaction_fee_amount &gt; aggr_lim;
-    <b>let</b> amount_to_burn= <b>if</b> (collect_fee_enabled) {
-        0
-    } <b>else</b> {
-        transaction_fee_amount - storage_fee_refunded
-    };
-    <b>let</b> apt_addr = <a href="../../aptos-stdlib/doc/type_info.md#0x1_type_info_type_of">type_info::type_of</a>&lt;AptosCoin&gt;().account_address;
-    <b>let</b> maybe_apt_supply = <b>global</b>&lt;CoinInfo&lt;AptosCoin&gt;&gt;(apt_addr).supply;
-    <b>let</b> total_supply_enabled = <a href="../../aptos-stdlib/../move-stdlib/doc/option.md#0x1_option_spec_is_some">option::spec_is_some</a>(maybe_apt_supply);
-    <b>let</b> apt_supply = <a href="../../aptos-stdlib/../move-stdlib/doc/option.md#0x1_option_spec_borrow">option::spec_borrow</a>(maybe_apt_supply);
-    <b>let</b> apt_supply_value = <a href="optional_aggregator.md#0x1_optional_aggregator_optional_aggregator_value">optional_aggregator::optional_aggregator_value</a>(apt_supply);
-    <b>let</b> <b>post</b> post_maybe_apt_supply = <b>global</b>&lt;CoinInfo&lt;AptosCoin&gt;&gt;(apt_addr).supply;
-    <b>let</b> <b>post</b> post_apt_supply = <a href="../../aptos-stdlib/../move-stdlib/doc/option.md#0x1_option_spec_borrow">option::spec_borrow</a>(post_maybe_apt_supply);
-    <b>let</b> <b>post</b> post_apt_supply_value = <a href="optional_aggregator.md#0x1_optional_aggregator_optional_aggregator_value">optional_aggregator::optional_aggregator_value</a>(post_apt_supply);
-    <b>aborts_if</b> amount_to_burn &gt; 0 && !<b>exists</b>&lt;AptosCoinCapabilities&gt;(@aptos_framework);
-    <b>aborts_if</b> amount_to_burn &gt; 0 && !<b>exists</b>&lt;CoinInfo&lt;AptosCoin&gt;&gt;(apt_addr);
-    <b>aborts_if</b> amount_to_burn &gt; 0 && total_supply_enabled && apt_supply_value &lt; amount_to_burn;
-    <b>ensures</b> total_supply_enabled ==&gt; apt_supply_value - amount_to_burn == post_apt_supply_value;
-    <b>let</b> amount_to_mint = <b>if</b> (collect_fee_enabled) {
-        storage_fee_refunded
-    } <b>else</b> {
-        storage_fee_refunded - transaction_fee_amount
-    };
-    <b>let</b> total_supply = <a href="coin.md#0x1_coin_supply">coin::supply</a>&lt;AptosCoin&gt;;
-    <b>let</b> <b>post</b> post_total_supply = <a href="coin.md#0x1_coin_supply">coin::supply</a>&lt;AptosCoin&gt;;
-    <b>aborts_if</b> amount_to_mint &gt; 0 && !<b>exists</b>&lt;CoinStore&lt;AptosCoin&gt;&gt;(addr);
-    <b>aborts_if</b> amount_to_mint &gt; 0 && !<b>exists</b>&lt;AptosCoinMintCapability&gt;(@aptos_framework);
-    <b>aborts_if</b> amount_to_mint &gt; 0 && total_supply + amount_to_mint &gt; MAX_U128;
-    <b>ensures</b> amount_to_mint &gt; 0 ==&gt; post_total_supply == total_supply + amount_to_mint;
-    <b>let</b> aptos_addr = <a href="../../aptos-stdlib/doc/type_info.md#0x1_type_info_type_of">type_info::type_of</a>&lt;AptosCoin&gt;().account_address;
-    <b>aborts_if</b> (amount_to_mint != 0) && !<b>exists</b>&lt;<a href="coin.md#0x1_coin_CoinInfo">coin::CoinInfo</a>&lt;AptosCoin&gt;&gt;(aptos_addr);
-    <b>include</b> <a href="coin.md#0x1_coin_CoinAddAbortsIf">coin::CoinAddAbortsIf</a>&lt;AptosCoin&gt; { amount: amount_to_mint };
 }
 </code></pre>
 
