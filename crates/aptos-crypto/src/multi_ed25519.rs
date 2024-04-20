@@ -527,16 +527,16 @@ impl Signature for MultiEd25519Signature {
                 )
             ));
         }
-        let mut bitmap_index = 0;
-        // TODO: Eventually switch to deterministic batch verification
-        for sig in &self.signatures {
-            while !bitmap_get_bit(self.bitmap, bitmap_index) {
-                bitmap_index += 1;
-            }
-            sig.verify_arbitrary_msg(message, &public_key.public_keys[bitmap_index])?;
-            bitmap_index += 1;
-        }
-        Ok(())
+
+        self.signatures
+            .iter()
+            .enumerate()
+            .filter(|(bitmap_index, _)| bitmap_get_bit(self.bitmap, *bitmap_index))
+            .map(|(bitmap_index, sig)| {
+                sig.verify_arbitrary_msg(message, &public_key.public_keys[bitmap_index])
+            })
+            .reduce(|accumulator, element| accumulator.and(element))
+            .unwrap_or(Ok(()))
     }
 
     fn to_bytes(&self) -> Vec<u8> {
