@@ -418,7 +418,7 @@ export class AptosClient {
    * for which events are queried. This refers to the account that events were emitted
    * to, not the account hosting the move module that emits that event type.
    * @param creationNumber Creation number corresponding to the event type.
-   * @returns Array of events assotiated with the given account and creation number.
+   * @returns Array of events associated with the given account and creation number.
    */
   @parseApiError
   async getEventsByCreationNumber(
@@ -704,7 +704,7 @@ export class AptosClient {
    * const rawTransaction = await this.generateRawTransaction(sender.address(), payload, extraArgs);
    * const bcsTxn = AptosClient.generateBCSTransaction(sender, rawTransaction);
    * const pendingTransaction = await this.submitSignedBCSTransaction(bcsTxn);
-   * const transasction = await this.aptosClient.waitForTransactionWithResult(pendingTransaction.hash);
+   * const transaction = await this.aptosClient.waitForTransactionWithResult(pendingTransaction.hash);
    * ```
    */
   async waitForTransactionWithResult(

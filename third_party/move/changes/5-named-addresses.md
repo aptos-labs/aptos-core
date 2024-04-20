@@ -197,4 +197,4 @@ Named address support will be expanded in a new package system. The intent is th
 a Move program will never assign a value to a named address within the `*.move` files. Instead, all
 assignment of a named addresses will exist in a config file, similar to Rust's `Cargo.toml` files.
 To enable this package system, additional support will likely be needed from the compiler for
-configuring and assigning named addreses.
+configuring and assigning named addresses.

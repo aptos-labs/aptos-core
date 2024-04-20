@@ -8,7 +8,7 @@ error[E05001]: ability constraint not satisfied
    │         ^^^^^^^^^^^
    │         │ │
    │         │ The type 'signer' does not have the ability 'copy'
-   │         'copy' constraint not satisifed
+   │         'copy' constraint not satisfied
 
 error[E05001]: ability constraint not satisfied
    ┌─ tests/move_check/typing/ability_constraint_prims_invalid.move:21:9

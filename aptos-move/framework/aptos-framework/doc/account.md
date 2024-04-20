@@ -760,7 +760,7 @@ The caller does not have a digital-signature-based capability to call this funct
 
 <a id="0x1_account_ENO_SUCH_ROTATION_CAPABILITY_OFFER"></a>
 
-The specified rotation capablity offer does not exist at the specified offerer address
+The specified rotation capability offer does not exist at the specified offerer address
 
 
 <pre><code><b>const</b> <a href="account.md#0x1_account_ENO_SUCH_ROTATION_CAPABILITY_OFFER">ENO_SUCH_ROTATION_CAPABILITY_OFFER</a>: u64 = 18;

@@ -12,7 +12,7 @@ export const $CheckSummary = {
         },
         summary_score: {
             type: 'number',
-            description: `An aggeregated summary (method TBA).`,
+            description: `An aggregated summary (method TBA).`,
             isRequired: true,
             format: 'uint8',
         },

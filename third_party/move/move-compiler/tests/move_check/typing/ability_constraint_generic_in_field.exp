@@ -7,7 +7,7 @@ error[E05001]: ability constraint not satisfied
   │              -       ^^^^
   │              │       │ │
   │              │       │ The type 'T' does not have the ability 'copy'
-  │              │       'copy' constraint not satisifed
+  │              │       'copy' constraint not satisfied
   │              To satisfy the constraint, the 'copy' ability would need to be added here
 
 error[E05001]: ability constraint not satisfied

@@ -160,7 +160,7 @@ while storing snapshot of aggregator state elsewhere.
 
 <a id="0x1_aggregator_v2_EAGGREGATOR_OVERFLOW"></a>
 
-The value of aggregator overflows. Raised by uncoditional add() call
+The value of aggregator overflows. Raised by unconditional add() call
 
 
 <pre><code><b>const</b> <a href="aggregator_v2.md#0x1_aggregator_v2_EAGGREGATOR_OVERFLOW">EAGGREGATOR_OVERFLOW</a>: u64 = 1;
@@ -170,7 +170,7 @@ The value of aggregator overflows. Raised by uncoditional add() call
 
 <a id="0x1_aggregator_v2_EAGGREGATOR_UNDERFLOW"></a>
 
-The value of aggregator underflows (goes below zero). Raised by uncoditional sub() call
+The value of aggregator underflows (goes below zero). Raised by unconditional sub() call
 
 
 <pre><code><b>const</b> <a href="aggregator_v2.md#0x1_aggregator_v2_EAGGREGATOR_UNDERFLOW">EAGGREGATOR_UNDERFLOW</a>: u64 = 2;
