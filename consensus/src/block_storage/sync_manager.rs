@@ -328,26 +328,26 @@ impl BlockStore {
         }
 
         // Check early that recovery will succeed, and return before corrupting our state in case it will not.
-        LedgerRecoveryData::new(highest_commit_decision.clone())
-            .find_root(&mut blocks.clone(), &mut quorum_certs.clone())
-            .with_context(|| {
-                // for better readability
-                quorum_certs.sort_by_key(|qc| qc.certified_block().round());
-                format!(
-                    "\nRoot: {:?}\nBlocks in db: {}\nQuorum Certs in db: {}\n",
-                    highest_commit_decision.commit_info(),
-                    blocks
-                        .iter()
-                        .map(|b| format!("\n\t{}", b))
-                        .collect::<Vec<String>>()
-                        .concat(),
-                    quorum_certs
-                        .iter()
-                        .map(|qc| format!("\n\t{}", qc))
-                        .collect::<Vec<String>>()
-                        .concat(),
-                )
-            })?;
+        // LedgerRecoveryData::new(highest_commit_decision.clone())
+        //     .find_root(&mut blocks.clone(), &mut quorum_certs.clone())
+        //     .with_context(|| {
+        //         // for better readability
+        //         quorum_certs.sort_by_key(|qc| qc.certified_block().round());
+        //         format!(
+        //             "\nRoot: {:?}\nBlocks in db: {}\nQuorum Certs in db: {}\n",
+        //             highest_commit_decision.commit_info(),
+        //             blocks
+        //                 .iter()
+        //                 .map(|b| format!("\n\t{}", b))
+        //                 .collect::<Vec<String>>()
+        //                 .concat(),
+        //             quorum_certs
+        //                 .iter()
+        //                 .map(|qc| format!("\n\t{}", qc))
+        //                 .collect::<Vec<String>>()
+        //                 .concat(),
+        //         )
+        //     })?;
 
         storage.save_tree(blocks.clone(), quorum_certs.clone())?;
 
