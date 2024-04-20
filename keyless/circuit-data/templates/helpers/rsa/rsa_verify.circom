@@ -80,6 +80,9 @@ template RsaVerifyPkcs1v15(w, nb) {
     // 1. Check hashed data
     // 64 * 4 = 256 bit. the first 4 numbers
     for (var i = 0; i < 4; i++) {
+        log(i);
+        log(hashed[i]);
+        log(pm.out[i]);
         hashed[i] === pm.out[i];
     }
     

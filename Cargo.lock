@@ -2312,11 +2312,14 @@ dependencies = [
  "anyhow",
  "aptos-crypto",
  "aptos-keyless-common",
+ "aptos-types",
  "ark-bn254",
  "ark-ff",
  "base64 0.13.1",
  "futures",
  "itertools 0.12.1",
+ "num-bigint 0.4.4",
+ "num-modular",
  "num-traits",
  "rand 0.8.5",
  "rand_chacha 0.3.1",
@@ -2332,8 +2335,13 @@ name = "aptos-keyless-common"
 version = "0.1.0"
 dependencies = [
  "anyhow",
+ "aptos-types",
  "ark-bn254",
+ "ark-ff",
  "base64 0.13.1",
+ "hex",
+ "num-bigint 0.3.3",
+ "num-modular",
  "serde",
  "serde_json",
  "tempfile",
@@ -11447,6 +11455,17 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "7d03e6c028c5dc5cac6e2dec0efda81fc887605bb3d884578bb6d6bf7514e252"
 dependencies = [
  "autocfg",
+ "num-integer",
+ "num-traits",
+]
+
+[[package]]
+name = "num-modular"
+version = "0.6.1"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "17bb261bf36fa7d83f4c294f834e91256769097b3cb505d44831e0a179ac647f"
+dependencies = [
+ "num-bigint 0.4.4",
  "num-integer",
  "num-traits",
 ]

@@ -15,7 +15,7 @@ fn byte_to_bits_msb(byte: u8) -> Vec<bool> {
     (0..8).map(|i| (byte >> (7 - i)) & 1 != 0).collect()
 }
 
-fn bytes_to_bits_msb(msg: Vec<u8>) -> Vec<bool> {
+pub fn bytes_to_bits_msb(msg: Vec<u8>) -> Vec<bool> {
     msg.into_iter().flat_map(byte_to_bits_msb).collect()
 }
 
