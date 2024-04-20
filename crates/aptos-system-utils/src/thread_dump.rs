@@ -1,15 +1,15 @@
 // Copyright © Aptos Foundation
 // SPDX-License-Identifier: Apache-2.0
 
-use crate::server::utils::{reply_with, reply_with_status};
+use crate::utils::{reply_with, reply_with_status};
 use anyhow::{ensure, Error};
-use aptos_logger::info;
 use async_mutex::Mutex;
 use http::header::{HeaderValue, CONTENT_LENGTH};
 use hyper::{Body, Request, Response, StatusCode};
 use lazy_static::lazy_static;
 use rstack_self::TraceOptions;
 use std::{collections::HashMap, env, process::Command};
+use tracing::info;
 
 lazy_static! {
     static ref THREAD_DUMP_MUTEX: Mutex<()> = Mutex::new(());
