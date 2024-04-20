@@ -11,6 +11,7 @@ use aptos_db::AptosDB;
 use aptos_executor::block_executor::BlockExecutor;
 use aptos_executor_types::BlockExecutorTrait;
 use aptos_sdk::{
+    move_types::account_address::AccountAddress,
     transaction_builder::TransactionFactory,
     types::{AccountKey, LocalAccount},
 };
@@ -19,13 +20,12 @@ use aptos_storage_interface::{
     DbReaderWriter, Order,
 };
 use aptos_types::{
-    account_config::aptos_test_root_address,
-    account_view::AccountView,
+    account_config::{aptos_test_root_address, AccountResource, CoinStoreResource},
     block_metadata::BlockMetadata,
     chain_id::ChainId,
     event::EventKey,
     ledger_info::LedgerInfo,
-    state_store::account_with_state_view::{AccountWithStateView, AsAccountWithStateView},
+    state_store::{MoveResourceExt, StateView},
     test_helpers::transaction_test_helpers::{block, TEST_BLOCK_EXECUTOR_ONCHAIN_CONFIG},
     transaction::{
         signature_verified_transaction::{
@@ -81,9 +81,10 @@ pub fn test_execution_with_storage_impl_inner(
     let account3 = LocalAccount::generate(&mut rng);
     let account4 = LocalAccount::generate(&mut rng);
 
-    let account1_address = account1.address();
-    let account2_address = account2.address();
-    let account3_address = account3.address();
+    let addr1 = account1.address();
+    let addr2 = account2.address();
+    let addr3 = account3.address();
+    let addr4 = account4.address();
 
     let txn_factory = TransactionFactory::new(ChainId::test());
 
@@ -249,35 +250,25 @@ pub fn test_execution_with_storage_impl_inner(
 
     // test the initial balance.
     // not a state checkpoint, can't get verified view
-    let db_state_view = db.reader.state_view_at_version(Some(7)).unwrap();
-    let account1_view = db_state_view.as_account_with_state_view(&account1_address);
-    verify_account_balance(get_account_balance(&account1_view), |x| x == 2_000 * B).unwrap();
-
-    let account2_view = db_state_view.as_account_with_state_view(&account2_address);
-    verify_account_balance(get_account_balance(&account2_view), |x| x == 1_200 * B).unwrap();
-
-    let account3_view = db_state_view.as_account_with_state_view(&account3_address);
-    verify_account_balance(get_account_balance(&account3_view), |x| x == 1_000 * B).unwrap();
+    let view = db.reader.state_view_at_version(Some(7)).unwrap();
+    verify_account_balance(get_account_balance(&view, &addr1), |x| x == 2_000 * B).unwrap();
+    verify_account_balance(get_account_balance(&view, &addr2), |x| x == 1_200 * B).unwrap();
+    verify_account_balance(get_account_balance(&view, &addr3), |x| x == 1_000 * B).unwrap();
 
     // test the final balance.
-    let db_state_view = db
+    let view = db
         .reader
         .verified_state_view_at_version(Some(current_version), latest_li)
         .unwrap();
-    let account1_view = db_state_view.as_account_with_state_view(&account1_address);
-    verify_account_balance(get_account_balance(&account1_view), |x| {
+    verify_account_balance(get_account_balance(&view, &addr1), |x| {
         approx_eq(x, 1_910 * B)
     })
     .unwrap();
-
-    let account2_view = db_state_view.as_account_with_state_view(&account2_address);
-    verify_account_balance(get_account_balance(&account2_view), |x| {
+    verify_account_balance(get_account_balance(&view, &addr2), |x| {
         approx_eq(x, 1_210 * B)
     })
     .unwrap();
-
-    let account3_view = db_state_view.as_account_with_state_view(&account3_address);
-    verify_account_balance(get_account_balance(&account3_view), |x| {
+    verify_account_balance(get_account_balance(&view, &addr3), |x| {
         approx_eq(x, 1_080 * B)
     })
     .unwrap();
@@ -368,13 +359,11 @@ pub fn test_execution_with_storage_impl_inner(
             .unwrap();
         // Account3 has three deposit events: from being minted to and from two transfers.
         assert_eq!(account3_received_events.len(), 3);
-        let account4_resource = db
+        let view = db
             .reader
             .verified_state_view_at_version(Some(current_version), latest_li)
-            .unwrap()
-            .as_account_with_state_view(&account4.address())
-            .get_account_resource()
             .unwrap();
+        let account4_resource = AccountResource::fetch_move_resource(&view, &addr4).unwrap();
         assert!(account4_resource.is_none());
 
         let account4_sent_events = db
@@ -444,19 +433,16 @@ pub fn test_execution_with_storage_impl_inner(
         .unwrap();
     verify_committed_txn_status(latest_li, &t28, &block3[14]).unwrap();
 
-    let db_state_view = db
+    let view = db
         .reader
         .verified_state_view_at_version(Some(current_version), latest_li)
         .unwrap();
 
-    let account1_view = db_state_view.as_account_with_state_view(&account1_address);
-    verify_account_balance(get_account_balance(&account1_view), |x| {
+    verify_account_balance(get_account_balance(&view, &addr1), |x| {
         approx_eq(x, 1_770 * B)
     })
     .unwrap();
-
-    let account3_view = db_state_view.as_account_with_state_view(&account3_address);
-    verify_account_balance(get_account_balance(&account3_view), |x| {
+    verify_account_balance(get_account_balance(&view, &addr3), |x| {
         approx_eq(x, 1_220 * B)
     })
     .unwrap();
@@ -568,12 +554,10 @@ pub fn create_db_and_executor<P: AsRef<std::path::Path>>(
     (db, dbrw, executor, waypoint)
 }
 
-pub fn get_account_balance(account_state_view: &AccountWithStateView) -> u64 {
-    account_state_view
-        .get_coin_store_resource()
+pub fn get_account_balance(state_view: &dyn StateView, address: &AccountAddress) -> u64 {
+    CoinStoreResource::fetch_move_resource(state_view, address)
         .unwrap()
-        .map(|b| b.coin())
-        .unwrap_or(0)
+        .map_or(0, |coin_store| coin_store.coin())
 }
 
 pub fn verify_account_balance<F>(balance: u64, f: F) -> Result<()>

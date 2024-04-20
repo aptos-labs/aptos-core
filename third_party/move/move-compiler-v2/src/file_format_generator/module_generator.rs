@@ -17,11 +17,13 @@ use move_binary_format::{
     file_format_common,
 };
 use move_bytecode_source_map::source_map::{SourceMap, SourceName};
-use move_core_types::{account_address::AccountAddress, identifier::Identifier};
+use move_core_types::{
+    account_address::AccountAddress, identifier::Identifier, metadata::Metadata,
+};
 use move_ir_types::ast as IR_AST;
 use move_model::{
     ast::{AccessSpecifier, Address, AddressSpecifier, ResourceSpecifier},
-    metadata::LanguageVersion,
+    metadata::{CompilationMetadata, CompilerVersion, LanguageVersion, COMPILATION_METADATA_KEY},
     model::{
         FieldEnv, FunId, FunctionEnv, GlobalEnv, Loc, ModuleEnv, ModuleId, Parameter, QualifiedId,
         StructEnv, StructId, TypeParameter, TypeParameterKind,
@@ -102,12 +104,20 @@ impl ModuleGenerator {
         module_env: &ModuleEnv,
     ) -> (FF::CompiledModule, SourceMap, Option<FF::FunctionHandle>) {
         let options = module_env.env.get_extension::<Options>().expect("options");
-        let gen_access_specifiers = options.language_version.unwrap_or_default()
-            >= LanguageVersion::V2_0
+        let language_version = options.language_version.unwrap_or_default();
+        let gen_access_specifiers = language_version >= LanguageVersion::V2_0
             && options.experiment_on(Experiment::GEN_ACCESS_SPECIFIERS);
+        let compilation_metadata =
+            CompilationMetadata::new(CompilerVersion::V2_0, language_version);
+        let metadata = Metadata {
+            key: COMPILATION_METADATA_KEY.to_vec(),
+            value: bcs::to_bytes(&compilation_metadata)
+                .expect("Serialization of CompilationMetadata should succeed"),
+        };
         let module = move_binary_format::CompiledModule {
             version: file_format_common::VERSION_NEXT,
             self_module_handle_idx: FF::ModuleHandleIndex(0),
+            metadata: vec![metadata],
             ..Default::default()
         };
         let source_map = {

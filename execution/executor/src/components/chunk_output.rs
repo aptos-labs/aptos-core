@@ -210,6 +210,7 @@ impl ChunkOutput {
     ) -> Result<BlockOutput<TransactionOutput>> {
         use aptos_types::{
             state_store::{StateViewId, TStateView},
+            transaction::TransactionAuxiliaryData,
             write_set::WriteSet,
         };
 
@@ -227,10 +228,10 @@ impl ChunkOutput {
                             Vec::new(),
                             0, // Keep gas zero to match with StateCheckpoint txn output
                             TransactionStatus::Keep(ExecutionStatus::Success),
+                            TransactionAuxiliaryData::None,
                         )
                     })
                     .collect::<Vec<_>>(),
-                None,
             ),
         };
         Ok(transaction_outputs)

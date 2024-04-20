@@ -188,12 +188,14 @@ spec:
         {{- include "aptos-monitoring.selectorLabels" . | nindent 8 }}
         app.kubernetes.io/name: monitoring
       annotations:
-        seccomp.security.alpha.kubernetes.io/pod: runtime/default
         checksum/prometheus.yml: {{ tpl (.Files.Get "files/prometheus.yml") . | sha256sum }}
         checksum/alertmanager.yml: {{ tpl (.Files.Get "files/alertmanager.yml") . | sha256sum }}
         checksum/rules.yml: {{ (tpl (.Files.Glob "files/rules/*.yml").AsConfig .) | sha256sum }}
         checksum/dashboards.json: {{ (.Files.Glob "files/dashboards/*.json.gz").AsSecrets | sha256sum }}
     spec:
+      securityContext:
+        seccompProfile:
+          type: RuntimeDefault
       {{- with .Values.monitoring }}
       containers:
       - name: prometheus

@@ -13,39 +13,42 @@ use aptos_storage_interface::{
     state_delta::StateDelta,
 };
 use aptos_types::{
-    account_address::AccountAddress,
-    account_config::CORE_CODE_ADDRESS,
-    account_view::AccountView,
     epoch_state::EpochState,
+    on_chain_config::{ConfigurationResource, OnChainConfig, ValidatorSet},
     state_store::{
         create_empty_sharded_state_updates, state_key::StateKey,
         state_storage_usage::StateStorageUsage, state_value::StateValue, ShardedStateUpdates,
+        TStateView,
     },
     transaction::Version,
     write_set::{TransactionWrite, WriteSet},
 };
 use arr_macro::arr;
-use bytes::Bytes;
 use dashmap::DashMap;
 use itertools::zip_eq;
 use rayon::prelude::*;
 use std::collections::HashMap;
 
-struct CoreAccountStateView<'a> {
+struct StateCacheView<'a> {
     base: &'a ShardedStateCache,
     updates: &'a ShardedStateUpdates,
 }
 
-impl<'a> CoreAccountStateView<'a> {
+impl<'a> StateCacheView<'a> {
     pub fn new(base: &'a ShardedStateCache, updates: &'a ShardedStateUpdates) -> Self {
         Self { base, updates }
     }
 }
 
-impl<'a> AccountView for CoreAccountStateView<'a> {
-    fn get_state_value(&self, state_key: &StateKey) -> Result<Option<Bytes>> {
+impl<'a> TStateView for StateCacheView<'a> {
+    type Key = StateKey;
+
+    fn get_state_value(
+        &self,
+        state_key: &Self::Key,
+    ) -> aptos_types::state_store::Result<Option<StateValue>> {
         if let Some(v_opt) = self.updates[state_key.get_shard_id() as usize].get(state_key) {
-            return Ok(v_opt.as_ref().map(StateValue::bytes).cloned());
+            return Ok(v_opt.clone());
         }
         if let Some(entry) = self
             .base
@@ -54,13 +57,13 @@ impl<'a> AccountView for CoreAccountStateView<'a> {
             .as_ref()
         {
             let state_value = entry.value().1.as_ref();
-            return Ok(state_value.map(StateValue::bytes).cloned());
+            return Ok(state_value.cloned());
         }
         Ok(None)
     }
 
-    fn get_account_address(&self) -> Result<Option<AccountAddress>> {
-        Ok(Some(CORE_CODE_ADDRESS))
+    fn get_usage(&self) -> aptos_types::state_store::Result<StateStorageUsage> {
+        unreachable!("not supposed to be used.")
     }
 }
 
@@ -420,12 +423,10 @@ impl InMemoryStateCalculatorV2 {
         base: &ShardedStateCache,
         updates: &ShardedStateUpdates,
     ) -> Result<EpochState> {
-        let core_account_view = CoreAccountStateView::new(base, updates);
-        let validator_set = core_account_view
-            .get_validator_set()?
+        let state_cache_view = StateCacheView::new(base, updates);
+        let validator_set = ValidatorSet::fetch_config(&state_cache_view)
             .ok_or_else(|| anyhow!("ValidatorSet not touched on epoch change"))?;
-        let configuration = core_account_view
-            .get_configuration_resource()?
+        let configuration = ConfigurationResource::fetch_config(&state_cache_view)
             .ok_or_else(|| anyhow!("Configuration resource not touched on epoch change"))?;
 
         Ok(EpochState {

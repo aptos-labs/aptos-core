@@ -3,7 +3,7 @@ module 0x42::m {
     struct S has store {}
     struct R has store {}
     struct T has store {}
-    struct G<T> has store {}
+    struct G<phantom T> has store {}
 
     fun f1() acquires S {
     }

@@ -11,9 +11,11 @@ use aptos_logger::info;
 use aptos_sdk::{transaction_builder::TransactionFactory, types::LocalAccount};
 use aptos_storage_interface::{state_view::LatestDbStateCheckpointView, DbReader, DbReaderWriter};
 use aptos_types::{
-    account_address::AccountAddress, account_config::aptos_test_root_address,
-    account_view::AccountView, chain_id::ChainId,
-    state_store::account_with_state_view::AsAccountWithStateView, transaction::Transaction,
+    account_address::AccountAddress,
+    account_config::{aptos_test_root_address, AccountResource},
+    chain_id::ChainId,
+    state_store::MoveResourceExt,
+    transaction::Transaction,
 };
 use chrono::Local;
 use indicatif::{ProgressBar, ProgressStyle};
@@ -55,9 +57,7 @@ pub(crate) fn get_progress_bar(num_accounts: usize) -> ProgressBar {
 fn get_sequence_number(address: AccountAddress, reader: Arc<dyn DbReader>) -> u64 {
     let db_state_view = reader.latest_state_checkpoint_view().unwrap();
 
-    let account_state_view = db_state_view.as_account_with_state_view(&address);
-
-    match account_state_view.get_account_resource().unwrap() {
+    match AccountResource::fetch_move_resource(&db_state_view, &address).unwrap() {
         Some(account_resource) => account_resource.sequence_number(),
         None => 0,
     }
@@ -782,10 +782,8 @@ impl TransactionGenerator {
             .for_each(|account| {
                 let address = account.address();
                 let db_state_view = db.latest_state_checkpoint_view().unwrap();
-                let address_account_view = db_state_view.as_account_with_state_view(&address);
                 assert_eq!(
-                    address_account_view
-                        .get_account_resource()
+                    AccountResource::fetch_move_resource(&db_state_view, &address)
                         .unwrap()
                         .unwrap()
                         .sequence_number(),

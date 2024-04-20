@@ -211,3 +211,6 @@ fun fields::write_val($t0: fields::S): fields::S {
   5: $t1 := infer($t0)
   6: return $t1
 }
+
+
+============ bytecode verification succeeded ========

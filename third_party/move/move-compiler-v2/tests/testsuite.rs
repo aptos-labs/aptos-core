@@ -8,7 +8,8 @@ use itertools::Itertools;
 use log::debug;
 use move_compiler_v2::{
     annotate_units, disassemble_compiled_units, env_pipeline::rewrite_target::RewritingScope,
-    logging, pipeline, run_bytecode_verifier, run_file_format_gen, Experiment, Options,
+    logging, pipeline, plan_builder, run_bytecode_verifier, run_file_format_gen, Experiment,
+    Options,
 };
 use move_model::{metadata::LanguageVersion, model::GlobalEnv};
 use move_prover_test_utils::{baseline_test, extract_test_directives};
@@ -219,11 +220,11 @@ const TEST_CONFIGS: Lazy<BTreeMap<&str, TestConfig>> = Lazy::new(|| {
             exclude: vec![],
             exp_suffix: None,
             options: opts.clone(),
-            // Run the bytecode pipeline as well for double-checking the result
-            stop_after: StopAfter::BytecodeGen,
+            // Run the entire compiler pipeline to double-check the result
+            stop_after: StopAfter::FileFormat,
             dump_ast: DumpLevel::EndStage,
             dump_bytecode: DumpLevel::EndStage,
-            dump_bytecode_filter: None,
+            dump_bytecode_filter: Some(vec![INITIAL_BYTECODE_STAGE]),
         },
         // -- Tests for stages in the bytecode pipeline
         // Live-var tests
@@ -333,7 +334,8 @@ const TEST_CONFIGS: Lazy<BTreeMap<&str, TestConfig>> = Lazy::new(|| {
             include: vec!["/acquires-checker/"],
             exclude: vec![],
             exp_suffix: None,
-            options: opts.clone(),
+            // Skip access check to avoid error message change in the acquires-checker
+            options: opts.clone().set_experiment(Experiment::ACCESS_CHECK, false),
             // Run the full compiler pipeline to double-check the result.
             stop_after: StopAfter::FileFormat,
             dump_ast: DumpLevel::None,
@@ -606,6 +608,14 @@ fn run_test(path: &Path, config: TestConfig) -> datatest_stable::Result<()> {
                 ));
             }
         }
+    }
+
+    if options.compile_test_code {
+        // Build the test plan here to parse and validate any test-related attributes in the AST.
+        // In real use, this is run outside of the compilation process, but the needed info is
+        // available in `env` once we finish the AST.
+        plan_builder::construct_test_plan(&env, None);
+        ok = check_diags(&mut test_output.borrow_mut(), &env);
     }
 
     if ok && config.stop_after > StopAfter::AstPipeline {

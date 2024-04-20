@@ -131,6 +131,11 @@ pub static EXPERIMENTS: Lazy<BTreeMap<String, Experiment>> = Lazy::new(|| {
             default: Inherited(Experiment::OPTIMIZE.to_string()),
         },
         Experiment {
+            name: Experiment::UNUSED_STRUCT_PARAMS_CHECK.to_string(),
+            description: "Whether to check for unused struct type parameters".to_string(),
+            default: Inherited(Experiment::CHECKS.to_string()),
+        },
+        Experiment {
             name: Experiment::VARIABLE_COALESCING.to_string(),
             description: "Whether to run variable coalescing".to_string(),
             default: Inherited(Experiment::OPTIMIZE.to_string()),
@@ -183,6 +188,7 @@ impl Experiment {
     pub const CHECKS: &'static str = "checks";
     pub const COPY_PROPAGATION: &'static str = "copy-propagation";
     pub const DEAD_CODE_ELIMINATION: &'static str = "dead-code-elimination";
+    pub const DUPLICATE_STRUCT_PARAMS_CHECK: &'static str = "duplicate-struct-params-check";
     pub const GEN_ACCESS_SPECIFIERS: &'static str = "gen-access-specifiers";
     pub const INLINING: &'static str = "inlining";
     pub const KEEP_INLINE_FUNS: &'static str = "keep-inline-funs";
@@ -195,6 +201,7 @@ impl Experiment {
     pub const SPEC_REWRITE: &'static str = "spec-rewrite";
     pub const SPLIT_CRITICAL_EDGES: &'static str = "split-critical-edges";
     pub const UNINITIALIZED_CHECK: &'static str = "uninitialized-check";
+    pub const UNUSED_STRUCT_PARAMS_CHECK: &'static str = "unused-struct-params-check";
     pub const USAGE_CHECK: &'static str = "usage-check";
     pub const VARIABLE_COALESCING: &'static str = "variable-coalescing";
     pub const VARIABLE_COALESCING_ANNOTATE: &'static str = "variable-coalescing-annotate";

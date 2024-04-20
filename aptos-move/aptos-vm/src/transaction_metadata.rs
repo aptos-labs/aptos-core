@@ -25,6 +25,7 @@ pub struct TransactionMetadata {
     pub chain_id: ChainId,
     pub script_hash: Vec<u8>,
     pub script_size: NumBytes,
+    pub required_deposit: Option<u64>,
 }
 
 impl TransactionMetadata {
@@ -63,6 +64,7 @@ impl TransactionMetadata {
                 TransactionPayload::Script(s) => (s.code().len() as u64).into(),
                 _ => NumBytes::zero(),
             },
+            required_deposit: None,
         }
     }
 
@@ -118,5 +120,9 @@ impl TransactionMetadata {
 
     pub fn is_multi_agent(&self) -> bool {
         !self.secondary_signers.is_empty() || self.fee_payer.is_some()
+    }
+
+    pub fn set_required_deposit(&mut self, required_deposit: Option<u64>) {
+        self.required_deposit = required_deposit;
     }
 }
