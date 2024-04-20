@@ -25,7 +25,7 @@ module aptos_framework::fungible_asset {
     const EMAX_SUPPLY_EXCEEDED: u64 = 5;
     /// Fungible asset do not match when merging.
     const EFUNGIBLE_ASSET_MISMATCH: u64 = 6;
-    /// The mint ref and the the store do not match.
+    /// The mint ref and the store do not match.
     const EMINT_REF_AND_STORE_MISMATCH: u64 = 7;
     /// Account is not the store's owner.
     const ENOT_STORE_OWNER: u64 = 8;

@@ -2092,7 +2092,7 @@ Destroy a burn capability.
 
 <tr>
 <td>7</td>
-<td>It should always be possible to (1) determine if a coin exists, and (2) determine if a user registered an account with a particular coin. If a coin exists, it should always be possible to request the following</td>
+<td>It should always be possible to (1) determine if a coin exists, and (2) determine if a user registered an account with a particular coin. If a coin exists, it should always be possible to request the following information of the coin: (1) Name, (2) Symbol, and (3) Supply.</td>
 <td>Low</td>
 <td>The following functions should never abort: (1) is_coin_initialized, and (2) is_account_registered. The following functions should not abort if the coin exists: (1) name, (2) symbol, and (3) supply.</td>
 <td>Formally Verified in corresponding functions: <a href="#high-level-req-7.1">is_coin_initialized</a>, <a href="#high-level-req-7.2">is_account_registered</a>, <a href="#high-level-req-7.3">name</a>, <a href="#high-level-req-7.4">symbol</a> and <a href="#high-level-req-7.5">supply</a>.</td>

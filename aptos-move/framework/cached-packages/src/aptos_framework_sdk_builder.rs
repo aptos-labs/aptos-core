@@ -321,7 +321,7 @@ pub enum EntryFunctionCall {
     DelegationPoolEnableDelegatorsAllowlisting {},
 
     /// Enable partial governance voting on a stake pool. The voter of this stake pool will be managed by this module.
-    /// THe existing voter will be replaced. The function is permissionless.
+    /// The existing voter will be replaced. The function is permissionless.
     DelegationPoolEnablePartialGovernanceVoting {
         pool_address: AccountAddress,
     },
@@ -352,7 +352,7 @@ pub enum EntryFunctionCall {
     },
 
     /// Allows an operator to change its beneficiary. Any existing unpaid commission rewards will be paid to the new
-    /// beneficiary. To ensures payment to the current beneficiary, one should first call `synchronize_delegation_pool`
+    /// beneficiary. To ensure payment to the current beneficiary, one should first call `synchronize_delegation_pool`
     /// before switching the beneficiary. An operator can set one beneficiary for delegation pools, not a separate
     /// one for each pool.
     DelegationPoolSetBeneficiaryForOperator {
@@ -2378,7 +2378,7 @@ pub fn delegation_pool_enable_delegators_allowlisting() -> TransactionPayload {
 }
 
 /// Enable partial governance voting on a stake pool. The voter of this stake pool will be managed by this module.
-/// THe existing voter will be replaced. The function is permissionless.
+/// The existing voter will be replaced. The function is permissionless.
 pub fn delegation_pool_enable_partial_governance_voting(
     pool_address: AccountAddress,
 ) -> TransactionPayload {
@@ -2478,7 +2478,7 @@ pub fn delegation_pool_remove_delegator_from_allowlist(
 }
 
 /// Allows an operator to change its beneficiary. Any existing unpaid commission rewards will be paid to the new
-/// beneficiary. To ensures payment to the current beneficiary, one should first call `synchronize_delegation_pool`
+/// beneficiary. To ensure payment to the current beneficiary, one should first call `synchronize_delegation_pool`
 /// before switching the beneficiary. An operator can set one beneficiary for delegation pools, not a separate
 /// one for each pool.
 pub fn delegation_pool_set_beneficiary_for_operator(

@@ -344,7 +344,7 @@ impl TransactionBuilder {
 }
 
 //---------------------------------------------------------------------------
-// CoinStore resource represenation
+// CoinStore resource representation
 //---------------------------------------------------------------------------
 
 /// Struct that represents an account CoinStore resource for tests.
@@ -385,7 +385,7 @@ impl CoinStore {
 }
 
 //---------------------------------------------------------------------------
-// Account resource represenation
+// Account resource representation
 //---------------------------------------------------------------------------
 
 /// Represents an account along with initial state about it.

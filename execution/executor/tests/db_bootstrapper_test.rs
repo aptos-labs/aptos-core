@@ -24,11 +24,10 @@ use aptos_types::{
         aptos_test_root_address, new_block_event_key, CoinStoreResource, NewBlockEvent,
         CORE_CODE_ADDRESS,
     },
-    account_view::AccountView,
     contract_event::ContractEvent,
     event::EventHandle,
     on_chain_config::{access_path_for_config, ConfigurationResource, OnChainConfig, ValidatorSet},
-    state_store::{account_with_state_view::AsAccountWithStateView, state_key::StateKey},
+    state_store::{state_key::StateKey, MoveResourceExt},
     test_helpers::transaction_test_helpers::{block, TEST_BLOCK_EXECUTOR_ONCHAIN_CONFIG},
     transaction::{authenticator::AuthenticationKey, ChangeSet, Transaction, WriteSetPayload},
     trusted_state::TrustedState,
@@ -172,9 +171,7 @@ fn get_aptos_coin_transfer_transaction(
 
 fn get_balance(account: &AccountAddress, db: &DbReaderWriter) -> u64 {
     let db_state_view = db.reader.latest_state_checkpoint_view().unwrap();
-    let account_state_view = db_state_view.as_account_with_state_view(account);
-    account_state_view
-        .get_coin_store_resource()
+    CoinStoreResource::fetch_move_resource(&db_state_view, account)
         .unwrap()
         .unwrap()
         .coin()
@@ -182,12 +179,7 @@ fn get_balance(account: &AccountAddress, db: &DbReaderWriter) -> u64 {
 
 fn get_configuration(db: &DbReaderWriter) -> ConfigurationResource {
     let db_state_view = db.reader.latest_state_checkpoint_view().unwrap();
-    let aptos_framework_account_state_view =
-        db_state_view.as_account_with_state_view(&CORE_CODE_ADDRESS);
-    aptos_framework_account_state_view
-        .get_configuration_resource()
-        .unwrap()
-        .unwrap()
+    ConfigurationResource::fetch_config(&db_state_view).unwrap()
 }
 
 #[test]

@@ -15,14 +15,15 @@ use aptos_storage_interface::state_view::DbStateViewAtVersion;
 use aptos_types::{
     access_path::AccessPath,
     account_config::{aptos_test_root_address, AccountResource, CORE_CODE_ADDRESS},
-    account_view::AccountView,
     block_metadata::BlockMetadata,
-    state_store::{account_with_state_view::AsAccountWithStateView, state_key::StateKey},
+    on_chain_config::{AptosVersion, OnChainConfig, ValidatorSet},
+    state_store::{state_key::StateKey, MoveResourceExt},
     test_helpers::transaction_test_helpers::TEST_BLOCK_EXECUTOR_ONCHAIN_CONFIG,
     transaction::{
         signature_verified_transaction::into_signature_verified_block, Transaction, WriteSetPayload,
     },
     trusted_state::TrustedState,
+    validator_config::ValidatorConfig,
     validator_signer::ValidatorSigner,
 };
 use move_core_types::move_resource::MoveStructType;
@@ -93,21 +94,15 @@ fn test_reconfiguration() {
         .reader
         .state_view_at_version(Some(current_version))
         .unwrap();
-    let validator_account_state_view = db_state_view.as_account_with_state_view(&validator_account);
-    let aptos_framework_account_state_view =
-        db_state_view.as_account_with_state_view(&CORE_CODE_ADDRESS);
 
     assert_eq!(
-        aptos_framework_account_state_view
-            .get_validator_set()
-            .unwrap()
+        ValidatorSet::fetch_config(&db_state_view)
             .unwrap()
             .payload()
             .next()
             .unwrap()
             .consensus_public_key(),
-        &validator_account_state_view
-            .get_validator_config_resource()
+        &ValidatorConfig::fetch_move_resource(&db_state_view, &validator_account)
             .unwrap()
             .unwrap()
             .consensus_public_key
@@ -184,15 +179,8 @@ fn test_reconfiguration() {
         .state_view_at_version(Some(current_version))
         .unwrap();
 
-    let aptos_framework_account_state_view2 =
-        db_state_view.as_account_with_state_view(&CORE_CODE_ADDRESS);
-
     assert_eq!(
-        aptos_framework_account_state_view2
-            .get_version()
-            .unwrap()
-            .unwrap()
-            .major,
+        AptosVersion::fetch_config(&db_state_view).unwrap().major,
         42
     );
 }

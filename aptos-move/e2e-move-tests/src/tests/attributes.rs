@@ -32,6 +32,66 @@ fn test_view_attribute() {
 
 #[test]
 #[should_panic]
+fn test_view_attribute_with_signer() {
+    let mut h = MoveHarness::new();
+    let account = h.new_account_at(AccountAddress::from_hex_literal("0xf00d").unwrap());
+
+    let mut builder = PackageBuilder::new("Package");
+    builder.add_source(
+        "m.move",
+        r#"
+        module 0xf00d::M {
+            #[view]
+            fun view(_:signer,value: u64): u64 { value }
+        }
+        "#,
+    );
+    let path = builder.write_to_temp().unwrap();
+    h.create_publish_package(&account, path.path(), None, |_| {});
+}
+
+#[test]
+#[should_panic]
+fn test_view_attribute_with_ref_signer() {
+    let mut h = MoveHarness::new();
+    let account = h.new_account_at(AccountAddress::from_hex_literal("0xf00d").unwrap());
+
+    let mut builder = PackageBuilder::new("Package");
+    builder.add_source(
+        "m.move",
+        r#"
+        module 0xf00d::M {
+            #[view]
+            fun view(_:&signer,value: u64): u64 { value }
+        }
+        "#,
+    );
+    let path = builder.write_to_temp().unwrap();
+    h.create_publish_package(&account, path.path(), None, |_| {});
+}
+
+#[test]
+#[should_panic]
+fn test_view_attribute_with_mut_ref_signer() {
+    let mut h = MoveHarness::new();
+    let account = h.new_account_at(AccountAddress::from_hex_literal("0xf00d").unwrap());
+
+    let mut builder = PackageBuilder::new("Package");
+    builder.add_source(
+        "m.move",
+        r#"
+        module 0xf00d::M {
+            #[view]
+            fun view(_:&mut signer,value: u64): u64 { value }
+        }
+        "#,
+    );
+    let path = builder.write_to_temp().unwrap();
+    h.create_publish_package(&account, path.path(), None, |_| {});
+}
+
+#[test]
+#[should_panic]
 fn test_view_attribute_on_non_view() {
     let mut h = MoveHarness::new();
     let account = h.new_account_at(AccountAddress::from_hex_literal("0xf00d").unwrap());

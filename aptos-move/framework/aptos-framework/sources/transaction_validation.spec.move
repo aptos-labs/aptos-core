@@ -333,6 +333,29 @@ spec aptos_framework::transaction_validation {
         let aptos_addr = type_info::type_of<AptosCoin>().account_address;
         aborts_if (amount_to_mint != 0) && !exists<coin::CoinInfo<AptosCoin>>(aptos_addr);
         include coin::CoinAddAbortsIf<AptosCoin> { amount: amount_to_mint };
+    }
 
+    spec collect_deposit {
+        pragma verify = false;
+    }
+
+    spec return_deposit {
+        pragma verify = false;
+    }
+
+    spec fee_payer_script_prologue_collect_deposit {
+        pragma verify = false;
+    }
+
+    spec script_prologue_collect_deposit {
+        pragma verify = false;
+    }
+
+    spec epilogue_gas_payer_return_deposit {
+        pragma verify = false;
+    }
+
+    spec epilogue_return_deposit {
+        pragma verify = false;
     }
 }

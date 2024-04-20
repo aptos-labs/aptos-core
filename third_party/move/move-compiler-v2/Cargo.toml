@@ -12,6 +12,7 @@ edition = "2021"
 [dependencies]
 abstract-domain-derive = { path = "../move-model/bytecode/abstract_domain_derive" }
 anyhow = "1.0.62"
+bcs = { workspace = true }
 move-binary-format = { path = "../move-binary-format" }
 move-bytecode-source-map = { path = "../move-ir-compiler/move-bytecode-source-map" }
 move-command-line-common = { path = "../move-command-line-common" }

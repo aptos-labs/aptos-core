@@ -10,7 +10,7 @@ use crate::{
         RequestShare, TAugmentedData, TShare,
     },
 };
-use anyhow::bail;
+use anyhow::{bail, ensure};
 use aptos_consensus_types::common::Author;
 use aptos_enum_conversion_derive::EnumConversion;
 use aptos_network::{protocols::network::RpcError, ProtocolId};
@@ -40,6 +40,7 @@ impl<S: TShare, D: TAugmentedData> RandMessage<S, D> {
         fast_rand_config: &Option<RandConfig>,
         sender: Author,
     ) -> anyhow::Result<()> {
+        ensure!(self.epoch() == epoch_state.epoch);
         match self {
             RandMessage::RequestShare(_) => Ok(()),
             RandMessage::Share(share) => share.verify(rand_config),

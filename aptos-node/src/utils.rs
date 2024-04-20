@@ -5,8 +5,7 @@ use anyhow::anyhow;
 use aptos_config::config::{NodeConfig, DEFAULT_EXECUTION_CONCURRENCY_LEVEL};
 use aptos_storage_interface::{state_view::LatestDbStateCheckpointView, DbReaderWriter};
 use aptos_types::{
-    account_config::CORE_CODE_ADDRESS, account_view::AccountView, chain_id::ChainId,
-    state_store::account_with_state_view::AsAccountWithStateView,
+    account_config::ChainIdResource, chain_id::ChainId, on_chain_config::OnChainConfig,
 };
 use aptos_vm::AptosVM;
 use std::cmp::min;
@@ -39,10 +38,7 @@ pub fn fetch_chain_id(db: &DbReaderWriter) -> anyhow::Result<ChainId> {
         .reader
         .latest_state_checkpoint_view()
         .map_err(|err| anyhow!("[aptos-node] failed to create db state view {}", err))?;
-    Ok(db_state_view
-        .as_account_with_state_view(&CORE_CODE_ADDRESS)
-        .get_chain_id_resource()
-        .map_err(|err| anyhow!("[aptos-node] failed to get chain id resource {}", err))?
+    Ok(ChainIdResource::fetch_config(&db_state_view)
         .expect("[aptos-node] missing chain ID resource")
         .chain_id())
 }
