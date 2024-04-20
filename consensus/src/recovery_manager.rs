@@ -90,7 +90,7 @@ impl RecoveryManager {
                 .collect(),
             self.max_blocks_to_request,
         );
-        let recovery_data = BlockStore::fast_forward_sync(
+        let recovery_data = BlockStore::fast_forward_sync_2(
             sync_info.highest_quorum_cert(),
             sync_info.highest_commit_decision(),
             &mut retriever,

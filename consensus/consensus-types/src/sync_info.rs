@@ -168,7 +168,7 @@ impl SyncInfo {
             .verify(validator)
             .and_then(|_| {
                 if let Some(highest_ordered_decision) = &self.highest_ordered_decision {
-                    // TODO: Earlier, quroum_cert.verify() compares if the certified_block.round() is 0. 
+                    // TODO: Earlier, quroum_cert.verify() compares if the certified_block.round() is 0.
                     // Here, we are comparing commit_info.round() > 0. Is this okay?
                     if highest_ordered_decision.commit_info().round() > 0 {
                         highest_ordered_decision.verify_signatures(validator)?;
