@@ -330,7 +330,8 @@ impl BlockStore {
         }
 
         // Check early that recovery will succeed, and return before corrupting our state in case it will not.
-        LedgerRecoveryData::new(highest_commit_decision.clone())
+        if num_blocks > 1 {
+            LedgerRecoveryData::new(highest_commit_decision.clone())
             .find_root(&mut blocks.clone(), &mut quorum_certs.clone())
             .with_context(|| {
                 // for better readability
@@ -356,7 +357,7 @@ impl BlockStore {
                     highest_commit_decision,
                 )
             })?;
-
+        }
         storage.save_tree(blocks.clone(), quorum_certs.clone())?;
 
         execution_client
