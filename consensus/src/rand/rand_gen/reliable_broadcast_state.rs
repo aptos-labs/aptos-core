@@ -18,10 +18,9 @@ use aptos_infallible::Mutex;
 use aptos_logger::info;
 use aptos_reliable_broadcast::BroadcastStatus;
 use aptos_types::{
-    aggregate_signature::PartialSignatures, epoch_state::EpochState
+    aggregate_signature::PartialSignatures, epoch_state::EpochState, randomness::RandMetadata,
 };
 use std::{collections::HashSet, sync::Arc};
-use aptos_types::randomness::RandMetadataToSign;
 
 pub struct AugDataCertBuilder<D> {
     epoch_state: Arc<EpochState>,
@@ -103,7 +102,7 @@ impl<S: TShare, D: TAugmentedData> BroadcastStatus<RandMessage<S, D>, RandMessag
 }
 
 pub struct ShareAggregateState<S> {
-    rand_metadata: RandMetadataToSign,
+    rand_metadata: RandMetadata,
     rand_store: Arc<Mutex<RandStore<S>>>,
     rand_config: RandConfig,
 }
@@ -111,7 +110,7 @@ pub struct ShareAggregateState<S> {
 impl<S> ShareAggregateState<S> {
     pub fn new(
         rand_store: Arc<Mutex<RandStore<S>>>,
-        rand_metadata: RandMetadataToSign,
+        rand_metadata: RandMetadata,
         rand_config: RandConfig,
     ) -> Self {
         Self {

@@ -29,7 +29,7 @@ use aptos_reliable_broadcast::{DropGuard, ReliableBroadcast};
 use aptos_time_service::TimeService;
 use aptos_types::{
     epoch_state::EpochState,
-    randomness::{RandMetadata, Randomness},
+    randomness::{FullRandMetadata, RandMetadata, Randomness},
     validator_signer::ValidatorSigner,
 };
 use bytes::Bytes;
@@ -44,7 +44,6 @@ use futures_channel::{
 };
 use std::{sync::Arc, time::Duration};
 use tokio_retry::strategy::ExponentialBackoff;
-use aptos_types::randomness::RandMetadataToSign;
 
 pub type Sender<T> = UnboundedSender<T>;
 pub type Receiver<T> = UnboundedReceiver<T>;
@@ -135,15 +134,15 @@ impl<S: TShare, D: TAugmentedData> RandManager<S, D> {
         let broadcast_handles: Vec<_> = blocks
             .ordered_blocks
             .iter()
-            .map(|block| RandMetadata::from(block.block()))
+            .map(|block| FullRandMetadata::from(block.block()))
             .map(|metadata| self.process_incoming_metadata(metadata))
             .collect();
         let queue_item = QueueItem::new(blocks, Some(broadcast_handles));
         self.block_queue.push_back(queue_item);
     }
 
-    fn process_incoming_metadata(&self, metadata: RandMetadata) -> DropGuard {
-        let self_share = S::generate(&self.config, metadata.metadata_to_sign.clone());
+    fn process_incoming_metadata(&self, metadata: FullRandMetadata) -> DropGuard {
+        let self_share = S::generate(&self.config, metadata.metadata.clone());
         info!(LogSchema::new(LogEvent::BroadcastRandShare)
             .epoch(self.epoch_state.epoch)
             .author(self.author)
@@ -155,7 +154,8 @@ impl<S: TShare, D: TAugmentedData> RandManager<S, D> {
             .expect("Add self share should succeed");
 
         if let Some(fast_config) = &self.fast_config {
-            let self_fast_share = FastShare::new(S::generate(fast_config, metadata.metadata_to_sign.clone()));
+            let self_fast_share =
+                FastShare::new(S::generate(fast_config, metadata.metadata.clone()));
             rand_store
                 .add_share(self_fast_share.rand_share(), PathType::Fast)
                 .expect("Add self share for fast path should succeed");
@@ -164,7 +164,7 @@ impl<S: TShare, D: TAugmentedData> RandManager<S, D> {
         rand_store.add_rand_metadata(metadata.clone());
         self.network_sender
             .broadcast_without_self(RandMessage::<S, D>::Share(self_share).into_network_message());
-        self.spawn_aggregate_shares_task(metadata.metadata_to_sign)
+        self.spawn_aggregate_shares_task(metadata.metadata)
     }
 
     fn process_ready_blocks(&mut self, ready_blocks: Vec<OrderedBlocks>) {
@@ -196,7 +196,7 @@ impl<S: TShare, D: TAugmentedData> RandManager<S, D> {
 
     fn process_randomness(&mut self, randomness: Randomness) {
         info!(
-            metadata = randomness.metadata().metadata_to_sign,
+            metadata = randomness.metadata(),
             "Processing decisioned randomness."
         );
         if let Some(block) = self.block_queue.item_mut(randomness.round()) {
@@ -256,7 +256,7 @@ impl<S: TShare, D: TAugmentedData> RandManager<S, D> {
         }
     }
 
-    fn spawn_aggregate_shares_task(&self, metadata: RandMetadataToSign) -> DropGuard {
+    fn spawn_aggregate_shares_task(&self, metadata: RandMetadata) -> DropGuard {
         let rb = self.reliable_broadcast.clone();
         let aggregate_state = Arc::new(ShareAggregateState::new(
             self.rand_store.clone(),

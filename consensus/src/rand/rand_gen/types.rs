@@ -21,7 +21,6 @@ use aptos_types::{
 use serde::{de::DeserializeOwned, Deserialize, Serialize};
 use sha3::{Digest, Sha3_256};
 use std::{fmt::Debug, sync::Arc};
-use aptos_types::randomness::RandMetadataToSign;
 
 pub const NUM_THREADS_FOR_WVUF_DERIVATION: usize = 8;
 pub const FUTURE_ROUNDS_TO_ACCEPT: u64 = 200;
@@ -53,7 +52,7 @@ impl TShare for Share {
     fn verify(
         &self,
         rand_config: &RandConfig,
-        rand_metadata: &RandMetadataToSign,
+        rand_metadata: &RandMetadata,
         author: &Author,
     ) -> anyhow::Result<()> {
         let index = *rand_config
@@ -79,12 +78,15 @@ impl TShare for Share {
         Ok(())
     }
 
-    fn generate(rand_config: &RandConfig, rand_metadata: RandMetadataToSign) -> RandShare<Self>
+    fn generate(rand_config: &RandConfig, rand_metadata: RandMetadata) -> RandShare<Self>
     where
         Self: Sized,
     {
         let share = Share {
-            share: WVUF::create_share(&rand_config.keys.ask, bcs::to_bytes(&rand_metadata).unwrap().as_slice()),
+            share: WVUF::create_share(
+                &rand_config.keys.ask,
+                bcs::to_bytes(&rand_metadata).unwrap().as_slice(),
+            ),
         };
         RandShare::new(rand_config.author(), rand_metadata, share)
     }
@@ -93,36 +95,53 @@ impl TShare for Share {
         shares: impl Iterator<Item = &'a RandShare<Self>>,
         rand_config: &RandConfig,
         rand_metadata: RandMetadata,
-    ) -> Randomness
+    ) -> anyhow::Result<Randomness>
     where
         Self: Sized,
     {
         let timer = std::time::Instant::now();
         let mut apks_and_proofs = vec![];
         for share in shares {
-            let id = *rand_config
+            let id = rand_config
                 .validator
                 .address_to_validator_index()
                 .get(share.author())
-                .unwrap();
-            let apk = rand_config.get_certified_apk(share.author()).unwrap(); // needs to have apk to verify the share
+                .copied()
+                .ok_or_else(|| {
+                    anyhow!(
+                        "Share::aggregate failed with invalid share author: {}",
+                        share.author
+                    )
+                })?;
+            let apk = rand_config
+                .get_certified_apk(share.author())
+                .ok_or_else(|| {
+                    anyhow!(
+                        "Share::aggregate failed with missing apk for share from {}",
+                        share.author
+                    )
+                })?;
             apks_and_proofs.push((Player { id }, apk.clone(), share.share().share));
         }
 
         let proof = WVUF::aggregate_shares(&rand_config.wconfig, &apks_and_proofs);
+        let metadata_serialized = bcs::to_bytes(&rand_metadata).map_err(|e| {
+            anyhow!("Share::aggregate failed with metadata serialization error: {e}")
+        })?;
         let eval = WVUF::derive_eval(
             &rand_config.wconfig,
             &rand_config.vuf_pp,
-            rand_metadata.to_bytes().as_slice(),
+            metadata_serialized.as_slice(),
             &rand_config.get_all_certified_apk(),
             &proof,
             THREAD_MANAGER.get_exe_cpu_pool(),
         )
-        .expect("All APK should exist");
+        .map_err(|e| anyhow!("Share::aggregate failed with WVUF derive_eval error: {e}"))?;
         debug!("WVUF derivation time: {} ms", timer.elapsed().as_millis());
-        let eval_bytes = bcs::to_bytes(&eval).unwrap();
+        let eval_bytes = bcs::to_bytes(&eval)
+            .map_err(|e| anyhow!("Share::aggregate failed with eval serialization error: {e}"))?;
         let rand_bytes = Sha3_256::digest(eval_bytes.as_slice()).to_vec();
-        Randomness::new(rand_metadata.clone(), rand_bytes)
+        Ok(Randomness::new(rand_metadata, rand_bytes))
     }
 }
 
@@ -197,13 +216,13 @@ impl TShare for MockShare {
     fn verify(
         &self,
         _rand_config: &RandConfig,
-        _rand_metadata: &RandMetadataToSign,
+        _rand_metadata: &RandMetadata,
         _author: &Author,
     ) -> anyhow::Result<()> {
         Ok(())
     }
 
-    fn generate(rand_config: &RandConfig, rand_metadata: RandMetadataToSign) -> RandShare<Self>
+    fn generate(rand_config: &RandConfig, rand_metadata: RandMetadata) -> RandShare<Self>
     where
         Self: Sized,
     {
@@ -214,11 +233,11 @@ impl TShare for MockShare {
         _shares: impl Iterator<Item = &'a RandShare<Self>>,
         _rand_config: &RandConfig,
         rand_metadata: RandMetadata,
-    ) -> Randomness
+    ) -> anyhow::Result<Randomness>
     where
         Self: Sized,
     {
-        Randomness::new(rand_metadata, vec![])
+        Ok(Randomness::new(rand_metadata, vec![]))
     }
 }
 
@@ -254,11 +273,11 @@ pub trait TShare:
     fn verify(
         &self,
         rand_config: &RandConfig,
-        rand_metadata: &RandMetadataToSign,
+        rand_metadata: &RandMetadata,
         author: &Author,
     ) -> anyhow::Result<()>;
 
-    fn generate(rand_config: &RandConfig, rand_metadata: RandMetadataToSign) -> RandShare<Self>
+    fn generate(rand_config: &RandConfig, rand_metadata: RandMetadata) -> RandShare<Self>
     where
         Self: Sized;
 
@@ -266,7 +285,7 @@ pub trait TShare:
         shares: impl Iterator<Item = &'a RandShare<Self>>,
         rand_config: &RandConfig,
         rand_metadata: RandMetadata,
-    ) -> Randomness
+    ) -> anyhow::Result<Randomness>
     where
         Self: Sized;
 }
@@ -303,12 +322,12 @@ pub struct ShareId {
 #[derive(Clone, Debug, Serialize, Deserialize, PartialEq)]
 pub struct RandShare<S> {
     author: Author,
-    metadata: RandMetadataToSign,
+    metadata: RandMetadata,
     share: S,
 }
 
 impl<S: TShare> RandShare<S> {
-    pub fn new(author: Author, metadata: RandMetadataToSign, share: S) -> Self {
+    pub fn new(author: Author, metadata: RandMetadata, share: S) -> Self {
         Self {
             author,
             metadata,
@@ -324,7 +343,7 @@ impl<S: TShare> RandShare<S> {
         &self.share
     }
 
-    pub fn metadata(&self) -> &RandMetadataToSign {
+    pub fn metadata(&self) -> &RandMetadata {
         &self.metadata
     }
 
@@ -351,21 +370,19 @@ impl<S: TShare> RandShare<S> {
 
 #[derive(Clone, Serialize, Deserialize)]
 pub struct RequestShare {
-    metadata: RandMetadataToSign,
+    metadata: RandMetadata,
 }
 
 impl RequestShare {
-    pub fn new(metadata: RandMetadataToSign) -> Self {
-        Self {
-            metadata,
-        }
+    pub fn new(metadata: RandMetadata) -> Self {
+        Self { metadata }
     }
 
     pub fn epoch(&self) -> u64 {
         self.metadata.epoch
     }
 
-    pub fn rand_metadata(&self) -> &RandMetadataToSign {
+    pub fn rand_metadata(&self) -> &RandMetadata {
         &self.metadata
     }
 }
@@ -392,7 +409,7 @@ impl<S: TShare> FastShare<S> {
         self.share.share()
     }
 
-    pub fn metadata(&self) -> &RandMetadataToSign {
+    pub fn metadata(&self) -> &RandMetadata {
         self.share.metadata()
     }
 

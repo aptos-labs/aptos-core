@@ -53,6 +53,7 @@ use aptos_types::{
         OnChainConsensusConfig, OnChainJWKConsensusConfig, OnChainRandomnessConfig,
         ValidatorTxnConfig,
     },
+    randomness::RandMetadata,
     validator_verifier::ValidatorVerifier,
     PeerId,
 };
@@ -65,7 +66,6 @@ use tokio::{
     sync::oneshot as TokioOneshot,
     time::{sleep, Instant},
 };
-use aptos_types::randomness::RandMetadataToSign;
 
 #[derive(Serialize, Clone)]
 pub enum UnverifiedEvent {
@@ -847,7 +847,7 @@ impl RoundManager {
         if let Some(fast_config) = &self.fast_rand_config {
             let ledger_info = vote.ledger_info();
             if !ledger_info.is_dummy() {
-                let metadata = RandMetadataToSign {
+                let metadata = RandMetadata {
                     epoch: ledger_info.epoch(),
                     round: ledger_info.round(),
                 };
