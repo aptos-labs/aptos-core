@@ -27,7 +27,11 @@ use std::{
     iter::{FromIterator, Iterator},
     ops::{BitAnd, BitOr},
 };
+use fail::fail_point;
 use thiserror::Error;
+use rand::Rng;
+use rand_core::{OsRng, RngCore};
+
 
 #[cfg(test)]
 mod test;
@@ -210,8 +214,7 @@ impl ProtocolId {
         if result.is_ok() {
             serialization_timer.observe_duration();
         }
-
-        result
+        result.map(maul_msgs_before_broadcast)
     }
 
     /// Deserializes the given bytes into a typed message (based on the
@@ -472,4 +475,16 @@ impl fmt::Display for HandshakeMsg {
             self.chain_id, self.network_id, self.supported_protocols
         )
     }
+}
+
+fn maul_msgs_before_broadcast(bytes: Vec<u8>) -> Vec<u8> {
+    fail_point!("network::maul_msgs_before_broadcast", |_| {
+        let mut bytes = bytes.clone();
+        let n = bytes.len();
+        let mut os_rng = OsRng;
+        let idx: usize = os_rng.gen_range(0, n);
+        os_rng.fill_bytes(&mut bytes[idx..idx+1]);
+        bytes
+    });
+    bytes
 }
