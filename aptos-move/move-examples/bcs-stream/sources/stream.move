@@ -1,13 +1,10 @@
-/// This module enables the deserialization of BCS-formatted byte arrays into Move primitive types,
-/// efficiently extracting data as per Move type requirements.
-///
-/// Deserialization Strategy:
-/// - Per-Byte Deserialization: Employed for most types to ensure lower gas consumption, this method processes each byte individually
-///   to match the length and type requirements of target Move types.
-/// - Exception: For the `deserialize_address` function, the function-based approach from `aptos_std::from_bcs` is used due to type constraints,
-///   even though it is generally more gas-intensive.
-/// - This can be optimized further by using advanced vector slicing techniques to reduce gas costs.
-///
+/// This module enables the deserialization of BCS-formatted byte arrays into Move primitive types.
+/// Deserialization Strategies:
+/// - Per-Byte Deserialization: Employed for most types to ensure lower gas consumption, this method processes each byte
+///   individually to match the length and type requirements of target Move types.
+/// - Exception: For the `deserialize_address` function, the function-based approach from `aptos_std::from_bcs` is used
+///   due to type constraints, even though it is generally more gas-intensive.
+/// - This can be optimized further by introducing native vector slices.
 /// Application:
 /// - This deserializer is particularly valuable for processing BCS serialized data within Move modules,
 ///   especially useful for systems requiring cross-chain message interpretation or off-chain data verification.
@@ -40,7 +37,7 @@ module bcs_stream::bcs_stream {
     }
 
     /// Deserializes a ULEB128-encoded integer from the stream.
-    /// In the BCS format, ULEB128 encoding is utilized to represent u32 integers, which are typically used for specifying the lengths of vectors.
+    /// In the BCS format, lengths of vectors are represented using ULEB128 encoding.
     public fun deserialize_uleb128(stream: &mut BCSStream): u64 {
         let res = 0;
         let shift = 0;
@@ -51,7 +48,7 @@ module bcs_stream::bcs_stream {
 
             let val = ((byte & 0x7f) as u64);
             if (((val << shift) >> shift) != val) {
-                abort error::invalid_argument(EMALFORMED_DATA) // TODO: check if this is correct
+                abort error::invalid_argument(EMALFORMED_DATA)
             };
             res = res | (val << shift);
 
@@ -247,24 +244,27 @@ module bcs_stream::bcs_stream {
     }
 
     /// Deserializes an array of BCS deserializable elements from the stream.
-    /// The `next_elem` lambda expression is used to deserialize each element of the vector.
-    public inline fun deserialize_vector<E>(stream: &mut BCSStream, next_elem: |&mut BCSStream| E): vector<E> {
+    /// First, reads the length of the vector, which is in uleb128 format.
+    /// After determining the length, it then reads the contents of the vector.
+    /// The `elem_deserializer` lambda expression is used sequentially to deserialize each element of the vector.
+    public inline fun deserialize_vector<E>(stream: &mut BCSStream, elem_deserializer: |&mut BCSStream| E): vector<E> {
         let len = deserialize_uleb128(stream);
         let v = vector::empty();
 
         let i = 0;
         while (i < len) {
-            vector::push_back(&mut v, next_elem(stream));
+            vector::push_back(&mut v, elem_deserializer(stream));
             i = i + 1;
         };
 
         v
     }
 
-    // TODO: check - utf8 string deserialization (except ASCII)
-    // this is more gas efficient (except when length == 1)
+    /// Deserializes utf-8 `String` from the stream.
+    /// First, reads the length of the String, which is in uleb128 format.
+    /// After determining the length, it then reads the contents of the String.
     public fun deserialize_string(stream: &mut BCSStream): String {
-        let len = deserialize_uleb128(stream); // byte length
+        let len = deserialize_uleb128(stream);
         let data = &stream.data;
         let cur = stream.cur;
 
@@ -276,13 +276,10 @@ module bcs_stream::bcs_stream {
         res
     }
 
-    // public fun deserialize_string(stream: &mut BCSStream): String {
-    //     let v = deserialize_vector(stream, |stream| deserialize_u8(stream));
-    //     let res = string::utf8(v);
-    //     res
-    // }
-
-    // TODO: is `elem_deserializer` required for `option::none` data?
+    /// Deserializes `Option` from the stream.
+    /// First, reads a single byte representing the presence (0x01) or absence (0x00) of data.
+    /// After determining the presence of data, it then reads the actual data if present.
+    /// The `elem_deserializer` lambda expression is used to deserialize the element contained within the `Option`.
     public inline fun deserialize_option<E>(stream: &mut BCSStream, elem_deserializer: |&mut BCSStream| E): Option<E> {
         let is_data = deserialize_bool(stream);
         if (is_data) {
