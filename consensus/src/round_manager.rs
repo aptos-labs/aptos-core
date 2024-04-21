@@ -481,9 +481,12 @@ impl RoundManager {
             self.process_proposal(proposal_msg.take_proposal()).await
         } else {
             bail!(
-                "Stale proposal {}, current round {}",
+                "Stale proposal {}, Sync info {}, Self sync info {}, current round {}, proposed round {}",
                 proposal_msg.proposal(),
-                self.round_state.current_round()
+                proposal_msg.sync_info(),
+                self.block_store.sync_info(),
+                self.round_state.current_round(),
+                proposal_msg.proposal().round(),
             );
         }
     }
