@@ -91,6 +91,7 @@ impl BlockStore {
         self.sync_to_highest_qc(
             sync_info.highest_quorum_cert().clone(),
             sync_info.highest_commit_decision().clone(),
+            sync_info.highest_ordered_decision().clone(),
             &mut retriever,
         )
         .await?;
@@ -199,6 +200,7 @@ impl BlockStore {
         &self,
         highest_qc: QuorumCert,
         highest_commit_decision: LedgerInfoWithSignatures,
+        highest_ordered_decision: LedgerInfoWithSignatures,
         retriever: &mut BlockRetriever,
     ) -> anyhow::Result<()> {
         if !self.need_sync_for_ledger_info(&highest_commit_decision) {
@@ -208,6 +210,7 @@ impl BlockStore {
             .fast_forward_sync(
                 &highest_qc,
                 &highest_commit_decision,
+                &highest_ordered_decision,
                 retriever,
                 self.storage.clone(),
                 self.execution_client.clone(),
@@ -239,6 +242,7 @@ impl BlockStore {
         &self,
         highest_qc: &'a QuorumCert,
         highest_commit_decision: &'a LedgerInfoWithSignatures,
+        _highest_ordered_decision: &'a LedgerInfoWithSignatures,
         retriever: &'a mut BlockRetriever,
         storage: Arc<dyn PersistentLivenessStorage>,
         execution_client: Arc<dyn TExecutionClient>,
@@ -330,34 +334,32 @@ impl BlockStore {
         }
 
         // Check early that recovery will succeed, and return before corrupting our state in case it will not.
-        if num_blocks > 1 {
-            LedgerRecoveryData::new(highest_commit_decision.clone())
-            .find_root(&mut blocks.clone(), &mut quorum_certs.clone())
-            .with_context(|| {
-                // for better readability
-                quorum_certs.sort_by_key(|qc| qc.certified_block().round());
-                format!(
-                    "\nRoot: {:?}\nBlocks in db: {}\nQuorum Certs in db: {}\n Self ordered root {}\n Self Ordered decision: {}\n Self Commit decision: {}\n, \n Self Sync info: {}\n Highest QC: {}\n Highest commit decision: {}\n",
-                    highest_commit_decision.commit_info(),
-                    blocks
-                        .iter()
-                        .map(|b| format!("\n\t{}", b))
-                        .collect::<Vec<String>>()
-                        .concat(),
-                    quorum_certs
-                        .iter()
-                        .map(|qc| format!("\n\t{}", qc))
-                        .collect::<Vec<String>>()
-                        .concat(),
-                    self.ordered_root(),
-                    self.highest_ordered_decision(),
-                    self.highest_commit_decision(),
-                    self.sync_info(),
-                    highest_qc,
-                    highest_commit_decision,
-                )
-            })?;
-        }
+        LedgerRecoveryData::new(highest_commit_decision.clone())
+        .find_root(&mut blocks.clone(), &mut quorum_certs.clone())
+        .with_context(|| {
+            // for better readability
+            quorum_certs.sort_by_key(|qc| qc.certified_block().round());
+            format!(
+                "\nRoot: {:?}\nBlocks in db: {}\nQuorum Certs in db: {}\n Self ordered root {}\n Self Ordered decision: {}\n Self Commit decision: {}\n, \n Self Sync info: {}\n Highest QC: {}\n Highest commit decision: {}\n",
+                highest_commit_decision.commit_info(),
+                blocks
+                    .iter()
+                    .map(|b| format!("\n\t{}", b))
+                    .collect::<Vec<String>>()
+                    .concat(),
+                quorum_certs
+                    .iter()
+                    .map(|qc| format!("\n\t{}", qc))
+                    .collect::<Vec<String>>()
+                    .concat(),
+                self.ordered_root(),
+                self.highest_ordered_decision(),
+                self.highest_commit_decision(),
+                self.sync_info(),
+                highest_qc,
+                highest_commit_decision,
+            )
+        })?;
         storage.save_tree(blocks.clone(), quorum_certs.clone())?;
 
         execution_client
@@ -369,7 +371,7 @@ impl BlockStore {
 
         let recovery_data = match storage.start() {
             LivenessStorageData::FullRecoveryData(recovery_data) => recovery_data,
-            _ => panic!("Failed to construct recovery data after fast forward sync"),
+            _ => panic!("Failed to construct recovery data after fast forward sync. Blocks: {:?},\n Quorum Certs: {:?},\n highest_qc: {:?}\n highest_commit_decision {:?}, self sync_info {:?}", blocks, quorum_certs, highest_qc, highest_commit_decision, self.sync_info()),
         };
 
         Ok(recovery_data)
