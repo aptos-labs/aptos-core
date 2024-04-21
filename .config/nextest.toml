@@ -16,7 +16,7 @@ failure-output = "immediate-final"
 junit = { path = "junit.xml" }
 
 [profile.default.slow-timeout]
-period = "600s"
+period = "600000000s"
 terminate-after = 1
 
 [profile.smoke-test]

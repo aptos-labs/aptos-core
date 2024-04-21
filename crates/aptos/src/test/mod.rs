@@ -74,6 +74,7 @@ use std::{
 use tempfile::TempDir;
 use thiserror::__private::AsDisplay;
 use tokio::time::{sleep, Instant};
+use crate::common::types::DEFAULT_EXPIRATION_SECS;
 
 #[cfg(test)]
 mod tests;
@@ -993,8 +994,13 @@ impl CliTestFramework {
         )
         .unwrap();
 
+        let gas_options = GasOptions {
+            gas_unit_price: Some(1),
+            max_gas: Some(2000000),
+            expiration_secs: DEFAULT_EXPIRATION_SECS,
+        };
         RunScript {
-            txn_options: self.transaction_options(index, None),
+            txn_options: self.transaction_options(index, Some(gas_options)),
             compile_proposal_args: CompileScriptFunction {
                 script_path: Some(source_path),
                 compiled_script_path: None,

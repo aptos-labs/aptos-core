@@ -73,7 +73,7 @@ struct DiceRollHistory {
     rolls: Vec<u64>,
 }
 
-async fn publish_on_chain_dice_module(cli: &mut CliTestFramework, publisher_account_idx: usize) {
+pub async fn publish_on_chain_dice_module(cli: &mut CliTestFramework, publisher_account_idx: usize) {
     cli.init_move_dir();
     let mut package_addresses = BTreeMap::new();
     package_addresses.insert("module_owner", "_");

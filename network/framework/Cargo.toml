@@ -35,6 +35,7 @@ arc-swap = { workspace = true }
 async-trait = { workspace = true }
 bcs = { workspace = true }
 bytes = { workspace = true }
+fail = { workspace = true }
 futures = { workspace = true }
 futures-util = { workspace = true }
 hex = { workspace = true }
@@ -46,6 +47,7 @@ pin-project = { workspace = true }
 proptest ={ workspace = true, optional = true }
 proptest-derive = { workspace = true, optional = true }
 rand = { workspace = true, features = ["small_rng"] }
+rand_core = { workspace = true }
 # Note: we cannot rely on the workspace version of rand. So we use this workaround. See:
 # https://github.com/aptos-labs/aptos-core/blob/main/state-sync/aptos-data-client/Cargo.toml#L41.
 rand_latest = { package = "rand", version = "0.8.5" }
@@ -68,12 +70,12 @@ aptos-time-service = { workspace = true, features = ["testing"] }
 aptos-types = { workspace = true, features = ["fuzzing"] }
 proptest = { workspace = true }
 proptest-derive = { workspace = true }
-rand_core = { workspace = true }
 
 [features]
 default = []
 fuzzing = ["aptos-bitvec/fuzzing", "aptos-config/fuzzing", "aptos-crypto/fuzzing", "aptos-types/fuzzing", "aptos-proptest-helpers", "aptos-time-service/testing", "aptos-types/fuzzing", "aptos-memsocket/testing", "aptos-netcore/fuzzing", "proptest", "proptest-derive"]
 testing = ["aptos-config/testing", "aptos-time-service/testing", "aptos-memsocket/testing", "aptos-netcore/testing"]
+failpoints = ["fail/failpoints"]
 
 [package.metadata.cargo-machete]
 ignored = ["serde_bytes"]
