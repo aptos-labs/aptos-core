@@ -10,7 +10,7 @@ use crate::{
 };
 use anyhow::ensure;
 use aptos_consensus_types::common::{Author, Round};
-use aptos_types::randomness::{RandMetadata, Randomness};
+use aptos_types::randomness::{RandMetadata, RandMetadataToSign, Randomness};
 use itertools::Either;
 use std::collections::{BTreeMap, HashMap, HashSet};
 
@@ -77,7 +77,7 @@ impl<S: TShare> ShareAggregator<S> {
 
     fn retain(&mut self, rand_config: &RandConfig, rand_metadata: &RandMetadata) {
         self.shares
-            .retain(|_, share| share.metadata() == rand_metadata);
+            .retain(|_, share| share.metadata() == &rand_metadata.metadata_to_sign);
         self.total_weight = self
             .shares
             .keys()
@@ -135,7 +135,7 @@ impl<S: TShare> RandItem<S> {
                 share_aggregator,
             } => {
                 ensure!(
-                    metadata == share.metadata(),
+                    &metadata.metadata_to_sign == share.metadata(),
                     "[RandStore] RandShare metadata from {} mismatch with block metadata!",
                     share.author(),
                 );
@@ -258,11 +258,11 @@ impl<S: TShare> RandStore<S> {
 
     pub fn add_share(&mut self, share: RandShare<S>, path: PathType) -> anyhow::Result<bool> {
         ensure!(
-            share.metadata().epoch() == self.epoch,
+            share.metadata().epoch == self.epoch,
             "Share from different epoch"
         );
         ensure!(
-            share.metadata().round() <= self.highest_known_round + FUTURE_ROUNDS_TO_ACCEPT,
+            share.metadata().round <= self.highest_known_round + FUTURE_ROUNDS_TO_ACCEPT,
             "Share from future round"
         );
         let rand_metadata = share.metadata().clone();
@@ -272,7 +272,7 @@ impl<S: TShare> RandStore<S> {
                 (Some(fast_rand_config), Some(fast_rand_map)) => (
                     fast_rand_config,
                     fast_rand_map
-                        .entry(rand_metadata.round())
+                        .entry(rand_metadata.round)
                         .or_insert_with(|| RandItem::new(self.author, path)),
                 ),
                 _ => anyhow::bail!("Fast path not enabled"),
@@ -281,7 +281,7 @@ impl<S: TShare> RandStore<S> {
             (
                 &self.rand_config,
                 self.rand_map
-                    .entry(rand_metadata.round())
+                    .entry(rand_metadata.round)
                     .or_insert_with(|| RandItem::new(self.author, PathType::Slow)),
             )
         };
@@ -293,25 +293,25 @@ impl<S: TShare> RandStore<S> {
 
     /// This should only be called after the block is added, returns None if already decided
     /// Otherwise returns existing shares' authors
-    pub fn get_all_shares_authors(&self, metadata: &RandMetadata) -> Option<HashSet<Author>> {
+    pub fn get_all_shares_authors(&self, round: Round) -> Option<HashSet<Author>> {
         self.rand_map
-            .get(&metadata.round())
+            .get(&round)
             .and_then(|item| item.get_all_shares_authors())
     }
 
     pub fn get_self_share(
         &mut self,
-        metadata: &RandMetadata,
+        metadata: &RandMetadataToSign,
     ) -> anyhow::Result<Option<RandShare<S>>> {
         ensure!(
-            metadata.round() <= self.highest_known_round,
+            metadata.round <= self.highest_known_round,
             "Request share from future round {}, highest known round {}",
-            metadata.round(),
+            metadata.round,
             self.highest_known_round
         );
         Ok(self
             .rand_map
-            .get(&metadata.round())
+            .get(&metadata.round)
             .and_then(|item| item.get_self_share())
             .filter(|share| share.metadata() == metadata))
     }
@@ -524,7 +524,7 @@ mod tests {
         // shares come before metadata
         for share in ctxt.authors[0..5]
             .iter()
-            .map(|author| create_share(metadata_1[0].clone(), *author))
+            .map(|author| create_share(metadata_1[0].metadata_to_sign.clone(), *author))
         {
             rand_store.add_share(share, PathType::Slow).unwrap();
         }
@@ -542,7 +542,7 @@ mod tests {
 
         for share in ctxt.authors[1..6]
             .iter()
-            .map(|author| create_share(metadata_2[0].clone(), *author))
+            .map(|author| create_share(metadata_2[0].metadata_to_sign.clone(), *author))
         {
             rand_store.add_share(share, PathType::Slow).unwrap();
         }

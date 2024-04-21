@@ -14,7 +14,8 @@ use aptos_runtimes::spawn_rayon_thread_pool;
 use aptos_types::{
     aggregate_signature::AggregateSignature,
     randomness::{
-        Delta, PKShare, ProofShare, RandKeys, RandMetadata, Randomness, WvufPP, APK, WVUF,
+        Delta, PKShare, ProofShare, RandKeys, RandMetadata, RandMetadataToSign, Randomness, WvufPP,
+        APK, WVUF,
     },
     validator_verifier::ValidatorVerifier,
 };
@@ -52,7 +53,7 @@ impl TShare for Share {
     fn verify(
         &self,
         rand_config: &RandConfig,
-        rand_metadata: &RandMetadata,
+        rand_metadata: &RandMetadataToSign,
         author: &Author,
     ) -> anyhow::Result<()> {
         let index = *rand_config
@@ -65,7 +66,7 @@ impl TShare for Share {
             WVUF::verify_share(
                 &rand_config.vuf_pp,
                 apk,
-                rand_metadata.to_bytes().as_slice(),
+                bcs::to_bytes(&rand_metadata).unwrap().as_slice(),
                 &self.share,
             )?;
         } else {
@@ -78,12 +79,15 @@ impl TShare for Share {
         Ok(())
     }
 
-    fn generate(rand_config: &RandConfig, rand_metadata: RandMetadata) -> RandShare<Self>
+    fn generate(rand_config: &RandConfig, rand_metadata: RandMetadataToSign) -> RandShare<Self>
     where
         Self: Sized,
     {
         let share = Share {
-            share: WVUF::create_share(&rand_config.keys.ask, rand_metadata.to_bytes().as_slice()),
+            share: WVUF::create_share(
+                &rand_config.keys.ask,
+                bcs::to_bytes(&rand_metadata).unwrap().as_slice(),
+            ),
         };
         RandShare::new(rand_config.author(), rand_metadata, share)
     }
@@ -202,13 +206,13 @@ impl TShare for MockShare {
     fn verify(
         &self,
         _rand_config: &RandConfig,
-        _rand_metadata: &RandMetadata,
+        _rand_metadata: &RandMetadataToSign,
         _author: &Author,
     ) -> anyhow::Result<()> {
         Ok(())
     }
 
-    fn generate(rand_config: &RandConfig, rand_metadata: RandMetadata) -> RandShare<Self>
+    fn generate(rand_config: &RandConfig, rand_metadata: RandMetadataToSign) -> RandShare<Self>
     where
         Self: Sized,
     {
@@ -259,11 +263,11 @@ pub trait TShare:
     fn verify(
         &self,
         rand_config: &RandConfig,
-        rand_metadata: &RandMetadata,
+        rand_metadata: &RandMetadataToSign,
         author: &Author,
     ) -> anyhow::Result<()>;
 
-    fn generate(rand_config: &RandConfig, rand_metadata: RandMetadata) -> RandShare<Self>
+    fn generate(rand_config: &RandConfig, rand_metadata: RandMetadataToSign) -> RandShare<Self>
     where
         Self: Sized;
 
@@ -308,12 +312,12 @@ pub struct ShareId {
 #[derive(Clone, Debug, Serialize, Deserialize, PartialEq)]
 pub struct RandShare<S> {
     author: Author,
-    metadata: RandMetadata,
+    metadata: RandMetadataToSign,
     share: S,
 }
 
 impl<S: TShare> RandShare<S> {
-    pub fn new(author: Author, metadata: RandMetadata, share: S) -> Self {
+    pub fn new(author: Author, metadata: RandMetadataToSign, share: S) -> Self {
         Self {
             author,
             metadata,
@@ -329,16 +333,16 @@ impl<S: TShare> RandShare<S> {
         &self.share
     }
 
-    pub fn metadata(&self) -> &RandMetadata {
+    pub fn metadata(&self) -> &RandMetadataToSign {
         &self.metadata
     }
 
     pub fn round(&self) -> Round {
-        self.metadata.round()
+        self.metadata.round
     }
 
     pub fn epoch(&self) -> u64 {
-        self.metadata.epoch()
+        self.metadata.epoch
     }
 
     pub fn verify(&self, rand_config: &RandConfig) -> anyhow::Result<()> {
@@ -356,24 +360,20 @@ impl<S: TShare> RandShare<S> {
 
 #[derive(Clone, Serialize, Deserialize)]
 pub struct RequestShare {
-    epoch: u64,
-    rand_metadata: RandMetadata,
+    metadata: RandMetadataToSign,
 }
 
 impl RequestShare {
-    pub fn new(epoch: u64, rand_metadata: RandMetadata) -> Self {
-        Self {
-            epoch,
-            rand_metadata,
-        }
+    pub fn new(metadata: RandMetadataToSign) -> Self {
+        Self { metadata }
     }
 
     pub fn epoch(&self) -> u64 {
-        self.epoch
+        self.metadata.epoch
     }
 
-    pub fn rand_metadata(&self) -> &RandMetadata {
-        &self.rand_metadata
+    pub fn rand_metadata(&self) -> &RandMetadataToSign {
+        &self.metadata
     }
 }
 
@@ -399,7 +399,7 @@ impl<S: TShare> FastShare<S> {
         self.share.share()
     }
 
-    pub fn metadata(&self) -> &RandMetadata {
+    pub fn metadata(&self) -> &RandMetadataToSign {
         self.share.metadata()
     }
 

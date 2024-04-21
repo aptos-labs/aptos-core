@@ -29,7 +29,7 @@ use aptos_reliable_broadcast::{DropGuard, ReliableBroadcast};
 use aptos_time_service::TimeService;
 use aptos_types::{
     epoch_state::EpochState,
-    randomness::{RandMetadata, Randomness},
+    randomness::{RandMetadata, RandMetadataToSign, Randomness},
     validator_signer::ValidatorSigner,
 };
 use bytes::Bytes;
@@ -141,7 +141,7 @@ impl<S: TShare, D: TAugmentedData> RandManager<S, D> {
     }
 
     fn process_incoming_metadata(&self, metadata: RandMetadata) -> DropGuard {
-        let self_share = S::generate(&self.config, metadata.clone());
+        let self_share = S::generate(&self.config, metadata.metadata_to_sign.clone());
         info!(LogSchema::new(LogEvent::BroadcastRandShare)
             .epoch(self.epoch_state.epoch)
             .author(self.author)
@@ -153,7 +153,8 @@ impl<S: TShare, D: TAugmentedData> RandManager<S, D> {
             .expect("Add self share should succeed");
 
         if let Some(fast_config) = &self.fast_config {
-            let self_fast_share = FastShare::new(S::generate(fast_config, metadata.clone()));
+            let self_fast_share =
+                FastShare::new(S::generate(fast_config, metadata.metadata_to_sign.clone()));
             rand_store
                 .add_share(self_fast_share.rand_share(), PathType::Fast)
                 .expect("Add self share for fast path should succeed");
@@ -162,7 +163,7 @@ impl<S: TShare, D: TAugmentedData> RandManager<S, D> {
         rand_store.add_rand_metadata(metadata.clone());
         self.network_sender
             .broadcast_without_self(RandMessage::<S, D>::Share(self_share).into_network_message());
-        self.spawn_aggregate_shares_task(metadata)
+        self.spawn_aggregate_shares_task(metadata.metadata_to_sign)
     }
 
     fn process_ready_blocks(&mut self, ready_blocks: Vec<OrderedBlocks>) {
@@ -253,7 +254,7 @@ impl<S: TShare, D: TAugmentedData> RandManager<S, D> {
         }
     }
 
-    fn spawn_aggregate_shares_task(&self, metadata: RandMetadata) -> DropGuard {
+    fn spawn_aggregate_shares_task(&self, metadata: RandMetadataToSign) -> DropGuard {
         let rb = self.reliable_broadcast.clone();
         let aggregate_state = Arc::new(ShareAggregateState::new(
             self.rand_store.clone(),
@@ -261,14 +262,14 @@ impl<S: TShare, D: TAugmentedData> RandManager<S, D> {
             self.config.clone(),
         ));
         let epoch_state = self.epoch_state.clone();
-        let round = metadata.round();
+        let round = metadata.round;
         let rand_store = self.rand_store.clone();
         let task = async move {
             tokio::time::sleep(Duration::from_millis(300)).await;
-            let maybe_existing_shares = rand_store.lock().get_all_shares_authors(&metadata);
+            let maybe_existing_shares = rand_store.lock().get_all_shares_authors(round);
             if let Some(existing_shares) = maybe_existing_shares {
                 let epoch = epoch_state.epoch;
-                let request = RequestShare::new(epoch, metadata);
+                let request = RequestShare::new(metadata.clone());
                 let targets = epoch_state
                     .verifier
                     .get_ordered_account_addresses_iter()
@@ -404,7 +405,7 @@ impl<S: TShare, D: TAugmentedData> RandManager<S, D> {
                             info!(LogSchema::new(LogEvent::ReceiveProactiveRandShare)
                                 .author(self.author)
                                 .epoch(share.epoch())
-                                .round(share.metadata().round())
+                                .round(share.metadata().round)
                                 .remote_peer(*share.author()));
 
                             if let Err(e) = self.rand_store.lock().add_share(share, PathType::Slow) {
@@ -415,7 +416,7 @@ impl<S: TShare, D: TAugmentedData> RandManager<S, D> {
                             info!(LogSchema::new(LogEvent::ReceiveRandShareFastPath)
                                 .author(self.author)
                                 .epoch(share.epoch())
-                                .round(share.metadata().round())
+                                .round(share.metadata().round)
                                 .remote_peer(*share.share.author()));
 
                             if let Err(e) = self.rand_store.lock().add_share(share.rand_share(), PathType::Fast) {
