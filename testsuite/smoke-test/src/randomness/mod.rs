@@ -30,6 +30,7 @@ mod enable_feature_1;
 mod enable_feature_2;
 mod randomness_stall_recovery;
 mod validator_restart_during_dkg;
+mod long_running_crash_recovery;
 
 #[allow(dead_code)]
 async fn get_current_version(rest_client: &Client) -> u64 {

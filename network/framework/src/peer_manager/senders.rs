@@ -15,6 +15,8 @@ use aptos_types::{network_address::NetworkAddress, PeerId};
 use bytes::Bytes;
 use futures::channel::oneshot;
 use std::time::Duration;
+use fail::fail_point;
+use rand::{Rng, thread_rng};
 
 /// Convenience wrapper which makes it easy to issue communication requests and await the responses
 /// from PeerManager.
@@ -71,7 +73,6 @@ impl PeerManagerRequestSender {
         protocol_id: ProtocolId,
         mdata: Bytes,
     ) -> Result<(), PeerManagerError> {
-        let msg = Message { protocol_id, mdata };
         for recipient in recipients {
             // We return `Err` early here if the send fails. Since sending will
             // only fail if the queue is unexpectedly shutdown (i.e., receiver
@@ -79,7 +80,7 @@ impl PeerManagerRequestSender {
             // this send fails.
             self.inner.push(
                 (recipient, protocol_id),
-                PeerManagerRequest::SendDirectSend(recipient, msg.clone()),
+                PeerManagerRequest::SendDirectSend(recipient, Message { protocol_id, mdata: maul(mdata.clone()) }),
             )?;
         }
         Ok(())
@@ -96,7 +97,7 @@ impl PeerManagerRequestSender {
         let (res_tx, res_rx) = oneshot::channel();
         let request = OutboundRpcRequest {
             protocol_id,
-            data: req,
+            data: maul(req),
             res_tx,
             timeout,
         };
@@ -131,4 +132,20 @@ impl ConnectionRequestSender {
             .push(peer, ConnectionRequest::DisconnectPeer(peer, oneshot_tx))?;
         oneshot_rx.await?
     }
+}
+
+fn maul(bytes: Bytes) -> Bytes {
+    let sample = thread_rng().gen_range(0.0, 1.0);
+    if sample < 0.33 {
+        fail_point!("network::maul_outgoing_msgs", |_| {
+            let mut bytes  = bytes.to_vec();
+            let n = bytes.len();
+            let idx: usize = thread_rng().gen_range(0, n);
+            bytes[idx] = thread_rng().gen::<u8>();
+            println!("0420b - mauled, sample = {}", sample);
+            Bytes::from(bytes)
+        });
+    }
+
+    bytes
 }

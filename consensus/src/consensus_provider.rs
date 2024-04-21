@@ -17,7 +17,7 @@ use crate::{
     util::time_service::ClockTimeService,
 };
 use aptos_bounded_executor::BoundedExecutor;
-use aptos_config::config::NodeConfig;
+use aptos_config::config::{NetworkConfig, NodeConfig};
 use aptos_consensus_notifications::ConsensusNotificationSender;
 use aptos_event_notifications::{DbBackedOnChainConfig, ReconfigNotificationListener};
 use aptos_executor::block_executor::BlockExecutor;
@@ -96,7 +96,8 @@ pub fn start_consensus(
         rand_storage,
     );
 
-    let (network_task, network_receiver) = NetworkTask::new(network_service_events, self_receiver);
+    let my_addr = node_config.validator_network.as_ref().map(NetworkConfig::peer_id);
+    let (network_task, network_receiver) = NetworkTask::new(my_addr, network_service_events, self_receiver);
 
     runtime.spawn(network_task.start());
     runtime.spawn(epoch_mgr.start(timeout_receiver, network_receiver));
