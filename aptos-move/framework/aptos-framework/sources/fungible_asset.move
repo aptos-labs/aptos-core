@@ -951,7 +951,7 @@ module aptos_framework::fungible_asset {
 
     #[test(fx = @aptos_framework, creator = @0xcafe)]
     fun test_fungible_asset_upgrade(fx: &signer, creator: &signer) acquires Supply, ConcurrentSupply, FungibleStore, ConcurrentFungibleBalance {
-        let feature = features::migrate_to_concurrent_fungible_balance_enabled();
+        let feature = features::get_migrate_to_concurrent_fungible_balance_feature();
         features::change_feature_flags_internal(fx, vector[], vector[feature]);
 
         let (creator_ref, token_object) = create_test_token(creator);
