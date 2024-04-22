@@ -304,6 +304,7 @@ where
         idx_to_validate: TxnIndex,
         last_input_output: &TxnLastInputOutput<T, E::Output, E::Error>,
         versioned_cache: &MVHashMap<T::Key, T::Tag, T::Value, X, T::Identifier>,
+        prefix_executed: bool,
     ) -> Result<bool, PanicError> {
         let _timer = TASK_VALIDATE_SECONDS.start_timer();
         let read_set = last_input_output
@@ -328,7 +329,11 @@ where
         Ok(
             read_set.validate_data_reads(versioned_cache.data(), idx_to_validate)
                 && read_set.validate_group_reads(versioned_cache.group_data(), idx_to_validate)
-                && read_set.partially_validate_delayed_field_reads(versioned_cache.delayed_fields(), idx_to_validate)?
+                && (!prefix_executed
+                    || read_set.partially_validate_delayed_field_reads(
+                        versioned_cache.delayed_fields(),
+                        idx_to_validate,
+                    )?),
         )
     }
 
@@ -473,7 +478,7 @@ where
                 scheduler.finish_execution_during_commit(txn_idx)?;
 
                 let validation_result =
-                    Self::validate(txn_idx, last_input_output, versioned_cache)?;
+                    Self::validate(txn_idx, last_input_output, versioned_cache, false)?;
                 if !validation_result
                     || !Self::validate_commit_ready(txn_idx, versioned_cache, last_input_output)
                         .unwrap_or(false)
@@ -780,8 +785,13 @@ where
             drain_commit_queue()?;
 
             scheduler_task = match scheduler_task {
-                SchedulerTask::ValidationTask(txn_idx, incarnation, wave) => {
-                    let valid = Self::validate(txn_idx, last_input_output, versioned_cache)?;
+                SchedulerTask::ValidationTask(txn_idx, incarnation, wave, prefix_executed) => {
+                    let valid = Self::validate(
+                        txn_idx,
+                        last_input_output,
+                        versioned_cache,
+                        prefix_executed,
+                    )?;
                     Self::update_on_validation(
                         txn_idx,
                         incarnation,

@@ -86,7 +86,9 @@ pub enum SchedulerTask {
     /// executing worker (suspended / waiting on a dependency).
     ExecutionTask(TxnIndex, Incarnation, ExecutionTaskType),
     /// Validation task with a version of the transaction, and the validation wave information.
-    ValidationTask(TxnIndex, Incarnation, Wave),
+    /// Last parameter is true iff all prior transactions have completed finish_execution, which
+    /// is useful to know to e.g. decide when to validate delayed field reads.
+    ValidationTask(TxnIndex, Incarnation, Wave, bool),
     /// Retry holds no task (similar None if we wrapped tasks in Option)
     Retry,
     /// Done implies that there are no more tasks and the scheduler is done.
@@ -264,6 +266,8 @@ pub struct Scheduler {
     /// An index i maps to the most up-to-date status of transaction i.
     txn_status: Vec<CachePadded<(RwLock<ExecutionStatus>, RwLock<ValidationStatus>)>>,
 
+    /// Number of transactions that have finished executing (incarnation 0) at least once.
+    executed_prefix_len: AtomicU32,
     /// Next transaction to commit, and sweeping lower bound on the wave of a validation that must
     /// be successful in order to commit the next transaction.
     commit_state: CachePadded<ExplicitSyncWrapper<(TxnIndex, Wave)>>,
@@ -321,6 +325,7 @@ impl Scheduler {
                     ))
                 })
                 .collect(),
+            executed_prefix_len: AtomicU32::new(0),
             commit_state: CachePadded::new(ExplicitSyncWrapper::new((0, 0))),
             execution_idx: AtomicU32::new(0),
             validation_idx: AtomicU64::new(0),
@@ -462,7 +467,12 @@ impl Scheduler {
                 if let Some((txn_idx, incarnation, wave)) =
                     self.try_validate_next_version(idx_to_validate, wave)
                 {
-                    return SchedulerTask::ValidationTask(txn_idx, incarnation, wave);
+                    return SchedulerTask::ValidationTask(
+                        txn_idx,
+                        incarnation,
+                        wave,
+                        self.prefix_executed(txn_idx),
+                    );
                 }
             }
 
@@ -529,6 +539,18 @@ impl Scheduler {
         // even validation status readers have to wait if they somehow end up at the same index.
         let mut validation_status = self.txn_status[txn_idx as usize].1.write();
         self.set_executed_status(txn_idx, incarnation)?;
+        // After status is set, update executed_prefix_len.
+        let mut i = txn_idx;
+        while self
+            .executed_prefix_len
+            .compare_exchange(i, i + 1, Ordering::SeqCst, Ordering::Acquire)
+            .is_ok()
+        {
+            i = i + 1;
+            if i >= self.num_txns || !self.never_executed(i) {
+                break;
+            }
+        }
 
         self.wake_dependencies_after_execution(txn_idx)?;
 
@@ -551,6 +573,7 @@ impl Scheduler {
                 txn_idx,
                 incarnation,
                 cur_wave,
+                self.prefix_executed(txn_idx),
             ));
         }
 
@@ -851,6 +874,10 @@ impl Scheduler {
                 | ExecutionStatus::Executing(0, _)
                 | ExecutionStatus::Suspended(0, _)
         )
+    }
+
+    fn prefix_executed(&self, txn_idx: TxnIndex) -> bool {
+        self.executed_prefix_len.load(Ordering::Relaxed) > txn_idx
     }
 
     /// Grab an index to try and validate next (by fetch-and-incrementing validation_idx).
