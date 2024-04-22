@@ -40,19 +40,19 @@ fn common<F: Fn(&mut Vec<u64>, &mut Vec<u64>, &mut Vec<u64>)>(update_signals: F,
     let num_iterations = std::env::var("NUM_ITERATIONS").unwrap_or("1".to_string()).parse::<usize>().unwrap_or(1);
 
     let circuit = TestCircuitHandle::new("rsa_verify_test.circom").unwrap();
-    let mut rng = rsa::rand_core::OsRng;
+    let mut rng = thread_rng();
     let e = rsa::BigUint::from_u64(EXPONENT).unwrap();
 
     for i in 0..num_iterations {
         info!("Iteration {i} starts. Generate RSA key pairs.");
-        let private_key = RsaPrivateKey::new_with_exp(&mut rng, 2048, &e).unwrap();
+        let private_key = RsaPrivateKey::new_with_exp(&mut rand_chacha::rand_core::OsRng, 2048, &e).unwrap();
         info!("Key pair generated, d={:?}, n={:?}.", private_key.d(), private_key.n());
         let modulus = BigUint::from_bytes_be(&private_key.to_public_key().n().to_bytes_be());
         let mut modulus_limbs = modulus.to_u64_digits();
         let signing_key = SigningKey::<Sha256>::new(private_key);
 
         info!("Generate a random message.");
-        let msg_len: usize = rng.gen_range(0..9999);
+        let msg_len: usize = rng.gen_range(0, 9999);
         let message: Vec<u8> = vec![0; msg_len];
 
         info!("Message generated, msg_hex={}", hex::encode(&message));
@@ -70,7 +70,7 @@ fn common<F: Fn(&mut Vec<u64>, &mut Vec<u64>, &mut Vec<u64>)>(update_signals: F,
                 .rev()
                 .collect();
 
-        let signature = BigUint::from_bytes_be(&signing_key.sign_with_rng(&mut rng, message.as_slice()).to_bytes());
+        let signature = BigUint::from_bytes_be(&signing_key.sign_with_rng(&mut rand_chacha::rand_core::OsRng, message.as_slice()).to_bytes());
         let mut signature_limbs = signature.to_u64_digits();
 
         let config = CircuitPaddingConfig::new();
@@ -89,7 +89,8 @@ fn common<F: Fn(&mut Vec<u64>, &mut Vec<u64>, &mut Vec<u64>)>(update_signals: F,
 }
 
 fn flip_random_bit(limbs: &mut Vec<u64>) {
-    let limb_idx = thread_rng().gen_range(0..limbs.len());
-    let bit_idx = thread_rng().gen_range(0..64);
+    let mut rng = thread_rng();
+    let limb_idx = rng.gen_range(0, limbs.len());
+    let bit_idx = rng.gen_range(0, 64);
     *limbs.get_mut(limb_idx).unwrap() ^= 1_u64 << bit_idx;
 }
