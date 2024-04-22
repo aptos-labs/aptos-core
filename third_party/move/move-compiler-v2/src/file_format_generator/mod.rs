@@ -54,7 +54,7 @@ pub fn generate_file_format(
                     name,
                     ..
                 } = main_handle.expect("main handle defined");
-                // When two scripts have the same function name, we need to use
+                // Because two scripts can have the same function name, we need to use
                 // the suffix of the script module name ("_0", "_1"...) to avoid the name conflict
                 let script_module_name = ctx.symbol_to_str(module_env.get_name().name());
                 let suffix = if script_module_name == SCRIPT_MODULE_NAME
