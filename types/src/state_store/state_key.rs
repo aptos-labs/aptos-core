@@ -429,6 +429,7 @@ impl StateKeyRegistry {
 pub struct StateKey(Arc<Entry>);
 
 impl StateKey {
+    #[inline]
     pub fn size(&self) -> usize {
         match self.inner() {
             StateKeyInner::AccessPath(access_path) => access_path.size(),
@@ -437,14 +438,17 @@ impl StateKey {
         }
     }
 
+    #[inline]
     pub fn inner(&self) -> &StateKeyInner {
         &self.0.deserialized
     }
 
+    #[inline]
     pub fn get_shard_id(&self) -> u8 {
         self.0.hash_value.nibble(0)
     }
 
+    #[inline]
     pub fn is_aptos_code(&self) -> bool {
         match self.inner() {
             StateKeyInner::AccessPath(access_path) => {
@@ -473,6 +477,7 @@ impl StateKey {
         }
     }
 
+    #[inline]
     pub fn resource(address: &AccountAddress, struct_tag: &StructTag) -> Self {
         if let Some(entry) = GLOBAL_REGISTRY
             .resource(struct_tag, address)
@@ -493,14 +498,17 @@ impl StateKey {
         Self(entry)
     }
 
+    #[inline]
     pub fn resource_typed<T: MoveResource>(address: &AccountAddress) -> Self {
         Self::resource(address, &T::struct_tag())
     }
 
+    #[inline]
     pub fn on_chain_config<T: OnChainConfig>() -> Self {
         Self::resource(T::address(), &T::struct_tag())
     }
 
+    #[inline]
     pub fn resource_group(address: &AccountAddress, struct_tag: &StructTag) -> Self {
         if let Some(entry) = GLOBAL_REGISTRY
             .resource_group(struct_tag, address)
@@ -521,6 +529,7 @@ impl StateKey {
         Self(entry)
     }
 
+    #[inline]
     pub fn module(address: &AccountAddress, name: &IdentStr) -> Self {
         if let Some(entry) = GLOBAL_REGISTRY.module(address, name).try_get(address, name) {
             return Self(entry);
@@ -538,10 +547,12 @@ impl StateKey {
         Self(entry)
     }
 
+    #[inline]
     pub fn module_id(module_id: &ModuleId) -> Self {
         Self::module(&module_id.address, &module_id.name)
     }
 
+    #[inline]
     pub fn table_item(handle: &TableHandle, key: &[u8]) -> Self {
         if let Some(entry) = GLOBAL_REGISTRY.table_item(handle, key).try_get(handle, key) {
             return Self(entry);
@@ -559,6 +570,7 @@ impl StateKey {
         Self(entry)
     }
 
+    #[inline]
     pub fn raw(bytes: &[u8]) -> Self {
         if let Some(entry) = GLOBAL_REGISTRY.raw(bytes).try_get(bytes, &()) {
             return Self(entry);
@@ -573,10 +585,12 @@ impl StateKey {
         Self(entry)
     }
 
+    #[inline]
     pub fn encode(&self) -> Result<Bytes> {
         Ok(self.0.encoded.clone())
     }
 
+    #[inline]
     pub fn decode(_val: &[u8]) -> Result<Self, StateKeyDecodeErr> {
         // FIXME(aldenhu): maybe check cache?
         let inner = StateKeyInner::decode(_val)?;

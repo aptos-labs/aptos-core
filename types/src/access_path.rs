@@ -105,10 +105,12 @@ pub enum PathType {
 }
 
 impl AccessPath {
+    #[inline]
     pub fn new(address: AccountAddress, path: Vec<u8>) -> Self {
         AccessPath { address, path }
     }
 
+    #[inline]
     pub fn resource_path_vec(tag: StructTag) -> Result<Vec<u8>> {
         let r = bcs::to_bytes(&Path::Resource(tag))?;
         Ok(r)
@@ -116,6 +118,7 @@ impl AccessPath {
 
     /// Convert Accesses into a byte offset which would be used by the storage layer to resolve
     /// where fields are stored.
+    #[inline]
     pub fn resource_access_path(address: AccountAddress, type_: StructTag) -> Result<AccessPath> {
         Ok(AccessPath {
             address,
@@ -123,12 +126,14 @@ impl AccessPath {
         })
     }
 
+    #[inline]
     pub fn resource_group_path_vec(tag: StructTag) -> Vec<u8> {
         bcs::to_bytes(&Path::ResourceGroup(tag)).expect("Unexpected serialization error")
     }
 
     /// Convert Accesses into a byte offset which would be used by the storage layer to resolve
     /// where fields are stored.
+    #[inline]
     pub fn resource_group_access_path(address: AccountAddress, type_: StructTag) -> AccessPath {
         AccessPath {
             address,
@@ -136,10 +141,12 @@ impl AccessPath {
         }
     }
 
+    #[inline]
     pub fn code_path_vec(key: ModuleId) -> Vec<u8> {
         bcs::to_bytes(&Path::Code(key)).expect("Unexpected serialization error")
     }
 
+    #[inline]
     pub fn code_access_path(key: ModuleId) -> Self {
         let address = *key.address();
         let path = AccessPath::code_path_vec(key);
@@ -147,12 +154,14 @@ impl AccessPath {
     }
 
     /// Extract the structured resource or module `Path` from `self`
+    #[inline]
     pub fn get_path(&self) -> Path {
         bcs::from_bytes::<Path>(&self.path).expect("Unexpected serialization error")
     }
 
     /// Extract a StructTag from `self`. Returns Some if this is a resource access
     /// path and None otherwise
+    #[inline]
     pub fn get_struct_tag(&self) -> Option<StructTag> {
         match self.get_path() {
             Path::Resource(s) => Some(s),
@@ -161,14 +170,17 @@ impl AccessPath {
         }
     }
 
+    #[inline]
     pub fn is_code(&self) -> bool {
         matches!(self.get_path(), Path::Code(_))
     }
 
+    #[inline]
     pub fn is_resource_group(&self) -> bool {
         matches!(self.get_path(), Path::ResourceGroup(_))
     }
 
+    #[inline]
     pub fn size(&self) -> usize {
         self.address.as_ref().len() + self.path.len()
     }
