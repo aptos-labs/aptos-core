@@ -318,7 +318,7 @@ impl<'a> SchedulerHandle<'a> {
     }
 
     pub fn halt(&self) -> bool {
-        eprintln!("set done marker in halt");
+        //eprintln!("set done marker in halt");
         self.scheduler.set_done_marker();
         self.garage.unwrap().halt()
     }
@@ -461,7 +461,7 @@ impl Scheduler {
             // Acquired the execution status read lock, which can be upgrade to write lock if necessary.
             if let ExecutionStatus::Executed(incarnation) = *status {
                 // Status is executed and we are holding the lock.
-                eprintln!("maybe should not be here?");
+                //eprintln!("maybe should not be here?");
                 // Note we update the wave inside commit_state only with max_triggered_wave,
                 // since max_triggered_wave records the new wave when validation index is
                 // decreased thus affecting all later txns as well,
@@ -478,7 +478,7 @@ impl Scheduler {
                         if *commit_idx == self.num_txns {
                             // All txns have been committed, the parallel execution can finish.
                             self.done_marker.store(                                 true, Ordering::SeqCst);
-                            eprintln!("yay done with all transactions?");
+                            //eprintln!("yay done with all transactions?");
                         }
                         return Some((*commit_idx - 1, incarnation));
                     }
@@ -521,7 +521,7 @@ impl Scheduler {
         }
 
         if *status == ExecutionStatus::Executed(incarnation) {
-            eprintln!("I really should not be here after halt");
+            //eprintln!("I really should not be here after halt");
             *status = ExecutionStatus::Aborting(incarnation);
             true
         } else {
@@ -1058,7 +1058,7 @@ impl Scheduler {
         incarnation: Incarnation,
     ) -> Result<(), PanicError> {
         let mut status = self.txn_status[txn_idx as usize].0.write();
-        eprintln!("was here maybe should be halted?");
+        //eprintln!("was here maybe should be halted?");
         match *status {
             ExecutionStatus::Executing(stored_incarnation, _)
                 if stored_incarnation == incarnation && !self.done() =>
@@ -1070,7 +1070,7 @@ impl Scheduler {
                 // The execution is already halted.
                 Ok(())
             },
-            _ => { eprintln!("started panicking here 2"); Err(code_invariant_error(format!(
+            _ => { Err(code_invariant_error(format!(
                 "Expected Executing incarnation {incarnation}, got {:?}",
                 &*status,
             ))) },
@@ -1084,11 +1084,11 @@ impl Scheduler {
         txn_idx: TxnIndex,
         incarnation: Incarnation,
     ) -> Result<(), PanicError> {
-        eprintln!("was here transaction_id={}", txn_idx);
+        //eprintln!("was here transaction_id={}", txn_idx);
         let mut status = self.txn_status[txn_idx as usize].0.write();
         match *status {
             ExecutionStatus::Aborting(stored_incarnation) if stored_incarnation == incarnation && !self.done() => {
-                eprintln!("aborted transaction_id={}", txn_idx);
+                //eprintln!("aborted transaction_id={}", txn_idx);
                 *status = ExecutionStatus::Ready(incarnation + 1, ExecutionTaskType::Execution);
                 Ok(())
             },
@@ -1096,7 +1096,7 @@ impl Scheduler {
                 // The execution is already halted.
                 Ok(())
             },
-            _ => { eprintln!("started panicking here"); Err(code_invariant_error(format!(
+            _ => {  Err(code_invariant_error(format!(
                 "Expected Aborting incarnation {incarnation}, got {:?}",
                 &*status,
             ))) },

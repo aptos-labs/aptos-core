@@ -410,7 +410,7 @@ fn wait_for_dependency(
 ) -> Result<bool, PanicError> {
     
 
-    eprintln!("calling suspend txn={} dep_txn={}", txn_idx, dep_idx);
+    //eprintln!("calling suspend txn={} dep_txn={}", txn_idx, dep_idx);
     
     match wait_for.conditional_suspend(txn_idx, dep_idx)? {
         DependencyStatus::ExecutionHalted => Ok(false),

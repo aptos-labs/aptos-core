@@ -248,7 +248,7 @@ impl ThreadGarage {
         where T : PartialEq + Copy + Debug, F: Fn(Baton<T>)->Option<Result<T,E>> {
         //println!("{thread_id}");
         
-        eprintln!("suspend called on thread={}", thread_id);
+        //eprintln!("suspend called on thread={}", thread_id);
         //create new baton for current_thread, using default_value
         let baton: Baton<T>;
         {
@@ -266,7 +266,7 @@ impl ThreadGarage {
         let hook_result = register_hook(baton.clone());
         
 
-        eprintln!("returned from hook, thread = {}", thread_id);
+        //eprintln!("returned from hook, thread = {}", thread_id);
         match hook_result {
             Some(val) => {
                 eprintln!("dependency already resolved thread={}", thread_id);
@@ -282,7 +282,7 @@ impl ThreadGarage {
                     }
                 }
                 if self.is_halted() {
-                    eprintln!("suspend not possible due to halt thread={}", thread_id);
+                    //eprintln!("suspend not possible due to halt thread={}", thread_id);
                     return Ok(SuspendResult::FailedDueToHaltedGarage);
                 }
 
@@ -291,13 +291,13 @@ impl ThreadGarage {
                         return Ok(SuspendResult::NotHalted(val));
                     },
                     Err(e) => {
-                        eprintln!("returning error thread={}", thread_id);
+                        //eprintln!("returning error thread={}", thread_id);
                         return Err(e);
                     },
                 };
             },
             None => {
-                eprintln!("actually going to sleep thread={}", thread_id);
+                //eprintln!("actually going to sleep thread={}", thread_id);
                 //suspend logic
                 let mut lock = self.global_mutex.lock().unwrap();
 
@@ -319,23 +319,20 @@ impl ThreadGarage {
 
                 self.global_cv.notify_one();
 
-                eprintln!("num sleeping prior {}", lock.num_sleeping);
+                //eprintln!("num sleeping prior {}", lock.num_sleeping);
 
                 while lock.asleep[thread_id] {
                     lock = self.baton_cv[thread_id].wait(lock).unwrap();
                 }
 
-                eprintln!("woke up thread={}", thread_id);
+                //eprintln!("woke up thread={}", thread_id);
                 lock.num_sleeping -= 1;
 
-                eprintln!("num sleeping after {}", lock.num_sleeping);
+                //eprintln!("num sleeping after {}", lock.num_sleeping);
 
                 if self.is_halted() {
-                    println!("Thread: {} woke up in halted state", thread_id);
+                    //println!("Thread: {} woke up in halted state", thread_id);
                     return Ok(SuspendResult::WokenUpToHaltedGarage);
-                }
-                else {
-                    println!("Thread: {} woke up in NON-halted state", thread_id);
                 }
 
                 let val = baton.get_value();
@@ -395,10 +392,10 @@ impl ThreadGarage {
         if self.is_halted() {
             while lock.halting_cleanup_idx < self.max_spawned {
                 let halting_cleanup_idx = lock.halting_cleanup_idx;
-                println!("IDx: << {} <<  cleanup_idx: {}", thread_id, halting_cleanup_idx);
-                println!(" num_active: {} num_completed: {}", lock.num_active, lock.num_completed);
+                //println!("IDx: << {} <<  cleanup_idx: {}", thread_id, halting_cleanup_idx);
+                //println!(" num_active: {} num_completed: {}", lock.num_active, lock.num_completed);
                 if lock.asleep[lock.halting_cleanup_idx] {
-                    println!("WILL WAKEUP THREAD: {}", lock.halting_cleanup_idx);
+                    //println!("WILL WAKEUP THREAD: {}", lock.halting_cleanup_idx);
                     lock.asleep[halting_cleanup_idx] = false;
                     self.baton_cv[halting_cleanup_idx].notify_one();
                     lock.halting_cleanup_idx += 1;
@@ -407,7 +404,7 @@ impl ThreadGarage {
                 lock.halting_cleanup_idx += 1;
             }
         }
-        println!("Clean exit from thread: {}",  thread_id); 
+        //println!("Clean exit from thread: {}",  thread_id); 
         false
     }
 
@@ -484,7 +481,7 @@ impl<F> Executor for WorkerFunctionExecutor<F> where F : Fn(&ThreadGarageHandle)
                 continue;
             }
 
-            println!("Calling closure, thread: {}", thread_id);
+            //println!("Calling closure, thread: {}", thread_id);
             let return_value = (input.worker_function)(&handle);
 
             let baton_thread_id = return_value.baton_thread_id;
@@ -495,7 +492,7 @@ impl<F> Executor for WorkerFunctionExecutor<F> where F : Fn(&ThreadGarageHandle)
                     
                     if lock.asleep[baton_thread_id] {
                         lock.asleep[baton_thread_id] = false;
-                        println!("thread: {}, waking up thread: {}", thread_id, baton_thread_id);
+                        //println!("thread: {}, waking up thread: {}", thread_id, baton_thread_id);
                         garage.baton_cv[baton_thread_id].notify_one();
                     }
                     else {

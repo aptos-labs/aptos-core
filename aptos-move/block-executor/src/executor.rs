@@ -782,7 +782,7 @@ where
 
             drain_commit_queue()?;
 
-            eprintln!("getting new task thread={}", scheduler_handle.get_thread_id());
+            //eprintln!("getting new task thread={}", scheduler_handle.get_thread_id());
 
             scheduler_task = match scheduler_task {
                 SchedulerTask::ValidationTask(txn_idx, incarnation, wave) => {
@@ -802,7 +802,7 @@ where
                     incarnation,
                     ExecutionTaskType::Execution,
                 ) => {
-                    eprintln!("getting new task thread={}, execution, txn={}", scheduler_handle.get_thread_id(), txn_idx);
+                    //eprintln!("getting new task thread={}, execution, txn={}", scheduler_handle.get_thread_id(), txn_idx);
 
                     let updates_outside = Self::execute(
                         txn_idx,
@@ -821,8 +821,8 @@ where
                     )?;
                     scheduler_handle.get_scheduler().finish_execution(txn_idx, incarnation, updates_outside)?
                 },
-                SchedulerTask::ExecutionTask(txn_idx, _, ExecutionTaskType::Wakeup(baton)) => {
-                    eprintln!("getting new task thread={}, wakeup, txn={}", scheduler_handle.get_thread_id(), txn_idx);
+                SchedulerTask::ExecutionTask(_, _, ExecutionTaskType::Wakeup(baton)) => {
+                    //eprintln!("getting new task thread={}, wakeup, txn={}", scheduler_handle.get_thread_id(), txn_idx);
 
                     assert!(baton.get_value() == DependencyStatus::Unresolved);
                     let temp_baton = baton.change_value(DependencyStatus::Resolved);
@@ -830,12 +830,12 @@ where
                     return Ok(Some(temp_baton));                
                 },
                 SchedulerTask::Retry => {
-                    eprintln!("getting new task thread={}, retry", scheduler_handle.get_thread_id());
+                    //eprintln!("getting new task thread={}, retry", scheduler_handle.get_thread_id());
                     scheduler_handle.get_scheduler().next_task()
                 },
                 SchedulerTask::Done => {
                     drain_commit_queue()?;
-                    eprintln!("why done here?");
+                    //eprintln!("why done here?");
                     break Ok(None);
                 },
             }
@@ -848,7 +848,7 @@ where
         signature_verified_block: &[T],
         base_view: &S,
     ) -> Result<BlockOutput<E::Output>, ()> {
-        eprintln!("entered function!");
+        //eprintln!("entered function!");
         let _timer = PARALLEL_EXECUTION_SECONDS.start_timer();
         // Using parallel execution with 1 thread currently will not work as it
         // will only have a coordinator role but no workers for rolling commit.
@@ -885,14 +885,14 @@ where
 
         let num_txns = num_txns as u32;
 
-        eprintln!("num txns={}", num_txns);
+        //eprintln!("num txns={}", num_txns);
 
         let last_input_output = TxnLastInputOutput::new(num_txns);
         let scheduler = Scheduler::new(num_txns);
 
         let timer = RAYON_EXECUTION_SECONDS.start_timer();
 
-        eprintln!("ready to spawn");
+        //eprintln!("ready to spawn");
 
         /* 
         self.executor_thread_pool.scope(|s| {
@@ -926,7 +926,7 @@ where
         });*/
 
         self.garage.spawn_n(|garage| -> ReturnType {
-            eprintln!("calling function");
+            //eprintln!("calling function");
             let scheduler_handle = SchedulerHandle::new(&scheduler, garage);
             let res = self.worker_loop(
                 &executor_initial_arguments,
@@ -952,7 +952,7 @@ where
                     
                     shared_maybe_error.store(true, Ordering::SeqCst);
 
-                    eprintln!("halting from here thread= {}", garage.get_thread_id());
+                    //eprintln!("halting from here thread= {}", garage.get_thread_id());
                     // Make sure to halt the scheduler if it hasn't already been halted.
                     scheduler_handle.halt();
 
