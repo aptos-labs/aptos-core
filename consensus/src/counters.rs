@@ -95,6 +95,38 @@ pub static SYNC_TO_HIGHEST_QC: Lazy<IntCounter> = Lazy::new(|| {
     .unwrap()
 });
 
+pub static SUCCESSFUL_EXECUTED_WITH_REGULAR_QC_ADD_CERTS: Lazy<IntCounter> = Lazy::new(|| {
+    register_int_counter!(
+        "aptos_consensus_successful_executed_with_regular_qc_add_certs",
+        "Count of the number of blocks successfully executed with regular QC and added certs"
+    )
+    .unwrap()
+});
+
+pub static SUCCESSFUL_EXECUTED_WITH_REGULAR_QC_FROM_VOTES: Lazy<IntCounter> = Lazy::new(|| {
+    register_int_counter!(
+        "aptos_consensus_successful_executed_with_regular_qc_from_votes",
+        "Count of the number of blocks successfully executed with regular QC from votes"
+    )
+    .unwrap()
+});
+
+pub static SUCCESSFUL_EXECUTED_WITH_ORDER_VOTE_QC_ADD_CERTS: Lazy<IntCounter> = Lazy::new(|| {
+    register_int_counter!(
+        "aptos_consensus_successful_executed_with_order_vote_qc_add_certs",
+        "Count of the number of blocks successfully executed with order vote QC and added certs"
+    )
+    .unwrap()
+});
+
+pub static SUCCESSFUL_EXECUTED_WITH_ORDER_VOTE_QC_FROM_VOTES: Lazy<IntCounter> = Lazy::new(|| {
+    register_int_counter!(
+        "aptos_consensus_successful_executed_with_order_vote_qc_from_votes",
+        "Count of the number of blocks successfully executed with order vote QC from votes"
+    )
+    .unwrap()
+});
+
 pub static ORDER_VOTE_ADDED: Lazy<IntCounter> = Lazy::new(|| {
     register_int_counter!(
         "aptos_consensus_order_vote_added",

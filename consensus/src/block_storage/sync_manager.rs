@@ -4,7 +4,13 @@
 
 use crate::{
     block_storage::{BlockReader, BlockStore},
-    counters::{EXECUTED_WITH_ORDER_VOTE_QC, SUCCESSFUL_EXECUTED_WITH_ORDER_VOTE_QC, SUCCESSFUL_EXECUTED_WITH_REGULAR_QC, SYNC_TO_HIGHEST_QC},
+    counters::{
+        EXECUTED_WITH_ORDER_VOTE_QC, SUCCESSFUL_EXECUTED_WITH_ORDER_VOTE_QC,
+        SUCCESSFUL_EXECUTED_WITH_ORDER_VOTE_QC_ADD_CERTS,
+        SUCCESSFUL_EXECUTED_WITH_ORDER_VOTE_QC_FROM_VOTES, SUCCESSFUL_EXECUTED_WITH_REGULAR_QC,
+        SUCCESSFUL_EXECUTED_WITH_REGULAR_QC_ADD_CERTS,
+        SUCCESSFUL_EXECUTED_WITH_REGULAR_QC_FROM_VOTES, SYNC_TO_HIGHEST_QC,
+    },
     epoch_manager::LivenessStorageData,
     logging::{LogEvent, LogSchema},
     monitor,
@@ -96,7 +102,10 @@ impl BlockStore {
         )
         .await?;
 
-        self.insert_quorum_cert(sync_info.highest_quorum_cert(), &mut retriever)
+        self.insert_aggregated_order_vote(sync_info.highest_ordered_decision(), &mut retriever, 2)
+            .await?;
+
+        self.insert_quorum_cert(sync_info.highest_quorum_cert(), &mut retriever, 2)
             .await?;
 
         if let Some(tc) = sync_info.highest_2chain_timeout_cert() {
@@ -109,6 +118,7 @@ impl BlockStore {
         &self,
         qc: &QuorumCert,
         retriever: &mut BlockRetriever,
+        caller_id: u64,
     ) -> anyhow::Result<()> {
         match self.need_fetch_for_quorum_cert(qc) {
             NeedFetchResult::NeedFetch => self.fetch_quorum_cert(qc.clone(), retriever).await?,
@@ -118,6 +128,11 @@ impl BlockStore {
         }
         if self.ordered_root().round() < qc.commit_info().round() {
             SUCCESSFUL_EXECUTED_WITH_REGULAR_QC.inc();
+            if caller_id == 1 {
+                SUCCESSFUL_EXECUTED_WITH_REGULAR_QC_FROM_VOTES.inc();
+            } else {
+                SUCCESSFUL_EXECUTED_WITH_REGULAR_QC_ADD_CERTS.inc();
+            }
             self.send_for_execution(qc.ledger_info().clone()).await?;
             if qc.ends_epoch() {
                 retriever
@@ -136,9 +151,15 @@ impl BlockStore {
         &self,
         ledger_info_with_sig: &LedgerInfoWithSignatures,
         retriever: &mut BlockRetriever,
+        caller_id: u64,
     ) -> anyhow::Result<()> {
         if self.ordered_root().round() < ledger_info_with_sig.ledger_info().round() {
             SUCCESSFUL_EXECUTED_WITH_ORDER_VOTE_QC.inc();
+            if caller_id == 1 {
+                SUCCESSFUL_EXECUTED_WITH_ORDER_VOTE_QC_FROM_VOTES.inc();
+            } else {
+                SUCCESSFUL_EXECUTED_WITH_ORDER_VOTE_QC_ADD_CERTS.inc();
+            }
             self.send_for_execution(ledger_info_with_sig.clone())
                 .await?;
             if ledger_info_with_sig.ledger_info().ends_epoch() {

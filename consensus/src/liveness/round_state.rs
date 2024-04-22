@@ -327,7 +327,7 @@ impl RoundState {
         order_vote: &OrderVote,
         verifier: &ValidatorVerifier,
     ) -> OrderVoteReceptionResult {
-        if order_vote.ledger_info().round() + 2 >= self.current_round {
+        if order_vote.ledger_info().round() + 3 >= self.current_round {
             self.pending_order_votes
                 .insert_order_vote(order_vote, verifier)
         } else {
