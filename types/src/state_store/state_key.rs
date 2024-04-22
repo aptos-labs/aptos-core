@@ -230,11 +230,121 @@ impl Drop for Entry {
     }
 }
 
+trait TwoKeys<Key1, Key2, Ref1, Ref2>
+where
+    Ref1: ?Sized,
+    Ref2: ?Sized,
+{
+    fn key1(&self) -> &Ref1;
+
+    fn key2(&self) -> &Ref2;
+}
+
+#[derive(Eq, Hash, PartialEq)]
+struct TwoKeysOwner<Key1, Key2> {
+    key1: Key1,
+    key2: Key2,
+}
+
+impl<Key1, Key2, Ref1, Ref2> TwoKeys<Key1, Key2, Ref1, Ref2> for TwoKeysOwner<Key1, Key2>
+where
+    Key1: Borrow<Ref1>,
+    Key2: Borrow<Ref2>,
+    Ref1: ?Sized,
+    Ref2: ?Sized,
+{
+    fn key1(&self) -> &Ref1 {
+        self.key1.borrow()
+    }
+
+    fn key2(&self) -> &Ref2 {
+        self.key2.borrow()
+    }
+}
+
+impl<Key1, Key2, Ref1, Ref2> TwoKeys<Key1, Key2, Ref1, Ref2> for (&Ref1, &Ref2)
+where
+    Key1: Borrow<Ref1>,
+    Key2: Borrow<Ref2>,
+    Ref1: ?Sized,
+    Ref2: ?Sized,
+{
+    fn key1(&self) -> &Ref1 {
+        self.0
+    }
+
+    fn key2(&self) -> &Ref2 {
+        self.1
+    }
+}
+
+impl<'a, Key1, Key2, Ref1, Ref2> Borrow<dyn TwoKeys<Key1, Key2, Ref1, Ref2> + 'a>
+    for TwoKeysOwner<Key1, Key2>
+where
+    Key1: Borrow<Ref1> + 'a,
+    Key2: Borrow<Ref2> + 'a,
+    Ref1: ?Sized,
+    Ref2: ?Sized,
+{
+    fn borrow(&self) -> &(dyn TwoKeys<Key1, Key2, Ref1, Ref2> + 'a) {
+        self
+    }
+}
+
+/*
+impl<Key1, Key2, Ref1, Ref2> Borrow<dyn TwoKeysTrait<Key1, Key2, Ref1, Ref2> + 'a>
+    for (&Ref1, &Ref2)
+where
+    Key1: Borrow<Ref1> + 'static,
+    Key2: Borrow<Ref2> + 'static,
+    Ref1: ?Sized + 'static,
+    Ref2: ?Sized + 'static,
+{
+    fn borrow(&self) -> &(dyn TwoKeysTrait<Key1, Key2, Ref1, Ref2>) {
+        self
+    }
+}
+ */
+
+impl<Key1, Key2, Ref1, Ref2> Hash for (dyn TwoKeys<Key1, Key2, Ref1, Ref2> + '_)
+where
+    Key1: Borrow<Ref1>,
+    Key2: Borrow<Ref2>,
+    Ref1: Hash + ?Sized,
+    Ref2: Hash + ?Sized,
+{
+    fn hash<H: Hasher>(&self, state: &mut H) {
+        Hash::hash(self.key1(), state);
+        Hash::hash(self.key2(), state);
+    }
+}
+
+impl<Key1, Key2, Ref1, Ref2> PartialEq for (dyn TwoKeys<Key1, Key2, Ref1, Ref2> + '_)
+where
+    Key1: Borrow<Ref1>,
+    Key2: Borrow<Ref2>,
+    Ref1: Eq + ?Sized,
+    Ref2: Eq + ?Sized,
+{
+    fn eq(&self, other: &Self) -> bool {
+        self.key1() == other.key1() && self.key2() == other.key2()
+    }
+}
+
+impl<Key1, Key2, Ref1, Ref2> Eq for (dyn TwoKeys<Key1, Key2, Ref1, Ref2> + '_)
+where
+    Key1: Borrow<Ref1>,
+    Key2: Borrow<Ref2>,
+    Ref1: Eq + ?Sized,
+    Ref2: Eq + ?Sized,
+{
+}
+
 struct TwoLevelRegistry<Key1, Key2> {
     // FIXME(aldenhu): remove
     #[allow(dead_code)]
     key_type: &'static str,
-    inner: RwLock<HashMap<Key1, HashMap<Key2, Weak<Entry>>>>,
+    inner: RwLock<HashMap<TwoKeysOwner<Key1, Key2>, Weak<Entry>>>,
 }
 
 impl<Key1, Key2> TwoLevelRegistry<Key1, Key2>
@@ -249,13 +359,15 @@ where
         }
     }
 
-    fn try_get<Q1, Q2>(&self, key1: &Q1, key2: &Q2) -> Option<Arc<Entry>>
+    fn try_get<Ref1, Ref2>(&self, key1: &Ref1, key2: &Ref2) -> Option<Arc<Entry>>
     where
-        Key1: Borrow<Q1>,
-        Key2: Borrow<Q2>,
-        Q1: Eq + Hash + ?Sized,
-        Q2: Eq + Hash + ?Sized,
+        Key1: Borrow<Ref1>,
+        Key2: Borrow<Ref2>,
+        Ref1: Eq + Hash + ?Sized,
+        Ref2: Eq + Hash + ?Sized,
     {
+        let two_keys = (key1, key2);
+
         let locked = match self.inner.inner().try_read() {
             Ok(locked) => locked,
             Err(..) => {
@@ -267,30 +379,33 @@ where
         };
 
         locked
-            .get(key1)
-            .and_then(|m| m.get(key2))
-            .and_then(|weak| weak.upgrade())
+            .get(&two_keys as &(dyn TwoKeys<Key1, Key2, Ref1, Ref2>))
+            .and_then(move |weak| weak.upgrade())
     }
 
-    fn lock_and_get_or_add<Q1, Q2>(&self, key1: &Q1, key2: &Q2, maybe_add: EntryInner) -> Arc<Entry>
+    fn lock_and_get_or_add<Ref1, Ref2>(
+        &self,
+        key1: &Ref1,
+        key2: &Ref2,
+        maybe_add: EntryInner,
+    ) -> Arc<Entry>
     where
-        Key1: Borrow<Q1>,
-        Key2: Borrow<Q2>,
-        Q1: Eq + Hash + ToOwned<Owned = Key1> + ?Sized,
-        Q2: Eq + Hash + ToOwned<Owned = Key2> + ?Sized,
+        Key1: Borrow<Ref1>,
+        Key2: Borrow<Ref2>,
+        Ref1: Eq + Hash + ToOwned<Owned = Key1> + ?Sized,
+        Ref2: Eq + Hash + ToOwned<Owned = Key2> + ?Sized,
     {
         // let _timer = STATE_KEY_TIMER.timer_with(&[self.key_type, "lock_and_get_or_add"]);
 
         const MAX_TRIES: usize = 100;
 
         for _ in 0..MAX_TRIES {
-            match self
-                .inner
-                .write()
-                .entry(key1.to_owned())
-                .or_default()
-                .entry(key2.to_owned())
-            {
+            let two_keys = TwoKeysOwner {
+                key1: key1.to_owned(),
+                key2: key2.to_owned(),
+            };
+
+            match self.inner.write().entry(two_keys) {
                 hash_map::Entry::Occupied(occupied) => {
                     if let Some(entry) = occupied.get().upgrade() {
                         // some other thread has added it
@@ -315,26 +430,18 @@ where
         unreachable!("Looks like deadlock");
     }
 
-    fn lock_and_remove(&self, key1: &Key1, key2: &Key2) {
-        match self.inner.write().entry(key1.to_owned()) {
-            hash_map::Entry::Occupied(mut occupied) => {
-                match occupied.get_mut().remove(key2) {
-                    Some(..) => {
-                        // STATE_KEY_COUNTERS.inc_with(&[self.key_type, "entry_remove"]);
-                    },
-                    None => {
-                        unreachable!("Entry missing in registry when dropping.")
-                    },
-                }
-                if occupied.get().is_empty() {
-                    occupied.remove();
-                }
-            },
-            hash_map::Entry::Vacant(_) => {
-                // This should not happen
-                unreachable!("level 1 map must exist when an entry is supposed to be in it.");
-            },
-        }
+    fn lock_and_remove<Ref1, Ref2>(&self, key1: &Ref1, key2: &Ref2)
+    where
+        Key1: Borrow<Ref1>,
+        Key2: Borrow<Ref2>,
+        Ref1: Eq + Hash + ToOwned<Owned = Key1> + ?Sized,
+        Ref2: Eq + Hash + ToOwned<Owned = Key2> + ?Sized,
+    {
+        assert!(self
+            .inner
+            .write()
+            .remove(&(key1, key2) as &dyn TwoKeys<Key1, Key2, Ref1, Ref2>)
+            .is_some());
     }
 }
 
