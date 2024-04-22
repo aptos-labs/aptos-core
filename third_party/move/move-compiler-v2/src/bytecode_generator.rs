@@ -1220,7 +1220,7 @@ impl<'env> Generator<'env> {
                 }
             },
             _ => {
-                // The type checker has ensured that this expression represents  tuple
+                // The type checker has ensured that this expression represents tuple
                 let (temps, cont_assigns) = self.flatten_patterns(pats, next_scope);
                 self.gen(temps, exp);
                 for (cont_id, cont_pat, cont_temp) in cont_assigns {
