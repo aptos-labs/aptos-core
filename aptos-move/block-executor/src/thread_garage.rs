@@ -11,6 +11,8 @@ use std::sync::{
     Arc,
 };
 
+use crossbeam::utils::CachePadded;
+
 use std::any::Any;
 use std::thread;
 use std::result::Result;
@@ -218,7 +220,7 @@ pub struct ThreadGarage {
     global_barrier: ThreadGarageBarrier,
 
     //mutex protecting mutable shared data
-    global_mutex: Mutex<CurrentThreadData>,
+    global_mutex: CachePadded<Mutex<CurrentThreadData>>,
     
     //global condvar used for waking up threads which are asleep due to enough threads running worker function
     global_cv: Condvar,
@@ -226,7 +228,7 @@ pub struct ThreadGarage {
     //vector of condvars used to waking up threads which are asleep due to unsatisfied dependencies
     baton_cv: Vec<Condvar>,
     
-    halted: AtomicBool,
+    halted: CachePadded<AtomicBool>,
 }
 
 impl ThreadGarage {
@@ -237,10 +239,10 @@ impl ThreadGarage {
             num_spawned: AtomicUsize::new(0),
             worker_function_vec: ExplicitSyncWrapper::new((0..max_spawned).map(|_| None).collect()),
             global_barrier: ThreadGarageBarrier::new(max_spawned),
-            global_mutex: Mutex::new(CurrentThreadData::new(max_spawned)),
+            global_mutex: CachePadded::new(Mutex::new(CurrentThreadData::new(max_spawned))),
             global_cv: Condvar::new(),
             baton_cv: (0..max_spawned).map(|_| Condvar::new()).collect(),
-            halted: AtomicBool::new(false),
+            halted: CachePadded::new(AtomicBool::new(false)),
         }
     }
 
