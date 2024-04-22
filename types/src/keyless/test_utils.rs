@@ -38,6 +38,12 @@ pub fn get_sample_esk() -> Ed25519PrivateKey {
     Ed25519PrivateKey::try_from(serialized).unwrap()
 }
 
+pub fn get_sample_tw_sk() -> Ed25519PrivateKey {
+    let sk_bytes =
+        hex::decode("1111111111111111111111111111111111111111111111111111111111111111").unwrap();
+    Ed25519PrivateKey::try_from(sk_bytes.as_slice()).unwrap()
+}
+
 pub fn get_sample_iss() -> String {
     SAMPLE_JWT_PARSED.oidc_claims.iss.clone()
 }
@@ -48,6 +54,14 @@ pub fn get_sample_jwk() -> RSA_JWK {
 
 pub fn get_sample_pepper() -> Pepper {
     SAMPLE_PEPPER.clone()
+}
+
+pub fn get_sample_epk_blinder() -> Vec<u8> {
+    SAMPLE_EPK_BLINDER.clone()
+}
+
+pub fn get_sample_exp_date() -> u64 {
+    SAMPLE_EXP_DATE
 }
 
 pub fn get_sample_groth16_zkp_and_statement() -> Groth16ProofAndStatement {
@@ -72,6 +86,18 @@ pub fn get_sample_groth16_zkp_and_statement() -> Groth16ProofAndStatement {
             ZKP::Groth16(proof) => proof,
         },
         public_inputs_hash,
+    }
+}
+
+pub fn get_sample_zk_sig() -> ZeroKnowledgeSig {
+    let proof = *SAMPLE_PROOF;
+
+    ZeroKnowledgeSig {
+        proof: proof.into(),
+        extra_field: Some(SAMPLE_JWT_EXTRA_FIELD.to_string()),
+        exp_horizon_secs: SAMPLE_EXP_HORIZON_SECS,
+        override_aud_val: None,
+        training_wheels_signature: None,
     }
 }
 
@@ -121,6 +147,27 @@ pub fn get_sample_groth16_sig_and_pk_no_extra_field() -> (KeylessSignature, Keyl
     };
 
     (sig, SAMPLE_PK.clone())
+}
+
+pub fn get_sample_jwt_token() -> String {
+    let jwt_header_b64 = SAMPLE_JWT_HEADER_B64.to_string();
+    let jwt_payload_b64 = base64url_encode_str(SAMPLE_JWT_PAYLOAD_JSON.as_str());
+    let msg = jwt_header_b64.clone() + "." + jwt_payload_b64.as_str();
+    let rng = ring::rand::SystemRandom::new();
+    let sk = &*SAMPLE_JWK_SK;
+    let mut jwt_sig = vec![0u8; sk.public_modulus_len()];
+
+    sk.sign(
+        &signature::RSA_PKCS1_SHA256,
+        &rng,
+        msg.as_bytes(),
+        jwt_sig.as_mut_slice(),
+    )
+    .unwrap();
+
+    let base64url_string = encode_config(jwt_sig.clone(), URL_SAFE_NO_PAD);
+
+    format!("{}.{}", msg, base64url_string)
 }
 
 /// Note: Does not have a valid ephemeral signature. Use the SAMPLE_ESK to compute one over the

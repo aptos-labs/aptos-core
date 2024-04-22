@@ -61,7 +61,7 @@ impl LocalAccountAuthenticator {
 
                 let sig = KeylessSignature {
                     cert: EphemeralCertificate::ZeroKnowledgeSig(keyless_account.zk_sig.clone()),
-                    jwt_header_json: keyless_account.get_jwt_header_json(),
+                    jwt_header_json: keyless_account.jwt_header_json.clone(),
                     exp_date_secs: keyless_account.ephemeral_key_pair.expiry_date_secs,
                     ephemeral_pubkey: keyless_account.ephemeral_key_pair.public_key.clone(),
                     ephemeral_signature,
@@ -499,29 +499,24 @@ pub struct KeylessAccount {
     #[allow(dead_code)]
     pepper: Pepper,
     zk_sig: ZeroKnowledgeSig,
-    jwt: String,
+    jwt_header_json: String,
+    #[allow(dead_code)]
+    jwt: Option<String>,
 }
 
 impl KeylessAccount {
     pub fn new(
-        jwt: String,
+        iss: String,
+        aud: String,
+        uid_key: String,
+        uid_val: String,
+        jwt_header_json: String,
         ephemeral_key_pair: EphemeralKeyPair,
         pepper: Pepper,
         zk_sig: ZeroKnowledgeSig,
     ) -> Result<Self> {
-        let parts: Vec<&str> = jwt.split('.').collect();
-        let jwt_payload_json = base64::decode_config(parts[1], base64::URL_SAFE).unwrap();
-        let claims: Claims = serde_json::from_slice(&jwt_payload_json)?;
-
-        let uid_key = "sub".to_owned();
-        let uid_val = claims.get_uid_val(&uid_key)?;
-        let aud = claims.oidc_claims.aud;
-
         let idc = IdCommitment::new_from_preimage(&pepper, &aud, &uid_key, &uid_val)?;
-        let public_key = KeylessPublicKey {
-            iss_val: claims.oidc_claims.iss,
-            idc,
-        };
+        let public_key = KeylessPublicKey { iss_val: iss, idc };
         Ok(Self {
             public_key,
             ephemeral_key_pair,
@@ -530,18 +525,45 @@ impl KeylessAccount {
             aud,
             pepper,
             zk_sig,
-            jwt,
+            jwt_header_json,
+            jwt: None,
         })
     }
 
-    pub fn get_jwt_header_json(&self) -> String {
-        let parts: Vec<&str> = self.jwt.split('.').collect();
+    pub fn new_from_jwt(
+        jwt: String,
+        ephemeral_key_pair: EphemeralKeyPair,
+        pepper: Pepper,
+        zk_sig: ZeroKnowledgeSig,
+    ) -> Result<Self> {
+        let parts: Vec<&str> = jwt.split('.').collect();
         let header_bytes = base64::decode(parts[0]).unwrap();
-        String::from_utf8(header_bytes).unwrap()
+        let jwt_header_json = String::from_utf8(header_bytes).unwrap();
+        let jwt_payload_json = base64::decode_config(parts[1], base64::URL_SAFE).unwrap();
+        let claims: Claims = serde_json::from_slice(&jwt_payload_json)?;
+
+        let uid_key = "sub".to_owned();
+        let uid_val = claims.get_uid_val(&uid_key)?;
+        let aud = claims.oidc_claims.aud;
+
+        Self::new(
+            claims.oidc_claims.iss,
+            aud,
+            uid_key,
+            uid_val,
+            jwt_header_json,
+            ephemeral_key_pair,
+            pepper,
+            zk_sig,
+        )
     }
 
     pub fn authentication_key(&self) -> AuthenticationKey {
         AuthenticationKey::any_key(AnyPublicKey::keyless(self.public_key.clone()))
+    }
+
+    pub fn public_key(&self) -> &KeylessPublicKey {
+        &self.public_key
     }
 }
 

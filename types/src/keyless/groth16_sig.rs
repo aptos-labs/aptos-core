@@ -177,6 +177,15 @@ impl ZeroKnowledgeSig {
     }
 }
 
+impl TryFrom<&[u8]> for ZeroKnowledgeSig {
+    type Error = CryptoMaterialError;
+
+    fn try_from(bytes: &[u8]) -> Result<Self, CryptoMaterialError> {
+        bcs::from_bytes::<ZeroKnowledgeSig>(bytes)
+            .map_err(|_e| CryptoMaterialError::DeserializationError)
+    }
+}
+
 impl TryFrom<&[u8]> for Groth16Proof {
     type Error = CryptoMaterialError;
 
