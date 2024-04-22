@@ -647,7 +647,8 @@ impl AptosDB {
         let ledger_batch = SchemaBatch::new();
         ledger_batch.put::<DbMetadataSchema>(
             &DbMetadataKey::LedgerCommitProgress,
-            &DbMetadataValue::Version(last_version - 1),
+            // Even though this is a revert operation, we still want to increment the version.
+            &DbMetadataValue::Version(last_version + 1),
         )?;
         self.ledger_db.metadata_db().write_schemas(ledger_batch)?;
 
@@ -655,11 +656,12 @@ impl AptosDB {
         let ledger_batch = SchemaBatch::new();
         ledger_batch.put::<DbMetadataSchema>(
             &DbMetadataKey::OverallCommitProgress,
-            &DbMetadataValue::Version(last_version - 1),
+            &DbMetadataValue::Version(last_version + 1),
         )?;
         self.ledger_db.metadata_db().write_schemas(ledger_batch)?;
 
         let temp_position = Position::from_postorder_index(last_version)?;
+
         // Revert the transaction accumulator
         let batch = SchemaBatch::new();
         self.ledger_db
@@ -687,7 +689,7 @@ impl AptosDB {
 
         // Revert the transaction auxiliary data
         let batch = SchemaBatch::new();
-        TransactionAuxiliaryDataDb::prune(last_version, last_version + 1, &batch)?;
+        TransactionAuxiliaryDataDb::prune(last_version, last_version, &batch)?;
 
         let batch = SchemaBatch::new();
         self.ledger_db
@@ -696,10 +698,10 @@ impl AptosDB {
 
         // Revert the write set
         let batch = SchemaBatch::new();
-        WriteSetDb::prune(last_version, last_version + 1, &batch)?;
+        WriteSetDb::prune(last_version - 1, last_version, &batch)?;
         self.ledger_db.transaction_db().prune_transactions(
+            last_version -1,
             last_version,
-            last_version + 1,
             &batch,
         )?;
         // Revert the state kv and ledger metadata not yet implemented
@@ -708,7 +710,7 @@ impl AptosDB {
             .revert_state_kv_and_ledger_metadata(last_version)?;
 
         // Update the latest ledger info if provided
-        self.commit_ledger_info(last_version, new_root_hash, Some(ledger_info_with_sigs))?;
+        self.commit_ledger_info(last_version + 1, new_root_hash, Some(ledger_info_with_sigs))?;
 
         Ok(())
     }

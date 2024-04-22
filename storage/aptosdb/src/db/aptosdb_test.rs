@@ -268,16 +268,15 @@ fn test_revert_last_commit() {
         .unwrap();
         cur_ver += txns_to_commit.len() as u64;
     }
-    println!("committed blocks");
 
     // Get the latest ledger info before revert
     let latest_ledger_info_before_revert = db.get_latest_ledger_info().unwrap();
-
-    // Revert the last commit
     let last_committed_version = latest_ledger_info_before_revert.ledger_info().version();
     let root_hash = latest_ledger_info_before_revert
         .commit_info()
         .executed_state_id();
+
+    // Revert the last commit
     db.revert_last_commit(
         last_committed_version,
         root_hash,
@@ -289,8 +288,48 @@ fn test_revert_last_commit() {
     let latest_ledger_info_after_revert = db.get_latest_ledger_info().unwrap();
     assert_eq!(
         latest_ledger_info_after_revert.ledger_info().version(),
-        last_committed_version 
+        last_committed_version
     );
+}
+
+#[test]
+fn test_revert_last_commit_should_fail_with_wrong_hash() {
+    aptos_logger::Logger::new().init();
+
+    let tmp_dir = TempPath::new();
+    let db = AptosDB::new_for_test(&tmp_dir);
+
+    let mut cur_ver: Version = 0;
+    let mut in_memory_state = db.buffered_state().lock().current_state().clone();
+    let _ancestor = in_memory_state.base.clone();
+    let mut val_generator = ValueGenerator::new();
+    let blocks = val_generator.generate(arb_blocks_to_commit());
+    for (txns_to_commit, ledger_info_with_sigs) in &blocks {
+        update_in_memory_state(&mut in_memory_state, txns_to_commit.as_slice());
+        db.save_transactions_for_test(
+            txns_to_commit,
+            cur_ver, /* first_version */
+            cur_ver.checked_sub(1),
+            Some(ledger_info_with_sigs),
+            true, /* sync_commit */
+            in_memory_state.clone(),
+        )
+        .unwrap();
+        cur_ver += txns_to_commit.len() as u64;
+    }
+
+    // Get the latest ledger info before revert
+    let latest_ledger_info_before_revert = db.get_latest_ledger_info().unwrap();
+    let last_committed_version = latest_ledger_info_before_revert.ledger_info().version();
+    
+    // Revert the last commit
+    let result = db.revert_last_commit(
+        last_committed_version,
+        HashValue::random(),  // A wrong hash
+        &latest_ledger_info_before_revert,
+    );
+    assert!(result.is_err());    
+
 }
 
 pub fn test_state_merkle_pruning_impl(
