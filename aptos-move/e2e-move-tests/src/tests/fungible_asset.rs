@@ -128,7 +128,7 @@ fn test_basic_fungible_token() {
     };
 
     // Ensure that the group data can be read
-    let mut alice_store: FungibleStore = h
+    let alice_store: FungibleStore = h
         .read_resource_from_resource_group(
             &alice_primary_store_addr,
             obj_group_tag.clone(),
@@ -144,9 +144,11 @@ fn test_basic_fungible_token() {
         )
         .unwrap();
 
-    assert_ne!(alice_store, bob_store);
-    // Determine that the only difference is the balance
-    assert_eq!(alice_store.balance, 70);
-    alice_store.balance = 10;
+    // The balance is no longer stored in the resource, so alice_store and bob_store are still equal
     assert_eq!(alice_store, bob_store);
+
+    // Determine that the only difference is the balance
+    // assert_eq!(alice_store.balance, 70);
+    // alice_store.balance = 10;
+    // assert_eq!(alice_store, bob_store);
 }
