@@ -49,6 +49,7 @@ pub const STATE_VALUE_CF_NAME: ColumnFamilyName = "state_value";
 pub const STATE_VALUE_INDEX_CF_NAME: ColumnFamilyName = "state_value_index";
 pub const TRANSACTION_CF_NAME: ColumnFamilyName = "transaction";
 pub const TRANSACTION_ACCUMULATOR_CF_NAME: ColumnFamilyName = "transaction_accumulator";
+pub const TRANSACTION_AUXILIARY_DATA_CF_NAME: ColumnFamilyName = "transaction_auxiliary_data";
 pub const TRANSACTION_BY_ACCOUNT_CF_NAME: ColumnFamilyName = "transaction_by_account";
 pub const TRANSACTION_BY_HASH_CF_NAME: ColumnFamilyName = "transaction_by_hash";
 pub const TRANSACTION_INFO_CF_NAME: ColumnFamilyName = "transaction_info";

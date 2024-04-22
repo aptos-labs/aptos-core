@@ -26,6 +26,7 @@ pub(super) fn ledger_db_column_families() -> Vec<ColumnFamilyName> {
         STATE_VALUE_CF_NAME,
         TRANSACTION_CF_NAME,
         TRANSACTION_ACCUMULATOR_CF_NAME,
+        TRANSACTION_AUXILIARY_DATA_CF_NAME, // not used in writing auxiliary data
         TRANSACTION_BY_ACCOUNT_CF_NAME,
         TRANSACTION_BY_HASH_CF_NAME,
         TRANSACTION_INFO_CF_NAME,
