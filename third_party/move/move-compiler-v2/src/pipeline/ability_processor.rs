@@ -133,7 +133,7 @@ struct CopyDropState {
     needs_drop: SetDomain<TempIndex>,
     /// Those temps which are consumed by the instruction but need to be checked for the drop ability
     /// since they internally drop the value. These are currently equalities.
-    check_drop: SetDomain<TempIndex>,
+    check_drop: SetDomain<(TempIndex, AttrId)>,
     /// Those temps which have been moved (that is consumed).
     moved: SetDomain<TempIndex>,
 }
@@ -189,11 +189,11 @@ impl<'a> TransferFunctions for CopyDropAnalysis<'a> {
             Call(_, _, Operation::BorrowLoc, _, _) => {
                 // Operation does not consume operands.
             },
-            Call(_, _, op, srcs, ..) => {
+            Call(id, _, op, srcs, ..) => {
                 // If this is an equality we need to check drop for the operands, even though we do not need
                 // to emit a drop.
                 if matches!(op, Operation::Eq | Operation::Neq) {
-                    state.check_drop.extend(srcs.iter().cloned())
+                    state.check_drop.extend(srcs.iter().cloned().zip(self.target.data.src_locations.get(id).unwrap().iter().cloned()));
                 }
                 // For arguments, we also need to check the case that a src, even if not used after this program
                 // point, is again used in the argument list. Also, in difference to assign inference, we only need
@@ -437,10 +437,12 @@ impl<'a> Transformer<'a> {
         if !bytecode.is_always_branching() || before {
             let copy_drop_at = self.copy_drop.get(&code_offset).expect("copy_drop");
             let id = bytecode.get_attr_id();
-            for temp in copy_drop_at.check_drop.iter() {
-                self.check_drop(bytecode.get_attr_id(), *temp, || {
+            for (temp, _id) in copy_drop_at.check_drop.iter() {
+                // println!("before {} code {} i {} temp {} {:?} {:?}", before, code_offset, i, temp, bytecode, self.builder.data.src_locations.get(&id).unwrap());
+                // let temp_attr = self.builder.data.src_locations.get(&id).expect("src locations").get(i).expect("src location");
+                self.check_drop(id, *temp, || {
                     (
-                        "operator drops value here (consider borrowing the argument)".to_owned(),
+                        format!("operator drops value here (consider borrowing the argument) temp {} offset {} bytecode {:?}", temp, code_offset, bytecode),
                         vec![],
                     )
                 });
@@ -517,8 +519,18 @@ impl<'a> Transformer<'a> {
     ) {
         if !self.has_ability(ty, ability) {
             let (message, hints) = describe();
+            let loc = if let Some(temp) = temp {
+                if let Some(loc) = self.builder.data.local_locations.get(&temp) {
+                    // loc.clone()
+                    self.loc(id)
+                } else {
+                    self.loc(id)
+                }
+            } else {
+                self.loc(id)
+            };
             self.error_with_hints(
-                self.loc(id),
+                loc,
                 format!(
                     "{}type `{}` does not have the `{}` ability",
                     if let Some(t) = temp {

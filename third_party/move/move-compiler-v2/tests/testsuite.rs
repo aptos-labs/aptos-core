@@ -295,6 +295,18 @@ const TEST_CONFIGS: Lazy<BTreeMap<&str, TestConfig>> = Lazy::new(|| {
             dump_bytecode: DumpLevel::AllStages,
             dump_bytecode_filter: Some(vec![INITIAL_BYTECODE_STAGE, "AbortAnalysisProcessor"]),
         },
+        TestConfig {
+            name: "debug",
+            runner: |p| run_test(p, get_config_by_name("debug")),
+            include: vec!["/debug/"],
+            exclude: vec![],
+            exp_suffix: None,
+            options: opts.clone(),
+            stop_after: StopAfter::FileFormat,
+            dump_ast: DumpLevel::None,
+            dump_bytecode: DumpLevel::AllStages,
+            dump_bytecode_filter: None,
+        },
         // Ability checking tests
         TestConfig {
             name: "ability-check",

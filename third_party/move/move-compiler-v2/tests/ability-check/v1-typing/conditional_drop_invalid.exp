@@ -40,7 +40,7 @@ error: value of type `M::Box<M::R>` does not have the `drop` ability
    ┌─ tests/ability-check/v1-typing/conditional_drop_invalid.move:17:9
    │
 17 │         Box<R> { f: R {} } == Box<R> { f: R {} };
-   │         ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ operator drops value here (consider borrowing the argument)
+   │         ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ operator drops value here (consider borrowing the argument) temp 24 offset 28 bytecode Call(AttrId(86), [23], Eq, [24, 27], None)
 
 error: value of type `M::Box<M::Box<M::R>>` does not have the `drop` ability
    ┌─ tests/ability-check/v1-typing/conditional_drop_invalid.move:18:9
@@ -64,4 +64,4 @@ error: value of type `M::Pair<M::R, M::S>` does not have the `drop` ability
    ┌─ tests/ability-check/v1-typing/conditional_drop_invalid.move:21:9
    │
 21 │         Pair<R, S> { f1: R{}, f2: S{} } == Pair<R, S> { f1: R{}, f2: S{} };
-   │         ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ operator drops value here (consider borrowing the argument)
+   │         ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ operator drops value here (consider borrowing the argument) temp 53 offset 56 bytecode Call(AttrId(176), [47], Eq, [48, 53], None)
