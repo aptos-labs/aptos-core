@@ -22,6 +22,9 @@ static DELEGATION_POOL_GET_STAKE_FUNCTION: Lazy<EntryFunctionId> =
 static STAKE_GET_LOCKUP_SECS_FUNCTION: Lazy<EntryFunctionId> =
     Lazy::new(|| "0x1::stake::get_lockup_secs".parse().unwrap());
 
+static STAKING_CONTRACT_AMOUNTS_FUNCTION: Lazy<EntryFunctionId> =
+    Lazy::new(|| "0x1::stake::staking_contract_amounts".parse().unwrap());
+
 /// Errors that can be returned by the API
 ///
 /// [API Spec](https://www.rosetta-api.org/docs/models/Error.html)
@@ -304,16 +307,44 @@ pub async fn get_stake_balances(
         let mut requested_balance: Option<String> = None;
         let lockup_expiration = stake_pool.locked_until_secs;
 
+        let staking_contract_amounts_response = rest_client
+            .view(
+                &ViewRequest {
+                    function: STAKING_CONTRACT_AMOUNTS_FUNCTION.clone(),
+                    type_arguments: vec![],
+                    arguments: vec![
+                        serde_json::Value::String(owner_account.address.to_string()),
+                        serde_json::Value::String(pool_address.to_string()),
+                    ],
+                },
+                Some(version),
+            )
+            .await?;
+        let commission = get_commission_not_yet_unlocked(staking_contract_amounts_response.into_inner());
+
+        // commission is calculated for the pool's total staked amount, so we can't just simply
+        // subtract commission from active, pending_active, etc. since the commission for those is
+        // combined
+        let total_minus_commission = stake_pool.get_total_staked_amount() - commission;
+
         if owner_account.is_active_stake() {
-            requested_balance = Some(stake_pool.active.to_string());
+            let active_stake = total_minus_commission
+                - stake_pool.pending_active - stake_pool.inactive
+                - stake_pool.pending_inactive;
+            requested_balance = Some(active_stake.to_string());
         } else if owner_account.is_pending_active_stake() {
-            requested_balance = Some(stake_pool.pending_active.to_string());
+            let pending_active_stake = total_minus_commission
+                - stake_pool.active - stake_pool.inactive
+                - stake_pool.pending_inactive;
+            requested_balance = Some(pending_active_stake.to_string());
         } else if owner_account.is_inactive_stake() {
+            // inactive will not have any commission, so no need to factor that in
             requested_balance = Some(stake_pool.inactive.to_string());
         } else if owner_account.is_pending_inactive_stake() {
+            // pending_inactive will not have any commission, so no need to factor that in
             requested_balance = Some(stake_pool.pending_inactive.to_string());
         } else if owner_account.is_total_stake() {
-            requested_balance = Some(stake_pool.get_total_staked_amount().to_string());
+            requested_balance = Some(total_minus_commission.to_string());
         }
 
         if let Some(balance) = requested_balance {
@@ -422,6 +453,14 @@ fn parse_requested_balance(
 fn parse_lockup_expiration(lockup_secs_result: Vec<serde_json::Value>) -> u64 {
     return lockup_secs_result
         .first()
+        .and_then(|v| v.as_str().and_then(|s| s.parse::<u64>().ok()))
+        .unwrap_or(0);
+}
+
+fn get_commission_not_yet_unlocked(staking_contract_amounts_result: Vec<serde_json::Value>) -> u64 {
+    // commission_not_yet_unlocked is the third value in the tuple returned by the view
+    return staking_contract_amounts_result
+        .get(2)
         .and_then(|v| v.as_str().and_then(|s| s.parse::<u64>().ok()))
         .unwrap_or(0);
 }
