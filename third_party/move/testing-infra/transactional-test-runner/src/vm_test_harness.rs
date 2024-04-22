@@ -17,14 +17,13 @@ use move_binary_format::{
     CompiledModule,
 };
 use move_command_line_common::{
-    address::ParsedAddress, env::read_bool_env_var, files::verify_and_create_named_address_mapping,
-    testing::MOVE_COMPILER_V2,
+    address::ParsedAddress,
+    env::{get_move_compiler_block_v1_from_env, get_move_compiler_v2_from_env, read_bool_env_var},
+    files::verify_and_create_named_address_mapping,
 };
 use move_compiler::{
     compiled_unit::AnnotatedCompiledUnit,
-    shared::{
-        known_attributes::KnownAttribute, move_compiler_block_v1_env_var, Flags, PackagePaths,
-    },
+    shared::{known_attributes::KnownAttribute, Flags, PackagePaths},
     FullyCompiledProgram,
 };
 use move_core_types::{
@@ -427,7 +426,7 @@ impl<'a> SimpleVMTestAdapter<'a> {
 }
 
 static PRECOMPILED_MOVE_STDLIB: Lazy<Option<FullyCompiledProgram>> = Lazy::new(|| {
-    if move_compiler_block_v1_env_var() {
+    if get_move_compiler_block_v1_from_env() {
         return None;
     }
     let program_res = move_compiler::construct_pre_compiled_lib(
@@ -522,7 +521,7 @@ pub fn run_test_with_config(
     mut config: TestRunConfig,
     path: &Path,
 ) -> Result<(), Box<dyn std::error::Error>> {
-    if read_bool_env_var(MOVE_COMPILER_V2) && !matches!(config, TestRunConfig::CompilerV2 { .. }) {
+    if get_move_compiler_v2_from_env() && !matches!(config, TestRunConfig::CompilerV2 { .. }) {
         config = TestRunConfig::CompilerV2 {
             language_version: LanguageVersion::default(),
             v2_experiments: vec![],
@@ -538,16 +537,15 @@ pub fn run_test_with_config_and_exp_suffix(
     path: &Path,
     exp_suffix: &Option<String>,
 ) -> Result<(), Box<dyn std::error::Error>> {
-    let config = if read_bool_env_var(MOVE_COMPILER_V2)
-        && !matches!(config, TestRunConfig::CompilerV2 { .. })
-    {
-        TestRunConfig::CompilerV2 {
-            language_version: LanguageVersion::default(),
-            v2_experiments: vec![],
-        }
-    } else {
-        config
-    };
+    let config =
+        if get_move_compiler_v2_from_env() && !matches!(config, TestRunConfig::CompilerV2 { .. }) {
+            TestRunConfig::CompilerV2 {
+                language_version: LanguageVersion::default(),
+                v2_experiments: vec![],
+            }
+        } else {
+            config
+        };
     let v1_lib = precompiled_v1_stdlib_if_needed(&config);
     let v2_lib = precompiled_v2_stdlib_if_needed(&config);
     run_test_impl::<SimpleVMTestAdapter>(config, path, v1_lib, v2_lib, exp_suffix)

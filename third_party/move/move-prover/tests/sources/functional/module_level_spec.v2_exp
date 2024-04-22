@@ -11,5 +11,5 @@ error: global memory invariant does not hold
    =         s = <redacted>
    =         value = <redacted>
    =     at tests/sources/functional/module_level_spec.move:11: store_incorrect
-   =         <redacted> = <redacted>
+   =         s = <redacted>
    =     at tests/sources/functional/module_level_spec.move:18

@@ -14,13 +14,13 @@ error: abort not covered by any of the `aborts_if` clauses
     =     at tests/sources/functional/loop_unroll.move:88: t6_failure
     =         n = <redacted>
     =     at tests/sources/functional/loop_unroll.move:89: t6_failure
-    =         i = <redacted>
+    =         n = <redacted>
     =     at tests/sources/functional/loop_unroll.move:91: t6_failure
     =     at tests/sources/functional/loop_unroll.move:94: t6_failure
     =     at tests/sources/functional/loop_unroll.move:90: t6_failure
     =     at tests/sources/functional/loop_unroll.move:96: t6_failure
-    =         <redacted> = <redacted>
     =         i = <redacted>
+    =         n = <redacted>
     =     at tests/sources/functional/loop_unroll.move:97: t6_failure
     =         <redacted> = <redacted>
     =     at tests/sources/functional/loop_unroll.move:97: t6_failure
@@ -30,8 +30,8 @@ error: abort not covered by any of the `aborts_if` clauses
     =     at tests/sources/functional/loop_unroll.move:94: t6_failure
     =     at tests/sources/functional/loop_unroll.move:90: t6_failure
     =     at tests/sources/functional/loop_unroll.move:96: t6_failure
-    =         <redacted> = <redacted>
     =         i = <redacted>
+    =         n = <redacted>
     =     at tests/sources/functional/loop_unroll.move:97: t6_failure
     =         <redacted> = <redacted>
     =     at tests/sources/functional/loop_unroll.move:95: t6_failure
@@ -41,8 +41,8 @@ error: abort not covered by any of the `aborts_if` clauses
     =     at tests/sources/functional/loop_unroll.move:94: t6_failure
     =     at tests/sources/functional/loop_unroll.move:90: t6_failure
     =     at tests/sources/functional/loop_unroll.move:96: t6_failure
-    =         <redacted> = <redacted>
     =         i = <redacted>
+    =         n = <redacted>
     =     at tests/sources/functional/loop_unroll.move:97: t6_failure
     =         <redacted> = <redacted>
     =     at tests/sources/functional/loop_unroll.move:95: t6_failure
@@ -52,8 +52,8 @@ error: abort not covered by any of the `aborts_if` clauses
     =     at tests/sources/functional/loop_unroll.move:94: t6_failure
     =     at tests/sources/functional/loop_unroll.move:90: t6_failure
     =     at tests/sources/functional/loop_unroll.move:96: t6_failure
-    =         <redacted> = <redacted>
     =         i = <redacted>
+    =         n = <redacted>
     =     at tests/sources/functional/loop_unroll.move:97: t6_failure
     =         <redacted> = <redacted>
     =     at tests/sources/functional/loop_unroll.move:95: t6_failure
@@ -63,8 +63,8 @@ error: abort not covered by any of the `aborts_if` clauses
     =     at tests/sources/functional/loop_unroll.move:94: t6_failure
     =     at tests/sources/functional/loop_unroll.move:90: t6_failure
     =     at tests/sources/functional/loop_unroll.move:96: t6_failure
-    =         <redacted> = <redacted>
     =         i = <redacted>
+    =         n = <redacted>
     =     at tests/sources/functional/loop_unroll.move:97: t6_failure
     =         <redacted> = <redacted>
     =     at tests/sources/functional/loop_unroll.move:97: t6_failure
@@ -86,36 +86,36 @@ error: abort not covered by any of the `aborts_if` clauses
     =     at tests/sources/functional/loop_unroll.move:120: t7_failure
     =         n = <redacted>
     =     at tests/sources/functional/loop_unroll.move:121: t7_failure
-    =         i = <redacted>
+    =         n = <redacted>
     =     at tests/sources/functional/loop_unroll.move:122: t7_failure
     =     at tests/sources/functional/loop_unroll.move:123: t7_failure
-    =         <redacted> = <redacted>
     =         i = <redacted>
+    =         n = <redacted>
     =     at tests/sources/functional/loop_unroll.move:124: t7_failure
     =         <redacted> = <redacted>
     =     at tests/sources/functional/loop_unroll.move:124: t7_failure
     =     at tests/sources/functional/loop_unroll.move:122: t7_failure
     =     at tests/sources/functional/loop_unroll.move:123: t7_failure
-    =         <redacted> = <redacted>
     =         i = <redacted>
+    =         n = <redacted>
     =     at tests/sources/functional/loop_unroll.move:124: t7_failure
     =         <redacted> = <redacted>
     =     at tests/sources/functional/loop_unroll.move:122: t7_failure
     =     at tests/sources/functional/loop_unroll.move:123: t7_failure
-    =         <redacted> = <redacted>
     =         i = <redacted>
+    =         n = <redacted>
     =     at tests/sources/functional/loop_unroll.move:124: t7_failure
     =         <redacted> = <redacted>
     =     at tests/sources/functional/loop_unroll.move:122: t7_failure
     =     at tests/sources/functional/loop_unroll.move:123: t7_failure
-    =         <redacted> = <redacted>
     =         i = <redacted>
+    =         n = <redacted>
     =     at tests/sources/functional/loop_unroll.move:124: t7_failure
     =         <redacted> = <redacted>
     =     at tests/sources/functional/loop_unroll.move:122: t7_failure
     =     at tests/sources/functional/loop_unroll.move:123: t7_failure
-    =         <redacted> = <redacted>
     =         i = <redacted>
+    =         n = <redacted>
     =     at tests/sources/functional/loop_unroll.move:124: t7_failure
     =         <redacted> = <redacted>
     =     at tests/sources/functional/loop_unroll.move:124: t7_failure

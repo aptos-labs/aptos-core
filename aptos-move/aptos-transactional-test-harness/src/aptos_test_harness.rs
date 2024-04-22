@@ -32,9 +32,8 @@ use move_binary_format::file_format::{CompiledModule, CompiledScript};
 use move_bytecode_verifier::verify_module;
 use move_command_line_common::{
     address::ParsedAddress,
-    env::read_bool_env_var,
+    env::{get_move_compiler_block_v1_from_env, get_move_compiler_v2_from_env},
     files::verify_and_create_named_address_mapping,
-    testing::{MOVE_COMPILER_BLOCK_V1, MOVE_COMPILER_V2},
 };
 use move_compiler::{self, shared::PackagePaths, FullyCompiledProgram};
 use move_core_types::{
@@ -291,7 +290,7 @@ fn panic_missing_private_key(cmd_name: &str) -> ! {
 }
 
 static PRECOMPILED_APTOS_FRAMEWORK_V1: Lazy<Option<FullyCompiledProgram>> = Lazy::new(|| {
-    if read_bool_env_var(MOVE_COMPILER_BLOCK_V1) {
+    if get_move_compiler_block_v1_from_env() {
         return None;
     }
     let deps = vec![PackagePaths {
@@ -1010,7 +1009,7 @@ fn precompiled_v2_stdlib_if_needed(
         TestRunConfig::CompilerV1 { .. } => None,
         TestRunConfig::ComparisonV1V2 { .. } => Some(&*PRECOMPILED_APTOS_FRAMEWORK_V2),
         TestRunConfig::CompilerV2 { .. } => Some(&*PRECOMPILED_APTOS_FRAMEWORK_V2),
-    };
+    }
 }
 
 pub fn run_aptos_test(path: &Path) -> Result<(), Box<dyn std::error::Error>> {
@@ -1021,16 +1020,15 @@ pub fn run_aptos_test_with_config(
     path: &Path,
     config: TestRunConfig,
 ) -> Result<(), Box<dyn std::error::Error>> {
-    let config = if read_bool_env_var(MOVE_COMPILER_V2)
-        && !matches!(config, TestRunConfig::CompilerV2 { .. })
-    {
-        TestRunConfig::CompilerV2 {
-            language_version: LanguageVersion::default(),
-            v2_experiments: vec![],
-        }
-    } else {
-        config
-    };
+    let config =
+        if get_move_compiler_v2_from_env() && !matches!(config, TestRunConfig::CompilerV2 { .. }) {
+            TestRunConfig::CompilerV2 {
+                language_version: LanguageVersion::default(),
+                v2_experiments: vec![],
+            }
+        } else {
+            config
+        };
     let v1_lib = precompiled_v1_stdlib_if_needed(&config);
     let v2_lib = precompiled_v2_stdlib_if_needed(&config);
     run_test_impl::<AptosTestAdapter>(config, path, v1_lib, v2_lib, &None)

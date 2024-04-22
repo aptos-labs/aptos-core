@@ -636,7 +636,7 @@ impl<'a> CompiledState<'a> {
         module: CompiledModule,
         source_file: (String, NamedTempFile),
     ) {
-        let id: ModuleId = module.self_id();
+        let id = module.self_id();
         self.check_not_precompiled(&id);
         if let Some(named_addr) = named_addr_opt {
             self.compiled_module_named_address_mapping

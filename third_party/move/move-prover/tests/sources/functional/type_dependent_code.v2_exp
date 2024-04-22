@@ -61,7 +61,7 @@ error: post-condition does not hold
    =         result = <redacted>
    =     at ../move-stdlib/sources/signer.move:14: address_of
    =     at tests/sources/functional/type_dependent_code.move:47: test1
-   =         <redacted> = <redacted>
+   =         account = <redacted>
    =     at tests/sources/functional/type_dependent_code.move:48: test1
    =     at tests/sources/functional/type_dependent_code.move:50: test1 (spec)
 
@@ -83,6 +83,6 @@ error: post-condition does not hold
    =         result = <redacted>
    =     at ../move-stdlib/sources/signer.move:14: address_of
    =     at tests/sources/functional/type_dependent_code.move:63: test2
-   =         <redacted> = <redacted>
+   =         account = <redacted>
    =     at tests/sources/functional/type_dependent_code.move:64: test2
    =     at tests/sources/functional/type_dependent_code.move:66: test2 (spec)

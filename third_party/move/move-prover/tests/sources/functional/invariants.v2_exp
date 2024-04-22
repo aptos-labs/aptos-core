@@ -36,20 +36,20 @@ error: data invariant does not hold
     =     at tests/sources/functional/invariants.move:154: lifetime_invalid_S_branching
     =     at tests/sources/functional/invariants.move:143
     =     at tests/sources/functional/invariants.move:154: lifetime_invalid_S_branching
-    =         a = <redacted>
+    =         cond = <redacted>
     =     at tests/sources/functional/invariants.move:155: lifetime_invalid_S_branching
     =     at tests/sources/functional/invariants.move:150
     =     at tests/sources/functional/invariants.move:155: lifetime_invalid_S_branching
-    =         b = <redacted>
+    =         a = <redacted>
     =     at tests/sources/functional/invariants.move:156: lifetime_invalid_S_branching
-    =         a_ref = <redacted>
+    =         b = <redacted>
     =     at tests/sources/functional/invariants.move:157: lifetime_invalid_S_branching
-    =         b_ref = <redacted>
+    =         a_ref = <redacted>
     =     at tests/sources/functional/invariants.move:158: lifetime_invalid_S_branching
     =     at tests/sources/functional/invariants.move:143
     =     at tests/sources/functional/invariants.move:158: lifetime_invalid_S_branching
-    =         a = <redacted>
-    =         x_ref = <redacted>
+    =         cond = <redacted>
+    =         b_ref = <redacted>
     =     at tests/sources/functional/invariants.move:160: lifetime_invalid_S_branching
     =     at tests/sources/functional/invariants.move:163: lifetime_invalid_S_branching
     =     at tests/sources/functional/invariants.move:150

@@ -2,7 +2,7 @@
 // SPDX-License-Identifier: Apache-2.0
 
 use anyhow::bail;
-use move_command_line_common::env::read_bool_env_var;
+use move_command_line_common::env::{get_move_compiler_v2_from_env, read_bool_env_var};
 use once_cell::sync::Lazy;
 use serde::{Deserialize, Serialize};
 use std::{
@@ -82,7 +82,7 @@ pub enum CompilerVersion {
 impl Default for CompilerVersion {
     /// We allow the default to be set via an environment variable.
     fn default() -> Self {
-        static MOVE_COMPILER_V2: Lazy<bool> = Lazy::new(|| read_bool_env_var("MOVE_COMPILER_V2"));
+        static MOVE_COMPILER_V2: Lazy<bool> = Lazy::new(get_move_compiler_v2_from_env);
         if *MOVE_COMPILER_V2 {
             Self::V2_0
         } else {

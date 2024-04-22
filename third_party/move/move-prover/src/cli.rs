@@ -11,6 +11,7 @@ use clap::{builder::PossibleValuesParser, Arg, ArgAction, ArgAction::SetTrue, Co
 use codespan_reporting::diagnostic::Severity;
 use log::LevelFilter;
 use move_abigen::AbigenOptions;
+use move_command_line_common::env::{bool_to_str, get_move_compiler_v2_from_env};
 use move_compiler::{command_line::SKIP_ATTRIBUTE_CHECKS, shared::NumericalAddress};
 use move_docgen::DocgenOptions;
 use move_errmapgen::ErrmapOptions;
@@ -178,7 +179,7 @@ impl Options {
             .arg(
                 Arg::new("compiler-v2")
                     .long("compiler-v2")
-                    .env("MOVE_COMPILER_V2")
+                    .default_value(bool_to_str(get_move_compiler_v2_from_env()))
                     .action(SetTrue)
                     .help("whether to use Move compiler v2 to compile to bytecode")
             )

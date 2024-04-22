@@ -13,7 +13,7 @@ error: post-condition does not hold
    =         addr = <redacted>
    =     at tests/sources/regression/vector_theory_boogie_array.move:7: f1
    =     at tests/sources/regression/vector_theory_boogie_array.move:8: f1
-   =         idx = <redacted>
+   =         pool = <redacted>
    =     at tests/sources/regression/vector_theory_boogie_array.move:6: f1
    =         pool = <redacted>
    =     at tests/sources/regression/vector_theory_boogie_array.move:9: f1

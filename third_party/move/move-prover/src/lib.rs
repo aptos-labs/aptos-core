@@ -138,9 +138,6 @@ pub fn run_move_prover_with_model_v2<W: WriteColor>(
     options: Options,
     start_time: Instant,
 ) -> anyhow::Result<()> {
-    eprintln!("global env before prover run:\n{}", env.dump_env_all());
-    debug!("global env before prover run:\n{}", env.dump_env_all());
-
     let build_duration = start_time.elapsed();
     check_errors(
         env,
@@ -283,7 +280,6 @@ pub fn create_and_process_bytecode(options: &Options, env: &GlobalEnv) -> Functi
         Path::new(s).file_name().unwrap().to_str().unwrap()
     });
 
-    eprintln!("create_and_process_bytecode");
     // Add function targets for all functions in the environment.
     for module_env in env.get_modules() {
         if module_env.is_target() {

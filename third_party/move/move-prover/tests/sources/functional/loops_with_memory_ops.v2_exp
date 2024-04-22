@@ -9,37 +9,36 @@ error: induction case of the loop invariant does not hold
    =         a = <redacted>
    =         b = <redacted>
    =     at tests/sources/functional/loops_with_memory_ops.move:57: nested_loop2
-   =         length = <redacted>
+   =         a = <redacted>
    =     at tests/sources/functional/loops_with_memory_ops.move:59: nested_loop2
    =     at tests/sources/functional/loops_with_memory_ops.move:60: nested_loop2
    =     at tests/sources/functional/loops_with_memory_ops.move:62: nested_loop2
-   =         i = <redacted>
+   =         b = <redacted>
    =     at tests/sources/functional/loops_with_memory_ops.move:63: nested_loop2
-   =         <redacted> = <redacted>
-   =         x = <redacted>
+   =         length = <redacted>
+   =         i = <redacted>
    =     at tests/sources/functional/loops_with_memory_ops.move:64: nested_loop2
    =         <redacted> = <redacted>
-   =         y = <redacted>
+   =         x = <redacted>
    =     at tests/sources/functional/loops_with_memory_ops.move:66: nested_loop2
    =     at tests/sources/functional/loops_with_memory_ops.move:67: nested_loop2
    =     at tests/sources/functional/loops_with_memory_ops.move:68: nested_loop2
    =     at tests/sources/functional/loops_with_memory_ops.move:69: nested_loop2
    =     at tests/sources/functional/loops_with_memory_ops.move:70: nested_loop2
-   =     enter loop, variable(s) a, b, i, x, y havocked and reassigned
+   =     enter loop, variable(s) a, b, b, i, x havocked and reassigned
    =         a = <redacted>
    =         b = <redacted>
    =         i = <redacted>
    =         x = <redacted>
-   =         y = <redacted>
    =     loop invariant holds at current state
    =     at tests/sources/functional/loops_with_memory_ops.move:67: nested_loop2
    =     at tests/sources/functional/loops_with_memory_ops.move:68: nested_loop2
    =     at tests/sources/functional/loops_with_memory_ops.move:69: nested_loop2
    =     at tests/sources/functional/loops_with_memory_ops.move:70: nested_loop2
    =     at tests/sources/functional/loops_with_memory_ops.move:74: nested_loop2
-   =     enter loop, variable(s) x, y havocked and reassigned
+   =     enter loop, variable(s) i, x havocked and reassigned
+   =         i = <redacted>
    =         x = <redacted>
-   =         y = <redacted>
    =     at tests/sources/functional/loops_with_memory_ops.move:75: nested_loop2
    =     at tests/sources/functional/loops_with_memory_ops.move:80: nested_loop2
    =     at tests/sources/functional/loops_with_memory_ops.move:81: nested_loop2
@@ -47,14 +46,14 @@ error: induction case of the loop invariant does not hold
    =         b = <redacted>
    =     at tests/sources/functional/loops_with_memory_ops.move:85: nested_loop2
    =         <redacted> = <redacted>
-   =         i = <redacted>
+   =         b = <redacted>
    =     at tests/sources/functional/loops_with_memory_ops.move:86: nested_loop2
    =     at tests/sources/functional/loops_with_memory_ops.move:89: nested_loop2
-   =         <redacted> = <redacted>
-   =         x = <redacted>
+   =         y = <redacted>
+   =         i = <redacted>
    =     at tests/sources/functional/loops_with_memory_ops.move:90: nested_loop2
    =         <redacted> = <redacted>
-   =         y = <redacted>
+   =         x = <redacted>
    =     at tests/sources/functional/loops_with_memory_ops.move:65: nested_loop2
    =     at tests/sources/functional/loops_with_memory_ops.move:67: nested_loop2
    =     at tests/sources/functional/loops_with_memory_ops.move:68: nested_loop2
@@ -71,37 +70,36 @@ error: unknown assertion failed
    =         a = <redacted>
    =         b = <redacted>
    =     at tests/sources/functional/loops_with_memory_ops.move:57: nested_loop2
-   =         length = <redacted>
+   =         a = <redacted>
    =     at tests/sources/functional/loops_with_memory_ops.move:59: nested_loop2
    =     at tests/sources/functional/loops_with_memory_ops.move:60: nested_loop2
    =     at tests/sources/functional/loops_with_memory_ops.move:62: nested_loop2
-   =         i = <redacted>
+   =         b = <redacted>
    =     at tests/sources/functional/loops_with_memory_ops.move:63: nested_loop2
-   =         <redacted> = <redacted>
-   =         x = <redacted>
+   =         length = <redacted>
+   =         i = <redacted>
    =     at tests/sources/functional/loops_with_memory_ops.move:64: nested_loop2
    =         <redacted> = <redacted>
-   =         y = <redacted>
+   =         x = <redacted>
    =     at tests/sources/functional/loops_with_memory_ops.move:66: nested_loop2
    =     at tests/sources/functional/loops_with_memory_ops.move:67: nested_loop2
    =     at tests/sources/functional/loops_with_memory_ops.move:68: nested_loop2
    =     at tests/sources/functional/loops_with_memory_ops.move:69: nested_loop2
    =     at tests/sources/functional/loops_with_memory_ops.move:70: nested_loop2
-   =     enter loop, variable(s) a, b, i, x, y havocked and reassigned
+   =     enter loop, variable(s) a, b, b, i, x havocked and reassigned
    =         a = <redacted>
    =         b = <redacted>
    =         i = <redacted>
    =         x = <redacted>
-   =         y = <redacted>
    =     loop invariant holds at current state
    =     at tests/sources/functional/loops_with_memory_ops.move:67: nested_loop2
    =     at tests/sources/functional/loops_with_memory_ops.move:68: nested_loop2
    =     at tests/sources/functional/loops_with_memory_ops.move:69: nested_loop2
    =     at tests/sources/functional/loops_with_memory_ops.move:70: nested_loop2
    =     at tests/sources/functional/loops_with_memory_ops.move:74: nested_loop2
-   =     enter loop, variable(s) x, y havocked and reassigned
+   =     enter loop, variable(s) i, x havocked and reassigned
+   =         i = <redacted>
    =         x = <redacted>
-   =         y = <redacted>
    =     at tests/sources/functional/loops_with_memory_ops.move:75: nested_loop2
    =     at tests/sources/functional/loops_with_memory_ops.move:80: nested_loop2
    =     at tests/sources/functional/loops_with_memory_ops.move:81: nested_loop2
@@ -109,7 +107,7 @@ error: unknown assertion failed
    =         b = <redacted>
    =     at tests/sources/functional/loops_with_memory_ops.move:85: nested_loop2
    =         <redacted> = <redacted>
-   =         i = <redacted>
+   =         b = <redacted>
    =     at tests/sources/functional/loops_with_memory_ops.move:86: nested_loop2
    =     at tests/sources/functional/loops_with_memory_ops.move:87: nested_loop2
    =     at tests/sources/functional/loops_with_memory_ops.move:93: nested_loop2
