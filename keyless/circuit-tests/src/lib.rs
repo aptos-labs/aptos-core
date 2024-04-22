@@ -21,6 +21,8 @@ mod sha;
 mod arrays;
 #[cfg(test)]
 mod rsa;
+#[cfg(test)]
+mod misc;
 
 pub struct TestCircuitHandle {
     dir: TempDir,
