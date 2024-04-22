@@ -20,7 +20,7 @@ use aptos_crypto::{
 use aptos_crypto_derive::CryptoHasher;
 use aptos_infallible::RwLock;
 use bytes::{BufMut, Bytes, BytesMut};
-use hashbrown::{hash_map, HashMap};
+use hashbrown::{hash_map, Equivalent, HashMap};
 // use aptos_metrics_core::{IntCounterHelper, TimerHelper};
 use move_core_types::{
     account_address::AccountAddress,
@@ -230,11 +230,81 @@ impl Drop for Entry {
     }
 }
 
+struct PreHashed<T> {
+    inner: T,
+    hash: u64,
+}
+
+impl<T: Hash> PreHashed<T> {
+    pub fn new(inner: T) -> Self {
+        let mut hasher = ahash::AHasher::default();
+        inner.hash(&mut hasher);
+        let hash = hasher.finish();
+        Self { inner, hash }
+    }
+
+    pub fn owned<Owned, Borrowed>(borrowed: &PreHashed<&Borrowed>) -> PreHashed<Owned>
+    where
+        Borrowed: ToOwned<Owned = Owned> + ?Sized,
+    {
+        PreHashed {
+            inner: borrowed.inner.to_owned(),
+            hash: borrowed.hash,
+        }
+    }
+}
+
+impl<T> Deref for PreHashed<T> {
+    type Target = T;
+
+    fn deref(&self) -> &Self::Target {
+        &self.inner
+    }
+}
+
+impl<T: Hash> Hash for PreHashed<T> {
+    fn hash<H: Hasher>(&self, state: &mut H) {
+        state.write_u64(self.hash)
+    }
+}
+
+impl<T: Eq> PartialEq for PreHashed<T> {
+    fn eq(&self, other: &Self) -> bool {
+        self.inner == other.inner
+    }
+}
+
+impl<T: Eq> Eq for PreHashed<T> {}
+
+macro_rules! impl_prehashed_equivalent_by_ref {
+    ($owned:ty) => {
+        impl_prehashed_equivalent_by_borrow!($owned, $owned);
+    };
+}
+
+macro_rules! impl_prehashed_equivalent_by_borrow {
+    ($borrowed:ty, $owned:ty) => {
+        impl Equivalent<PreHashed<$owned>> for PreHashed<&$borrowed> {
+            fn equivalent(&self, other: &PreHashed<$owned>) -> bool {
+                Borrow::<$borrowed>::borrow(&other.inner) == self.inner
+            }
+        }
+    };
+}
+
+impl_prehashed_equivalent_by_ref!(StructTag);
+impl_prehashed_equivalent_by_ref!(AccountAddress);
+impl_prehashed_equivalent_by_ref!(TableHandle);
+impl_prehashed_equivalent_by_ref!(());
+
+impl_prehashed_equivalent_by_borrow!(IdentStr, Identifier);
+impl_prehashed_equivalent_by_borrow!([u8], Vec<u8>);
+
 struct TwoLevelRegistry<Key1, Key2> {
     // FIXME(aldenhu): remove
     #[allow(dead_code)]
     key_type: &'static str,
-    inner: RwLock<HashMap<Key1, HashMap<Key2, Weak<Entry>>>>,
+    inner: RwLock<HashMap<PreHashed<Key1>, HashMap<PreHashed<Key2>, Weak<Entry>>>>,
 }
 
 impl<Key1, Key2> TwoLevelRegistry<Key1, Key2>
@@ -249,13 +319,16 @@ where
         }
     }
 
-    fn try_get<Q1, Q2>(&self, key1: &Q1, key2: &Q2) -> Option<Arc<Entry>>
+    fn try_get<'a, Q1, Q2>(&self, key1: &'a Q1, key2: &'a Q2) -> Option<Arc<Entry>>
     where
-        Key1: Borrow<Q1>,
-        Key2: Borrow<Q2>,
-        Q1: Eq + Hash + ?Sized,
-        Q2: Eq + Hash + ?Sized,
+        PreHashed<&'a Q1>: Equivalent<PreHashed<Key1>> + Hash,
+        PreHashed<&'a Q2>: Equivalent<PreHashed<Key2>> + Hash,
+        Q1: Hash + ?Sized,
+        Q2: Hash + ?Sized,
     {
+        let key1 = PreHashed::new(key1);
+        let key2 = PreHashed::new(key2);
+
         let locked = match self.inner.inner().try_read() {
             Ok(locked) => locked,
             Err(..) => {
@@ -267,8 +340,8 @@ where
         };
 
         locked
-            .get(key1)
-            .and_then(|m| m.get(key2))
+            .get(&key1)
+            .and_then(|m| m.get(&key2))
             .and_then(|weak| weak.upgrade())
     }
 
@@ -284,13 +357,10 @@ where
         const MAX_TRIES: usize = 100;
 
         for _ in 0..MAX_TRIES {
-            match self
-                .inner
-                .write()
-                .entry(key1.to_owned())
-                .or_default()
-                .entry(key2.to_owned())
-            {
+            let key1 = PreHashed::new(key1.to_owned());
+            let key2 = PreHashed::new(key2.to_owned());
+
+            match self.inner.write().entry(key1).or_default().entry(key2) {
                 hash_map::Entry::Occupied(occupied) => {
                     if let Some(entry) = occupied.get().upgrade() {
                         // some other thread has added it
@@ -315,10 +385,19 @@ where
         unreachable!("Looks like deadlock");
     }
 
-    fn lock_and_remove(&self, key1: &Key1, key2: &Key2) {
-        match self.inner.write().entry(key1.to_owned()) {
+    fn lock_and_remove<'a, Q1, Q2>(&self, key1: &'a Q1, key2: &'a Q2)
+    where
+        PreHashed<&'a Q1>: Equivalent<PreHashed<Key1>> + Hash,
+        PreHashed<&'a Q2>: Equivalent<PreHashed<Key2>> + Hash,
+        Q1: Eq + Hash + ToOwned<Owned = Key1> + ?Sized,
+        Q2: Eq + Hash + ToOwned<Owned = Key2> + ?Sized,
+    {
+        let key1 = PreHashed::<Key1>::owned(&PreHashed::new(key1));
+        let key2 = PreHashed::new(key2);
+
+        match self.inner.write().entry(key1) {
             hash_map::Entry::Occupied(mut occupied) => {
-                match occupied.get_mut().remove(key2) {
+                match occupied.get_mut().remove(&key2) {
                     Some(..) => {
                         // STATE_KEY_COUNTERS.inc_with(&[self.key_type, "entry_remove"]);
                     },

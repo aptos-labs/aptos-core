@@ -3956,6 +3956,7 @@ dependencies = [
  "proptest-derive 0.4.0",
  "rand 0.7.3",
  "rayon",
+ "ref-cast",
  "regex",
  "ring 0.16.20",
  "rsa 0.9.6",
