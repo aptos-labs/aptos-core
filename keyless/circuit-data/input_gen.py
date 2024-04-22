@@ -70,6 +70,7 @@ BASE = 64
 
 
 def long_to_limbs(n):
+    '''Limbs are in l-endian.'''
     limbs = []
     for i in range(int(MAX / BASE)):  # split into 32 64-bit limbs
         idx = i * BASE
