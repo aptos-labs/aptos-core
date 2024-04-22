@@ -7,6 +7,7 @@ use crate::{
     resolver::Resolver,
 };
 use anyhow::{anyhow, Result};
+pub use limit::Limiter;
 use move_binary_format::{
     errors::{Location, PartialVMError},
     file_format::{Ability, AbilitySet},
@@ -30,6 +31,7 @@ use std::{
 };
 
 mod fat_type;
+mod limit;
 mod module_cache;
 mod resolver;
 
@@ -119,6 +121,7 @@ impl<'a, T: ModuleResolver + ?Sized> MoveValueAnnotator<'a, T> {
         ty_args: &[TypeTag],
         args: &[Vec<u8>],
     ) -> Result<Vec<AnnotatedMoveValue>> {
+        let mut limit = Limiter::default();
         let types: Vec<FatType> = self
             .cache
             .resolve_function_arguments(module, function)?
@@ -154,18 +157,29 @@ impl<'a, T: ModuleResolver + ?Sized> MoveValueAnnotator<'a, T> {
             .iter()
             .enumerate()
             .map(|(i, ty)| {
-                ty.subst(&ty_args)
+                ty.subst(&ty_args, &mut limit)
                     .map_err(anyhow::Error::from)
-                    .and_then(|fat_type| self.view_value_by_fat_type(&fat_type, &args[i]))
+                    .and_then(|fat_type| {
+                        self.view_value_by_fat_type(&fat_type, &args[i], &mut limit)
+                    })
             })
             .collect::<Result<Vec<AnnotatedMoveValue>>>()
     }
 
     pub fn view_resource(&self, tag: &StructTag, blob: &[u8]) -> Result<AnnotatedMoveStruct> {
+        self.view_resource_with_limit(tag, blob, &mut Limiter::default())
+    }
+
+    pub fn view_resource_with_limit(
+        &self,
+        tag: &StructTag,
+        blob: &[u8],
+        limit: &mut Limiter,
+    ) -> Result<AnnotatedMoveStruct> {
         let ty = self.cache.resolve_struct(tag)?;
         let struct_def = (&ty).try_into().map_err(into_vm_status)?;
         let move_struct = MoveStruct::simple_deserialize(blob, &struct_def)?;
-        self.annotate_struct(&move_struct, &ty)
+        self.annotate_struct(&move_struct, &ty, limit)
     }
 
     pub fn move_struct_fields(
@@ -187,28 +201,38 @@ impl<'a, T: ModuleResolver + ?Sized> MoveValueAnnotator<'a, T> {
     }
 
     pub fn view_value(&self, ty_tag: &TypeTag, blob: &[u8]) -> Result<AnnotatedMoveValue> {
-        let ty = self.cache.resolve_type(ty_tag)?;
-        self.view_value_by_fat_type(&ty, blob)
+        let mut limit = Limiter::default();
+        let ty = self.cache.resolve_type_impl(ty_tag, &mut limit)?;
+        self.view_value_by_fat_type(&ty, blob, &mut limit)
     }
 
-    fn view_value_by_fat_type(&self, ty: &FatType, blob: &[u8]) -> Result<AnnotatedMoveValue> {
+    fn view_value_by_fat_type(
+        &self,
+        ty: &FatType,
+        blob: &[u8],
+        limit: &mut Limiter,
+    ) -> Result<AnnotatedMoveValue> {
         let layout = ty.try_into().map_err(into_vm_status)?;
         let move_value = MoveValue::simple_deserialize(blob, &layout)?;
-        self.annotate_value(&move_value, ty)
+        self.annotate_value(&move_value, ty, limit)
     }
 
     fn annotate_struct(
         &self,
         move_struct: &MoveStruct,
         ty: &FatStructType,
+        limit: &mut Limiter,
     ) -> Result<AnnotatedMoveStruct> {
         let struct_tag = ty
-            .struct_tag()
+            .struct_tag(limit)
             .map_err(|e| e.finish(Location::Undefined).into_vm_status())?;
         let field_names = self.cache.get_field_names(ty)?;
+        for names in field_names.iter() {
+            limit.charge(names.as_bytes().len())?;
+        }
         let mut annotated_fields = vec![];
         for (ty, v) in ty.layout.iter().zip(move_struct.fields().iter()) {
-            annotated_fields.push(self.annotate_value(v, ty)?);
+            annotated_fields.push(self.annotate_value(v, ty, limit)?);
         }
         Ok(AnnotatedMoveStruct {
             abilities: ty.abilities.0,
@@ -217,7 +241,12 @@ impl<'a, T: ModuleResolver + ?Sized> MoveValueAnnotator<'a, T> {
         })
     }
 
-    fn annotate_value(&self, value: &MoveValue, ty: &FatType) -> Result<AnnotatedMoveValue> {
+    fn annotate_value(
+        &self,
+        value: &MoveValue,
+        ty: &FatType,
+        limit: &mut Limiter,
+    ) -> Result<AnnotatedMoveValue> {
         Ok(match (value, ty) {
             (MoveValue::Bool(b), FatType::Bool) => AnnotatedMoveValue::Bool(*b),
             (MoveValue::U8(i), FatType::U8) => AnnotatedMoveValue::U8(*i),
@@ -237,14 +266,14 @@ impl<'a, T: ModuleResolver + ?Sized> MoveValueAnnotator<'a, T> {
                         .collect::<Result<_>>()?,
                 ),
                 _ => AnnotatedMoveValue::Vector(
-                    ty.type_tag().unwrap(),
+                    ty.type_tag(limit).unwrap(),
                     a.iter()
-                        .map(|v| self.annotate_value(v, ty.as_ref()))
+                        .map(|v| self.annotate_value(v, ty.as_ref(), limit))
                         .collect::<Result<_>>()?,
                 ),
             },
             (MoveValue::Struct(s), FatType::Struct(ty)) => {
-                AnnotatedMoveValue::Struct(self.annotate_struct(s, ty.as_ref())?)
+                AnnotatedMoveValue::Struct(self.annotate_struct(s, ty.as_ref(), limit)?)
             },
             (MoveValue::U8(_), _)
             | (MoveValue::U64(_), _)
