@@ -476,9 +476,10 @@ impl EphemeralKeyPair {
             &Configuration::new_for_devnet(),
         )?;
 
+        let public_key = private_key.public_key();
         Ok(Self {
-            private_key: private_key.clone(),
-            public_key: EphemeralPublicKey::ed25519(private_key.public_key()),
+            private_key: private_key,
+            public_key: EphemeralPublicKey::ed25519(public_key),
             nonce,
             expiry_date_secs,
             blinder,
