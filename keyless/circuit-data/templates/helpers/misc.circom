@@ -35,12 +35,8 @@ template JWTFieldCheck(maxKVPairLen, maxNameLen, maxValueLen) {
     signal colon <== SelectArrayValue(maxKVPairLen)(field, colon_index);
     colon === 58; // ':'
 
-    // TODO: Do we need to check quotes around values? Should we? Some don't have quotes so probably not
-    //signal third_quote <== SelectArrayValue(maxKVPairLen)(field, value_index-1);
-    //third_quote === 34; // '"'
+    // Note: we don't check for quotes around values, since some JSON values (e.g., integers, booleans) don't have quotes
     CheckSubstrInclusionPoly(maxKVPairLen, maxValueLen)(field, field_hash, value, value_len, value_index);
-    //signal fourth_quote <== SelectArrayValue(maxKVPairLen)(field, value_index+value_len);
-    //fourth_quote === 34; // '"'
 
     // Enforce last character of `field` is comma or end brace
     signal last_char <== SelectArrayValue(maxKVPairLen)(field, field_len-1);
