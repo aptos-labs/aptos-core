@@ -94,7 +94,7 @@ where
         let concurrency_level = config.local.concurrency_level;
         Self {
             config,
-            garage: ThreadGarageExecutor::new(concurrency_level, concurrency_level*10),
+            garage: ThreadGarageExecutor::new(concurrency_level, concurrency_level*5),
             //executor_thread_pool,
             transaction_commit_hook,
             phantom: PhantomData,
