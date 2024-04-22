@@ -1,81 +1,95 @@
 use num_traits::FromPrimitive;
-use rand::thread_rng;
 use rsa::RsaPrivateKey;
-use rsa::pkcs1v15::{SigningKey, VerifyingKey};
-use rsa::signature::{Keypair, RandomizedSigner, SignatureEncoding, Verifier};
+use rsa::pkcs1v15::{SigningKey};
+use rsa::signature::{RandomizedSigner, SignatureEncoding};
 use rsa::sha2::{Digest, Sha256};
-use rsa::traits::{PublicKeyParts};
+use rsa::traits::{PrivateKeyParts, PublicKeyParts};
 use num_bigint::BigUint;
 
 use aptos_keyless_common::input_processing::circuit_input_signals::CircuitInputSignals;
 use aptos_keyless_common::input_processing::config::CircuitPaddingConfig;
-use aptos_keyless_common::input_processing::encoding::As64BitLimbs;
 use crate::TestCircuitHandle;
 use std::convert::TryInto;
-use num_modular::*;
+use rand::{Rng, thread_rng};
+use aptos_logger::{info};
 
 const EXPONENT : u64 = 65537;
 
-
-// to debug, I'm trying to verify the signature manually wrt the hash limbs
-fn verify_sig(modulus: &BigUint, signature: &BigUint, expected_hash_limbs: &[u64]) {
-    let exponent_bigint = BigUint::from_u64(EXPONENT).unwrap();
-    let computed_hash_bigint = signature.powm(&exponent_bigint, modulus);
-    let computed_hash_limbs = computed_hash_bigint.to_u64_digits();
-
-    println!("{:?}", expected_hash_limbs);
-    println!("{:?}", computed_hash_limbs);
-
-    assert_eq!(expected_hash_limbs, computed_hash_limbs);
+#[test]
+fn rsa_verify_should_pass_with_valid_input() {
+    common(|_, _, _| {}, true)
 }
 
+#[test]
+fn rsa_verify_should_fail_with_invalid_signature() {
+    common(|sig_limbs, _, _| { flip_random_bit(sig_limbs); }, false);
+}
 
 #[test]
-fn test_rsa_verify() {
-    println!("Compiling circuit");
+fn rsa_verify_should_fail_with_invalid_modulus() {
+    common(|_, modulus_limbs, _| { flip_random_bit(modulus_limbs); }, false);
+}
+
+#[test]
+fn rsa_verify_should_fail_with_invalid_hased_msg() {
+    common(|_, _, hashed_msg_limbs| { flip_random_bit(hashed_msg_limbs); }, false);
+}
+
+fn common<F: Fn(&mut Vec<u64>, &mut Vec<u64>, &mut Vec<u64>)>(update_signals: F, witness_gen_should_pass: bool) {
+    // Default #iterations to 1 but allow customization.
+    let num_iterations = std::env::var("NUM_ITERATIONS").unwrap_or("1".to_string()).parse::<usize>().unwrap_or(1);
+
     let circuit = TestCircuitHandle::new("rsa_verify_test.circom").unwrap();
-    println!("Computing input signals");
     let mut rng = rsa::rand_core::OsRng;
     let e = rsa::BigUint::from_u64(EXPONENT).unwrap();
-    let private_key = RsaPrivateKey::new_with_exp(&mut rng, 2048, &e).unwrap();
-    let modulus = BigUint::from_bytes_be(&private_key.to_public_key().n().to_bytes_be());
-    let modulus_limbs = modulus.to_u64_digits();
-    let signing_key = SigningKey::<Sha256>::new(private_key);
 
-    let message = b"Hello, RSA signing!";
+    for i in 0..num_iterations {
+        info!("Iteration {i} starts. Generate RSA key pairs.");
+        let private_key = RsaPrivateKey::new_with_exp(&mut rng, 2048, &e).unwrap();
+        info!("Key pair generated, d={:?}, n={:?}.", private_key.d(), private_key.n());
+        let modulus = BigUint::from_bytes_be(&private_key.to_public_key().n().to_bytes_be());
+        let mut modulus_limbs = modulus.to_u64_digits();
+        let signing_key = SigningKey::<Sha256>::new(private_key);
 
-    let mut hasher = Sha256::new();
-    hasher.update(message);
-    
-    let hashed_msg = hasher.finalize().to_vec();
+        info!("Generate a random message.");
+        let msg_len: usize = rng.gen_range(0..9999);
+        let message: Vec<u8> = vec![0; msg_len];
 
-    let hashed_msg_limbs : Vec<u64> = 
-        hashed_msg.chunks(8)
-                  .map(|bytes| bytes.try_into())
-                  .collect::<Result<Vec<[u8; 8]>, _>>()
-                  .unwrap()
-                  .into_iter()
-                  .map(u64::from_be_bytes)
-                  .collect();
+        info!("Message generated, msg_hex={}", hex::encode(&message));
+        let mut hasher = Sha256::new();
+        hasher.update(&message);
+        let hashed_msg = hasher.finalize().to_vec();
 
+        let mut hashed_msg_limbs: Vec<u64> =
+            hashed_msg.chunks(8)
+                .map(|bytes| bytes.try_into())
+                .collect::<Result<Vec<[u8; 8]>, _>>()
+                .unwrap()
+                .into_iter()
+                .map(u64::from_be_bytes)
+                .rev()
+                .collect();
 
-    let signature = BigUint::from_bytes_be(&signing_key.sign_with_rng(&mut rng, &hashed_msg).to_bytes());
-    let signature_limbs = signature.to_u64_digits();
+        let signature = BigUint::from_bytes_be(&signing_key.sign_with_rng(&mut rng, message.as_slice()).to_bytes());
+        let mut signature_limbs = signature.to_u64_digits();
 
-    verify_sig(&modulus, &signature, &hashed_msg_limbs);
+        let config = CircuitPaddingConfig::new();
 
-    let config = CircuitPaddingConfig::new();
+        update_signals(&mut signature_limbs, &mut modulus_limbs, &mut hashed_msg_limbs);
 
-    let circuit_input_signals = CircuitInputSignals::new()
-        .limbs_input("sign", signature_limbs.as_slice())
-        .limbs_input("modulus", modulus_limbs.as_slice())
-        .limbs_input("hashed", hashed_msg_limbs.as_slice())
-        .pad(&config)
-        .unwrap();
-    println!("{:?}", circuit_input_signals);
-    println!("Generating witness");
-    let result = circuit.gen_witness(circuit_input_signals);
-    println!("Done.");
-    println!("{:?}", result);
-    assert!(result.is_ok());
+        let circuit_input_signals = CircuitInputSignals::new()
+            .limbs_input("sign", signature_limbs.as_slice())
+            .limbs_input("modulus", modulus_limbs.as_slice())
+            .limbs_input("hashed", hashed_msg_limbs.as_slice())
+            .pad(&config)
+            .unwrap();
+        let result = circuit.gen_witness(circuit_input_signals);
+        assert_eq!(witness_gen_should_pass, result.is_ok());
+    }
+}
+
+fn flip_random_bit(limbs: &mut Vec<u64>) {
+    let limb_idx = thread_rng().gen_range(0..limbs.len());
+    let bit_idx = thread_rng().gen_range(0..64);
+    *limbs.get_mut(limb_idx).unwrap() ^= 1_u64 << bit_idx;
 }

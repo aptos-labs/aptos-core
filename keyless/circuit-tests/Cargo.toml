@@ -28,6 +28,7 @@ rsa = { version = "0.9.6", features = ["sha2"] }
 serde_json = { workspace = true }
 sha2 = "0.10.6"
 tempfile = { workspace = true }
+aptos-logger = { workspace = true }
 
 
 [dev-dependencies]
@@ -35,3 +36,4 @@ num-modular = { version = "0.6.1", features = ["num-bigint", "num-integer", "num
 num-bigint = "0.4.3"
 rand_chacha = "0.3.1"
 tokio = { workspace = true }
+hex = { workspace = true }
