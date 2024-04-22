@@ -20,7 +20,7 @@
 //! - Every copied value must have the `copy` ability
 //! - Every dropped value must have the `drop` ability
 //! - Every type used in storage operations must have the `key` ability (TODO(#12036): this check should
-//!   go the the frontend where also `store` is checked)
+//!   go the frontend where also `store` is checked)
 //! - All type instantiations in the program must satisfy ability constraints (TODO: also frontend)
 //!
 //! Precondition: LiveVarAnnotation, LifetimeAnnotation, ExitStateAnnotation
