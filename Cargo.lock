@@ -3736,7 +3736,6 @@ dependencies = [
  "dashmap",
  "derive_more",
  "fail 0.5.1",
- "futures",
  "hex",
  "jsonwebtoken 8.3.0",
  "move-binary-format",

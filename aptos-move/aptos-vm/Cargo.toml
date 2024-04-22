@@ -45,7 +45,6 @@ crossbeam-channel = { workspace = true }
 dashmap = { workspace = true }
 derive_more = { workspace = true }
 fail = { workspace = true }
-futures = { workspace = true }
 hex = { workspace = true }
 jsonwebtoken = { workspace = true }
 move-binary-format = { workspace = true }
