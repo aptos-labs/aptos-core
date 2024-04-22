@@ -12,6 +12,7 @@ use crate::{
         table::TableHandle,
     },
 };
+use ahash::AHashMap as HashMap;
 use anyhow::Result;
 use aptos_crypto::{
     hash::{CryptoHash, CryptoHasher, DummyHasher},
@@ -20,7 +21,6 @@ use aptos_crypto::{
 use aptos_crypto_derive::CryptoHasher;
 use aptos_infallible::RwLock;
 use bytes::{BufMut, Bytes, BytesMut};
-use hashbrown::{hash_map, HashMap};
 // use aptos_metrics_core::{IntCounterHelper, TimerHelper};
 use move_core_types::{
     account_address::AccountAddress,
@@ -35,6 +35,7 @@ use serde::{Deserialize, Deserializer, Serialize, Serializer};
 use std::{
     borrow::Borrow,
     cmp::Ordering,
+    collections::hash_map,
     convert::TryInto,
     fmt,
     fmt::{Debug, Formatter},
@@ -370,6 +371,7 @@ impl StateKeyRegistry {
         }
     }
 
+    #[inline]
     pub fn hash_address_and_name(address: &AccountAddress, name: &[u8]) -> usize {
         let mut hasher = fxhash::FxHasher::default();
         hasher.write_u8(address.as_ref()[AccountAddress::LENGTH - 1]);

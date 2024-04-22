@@ -3944,6 +3944,7 @@ dependencies = [
  "move-core-types",
  "move-table-extension",
  "move-vm-types",
+ "nohash-hasher",
  "num-bigint 0.3.3",
  "num-derive",
  "num-traits",
@@ -11195,6 +11196,12 @@ name = "nodrop"
 version = "0.1.14"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "72ef4a56884ca558e5ddb05a1d1e7e1bfd9a68d9ed024c21704cc98872dae1bb"
+
+[[package]]
+name = "nohash-hasher"
+version = "0.2.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "2bf50223579dc7cdcfb3bfcacf7069ff68243f8c363f62ffa99cf000a6b9c451"
 
 [[package]]
 name = "nom"
