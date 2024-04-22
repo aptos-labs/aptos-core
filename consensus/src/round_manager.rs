@@ -339,7 +339,7 @@ impl RoundManager {
         {
             self.log_collected_vote_stats(&new_round_event);
             self.round_state.setup_leader_timeout();
-            info!("Generating proposal for round {}. Self sync info {:?}", new_round_event.round, self.sync_info());
+            info!("Generating proposal for round {}. Self sync info {:?}", new_round_event.round, self.block_store.sync_info());
             let proposal_msg = self.generate_proposal(new_round_event).await?;
             #[cfg(feature = "failpoints")]
             {
