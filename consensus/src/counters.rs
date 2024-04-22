@@ -79,6 +79,22 @@ pub static SUCCESSFUL_EXECUTED_WITH_ORDER_VOTE_QC: Lazy<IntCounter> = Lazy::new(
     .unwrap()
 });
 
+pub static SUCCESSFUL_EXECUTED_WITH_REGULAR_QC: Lazy<IntCounter> = Lazy::new(|| {
+    register_int_counter!(
+        "aptos_consensus_successful_executed_with_regular_qc",
+        "Count of the number of blocks successfully executed with regular QC"
+    )
+    .unwrap()
+});
+
+pub static SYNC_TO_HIGHEST_QC: Lazy<IntCounter> = Lazy::new(|| {
+    register_int_counter!(
+        "aptos_consensus_sync_to_highest_qc",
+        "Count of the number of times we sync to highest QC"
+    )
+    .unwrap()
+});
+
 pub static ORDER_VOTE_ADDED: Lazy<IntCounter> = Lazy::new(|| {
     register_int_counter!(
         "aptos_consensus_order_vote_added",

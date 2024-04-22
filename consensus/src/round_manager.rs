@@ -339,7 +339,11 @@ impl RoundManager {
         {
             self.log_collected_vote_stats(&new_round_event);
             self.round_state.setup_leader_timeout();
-            info!("Generating proposal for round {}. Self sync info {:?}", new_round_event.round, self.block_store.sync_info());
+            info!(
+                "Generating proposal for round {}. Self sync info {:?}",
+                new_round_event.round,
+                self.block_store.sync_info()
+            );
             let proposal_msg = self.generate_proposal(new_round_event).await?;
             #[cfg(feature = "failpoints")]
             {
@@ -696,7 +700,12 @@ impl RoundManager {
             .author()
             .expect("Proposal should be verified having an author");
 
-        info!("Processing proposal round {}, proposal {:?}", proposal.round(), proposal);
+        info!(
+            "Processing proposal round {}, proposal {:?}, self sync info {:?}",
+            proposal.round(),
+            proposal,
+            self.block_store.sync_info()
+        );
         if !self.vtxn_config.enabled()
             && matches!(
                 proposal.block_data().block_type(),

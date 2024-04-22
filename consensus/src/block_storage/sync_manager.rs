@@ -4,7 +4,7 @@
 
 use crate::{
     block_storage::{BlockReader, BlockStore},
-    counters::{EXECUTED_WITH_ORDER_VOTE_QC, SUCCESSFUL_EXECUTED_WITH_ORDER_VOTE_QC},
+    counters::{EXECUTED_WITH_ORDER_VOTE_QC, SUCCESSFUL_EXECUTED_WITH_ORDER_VOTE_QC, SUCCESSFUL_EXECUTED_WITH_REGULAR_QC, SYNC_TO_HIGHEST_QC},
     epoch_manager::LivenessStorageData,
     logging::{LogEvent, LogSchema},
     monitor,
@@ -117,6 +117,7 @@ impl BlockStore {
             _ => (),
         }
         if self.ordered_root().round() < qc.commit_info().round() {
+            SUCCESSFUL_EXECUTED_WITH_REGULAR_QC.inc();
             self.send_for_execution(qc.ledger_info().clone()).await?;
             if qc.ends_epoch() {
                 retriever
@@ -206,6 +207,7 @@ impl BlockStore {
         if !self.need_sync_for_ledger_info(&highest_commit_decision) {
             return Ok(());
         }
+        SYNC_TO_HIGHEST_QC.inc();
         let (root, root_metadata, blocks, quorum_certs) = self
             .fast_forward_sync(
                 &highest_qc,
