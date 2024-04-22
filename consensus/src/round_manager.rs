@@ -695,6 +695,7 @@ impl RoundManager {
             .author()
             .expect("Proposal should be verified having an author");
 
+        info!("Processing proposal round {}, proposal {:?}", proposal.round(), proposal);
         if !self.vtxn_config.enabled()
             && matches!(
                 proposal.block_data().block_type(),
