@@ -6,20 +6,6 @@ use itertools::*;
 use aptos_crypto::poseidon_bn254;
 use ark_bn254::Fr;
 use ark_ff::{Zero, One};
-     
-#[test]
-fn array_selector_test_large() {
-    let circuit_handle = TestCircuitHandle::new("array_selector_test.circom").unwrap();
-    let out_len = 2000;
-    let start = 2;
-    let end = 5;
-    let output = build_array_selector_output(out_len, start, end);
-    let config = CircuitPaddingConfig::new().max_length("expected_output", out_len as usize);
-    let circuit_input_signals = CircuitInputSignals::new().u64_input("start_index", start as u64).u64_input("end_index", end as u64).bytes_input("expected_output", &output).pad(&config).unwrap();
-     
-    let result = circuit_handle.gen_witness(circuit_input_signals);
-    assert!(result.is_ok());
-}
 
 fn build_array_selector_output(len: u32, start: u32, end: u32) -> Vec<u8> {
     let mut output = Vec::new();
@@ -34,6 +20,7 @@ fn build_array_selector_output(len: u32, start: u32, end: u32) -> Vec<u8> {
     };
     output
 }
+     
 
 #[test]
 fn array_selector_test() {
@@ -51,6 +38,138 @@ fn array_selector_test() {
 }
 
 #[test]
+fn array_selector_test_large() {
+    let circuit_handle = TestCircuitHandle::new("array_selector_test_large.circom").unwrap();
+    let out_len = 2000;
+    let start = 146;
+    let end = 1437;
+    let output = build_array_selector_output(out_len, start, end);
+    let config = CircuitPaddingConfig::new().max_length("expected_output", out_len as usize);
+    let circuit_input_signals = CircuitInputSignals::new().u64_input("start_index", start as u64).u64_input("end_index", end as u64).bytes_input("expected_output", &output).pad(&config).unwrap();
+     
+    let result = circuit_handle.gen_witness(circuit_input_signals);
+    assert!(result.is_ok());
+}
+
+#[test]
+fn array_selector_test_small() {
+    let circuit_handle = TestCircuitHandle::new("array_selector_test_small.circom").unwrap();
+    let out_len = 2;
+    let start = 0;
+    let end = 1;
+    let output = build_array_selector_output(out_len, start, end);
+    let config = CircuitPaddingConfig::new().max_length("expected_output", out_len as usize);
+    let circuit_input_signals = CircuitInputSignals::new().u64_input("start_index", start as u64).u64_input("end_index", end as u64).bytes_input("expected_output", &output).pad(&config).unwrap();
+     
+    let result = circuit_handle.gen_witness(circuit_input_signals);
+    assert!(result.is_ok());
+}
+
+#[test]
+#[should_panic]
+fn array_selector_test_wrong_end() {
+    let circuit_handle = TestCircuitHandle::new("array_selector_test.circom").unwrap();
+    let out_len = 8;
+    let start = 3;
+    let end = 8;
+    let output = build_array_selector_output(out_len, start, end);
+    let config = CircuitPaddingConfig::new().max_length("expected_output", out_len as usize);
+    let circuit_input_signals = CircuitInputSignals::new().u64_input("start_index", start as u64).u64_input("end_index", end as u64).bytes_input("expected_output", &output).pad(&config).unwrap();
+     
+    let result = circuit_handle.gen_witness(circuit_input_signals);
+    assert!(result.is_ok());
+}
+
+#[test]
+#[should_panic]
+fn array_selector_test_wrong_start() {
+    let circuit_handle = TestCircuitHandle::new("array_selector_test.circom").unwrap();
+    let out_len = 8;
+    let start = 3;
+    let end = 3;
+    let output = build_array_selector_output(out_len, start, end);
+    let config = CircuitPaddingConfig::new().max_length("expected_output", out_len as usize);
+    let circuit_input_signals = CircuitInputSignals::new().u64_input("start_index", start as u64).u64_input("end_index", end as u64).bytes_input("expected_output", &output).pad(&config).unwrap();
+     
+    let result = circuit_handle.gen_witness(circuit_input_signals);
+    assert!(result.is_ok());
+}
+
+#[test]
+fn array_selector_test_complex() {
+    let circuit_handle = TestCircuitHandle::new("array_selector_complex_test.circom").unwrap();
+    let out_len = 8;
+    // Fails when start = 0 by design
+    for start in 1..out_len {
+        for end in start+1..out_len {
+            let output = build_array_selector_output(out_len, start, end);
+            let config = CircuitPaddingConfig::new().max_length("expected_output", out_len as usize);
+            let circuit_input_signals = CircuitInputSignals::new().u64_input("start_index", start as u64).u64_input("end_index", end as u64).bytes_input("expected_output", &output[..]).pad(&config).unwrap();
+            let result = circuit_handle.gen_witness(circuit_input_signals);
+            assert!(result.is_ok());
+        };
+    };
+}
+
+#[test]
+fn array_selector_test_complex_large() {
+    let circuit_handle = TestCircuitHandle::new("array_selector_complex_large_test.circom").unwrap();
+    let out_len = 2000;
+    let start = 157;
+    let end = 1143;
+    let output = build_array_selector_output(out_len, start, end);
+    let config = CircuitPaddingConfig::new().max_length("expected_output", out_len as usize);
+    let circuit_input_signals = CircuitInputSignals::new().u64_input("start_index", start as u64).u64_input("end_index", end as u64).bytes_input("expected_output", &output).pad(&config).unwrap();
+     
+    let result = circuit_handle.gen_witness(circuit_input_signals);
+    assert!(result.is_ok());
+}
+
+#[test]
+fn array_selector_test_complex_small() {
+    let circuit_handle = TestCircuitHandle::new("array_selector_complex_small_test.circom").unwrap();
+    let out_len = 3;
+    let start = 1;
+    let end = 2;
+    let output = build_array_selector_output(out_len, start, end);
+    let config = CircuitPaddingConfig::new().max_length("expected_output", out_len as usize);
+    let circuit_input_signals = CircuitInputSignals::new().u64_input("start_index", start as u64).u64_input("end_index", end as u64).bytes_input("expected_output", &output).pad(&config).unwrap();
+     
+    let result = circuit_handle.gen_witness(circuit_input_signals);
+    assert!(result.is_ok());
+}
+
+#[test]
+#[should_panic]
+fn array_selector_test_complex_wrong_end() {
+    let circuit_handle = TestCircuitHandle::new("array_selector_complex_test.circom").unwrap();
+    let out_len = 8;
+    let start = 3;
+    let end = 8;
+    let output = build_array_selector_output(out_len, start, end);
+    let config = CircuitPaddingConfig::new().max_length("expected_output", out_len as usize);
+    let circuit_input_signals = CircuitInputSignals::new().u64_input("start_index", start as u64).u64_input("end_index", end as u64).bytes_input("expected_output", &output).pad(&config).unwrap();
+     
+    let result = circuit_handle.gen_witness(circuit_input_signals);
+    assert!(result.is_ok());
+}
+
+#[test]
+#[should_panic]
+fn array_selector_test_complex_wrong_start() {
+    let circuit_handle = TestCircuitHandle::new("array_selector_test.circom").unwrap();
+    let out_len = 8;
+    let start = 3;
+    let end = 3;
+    let output = build_array_selector_output(out_len, start, end);
+    let config = CircuitPaddingConfig::new().max_length("expected_output", out_len as usize);
+    let circuit_input_signals = CircuitInputSignals::new().u64_input("start_index", start as u64).u64_input("end_index", end as u64).bytes_input("expected_output", &output).pad(&config).unwrap();
+     
+    let result = circuit_handle.gen_witness(circuit_input_signals);
+    assert!(result.is_ok());
+}
+
+/*#[test]
 fn array_selector_complex_test() {
     let circuit_handle = TestCircuitHandle::new("array_selector_complex_test.circom").unwrap();
     let output = [0,0,1,1,1,0,0,0];
@@ -62,7 +181,7 @@ fn array_selector_complex_test() {
      
     let result = circuit_handle.gen_witness(circuit_input_signals);
     assert!(result.is_ok());
-}
+}*/
 
 #[test]
 fn left_array_selector_test() {
