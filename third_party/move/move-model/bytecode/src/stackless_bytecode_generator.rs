@@ -172,6 +172,7 @@ impl<'a> StacklessBytecodeGenerator<'a> {
             loop_unrolling,
             loop_invariants,
             BTreeMap::new(),
+            BTreeMap::new(),
         )
     }
 

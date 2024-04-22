@@ -90,6 +90,8 @@ pub struct FunctionData {
     pub ghost_type_param_count: usize,
     /// A map for temporaries to associated name, if available.
     pub local_names: BTreeMap<TempIndex, Symbol>,
+    /// A map from temporaries to their locations
+    pub local_locations: BTreeMap<TempIndex, Loc>,
 }
 
 impl<'env> FunctionTarget<'env> {
@@ -498,6 +500,7 @@ impl FunctionData {
         loop_unrolling: BTreeMap<AttrId, usize>,
         loop_invariants: BTreeSet<AttrId>,
         local_names: BTreeMap<TempIndex, Symbol>,
+        local_locations: BTreeMap<TempIndex, Loc>,
     ) -> Self {
         let modify_targets = func_env.get_modify_targets();
         FunctionData {
@@ -517,6 +520,7 @@ impl FunctionData {
             modify_targets,
             ghost_type_param_count: 0,
             local_names,
+            local_locations: local_locations,
         }
     }
 
