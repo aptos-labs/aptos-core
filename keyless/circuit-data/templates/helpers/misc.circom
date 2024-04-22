@@ -63,15 +63,19 @@ template JWTFieldCheck(maxKVPairLen, maxNameLen, maxValueLen) {
 }
 
 // Checks if character 'char' is a whitespace character. Returns 1 if so, 0 otherwise
+// Assumes char is a valid ascii character. Does not check for non-ascii unicode whitespace chars.
 template isWhitespace() {
    signal input char;  
                        
    signal is_tab <== IsEqual()([char, 9]); // character is a tab space
-   signal is_newline <== IsEqual()([char, 10]); // character is a newline 
-   signal is_carriage_return <== IsEqual()([char, 13]); // character is a carriage return
+
+   signal is_line_break_part_1 <== GreaterEqThan(8)([char, 10]); // character is a newline 
+   signal is_line_break_part_2 <== LessEqThan(8)([char, 13]); // character is a carriage return
+   signal is_line_break <== is_line_break_part_1 * is_line_break_part_2;
+
    signal is_space <== IsEqual()([char, 32]); // ' '
                        
-   signal output is_whitespace <== is_tab + is_newline + is_carriage_return + is_space;
+   signal output is_whitespace <== is_tab + is_line_break + is_space;
 }
 
 // https://github.com/TheFrozenFire/snark-jwt-verify/blob/master/circuits/calculate_total.circom
