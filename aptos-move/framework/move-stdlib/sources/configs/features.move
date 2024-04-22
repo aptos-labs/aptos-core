@@ -514,7 +514,7 @@ module std::features {
     }
 
     /// Update feature flags directly. Only used in genesis/tests.
-    fun change_feature_flags_internal(framework: &signer, enable: vector<u64>, disable: vector<u64>) acquires Features {
+    public fun change_feature_flags_internal(framework: &signer, enable: vector<u64>, disable: vector<u64>) acquires Features {
         assert!(signer::address_of(framework) == @std, error::permission_denied(EFRAMEWORK_SIGNER_NEEDED));
         if (!exists<Features>(@std)) {
             move_to<Features>(framework, Features { features: vector[] })
