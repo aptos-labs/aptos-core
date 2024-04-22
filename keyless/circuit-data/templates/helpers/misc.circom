@@ -11,7 +11,6 @@ include "../node_modules/circomlib/circuits/bitify.circom";
 template JWTFieldCheck(maxKVPairLen, maxNameLen, maxValueLen) {
     signal input field[maxKVPairLen]; // ASCII
     signal input field_len; // ASCII
-    signal input index; // index of field in ASCII jwt
     signal input name_len;
     signal input value_index; // index of value within `field`
     signal input value_len;
