@@ -599,7 +599,7 @@ module DiemFramework::AccountAdministrationScripts {
     ///
     /// # Technical Description
     /// Publishes a `VASPDomain::VASPDomains` resource under `account`.
-    /// the `VASPDomain::VASPDomains` resource's `domains` field is a vector
+    /// The `VASPDomain::VASPDomains` resource's `domains` field is a vector
     /// of VASPDomain, and will be empty on at the end of processing this transaction.
     ///
     /// # Parameters

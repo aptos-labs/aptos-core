@@ -1723,7 +1723,7 @@ module DiemFramework::Diem {
             ==> spec_currency_info<CoinType>().preburn_value <= old(spec_currency_info<CoinType>().preburn_value);
     }
     spec schema PreburnValueNotDecrease<CoinType> {
-        /// the preburn value of currency does not decrease.
+        /// The preburn value of currency does not decrease.
         ensures old(spec_is_currency<CoinType>())
             ==> spec_currency_info<CoinType>().preburn_value >= old(spec_currency_info<CoinType>().preburn_value);
     }
