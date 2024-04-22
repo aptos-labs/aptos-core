@@ -48,6 +48,10 @@ pub fn get_sample_iss() -> String {
     SAMPLE_JWT_PARSED.oidc_claims.iss.clone()
 }
 
+pub fn get_sample_aud() -> String {
+    "test-keyless-dapp".to_string()
+}
+
 pub fn get_sample_jwk() -> RSA_JWK {
     SAMPLE_JWK.clone()
 }
@@ -62,6 +66,14 @@ pub fn get_sample_epk_blinder() -> Vec<u8> {
 
 pub fn get_sample_exp_date() -> u64 {
     SAMPLE_EXP_DATE
+}
+
+pub fn get_sample_jwt_header_json() -> String {
+    SAMPLE_JWT_HEADER_JSON.to_string()
+}
+
+pub fn get_sample_uid_key() -> String {
+    SAMPLE_UID_KEY.to_string()
 }
 
 pub fn get_sample_groth16_zkp_and_statement() -> Groth16ProofAndStatement {
