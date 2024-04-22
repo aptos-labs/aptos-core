@@ -18,14 +18,15 @@ aptos-config = { workspace = true }
 aptos-crypto = { workspace = true }
 aptos-crypto-derive = { workspace = true }
 aptos-db = { workspace = true }
+aptos-drop-helper = { workspace = true }
 aptos-experimental-runtimes = { workspace = true }
+aptos-experimental-scratchpad = { workspace = true, features = ["fuzzing", "bench"] }
 aptos-infallible = { workspace = true }
 aptos-jellyfish-merkle = { workspace = true }
 aptos-logger = { workspace = true }
 aptos-metrics-core = { workspace = true }
 aptos-storage-interface = { workspace = true }
 aptos-schemadb = { workspace = true }
-aptos-scratchpad = { workspace = true, features = ["fuzzing", "bench"] }
 aptos-types = { workspace = true }
 bcs = { workspace = true }
 bytes = { workspace = true }
@@ -36,7 +37,14 @@ rayon = {workspace = true}
 rand = {workspace = true}
 serde = { workspace = true }
 tempfile = { workspace = true }
-tokio = { workspace = true }
+bitvec = { workspace = true }
+criterion = { workspace = true, optional = true }
+itertools = { workspace = true }
+proptest = { workspace = true, optional = true }
+thiserror = { workspace = true }
+aptos-node-resource-metrics = { workspace = true }
+aptos-push-metrics =  { workspace = true }
+
 
 [target.'cfg(unix)'.dependencies]
 jemallocator = { workspace = true }

@@ -4,7 +4,7 @@
 
 //! This crate provides in-memory representation of Aptos core data structures used by the executor.
 
-mod sparse_merkle;
+pub mod sparse_merkle;
 
 #[cfg(any(test, feature = "bench", feature = "fuzzing"))]
 pub use crate::sparse_merkle::test_utils;

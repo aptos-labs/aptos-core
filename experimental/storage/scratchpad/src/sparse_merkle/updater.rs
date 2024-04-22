@@ -16,7 +16,7 @@ use aptos_crypto::{
 };
 use aptos_experimental_runtimes::thread_manager::THREAD_MANAGER;
 use aptos_types::proof::{definition::NodeInProof, SparseMerkleLeafNode, SparseMerkleProofExt};
-use std::cmp::Ordering;
+use std::{cmp::Ordering, fmt};
 
 type Result<T> = std::result::Result<T, UpdateError>;
 
@@ -37,6 +37,17 @@ enum InMemSubTreeInfo<V: Send + Sync + 'static> {
         subtree: InMemSubTree<V>,
     },
     Empty,
+}
+
+impl<V: CryptoHash + Send + Sync + 'static> fmt::Debug for InMemSubTreeInfo<V> {
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        match self {
+            Self::Unknown { .. } => write!(f, "Unknown"),
+            Self::Leaf { key, .. } => write!(f, "Leaf: {:?}", key),
+            Self::Internal { node: _, subtree } => write!(f, "Internal: {:?} ", subtree.hash()),
+            Self::Empty => write!(f, "Empty"),
+        }
+    }
 }
 
 impl<V: Clone + CryptoHash + Send + Sync + 'static> InMemSubTreeInfo<V> {
@@ -93,6 +104,30 @@ impl<V: Clone + CryptoHash + Send + Sync + 'static> InMemSubTreeInfo<V> {
             (Self::Leaf { .. }, Self::Empty) => left,
             (Self::Empty, Self::Leaf { .. }) => right,
             _ => InMemSubTreeInfo::create_internal(left, right, generation),
+        }
+    }
+
+    // create a new InmemSubTreeInfo as wrapper for inplace-updated subtree
+    fn inplace_combine(left: Self, right: Self, generation: u64, parent: &mut Self) -> Self {
+        println!("Inplace combine: {:?}, {:?}", left, right);
+        match (&left, &right) {
+            (Self::Empty, Self::Empty) => Self::Empty,
+            (Self::Leaf { .. }, Self::Empty) => left,
+            (Self::Empty, Self::Leaf { .. }) => right,
+            _ => match parent {
+                Self::Internal {
+                    node: _,
+                    ref mut subtree,
+                } => {
+                    let left_sub = left.into_subtree();
+                    let right_sub = right.into_subtree();
+                    subtree
+                        .update_internal_node(left_sub, right_sub, generation)
+                        .unwrap();
+                    parent.clone()
+                },
+                _ => InMemSubTreeInfo::create_internal(left, right, generation),
+            },
         }
     }
 }
@@ -169,7 +204,7 @@ impl<'a, V: Clone + CryptoHash + Send + Sync + 'static> SubTreeInfo<'a, V> {
                     NodeInner::Internal(internal_node) => {
                         SubTreeInfo::InMem(InMemSubTreeInfo::Internal {
                             node: internal_node.clone(),
-                            subtree: subtree.weak(),
+                            subtree: subtree.clone(),
                         })
                     },
                     NodeInner::Leaf(leaf_node) => {
@@ -195,7 +230,7 @@ impl<'a, V: Clone + CryptoHash + Send + Sync + 'static> SubTreeInfo<'a, V> {
                     },
                 },
                 None => SubTreeInfo::InMem(InMemSubTreeInfo::Unknown {
-                    subtree: subtree.weak(),
+                    subtree: subtree.clone(),
                 }),
             },
         }
@@ -246,7 +281,7 @@ impl<'a, V: Clone + CryptoHash + Send + Sync + 'static> SubTreeInfo<'a, V> {
                 PersistedSubTreeInfo::ProofPathInternal { proof } => {
                     let siblings = proof.siblings();
                     assert!(siblings.len() > depth);
-                    let sibling_child =
+                    let sibling_child: SubTreeInfo<'_, V> =
                         SubTreeInfo::new_proof_sibling(&siblings[siblings.len() - depth - 1]);
                     let on_path_child = SubTreeInfo::new_on_proof_path(proof, depth + 1);
                     swap_if(on_path_child, sibling_child, a_descendent_key.bit(depth))
@@ -294,10 +329,27 @@ impl<'a, V: Send + Sync + 'static + Clone + CryptoHash> SubTreeUpdater<'a, V> {
             updates,
             generation,
         };
-        Ok(updater.run(proof_reader)?.into_subtree())
+        Ok(updater.run(proof_reader, false)?.into_subtree())
     }
 
-    fn run(self, proof_reader: &impl ProofRead) -> Result<InMemSubTreeInfo<V>> {
+    // we resue exisiting internal and leaf nodes for updates
+    // we also update all nodes in proof_reader as unknown nodes
+    pub(crate) fn inplace_update(
+        root: InMemSubTree<V>,
+        updates: &'a [(HashValue, Option<&'a V>)],
+        proof_reader: &'a impl ProofRead,
+        generation: u64,
+    ) -> Result<InMemSubTree<V>> {
+        let updater = Self {
+            depth: 0,
+            info: SubTreeInfo::from_in_mem(&root, generation),
+            updates,
+            generation,
+        };
+        Ok(updater.run(proof_reader, true)?.into_subtree())
+    }
+
+    fn run(self, proof_reader: &impl ProofRead, inplace: bool) -> Result<InMemSubTreeInfo<V>> {
         // Limit total tasks that are potentially sent to other threads.
         const MAX_PARALLELIZABLE_DEPTH: usize = 8;
         // No point to introduce Rayon overhead if work is small.
@@ -305,27 +357,49 @@ impl<'a, V: Send + Sync + 'static + Clone + CryptoHash> SubTreeUpdater<'a, V> {
 
         let generation = self.generation;
         let depth = self.depth;
-        match self.maybe_end_recursion()? {
-            MaybeEndRecursion::End(ended) => Ok(ended),
+        let mut parent = self.info.clone().materialize(generation);
+        match self.maybe_end_recursion(proof_reader)? {
+            MaybeEndRecursion::End(ended) => {
+                println!("End: {:?}", ended);
+                Ok(ended)
+            },
             MaybeEndRecursion::Continue(myself) => {
                 let (left, right) = myself.into_children(proof_reader)?;
                 let (left_ret, right_ret) = if depth <= MAX_PARALLELIZABLE_DEPTH
                     && left.updates.len() >= MIN_PARALLELIZABLE_SIZE
                     && right.updates.len() >= MIN_PARALLELIZABLE_SIZE
                 {
-                    THREAD_MANAGER
-                        .get_exe_cpu_pool()
-                        .join(|| left.run(proof_reader), || right.run(proof_reader))
+                    THREAD_MANAGER.get_exe_cpu_pool().join(
+                        || left.run(proof_reader, inplace),
+                        || right.run(proof_reader, inplace),
+                    )
                 } else {
-                    (left.run(proof_reader), right.run(proof_reader))
+                    (
+                        left.run(proof_reader, inplace),
+                        right.run(proof_reader, inplace),
+                    )
                 };
-
-                Ok(InMemSubTreeInfo::combine(left_ret?, right_ret?, generation))
+                if !inplace {
+                    Ok(InMemSubTreeInfo::combine(left_ret?, right_ret?, generation))
+                } else {
+                    let old_parent = parent.clone();
+                    let new_parent = InMemSubTreeInfo::inplace_combine(
+                        left_ret?,
+                        right_ret?,
+                        generation,
+                        &mut parent,
+                    );
+                    println!("Parent({:?}): {:?}, {:?}", depth, old_parent, new_parent);
+                    Ok(new_parent)
+                }
             },
         }
     }
 
-    fn maybe_end_recursion(self) -> Result<MaybeEndRecursion<InMemSubTreeInfo<V>, Self>> {
+    fn maybe_end_recursion(
+        self,
+        proof_reader: &impl ProofRead,
+    ) -> Result<MaybeEndRecursion<InMemSubTreeInfo<V>, Self>> {
         Ok(match self.updates.len() {
             0 => MaybeEndRecursion::End(self.info.materialize(self.generation)),
             1 => {
@@ -339,7 +413,7 @@ impl<'a, V: Send + Sync + 'static + Clone + CryptoHash> SubTreeUpdater<'a, V> {
                                     self.generation,
                                 ))
                             },
-                            None => MaybeEndRecursion::End(self.info.materialize(self.generation)),
+                            None => panic!("Trying to delete a internal node"),
                         },
                         InMemSubTreeInfo::Leaf { key, .. } => match update {
                             Some(value) => MaybeEndRecursion::or(
@@ -352,7 +426,14 @@ impl<'a, V: Send + Sync + 'static + Clone + CryptoHash> SubTreeUpdater<'a, V> {
                             ),
                             None => {
                                 if key == key_to_update {
-                                    MaybeEndRecursion::End(InMemSubTreeInfo::Empty)
+                                    if proof_reader.get_proof(*key_to_update).is_some() {
+                                        // simulate the evict of the leaf node
+                                        MaybeEndRecursion::End(InMemSubTreeInfo::create_unknown(
+                                            *key_to_update,
+                                        ))
+                                    } else {
+                                        MaybeEndRecursion::End(InMemSubTreeInfo::Empty)
+                                    }
                                 } else {
                                     MaybeEndRecursion::End(self.info.materialize(self.generation))
                                 }

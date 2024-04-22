@@ -8,18 +8,17 @@ use crate::{
 use aptos_config::config::{RocksdbConfigs, StorageDirPaths};
 use aptos_crypto::hash::SPARSE_MERKLE_PLACEHOLDER_HASH;
 use aptos_db::state_merkle_db::StateMerkleDb;
+use aptos_experimental_scratchpad::sparse_merkle::SparseMerkleTree;
 use aptos_logger::info;
-use aptos_scratchpad::SparseMerkleTree;
 use aptos_types::state_store::{
     state_key::StateKey, state_storage_usage::StateStorageUsage, state_value::StateValue,
 };
 use std::{
     sync::{
-        mpsc::{channel, Receiver, Sender},
+        mpsc::{sync_channel, Receiver, SyncSender},
         Arc,
     },
-    thread,
-    thread::sleep,
+    thread::{self, sleep},
     time::Duration,
 };
 pub enum Action {
@@ -84,7 +83,7 @@ impl PipelineConfig {
 
 pub struct Pipeline {
     config: PipelineConfig,
-    sender: Sender<ActionConfig>,
+    sender: SyncSender<ActionConfig>,
     handle: thread::JoinHandle<()>,
 }
 
@@ -98,18 +97,18 @@ impl Pipeline {
 
     pub fn new(config: PipelineConfig) -> Self {
         // setup the channel between pipeline and genearator
-        let (updates_sender, updates_receiver): (Sender<ActionConfig>, Receiver<ActionConfig>) =
-            channel();
+        let (updates_sender, updates_receiver): (SyncSender<ActionConfig>, Receiver<ActionConfig>) =
+            sync_channel(5);
 
         // setup the channel between generate and executor
-        let (action_sender, action_receiver): (Sender<Vec<Action>>, Receiver<Vec<Action>>) =
-            channel();
+        let (action_sender, action_receiver): (SyncSender<Vec<Action>>, Receiver<Vec<Action>>) =
+            sync_channel(5);
 
         // setup the channel betwen the executor and committer
         let (committer_sender, committer_receiver): (
-            Sender<CommitMessage>,
+            SyncSender<CommitMessage>,
             Receiver<CommitMessage>,
-        ) = channel();
+        ) = sync_channel(5);
 
         let db_path = config.db_path.clone();
         let handle3 = thread::spawn(move || {

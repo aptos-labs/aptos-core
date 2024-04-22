@@ -22,6 +22,7 @@
 //! corresponding account content. The difference is that a `LeafNode` does not always have the
 //! value, in the case when the leaf was loaded into memory as part of a non-inclusion proof.
 
+use anyhow::Result;
 use aptos_crypto::{
     hash::{CryptoHash, SPARSE_MERKLE_PLACEHOLDER_HASH},
     HashValue,
@@ -30,7 +31,7 @@ use aptos_types::proof::{SparseMerkleInternalNode, SparseMerkleLeafNode};
 use std::sync::{Arc, Weak};
 
 #[derive(Clone, Debug)]
-pub(crate) struct InternalNode<V: Send + Sync + 'static> {
+pub struct InternalNode<V: Send + Sync + 'static> {
     pub left: SubTree<V>,
     pub right: SubTree<V>,
 }
@@ -42,7 +43,7 @@ impl<V: CryptoHash + Send + Sync + 'static> InternalNode<V> {
 }
 
 #[derive(Clone, Debug)]
-pub(crate) struct LeafNode<V: Send + Sync + 'static> {
+pub struct LeafNode<V: Send + Sync + 'static> {
     pub key: HashValue,
     pub value: LeafValue<V>,
 }
@@ -79,13 +80,29 @@ where
 }
 
 #[derive(Debug)]
-pub(crate) enum NodeInner<V: Send + Sync + 'static> {
+pub enum NodeInner<V: Send + Sync + 'static> {
     Internal(InternalNode<V>),
     Leaf(LeafNode<V>),
 }
 
+impl<V: Send + Sync + 'static> NodeInner<V> {
+    pub fn as_internal(&self) -> &InternalNode<V> {
+        match self {
+            NodeInner::Internal(internal_node) => internal_node,
+            _ => panic!("Expected internal node"),
+        }
+    }
+
+    pub fn as_leaf(&self) -> &LeafNode<V> {
+        match self {
+            NodeInner::Leaf(leaf_node) => leaf_node,
+            _ => panic!("Expected leaf node"),
+        }
+    }
+}
+
 #[derive(Debug)]
-pub(crate) struct Node<V: Send + Sync + 'static> {
+pub struct Node<V: Send + Sync + 'static> {
     generation: u64,
     inner: NodeInner<V>,
 }
@@ -114,7 +131,6 @@ impl<V: Send + Sync + 'static> Node<V> {
         }
     }
 
-    #[cfg(test)]
     pub fn new_internal(left: SubTree<V>, right: SubTree<V>, generation: u64) -> Self {
         Self {
             generation,
@@ -173,10 +189,10 @@ impl<R> Clone for Ref<R> {
     }
 }
 
-pub(crate) type NodeHandle<V> = Ref<Node<V>>;
+pub type NodeHandle<V> = Ref<Node<V>>;
 
 #[derive(Clone, Debug)]
-pub(crate) enum SubTree<V: Send + Sync + 'static> {
+pub enum SubTree<V: Send + Sync + 'static> {
     Empty,
     NonEmpty {
         hash: HashValue,
@@ -268,6 +284,31 @@ impl<V: CryptoHash + Send + Sync + 'static> SubTree<V> {
     #[cfg(test)]
     pub fn is_empty(&self) -> bool {
         matches!(self, SubTree::Empty)
+    }
+
+    pub fn update_internal_node(&mut self, left: Self, right: Self, generation: u64) -> Result<()> {
+        match self {
+            Self::NonEmpty {
+                ref mut hash,
+                ref mut root,
+            } => {
+                assert!(
+                    matches!(
+                        root.get_if_in_mem()
+                            .expect("Node should exist in mem")
+                            .inner(),
+                        NodeInner::Internal(_)
+                    ),
+                    "update internal node called on a non-internal node"
+                );
+                let internal_node = InternalNode { left, right };
+                let node = Node::new_internal_from_node(internal_node, generation);
+                *hash = node.calc_hash();
+                *root = NodeHandle::new_shared(node);
+                Ok(())
+            },
+            _ => panic!("update_internal_node called on an empty subtree"),
+        }
     }
 }
 

@@ -1,7 +1,7 @@
 // Copyright © Aptos Foundation
 // SPDX-License-Identifier: Apache-2.0
 use aptos_crypto::hash::HashValue;
-use aptos_scratchpad::sparse_merkle::ProofRead;
+use aptos_experimental_scratchpad::sparse_merkle::ProofRead;
 use aptos_types::proof::SparseMerkleProofExt;
 use std::collections::HashMap;
 pub struct BasicProofReader {

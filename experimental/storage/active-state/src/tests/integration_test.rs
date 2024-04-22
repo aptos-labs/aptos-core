@@ -16,9 +16,11 @@ use aptos_crypto::{
 };
 use aptos_db::state_merkle_db::StateMerkleDb;
 use aptos_experimental_runtimes::thread_manager::THREAD_MANAGER;
+use aptos_experimental_scratchpad::sparse_merkle::{
+    test_utils::proof_reader::ProofReader, SparseMerkleTree,
+};
 use aptos_jellyfish_merkle::node_type::Node;
 use aptos_schemadb::SchemaBatch;
-use aptos_scratchpad::{test_utils::proof_reader::ProofReader, SparseMerkleTree};
 use aptos_storage_interface::{jmt_update_refs, jmt_updates, Result};
 use aptos_types::state_store::{
     state_key::StateKey, state_storage_usage::StateStorageUsage, state_value::StateValue,
@@ -44,7 +46,7 @@ fn create_empty_smt() -> SparseMerkleTree<StateValue> {
 }
 
 fn gen_key(value: HashValue) -> StateKey {
-    StateKey::raw(value.to_vec())
+    StateKey::raw(&value.to_vec())
 }
 
 fn gen_value(rng: &mut StdRng) -> Option<StateValue> {

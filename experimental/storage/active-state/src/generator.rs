@@ -10,18 +10,21 @@ use aptos_types::state_store::{state_key::StateKey, state_value::StateValue};
 use bytes::Bytes;
 use rand::Rng;
 use std::{
-    sync::mpsc::{Receiver, Sender},
+    sync::mpsc::{Receiver, SyncSender},
     thread,
 };
 
 pub struct ActionGenerator {
     receiver: Receiver<ActionConfig>,
-    execution_sender: Sender<Vec<Action>>,
+    execution_sender: SyncSender<Vec<Action>>,
     executor_handle: Option<thread::JoinHandle<()>>,
 }
 
 impl ActionGenerator {
-    pub fn new(receiver: Receiver<ActionConfig>, execution_sender: Sender<Vec<Action>>) -> Self {
+    pub fn new(
+        receiver: Receiver<ActionConfig>,
+        execution_sender: SyncSender<Vec<Action>>,
+    ) -> Self {
         Self {
             receiver,
             execution_sender,
@@ -74,7 +77,7 @@ impl ActionGenerator {
     }
 
     fn generate_state_key(&self, state_key_ind: usize) -> StateKey {
-        StateKey::raw(state_key_ind.to_be_bytes().to_vec())
+        StateKey::raw(&state_key_ind.to_be_bytes())
     }
 
     fn generate_state_value(&self, state_key_ind: usize) -> StateValue {

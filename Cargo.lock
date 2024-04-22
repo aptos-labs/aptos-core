@@ -1485,28 +1485,35 @@ dependencies = [
  "aptos-crypto",
  "aptos-crypto-derive",
  "aptos-db",
+ "aptos-drop-helper",
  "aptos-experimental-runtimes",
+ "aptos-experimental-scratchpad",
  "aptos-infallible",
  "aptos-jellyfish-merkle",
  "aptos-logger",
  "aptos-metrics-core",
+ "aptos-node-resource-metrics",
  "aptos-profiler",
+ "aptos-push-metrics",
  "aptos-schemadb",
- "aptos-scratchpad",
  "aptos-storage-interface",
  "aptos-types",
  "bcs 0.1.4",
+ "bitvec 1.0.1",
  "bytes",
+ "criterion",
  "dashmap",
  "fail 0.5.1",
+ "itertools 0.12.1",
  "jemallocator",
  "mockall 0.10.2",
  "once_cell",
+ "proptest",
  "rand 0.7.3",
  "rayon",
  "serde",
  "tempfile",
- "tokio",
+ "thiserror",
 ]
 
 [[package]]
@@ -1553,6 +1560,28 @@ dependencies = [
  "num_cpus",
  "once_cell",
  "rayon",
+]
+
+[[package]]
+name = "aptos-experimental-scratchpad"
+version = "0.1.0"
+dependencies = [
+ "anyhow",
+ "aptos-crypto",
+ "aptos-drop-helper",
+ "aptos-experimental-runtimes",
+ "aptos-infallible",
+ "aptos-metrics-core",
+ "aptos-types",
+ "bitvec 1.0.1",
+ "criterion",
+ "itertools 0.12.1",
+ "jemallocator",
+ "once_cell",
+ "proptest",
+ "rand 0.7.3",
+ "rayon",
+ "thiserror",
 ]
 
 [[package]]
@@ -3407,7 +3436,6 @@ dependencies = [
 name = "aptos-scratchpad"
 version = "0.1.0"
 dependencies = [
- "anyhow",
  "aptos-crypto",
  "aptos-drop-helper",
  "aptos-experimental-runtimes",

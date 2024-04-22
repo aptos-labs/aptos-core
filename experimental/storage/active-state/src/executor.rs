@@ -12,10 +12,10 @@ use crate::{
     ActiveState,
 };
 use aptos_crypto::hash::CryptoHash;
+use aptos_experimental_scratchpad::sparse_merkle::SparseMerkleTree;
 use aptos_logger::info;
-use aptos_scratchpad::SparseMerkleTree;
 use aptos_types::state_store::state_value::StateValue;
-use std::sync::mpsc::{Receiver, Sender};
+use std::sync::mpsc::{Receiver, SyncSender};
 
 pub struct ActionExecutor {
     mode: ExecutionMode,
@@ -23,7 +23,7 @@ pub struct ActionExecutor {
     current_smt: SparseMerkleTree<StateValue>,
     active_state: Option<ActiveState>,
     receiver: Receiver<Vec<Action>>,
-    committer_sender: Sender<CommitMessage>,
+    committer_sender: SyncSender<CommitMessage>,
     committer_handle: Option<std::thread::JoinHandle<()>>,
 }
 
@@ -33,7 +33,7 @@ impl ActionExecutor {
         proof_reader: BasicProofReader,
         current_smt: SparseMerkleTree<StateValue>,
         receiver: Receiver<Vec<Action>>,
-        committer_sender: Sender<CommitMessage>,
+        committer_sender: SyncSender<CommitMessage>,
         active_set_size: usize,
     ) -> Self {
         match mode {

@@ -4,10 +4,10 @@
 use crate::pipeline::CommitMessage;
 use aptos_db::state_merkle_db::StateMerkleDb;
 use aptos_experimental_runtimes::thread_manager::THREAD_MANAGER;
+use aptos_experimental_scratchpad::sparse_merkle::SparseMerkleTree;
 use aptos_jellyfish_merkle::node_type::Node;
 use aptos_logger::info;
 use aptos_schemadb::SchemaBatch;
-use aptos_scratchpad::SparseMerkleTree;
 use aptos_storage_interface::{jmt_update_refs, jmt_updates, Result};
 use aptos_types::state_store::{state_key::StateKey, state_value::StateValue, ShardedStateUpdates};
 use rayon::iter::{IntoParallelIterator, ParallelIterator};

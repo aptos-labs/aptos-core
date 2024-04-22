@@ -34,6 +34,7 @@ mod ledger_db;
 mod lru_node_cache;
 mod pruner;
 mod state_kv_db;
+// TODO(bowu): remove the pub once we finish active state benchmark
 pub mod state_merkle_db;
 mod state_store;
 mod transaction_store;
