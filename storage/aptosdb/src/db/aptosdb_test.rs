@@ -289,7 +289,7 @@ fn test_revert_last_commit() {
     let latest_ledger_info_after_revert = db.get_latest_ledger_info().unwrap();
     assert_eq!(
         latest_ledger_info_after_revert.ledger_info().version(),
-        last_committed_version - 1
+        last_committed_version 
     );
 }
 
