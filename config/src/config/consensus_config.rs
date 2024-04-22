@@ -312,7 +312,7 @@ impl Default for ConsensusConfig {
             max_blocks_per_sending_request_quorum_store_override: 10,
             max_blocks_per_receiving_request: 10,
             max_blocks_per_receiving_request_quorum_store_override: 100,
-            broadcast_vote: true,
+            broadcast_vote: false,
             proof_cache_capacity: 10_000,
             rand_rb_config: ReliableBroadcastConfig {
                 backoff_policy_base_ms: 2,

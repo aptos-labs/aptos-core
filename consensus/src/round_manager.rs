@@ -967,7 +967,7 @@ impl RoundManager {
             is_timeout = vote.is_timeout(),
         );
 
-        if !self.local_config.broadcast_vote && !vote.is_timeout() {
+        if !vote.is_timeout() {
             // Unlike timeout votes regular votes are sent to the leaders of the next round only.
             let next_round = round + 1;
             ensure!(
