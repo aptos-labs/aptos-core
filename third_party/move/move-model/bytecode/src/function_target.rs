@@ -265,7 +265,7 @@ impl<'env> FunctionTarget<'env> {
     }
 
     /// Returns a printable name for a local. If the local is a temporary which has
-    /// no name, returns `local`, otherwise `local <name>`. The returned value
+    /// no name, returns `value`, otherwise `local <name>`. The returned value
     /// should produce correct English whether a name is available or not.
     pub fn get_local_name_for_error_message(&self, temp: TempIndex) -> String {
         if let Some(sym) = self.data.local_names.get(&temp) {
