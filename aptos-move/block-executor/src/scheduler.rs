@@ -14,10 +14,7 @@ use crossbeam::utils::CachePadded;
 use parking_lot::{RwLock, RwLockUpgradableReadGuard};
 use std::{
     cmp::{max, min},
-    sync::{
-        atomic::{AtomicBool, AtomicU32, AtomicU64, Ordering},
-        Arc, Condvar,
-    },
+    sync::atomic::{AtomicBool, AtomicU32, AtomicU64, Ordering},
 };
 
 const TXN_IDX_MASK: u64 = (1 << 32) - 1;

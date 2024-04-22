@@ -398,7 +398,7 @@ impl BlockAptosVM {
         S: StateView + Sync,
         L: TransactionCommitHook<Output = AptosTransactionOutput>,
     >(
-        executor_thread_pool: Arc<ThreadPool>,
+        _executor_thread_pool: Arc<ThreadPool>,
         signature_verified_block: &[SignatureVerifiedTransaction],
         state_view: &S,
         config: BlockExecutorConfig,
@@ -419,7 +419,7 @@ impl BlockAptosVM {
             S,
             L,
             ExecutableTestType,
-        >::new(config, executor_thread_pool, transaction_commit_listener);
+        >::new(config, transaction_commit_listener);
 
         let ret = executor.execute_block(state_view, signature_verified_block, state_view);
         match ret {

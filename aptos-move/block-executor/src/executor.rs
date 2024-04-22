@@ -83,7 +83,7 @@ where
     /// be handled by sequential execution) and that concurrency_level <= num_cpus.
     pub fn new(
         config: BlockExecutorConfig,
-        _executor_thread_pool: Arc<ThreadPool>,
+        //_executor_thread_pool: Arc<ThreadPool>,
         transaction_commit_hook: Option<L>,
     ) -> Self {
         assert!(

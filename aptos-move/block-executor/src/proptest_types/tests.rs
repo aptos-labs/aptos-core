@@ -63,12 +63,7 @@ fn run_transactions<K, V, E>(
         phantom: PhantomData,
     };
 
-    let executor_thread_pool = Arc::new(
-        rayon::ThreadPoolBuilder::new()
-            .num_threads(num_cpus::get())
-            .build()
-            .unwrap(),
-    );
+    
 
     for _ in 0..num_repeat {
         let output = BlockExecutor::<
@@ -79,7 +74,6 @@ fn run_transactions<K, V, E>(
             ExecutableTestType,
         >::new(
             BlockExecutorConfig::new_maybe_block_limit(num_cpus::get(), maybe_block_gas_limit),
-            executor_thread_pool.clone(),
             None,
         )
         .execute_transactions_parallel((), &transactions, &data_view);
@@ -198,12 +192,7 @@ fn deltas_writes_mixed_with_block_gas_limit(num_txns: usize, maybe_block_gas_lim
         phantom: PhantomData,
     };
 
-    let executor_thread_pool = Arc::new(
-        rayon::ThreadPoolBuilder::new()
-            .num_threads(num_cpus::get())
-            .build()
-            .unwrap(),
-    );
+    
 
     for _ in 0..20 {
         let output = BlockExecutor::<
@@ -214,7 +203,6 @@ fn deltas_writes_mixed_with_block_gas_limit(num_txns: usize, maybe_block_gas_lim
             ExecutableTestType,
         >::new(
             BlockExecutorConfig::new_maybe_block_limit(num_cpus::get(), maybe_block_gas_limit),
-            executor_thread_pool.clone(),
             None,
         )
         .execute_transactions_parallel((), &transactions, &data_view);
@@ -249,12 +237,7 @@ fn deltas_resolver_with_block_gas_limit(num_txns: usize, maybe_block_gas_limit: 
         .map(|txn_gen| txn_gen.materialize_with_deltas(&universe, 15, false))
         .collect();
 
-    let executor_thread_pool = Arc::new(
-        rayon::ThreadPoolBuilder::new()
-            .num_threads(num_cpus::get())
-            .build()
-            .unwrap(),
-    );
+    
 
     for _ in 0..20 {
         let output = BlockExecutor::<
@@ -265,7 +248,6 @@ fn deltas_resolver_with_block_gas_limit(num_txns: usize, maybe_block_gas_limit: 
             ExecutableTestType,
         >::new(
             BlockExecutorConfig::new_maybe_block_limit(num_cpus::get(), maybe_block_gas_limit),
-            executor_thread_pool.clone(),
             None,
         )
         .execute_transactions_parallel((), &transactions, &data_view);
@@ -405,12 +387,6 @@ fn publishing_fixed_params_with_block_gas_limit(
         phantom: PhantomData,
     };
 
-    let executor_thread_pool = Arc::new(
-        rayon::ThreadPoolBuilder::new()
-            .num_threads(num_cpus::get())
-            .build()
-            .unwrap(),
-    );
 
     // Confirm still no intersection
     let output = BlockExecutor::<
@@ -421,7 +397,6 @@ fn publishing_fixed_params_with_block_gas_limit(
         ExecutableTestType,
     >::new(
         BlockExecutorConfig::new_maybe_block_limit(num_cpus::get(), maybe_block_gas_limit),
-        executor_thread_pool,
         None,
     )
     .execute_transactions_parallel((), &transactions, &data_view);
@@ -446,14 +421,6 @@ fn publishing_fixed_params_with_block_gas_limit(
             unreachable!();
         },
     };
-
-    let executor_thread_pool = Arc::new(
-        rayon::ThreadPoolBuilder::new()
-            .num_threads(num_cpus::get())
-            .build()
-            .unwrap(),
-    );
-
     for _ in 0..200 {
         let output = BlockExecutor::<
             MockTransaction<KeyType<[u8; 32]>, MockEvent>,
@@ -466,7 +433,6 @@ fn publishing_fixed_params_with_block_gas_limit(
                 num_cpus::get(),
                 Some(max(w_index, r_index) as u64 * MAX_GAS_PER_TXN + 1),
             ),
-            executor_thread_pool.clone(),
             None,
         ) // Ensure enough gas limit to commit the module txns (4 is maximum gas per txn)
         .execute_transactions_parallel((), &transactions, &data_view);
@@ -529,12 +495,6 @@ fn non_empty_group(
             .collect(),
     };
 
-    let executor_thread_pool = Arc::new(
-        rayon::ThreadPoolBuilder::new()
-            .num_threads(num_cpus::get())
-            .build()
-            .unwrap(),
-    );
 
     for _ in 0..num_repeat_parallel {
         let output = BlockExecutor::<
@@ -545,7 +505,6 @@ fn non_empty_group(
             ExecutableTestType,
         >::new(
             BlockExecutorConfig::new_no_block_limit(num_cpus::get()),
-            executor_thread_pool.clone(),
             None,
         )
         .execute_transactions_parallel((), &transactions, &data_view);
@@ -562,7 +521,6 @@ fn non_empty_group(
             ExecutableTestType,
         >::new(
             BlockExecutorConfig::new_no_block_limit(num_cpus::get()),
-            executor_thread_pool.clone(),
             None,
         )
         .execute_transactions_sequential((), &transactions, &data_view, false);

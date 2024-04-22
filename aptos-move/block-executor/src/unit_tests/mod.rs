@@ -78,12 +78,7 @@ fn resource_group_bcs_fallback() {
     let data_view = NonEmptyGroupDataView::<KeyType<u32>> {
         group_keys: HashSet::new(),
     };
-    let executor_thread_pool = Arc::new(
-        rayon::ThreadPoolBuilder::new()
-            .num_threads(num_cpus::get())
-            .build()
-            .unwrap(),
-    );
+    
     let block_executor = BlockExecutor::<
         MockTransaction<KeyType<u32>, MockEvent>,
         MockTask<KeyType<u32>, MockEvent>,
@@ -92,7 +87,6 @@ fn resource_group_bcs_fallback() {
         ExecutableTestType,
     >::new(
         BlockExecutorConfig::new_no_block_limit(num_cpus::get()),
-        executor_thread_pool,
         None,
     );
 
@@ -171,12 +165,7 @@ fn block_output_err_precedence() {
     let data_view = DeltaDataView::<KeyType<u32>> {
         phantom: PhantomData,
     };
-    let executor_thread_pool = Arc::new(
-        rayon::ThreadPoolBuilder::new()
-            .num_threads(num_cpus::get())
-            .build()
-            .unwrap(),
-    );
+    
     let block_executor = BlockExecutor::<
         MockTransaction<KeyType<u32>, MockEvent>,
         MockTask<KeyType<u32>, MockEvent>,
@@ -185,7 +174,6 @@ fn block_output_err_precedence() {
         ExecutableTestType,
     >::new(
         BlockExecutorConfig::new_no_block_limit(num_cpus::get()),
-        executor_thread_pool,
         None,
     );
 
@@ -209,12 +197,7 @@ fn skip_rest_gas_limit() {
     let data_view = DeltaDataView::<KeyType<u32>> {
         phantom: PhantomData,
     };
-    let executor_thread_pool = Arc::new(
-        rayon::ThreadPoolBuilder::new()
-            .num_threads(num_cpus::get())
-            .build()
-            .unwrap(),
-    );
+    
     let block_executor = BlockExecutor::<
         MockTransaction<KeyType<u32>, MockEvent>,
         MockTask<KeyType<u32>, MockEvent>,
@@ -223,7 +206,6 @@ fn skip_rest_gas_limit() {
         ExecutableTestType,
     >::new(
         BlockExecutorConfig::new_maybe_block_limit(num_cpus::get(), Some(5)),
-        executor_thread_pool,
         None,
     );
 
@@ -241,12 +223,7 @@ where
         phantom: PhantomData,
     };
 
-    let executor_thread_pool = Arc::new(
-        rayon::ThreadPoolBuilder::new()
-            .num_threads(num_cpus::get())
-            .build()
-            .unwrap(),
-    );
+    
 
     let output = BlockExecutor::<
         MockTransaction<K, E>,
@@ -256,7 +233,6 @@ where
         ExecutableTestType,
     >::new(
         BlockExecutorConfig::new_no_block_limit(num_cpus::get()),
-        executor_thread_pool,
         None,
     )
     .execute_transactions_parallel((), &transactions, &data_view);
