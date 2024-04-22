@@ -31,6 +31,7 @@ bcs = { workspace = true }
 bytes = { workspace = true }
 fixed = { workspace = true }
 fxhash = { workspace = true }
+hashbrown = { workspace = true }
 hex = { workspace = true }
 itertools = { workspace = true }
 jsonwebtoken = { workspace = true }
@@ -60,11 +61,13 @@ strum_macros = { workspace = true }
 thiserror = { workspace = true }
 
 [dev-dependencies]
+ahash = { workspace = true }
 aptos-crypto = { workspace = true, features = ["fuzzing", "testing"] }
 async-trait = { workspace = true }
 ciborium = { workspace = true }
 claims = { workspace = true }
 coset = { workspace = true }
+criterion = { workspace = true }
 move-core-types = { workspace = true, features = ["fuzzing"] }
 p256 = { workspace = true }
 passkey-authenticator = { workspace = true }
@@ -79,3 +82,7 @@ url = { workspace = true }
 [features]
 default = []
 fuzzing = ["proptest", "proptest-derive", "aptos-crypto/fuzzing", "move-core-types/fuzzing"]
+
+[[bench]]
+name = "state_key"
+harness = false

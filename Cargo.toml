@@ -442,6 +442,7 @@ aptos-cargo-cli = { path = "devtools/aptos-cargo-cli" }
 # External crate dependencies.
 # Please do not add any test features here: they should be declared by the individual crate.
 aes-gcm = "0.10.3"
+ahash = "0.8.11"
 nalgebra = "0.32"
 float-cmp = "0.9.0"
 again = "0.1.2"
@@ -550,6 +551,7 @@ google-cloud-storage = "0.13.0"
 group = "0.13"
 guppy = "0.17.5"
 handlebars = "4.2.2"
+hashbrown = "0.14.3"
 heck = "0.4.1"
 hex = { version = "0.4.3", features = ["serde"] }
 hkdf = "0.10.0"

@@ -20,6 +20,7 @@ use aptos_crypto::{
 use aptos_crypto_derive::CryptoHasher;
 use aptos_infallible::RwLock;
 use bytes::{BufMut, Bytes, BytesMut};
+use hashbrown::{hash_map, HashMap};
 // use aptos_metrics_core::{IntCounterHelper, TimerHelper};
 use move_core_types::{
     account_address::AccountAddress,
@@ -34,7 +35,6 @@ use serde::{Deserialize, Deserializer, Serialize, Serializer};
 use std::{
     borrow::Borrow,
     cmp::Ordering,
-    collections::{hash_map, HashMap},
     convert::TryInto,
     fmt,
     fmt::{Debug, Formatter},
@@ -370,7 +370,7 @@ impl StateKeyRegistry {
         }
     }
 
-    fn hash_address_and_name(address: &AccountAddress, name: &[u8]) -> usize {
+    pub fn hash_address_and_name(address: &AccountAddress, name: &[u8]) -> usize {
         let mut hasher = fxhash::FxHasher::default();
         hasher.write_u8(address.as_ref()[AccountAddress::LENGTH - 1]);
         if !name.is_empty() {
@@ -418,7 +418,8 @@ impl StateKeyRegistry {
     }
 
     fn raw(&self, bytes: &[u8]) -> &TwoLevelRegistry<Vec<u8>, ()> {
-        &self.raw_shards[Self::hash_address_and_name(&AccountAddress::ONE, bytes) % NUM_MODULE_SHARDS]
+        &self.raw_shards
+            [Self::hash_address_and_name(&AccountAddress::ONE, bytes) % NUM_MODULE_SHARDS]
     }
 }
 
