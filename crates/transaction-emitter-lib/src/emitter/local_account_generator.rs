@@ -1,6 +1,6 @@
-use aptos_crypto::ed25519::Ed25519PrivateKey;
 // Copyright © Aptos Foundation
 // SPDX-License-Identifier: Apache-2.0
+use aptos_crypto::ed25519::Ed25519PrivateKey;
 use aptos_sdk::types::{AccountKey, EphemeralKeyPair, KeylessAccount, LocalAccount};
 use aptos_transaction_generator_lib::{AccountType, ReliableTransactionSubmitter};
 use aptos_types::keyless::{
