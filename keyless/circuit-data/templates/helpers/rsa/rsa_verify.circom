@@ -64,10 +64,10 @@ template FpPow65537Mod(n, k) {
 // exp 65537
 template RsaVerifyPkcs1v15(w, nb) {
     //signal input exp[nb];
-    signal input sign[nb];
-    signal input modulus[nb];
+    signal input sign[nb];      // least-significant-limb first
+    signal input modulus[nb];   // least-significant-limb first
 
-    signal input hashed[4];
+    signal input hashed[4];     // least-significant-limb first
 
     // sign ** exp mod modulus
     component pm = FpPow65537Mod(w, nb);
