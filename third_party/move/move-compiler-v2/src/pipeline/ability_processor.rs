@@ -157,6 +157,7 @@ impl<'a> TransferFunctions for CopyDropAnalysis<'a> {
         // Clear local state info
         state.needs_copy.clear();
         state.needs_drop.clear();
+        state.check_drop.clear();
         let live_var = self.live_var.get_info_at(offset);
         let lifetime = self.lifetime.get_info_at(offset);
         let exit_state = self.exit_state.get_state_at(offset);
