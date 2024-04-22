@@ -1,13 +1,12 @@
 // Copyright © Aptos Foundation
 // SPDX-License-Identifier: Apache-2.0
 
-use proptest::std_facade::HashMap;
 use crate::{
     db::{
         get_first_seq_num_and_limit, test_helper,
         test_helper::{
             arb_blocks_to_commit, put_as_state_root, put_transaction_auxiliary_data,
-            put_transaction_infos,
+            put_transaction_infos, update_in_memory_state,
         },
         AptosDB,
     },
@@ -19,35 +18,38 @@ use aptos_config::config::{
     StateMerklePrunerConfig, StorageDirPaths, BUFFERED_STATE_TARGET_ITEMS,
     DEFAULT_MAX_NUM_NODES_PER_LRU_CACHE_SHARD,
 };
-use aptos_crypto::{hash::CryptoHash, HashValue, PrivateKey, Uniform};
+use aptos_crypto::{
+    ed25519::{Ed25519PrivateKey, Ed25519Signature},
+    hash::CryptoHash,
+    HashValue, PrivateKey, Uniform,
+};
+use aptos_executor_types::StateComputeResult;
+use aptos_proptest_helpers::ValueGenerator;
 use aptos_storage_interface::{DbReader, ExecutedTrees, Order};
 use aptos_temppath::TempPath;
 use aptos_types::{
-    ledger_info::LedgerInfoWithSignatures,
-    proof::SparseMerkleLeafNode,
+    chain_id::ChainId,
+    ledger_info::{generate_ledger_info_with_sig, LedgerInfoWithSignatures},
+    on_chain_config::ValidatorSet,
+    proof::{position::Position, SparseMerkleLeafNode},
+    proptest_types::{
+        AccountInfoUniverse, BlockInfoGen, LedgerInfoGen, LedgerInfoWithSignaturesGen,
+        ValidatorSetGen,
+    },
     state_store::{
         state_key::StateKey, state_storage_usage::StateStorageUsage, state_value::StateValue,
     },
     transaction::{
-        ExecutionStatus, TransactionAuxiliaryData, TransactionAuxiliaryDataV1, TransactionInfo,
+        ExecutionStatus, RawTransaction, Script, SignedTransaction, Transaction,
+        TransactionAuxiliaryData, TransactionAuxiliaryDataV1, TransactionInfo, TransactionPayload,
         TransactionToCommit, VMErrorDetail, Version,
     },
     vm_status::StatusCode,
+    write_set::WriteSet,
 };
-use proptest::prelude::*;
-use std::{collections::HashSet, default, sync::Arc};
-use proptest::test_runner::TestRunner;
-use aptos_crypto::ed25519::{Ed25519PrivateKey, Ed25519Signature};
-use aptos_executor_types::StateComputeResult;
-use aptos_types::chain_id::ChainId;
-use aptos_types::ledger_info::generate_ledger_info_with_sig;
-use aptos_types::on_chain_config::ValidatorSet;
-use aptos_types::proof::position::Position;
-use aptos_types::proptest_types::{AccountInfoUniverse, BlockInfoGen, LedgerInfoGen, LedgerInfoWithSignaturesGen, ValidatorSetGen};
-use aptos_types::transaction::{RawTransaction, Script, SignedTransaction, Transaction, TransactionPayload};
-use aptos_types::write_set::WriteSet;
-use move_core_types::account_address::AccountAddress;
-use move_core_types::vm_status::StatusType::Execution;
+use move_core_types::{account_address::AccountAddress, vm_status::StatusType::Execution};
+use proptest::{prelude::*, std_facade::HashMap, test_runner::TestRunner};
+use std::{collections::HashSet, default, ops::DerefMut, sync::Arc};
 use test_helper::{test_save_blocks_impl, test_sync_transactions_impl};
 
 proptest! {
@@ -220,6 +222,77 @@ fn test_get_latest_executed_trees() {
     );
 }
 
+fn create_signed_transaction(gas_unit_price: u64) -> SignedTransaction {
+    let private_key = Ed25519PrivateKey::generate_for_testing();
+    let public_key = private_key.public_key();
+
+    let transaction_payload = TransactionPayload::Script(Script::new(vec![], vec![], vec![]));
+    let raw_transaction = RawTransaction::new(
+        AccountAddress::random(),
+        0,
+        transaction_payload,
+        0,
+        gas_unit_price,
+        0,
+        ChainId::new(10), // This is the value used in aptos testing code.
+    );
+    SignedTransaction::new(
+        raw_transaction,
+        public_key,
+        Ed25519Signature::dummy_signature(),
+    )
+}
+
+#[test]
+fn test_revert_last_commit() {
+    aptos_logger::Logger::new().init();
+
+    let tmp_dir = TempPath::new();
+    let db = AptosDB::new_for_test(&tmp_dir);
+
+    let mut cur_ver: Version = 0;
+    let mut in_memory_state = db.buffered_state().lock().current_state().clone();
+    let _ancestor = in_memory_state.base.clone();
+    let mut val_generator = ValueGenerator::new();
+    let blocks = val_generator.generate(arb_blocks_to_commit());
+    for (txns_to_commit, ledger_info_with_sigs) in &blocks {
+        update_in_memory_state(&mut in_memory_state, txns_to_commit.as_slice());
+        db.save_transactions_for_test(
+            txns_to_commit,
+            cur_ver, /* first_version */
+            cur_ver.checked_sub(1),
+            Some(ledger_info_with_sigs),
+            true, /* sync_commit */
+            in_memory_state.clone(),
+        )
+        .unwrap();
+        cur_ver += txns_to_commit.len() as u64;
+    }
+    println!("committed blocks");
+
+    // Get the latest ledger info before revert
+    let latest_ledger_info_before_revert = db.get_latest_ledger_info().unwrap();
+
+    // Revert the last commit
+    let last_committed_version = latest_ledger_info_before_revert.ledger_info().version();
+    let root_hash = latest_ledger_info_before_revert
+        .commit_info()
+        .executed_state_id();
+    db.revert_last_commit(
+        last_committed_version,
+        root_hash,
+        &latest_ledger_info_before_revert,
+    )
+    .unwrap();
+
+    // Check that the latest ledger info is updated correctly after the revert
+    let latest_ledger_info_after_revert = db.get_latest_ledger_info().unwrap();
+    assert_eq!(
+        latest_ledger_info_after_revert.ledger_info().version(),
+        last_committed_version - 1
+    );
+}
+
 pub fn test_state_merkle_pruning_impl(
     input: Vec<(Vec<TransactionToCommit>, LedgerInfoWithSignatures)>,
 ) {
@@ -324,128 +397,6 @@ pub fn test_state_merkle_pruning_impl(
             .collect();
 
         assert_eq!(expected_nodes, all_nodes);
-    }
-
-    fn create_signed_transaction(gas_unit_price: u64) -> SignedTransaction {
-        let private_key = Ed25519PrivateKey::generate_for_testing();
-        let public_key = private_key.public_key();
-
-        let transaction_payload = TransactionPayload::Script(Script::new(vec![], vec![], vec![]));
-        let raw_transaction = RawTransaction::new(
-            AccountAddress::random(),
-            0,
-            transaction_payload,
-            0,
-            gas_unit_price,
-            0,
-            ChainId::new(10), // This is the value used in aptos testing code.
-        );
-        SignedTransaction::new(raw_transaction, public_key, Ed25519Signature::dummy_signature())
-    }
-
-    #[test]
-    fn test_revert_last_commit() {
-        let tmp_dir = TempPath::new();
-        let db = AptosDB::new_for_test(&tmp_dir);
-
-        // Commit some transactions
-        let txns_to_commit = vec![
-            vec![
-                TransactionToCommit::new(
-                    Transaction::UserTransaction(create_signed_transaction(100)),
-                    TransactionInfo::new_placeholder(
-                        0,
-                        Some(HashValue::random()),
-                        ExecutionStatus::Success,
-                    ),
-                    arr_macro::arr![HashMap::new(); 16],
-                    WriteSet::default(),
-                    Vec::new(),
-                    false,
-                    TransactionAuxiliaryData::default(),
-                ),
-            ],
-            vec![
-                TransactionToCommit::new(
-                    Transaction::UserTransaction(create_signed_transaction(200)),
-                    TransactionInfo::new_placeholder(
-                        1,
-                        Some(HashValue::random()),
-                        ExecutionStatus::Success,
-                    ),
-                    arr_macro::arr![HashMap::new(); 16],
-                    WriteSet::default(),
-                    Vec::new(),
-                    false,
-                    TransactionAuxiliaryData::default(),
-                ),
-            ],
-        ];
-        //let ledger_info_with_sigs = generate_ledger_info_with_sigs(1, &db, None);
-
-        let commit_info_gen_strategy = BlockInfoGen::arbitrary();
-        let commit_info_gen = commit_info_gen_strategy.new_tree(&mut TestRunner::default()).unwrap().current();
-        let ledger_info_gen = LedgerInfoGen {
-            consensus_data_hash: HashValue::random(),
-            commit_info_gen,
-        };
-
-        let block_size: usize = 100;
-        let universe_strategy = AccountInfoUniverse::arbitrary_with(2);
-        let mut universe = universe_strategy.new_tree(&mut TestRunner::default()).unwrap().current();
-        let ledger_info= ledger_info_gen.materialize(&mut universe, block_size);
-        let validator_set = universe.get_validator_set(ledger_info.epoch());
-        let ledger_info_sig = generate_ledger_info_with_sig(validator_set, ledger_info);
-        let mut in_memory_state = db.state_store.buffered_state.lock().current_state().clone();
-        let last_version= 42;
-        db.save_transactions_for_test(
-            &txns_to_commit[0],
-            0,
-            Some(0),
-            Some(&ledger_info_sig),
-            false,
-            in_memory_state.clone(),
-        ).unwrap();
-
-        db.revert_last_commit(0, Default::default(), Some(&ledger_info_sig)).unwrap();
-
-        // Check that the latest version is now one less
-        // assert_eq!(
-        //     db.get_latest_ledger_info().unwrap().ledger_info().version(),
-        //     last_version - 1
-        // );
-
-        let dummy_version = 1;
-        // Check that the transaction at the reverted version is no longer queryable
-        assert!(db
-            .get_transaction_by_version(dummy_version, last_version, false)
-            .unwrap()
-            .events.is_none());
-
-        // Check that the transaction info at the reverted version is no longer queryable
-
-        // @TODO: implement get_transaction_info_by_version on db
-        // assert!(db
-        //     .get_transaction_info_by_version(last_version, false)
-        //     .unwrap()
-        //     .is_none());
-
-        // Check that the events at the reverted version are no longer queryable
-        // @TODO: implement get_events_by_version on db
-        // assert!(db
-        //     .get_events_by_version(last_version, false)
-        //     .unwrap()
-        //     .is_empty());
-
-        // Check that the transaction accumulator is reverted
-        // @TODO implement get_hash_by_version on db
-        // let position = Position::from_postorder_index(last_version).unwrap();
-        // assert!(db
-        //     .ledger_db
-        //     .transaction_accumulator_db()
-        //     .get_hash_by_position(&position)
-        //     .unwrap()
-        //     .is_none());
     }
 }
 

@@ -637,7 +637,7 @@ impl AptosDB {
         &self,
         last_version: Version,
         new_root_hash: HashValue,
-        ledger_info_with_sigs: Option<&LedgerInfoWithSignatures>,
+        ledger_info_with_sigs: &LedgerInfoWithSignatures,
     ) -> Result<()> {
         let _timer = OTHER_TIMERS_SECONDS
             .with_label_values(&["revert_last_commit"])
@@ -708,9 +708,7 @@ impl AptosDB {
             .revert_state_kv_and_ledger_metadata(last_version)?;
 
         // Update the latest ledger info if provided
-        if let Some(x) = ledger_info_with_sigs {
-            self.commit_ledger_info(last_version - 1, new_root_hash, Some(x))?;
-        }
+        self.commit_ledger_info(last_version, new_root_hash, Some(ledger_info_with_sigs))?;
 
         Ok(())
     }
