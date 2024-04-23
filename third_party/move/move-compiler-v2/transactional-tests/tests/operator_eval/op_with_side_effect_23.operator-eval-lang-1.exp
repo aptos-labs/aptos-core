@@ -1,0 +1,40 @@
+comparison between v1 and v2 failed:
+= processed 2 tasks
+= 
+= task 0 'publish'. lines 1-6:
+- warning[W09005]: dead or unreachable code
++ Error: compilation errors:
++  error: Non-empty sequence within the context of the binary operation `+`
+=   ┌─ TEMPFILE:4:9
+=   │
+= 4 │         (abort 0) + {(abort 14); 0} + 0
+-   │         ^^^^^^^^^ Invalid use of a divergent expression. The code following the evaluation of this expression will be dead and should be removed.
+- 
+- warning[W09005]: dead or unreachable code
+-   ┌─ TEMPFILE:4:22
++   │         ^^^^^^^^^^^^^^^^^^^^^^^^^^^
++   │         │           │
++   │         │           non-empty sequence
++   │         binary operation `+`
+=   │
+- 4 │         (abort 0) + {(abort 14); 0} + 0
+-   │                      ^^^^^^^^^^ Unreachable code. This statement (and any following statements) will not be executed.
++   = To compile this code, either:
++   = 1. upgrade to language version 2.0 or above,
++   = 2. rewrite the code to remove sequences from directly within binary operations,
++   =    e.g., save intermediate results providing explicit order.
+= 
+= 
+= 
+= task 1 'run'. lines 8-8:
+= Error: Function execution failed with VMError: {
+-     major_status: ABORTED,
+-     sub_status: Some(0),
+-     location: 0xc0ffee::m,
++     major_status: LINKER_ERROR,
++     sub_status: None,
++     location: undefined,
+=     indices: redacted,
+=     offsets: redacted,
+= }
+= 

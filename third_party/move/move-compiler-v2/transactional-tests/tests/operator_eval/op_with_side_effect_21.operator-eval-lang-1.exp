@@ -1,0 +1,83 @@
+comparison between v1 and v2 failed:
+= processed 3 tasks
+= 
++ task 0 'publish'. lines 1-17:
++ Error: compilation errors:
++  error: Non-empty sequence within the context of the binary operation `+`
++   ┌─ TEMPFILE:9:9
++   │
++ 9 │         inc(&mut x) + { inc(&mut x); inc(&mut x) + inc(&mut x) } + { inc(&mut x); inc(&mut x); inc(&mut x) }
++   │         ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
++   │         │             │
++   │         │             non-empty sequence
++   │         binary operation `+`
++   │
++   = To compile this code, either:
++   = 1. upgrade to language version 2.0 or above,
++   = 2. rewrite the code to remove sequences from directly within binary operations,
++   =    e.g., save intermediate results providing explicit order.
++ 
++ error: Non-empty sequence within the context of the binary operation `+`
++   ┌─ TEMPFILE:9:9
++   │
++ 9 │         inc(&mut x) + { inc(&mut x); inc(&mut x) + inc(&mut x) } + { inc(&mut x); inc(&mut x); inc(&mut x) }
++   │         ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
++   │         │                                                          │
++   │         │                                                          non-empty sequence
++   │         binary operation `+`
++   │
++   = To compile this code, either:
++   = 1. upgrade to language version 2.0 or above,
++   = 2. rewrite the code to remove sequences from directly within binary operations,
++   =    e.g., save intermediate results providing explicit order.
++ 
++ error: Non-empty sequence within the context of the binary operation `+`
++    ┌─ TEMPFILE:13:9
++    │
++ 13 │         inc(&mut {x = x + 1; x}) + { inc(&mut x); inc(&mut x) + inc(&mut x) } + { inc(&mut x); inc(&mut x); inc(&mut x) }
++    │         ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
++    │         │        │
++    │         │        non-empty sequence
++    │         binary operation `+`
++    │
++    = To compile this code, either:
++    = 1. upgrade to language version 2.0 or above,
++    = 2. rewrite the code to remove sequences from directly within binary operations,
++    =    e.g., save intermediate results providing explicit order.
++ 
++ error: Non-empty sequence within the context of the binary operation `+`
++    ┌─ TEMPFILE:13:9
++    │
++ 13 │         inc(&mut {x = x + 1; x}) + { inc(&mut x); inc(&mut x) + inc(&mut x) } + { inc(&mut x); inc(&mut x); inc(&mut x) }
++    │         ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
++    │         │                                                                       │
++    │         │                                                                       non-empty sequence
++    │         binary operation `+`
++    │
++    = To compile this code, either:
++    = 1. upgrade to language version 2.0 or above,
++    = 2. rewrite the code to remove sequences from directly within binary operations,
++    =    e.g., save intermediate results providing explicit order.
++ 
++ 
++ 
+= task 1 'run'. lines 19-19:
+- return values: 26
++ Error: Function execution failed with VMError: {
++     major_status: LINKER_ERROR,
++     sub_status: None,
++     location: undefined,
++     indices: redacted,
++     offsets: redacted,
++ }
+= 
+= task 2 'run'. lines 21-21:
+- return values: 24
++ Error: Function execution failed with VMError: {
++     major_status: LINKER_ERROR,
++     sub_status: None,
++     location: undefined,
++     indices: redacted,
++     offsets: redacted,
++ }
+= 

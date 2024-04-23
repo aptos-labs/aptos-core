@@ -1,0 +1,83 @@
+comparison between v1 and v2 failed:
+= processed 3 tasks
+= 
++ task 0 'publish'. lines 1-26:
++ Error: compilation errors:
++  error: Non-empty sequence within the context of the binary operation `+`
++   ┌─ TEMPFILE:8:9
++   │
++ 8 │         x + add3(x, {x = inc(&mut x); add3(x, {x = x + 1; x}, {x = x + 1; x})}, {x = inc(&mut x); add3({x = x + 1; x}, x, {x = x + 1; x})}) + {x = inc(&mut x) + 1; x}
++   │         ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
++   │         │           │
++   │         │           non-empty sequence
++   │         binary operation `+`
++   │
++   = To compile this code, either:
++   = 1. upgrade to language version 2.0 or above,
++   = 2. rewrite the code to remove sequences from directly within binary operations,
++   =    e.g., save intermediate results providing explicit order.
++ 
++ error: Non-empty sequence within the context of the binary operation `+`
++   ┌─ TEMPFILE:8:9
++   │
++ 8 │         x + add3(x, {x = inc(&mut x); add3(x, {x = x + 1; x}, {x = x + 1; x})}, {x = inc(&mut x); add3({x = x + 1; x}, x, {x = x + 1; x})}) + {x = inc(&mut x) + 1; x}
++   │         ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
++   │         │                                                                                                                                     │
++   │         │                                                                                                                                     non-empty sequence
++   │         binary operation `+`
++   │
++   = To compile this code, either:
++   = 1. upgrade to language version 2.0 or above,
++   = 2. rewrite the code to remove sequences from directly within binary operations,
++   =    e.g., save intermediate results providing explicit order.
++ 
++ error: Non-empty sequence within the context of the binary operation `+`
++    ┌─ TEMPFILE:20:9
++    │
++ 20 │         x + add3(x, {x = inc_by(&mut x, 3); add3(x, {x = x + 1; x}, {x = x + 1; x})}, {x = inc(&mut x); add3({x = x + 1; x}, x, {x = x + 1; x})}) + {x = inc_by(&mut x, 47) + 1; x}
++    │         ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
++    │         │           │
++    │         │           non-empty sequence
++    │         binary operation `+`
++    │
++    = To compile this code, either:
++    = 1. upgrade to language version 2.0 or above,
++    = 2. rewrite the code to remove sequences from directly within binary operations,
++    =    e.g., save intermediate results providing explicit order.
++ 
++ error: Non-empty sequence within the context of the binary operation `+`
++    ┌─ TEMPFILE:20:9
++    │
++ 20 │         x + add3(x, {x = inc_by(&mut x, 3); add3(x, {x = x + 1; x}, {x = x + 1; x})}, {x = inc(&mut x); add3({x = x + 1; x}, x, {x = x + 1; x})}) + {x = inc_by(&mut x, 47) + 1; x}
++    │         ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
++    │         │                                                                                                                                           │
++    │         │                                                                                                                                           non-empty sequence
++    │         binary operation `+`
++    │
++    = To compile this code, either:
++    = 1. upgrade to language version 2.0 or above,
++    = 2. rewrite the code to remove sequences from directly within binary operations,
++    =    e.g., save intermediate results providing explicit order.
++ 
++ 
++ 
+= task 1 'run'. lines 28-28:
+- return values: 49
++ Error: Function execution failed with VMError: {
++     major_status: LINKER_ERROR,
++     sub_status: None,
++     location: undefined,
++     indices: redacted,
++     offsets: redacted,
++ }
+= 
+= task 2 'run'. lines 30-30:
+- return values: 203
++ Error: Function execution failed with VMError: {
++     major_status: LINKER_ERROR,
++     sub_status: None,
++     location: undefined,
++     indices: redacted,
++     offsets: redacted,
++ }
+= 
