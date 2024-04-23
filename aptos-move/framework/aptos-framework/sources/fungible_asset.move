@@ -442,7 +442,7 @@ module aptos_framework::fungible_asset {
     public fun is_dispatchable<T: key>(store: Object<T>): bool acquires FungibleStore {
         let fa_store = borrow_store_resource(&store);
         let metadata_addr = object::object_address(&fa_store.metadata);
-        exists<DispatchFunctionStore>(metadata_addr)
+        metadata_addr != @aptos_fungible_asset && exists<DispatchFunctionStore>(metadata_addr)
     }
 
     public(friend) fun deposit_dispatch_function<T: key>(store: Object<T>): FunctionInfo acquires FungibleStore, DispatchFunctionStore {
