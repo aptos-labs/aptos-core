@@ -177,6 +177,8 @@ impl DagDriver {
 
         self.dag.add_node(node)?;
 
+        self.check_new_round();
+
         Ok(())
     }
 
