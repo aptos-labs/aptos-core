@@ -304,7 +304,13 @@ struct TwoLevelRegistry<Key1, Key2> {
     // FIXME(aldenhu): remove
     #[allow(dead_code)]
     key_type: &'static str,
-    inner: RwLock<HashMap<PreHashed<Key1>, HashMap<PreHashed<Key2>, Weak<Entry>>>>,
+    inner: RwLock<
+        HashMap<
+            PreHashed<Key1>,
+            HashMap<PreHashed<Key2>, Weak<Entry>, nohash_hasher::BuildNoHashHasher<u64>>,
+            nohash_hasher::BuildNoHashHasher<u64>,
+        >,
+    >,
 }
 
 impl<Key1, Key2> TwoLevelRegistry<Key1, Key2>
@@ -315,7 +321,9 @@ where
     fn new_empty(key_type: &'static str) -> Self {
         Self {
             key_type,
-            inner: RwLock::new(HashMap::new()),
+            inner: RwLock::new(HashMap::with_hasher(
+                nohash_hasher::BuildNoHashHasher::default(),
+            )),
         }
     }
 
