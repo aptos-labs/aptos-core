@@ -407,6 +407,48 @@ fn single_neg_one_array_test() {
 }*/
 
 #[test]
+fn check_substr_inclusion_poly_test() {
+    let circuit_handle = TestCircuitHandle::new("check_substr_inclusion_poly_test.circom").unwrap();
+
+    let max_str_len = 100;
+    let max_substr_len = 20;
+    let config = CircuitPaddingConfig::new().max_length("str", max_str_len).max_length("substr", max_substr_len);
+    let string = "Hello World!";
+    let string_hash = poseidon_bn254::pad_and_hash_string(&string, max_str_len).unwrap();
+    let substring = "lo Wor";
+    let substring_len = substring.len();
+    let start_index = 3;
+
+
+    let circuit_input_signals = CircuitInputSignals::new().str_input("str", string).str_input("substr", substring).u64_input("substr_len", substring_len as u64).u64_input("start_index", start_index).fr_input("str_hash", string_hash).pad(&config).unwrap();
+
+    let result = circuit_handle.gen_witness(circuit_input_signals);
+    assert!(result.is_ok());
+}
+
+#[test]
+fn check_substr_inclusion_poly_boolean_test() {
+    let circuit_handle = TestCircuitHandle::new("check_substr_inclusion_poly_boolean_test.circom").unwrap();
+
+    let max_str_len = 100;
+    let max_substr_len = 20;
+    let config = CircuitPaddingConfig::new().max_length("str", max_str_len).max_length("substr", max_substr_len);
+    let string = "Hello World!";
+    let string_hash = poseidon_bn254::pad_and_hash_string(&string, max_str_len).unwrap();
+    let substring = "lo Wor";
+    let substring_len = substring.len();
+    let start_index = 3;
+    let expected_output = 1;
+
+
+    let circuit_input_signals = CircuitInputSignals::new().str_input("str", string).str_input("substr", substring).u64_input("substr_len", substring_len as u64).u64_input("start_index", start_index).fr_input("str_hash", string_hash).u64_input("expected_output", expected_output).pad(&config).unwrap();
+
+
+    let result = circuit_handle.gen_witness(circuit_input_signals);
+    assert!(result.is_ok());
+}
+
+#[test]
 fn concatenation_check_test() {
     let circuit_handle = TestCircuitHandle::new("concatenation_check_test.circom").unwrap();
 
