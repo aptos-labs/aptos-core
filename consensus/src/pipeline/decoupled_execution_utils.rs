@@ -36,6 +36,7 @@ pub fn prepare_phases_and_buffer_manager(
     sync_rx: UnboundedReceiver<ResetRequest>,
     epoch_state: Arc<EpochState>,
     bounded_executor: BoundedExecutor,
+    broadcast_commit_votes: bool,
 ) -> (
     PipelinePhase<ExecutionSchedulePhase>,
     PipelinePhase<ExecutionWaitPhase>,
@@ -119,6 +120,7 @@ pub fn prepare_phases_and_buffer_manager(
             ongoing_tasks,
             reset_flag.clone(),
             bounded_executor,
+            broadcast_commit_votes,
         ),
     )
 }
