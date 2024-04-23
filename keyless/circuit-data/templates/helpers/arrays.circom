@@ -1,11 +1,9 @@
 pragma circom 2.1.3;
 
 include "../../node_modules/circomlib/circuits/multiplexer.circom";
+include "../../node_modules/circomlib/circuits/comparators.circom";
 include "helpers/hashtofield.circom";
 include "helpers/misc.circom";
-include "../node_modules/circomlib/circuits/bitify.circom";
-include "../node_modules/circomlib/circuits/gates.circom";
-
 
 // Outputs a bit array where indices [start_index, end_index) (inclusive of start_index, exclusive of end_index) are all 1, and all other bits are 0. Does not work if end_index is greater than `len`
 template ArraySelector(len) {
@@ -45,8 +43,12 @@ template LeftArraySelector(len) {
     signal output out[len];
 
     signal bits[len] <== SingleOneArray(len)(index);
+    var sum;
+    for (var i = 0; i < len; i++) {
+        sum = sum + bits[i];
+    }
 
-    out[len-1] <== 0;
+    out[len-1] <== 1 - sum;
     for (var i = len-2; i >= 0; i--) {
         out[i] <== out[i+1] + bits[i+1];
     }
@@ -69,7 +71,6 @@ template RightArraySelector(len) {
 // Returns a bit array `out` with a 1 at index `index`, and 0s everywhere else
 template SingleOneArray(len) {
     signal input index;
-    assert(index < len);
 
     signal output out[len];
     signal success;
@@ -81,7 +82,9 @@ template SingleOneArray(len) {
         lc = lc + out[i];
     }
     lc ==> success;
-    success === 1;
+    // support array sizes up to a million. Being conservative here b/c according to Michael this template is very cheap
+    signal should_be_all_zeros <== GreaterEqThan(20)([index, len]);
+    success === 1 * (1 - should_be_all_zeros);
 }
 
 // Given an array 'arr', returns the value at index `index`
