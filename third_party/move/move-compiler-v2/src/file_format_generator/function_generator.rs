@@ -554,6 +554,7 @@ impl<'a> FunctionGenerator<'a> {
             | Operation::PackRef
             | Operation::UnpackRefDeep
             | Operation::PackRefDeep => fun_ctx.internal_error("unexpected specification opcode"),
+            _ => unimplemented!("operation {:?}", oper),
         }
     }
 

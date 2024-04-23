@@ -13,7 +13,7 @@ use move_model::{
         QualifiedInstId, StructId,
     },
     symbol::Symbol,
-    ty::{PrimitiveType, ReferenceKind, Type},
+    ty::{PrimitiveType, ReferenceKind, Type}, well_known,
 };
 use move_stackless_bytecode::{
     function_target::FunctionData,
@@ -209,7 +209,25 @@ impl<'env> Generator<'env> {
         sources: Vec<TempIndex>,
         source_node_ids: Vec<NodeId>,
     ) {
-        self.emit_with(id, target_node_ids, source_node_ids, |attr| {
+        self.emit_with(id, |attr| {
+            // match oper {
+            //     BytecodeOperation::Function(mid, fid, _) => {
+            //         let mod_env = self.env().get_module(mid);
+            //         let mod_name = mod_env.get_name();
+            //         if mod_name.addr() == &self.env().get_stdlib_address() {
+            //             let symbol_pool = self.env().symbol_pool();
+            //             let mod_name_str = symbol_pool.string(mod_name.name());
+            //             if mod_name_str.as_str() == well_known::VECTOR_MODULE {
+            //                 let fun_name = mod_env.get_function(fid).get_name_str();
+            //                 // match fun_name.as_str() {
+            //                 //     "empty" =>
+            //                 // }
+            //             }
+            //         }
+            //         todo!()
+            //     },
+            //     _ => Bytecode::Call(attr, targets, oper, sources, None),
+            // }
             Bytecode::Call(attr, targets, oper, sources, None)
         })
     }
