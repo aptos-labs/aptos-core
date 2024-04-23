@@ -352,6 +352,7 @@ fn select_array_value_small_test() {
     assert!(result.is_ok());
 }
 
+
 #[test]
 #[should_panic]
 fn select_array_value_test_wrong_index() {
@@ -366,7 +367,33 @@ fn select_array_value_test_wrong_index() {
     assert!(result.is_ok());
 }
 
+fn build_single_neg_one_array_output(len: u32, index: u32) -> Vec<Fr> {
+    let mut output = Vec::new();
+    for _ in 0..index {
+        output.push(Fr::zero());
+    };
+    output.push(Fr::zero()-Fr::one());
+    for _ in index+2..len {
+        output.push(Fr::zero());
+    };
+    output
+}
+
 #[test]
+fn single_neg_one_array_test() {
+    let circuit_handle = TestCircuitHandle::new("single_neg_one_array_test.circom").unwrap();
+    let out_len = 8;
+    for index in 0..out_len {
+        let output = build_single_neg_one_array_output(out_len, index);
+        let config = CircuitPaddingConfig::new().max_length("expected_output", out_len as usize);
+        let circuit_input_signals = CircuitInputSignals::new().u64_input("index", index as u64).frs_input("expected_output", &output).pad(&config).unwrap();
+     
+        let result = circuit_handle.gen_witness(circuit_input_signals);
+        assert!(result.is_ok());
+    }
+}
+
+/*#[test]
 fn single_neg_one_array_test() {
     let circuit_handle = TestCircuitHandle::new("single_neg_one_array_test.circom").unwrap();
     let output = [Fr::zero(), Fr::zero(), Fr::zero()-Fr::one(), Fr::zero(), Fr::zero(), Fr::zero(), Fr::zero(), Fr::zero()]; //[0,0,-1,0,0,0,0,0];
@@ -377,7 +404,7 @@ fn single_neg_one_array_test() {
      
     let result = circuit_handle.gen_witness(circuit_input_signals);
     assert!(result.is_ok());
-}
+}*/
 
 #[test]
 fn concatenation_check_test() {
