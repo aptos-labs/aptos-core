@@ -65,7 +65,7 @@ impl TShare for Share {
             WVUF::verify_share(
                 &rand_config.vuf_pp,
                 apk,
-                rand_metadata.to_bytes().as_slice(),
+                bcs::to_bytes(&rand_metadata).unwrap().as_slice(),
                 &self.share,
             )?;
         } else {
@@ -83,7 +83,10 @@ impl TShare for Share {
         Self: Sized,
     {
         let share = Share {
-            share: WVUF::create_share(&rand_config.keys.ask, rand_metadata.to_bytes().as_slice()),
+            share: WVUF::create_share(
+                &rand_config.keys.ask,
+                bcs::to_bytes(&rand_metadata).unwrap().as_slice(),
+            ),
         };
         RandShare::new(rand_config.author(), rand_metadata, share)
     }
@@ -92,36 +95,53 @@ impl TShare for Share {
         shares: impl Iterator<Item = &'a RandShare<Self>>,
         rand_config: &RandConfig,
         rand_metadata: RandMetadata,
-    ) -> Randomness
+    ) -> anyhow::Result<Randomness>
     where
         Self: Sized,
     {
         let timer = std::time::Instant::now();
         let mut apks_and_proofs = vec![];
         for share in shares {
-            let id = *rand_config
+            let id = rand_config
                 .validator
                 .address_to_validator_index()
                 .get(share.author())
-                .unwrap();
-            let apk = rand_config.get_certified_apk(share.author()).unwrap(); // needs to have apk to verify the share
+                .copied()
+                .ok_or_else(|| {
+                    anyhow!(
+                        "Share::aggregate failed with invalid share author: {}",
+                        share.author
+                    )
+                })?;
+            let apk = rand_config
+                .get_certified_apk(share.author())
+                .ok_or_else(|| {
+                    anyhow!(
+                        "Share::aggregate failed with missing apk for share from {}",
+                        share.author
+                    )
+                })?;
             apks_and_proofs.push((Player { id }, apk.clone(), share.share().share));
         }
 
         let proof = WVUF::aggregate_shares(&rand_config.wconfig, &apks_and_proofs);
+        let metadata_serialized = bcs::to_bytes(&rand_metadata).map_err(|e| {
+            anyhow!("Share::aggregate failed with metadata serialization error: {e}")
+        })?;
         let eval = WVUF::derive_eval(
             &rand_config.wconfig,
             &rand_config.vuf_pp,
-            rand_metadata.to_bytes().as_slice(),
+            metadata_serialized.as_slice(),
             &rand_config.get_all_certified_apk(),
             &proof,
             THREAD_MANAGER.get_exe_cpu_pool(),
         )
-        .expect("All APK should exist");
+        .map_err(|e| anyhow!("Share::aggregate failed with WVUF derive_eval error: {e}"))?;
         debug!("WVUF derivation time: {} ms", timer.elapsed().as_millis());
-        let eval_bytes = bcs::to_bytes(&eval).unwrap();
+        let eval_bytes = bcs::to_bytes(&eval)
+            .map_err(|e| anyhow!("Share::aggregate failed with eval serialization error: {e}"))?;
         let rand_bytes = Sha3_256::digest(eval_bytes.as_slice()).to_vec();
-        Randomness::new(rand_metadata.clone(), rand_bytes)
+        Ok(Randomness::new(rand_metadata, rand_bytes))
     }
 }
 
@@ -213,11 +233,11 @@ impl TShare for MockShare {
         _shares: impl Iterator<Item = &'a RandShare<Self>>,
         _rand_config: &RandConfig,
         rand_metadata: RandMetadata,
-    ) -> Randomness
+    ) -> anyhow::Result<Randomness>
     where
         Self: Sized,
     {
-        Randomness::new(rand_metadata, vec![])
+        Ok(Randomness::new(rand_metadata, vec![]))
     }
 }
 
@@ -265,7 +285,7 @@ pub trait TShare:
         shares: impl Iterator<Item = &'a RandShare<Self>>,
         rand_config: &RandConfig,
         rand_metadata: RandMetadata,
-    ) -> Randomness
+    ) -> anyhow::Result<Randomness>
     where
         Self: Sized;
 }
@@ -328,11 +348,11 @@ impl<S: TShare> RandShare<S> {
     }
 
     pub fn round(&self) -> Round {
-        self.metadata.round()
+        self.metadata.round
     }
 
     pub fn epoch(&self) -> u64 {
-        self.metadata.epoch()
+        self.metadata.epoch
     }
 
     pub fn verify(&self, rand_config: &RandConfig) -> anyhow::Result<()> {
@@ -350,24 +370,20 @@ impl<S: TShare> RandShare<S> {
 
 #[derive(Clone, Serialize, Deserialize)]
 pub struct RequestShare {
-    epoch: u64,
-    rand_metadata: RandMetadata,
+    metadata: RandMetadata,
 }
 
 impl RequestShare {
-    pub fn new(epoch: u64, rand_metadata: RandMetadata) -> Self {
-        Self {
-            epoch,
-            rand_metadata,
-        }
+    pub fn new(metadata: RandMetadata) -> Self {
+        Self { metadata }
     }
 
     pub fn epoch(&self) -> u64 {
-        self.epoch
+        self.metadata.epoch
     }
 
     pub fn rand_metadata(&self) -> &RandMetadata {
-        &self.rand_metadata
+        &self.metadata
     }
 }
 

@@ -56,13 +56,9 @@ pub(super) fn create_share_for_round(
     round: Round,
     author: Author,
 ) -> RandShare<MockShare> {
-    RandShare::<MockShare>::new(
-        author,
-        RandMetadata::new(epoch, round, HashValue::zero(), 1700000000),
-        MockShare,
-    )
+    RandShare::<MockShare>::new(author, RandMetadata { epoch, round }, MockShare)
 }
 
-pub(super) fn create_share(rand_metadata: RandMetadata, author: Author) -> RandShare<MockShare> {
-    RandShare::<MockShare>::new(author, rand_metadata, MockShare)
+pub(super) fn create_share(metadata: RandMetadata, author: Author) -> RandShare<MockShare> {
+    RandShare::<MockShare>::new(author, metadata, MockShare)
 }
