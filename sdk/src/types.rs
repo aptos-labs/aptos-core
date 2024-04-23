@@ -140,12 +140,9 @@ impl LocalAccount {
         let key = AccountKey::from_private_key(Ed25519PrivateKey::try_from(
             hex::decode(private_key.trim_start_matches("0x"))?.as_ref(),
         )?);
+        let address = key.authentication_key().account_address();
 
-        Ok(Self {
-            address: key.authentication_key().account_address(),
-            key,
-            sequence_number: AtomicU64::new(sequence_number),
-        })
+        Ok(Self::new(address, key, sequence_number))
     }
 
     /// Generate a new account locally. Note: This function does not actually
