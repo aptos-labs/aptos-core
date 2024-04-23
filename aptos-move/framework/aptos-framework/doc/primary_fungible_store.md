@@ -26,6 +26,8 @@ fungible asset to it. This emits an deposit event.
 -  [Function `primary_store`](#0x1_primary_fungible_store_primary_store)
 -  [Function `primary_store_exists`](#0x1_primary_fungible_store_primary_store_exists)
 -  [Function `balance`](#0x1_primary_fungible_store_balance)
+-  [Function `apt_balance`](#0x1_primary_fungible_store_apt_balance)
+-  [Function `burn_from_apt`](#0x1_primary_fungible_store_burn_from_apt)
 -  [Function `is_frozen`](#0x1_primary_fungible_store_is_frozen)
 -  [Function `withdraw`](#0x1_primary_fungible_store_withdraw)
 -  [Function `deposit`](#0x1_primary_fungible_store_deposit)
@@ -303,6 +305,66 @@ Get the balance of <code><a href="account.md#0x1_account">account</a></code>'s p
     } <b>else</b> {
         0
     }
+}
+</code></pre>
+
+
+
+</details>
+
+<a id="0x1_primary_fungible_store_apt_balance"></a>
+
+## Function `apt_balance`
+
+
+
+<pre><code>#[view]
+<b>public</b> <b>fun</b> <a href="primary_fungible_store.md#0x1_primary_fungible_store_apt_balance">apt_balance</a>(<a href="account.md#0x1_account">account</a>: <b>address</b>): u64
+</code></pre>
+
+
+
+<details>
+<summary>Implementation</summary>
+
+
+<pre><code><b>public</b> <b>fun</b> <a href="primary_fungible_store.md#0x1_primary_fungible_store_apt_balance">apt_balance</a>(<a href="account.md#0x1_account">account</a>: <b>address</b>): u64 {
+    <b>let</b> store_addr = <a href="transaction_context.md#0x1_transaction_context_create_user_derived_object_address">transaction_context::create_user_derived_object_address</a>(<a href="account.md#0x1_account">account</a>, @aptos_fungible_asset);
+    <a href="fungible_asset.md#0x1_fungible_asset_balance_from_address">fungible_asset::balance_from_address</a>(store_addr)
+}
+</code></pre>
+
+
+
+</details>
+
+<a id="0x1_primary_fungible_store_burn_from_apt"></a>
+
+## Function `burn_from_apt`
+
+
+
+<pre><code><b>public</b>(<b>friend</b>) <b>fun</b> <a href="primary_fungible_store.md#0x1_primary_fungible_store_burn_from_apt">burn_from_apt</a>(<a href="account.md#0x1_account">account</a>: <b>address</b>, amount: u64)
+</code></pre>
+
+
+
+<details>
+<summary>Implementation</summary>
+
+
+<pre><code><b>public</b>(<b>friend</b>) <b>fun</b> <a href="primary_fungible_store.md#0x1_primary_fungible_store_burn_from_apt">burn_from_apt</a>(
+    <a href="account.md#0x1_account">account</a>: <b>address</b>,
+    amount: u64,
+) {
+    // Skip burning <b>if</b> amount is zero. This shouldn't <a href="../../aptos-stdlib/../move-stdlib/doc/error.md#0x1_error">error</a> out <b>as</b> it's called <b>as</b> part of transaction fee burning.
+    <b>if</b> (amount == 0) {
+        <b>return</b>
+    };
+
+    <b>let</b> store_addr = <a href="transaction_context.md#0x1_transaction_context_create_user_derived_object_address">transaction_context::create_user_derived_object_address</a>(<a href="account.md#0x1_account">account</a>, @aptos_fungible_asset);
+    <b>let</b> fa = <a href="fungible_asset.md#0x1_fungible_asset_withdraw_internal">fungible_asset::withdraw_internal</a>(store_addr, amount);
+    <a href="fungible_asset.md#0x1_fungible_asset_burn_internal">fungible_asset::burn_internal</a>(fa);
 }
 </code></pre>
 

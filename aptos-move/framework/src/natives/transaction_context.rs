@@ -130,12 +130,12 @@ fn native_create_user_derived_object_address(
     let derive_from = safely_pop_arg!(args, AccountAddress);
     let source = safely_pop_arg!(args, AccountAddress);
 
-    let derived_address = transaction_context.derived_addresses.borrow_mut().entry((derive_from, source)).or_insert_with(|| {
+    let derived_address = *transaction_context.derived_addresses.borrow_mut().entry((derive_from, source)).or_insert_with(|| {
         let mut bytes = source.to_vec();
         bytes.append(&mut derive_from.to_vec());
         bytes.push(0xFC);
         AccountAddress::from_bytes(aptos_crypto::hash::HashValue::sha3_256_of(&bytes).to_vec()).unwrap()
-    }).clone();
+    });
 
     Ok(smallvec![Value::address(derived_address)])
 }

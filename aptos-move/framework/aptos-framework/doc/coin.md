@@ -69,7 +69,6 @@ This module provides the foundation for typesafe Coins.
 -  [Function `coin_supply`](#0x1_coin_coin_supply)
 -  [Function `burn`](#0x1_coin_burn)
 -  [Function `burn_from`](#0x1_coin_burn_from)
--  [Function `burn_from_apt`](#0x1_coin_burn_from_apt)
 -  [Function `deposit`](#0x1_coin_deposit)
 -  [Function `migrated_primary_fungible_store_exists`](#0x1_coin_migrated_primary_fungible_store_exists)
 -  [Function `force_deposit`](#0x1_coin_force_deposit)
@@ -2444,44 +2443,6 @@ Note: This bypasses CoinStore::frozen -- coins within a frozen CoinStore can be 
     <b>let</b> fa = <a href="fungible_asset.md#0x1_fungible_asset_withdraw_internal">fungible_asset::withdraw_internal</a>(store_addr, amount);
     <a href="fungible_asset.md#0x1_fungible_asset_burn_internal">fungible_asset::burn_internal</a>(fa);
     // };
-}
-</code></pre>
-
-
-
-</details>
-
-<a id="0x1_coin_burn_from_apt"></a>
-
-## Function `burn_from_apt`
-
-
-
-<pre><code><b>public</b> <b>fun</b> <a href="coin.md#0x1_coin_burn_from_apt">burn_from_apt</a>&lt;CoinType&gt;(account_addr: <b>address</b>, amount: u64, burn_cap: &<a href="coin.md#0x1_coin_BurnCapability">coin::BurnCapability</a>&lt;CoinType&gt;)
-</code></pre>
-
-
-
-<details>
-<summary>Implementation</summary>
-
-
-<pre><code><b>public</b> <b>fun</b> <a href="coin.md#0x1_coin_burn_from_apt">burn_from_apt</a>&lt;CoinType&gt;(
-    account_addr: <b>address</b>,
-    amount: u64,
-    burn_cap: &<a href="coin.md#0x1_coin_BurnCapability">BurnCapability</a>&lt;CoinType&gt;,
-) {
-    // Skip burning <b>if</b> amount is zero. This shouldn't <a href="../../aptos-stdlib/../move-stdlib/doc/error.md#0x1_error">error</a> out <b>as</b> it's called <b>as</b> part of transaction fee burning.
-    <b>if</b> (amount == 0) {
-        <b>return</b>
-    };
-    <b>let</b> apt_fa = <a href="coin.md#0x1_coin_apt_fa_metadata">apt_fa_metadata</a>();
-    <b>let</b> store_addr = <a href="primary_fungible_store.md#0x1_primary_fungible_store_primary_store_address">primary_fungible_store::primary_store_address</a>(
-        account_addr,
-        apt_fa
-    );
-    <b>let</b> fa = <a href="fungible_asset.md#0x1_fungible_asset_withdraw_internal">fungible_asset::withdraw_internal</a>(store_addr, amount);
-    <a href="fungible_asset.md#0x1_fungible_asset_burn_internal">fungible_asset::burn_internal</a>(fa);
 }
 </code></pre>
 

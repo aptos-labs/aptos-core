@@ -31,11 +31,8 @@
 <pre><code><b>use</b> <a href="account.md#0x1_account">0x1::account</a>;
 <b>use</b> <a href="../../aptos-stdlib/../move-stdlib/doc/bcs.md#0x1_bcs">0x1::bcs</a>;
 <b>use</b> <a href="chain_id.md#0x1_chain_id">0x1::chain_id</a>;
-<b>use</b> <a href="coin.md#0x1_coin">0x1::coin</a>;
 <b>use</b> <a href="../../aptos-stdlib/../move-stdlib/doc/error.md#0x1_error">0x1::error</a>;
 <b>use</b> <a href="../../aptos-stdlib/../move-stdlib/doc/features.md#0x1_features">0x1::features</a>;
-<b>use</b> <a href="fungible_asset.md#0x1_fungible_asset">0x1::fungible_asset</a>;
-<b>use</b> <a href="object.md#0x1_object">0x1::object</a>;
 <b>use</b> <a href="primary_fungible_store.md#0x1_primary_fungible_store">0x1::primary_fungible_store</a>;
 <b>use</b> <a href="../../aptos-stdlib/../move-stdlib/doc/signer.md#0x1_signer">0x1::signer</a>;
 <b>use</b> <a href="system_addresses.md#0x1_system_addresses">0x1::system_addresses</a>;
@@ -338,14 +335,14 @@ Only called during genesis to initialize system resources for this module.
         );
     };
 
-    <b>let</b> apt_fa = <a href="coin.md#0x1_coin_apt_fa_metadata">coin::apt_fa_metadata</a>(); // ensure_paired_metadata&lt;AptosCoin&gt;();
+    // <b>let</b> apt_fa = <a href="coin.md#0x1_coin_apt_fa_metadata">coin::apt_fa_metadata</a>(); // ensure_paired_metadata&lt;AptosCoin&gt;();
 
     <b>let</b> max_transaction_fee = txn_gas_price * txn_max_gas_units;
     // <b>assert</b>!(
     //     <a href="primary_fungible_store.md#0x1_primary_fungible_store_primary_store_exists">primary_fungible_store::primary_store_exists</a>(gas_payer, apt_fa),
     //     <a href="../../aptos-stdlib/../move-stdlib/doc/error.md#0x1_error_invalid_argument">error::invalid_argument</a>(<a href="transaction_validation.md#0x1_transaction_validation_PROLOGUE_ECANT_PAY_GAS_DEPOSIT">PROLOGUE_ECANT_PAY_GAS_DEPOSIT</a>),
     // );
-    <b>let</b> balance = <a href="primary_fungible_store.md#0x1_primary_fungible_store_balance">primary_fungible_store::balance</a>(gas_payer, apt_fa);
+    <b>let</b> balance = <a href="primary_fungible_store.md#0x1_primary_fungible_store_apt_balance">primary_fungible_store::apt_balance</a>(gas_payer);
     // <b>let</b> balance = <a href="coin.md#0x1_coin_balance">coin::balance</a>&lt;AptosCoin&gt;(gas_payer);
     <b>assert</b>!(balance &gt;= max_transaction_fee, <a href="../../aptos-stdlib/../move-stdlib/doc/error.md#0x1_error_invalid_argument">error::invalid_argument</a>(<a href="transaction_validation.md#0x1_transaction_validation_PROLOGUE_ECANT_PAY_GAS_DEPOSIT">PROLOGUE_ECANT_PAY_GAS_DEPOSIT</a>));
 }
@@ -606,9 +603,9 @@ Called by the Adapter
     <b>let</b> transaction_fee_amount = txn_gas_price * gas_used;
     // it's important <b>to</b> maintain the <a href="../../aptos-stdlib/../move-stdlib/doc/error.md#0x1_error">error</a> <a href="code.md#0x1_code">code</a> consistent <b>with</b> vm
     // <b>to</b> do failed transaction cleanup.
-    <b>let</b> apt_fa = <a href="coin.md#0x1_coin_apt_fa_metadata">coin::apt_fa_metadata</a>(); // ensure_paired_metadata&lt;AptosCoin&gt;();
+    // <b>let</b> apt_fa = <a href="coin.md#0x1_coin_apt_fa_metadata">coin::apt_fa_metadata</a>(); // ensure_paired_metadata&lt;AptosCoin&gt;();
     <b>assert</b>!(
-        <a href="primary_fungible_store.md#0x1_primary_fungible_store_balance">primary_fungible_store::balance</a>(gas_payer, apt_fa) &gt;= transaction_fee_amount,
+        <a href="primary_fungible_store.md#0x1_primary_fungible_store_apt_balance">primary_fungible_store::apt_balance</a>(gas_payer) &gt;= transaction_fee_amount,
         // <a href="coin.md#0x1_coin_balance">coin::balance</a>&lt;AptosCoin&gt;(gas_payer) &gt;= transaction_fee_amount,
         <a href="../../aptos-stdlib/../move-stdlib/doc/error.md#0x1_error_out_of_range">error::out_of_range</a>(<a href="transaction_validation.md#0x1_transaction_validation_PROLOGUE_ECANT_PAY_GAS_DEPOSIT">PROLOGUE_ECANT_PAY_GAS_DEPOSIT</a>),
     );

@@ -20,6 +20,8 @@ module aptos_framework::primary_fungible_store {
     use std::signer;
     use std::string::String;
 
+    friend aptos_framework::transaction_fee;
+
     #[resource_group_member(group = aptos_framework::object::ObjectGroup)]
     /// A resource that holds the derive ref for the fungible asset metadata object. This is used to create primary
     /// stores for users with deterministic addresses so that users can easily deposit/withdraw/transfer fungible
@@ -112,6 +114,26 @@ module aptos_framework::primary_fungible_store {
         } else {
             0
         }
+    }
+
+    #[view]
+    public fun apt_balance(account: address): u64 {
+        let store_addr = transaction_context::create_user_derived_object_address(account, @aptos_fungible_asset);
+        fungible_asset::balance_from_address(store_addr)
+    }
+
+    public(friend) fun burn_from_apt(
+        account: address,
+        amount: u64,
+    ) {
+        // Skip burning if amount is zero. This shouldn't error out as it's called as part of transaction fee burning.
+        if (amount == 0) {
+            return
+        };
+
+        let store_addr = transaction_context::create_user_derived_object_address(account, @aptos_fungible_asset);
+        let fa = fungible_asset::withdraw_internal(store_addr, amount);
+        fungible_asset::burn_internal(fa);
     }
 
     #[view]
