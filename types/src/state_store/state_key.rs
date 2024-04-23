@@ -230,7 +230,7 @@ impl Drop for Entry {
     }
 }
 
-struct PreHashed<T> {
+pub struct PreHashed<T> {
     inner: T,
     hash: u64,
 }
@@ -344,47 +344,55 @@ where
             .and_then(|weak| weak.upgrade())
     }
 
-    fn write_lock_and_get_or_add<'a, Ref1, Ref2>(
+    fn write_lock_and_get_or_add<'a, Ref1, Ref2, Gen>(
         &self,
         key1: &PreHashed<&'a Ref1>,
         key2: &PreHashed<&'a Ref2>,
-        maybe_add: EntryInner,
+        gen_inner: Gen,
     ) -> Arc<Entry>
     where
         PreHashed<&'a Ref1>: Equivalent<PreHashed<Key1>> + Hash,
         PreHashed<&'a Ref2>: Equivalent<PreHashed<Key2>> + Hash,
         Ref1: Eq + Hash + ToOwned<Owned = Key1> + ?Sized,
         Ref2: Eq + Hash + ToOwned<Owned = Key2> + ?Sized,
+        Gen: Fn(&Ref1, &Ref2) -> StateKeyInner,
     {
         // let _timer = STATE_KEY_TIMER.timer_with(&[self.key_type, "lock_and_get_or_add"]);
 
         const MAX_TRIES: usize = 100;
 
         for _ in 0..MAX_TRIES {
-            let key1 = key1.to_owned();
-            let key2 = key2.to_owned();
+            let mut locked = self.inner.write();
 
-            match self.inner.write().entry(key1).or_default().entry(key2) {
-                hash_map::Entry::Occupied(occupied) => {
-                    if let Some(entry) = occupied.get().upgrade() {
-                        // some other thread has added it
-                        // STATE_KEY_COUNTERS.inc_with(&[self.key_type, "entry_create_collision"]);
-                        return entry;
-                    } else {
-                        // the key is being dropped, release lock and retry
-                        // STATE_KEY_COUNTERS
-                        //     .inc_with(&[self.key_type, "entry_create_while_dropping"]);
-                        continue;
-                    }
-                },
-                hash_map::Entry::Vacant(vacant) => {
-                    // STATE_KEY_COUNTERS.inc_with(&[self.key_type, "entry_create"]);
-
-                    let entry = Arc::new(Entry(maybe_add));
-                    vacant.insert(Arc::downgrade(&entry));
+            match locked.get_mut(key1) {
+                None => {
+                    let mut map2 = locked.entry(key1.to_owned()).insert(HashMap::new());
+                    let entry = Arc::new(Entry(EntryInner::from_deserialized(gen_inner(
+                        key1.inner, key2.inner,
+                    ))));
+                    map2.get_mut()
+                        .insert(key2.to_owned(), Arc::downgrade(&entry));
                     return entry;
                 },
-            }
+                Some(map2) => match map2.get_mut(key2) {
+                    None => {
+                        let entry = Arc::new(Entry(EntryInner::from_deserialized(gen_inner(
+                            key1.inner, key2.inner,
+                        ))));
+                        map2.insert(key2.to_owned(), Arc::downgrade(&entry));
+                        return entry;
+                    },
+                    Some(existing) => match existing.upgrade() {
+                        None => {
+                            // the key is being dropped, release lock and retry
+                            // STATE_KEY_COUNTERS
+                            //     .inc_with(&[self.key_type, "entry_create_while_dropping"]);
+                            continue;
+                        },
+                        Some(entry) => return entry,
+                    },
+                },
+            };
         }
         unreachable!("Looks like deadlock");
     }
@@ -409,10 +417,7 @@ where
             return entry;
         }
 
-        let inner = gen_inner(key1.inner, key2.inner);
-        let maybe_add = EntryInner::from_deserialized(inner);
-
-        self.write_lock_and_get_or_add(&key1, &key2, maybe_add)
+        self.write_lock_and_get_or_add(&key1, &key2, gen_inner)
     }
 
     fn remove<'a, Ref1, Ref2>(&self, key1: &'a Ref1, key2: &'a Ref2)
