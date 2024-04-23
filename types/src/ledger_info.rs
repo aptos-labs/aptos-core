@@ -180,6 +180,15 @@ impl LedgerInfoWithSignatures {
             LedgerInfoWithSignatures::V0(ledger) => ledger.commit_info(),
         }
     }
+
+    pub fn verify_signatures(
+        &self,
+        validator: &ValidatorVerifier,
+    ) -> ::std::result::Result<(), VerifyError> {
+        match self {
+            LedgerInfoWithSignatures::V0(ledger) => ledger.verify_signatures(validator),
+        }
+    }
 }
 
 /// Helper function to generate LedgerInfoWithSignature from a set of validator signers used for testing
@@ -297,7 +306,16 @@ impl LedgerInfoWithV0 {
         &self,
         validator: &ValidatorVerifier,
     ) -> ::std::result::Result<(), VerifyError> {
-        validator.verify_multi_signatures(self.ledger_info(), &self.signatures)
+        match validator.verify_multi_signatures(self.ledger_info(), &self.signatures) {
+            Ok(result) => Ok(result),
+            Err(e) => {
+                println!(
+                    "Fail to verify signatures for LedgerInfo with error: {:?}, LedgerInfo: {:?}, signatures: {:?}, num_votes: {}",
+                    e, self.ledger_info(), self.signatures, self.signatures.get_num_voters()
+                );
+                Err(e)
+            },
+        }
     }
 
     pub fn check_voting_power(

@@ -16,8 +16,8 @@ use std::fmt::{Debug, Display, Formatter};
 pub struct SyncInfo {
     /// Highest quorum certificate known to the peer.
     highest_quorum_cert: QuorumCert,
-    /// Highest ordered cert known to the peer.
-    highest_ordered_cert: Option<QuorumCert>,
+    /// Highest ordered decision known to the peer.
+    highest_ordered_decision: Option<LedgerInfoWithSignatures>,
     // TODO: Changing highest_commit_cert to highest_commit_decision would be backward incompatible.
     // Need to think about how to handle this.
     /// Highest commit cert (ordered cert with execution result) known to the peer.
@@ -37,7 +37,11 @@ impl Display for SyncInfo {
     fn fmt(&self, f: &mut Formatter) -> std::fmt::Result {
         write!(
             f,
-            "SyncInfo[certified_round: {}, ordered_round: {}, timeout round: {}, commit_info: {}]",
+            "SyncInfo[highest_quorum_cert: {:?}, highest_ordered_decision: {:?}, highest_commit_decision: {:?}, highest_2chain_timeout_cert: {:?}, certified_round: {}, ordered_round: {}, timeout round: {}, commit_info: {}]",
+            self.highest_quorum_cert,
+            self.highest_ordered_decision,
+            self.highest_commit_decision.commit_info(),
+            self.highest_2chain_timeout_cert,
             self.highest_certified_round(),
             self.highest_ordered_round(),
             self.highest_timeout_round(),
@@ -49,7 +53,7 @@ impl Display for SyncInfo {
 impl SyncInfo {
     pub fn new_decoupled(
         highest_quorum_cert: QuorumCert,
-        highest_ordered_cert: QuorumCert,
+        highest_ordered_decision: LedgerInfoWithSignatures,
         highest_commit_decision: LedgerInfoWithSignatures,
         highest_2chain_timeout_cert: Option<TwoChainTimeoutCertificate>,
     ) -> Self {
@@ -57,12 +61,13 @@ impl SyncInfo {
         let highest_2chain_timeout_cert = highest_2chain_timeout_cert
             .filter(|tc| tc.round() > highest_quorum_cert.certified_block().round());
 
-        let highest_ordered_cert =
-            Some(highest_ordered_cert).filter(|hoc| hoc != &highest_quorum_cert);
+        // TODO: Is this an okay check to do? Here we are also check if consensus_data_hash is matching.
+        let highest_ordered_decision =
+            Some(highest_ordered_decision).filter(|hoc| hoc != highest_quorum_cert.ledger_info());
 
         Self {
             highest_quorum_cert,
-            highest_ordered_cert,
+            highest_ordered_decision,
             highest_commit_decision,
             highest_2chain_timeout_cert,
         }
@@ -70,13 +75,13 @@ impl SyncInfo {
 
     pub fn new(
         highest_quorum_cert: QuorumCert,
-        highest_ordered_cert: QuorumCert,
+        highest_ordered_decision: LedgerInfoWithSignatures,
         highest_2chain_timeout_cert: Option<TwoChainTimeoutCertificate>,
     ) -> Self {
-        let highest_commit_decision = highest_ordered_cert.ledger_info().clone();
+        let highest_commit_decision = highest_ordered_decision.clone();
         Self::new_decoupled(
             highest_quorum_cert,
-            highest_ordered_cert,
+            highest_ordered_decision,
             highest_commit_decision,
             highest_2chain_timeout_cert,
         )
@@ -88,10 +93,10 @@ impl SyncInfo {
     }
 
     /// Highest ordered certificate
-    pub fn highest_ordered_cert(&self) -> &QuorumCert {
-        self.highest_ordered_cert
+    pub fn highest_ordered_decision(&self) -> &LedgerInfoWithSignatures {
+        self.highest_ordered_decision
             .as_ref()
-            .unwrap_or(&self.highest_quorum_cert)
+            .unwrap_or(self.highest_quorum_cert.ledger_info())
     }
 
     /// Highest ledger info
@@ -114,7 +119,7 @@ impl SyncInfo {
     }
 
     pub fn highest_ordered_round(&self) -> Round {
-        self.highest_ordered_cert().commit_info().round()
+        self.highest_ordered_decision().commit_info().round()
     }
 
     pub fn highest_commit_round(&self) -> Round {
@@ -128,8 +133,10 @@ impl SyncInfo {
 
     pub fn verify(&self, validator: &ValidatorVerifier) -> anyhow::Result<()> {
         let epoch = self.highest_quorum_cert.certified_block().epoch();
+        // TODO: Is it okay to change highest_ordered_cert -> highest_ordered_decision here?
+        // Does it break when epoch changes?
         ensure!(
-            epoch == self.highest_ordered_cert().certified_block().epoch(),
+            epoch == self.highest_ordered_decision().commit_info().epoch(),
             "Multi epoch in SyncInfo - HOC and HQC"
         );
         ensure!(
@@ -142,17 +149,17 @@ impl SyncInfo {
 
         ensure!(
             self.highest_quorum_cert.certified_block().round()
-                >= self.highest_ordered_cert().certified_block().round(),
+                >= self.highest_ordered_decision().commit_info().round(),
             "HQC has lower round than HOC"
         );
 
         ensure!(
-            self.highest_ordered_cert().certified_block().round() >= self.highest_commit_round(),
+            self.highest_ordered_decision().commit_info().round() >= self.highest_commit_round(),
             "HOC has lower round than HLI"
         );
 
         ensure!(
-            *self.highest_ordered_cert().commit_info() != BlockInfo::empty(),
+            *self.highest_ordered_decision().commit_info() != BlockInfo::empty(),
             "HOC has no committed block"
         );
 
@@ -164,9 +171,14 @@ impl SyncInfo {
         self.highest_quorum_cert
             .verify(validator)
             .and_then(|_| {
-                self.highest_ordered_cert
-                    .as_ref()
-                    .map_or(Ok(()), |cert| cert.verify(validator))
+                if let Some(highest_ordered_decision) = &self.highest_ordered_decision {
+                    // TODO: Earlier, quroum_cert.verify() compares if the certified_block.round() is 0.
+                    // Here, we are comparing commit_info.round() > 0. Is this okay?
+                    if highest_ordered_decision.commit_info().round() > 0 {
+                        highest_ordered_decision.verify_signatures(validator)?;
+                    }
+                }
+                Ok(())
             })
             .and_then(|_| {
                 // we do not verify genesis ledger info

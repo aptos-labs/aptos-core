@@ -3,19 +3,21 @@
 // SPDX-License-Identifier: Apache-2.0
 
 use crate::{
-    counters,
+    counters::{self, ORDER_VOTE_VERY_OLD},
+    pending_order_votes::{OrderVoteReceptionResult, PendingOrderVotes},
     pending_votes::{PendingVotes, VoteReceptionResult},
     util::time_service::{SendTask, TimeService},
 };
 use aptos_config::config::QcAggregatorType;
 use aptos_consensus_types::{
-    common::Round, delayed_qc_msg::DelayedQcMsg, sync_info::SyncInfo,
+    common::Round, delayed_qc_msg::DelayedQcMsg, order_vote::OrderVote, sync_info::SyncInfo,
     timeout_2chain::TwoChainTimeoutWithPartialSignatures, vote::Vote,
 };
 use aptos_crypto::HashValue;
 use aptos_logger::{prelude::*, Schema};
 use aptos_types::{
-    ledger_info::LedgerInfoWithPartialSignatures, validator_verifier::ValidatorVerifier,
+    ledger_info::{LedgerInfo, LedgerInfoWithPartialSignatures},
+    validator_verifier::ValidatorVerifier,
 };
 use futures::future::AbortHandle;
 use futures_channel::mpsc::UnboundedSender;
@@ -157,8 +159,10 @@ pub struct RoundState {
     time_service: Arc<dyn TimeService>,
     // To send local timeout events to the subscriber (e.g., SMR)
     timeout_sender: aptos_channels::Sender<Round>,
-    // Votes received fot the current round.
+    // Votes received for the current round.
     pending_votes: PendingVotes,
+    // OrderVotes received for the last 2 rounds.
+    pending_order_votes: PendingOrderVotes,
     // Vote sent locally for the current round.
     vote_sent: Option<Vote>,
     // The handle to cancel previous timeout task when moving to next round.
@@ -209,6 +213,7 @@ impl RoundState {
             qc_aggregator_type.clone(),
         );
 
+        let pending_order_votes = PendingOrderVotes::new();
         Self {
             time_interval,
             highest_committed_round: 0,
@@ -217,6 +222,7 @@ impl RoundState {
             time_service,
             timeout_sender,
             pending_votes,
+            pending_order_votes,
             vote_sent: None,
             abort_handle: None,
             delayed_qc_tx,
@@ -251,6 +257,10 @@ impl RoundState {
         true
     }
 
+    pub fn has_enough_order_votes(&self, ledger_info: &LedgerInfo) -> bool {
+        self.pending_order_votes.has_enough_order_votes(ledger_info)
+    }
+
     /// Notify the RoundState about the potentially new QC, TC, and highest committed round.
     /// Note that some of these values might not be available by the caller.
     pub fn process_certificates(&mut self, sync_info: SyncInfo) -> Option<NewRoundEvent> {
@@ -268,6 +278,7 @@ impl RoundState {
                 self.delayed_qc_tx.clone(),
                 self.qc_aggregator_type.clone(),
             );
+            self.pending_order_votes.set_round(self.current_round);
             self.vote_sent = None;
             let timeout = self.setup_timeout(1);
             // The new round reason is QCReady in case both QC.round + 1 == new_round, otherwise
@@ -308,6 +319,23 @@ impl RoundState {
     pub fn record_vote(&mut self, vote: Vote) {
         if vote.vote_data().proposed().round() == self.current_round {
             self.vote_sent = Some(vote);
+        }
+    }
+
+    pub fn insert_order_vote(
+        &mut self,
+        order_vote: &OrderVote,
+        verifier: &ValidatorVerifier,
+    ) -> OrderVoteReceptionResult {
+        if order_vote.ledger_info().round() + 3 >= self.current_round {
+            self.pending_order_votes
+                .insert_order_vote(order_vote, verifier)
+        } else {
+            ORDER_VOTE_VERY_OLD.inc();
+            OrderVoteReceptionResult::UnexpectedRound(
+                order_vote.ledger_info().round(),
+                self.current_round,
+            )
         }
     }
 

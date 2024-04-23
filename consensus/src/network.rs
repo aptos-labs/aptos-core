@@ -25,6 +25,7 @@ use aptos_config::network_id::NetworkId;
 use aptos_consensus_types::{
     block_retrieval::{BlockRetrievalRequest, BlockRetrievalResponse},
     common::Author,
+    order_vote::OrderVote,
     pipeline::{commit_decision::CommitDecision, commit_vote::CommitVote},
     proof_of_store::{ProofOfStore, ProofOfStoreMsg, SignedBatchInfo, SignedBatchInfoMsg},
     proposal_msg::ProposalMsg,
@@ -307,6 +308,7 @@ impl NetworkSender {
         let self_msg = Event::Message(self.author, msg.clone());
         let mut self_sender = self.self_sender.clone();
         if let Err(err) = self_sender.send(self_msg).await {
+            info!("ErrorBroadcastedConsensusMsg::{}", msg.name());
             error!("Error broadcasting to self: {:?}", err);
         }
 
@@ -325,10 +327,12 @@ impl NetworkSender {
         // Broadcast message over direct-send to all other validators.
         if let Err(err) = self
             .consensus_network_client
-            .send_to_many(other_validators.into_iter(), msg)
+            .send_to_many(other_validators.into_iter(), msg.clone())
         {
+            info!("ErrorBroadcastedConsensusMsg::{}", msg.name());
             warn!(error = ?err, "Error broadcasting message");
         }
+        info!("BroadcastedConsensusMsg::{}", msg.name());
     }
 
     pub fn broadcast_without_self(&self, msg: ConsensusMsg) {
@@ -415,6 +419,12 @@ impl NetworkSender {
     pub async fn broadcast_vote(&self, vote_msg: VoteMsg) {
         fail_point!("consensus::send::vote", |_| ());
         let msg = ConsensusMsg::VoteMsg(Box::new(vote_msg));
+        self.broadcast(msg).await
+    }
+
+    pub async fn broadcast_order_vote(&self, order_vote_msg: OrderVote) {
+        fail_point!("consensus::send::order_vote", |_| ());
+        let msg = ConsensusMsg::OrderVoteMsg(Box::new(order_vote_msg));
         self.broadcast(msg).await
     }
 
@@ -736,6 +746,7 @@ impl NetworkTask {
                         },
                         consensus_msg @ (ConsensusMsg::ProposalMsg(_)
                         | ConsensusMsg::VoteMsg(_)
+                        | ConsensusMsg::OrderVoteMsg(_)
                         | ConsensusMsg::SyncInfo(_)
                         | ConsensusMsg::EpochRetrievalRequest(_)
                         | ConsensusMsg::EpochChangeProof(_)) => {

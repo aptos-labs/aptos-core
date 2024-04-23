@@ -14,6 +14,7 @@ use aptos_config::network_id::{NetworkId, PeerNetworkId};
 use aptos_consensus_types::{
     block_retrieval::{BlockRetrievalRequest, BlockRetrievalResponse},
     epoch_retrieval::EpochRetrievalRequest,
+    order_vote::OrderVote,
     pipeline::{commit_decision::CommitDecision, commit_vote::CommitVote},
     proof_of_store::{ProofOfStoreMsg, SignedBatchInfoMsg},
     proposal_msg::ProposalMsg,
@@ -49,6 +50,9 @@ pub enum ConsensusMsg {
     /// VoteMsg is the struct that is ultimately sent by the voter in response for receiving a
     /// proposal.
     VoteMsg(Box<VoteMsg>),
+    /// OrderVoteMsg is the struct that is broadcasted by a validator on receiving quorum certificate
+    /// on a block.
+    OrderVoteMsg(Box<OrderVote>),
     /// CommitProposal is the struct that is sent by the validator after execution to propose
     /// on the committed state hash root.
     CommitVoteMsg(Box<CommitVote>),
@@ -90,6 +94,7 @@ impl ConsensusMsg {
             ConsensusMsg::SyncInfo(_) => "SyncInfo",
             ConsensusMsg::EpochChangeProof(_) => "EpochChangeProof",
             ConsensusMsg::VoteMsg(_) => "VoteMsg",
+            ConsensusMsg::OrderVoteMsg(_) => "OrderVoteMsg",
             ConsensusMsg::CommitVoteMsg(_) => "CommitVoteMsg",
             ConsensusMsg::CommitDecisionMsg(_) => "CommitDecisionMsg",
             ConsensusMsg::BatchMsg(_) => "BatchMsg",

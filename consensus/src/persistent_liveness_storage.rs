@@ -23,7 +23,7 @@ use std::{cmp::max, collections::HashSet, sync::Arc};
 /// Blocks persisted are proposed but not yet committed.  The committed state is persisted
 /// via StateComputer.
 pub trait PersistentLivenessStorage: Send + Sync {
-    /// Persist the blocks and quorum certs into storage atomically.
+    /// Persist the blocks, quorum certs and highest ordered decision into storage atomically.
     fn save_tree(&self, blocks: Vec<Block>, quorum_certs: Vec<QuorumCert>) -> Result<()>;
 
     /// Delete the corresponding blocks and quorum certs atomically.
@@ -60,8 +60,7 @@ pub trait PersistentLivenessStorage: Send + Sync {
 pub struct RootInfo(
     pub Box<Block>,
     pub QuorumCert,
-    pub QuorumCert,
-    // TODO: Changing this to LedgerInfoWithSignatures could lead to backward incompatibility?
+    pub LedgerInfoWithSignatures,
     pub LedgerInfoWithSignatures,
 );
 
@@ -128,24 +127,28 @@ impl LedgerRecoveryData {
             .find(|qc| qc.certified_block().id() == root_block.id())
             .ok_or_else(|| format_err!("No QC found for root: {}", root_id))?
             .clone();
-        let root_ordered_cert = quorum_certs
+        let root_ordered_decision = if let Some(qc) = quorum_certs
             .iter()
             .find(|qc| qc.commit_info().id() == root_block.id())
-            .ok_or_else(|| format_err!("No LI found for root: {}", root_id))?
-            .clone();
+        {
+            qc.ledger_info().clone()
+        } else {
+            latest_ledger_info_sig.clone()
+        };
+        // } else if root_block.id() == highest_ordered_decision.commit_info().id() {
+        //     highest_ordered_decision.clone()
+        // } else {
+        //     return Err(format_err!("No LI found for root: {}", root_id));
+        // };
 
         info!("Consensus root block is {}", root_block);
 
-        let root_commit_decision = root_ordered_cert
-            .create_merged_with_executed_state(latest_ledger_info_sig)
-            .expect("Inconsistent commit proof and evaluation decision, cannot commit block")
-            .ledger_info()
-            .clone();
+        let root_commit_decision = latest_ledger_info_sig;
 
         Ok(RootInfo(
             Box::new(root_block),
             root_quorum_cert,
-            root_ordered_cert,
+            root_ordered_decision,
             root_commit_decision,
         ))
     }

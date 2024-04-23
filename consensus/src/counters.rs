@@ -63,6 +63,118 @@ pub static LAST_COMMITTED_VERSION: Lazy<IntGauge> = Lazy::new(|| {
     .unwrap()
 });
 
+pub static EXECUTED_WITH_ORDER_VOTE_QC: Lazy<IntCounter> = Lazy::new(|| {
+    register_int_counter!(
+        "aptos_consensus_executed_with_order_vote_qc",
+        "Count of the number of blocks executed with order vote QC"
+    )
+    .unwrap()
+});
+
+pub static SUCCESSFUL_EXECUTED_WITH_ORDER_VOTE_QC: Lazy<IntCounter> = Lazy::new(|| {
+    register_int_counter!(
+        "aptos_consensus_successful_executed_with_order_vote_qc",
+        "Count of the number of blocks successfully executed with order vote QC"
+    )
+    .unwrap()
+});
+
+pub static SUCCESSFUL_EXECUTED_WITH_REGULAR_QC: Lazy<IntCounter> = Lazy::new(|| {
+    register_int_counter!(
+        "aptos_consensus_successful_executed_with_regular_qc",
+        "Count of the number of blocks successfully executed with regular QC"
+    )
+    .unwrap()
+});
+
+pub static SYNC_TO_HIGHEST_QC: Lazy<IntCounter> = Lazy::new(|| {
+    register_int_counter!(
+        "aptos_consensus_sync_to_highest_qc",
+        "Count of the number of times we sync to highest QC"
+    )
+    .unwrap()
+});
+
+pub static SUCCESSFUL_EXECUTED_WITH_REGULAR_QC_ADD_CERTS: Lazy<IntCounter> = Lazy::new(|| {
+    register_int_counter!(
+        "aptos_consensus_successful_executed_with_regular_qc_add_certs",
+        "Count of the number of blocks successfully executed with regular QC and added certs"
+    )
+    .unwrap()
+});
+
+pub static SUCCESSFUL_EXECUTED_WITH_REGULAR_QC_FROM_VOTES: Lazy<IntCounter> = Lazy::new(|| {
+    register_int_counter!(
+        "aptos_consensus_successful_executed_with_regular_qc_from_votes",
+        "Count of the number of blocks successfully executed with regular QC from votes"
+    )
+    .unwrap()
+});
+
+pub static SUCCESSFUL_EXECUTED_WITH_ORDER_VOTE_QC_ADD_CERTS: Lazy<IntCounter> = Lazy::new(|| {
+    register_int_counter!(
+        "aptos_consensus_successful_executed_with_order_vote_qc_add_certs",
+        "Count of the number of blocks successfully executed with order vote QC and added certs"
+    )
+    .unwrap()
+});
+
+pub static SUCCESSFUL_EXECUTED_WITH_ORDER_VOTE_QC_FROM_VOTES: Lazy<IntCounter> = Lazy::new(|| {
+    register_int_counter!(
+        "aptos_consensus_successful_executed_with_order_vote_qc_from_votes",
+        "Count of the number of blocks successfully executed with order vote QC from votes"
+    )
+    .unwrap()
+});
+
+pub static ORDER_VOTE_ADDED: Lazy<IntCounter> = Lazy::new(|| {
+    register_int_counter!(
+        "aptos_consensus_order_vote_added",
+        "Count of the number of order votes added"
+    )
+    .unwrap()
+});
+
+pub static ORDER_VOTE_VERY_OLD: Lazy<IntCounter> = Lazy::new(|| {
+    register_int_counter!(
+        "aptos_consensus_order_vote_very_old",
+        "Count of the number of order votes that are very old"
+    )
+    .unwrap()
+});
+
+pub static ORDER_VOTE_OTHER_ERRORS: Lazy<IntCounter> = Lazy::new(|| {
+    register_int_counter!(
+        "aptos_consensus_order_vote_other_errors",
+        "Count of the number of order votes that have other errors"
+    )
+    .unwrap()
+});
+
+pub static ORDER_VOTE_BROADCASTED: Lazy<IntCounter> = Lazy::new(|| {
+    register_int_counter!(
+        "aptos_consensus_order_vote_broadcasted",
+        "Count of the number of order votes broadcasted"
+    )
+    .unwrap()
+});
+
+pub static FAILED_ORDER_VOTE_BROADCASTED: Lazy<IntCounter> = Lazy::new(|| {
+    register_int_counter!(
+        "aptos_consensus_failed_order_vote_broadcasted",
+        "Count of the number of failed order vote broadcasts"
+    )
+    .unwrap()
+});
+
+pub static ORDER_VOTE_BRODCAST_DIDNT_START: Lazy<IntCounter> = Lazy::new(|| {
+    register_int_counter!(
+        "aptos_consensus_order_vote_broadcast_didnt_start",
+        "Count of the number of order vote broadcasts that didn't start"
+    )
+    .unwrap()
+});
+
 /// Count of the committed failed rounds since last restart.
 pub static COMMITTED_FAILED_ROUNDS_COUNT: Lazy<IntCounter> = Lazy::new(|| {
     register_int_counter!(

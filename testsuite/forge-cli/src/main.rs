@@ -1041,8 +1041,9 @@ fn realistic_env_sweep_wrap(
 }
 
 fn realistic_env_load_sweep_test() -> ForgeConfig {
-    realistic_env_sweep_wrap(20, 10, LoadVsPerfBenchmark {
+    realistic_env_sweep_wrap(100, 10, LoadVsPerfBenchmark {
         test: Box::new(PerformanceBenchmark),
+        // workloads: Workloads::TPS(vec![10]),
         workloads: Workloads::TPS(vec![10, 100, 1000, 3000, 5000]),
         criteria: [
             (9, 1.5, 3., 4., 0),

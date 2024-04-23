@@ -7,7 +7,11 @@ use crate::{
         tracing::{observe_block, BlockStage},
         BlockReader, BlockRetriever, BlockStore,
     },
-    counters::{self, PROPOSED_VTXN_BYTES, PROPOSED_VTXN_COUNT},
+    counters::{
+        self, FAILED_ORDER_VOTE_BROADCASTED, ORDER_VOTE_ADDED, ORDER_VOTE_BROADCASTED,
+        ORDER_VOTE_BRODCAST_DIDNT_START, ORDER_VOTE_OTHER_ERRORS, PROPOSED_VTXN_BYTES,
+        PROPOSED_VTXN_COUNT,
+    },
     error::{error_kind, VerifyError},
     liveness::{
         proposal_generator::ProposalGenerator,
@@ -20,6 +24,7 @@ use crate::{
     monitor,
     network::NetworkSender,
     network_interface::ConsensusMsg,
+    pending_order_votes::OrderVoteReceptionResult,
     pending_votes::VoteReceptionResult,
     persistent_liveness_storage::PersistentLivenessStorage,
     quorum_store::types::BatchMsg,
@@ -34,6 +39,7 @@ use aptos_consensus_types::{
     block_data::BlockType,
     common::{Author, Round},
     delayed_qc_msg::DelayedQcMsg,
+    order_vote::OrderVote,
     proof_of_store::{ProofCache, ProofOfStoreMsg, SignedBatchInfoMsg},
     proposal_msg::ProposalMsg,
     quorum_cert::QuorumCert,
@@ -49,6 +55,7 @@ use aptos_safety_rules::ConsensusState;
 use aptos_safety_rules::TSafetyRules;
 use aptos_types::{
     epoch_state::EpochState,
+    ledger_info::LedgerInfoWithSignatures,
     on_chain_config::{
         OnChainConsensusConfig, OnChainJWKConsensusConfig, OnChainRandomnessConfig,
         ValidatorTxnConfig,
@@ -71,6 +78,7 @@ use tokio::{
 pub enum UnverifiedEvent {
     ProposalMsg(Box<ProposalMsg>),
     VoteMsg(Box<VoteMsg>),
+    OrderVoteMsg(Box<OrderVote>),
     SyncInfo(Box<SyncInfo>),
     BatchMsg(Box<BatchMsg>),
     SignedBatchInfo(Box<SignedBatchInfoMsg>),
@@ -110,6 +118,15 @@ impl UnverifiedEvent {
                         .observe(start_time.elapsed().as_secs_f64());
                 }
                 VerifiedEvent::VoteMsg(v)
+            },
+            UnverifiedEvent::OrderVoteMsg(v) => {
+                if !self_message {
+                    v.verify(validator)?;
+                    counters::VERIFY_MSG
+                        .with_label_values(&["order_vote"])
+                        .observe(start_time.elapsed().as_secs_f64());
+                }
+                VerifiedEvent::OrderVoteMsg(v)
             },
             // sync info verification is on-demand (verified when it's used)
             UnverifiedEvent::SyncInfo(s) => VerifiedEvent::UnverifiedSyncInfo(s),
@@ -152,6 +169,7 @@ impl UnverifiedEvent {
         match self {
             UnverifiedEvent::ProposalMsg(p) => Ok(p.epoch()),
             UnverifiedEvent::VoteMsg(v) => Ok(v.epoch()),
+            UnverifiedEvent::OrderVoteMsg(v) => Ok(v.epoch()),
             UnverifiedEvent::SyncInfo(s) => Ok(s.epoch()),
             UnverifiedEvent::BatchMsg(b) => b.epoch(),
             UnverifiedEvent::SignedBatchInfo(sd) => sd.epoch(),
@@ -165,6 +183,7 @@ impl From<ConsensusMsg> for UnverifiedEvent {
         match value {
             ConsensusMsg::ProposalMsg(m) => UnverifiedEvent::ProposalMsg(m),
             ConsensusMsg::VoteMsg(m) => UnverifiedEvent::VoteMsg(m),
+            ConsensusMsg::OrderVoteMsg(m) => UnverifiedEvent::OrderVoteMsg(m),
             ConsensusMsg::SyncInfo(m) => UnverifiedEvent::SyncInfo(m),
             ConsensusMsg::BatchMsg(m) => UnverifiedEvent::BatchMsg(m),
             ConsensusMsg::SignedBatchInfo(m) => UnverifiedEvent::SignedBatchInfo(m),
@@ -180,6 +199,7 @@ pub enum VerifiedEvent {
     ProposalMsg(Box<ProposalMsg>),
     VerifiedProposalMsg(Box<Block>),
     VoteMsg(Box<VoteMsg>),
+    OrderVoteMsg(Box<OrderVote>),
     UnverifiedSyncInfo(Box<SyncInfo>),
     BatchMsg(Box<BatchMsg>),
     SignedBatchInfo(Box<SignedBatchInfoMsg>),
@@ -319,6 +339,11 @@ impl RoundManager {
         {
             self.log_collected_vote_stats(&new_round_event);
             self.round_state.setup_leader_timeout();
+            info!(
+                "Generating proposal for round {}. Self sync info {:?}",
+                new_round_event.round,
+                self.block_store.sync_info()
+            );
             let proposal_msg = self.generate_proposal(new_round_event).await?;
             #[cfg(feature = "failpoints")]
             {
@@ -461,9 +486,12 @@ impl RoundManager {
             self.process_proposal(proposal_msg.take_proposal()).await
         } else {
             bail!(
-                "Stale proposal {}, current round {}",
+                "Stale proposal {},\n Sync info {},\n Self sync info {},\n current round {},\n proposed round {}\n",
                 proposal_msg.proposal(),
-                self.round_state.current_round()
+                proposal_msg.sync_info(),
+                self.block_store.sync_info(),
+                self.round_state.current_round(),
+                proposal_msg.proposal().round(),
             );
         }
     }
@@ -672,6 +700,12 @@ impl RoundManager {
             .author()
             .expect("Proposal should be verified having an author");
 
+        info!(
+            "Processing proposal round {}, proposal {:?}, self sync info {:?}",
+            proposal.round(),
+            proposal,
+            self.block_store.sync_info()
+        );
         if !self.vtxn_config.enabled()
             && matches!(
                 proposal.block_data().block_type(),
@@ -878,6 +912,38 @@ impl RoundManager {
         Ok(())
     }
 
+    async fn broadcast_order_vote(&mut self, vote: &Vote) -> anyhow::Result<()> {
+        if let Some(proposed_block) = self.block_store.get_block(vote.vote_data().proposed().id()) {
+            // Generate an order vote with ledger_info = proposed_block
+            let vote_proposal = proposed_block.vote_proposal();
+            let order_vote_result = self
+                .safety_rules
+                .lock()
+                .construct_and_sign_order_vote(&vote_proposal);
+            let order_vote = order_vote_result.context(format!(
+                "[RoundManager] SafetyRules Rejected {} for order vote",
+                proposed_block.block()
+            ))?;
+            if let Some(to_be_order_voted_block) = self
+                .block_store
+                .get_block(order_vote.ledger_info().consensus_block_id())
+            {
+                if !to_be_order_voted_block.block().is_nil_block() {
+                    observe_block(
+                        to_be_order_voted_block.block().timestamp_usecs(),
+                        BlockStage::ORDER_VOTED,
+                    );
+                }
+            }
+            info!(self.new_log(LogEvent::SendOrderVote), "{}", order_vote);
+            self.network.broadcast_order_vote(order_vote).await;
+            ORDER_VOTE_BROADCASTED.inc();
+        } else {
+            FAILED_ORDER_VOTE_BROADCASTED.inc();
+        }
+        Ok(())
+    }
+
     /// The function generates a VoteMsg for a given proposed_block:
     /// * first execute the block and add it to the block store
     /// * then verify the voting rules
@@ -995,6 +1061,25 @@ impl RoundManager {
             .await
     }
 
+    async fn process_order_vote_msg(&mut self, order_vote: OrderVote) -> anyhow::Result<()> {
+        fail_point!("consensus::process_order_vote_msg", |_| {
+            Err(anyhow::anyhow!("Injected error in process_order_vote_msg"))
+        });
+        info!(self.new_log(LogEvent::ReceiveOrderVote), "{}", order_vote);
+
+        if self
+            .round_state
+            .has_enough_order_votes(order_vote.ledger_info())
+        {
+            return Ok(());
+        }
+        let vote_reception_result = self
+            .round_state
+            .insert_order_vote(&order_vote, &self.epoch_state.verifier);
+        self.process_order_vote_reception_result(&order_vote, vote_reception_result)
+            .await
+    }
+
     async fn process_vote_reception_result(
         &mut self,
         vote: &Vote,
@@ -1009,7 +1094,15 @@ impl RoundManager {
                         BlockStage::QC_AGGREGATED,
                     );
                 }
-                self.new_qc_aggregated(qc, vote.author()).await
+                let result = self.new_qc_aggregated(qc.clone(), vote.author()).await;
+                if result.is_ok() {
+                    info!("OrderVoteBrodcast");
+                    let _ = self.broadcast_order_vote(vote).await;
+                } else {
+                    info!("OrderVoteBrodcastDidntStart");
+                    ORDER_VOTE_BRODCAST_DIDNT_START.inc();
+                }
+                result
             },
             VoteReceptionResult::New2ChainTimeoutCertificate(tc) => {
                 self.new_2chain_tc_aggregated(tc).await
@@ -1025,6 +1118,41 @@ impl RoundManager {
         }
     }
 
+    async fn process_order_vote_reception_result(
+        &mut self,
+        order_vote: &OrderVote,
+        result: OrderVoteReceptionResult,
+    ) -> anyhow::Result<()> {
+        match result {
+            OrderVoteReceptionResult::NewLedgerInfoWithSignatures(ledger_info_with_signatures) => {
+                if let Some(order_voted_block) = self
+                    .block_store
+                    .get_block(order_vote.ledger_info().consensus_block_id())
+                {
+                    if !order_voted_block.block().is_nil_block() {
+                        observe_block(
+                            order_voted_block.block().timestamp_usecs(),
+                            BlockStage::QC_AGGREGATED,
+                        );
+                    }
+                }
+                self.new_order_vote_aggregated(
+                    ledger_info_with_signatures.clone(),
+                    order_vote.author(),
+                )
+                .await
+            },
+            OrderVoteReceptionResult::VoteAdded(_) => {
+                ORDER_VOTE_ADDED.inc();
+                Ok(())
+            },
+            e => {
+                ORDER_VOTE_OTHER_ERRORS.inc();
+                Err(anyhow::anyhow!("{:?}", e))
+            },
+        }
+    }
+
     async fn new_qc_aggregated(
         &mut self,
         qc: Arc<QuorumCert>,
@@ -1032,11 +1160,26 @@ impl RoundManager {
     ) -> anyhow::Result<()> {
         let result = self
             .block_store
-            .insert_quorum_cert(&qc, &mut self.create_block_retriever(preferred_peer))
+            .insert_quorum_cert(&qc, &mut self.create_block_retriever(preferred_peer), 1)
             .await
             .context("[RoundManager] Failed to process a newly aggregated QC");
         self.process_certificates().await?;
         result
+    }
+
+    async fn new_order_vote_aggregated(
+        &mut self,
+        ledger_info_with_sig: Arc<LedgerInfoWithSignatures>,
+        preferred_peer: Author,
+    ) -> anyhow::Result<()> {
+        self.block_store
+            .insert_aggregated_order_vote(
+                &ledger_info_with_sig,
+                &mut self.create_block_retriever(preferred_peer),
+                1,
+            )
+            .await
+            .context("[RoundManager] Failed to process a new OrderVoteAggregate")
     }
 
     async fn new_2chain_tc_aggregated(
@@ -1173,13 +1316,20 @@ impl RoundManager {
                     let result = match event {
                         VerifiedEvent::VoteMsg(vote_msg) => {
                             monitor!("process_vote", self.process_vote_msg(*vote_msg).await)
-                        }
+                        },
+                        VerifiedEvent::OrderVoteMsg(order_vote) => {
+                            info!("OrderVoteReceived");
+                            monitor!(
+                                "process_order_vote",
+                                self.process_order_vote_msg(*order_vote).await
+                            )
+                        },
                         VerifiedEvent::UnverifiedSyncInfo(sync_info) => {
                             monitor!(
                                 "process_sync_info",
                                 self.process_sync_info_msg(*sync_info, peer_id).await
                             )
-                        }
+                        },
                         VerifiedEvent::LocalTimeout(round) => monitor!(
                             "process_local_timeout",
                             self.process_local_timeout(round).await
