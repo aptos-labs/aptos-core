@@ -50,8 +50,8 @@ module aptos_framework::reconfiguration_with_dkg {
         jwk_consensus_config::on_new_epoch();
         jwks::on_new_epoch();
         randomness_config_seqnum::on_new_epoch();
-        keyless_account::on_new_epoch(account);
         randomness_config::on_new_epoch();
+        keyless_account::on_new_epoch(account);
         features::on_new_epoch(account);
         reconfiguration::reconfigure();
     }

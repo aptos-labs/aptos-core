@@ -8,11 +8,11 @@ use aptos_language_e2e_tests::account::{Account, AccountPublicKey, TransactionBu
 use aptos_types::{
     keyless::{
         test_utils::{
-            get_sample_esk, get_sample_groth16_sig_and_pk, get_sample_iss, get_sample_jwk,
-            get_sample_openid_sig_and_pk,
+            get_groth16_sig_and_pk_for_upgraded_vk, get_sample_esk, get_sample_groth16_sig_and_pk,
+            get_sample_iss, get_sample_jwk, get_sample_openid_sig_and_pk, get_upgraded_vk,
         },
-        Configuration, EphemeralCertificate, KeylessPublicKey, KeylessSignature,
-        TransactionAndProof,
+        Configuration, EphemeralCertificate, Groth16VerificationKey, KeylessPublicKey,
+        KeylessSignature, TransactionAndProof,
     },
     on_chain_config::FeatureFlag,
     transaction::{
@@ -21,22 +21,23 @@ use aptos_types::{
     },
 };
 use move_core_types::{
-    account_address::AccountAddress, transaction_argument::TransactionArgument,
-    vm_status::StatusCode::FEATURE_UNDER_GATING,
+    account_address::AccountAddress,
+    transaction_argument::TransactionArgument,
+    vm_status::{StatusCode, StatusCode::FEATURE_UNDER_GATING},
 };
 
 fn init_feature_gating(
     enabled_features: Vec<FeatureFlag>,
     disabled_features: Vec<FeatureFlag>,
-) -> (MoveHarness, Account) {
+) -> (MoveHarness, Account, Account) {
     let mut h = MoveHarness::new_with_features(enabled_features, disabled_features);
 
     let recipient = h.new_account_at(AccountAddress::from_hex_literal("0xb0b").unwrap());
 
     // initialize JWKs
-    run_setup_script(&mut h);
+    let core_resources = run_jwk_and_config_script(&mut h);
 
-    (h, recipient)
+    (h, recipient, core_resources)
 }
 
 fn test_feature_gating(
@@ -76,10 +77,68 @@ fn test_feature_gating(
 }
 
 #[test]
+fn test_rotate_vk() {
+    let (mut h, recipient, core_resources) = init_feature_gating(
+        vec![
+            FeatureFlag::CRYPTOGRAPHY_ALGEBRA_NATIVES,
+            FeatureFlag::BN254_STRUCTURES,
+            FeatureFlag::KEYLESS_ACCOUNTS,
+        ],
+        vec![],
+    );
+
+    // Old proof for old VK
+    let (old_sig, pk) = get_sample_groth16_sig_and_pk();
+    let account = create_keyless_account(&mut h, pk.clone());
+    let transaction =
+        spend_keyless_account(&mut h, old_sig.clone(), &account, *recipient.address());
+    let output = h.run_raw(transaction);
+    assert_success!(output.status().clone());
+
+    // New proof for old VK
+    let (new_sig, _) = get_groth16_sig_and_pk_for_upgraded_vk();
+    let transaction =
+        spend_keyless_account(&mut h, new_sig.clone(), &account, *recipient.address());
+    let output = h.run_raw(transaction);
+    //println!("TXN status: {:?}", output.status());
+    match output.status() {
+        TransactionStatus::Discard(sc) => assert_eq!(*sc, StatusCode::INVALID_SIGNATURE),
+        TransactionStatus::Keep(es) => {
+            panic!("Expected TransactionStatus::Discard, got Keep({:?})", es)
+        },
+        TransactionStatus::Retry => panic!("Expected TransactionStatus::Discard, got Retry"),
+    }
+
+    // Upgrade the VK
+    run_upgrade_vk_script(
+        &mut h,
+        core_resources,
+        Groth16VerificationKey::from(get_upgraded_vk()),
+    );
+
+    // New proof for new VK
+    let transaction = spend_keyless_account(&mut h, new_sig, &account, *recipient.address());
+    let output = h.run_raw(transaction);
+    assert_success!(output.status().clone());
+
+    // Old proof for old VK
+    let transaction = spend_keyless_account(&mut h, old_sig, &account, *recipient.address());
+    let output = h.run_raw(transaction);
+    // println!("TXN status: {:?}", output.status());
+    match output.status() {
+        TransactionStatus::Discard(sc) => assert_eq!(*sc, StatusCode::INVALID_SIGNATURE),
+        TransactionStatus::Keep(es) => {
+            panic!("Expected TransactionStatus::Discard, got Keep({:?})", es)
+        },
+        TransactionStatus::Retry => panic!("Expected TransactionStatus::Discard, got Retry"),
+    }
+}
+
+#[test]
 fn test_feature_gating_with_zk_on() {
     //
     // ZK & ZKless
-    let (mut h, recipient) = init_feature_gating(
+    let (mut h, recipient, _) = init_feature_gating(
         vec![
             FeatureFlag::CRYPTOGRAPHY_ALGEBRA_NATIVES,
             FeatureFlag::BN254_STRUCTURES,
@@ -95,7 +154,7 @@ fn test_feature_gating_with_zk_on() {
 
     //
     // ZK & !ZKless
-    let (mut h, recipient) = init_feature_gating(
+    let (mut h, recipient, _) = init_feature_gating(
         vec![
             FeatureFlag::CRYPTOGRAPHY_ALGEBRA_NATIVES,
             FeatureFlag::BN254_STRUCTURES,
@@ -113,7 +172,7 @@ fn test_feature_gating_with_zk_on() {
 fn test_feature_gating_with_zk_off() {
     //
     // !ZK & ZKless
-    let (mut h, recipient) = init_feature_gating(
+    let (mut h, recipient, _) = init_feature_gating(
         vec![
             FeatureFlag::CRYPTOGRAPHY_ALGEBRA_NATIVES,
             FeatureFlag::BN254_STRUCTURES,
@@ -128,7 +187,7 @@ fn test_feature_gating_with_zk_off() {
 
     //
     // !ZK & !ZKless
-    let (mut h, recipient) = init_feature_gating(
+    let (mut h, recipient, _) = init_feature_gating(
         vec![
             FeatureFlag::CRYPTOGRAPHY_ALGEBRA_NATIVES,
             FeatureFlag::BN254_STRUCTURES,
@@ -213,7 +272,7 @@ fn create_and_spend_keyless_account(
     spend_keyless_account(h, sig, &account, recipient)
 }
 
-fn run_setup_script(h: &mut MoveHarness) {
+fn run_jwk_and_config_script(h: &mut MoveHarness) -> Account {
     let core_resources = h.new_account_at(AccountAddress::from_hex_literal("0xA550C18").unwrap());
 
     let package = build_package(
@@ -246,6 +305,40 @@ fn run_setup_script(h: &mut MoveHarness) {
         .sign();
 
     // NOTE: We cannot write the Configuration and Groth16Verification key via MoveHarness::set_resource
+    // because it does not (yet) work with resource groups.
+
+    assert_success!(h.run(txn));
+
+    core_resources
+}
+
+fn run_upgrade_vk_script(h: &mut MoveHarness, core_resources: Account, vk: Groth16VerificationKey) {
+    let package = build_package(
+        common::test_dir_path("keyless_new_vk.data/pack"),
+        aptos_framework::BuildOptions::default(),
+    )
+    .expect("building package must succeed");
+
+    let txn = h.create_publish_built_package(&core_resources, &package, |_| {});
+    assert_success!(h.run(txn));
+
+    let script = package.extract_script_code()[0].clone();
+
+    let txn = TransactionBuilder::new(core_resources.clone())
+        .script(Script::new(script, vec![], vec![
+            TransactionArgument::U8Vector(vk.alpha_g1),
+            TransactionArgument::U8Vector(vk.beta_g2),
+            TransactionArgument::U8Vector(vk.gamma_g2),
+            TransactionArgument::U8Vector(vk.delta_g2),
+            TransactionArgument::U8Vector(vk.gamma_abc_g1[0].clone()),
+            TransactionArgument::U8Vector(vk.gamma_abc_g1[1].clone()),
+        ]))
+        .sequence_number(h.sequence_number(core_resources.address()))
+        .max_gas_amount(1_000_000)
+        .gas_unit_price(1)
+        .sign();
+
+    // NOTE: We cannot write the Groth16Verification key via MoveHarness::set_resource
     // because it does not (yet) work with resource groups.
 
     assert_success!(h.run(txn));

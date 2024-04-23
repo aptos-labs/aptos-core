@@ -268,7 +268,10 @@ impl AptosVM {
         // via governance (although, currently, we do check for that in `keyless_account.move`).
         let pvk = keyless_validation::get_groth16_vk_onchain(resolver)
             .ok()
-            .and_then(|vk| vk.try_into().ok());
+            .and_then(|vk| {
+                // println!("[aptos-vm][groth16] PVK cached in VM: {}", vk.hash());
+                vk.try_into().ok()
+            });
 
         Self {
             is_simulation: false,
@@ -1589,6 +1592,7 @@ impl AptosVM {
             // Or, if we spawn a network without initializing the VK in genesis. Either way, it must
             // be handled here.
             if self.pvk.is_none() {
+                // println!("[aptos-vm][groth16] PVK has not been set on-chain");
                 return Err(invalid_signature!("Groth16 VK has not been set on-chain"));
             }
 

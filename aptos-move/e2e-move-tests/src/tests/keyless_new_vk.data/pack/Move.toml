@@ -1,5 +1,5 @@
 [package]
-name = 'InsertJwkAndUpdateMaxExpHorizon'
+name = 'UpdateGroth16VerificationKey'
 version = "0.0.0"
 
 [dependencies]
