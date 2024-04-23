@@ -1,7 +1,7 @@
 ///
 /// Vesting without staking contract
 ///
-module aptos_framework::vesting_without_staking {
+module supra_framework::vesting_without_staking {
     use std::bcs;
     use std::error;
     use std::fixed_point32::{Self, FixedPoint32};
@@ -12,17 +12,17 @@ module aptos_framework::vesting_without_staking {
     use aptos_std::simple_map::{Self, SimpleMap};
     use aptos_std::math64::min;
 
-    use aptos_framework::account::{Self, SignerCapability, new_event_handle};
-    use aptos_framework::aptos_account::{assert_account_is_registered_for_apt};
-    use aptos_framework::aptos_coin::AptosCoin;
-    use aptos_framework::coin::{Self, Coin};
-    use aptos_framework::event::{EventHandle, emit_event};
-    use aptos_framework::system_addresses;
-    use aptos_framework::timestamp;
+    use supra_framework::account::{Self, SignerCapability, new_event_handle};
+    use supra_framework::aptos_account::{assert_account_is_registered_for_apt};
+    use supra_framework::supra_coin::SupraCoin;
+    use supra_framework::coin::{Self, Coin};
+    use supra_framework::event::{EventHandle, emit_event};
+    use supra_framework::system_addresses;
+    use supra_framework::timestamp;
 
-    friend aptos_framework::genesis;
+    friend supra_framework::genesis;
 
-    const VESTING_POOL_SALT: vector<u8> = b"aptos_framework::vesting";
+    const VESTING_POOL_SALT: vector<u8> = b"supra_framework::vesting";
 
     /// Withdrawal address is invalid.
     const EINVALID_WITHDRAWAL_ADDRESS: u64 = 1;
@@ -286,7 +286,7 @@ module aptos_framework::vesting_without_staking {
     /// Create a vesting contract with a given configurations.
     public fun create_vesting_contract(
         admin: &signer,
-        buy_ins: SimpleMap<address, Coin<AptosCoin>>,
+        buy_ins: SimpleMap<address, Coin<SupraCoin>>,
         vesting_schedule: VestingSchedule,
         withdrawal_address: address,
         contract_creation_seed: vector<u8>,
@@ -300,7 +300,7 @@ module aptos_framework::vesting_without_staking {
         assert!(vector::length(shareholders_address) > 0, error::invalid_argument(ENO_SHAREHOLDERS));
 
         let shareholders = simple_map::create<address, VestingRecord>();
-        let grant = coin::zero<AptosCoin>();
+        let grant = coin::zero<SupraCoin>();
         let grant_amount = 0;
         let (shareholders_address, buy_ins) = simple_map::to_vec_pair(buy_ins);
         while (vector::length(&shareholders_address) > 0) {
@@ -430,7 +430,7 @@ module aptos_framework::vesting_without_staking {
             total_amount_left = total_amount_left + amount_to_add;
         };
 
-        let total_balance = coin::balance<AptosCoin>(contract_address);
+        let total_balance = coin::balance<SupraCoin>(contract_address);
         assert!(total_amount_left == total_balance, EBALANCE_MISMATCH);
         if (total_balance == 0) {
             set_terminate_vesting_contract(contract_address);
@@ -442,7 +442,7 @@ module aptos_framework::vesting_without_staking {
         let shareholder_record = vector::pop_back(vesting_records);
         let amount = min(shareholder_record.left_amount, fixed_point32::multiply_u64(shareholder_record.init_amount, vesting_fraction));
         let recipient_address = get_beneficiary(vesting_contract, shareholder);
-        coin::transfer<AptosCoin>(vesting_signer, recipient_address, amount);
+        coin::transfer<SupraCoin>(vesting_signer, recipient_address, amount);
         let shareholder_amount = simple_map::borrow_mut(&mut vesting_contract.shareholders, &shareholder);
         shareholder_amount.left_amount = shareholder_amount.left_amount - amount;
         shareholder_amount.left_amount
@@ -455,7 +455,7 @@ module aptos_framework::vesting_without_staking {
         verify_admin(admin, vesting_contract);
         let vesting_signer = get_vesting_account_signer_internal(vesting_contract);
         let shareholder_amount = simple_map::borrow(&vesting_contract.shareholders, &shareholder_address).left_amount;
-        coin::transfer<AptosCoin>(&vesting_signer, vesting_contract.withdrawal_address, shareholder_amount);
+        coin::transfer<SupraCoin>(&vesting_signer, vesting_contract.withdrawal_address, shareholder_amount);
         emit_event(
             &mut vesting_contract.admin_withdraw_events,
             AdminWithdrawEvent {
@@ -516,9 +516,9 @@ module aptos_framework::vesting_without_staking {
 
         let vesting_contract = borrow_global_mut<VestingContract>(contract_address);
         verify_admin(admin, vesting_contract);
-        let total_balance = coin::balance<AptosCoin>(contract_address);
+        let total_balance = coin::balance<SupraCoin>(contract_address);
         let vesting_signer  = get_vesting_account_signer_internal(vesting_contract);
-        coin::transfer<AptosCoin>(&vesting_signer, vesting_contract.withdrawal_address, total_balance);
+        coin::transfer<SupraCoin>(&vesting_signer, vesting_contract.withdrawal_address, total_balance);
 
         emit_event(
             &mut vesting_contract.admin_withdraw_events,
@@ -643,7 +643,7 @@ module aptos_framework::vesting_without_staking {
 
         let (account_signer, signer_cap) = account::create_resource_account(admin, seed);
         // Register the vesting contract account to receive APT
-        coin::register<AptosCoin>(&account_signer);
+        coin::register<SupraCoin>(&account_signer);
 
         (account_signer, signer_cap)
     }
@@ -684,10 +684,10 @@ module aptos_framework::vesting_without_staking {
 
 
     #[test_only]
-    use aptos_framework::stake;
+    use supra_framework::stake;
 
     #[test_only]
-    use aptos_framework::account::create_account_for_test;
+    use supra_framework::account::create_account_for_test;
 
     #[test_only]
     const GRANT_AMOUNT: u64 = 1000; // 1000 APT coins with 8 decimals.
@@ -700,10 +700,10 @@ module aptos_framework::vesting_without_staking {
 
 
     #[test_only]
-    public entry fun setup(aptos_framework: &signer, accounts: &vector<address>) {
-        use aptos_framework::aptos_account::create_account;
-        timestamp::set_time_has_started_for_testing(aptos_framework);
-        stake::initialize_for_test(aptos_framework);
+    public entry fun setup(supra_framework: &signer, accounts: &vector<address>) {
+        use supra_framework::aptos_account::create_account;
+        timestamp::set_time_has_started_for_testing(supra_framework);
+        stake::initialize_for_test(supra_framework);
         vector::for_each_ref(accounts, |addr| {
             let addr: address = *addr;
             if (!account::exists_at(addr)) {
@@ -748,7 +748,7 @@ module aptos_framework::vesting_without_staking {
             VESTING_PERIOD,
         );
 
-        let buy_ins = simple_map::create<address, Coin<AptosCoin>>();
+        let buy_ins = simple_map::create<address, Coin<SupraCoin>>();
         vector::enumerate_ref(shares, |i, share| {
             let shareholder = *vector::borrow(shareholders, i);
             simple_map::add(&mut buy_ins, shareholder, stake::mint_coins(*share));
@@ -763,10 +763,10 @@ module aptos_framework::vesting_without_staking {
         )
     }
 
-    #[test(aptos_framework = @0x1, admin = @0x123, shareholder_1 = @0x234, shareholder_2 = @0x345, withdrawal = @111)]
+    #[test(supra_framework = @0x1, admin = @0x123, shareholder_1 = @0x234, shareholder_2 = @0x345, withdrawal = @111)]
     #[expected_failure(abort_code = 0x30008, location = Self)]
     public entry fun test_termination_after_successful_vesting(
-        aptos_framework: &signer,
+        supra_framework: &signer,
         admin: &signer,
         shareholder_1: &signer,
         shareholder_2: &signer,
@@ -782,7 +782,7 @@ module aptos_framework::vesting_without_staking {
         let shares = &vector[shareholder_1_share, shareholder_2_share];
         // Create the vesting contract.
         setup(
-            aptos_framework, &vector[admin_address, withdrawal_address, shareholder_1_address, shareholder_2_address]);
+            supra_framework, &vector[admin_address, withdrawal_address, shareholder_1_address, shareholder_2_address]);
         // let contract_address = setup_vesting_contract(admin, shareholders, shares, withdrawal_address);
         let contract_address = setup_vesting_contract_with_schedule(
             admin,
@@ -796,23 +796,23 @@ module aptos_framework::vesting_without_staking {
         let vested_amount_1 = 0;
         let vested_amount_2 = 0;
 
-        assert!(coin::balance<AptosCoin>(contract_address) == GRANT_AMOUNT, 0);
-        assert!(coin::balance<AptosCoin>(shareholder_1_address) == vested_amount_1, 0);
-        assert!(coin::balance<AptosCoin>(shareholder_2_address) == vested_amount_2, 0);
+        assert!(coin::balance<SupraCoin>(contract_address) == GRANT_AMOUNT, 0);
+        assert!(coin::balance<SupraCoin>(shareholder_1_address) == vested_amount_1, 0);
+        assert!(coin::balance<SupraCoin>(shareholder_2_address) == vested_amount_2, 0);
 
         // Time is now at the start time, vest will unlock the first period, which is 2/10.
         timestamp::update_global_time_for_test_secs(vesting_start_secs(contract_address)+period_duration_secs(contract_address));
         vest(contract_address);
 
-        assert!(coin::balance<AptosCoin>(shareholder_1_address) == shareholder_1_share, 0);
-        assert!(coin::balance<AptosCoin>(shareholder_2_address) == shareholder_2_share, 0);
+        assert!(coin::balance<SupraCoin>(shareholder_1_address) == shareholder_1_share, 0);
+        assert!(coin::balance<SupraCoin>(shareholder_2_address) == shareholder_2_share, 0);
 
         vest(contract_address);
     }
 
-    #[test(aptos_framework = @0x1, admin = @0x123, shareholder_1 = @0x234, shareholder_2 = @0x345, withdrawal = @111)]
+    #[test(supra_framework = @0x1, admin = @0x123, shareholder_1 = @0x234, shareholder_2 = @0x345, withdrawal = @111)]
     public entry fun test_end_to_end(
-        aptos_framework: &signer,
+        supra_framework: &signer,
         admin: &signer,
         shareholder_1: &signer,
         shareholder_2: &signer,
@@ -828,171 +828,171 @@ module aptos_framework::vesting_without_staking {
         let shares = &vector[shareholder_1_share, shareholder_2_share];
         // Create the vesting contract.
         setup(
-            aptos_framework, &vector[admin_address, withdrawal_address, shareholder_1_address, shareholder_2_address]);
+            supra_framework, &vector[admin_address, withdrawal_address, shareholder_1_address, shareholder_2_address]);
         let contract_address = setup_vesting_contract(admin, shareholders, shares, withdrawal_address);
         assert!(vector::length(&borrow_global<AdminStore>(admin_address).vesting_contracts) == 1, 0);
         let vested_amount_1 = 0;
         let vested_amount_2 = 0;
         // Because the time is behind the start time, vest will do nothing.
         vest(contract_address);
-        assert!(coin::balance<AptosCoin>(contract_address) == GRANT_AMOUNT, 0);
-        assert!(coin::balance<AptosCoin>(shareholder_1_address) == vested_amount_1, 0);
-        assert!(coin::balance<AptosCoin>(shareholder_2_address) == vested_amount_2, 0);
+        assert!(coin::balance<SupraCoin>(contract_address) == GRANT_AMOUNT, 0);
+        assert!(coin::balance<SupraCoin>(shareholder_1_address) == vested_amount_1, 0);
+        assert!(coin::balance<SupraCoin>(shareholder_2_address) == vested_amount_2, 0);
 
         // Time is now at the start time, vest will unlock the first period, which is 2/10.
         timestamp::update_global_time_for_test_secs(vesting_start_secs(contract_address)+period_duration_secs(contract_address));
         vest(contract_address);
         vested_amount_1 = vested_amount_1 + fraction(shareholder_1_share, 2, 10);
         vested_amount_2 = vested_amount_2 + fraction(shareholder_2_share, 2, 10);
-        assert!(coin::balance<AptosCoin>(shareholder_1_address) == vested_amount_1, 0);
-        assert!(coin::balance<AptosCoin>(shareholder_2_address) == vested_amount_2, 0);
+        assert!(coin::balance<SupraCoin>(shareholder_1_address) == vested_amount_1, 0);
+        assert!(coin::balance<SupraCoin>(shareholder_2_address) == vested_amount_2, 0);
 
         timestamp::update_global_time_for_test_secs(vesting_start_secs(contract_address)+period_duration_secs(contract_address)*2);
         vest(contract_address);
         vested_amount_1 = vested_amount_1 + fraction(shareholder_1_share, 2, 10);
         vested_amount_2 = vested_amount_2 + fraction(shareholder_2_share, 2, 10);
-        assert!(coin::balance<AptosCoin>(shareholder_1_address) == vested_amount_1, 0);
-        assert!(coin::balance<AptosCoin>(shareholder_2_address) == vested_amount_2, 0);
+        assert!(coin::balance<SupraCoin>(shareholder_1_address) == vested_amount_1, 0);
+        assert!(coin::balance<SupraCoin>(shareholder_2_address) == vested_amount_2, 0);
 
         timestamp::update_global_time_for_test_secs(vesting_start_secs(contract_address)+period_duration_secs(contract_address)*3);
         vest(contract_address);
         vested_amount_1 = vested_amount_1 + fraction(shareholder_1_share, 1, 10);
         vested_amount_2 = vested_amount_2 + fraction(shareholder_2_share, 1, 10);
-        assert!(coin::balance<AptosCoin>(shareholder_1_address) == vested_amount_1, 0);
-        assert!(coin::balance<AptosCoin>(shareholder_2_address) == vested_amount_2, 0);
+        assert!(coin::balance<SupraCoin>(shareholder_1_address) == vested_amount_1, 0);
+        assert!(coin::balance<SupraCoin>(shareholder_2_address) == vested_amount_2, 0);
 
         timestamp::update_global_time_for_test_secs(vesting_start_secs(contract_address)+period_duration_secs(contract_address)*4);
         vest(contract_address);
         vested_amount_1 = vested_amount_1 + fraction(shareholder_1_share, 1, 10);
         vested_amount_2 = vested_amount_2 + fraction(shareholder_2_share, 1, 10);
-        assert!(coin::balance<AptosCoin>(shareholder_1_address) == vested_amount_1, 0);
-        assert!(coin::balance<AptosCoin>(shareholder_2_address) == vested_amount_2, 0);
+        assert!(coin::balance<SupraCoin>(shareholder_1_address) == vested_amount_1, 0);
+        assert!(coin::balance<SupraCoin>(shareholder_2_address) == vested_amount_2, 0);
 
         timestamp::update_global_time_for_test_secs(vesting_start_secs(contract_address)+period_duration_secs(contract_address)*5);
         vest(contract_address);
         vested_amount_1 = vested_amount_1 + fraction(shareholder_1_share, 1, 10);
         vested_amount_2 = vested_amount_2 + fraction(shareholder_2_share, 1, 10);
-        assert!(coin::balance<AptosCoin>(shareholder_1_address) == vested_amount_1, 0);
-        assert!(coin::balance<AptosCoin>(shareholder_2_address) == vested_amount_2, 0);
+        assert!(coin::balance<SupraCoin>(shareholder_1_address) == vested_amount_1, 0);
+        assert!(coin::balance<SupraCoin>(shareholder_2_address) == vested_amount_2, 0);
 
         timestamp::update_global_time_for_test_secs(vesting_start_secs(contract_address)+period_duration_secs(contract_address)*6);
         vest(contract_address);
         vested_amount_1 = vested_amount_1 + fraction(shareholder_1_share, 1, 10);
         vested_amount_2 = vested_amount_2 + fraction(shareholder_2_share, 1, 10);
-        assert!(coin::balance<AptosCoin>(shareholder_1_address) == vested_amount_1, 0);
-        assert!(coin::balance<AptosCoin>(shareholder_2_address) == vested_amount_2, 0);
+        assert!(coin::balance<SupraCoin>(shareholder_1_address) == vested_amount_1, 0);
+        assert!(coin::balance<SupraCoin>(shareholder_2_address) == vested_amount_2, 0);
 
         timestamp::update_global_time_for_test_secs(vesting_start_secs(contract_address)+period_duration_secs(contract_address)*7);
         vest(contract_address);
         vested_amount_1 = vested_amount_1 + fraction(shareholder_1_share, 1, 10);
         vested_amount_2 = vested_amount_2 + fraction(shareholder_2_share, 1, 10);
-        assert!(coin::balance<AptosCoin>(shareholder_1_address) == vested_amount_1, 0);
-        assert!(coin::balance<AptosCoin>(shareholder_2_address) == vested_amount_2, 0);
+        assert!(coin::balance<SupraCoin>(shareholder_1_address) == vested_amount_1, 0);
+        assert!(coin::balance<SupraCoin>(shareholder_2_address) == vested_amount_2, 0);
 
         timestamp::update_global_time_for_test_secs(vesting_start_secs(contract_address)+period_duration_secs(contract_address)*8);
         vest(contract_address);
         vested_amount_1 = vested_amount_1 + fraction(shareholder_1_share, 1, 10);
         vested_amount_2 = vested_amount_2 + fraction(shareholder_2_share, 1, 10);
-        assert!(coin::balance<AptosCoin>(shareholder_1_address) == vested_amount_1, 0);
-        assert!(coin::balance<AptosCoin>(shareholder_2_address) == vested_amount_2, 0);
+        assert!(coin::balance<SupraCoin>(shareholder_1_address) == vested_amount_1, 0);
+        assert!(coin::balance<SupraCoin>(shareholder_2_address) == vested_amount_2, 0);
 
         timestamp::update_global_time_for_test_secs(vesting_start_secs(contract_address)+period_duration_secs(contract_address)*9);
         vest(contract_address);
         vested_amount_1 = shareholder_1_share;
         vested_amount_2 = shareholder_2_share;
-        assert!(coin::balance<AptosCoin>(shareholder_1_address) == vested_amount_1, 0);
-        assert!(coin::balance<AptosCoin>(shareholder_2_address) == vested_amount_2, 0);
+        assert!(coin::balance<SupraCoin>(shareholder_1_address) == vested_amount_1, 0);
+        assert!(coin::balance<SupraCoin>(shareholder_2_address) == vested_amount_2, 0);
     }
 
-    #[test(aptos_framework = @0x1, admin = @0x123)]
+    #[test(supra_framework = @0x1, admin = @0x123)]
     #[expected_failure(abort_code = 0x1000C, location = Self)]
     public entry fun test_create_vesting_contract_with_zero_grant_should_fail(
-        aptos_framework: &signer,
+        supra_framework: &signer,
         admin: &signer,
     ) acquires AdminStore {
         let admin_address = signer::address_of(admin);
-        setup(aptos_framework, &vector[admin_address]);
+        setup(supra_framework, &vector[admin_address]);
         setup_vesting_contract(admin, &vector[@1], &vector[0], admin_address);
     }
 
-    #[test(aptos_framework = @0x1, admin = @0x123)]
+    #[test(supra_framework = @0x1, admin = @0x123)]
     #[expected_failure(abort_code = 0x10004, location = Self)]
     public entry fun test_create_vesting_contract_with_no_shareholders_should_fail(
-        aptos_framework: &signer,
+        supra_framework: &signer,
         admin: &signer,
     ) acquires AdminStore {
         let admin_address = signer::address_of(admin);
-        setup(aptos_framework, &vector[admin_address]);
+        setup(supra_framework, &vector[admin_address]);
         setup_vesting_contract(admin, &vector[], &vector[], admin_address);
     }
 
-    #[test(aptos_framework = @0x1, admin = @0x123)]
-    #[expected_failure(abort_code = 0x60001, location = aptos_framework::aptos_account)]
+    #[test(supra_framework = @0x1, admin = @0x123)]
+    #[expected_failure(abort_code = 0x60001, location = supra_framework::aptos_account)]
     public entry fun test_create_vesting_contract_with_invalid_withdrawal_address_should_fail(
-        aptos_framework: &signer,
+        supra_framework: &signer,
         admin: &signer,
     ) acquires AdminStore {
         let admin_address = signer::address_of(admin);
-        setup(aptos_framework, &vector[admin_address]);
+        setup(supra_framework, &vector[admin_address]);
         setup_vesting_contract(admin, &vector[@1, @2], &vector[1], @5);
     }
 
-    #[test(aptos_framework = @0x1, admin = @0x123)]
-    #[expected_failure(abort_code = 0x60001, location = aptos_framework::aptos_account)]
+    #[test(supra_framework = @0x1, admin = @0x123)]
+    #[expected_failure(abort_code = 0x60001, location = supra_framework::aptos_account)]
     public entry fun test_create_vesting_contract_with_missing_withdrawal_account_should_fail(
-        aptos_framework: &signer,
+        supra_framework: &signer,
         admin: &signer,
     ) acquires AdminStore {
         let admin_address = signer::address_of(admin);
-        setup(aptos_framework, &vector[admin_address]);
+        setup(supra_framework, &vector[admin_address]);
         setup_vesting_contract(admin, &vector[@1, @2], &vector[1], @11);
     }
 
-    #[test(aptos_framework = @0x1, admin = @0x123)]
-    #[expected_failure(abort_code = 0x60002, location = aptos_framework::aptos_account)]
+    #[test(supra_framework = @0x1, admin = @0x123)]
+    #[expected_failure(abort_code = 0x60002, location = supra_framework::aptos_account)]
     public entry fun test_create_vesting_contract_with_unregistered_withdrawal_account_should_fail(
-        aptos_framework: &signer,
+        supra_framework: &signer,
         admin: &signer,
     ) acquires AdminStore {
         let admin_address = signer::address_of(admin);
-        setup(aptos_framework, &vector[admin_address]);
+        setup(supra_framework, &vector[admin_address]);
         create_account_for_test(@11);
         setup_vesting_contract(admin, &vector[@1, @2], &vector[1], @11);
     }
 
 
-    #[test(aptos_framework = @0x1)]
+    #[test(supra_framework = @0x1)]
     #[expected_failure(abort_code = 0x10002, location = Self)]
-    public entry fun test_create_empty_vesting_schedule_should_fail(aptos_framework: &signer) {
-        setup(aptos_framework, &vector[]);
+    public entry fun test_create_empty_vesting_schedule_should_fail(supra_framework: &signer) {
+        setup(supra_framework, &vector[]);
         create_vesting_schedule(vector[], 1, 1);
     }
 
-    #[test(aptos_framework = @0x1)]
+    #[test(supra_framework = @0x1)]
     #[expected_failure(abort_code = 0x10002, location = Self)]
-    public entry fun test_create_first_element_zero_vesting_schedule_should_fail(aptos_framework: &signer) {
-        setup(aptos_framework, &vector[]);
+    public entry fun test_create_first_element_zero_vesting_schedule_should_fail(supra_framework: &signer) {
+        setup(supra_framework, &vector[]);
         create_vesting_schedule(vector[fixed_point32::create_from_raw_value(0), fixed_point32::create_from_raw_value(8)], 1, 1);
     }
 
-    #[test(aptos_framework = @0x1)]
+    #[test(supra_framework = @0x1)]
     #[expected_failure(abort_code = 0x10002, location = Self)]
-    public entry fun test_create_last_element_zero_vesting_schedule_should_fail(aptos_framework: &signer) {
-        setup(aptos_framework, &vector[]);
+    public entry fun test_create_last_element_zero_vesting_schedule_should_fail(supra_framework: &signer) {
+        setup(supra_framework, &vector[]);
         create_vesting_schedule(vector[ fixed_point32::create_from_raw_value(8), fixed_point32::create_from_raw_value(0)], 1, 1);
     }
 
-    #[test(aptos_framework = @0x1)]
+    #[test(supra_framework = @0x1)]
     #[expected_failure(abort_code = 0x10003, location = Self)]
-    public entry fun test_create_vesting_schedule_with_zero_period_duration_should_fail(aptos_framework: &signer) {
-        setup(aptos_framework, &vector[]);
+    public entry fun test_create_vesting_schedule_with_zero_period_duration_should_fail(supra_framework: &signer) {
+        setup(supra_framework, &vector[]);
         create_vesting_schedule(vector[fixed_point32::create_from_rational(1, 1)], 1, 0);
     }
 
-    #[test(aptos_framework = @0x1, admin = @0x123)]
+    #[test(supra_framework = @0x1, admin = @0x123)]
     #[expected_failure(abort_code = 0x10006, location = Self)]
-    public entry fun test_create_vesting_schedule_with_invalid_vesting_start_should_fail(aptos_framework: &signer) {
-        setup(aptos_framework, &vector[]);
+    public entry fun test_create_vesting_schedule_with_invalid_vesting_start_should_fail(supra_framework: &signer) {
+        setup(supra_framework, &vector[]);
         timestamp::update_global_time_for_test_secs(1000);
         create_vesting_schedule(
             vector[fixed_point32::create_from_rational(1, 1)],
@@ -1000,15 +1000,15 @@ module aptos_framework::vesting_without_staking {
             1);
     }
 
-    #[test(aptos_framework = @0x1, admin = @0x123, shareholder = @0x234)]
+    #[test(supra_framework = @0x1, admin = @0x123, shareholder = @0x234)]
     public entry fun test_last_vest_should_distribute_remaining_amount(
-        aptos_framework: &signer,
+        supra_framework: &signer,
         admin: &signer,
         shareholder: &signer,
     ) acquires AdminStore, VestingContract {
         let admin_address = signer::address_of(admin);
         let shareholder_address = signer::address_of(shareholder);
-        setup(aptos_framework, &vector[admin_address, shareholder_address]);
+        setup(supra_framework, &vector[admin_address, shareholder_address]);
         let contract_address = setup_vesting_contract_with_schedule(
             admin,
             &vector[shareholder_address],
@@ -1033,16 +1033,16 @@ module aptos_framework::vesting_without_staking {
         assert!(remaining_grant(contract_address, shareholder_address) == remaining_grant, 0);
     }
 
-    #[test(aptos_framework = @0x1, admin = @0x123, shareholder = @0x234)]
+    #[test(supra_framework = @0x1, admin = @0x123, shareholder = @0x234)]
     #[expected_failure(abort_code = 0x30008, location = Self)]
     public entry fun test_cannot_vest_after_contract_is_terminated(
-        aptos_framework: &signer,
+        supra_framework: &signer,
         admin: &signer,
         shareholder: &signer,
     ) acquires AdminStore, VestingContract {
         let admin_address = signer::address_of(admin);
         let shareholder_address = signer::address_of(shareholder);
-        setup(aptos_framework, &vector[admin_address, shareholder_address]);
+        setup(supra_framework, &vector[admin_address, shareholder_address]);
         let contract_address = setup_vesting_contract(
             admin, &vector[shareholder_address], &vector[GRANT_AMOUNT], admin_address);
 
@@ -1051,16 +1051,16 @@ module aptos_framework::vesting_without_staking {
         vest(contract_address);
     }
 
-    #[test(aptos_framework = @0x1, admin = @0x123, shareholder = @0x234)]
+    #[test(supra_framework = @0x1, admin = @0x123, shareholder = @0x234)]
     #[expected_failure(abort_code = 0x30008, location = Self)]
     public entry fun test_cannot_terminate_twice(
-        aptos_framework: &signer,
+        supra_framework: &signer,
         admin: &signer,
         shareholder: &signer,
     ) acquires AdminStore, VestingContract {
         let admin_address = signer::address_of(admin);
         let shareholder_address = signer::address_of(shareholder);
-        setup(aptos_framework, &vector[admin_address, shareholder_address]);
+        setup(supra_framework, &vector[admin_address, shareholder_address]);
         let contract_address = setup_vesting_contract(
             admin, &vector[shareholder_address], &vector[GRANT_AMOUNT], admin_address);
 
@@ -1069,16 +1069,16 @@ module aptos_framework::vesting_without_staking {
         terminate_vesting_contract(admin, contract_address);
     }
 
-    #[test(aptos_framework = @0x1, admin = @0x123, shareholder = @0x234)]
+    #[test(supra_framework = @0x1, admin = @0x123, shareholder = @0x234)]
     #[expected_failure(abort_code = 0x30009, location = Self)]
     public entry fun test_cannot_call_admin_withdraw_if_contract_is_not_terminated(
-        aptos_framework: &signer,
+        supra_framework: &signer,
         admin: &signer,
         shareholder: &signer,
     ) acquires AdminStore, VestingContract {
         let admin_address = signer::address_of(admin);
         let shareholder_address = signer::address_of(shareholder);
-        setup(aptos_framework, &vector[admin_address, shareholder_address]);
+        setup(supra_framework, &vector[admin_address, shareholder_address]);
         let contract_address = setup_vesting_contract(
             admin, &vector[shareholder_address], &vector[GRANT_AMOUNT], admin_address);
 
@@ -1086,40 +1086,40 @@ module aptos_framework::vesting_without_staking {
         admin_withdraw(admin, contract_address);
     }
 
-    #[test(aptos_framework = @0x1, admin = @0x123)]
-    #[expected_failure(abort_code = 0x60001, location = aptos_framework::aptos_account)]
+    #[test(supra_framework = @0x1, admin = @0x123)]
+    #[expected_failure(abort_code = 0x60001, location = supra_framework::aptos_account)]
     public entry fun test_set_beneficiary_with_missing_account_should_fail(
-        aptos_framework: &signer,
+        supra_framework: &signer,
         admin: &signer,
     ) acquires AdminStore, VestingContract {
         let admin_address = signer::address_of(admin);
-        setup(aptos_framework, &vector[admin_address]);
+        setup(supra_framework, &vector[admin_address]);
         let contract_address = setup_vesting_contract(
             admin, &vector[@1, @2], &vector[GRANT_AMOUNT, GRANT_AMOUNT], admin_address);
         set_beneficiary(admin, contract_address, @1, @11);
     }
 
-    #[test(aptos_framework = @0x1, admin = @0x123)]
-    #[expected_failure(abort_code = 0x60002, location = aptos_framework::aptos_account)]
+    #[test(supra_framework = @0x1, admin = @0x123)]
+    #[expected_failure(abort_code = 0x60002, location = supra_framework::aptos_account)]
     public entry fun test_set_beneficiary_with_unregistered_account_should_fail(
-        aptos_framework: &signer,
+        supra_framework: &signer,
         admin: &signer,
     ) acquires AdminStore, VestingContract {
         let admin_address = signer::address_of(admin);
-        setup(aptos_framework, &vector[admin_address]);
+        setup(supra_framework, &vector[admin_address]);
         let contract_address = setup_vesting_contract(
             admin, &vector[@1, @2], &vector[GRANT_AMOUNT, GRANT_AMOUNT], admin_address);
         create_account_for_test(@11);
         set_beneficiary(admin, contract_address, @1, @11);
     }
 
-    #[test(aptos_framework = @0x1, admin = @0x123)]
+    #[test(supra_framework = @0x1, admin = @0x123)]
     public entry fun test_set_beneficiary_should_send_distribution(
-        aptos_framework: &signer,
+        supra_framework: &signer,
         admin: &signer,
     ) acquires AdminStore, VestingContract {
         let admin_address = signer::address_of(admin);
-        setup(aptos_framework, &vector[admin_address, @11]);
+        setup(supra_framework, &vector[admin_address, @11]);
         let contract_address = setup_vesting_contract(
             admin, &vector[@1], &vector[GRANT_AMOUNT], admin_address);
         set_beneficiary(admin, contract_address, @1, @11);
@@ -1130,17 +1130,17 @@ module aptos_framework::vesting_without_staking {
         vest(contract_address);
 
         let vested_amount = fraction(GRANT_AMOUNT, 2, 10);
-        let balance = coin::balance<AptosCoin>(@11);
+        let balance = coin::balance<SupraCoin>(@11);
         assert!(balance == vested_amount, balance);
     }
 
-    #[test(aptos_framework = @0x1, admin = @0x123)]
+    #[test(supra_framework = @0x1, admin = @0x123)]
     public entry fun test_set_management_role(
-        aptos_framework: &signer,
+        supra_framework: &signer,
         admin: &signer,
     ) acquires AdminStore, VestingAccountManagement, VestingContract {
         let admin_address = signer::address_of(admin);
-        setup(aptos_framework, &vector[admin_address]);
+        setup(supra_framework, &vector[admin_address]);
         let contract_address = setup_vesting_contract(
             admin, &vector[@11], &vector[GRANT_AMOUNT], admin_address);
         let role = utf8(b"RANDOM");
@@ -1150,13 +1150,13 @@ module aptos_framework::vesting_without_staking {
         assert!(get_role_holder(contract_address, role) == @13, 0);
     }
 
-    #[test(aptos_framework = @0x1, admin = @0x123)]
+    #[test(supra_framework = @0x1, admin = @0x123)]
     public entry fun test_reset_beneficiary(
-        aptos_framework: &signer,
+        supra_framework: &signer,
         admin: &signer,
     ) acquires AdminStore, VestingAccountManagement, VestingContract {
         let admin_address = signer::address_of(admin);
-        setup(aptos_framework, &vector[admin_address, @11, @12]);
+        setup(supra_framework, &vector[admin_address, @11, @12]);
         let contract_address = setup_vesting_contract(
             admin, &vector[@11], &vector[GRANT_AMOUNT], admin_address);
         set_beneficiary(admin, contract_address, @11, @12);
@@ -1170,18 +1170,18 @@ module aptos_framework::vesting_without_staking {
         reset_beneficiary(admin, contract_address, @11);
 
         let vested_amount = fraction(GRANT_AMOUNT, 2, 10);
-        assert!(coin::balance<AptosCoin>(@12) == vested_amount, 0);
-        assert!(coin::balance<AptosCoin>(@11) == 0, 1);
+        assert!(coin::balance<SupraCoin>(@12) == vested_amount, 0);
+        assert!(coin::balance<SupraCoin>(@11) == 0, 1);
     }
 
-    #[test(aptos_framework = @0x1, admin = @0x123, resetter = @0x234)]
+    #[test(supra_framework = @0x1, admin = @0x123, resetter = @0x234)]
     public entry fun test_reset_beneficiary_with_resetter_role(
-        aptos_framework: &signer,
+        supra_framework: &signer,
         admin: &signer,
         resetter: &signer,
     ) acquires AdminStore, VestingAccountManagement, VestingContract {
         let admin_address = signer::address_of(admin);
-        setup(aptos_framework, &vector[admin_address, @11, @12]);
+        setup(supra_framework, &vector[admin_address, @11, @12]);
         let contract_address = setup_vesting_contract(
             admin, &vector[@11], &vector[GRANT_AMOUNT], admin_address);
         set_beneficiary(admin, contract_address, @11, @12);
@@ -1195,16 +1195,16 @@ module aptos_framework::vesting_without_staking {
         assert!(beneficiary(contract_address, @11) == @11, 0);
     }
 
-    #[test(aptos_framework = @0x1, admin = @0x123, resetter = @0x234, random = @0x345)]
+    #[test(supra_framework = @0x1, admin = @0x123, resetter = @0x234, random = @0x345)]
     #[expected_failure(abort_code = 0x5000F, location = Self)]
     public entry fun test_reset_beneficiary_with_unauthorized(
-        aptos_framework: &signer,
+        supra_framework: &signer,
         admin: &signer,
         resetter: &signer,
         random: &signer,
     ) acquires AdminStore, VestingAccountManagement, VestingContract {
         let admin_address = signer::address_of(admin);
-        setup(aptos_framework, &vector[admin_address, @11]);
+        setup(supra_framework, &vector[admin_address, @11]);
         let contract_address = setup_vesting_contract(
             admin, &vector[@11], &vector[GRANT_AMOUNT], admin_address);
 
@@ -1213,13 +1213,13 @@ module aptos_framework::vesting_without_staking {
         reset_beneficiary(random, contract_address, @11);
     }
 
-    #[test(aptos_framework = @0x1, admin = @0x123)]
+    #[test(supra_framework = @0x1, admin = @0x123)]
     public entry fun test_shareholder(
-        aptos_framework: &signer,
+        supra_framework: &signer,
         admin: &signer,
     ) acquires AdminStore, VestingContract {
         let admin_address = signer::address_of(admin);
-        setup(aptos_framework, &vector[admin_address, @11, @12]);
+        setup(supra_framework, &vector[admin_address, @11, @12]);
         let contract_address = setup_vesting_contract(
             admin, &vector[@11], &vector[GRANT_AMOUNT], admin_address);
 

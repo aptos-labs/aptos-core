@@ -6,15 +6,15 @@
 /// requirements:
 /// 1. two committee has different id
 /// 2. two indentical node should not be in the same committee
-module aptos_framework::dora_committee {
+module supra_framework::dora_committee {
     use std::error;
     use std::option;
     use std::signer;
     use std::vector;
     use aptos_std::capability;
-    use aptos_framework::event::{emit_event, EventHandle};
+    use supra_framework::event::{emit_event, EventHandle};
     use aptos_std::simple_map::{Self, SimpleMap};
-    use aptos_framework::account::{Self, new_event_handle};
+    use supra_framework::account::{Self, new_event_handle};
 
     /// The number of committee is not equal to the number of committee member
     const INVALID_COMMITTEE_NUMBERS: u64 = 4;
@@ -36,7 +36,7 @@ module aptos_framework::dora_committee {
     const CLAN: u8 = 2;
     const TRIBE: u8 = 3;
 
-    const SEED_COMMITTEE: vector<u8> = b"aptos_framework::dora_committee::CommitteeInfoStore";
+    const SEED_COMMITTEE: vector<u8> = b"supra_framework::dora_committee::CommitteeInfoStore";
 
     /// Capability that grants an owner the right to perform action.
     struct OwnerCap has drop {}
