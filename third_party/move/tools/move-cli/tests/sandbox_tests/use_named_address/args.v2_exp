@@ -1,0 +1,12 @@
+Command `sandbox publish`:
+[0m[1m[38;5;9merror[0m[1m: duplicate declaration, item, or annotation[0m
+  [0m[34m┌─[0m ./sources/M_no_named.move:1:14
+  [0m[34m│[0m
+[0m[34m1[0m [0m[34m│[0m module 0x42::[0m[31mM[0m {
+  [0m[34m│[0m              [0m[31m^[0m [0m[31mDuplicate definition for module '0x42::M'[0m
+  [0m[34m│[0m
+  [0m[34m┌─[0m ./sources/M.move:1:11
+  [0m[34m│[0m
+[0m[34m1[0m [0m[34m│[0m module A::M {
+  [0m[34m│[0m           [0m[34m-[0m [0m[34mModule previously defined here, with '(A=0x42)::M'[0m
+

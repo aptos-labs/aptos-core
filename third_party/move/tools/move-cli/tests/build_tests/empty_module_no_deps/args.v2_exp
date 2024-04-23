@@ -1,0 +1,8 @@
+Command `build -v`:
+BUILDING A
+[0m[1m[38;5;11mwarning[0m[1m: unknown attribute[0m
+  [0m[34m┌─[0m ./sources/A.move:1:3
+  [0m[34m│[0m
+[0m[34m1[0m [0m[34m│[0m #[[0m[33mevm_contract[0m] // for passing evm test flavor
+  [0m[34m│[0m   [0m[33m^^^^^^^^^^^^[0m [0m[33mAttribute name 'evm_contract' is unknown (use --skip-attribute-checks CLI option to ignore); known attributes are '{"bytecode_instruction", "deprecated", "expected_failure", "native_interface", "test", "test_only", "verify_only"}'.[0m
+
