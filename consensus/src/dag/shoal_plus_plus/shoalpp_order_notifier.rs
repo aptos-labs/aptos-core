@@ -139,6 +139,7 @@ impl ShoalppOrderNotifier {
             .collect();
 
         let consensus_data_hash = self.committed_anchors_to_hashvalue();
+        let num_validators = self.epoch_state.verifier.len();
         Some(OrderedBlocks {
             ordered_blocks: vec![block],
             ordered_proof: LedgerInfoWithSignatures::new(
@@ -151,7 +152,7 @@ impl ShoalppOrderNotifier {
                     let committed_rounds =
                         commit_decision.get_highest_committed_rounds_for_shoalpp();
                     dag_vec.iter().enumerate().for_each(|(dag_id, dag)| {
-                        let round = committed_rounds[dag_id];
+                        let round = committed_rounds[dag_id] / num_validators as u64;
                         dag.write().commit_callback(round);
                     });
                     ledger_info_provider

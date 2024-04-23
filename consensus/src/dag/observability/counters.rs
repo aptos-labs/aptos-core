@@ -3,18 +3,19 @@
 
 use aptos_metrics_core::{
     register_histogram, register_histogram_vec, register_int_counter, register_int_counter_vec,
-    register_int_gauge, Histogram, HistogramVec, IntCounter, IntCounterVec, IntGauge,
+    register_int_gauge, register_int_gauge_vec, Histogram, HistogramVec, IntCounter, IntCounterVec,
+    IntGauge, IntGaugeVec,
 };
 use once_cell::sync::Lazy;
 
 const HIGH_LATENCY_BUCKETS: &[f64] = &[
-    0.005, 0.01, 0.02, 0.03, 0.05, 0.1, 0.2, 0.3, 0.4, 0.5, 0.6, 0.7, 0.8, 0.9, 1.0, 1.1, 1.2, 1.3, 1.4, 1.5, 
-    1.6, 1.7, 1.8, 1.9, 2.0, 3.0, 4.0, 5.0, 6.0, 7.0, 8.0, 9.0, 10.0,
+    0.005, 0.01, 0.02, 0.03, 0.05, 0.1, 0.2, 0.3, 0.4, 0.5, 0.6, 0.7, 0.8, 0.9, 1.0, 1.1, 1.2, 1.3,
+    1.4, 1.5, 1.6, 1.7, 1.8, 1.9, 2.0, 3.0, 4.0, 5.0, 6.0, 7.0, 8.0, 9.0, 10.0,
 ];
 
 const LOW_LATENCY_BUCKETS: &[f64] = &[
-    0.001, 0.002, 0.005, 0.01, 0.02, 0.03, 0.05, 0.06, 0.07, 0.08, 0.09, 0.1, 0.2, 0.3, 0.4, 0.5, 0.6, 0.7, 0.8, 0.9, 1.0, 1.2, 1.4, 
-    1.6, 1.8, 2.0, 3.0, 4.0, 5.0, 6.0, 7.0, 8.0, 9.0, 10.0,
+    0.001, 0.002, 0.005, 0.01, 0.02, 0.03, 0.05, 0.06, 0.07, 0.08, 0.09, 0.1, 0.2, 0.3, 0.4, 0.5,
+    0.6, 0.7, 0.8, 0.9, 1.0, 1.2, 1.4, 1.6, 1.8, 2.0, 3.0, 4.0, 5.0, 6.0, 7.0, 8.0, 9.0, 10.0,
 ];
 
 /// Traces node latency movement throughout the DAG
@@ -22,7 +23,7 @@ pub static NODE_TRACING: Lazy<HistogramVec> = Lazy::new(|| {
     register_histogram_vec!(
         "aptos_consensus_dag_node_tracing",
         "Histogram for different stages of a node",
-        &["stage"],
+        &["dag_id", "stage"],
         HIGH_LATENCY_BUCKETS.to_vec(),
     )
     .unwrap()
@@ -33,17 +34,18 @@ pub static ROUND_TRACING: Lazy<HistogramVec> = Lazy::new(|| {
     register_histogram_vec!(
         "aptos_consensus_dag_round_tracing",
         "Histogram for different stages of a round",
-        &["stage"],
+        &["dag_id", "stage"],
         HIGH_LATENCY_BUCKETS.to_vec(),
     )
     .unwrap()
 });
 
 /// This counter is set to the last round reported by the local round_state.
-pub static CURRENT_ROUND: Lazy<IntGauge> = Lazy::new(|| {
-    register_int_gauge!(
+pub static CURRENT_ROUND: Lazy<IntGaugeVec> = Lazy::new(|| {
+    register_int_gauge_vec!(
         "aptos_consensus_dag_current_round",
-        "This counter is set to the last round reported by the dag driver."
+        "This counter is set to the last round reported by the dag driver.",
+        &["dag_id"],
     )
     .unwrap()
 });
@@ -137,8 +139,6 @@ pub static TIMEOUT_WAIT_VOTING_POWER_COUNT: Lazy<IntCounter> = Lazy::new(|| {
     )
     .unwrap()
 });
-
-
 
 pub static RPC_PROCESS_DURATION: Lazy<HistogramVec> = Lazy::new(|| {
     register_histogram_vec!(

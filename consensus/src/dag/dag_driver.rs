@@ -274,7 +274,9 @@ impl DagDriver {
             }
 
             debug!(LogSchema::new(LogEvent::NewRound).round(new_round));
-            counters::CURRENT_ROUND.set(new_round as i64);
+            counters::CURRENT_ROUND
+                .with_label_values(&[&self.dag_id.to_string()])
+                .set(new_round as i64);
 
             let strong_links = dag_reader
                 .get_strong_links_for_round(new_round - 1, &self.epoch_state.verifier)
@@ -386,8 +388,12 @@ impl DagDriver {
         let rb2 = self.broadcast_sender.clone();
         let (abort_handle, abort_registration) = AbortHandle::new_pair();
         let (tx, rx) = oneshot::channel();
-        let signature_builder =
-            SignatureBuilder::new(node.metadata().clone(), self.epoch_state.clone(), tx);
+        let signature_builder = SignatureBuilder::new(
+            self.dag_id,
+            node.metadata().clone(),
+            self.epoch_state.clone(),
+            tx,
+        );
         let cert_ack_set = CertificateAckState::new(self.epoch_state.verifier.len());
         let latest_ledger_info = self.ledger_info_provider.clone();
 
@@ -437,7 +443,7 @@ impl DagDriver {
                 error!("channel closed before receiving certificate");
                 return;
             };
-            observe_round(timestamp, RoundStage::NodeBroadcastedQuorum);
+            observe_round(dag_id, timestamp, RoundStage::NodeBroadcastedQuorum);
             let round = node_clone.round();
 
             debug!(
@@ -497,12 +503,12 @@ impl DagDriver {
             rb_handles.push_back((DropGuard::new(abort_handle), timestamp, round))
         {
             // TODO: this observation is inaccurate.
-            observe_round(prev_round_timestamp, RoundStage::Finished);
+            observe_round(self.dag_id, prev_round_timestamp, RoundStage::Finished);
         }
 
         while let Some(front) = rb_handles.front() {
             if round.abs_diff(front.2) > self.window_size_config {
-                observe_round(front.1, RoundStage::Finished);
+                observe_round(self.dag_id, front.1, RoundStage::Finished);
                 rb_handles.pop_front();
             } else {
                 break;
@@ -530,7 +536,11 @@ impl RpcHandler for DagDriver {
             return Ok(CertifiedAck::new(epoch, self.dag_id));
         }
 
-        observe_node(certified_node.timestamp(), NodeStage::CertifiedNodeReceived);
+        observe_node(
+            self.dag_id,
+            certified_node.timestamp(),
+            NodeStage::CertifiedNodeReceived,
+        );
         NUM_TXNS_PER_NODE.observe(certified_node.payload().len() as f64);
         NODE_PAYLOAD_SIZE.observe(certified_node.payload().size() as f64);
 

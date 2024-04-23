@@ -218,9 +218,9 @@ impl ShoalOrderRule {
             })
             .collect();
 
-        observe_node(anchor.timestamp(), NodeStage::AnchorOrdered);
+        observe_node(0, anchor.timestamp(), NodeStage::AnchorOrdered);
         for node in ordered_nodes.iter().skip(1) {
-            observe_node(node.timestamp(), NodeStage::NodeOrdered);
+            observe_node(0, node.timestamp(), NodeStage::NodeOrdered);
         }
         ordered_nodes.reverse();
 

@@ -568,6 +568,7 @@ impl TryFrom<DAGRpcResult> for Vote {
 }
 
 pub struct SignatureBuilder {
+    dag_id: u8,
     metadata: NodeMetadata,
     inner: Mutex<(PartialSignatures, Option<oneshot::Sender<NodeCertificate>>)>,
     epoch_state: Arc<EpochState>,
@@ -575,11 +576,13 @@ pub struct SignatureBuilder {
 
 impl SignatureBuilder {
     pub fn new(
+        dag_id: u8,
         metadata: NodeMetadata,
         epoch_state: Arc<EpochState>,
         tx: oneshot::Sender<NodeCertificate>,
     ) -> Arc<Self> {
         Arc::new(Self {
+            dag_id,
             metadata,
             inner: Mutex::new((PartialSignatures::empty(), Some(tx))),
             epoch_state,
@@ -617,7 +620,11 @@ impl BroadcastStatus<DAGMessage, DAGRpcResult> for Arc<SignatureBuilder> {
                 .verifier
                 .aggregate_signatures(partial_signatures)
                 .expect("Signature aggregation should succeed");
-            observe_node(self.metadata.timestamp(), NodeStage::CertAggregated);
+            observe_node(
+                self.dag_id,
+                self.metadata.timestamp(),
+                NodeStage::CertAggregated,
+            );
             let certificate = NodeCertificate::new(self.metadata.clone(), aggregated_signature);
 
             _ = tx.take().expect("must exist").send(certificate);

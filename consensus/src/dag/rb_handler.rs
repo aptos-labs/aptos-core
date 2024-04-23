@@ -302,7 +302,7 @@ impl RpcHandler for NodeBroadcastHandler {
             assert_some!(self.votes_fine_grained_lock.remove(&key));
         });
         if self.dedup.insert(key) {
-            observe_node(node.timestamp(), NodeStage::NodeFirstReceived);
+            observe_node(self.dag_id, node.timestamp(), NodeStage::NodeFirstReceived);
         }
 
         if let Some(ack) = self
@@ -327,7 +327,7 @@ impl RpcHandler for NodeBroadcastHandler {
             order_rule.process_new_node(&metadata);
         });
 
-        observe_node(node.timestamp(), NodeStage::NodeReceived);
+        observe_node(self.dag_id, node.timestamp(), NodeStage::NodeReceived);
         debug!(LogSchema::new(LogEvent::ReceiveNode)
             .remote_peer(*node.author())
             .round(node.round()));

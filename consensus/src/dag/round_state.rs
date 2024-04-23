@@ -140,6 +140,7 @@ struct AdaptiveResponsiveInner {
 /// Move as soon as 3f+1 is ready. (TODO: make it configurable)
 /// Move if minimal wait time is reached.
 pub struct AdaptiveResponsive {
+    dag_id: u8,
     inner: Mutex<AdaptiveResponsiveInner>,
     epoch_state: Arc<EpochState>,
     wait_voting_power: u128,
@@ -149,6 +150,7 @@ pub struct AdaptiveResponsive {
 
 impl AdaptiveResponsive {
     pub fn new(
+        dag_id: u8,
         event_sender: tokio::sync::mpsc::UnboundedSender<Round>,
         epoch_state: Arc<EpochState>,
         minimal_wait_time: Duration,
@@ -161,6 +163,7 @@ impl AdaptiveResponsive {
             .saturating_add(50)
             .saturating_div(100);
         Self {
+            dag_id,
             inner: Mutex::new(AdaptiveResponsiveInner {
                 start_time: duration_since_epoch(),
                 state: State::Initial,
@@ -191,6 +194,7 @@ impl ResponsiveCheck for AdaptiveResponsive {
         let new_round = highest_strong_links_round + 1;
         if matches!(inner.state, State::Initial) {
             observe_round(
+                self.dag_id,
                 inner.start_time.as_micros() as u64,
                 RoundStage::StrongLinkReceived,
             );
@@ -223,6 +227,7 @@ impl ResponsiveCheck for AdaptiveResponsive {
             if voting_power >= self.wait_voting_power {
                 debug!(round = highest_strong_links_round, "voting power met");
                 observe_round(
+                    self.dag_id,
                     inner.start_time.as_micros() as u64,
                     RoundStage::VotingPowerMet,
                 );

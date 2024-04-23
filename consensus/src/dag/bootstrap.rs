@@ -588,6 +588,7 @@ impl DagBootstrapper {
         let order_rule = monitor!(
             "dag_order_rule_new",
             Arc::new(Mutex::new(OrderRule::new(
+                self.dag_id,
                 self.epoch_state.clone(),
                 highest_committed_anchor_round + 1,
                 dag.clone(),
@@ -650,6 +651,7 @@ impl DagBootstrapper {
         let round_state = RoundState::new(
             new_round_tx.clone(),
             Box::new(AdaptiveResponsive::new(
+                self.dag_id,
                 new_round_tx,
                 self.epoch_state.clone(),
                 Duration::from_millis(round_state_config.adaptive_responsive_minimum_wait_time_ms),

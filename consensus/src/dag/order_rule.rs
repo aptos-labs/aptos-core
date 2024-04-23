@@ -30,6 +30,7 @@ pub trait TOrderRule: Send + Sync {
 }
 
 pub struct OrderRule {
+    dag_id: u8,
     epoch_state: Arc<EpochState>,
     lowest_unordered_anchor_round: Round,
     dag: Arc<DagStore>,
@@ -42,6 +43,7 @@ pub struct OrderRule {
 
 impl OrderRule {
     pub fn new(
+        dag_id: u8,
         epoch_state: Arc<EpochState>,
         lowest_unordered_anchor_round: Round,
         dag: Arc<DagStore>,
@@ -80,6 +82,7 @@ impl OrderRule {
         }
 
         let mut order_rule = Self {
+            dag_id,
             max_instances: anchor_election.get_max_instances(),
             epoch_state,
             lowest_unordered_anchor_round,
@@ -238,9 +241,9 @@ impl OrderRule {
             })
             .collect();
 
-        observe_node(anchor.timestamp(), NodeStage::AnchorOrdered);
+        observe_node(self.dag_id, anchor.timestamp(), NodeStage::AnchorOrdered);
         for node in ordered_nodes.iter().skip(1) {
-            observe_node(node.timestamp(), NodeStage::NodeOrdered);
+            observe_node(self.dag_id, node.timestamp(), NodeStage::NodeOrdered);
         }
         ordered_nodes.reverse();
 
