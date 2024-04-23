@@ -356,6 +356,7 @@ Create a <code><a href="randomness_config.md#0x1_randomness_config_ConfigV1">Con
 
 ## Function `new_v2`
 
+Create a <code><a href="randomness_config.md#0x1_randomness_config_ConfigV2">ConfigV2</a></code> variant.
 
 
 <pre><code><b>public</b> <b>fun</b> <a href="randomness_config.md#0x1_randomness_config_new_v2">new_v2</a>(secrecy_threshold: <a href="../../aptos-stdlib/doc/fixed_point64.md#0x1_fixed_point64_FixedPoint64">fixed_point64::FixedPoint64</a>, reconstruction_threshold: <a href="../../aptos-stdlib/doc/fixed_point64.md#0x1_fixed_point64_FixedPoint64">fixed_point64::FixedPoint64</a>, fast_path_secrecy_threshold: <a href="../../aptos-stdlib/doc/fixed_point64.md#0x1_fixed_point64_FixedPoint64">fixed_point64::FixedPoint64</a>): <a href="randomness_config.md#0x1_randomness_config_RandomnessConfig">randomness_config::RandomnessConfig</a>
@@ -370,7 +371,7 @@ Create a <code><a href="randomness_config.md#0x1_randomness_config_ConfigV1">Con
 <pre><code><b>public</b> <b>fun</b> <a href="randomness_config.md#0x1_randomness_config_new_v2">new_v2</a>(
     secrecy_threshold: FixedPoint64,
     reconstruction_threshold: FixedPoint64,
-    fast_path_secrecy_threshold: FixedPoint64
+    fast_path_secrecy_threshold: FixedPoint64,
 ): <a href="randomness_config.md#0x1_randomness_config_RandomnessConfig">RandomnessConfig</a> {
     <a href="randomness_config.md#0x1_randomness_config_RandomnessConfig">RandomnessConfig</a> {
         variant: <a href="../../aptos-stdlib/doc/copyable_any.md#0x1_copyable_any_pack">copyable_any::pack</a>( <a href="randomness_config.md#0x1_randomness_config_ConfigV2">ConfigV2</a> {
