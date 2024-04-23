@@ -54,6 +54,8 @@ it tolerates collisions.
     -  [Function `clear`](#@Specification_1_clear)
     -  [Function `add_all`](#@Specification_1_add_all)
     -  [Function `to_simple_map`](#@Specification_1_to_simple_map)
+    -  [Function `keys`](#@Specification_1_keys)
+    -  [Function `keys_paginated`](#@Specification_1_keys_paginated)
     -  [Function `split_one_bucket`](#@Specification_1_split_one_bucket)
     -  [Function `bucket_index`](#@Specification_1_bucket_index)
     -  [Function `borrow_with_default`](#@Specification_1_borrow_with_default)
@@ -1519,6 +1521,38 @@ map_spec_has_key = spec_contains;
 
 
 <pre><code><b>public</b> <b>fun</b> <a href="smart_table.md#0x1_smart_table_to_simple_map">to_simple_map</a>&lt;K: <b>copy</b>, drop, store, V: <b>copy</b>, store&gt;(<a href="table.md#0x1_table">table</a>: &<a href="smart_table.md#0x1_smart_table_SmartTable">smart_table::SmartTable</a>&lt;K, V&gt;): <a href="simple_map.md#0x1_simple_map_SimpleMap">simple_map::SimpleMap</a>&lt;K, V&gt;
+</code></pre>
+
+
+
+
+<pre><code><b>pragma</b> verify = <b>false</b>;
+</code></pre>
+
+
+
+<a id="@Specification_1_keys"></a>
+
+### Function `keys`
+
+
+<pre><code><b>public</b> <b>fun</b> <a href="smart_table.md#0x1_smart_table_keys">keys</a>&lt;K: <b>copy</b>, drop, store, V: <b>copy</b>, store&gt;(table_ref: &<a href="smart_table.md#0x1_smart_table_SmartTable">smart_table::SmartTable</a>&lt;K, V&gt;): <a href="../../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;K&gt;
+</code></pre>
+
+
+
+
+<pre><code><b>pragma</b> verify = <b>false</b>;
+</code></pre>
+
+
+
+<a id="@Specification_1_keys_paginated"></a>
+
+### Function `keys_paginated`
+
+
+<pre><code><b>public</b> <b>fun</b> <a href="smart_table.md#0x1_smart_table_keys_paginated">keys_paginated</a>&lt;K: <b>copy</b>, drop, store, V: <b>copy</b>, store&gt;(table_ref: &<a href="smart_table.md#0x1_smart_table_SmartTable">smart_table::SmartTable</a>&lt;K, V&gt;, starting_bucket_index: u64, starting_vector_index: u64, num_keys_to_get: u64): (<a href="../../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;K&gt;, <a href="../../move-stdlib/doc/option.md#0x1_option_Option">option::Option</a>&lt;u64&gt;, <a href="../../move-stdlib/doc/option.md#0x1_option_Option">option::Option</a>&lt;u64&gt;)
 </code></pre>
 
 
