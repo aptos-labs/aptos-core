@@ -262,6 +262,7 @@ impl ExecutionProxyClient {
             reset_buffer_manager_rx,
             epoch_state,
             self.bounded_executor.clone(),
+            self.consensus_config.broadcast_commit_votes,
         );
 
         tokio::spawn(execution_schedule_phase.start());

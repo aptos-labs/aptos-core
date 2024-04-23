@@ -74,6 +74,7 @@ pub struct ConsensusConfig {
     pub broadcast_vote: bool,
     pub proof_cache_capacity: u64,
     pub rand_rb_config: ReliableBroadcastConfig,
+    pub broadcast_commit_votes: bool,
 }
 
 #[derive(Clone, Debug, Default, Deserialize, Eq, PartialEq, Serialize)]
@@ -320,6 +321,7 @@ impl Default for ConsensusConfig {
                 backoff_policy_max_delay_ms: 10000,
                 rpc_timeout_ms: 10000,
             },
+            broadcast_commit_votes: false,
         }
     }
 }
