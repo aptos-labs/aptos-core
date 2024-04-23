@@ -33,6 +33,7 @@ use aptos_types::{
     validator_signer::ValidatorSigner,
 };
 use bytes::Bytes;
+use fail::fail_point;
 use futures::{
     future::{AbortHandle, Abortable},
     FutureExt, StreamExt,
@@ -170,6 +171,7 @@ impl<S: TShare, D: TAugmentedData> RandManager<S, D> {
             .iter()
             .flat_map(|b| b.ordered_blocks.iter().map(|b3| b3.round()))
             .collect();
+        fail_point!("rand_manager::process_ready_blocks", |_| {});
         info!(rounds = rounds, "Processing rand-ready blocks.");
 
         for blocks in ready_blocks {
