@@ -3,6 +3,7 @@
 // SPDX-License-Identifier: Apache-2.0
 
 pub(crate) mod vm_wrapper;
+use aptos_block_executor::thread_garage::ThreadGarageExecutor;
 
 use crate::{
     block_executor::vm_wrapper::AptosExecutorTask,
@@ -398,7 +399,7 @@ impl BlockAptosVM {
         S: StateView + Sync,
         L: TransactionCommitHook<Output = AptosTransactionOutput>,
     >(
-        _executor_thread_pool: Arc<ThreadPool>,
+        garage: Arc<ThreadGarageExecutor>,
         signature_verified_block: &[SignatureVerifiedTransaction],
         state_view: &S,
         config: BlockExecutorConfig,
@@ -419,7 +420,7 @@ impl BlockAptosVM {
             S,
             L,
             ExecutableTestType,
-        >::new(config, transaction_commit_listener);
+        >::new(config, garage, transaction_commit_listener);
 
         let ret = executor.execute_block(state_view, signature_verified_block, state_view);
         match ret {

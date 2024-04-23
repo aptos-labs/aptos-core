@@ -55,11 +55,7 @@ use aptos_types::{
     write_set::WriteSet,
 };
 use aptos_vm::{
-    block_executor::{AptosTransactionOutput, BlockAptosVM},
-    data_cache::AsMoveResolver,
-    gas::get_gas_parameters,
-    move_vm_ext::{AptosMoveResolver, MoveVmExt, SessionId},
-    verifier, AptosVM, VMValidator,
+    aptos_vm::THREAD_GARAGE_EXECUTOR, block_executor::{AptosTransactionOutput, BlockAptosVM}, data_cache::AsMoveResolver, gas::get_gas_parameters, move_vm_ext::{AptosMoveResolver, MoveVmExt, SessionId}, verifier, AptosVM, VMValidator
 };
 use aptos_vm_genesis::{generate_genesis_change_set_for_testing_with_count, GenesisOptions};
 use aptos_vm_logging::log_schema::AdapterLogSchema;
@@ -503,7 +499,7 @@ impl FakeExecutor {
             onchain: onchain_config,
         };
         BlockAptosVM::execute_block::<_, NoOpTransactionCommitHook<AptosTransactionOutput, VMStatus>>(
-            self.executor_thread_pool.clone(),
+            Arc::clone(&THREAD_GARAGE_EXECUTOR),
             txn_block,
             &state_view,
             config,

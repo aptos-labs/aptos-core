@@ -515,7 +515,8 @@ impl<F> Executor for WorkerFunctionExecutor<F> where F : Fn(&ThreadGarageHandle)
 pub struct ThreadGarageExecutor {
     garage: Arc<ThreadGarage>,
 }
-    
+
+
 impl ThreadGarageExecutor {    
 
     pub fn new(max_active: usize, max_spawned: usize) -> Self {

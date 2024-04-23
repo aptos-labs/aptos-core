@@ -12,6 +12,8 @@ use aptos_language_e2e_tests::{
     account_universe::{AUTransactionGen, AccountPickStyle, AccountUniverseGen},
     gas_costs::TXN_RESERVED,
 };
+use aptos_block_executor::thread_garage::ThreadGarageExecutor;
+
 use criterion::{measurement::Measurement, BatchSize, Bencher};
 use once_cell::sync::Lazy;
 use proptest::strategy::Strategy;
@@ -26,6 +28,13 @@ pub static RAYON_EXEC_POOL: Lazy<Arc<rayon::ThreadPool>> = Lazy::new(|| {
             .unwrap(),
     )
 });
+
+pub static THREAD_GARAGE_EXECUTOR: Lazy<Arc<ThreadGarageExecutor>> = Lazy::new(|| {
+    Arc::new(
+        ThreadGarageExecutor::new(4, num_cpus::get()*10)
+    )
+});
+
 
 /// Benchmarking support for transactions.
 #[derive(Clone)]

@@ -20,6 +20,7 @@ use crate::{
     view::{LatestView, ParallelState, SequentialState, ViewState},
     thread_garage::{ThreadGarageExecutor,Baton,ReturnType},
 };
+
 use aptos_aggregator::{
     delayed_change::{ApplyBase, DelayedChange},
     delta_change_set::serialize,
@@ -33,6 +34,7 @@ use aptos_mvhashmap::{
     versioned_delayed_fields::CommitError,
     MVHashMap,
 };
+
 use aptos_types::{
     block_executor::config::BlockExecutorConfig,
     delayed_fields::PanicError,
@@ -50,7 +52,6 @@ use core::panic;
 use fail::fail_point;
 use move_core_types::{value::MoveTypeLayout, vm_status::StatusCode};
 use num_cpus;
-use rayon::ThreadPool;
 use std::{
     cell::RefCell,
     collections::{BTreeMap, HashMap, HashSet},
@@ -60,12 +61,14 @@ use std::{
         Arc,
     },
 };
+use once_cell::unsync::Lazy;
+
 
 pub struct BlockExecutor<T, E, S, L, X> {
     // Number of active concurrent tasks, corresponding to the maximum number of rayon
     // threads that may be concurrently participating in parallel execution.
     config: BlockExecutorConfig,
-    garage: ThreadGarageExecutor,
+    garage: Arc<ThreadGarageExecutor>,
     //executor_thread_pool: Arc<ThreadPool>,
     transaction_commit_hook: Option<L>,
     phantom: PhantomData<(T, E, S, L, X)>,
@@ -83,7 +86,7 @@ where
     /// be handled by sequential execution) and that concurrency_level <= num_cpus.
     pub fn new(
         config: BlockExecutorConfig,
-        //_executor_thread_pool: Arc<ThreadPool>,
+        garage: Arc<ThreadGarageExecutor>,
         transaction_commit_hook: Option<L>,
     ) -> Self {
         assert!(
@@ -91,10 +94,10 @@ where
             "Parallel execution concurrency level {} should be between 1 and number of CPUs",
             config.local.concurrency_level
         );
-        let concurrency_level = config.local.concurrency_level;
+        //let concurrency_level = config.local.concurrency_level;
         Self {
             config,
-            garage: ThreadGarageExecutor::new(concurrency_level, concurrency_level*5),
+            garage,
             //executor_thread_pool,
             transaction_commit_hook,
             phantom: PhantomData,

@@ -26,6 +26,8 @@ use crate::{
 };
 use anyhow::anyhow;
 use aptos_block_executor::txn_commit_hook::NoOpTransactionCommitHook;
+use aptos_block_executor::thread_garage::ThreadGarageExecutor;
+
 use aptos_crypto::HashValue;
 use aptos_framework::{
     natives::{code::PublishRequest, randomness::RandomnessContext},
@@ -124,6 +126,12 @@ pub static RAYON_EXEC_POOL: Lazy<Arc<rayon::ThreadPool>> = Lazy::new(|| {
             .thread_name(|index| format!("par_exec-{}", index))
             .build()
             .unwrap(),
+    )
+});
+
+pub static THREAD_GARAGE_EXECUTOR: Lazy<Arc<ThreadGarageExecutor>> = Lazy::new(|| {
+    Arc::new(
+        ThreadGarageExecutor::new(4, num_cpus::get()*10)
     )
 });
 
@@ -2306,7 +2314,7 @@ impl VMExecutor for AptosVM {
             _,
             NoOpTransactionCommitHook<AptosTransactionOutput, VMStatus>,
         >(
-            Arc::clone(&RAYON_EXEC_POOL),
+            Arc::clone(&THREAD_GARAGE_EXECUTOR),
             transactions,
             state_view,
             BlockExecutorConfig {

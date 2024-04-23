@@ -2,8 +2,7 @@
 // SPDX-License-Identifier: Apache-2.0
 
 use crate::{
-    block_executor::BlockAptosVM,
-    sharded_block_executor::{
+    aptos_vm::THREAD_GARAGE_EXECUTOR, block_executor::BlockAptosVM, sharded_block_executor::{
         aggr_overridden_state_view::{AggregatorOverriddenStateView, TOTAL_SUPPLY_AGGR_BASE_VAL},
         coordinator_client::CoordinatorClient,
         counters::{
@@ -14,7 +13,7 @@ use crate::{
         cross_shard_state_view::CrossShardStateView,
         messages::CrossShardMsg,
         ExecutorShardCommand,
-    },
+    }
 };
 use aptos_logger::{info, trace};
 use aptos_types::{
@@ -136,7 +135,7 @@ impl<S: StateView + Sync + Send + 'static> ShardedExecutorService<S> {
             });
             s.spawn(move |_| {
                 let ret = BlockAptosVM::execute_block(
-                    executor_thread_pool,
+                    Arc::clone(&THREAD_GARAGE_EXECUTOR),
                     &signature_verified_transactions,
                     aggr_overridden_state_view.as_ref(),
                     config,

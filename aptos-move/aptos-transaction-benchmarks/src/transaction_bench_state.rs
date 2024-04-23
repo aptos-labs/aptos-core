@@ -30,12 +30,10 @@ use aptos_types::{
     vm_status::VMStatus,
 };
 use aptos_vm::{
-    block_executor::{AptosTransactionOutput, BlockAptosVM},
-    data_cache::AsMoveResolver,
-    sharded_block_executor::{
+    aptos_vm::THREAD_GARAGE_EXECUTOR, block_executor::{AptosTransactionOutput, BlockAptosVM}, data_cache::AsMoveResolver, sharded_block_executor::{
         local_executor_shard::{LocalExecutorClient, LocalExecutorService},
         ShardedBlockExecutor,
-    },
+    }
 };
 use proptest::{collection::vec, prelude::Strategy, strategy::ValueTree, test_runner::TestRunner};
 use std::{net::SocketAddr, sync::Arc, time::Instant};
@@ -216,7 +214,7 @@ where
             _,
             NoOpTransactionCommitHook<AptosTransactionOutput, VMStatus>,
         >(
-            Arc::clone(&RAYON_EXEC_POOL),
+            Arc::clone(&THREAD_GARAGE_EXECUTOR),
             transactions,
             self.state_view.as_ref(),
             BlockExecutorConfig::new_maybe_block_limit(1, maybe_block_gas_limit),
@@ -265,7 +263,7 @@ where
             _,
             NoOpTransactionCommitHook<AptosTransactionOutput, VMStatus>,
         >(
-            Arc::clone(&RAYON_EXEC_POOL),
+            Arc::clone(&THREAD_GARAGE_EXECUTOR),
             transactions,
             self.state_view.as_ref(),
             BlockExecutorConfig::new_maybe_block_limit(
