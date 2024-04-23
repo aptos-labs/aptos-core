@@ -386,7 +386,7 @@ fn build_single_neg_one_array_output(len: usize, index: usize) -> Vec<Fr> {
 fn single_neg_one_array_test() {
     let circuit_handle = TestCircuitHandle::new("single_neg_one_array_test.circom").unwrap();
     let out_len = 8;
-    for index in 0..out_len {
+    for index in 0..=out_len {
         let output = build_single_neg_one_array_output(out_len, index);
         let config = CircuitPaddingConfig::new().max_length("expected_output", out_len as usize);
         let circuit_input_signals = CircuitInputSignals::new().u64_input("index", index as u64).frs_input("expected_output", &output).pad(&config).unwrap();
