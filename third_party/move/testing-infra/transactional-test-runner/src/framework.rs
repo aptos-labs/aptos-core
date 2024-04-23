@@ -753,10 +753,6 @@ fn compile_source_unit_v2(
         anyhow::bail!("expected either one script or one module")
     } else {
         units.pop().unwrap()
-        // match units.pop().unwrap() {
-        //     AnnotatedCompiledUnit::Module(m) => (Some(m.named_module.module), None),
-        //     AnnotatedCompiledUnit::Script(s) => (None, Some(s.named_script.script)),
-        // }
     };
     if error_str.is_empty() {
         Ok((unit, None))
