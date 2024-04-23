@@ -310,7 +310,7 @@ impl EventStore {
     }
 
     /// Gets the version of the last transaction committed before timestamp,
-    /// a commited block at or after the required timestamp must exist (otherwise it's possible
+    /// a committed block at or after the required timestamp must exist (otherwise it's possible
     /// the next block committed as a timestamp smaller than the one in the request).
     pub(crate) fn get_last_version_before_timestamp(
         &self,

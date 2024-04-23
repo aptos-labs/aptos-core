@@ -390,7 +390,7 @@ module post_mint_reveal_nft::minting {
         whitelist::add_whitelist_addresses(admin, wl_addresses, mint_limit, whitelist_stage);
     }
 
-    /// Add destination tokens - the actual art tokens. Note that curently, there is no way to reset the list of destination tokens once it's added.
+    /// Add destination tokens - the actual art tokens. Note that currently, there is no way to reset the list of destination tokens once it's added.
     /// The users will be able to exchange their source certificate token for a randomized destination token after the reveal time starts..
     public entry fun add_tokens(
         admin: &signer,

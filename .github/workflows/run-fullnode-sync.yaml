@@ -1,5 +1,5 @@
 # This workflow is a simple wrapper around the fullnode-sync github
-# action. It invokes the action with all the neccessary configurations
+# action. It invokes the action with all the necessary configurations
 # required by the specific fullnode sync test instance.
 
 name: "Run Fullnode Sync"

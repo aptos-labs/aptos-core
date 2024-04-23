@@ -187,7 +187,7 @@ pub async fn query_range_with_metadata(
     })?;
     if range.len() != 1 {
         bail!(
-            "Expected only one range vector from prometheus, recieved {} ({:?}). start={}, end={}, query={}",
+            "Expected only one range vector from prometheus, received {} ({:?}). start={}, end={}, query={}",
             range.len(),
             range,
             start_time,

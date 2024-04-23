@@ -118,7 +118,7 @@ module aptos_token::token_coin_swap {
         abort error::invalid_argument(EDEPRECATED_MODULE)
     }
 
-    /// Intialize the token escrow
+    /// Initialize the token escrow
     fun initialize_token_store_escrow(_token_owner: &signer) {
         abort error::invalid_argument(EDEPRECATED_MODULE)
     }

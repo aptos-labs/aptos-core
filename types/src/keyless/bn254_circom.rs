@@ -299,7 +299,7 @@ pub fn get_public_inputs_hash(
         // Add the epk as padded and packed scalars
         let mut epk_frs = poseidon_bn254::pad_and_pack_bytes_to_scalars_with_len(
             sig.ephemeral_pubkey.to_bytes().as_slice(),
-            config.max_commited_epk_bytes as usize,
+            config.max_committed_epk_bytes as usize,
         )?;
 
         // println!("Num EPK scalars:    {}", epk_frs.len());

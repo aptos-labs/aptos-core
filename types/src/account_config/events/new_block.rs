@@ -58,7 +58,7 @@ impl NewBlockEvent {
     }
 
     /// The list of indices in the validators list,
-    /// of consecutive proposers from the immediately preceeding
+    /// of consecutive proposers from the immediately preceding
     /// rounds that didn't produce a successful block
     pub fn failed_proposer_indices(&self) -> &Vec<u64> {
         &self.failed_proposer_indices

@@ -223,7 +223,7 @@ module 0xABCD::simple {
     }
 
     // Given an `other` address with `Resource` (if `Resource` does not exist on `other`,
-    // this funtion returns immediately) it appends the bigger `Resource.data`- between
+    // this function returns immediately) it appends the bigger `Resource.data`- between
     // `other` and `owner` (`signer`) - to the smaller.
     // On return the owner of the smaller `Resource` will have its value bigger than
     // the other (the bigger value get appended to the smaller one) or at least 1K.
@@ -285,7 +285,7 @@ module 0xABCD::simple {
     }
 
     // Given an `other` address with `Resource` (if `Resource` does not exist on `other`,
-    // this funtion returns immediately) it resizes the bigger `Resource.data` - between
+    // this function returns immediately) it resizes the bigger `Resource.data` - between
     // `other` and `owner` (`signer`) - to half the size of the smaller.
     // On return the owner of the bigger `Resource` will have its size half of the smaller size.
     // Read is size of 2 rousources/addresses. Write is 1 resource/address (smaller than what was there).

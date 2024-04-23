@@ -2150,7 +2150,7 @@ Unlock all accumulated rewards since the last recorded principals.
 
 ## Function `switch_operator_with_same_commission`
 
-Allows staker to switch operator without going through the lenghthy process to unstake, without resetting commission.
+Allows staker to switch operator without going through the lengthy process to unstake, without resetting commission.
 
 
 <pre><code><b>public</b> entry <b>fun</b> <a href="staking_contract.md#0x1_staking_contract_switch_operator_with_same_commission">switch_operator_with_same_commission</a>(staker: &<a href="../../aptos-stdlib/../move-stdlib/doc/signer.md#0x1_signer">signer</a>, old_operator: <b>address</b>, new_operator: <b>address</b>)
@@ -2183,7 +2183,7 @@ Allows staker to switch operator without going through the lenghthy process to u
 
 ## Function `switch_operator`
 
-Allows staker to switch operator without going through the lenghthy process to unstake.
+Allows staker to switch operator without going through the lengthy process to unstake.
 
 
 <pre><code><b>public</b> entry <b>fun</b> <a href="staking_contract.md#0x1_staking_contract_switch_operator">switch_operator</a>(staker: &<a href="../../aptos-stdlib/../move-stdlib/doc/signer.md#0x1_signer">signer</a>, old_operator: <b>address</b>, new_operator: <b>address</b>, new_commission_percentage: u64)

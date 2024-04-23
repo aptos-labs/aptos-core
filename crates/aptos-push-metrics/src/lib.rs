@@ -26,7 +26,7 @@ const DEFAULT_DASHBOARD_BASE_URL: &str = "https://aptoslabs.grafana.net/d/execut
 
 /// MetricsPusher provides a function to push a list of Metrics to a configurable
 /// pushgateway endpoint.
-#[must_use = "Assign the contructed pusher to a variable, \
+#[must_use = "Assign the constructed pusher to a variable, \
               otherwise the worker thread is joined immediately."]
 pub struct MetricsPusher {
     worker_thread: Option<JoinHandle<()>>,

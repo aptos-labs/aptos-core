@@ -44,7 +44,7 @@ module aptos_framework::keyless_account {
         /// The training wheels PK, if training wheels are on
         training_wheels_pubkey: Option<vector<u8>>,
         /// The max length of an ephemeral public key supported in our circuit (93 bytes)
-        max_commited_epk_bytes: u16,
+        max_committed_epk_bytes: u16,
         /// The max length of the value of the JWT's `iss` field supported in our circuit (e.g., `"https://accounts.google.com"`)
         max_iss_val_bytes: u16,
         /// The max length of the JWT field name and value (e.g., `"max_age":"18"`) supported in our circuit
@@ -81,7 +81,7 @@ module aptos_framework::keyless_account {
         max_signatures_per_txn: u16,
         max_exp_horizon_secs: u64,
         training_wheels_pubkey: Option<vector<u8>>,
-        max_commited_epk_bytes: u16,
+        max_committed_epk_bytes: u16,
         max_iss_val_bytes: u16,
         max_extra_field_bytes: u16,
         max_jwt_header_b64_bytes: u32
@@ -91,7 +91,7 @@ module aptos_framework::keyless_account {
             max_signatures_per_txn,
             max_exp_horizon_secs,
             training_wheels_pubkey,
-            max_commited_epk_bytes,
+            max_committed_epk_bytes,
             max_iss_val_bytes,
             max_extra_field_bytes,
             max_jwt_header_b64_bytes,
@@ -127,7 +127,7 @@ module aptos_framework::keyless_account {
                 max_signatures_per_txn: _,
                 max_exp_horizon_secs: _,
                 training_wheels_pubkey: _,
-                max_commited_epk_bytes: _,
+                max_committed_epk_bytes: _,
                 max_iss_val_bytes: _,
                 max_extra_field_bytes: _,
                 max_jwt_header_b64_bytes: _,

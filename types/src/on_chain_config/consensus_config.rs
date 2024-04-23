@@ -188,7 +188,7 @@ impl OnChainConsensusConfig {
         true
     }
 
-    // Trim the list of failed authors from immediatelly preceeding rounds
+    // Trim the list of failed authors from immediatelly preceding rounds
     // to this max size.
     pub fn max_failed_authors_to_store(&self) -> usize {
         match &self {

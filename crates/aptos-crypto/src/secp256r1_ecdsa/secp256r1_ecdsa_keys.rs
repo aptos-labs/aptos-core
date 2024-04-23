@@ -122,7 +122,7 @@ impl SigningKey for PrivateKey {
 
 impl Uniform for PrivateKey {
     // Returns a random field element as a private key indistinguishable from uniformly random.
-    // Uses a hack to get around the incompatability of the `aptos-crypto` RngCore trait and the
+    // Uses a hack to get around the incompatibility of the `aptos-crypto` RngCore trait and the
     // `RustCrypto` RngCore trait
     fn generate<R>(rng: &mut R) -> Self
     where

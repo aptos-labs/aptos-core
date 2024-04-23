@@ -2477,7 +2477,7 @@ module aptos_token::token {
             new_types,
         );
 
-        // should have two new property_version from the orignal two tokens
+        // should have two new property_version from the original two tokens
         let largest_property_version = get_tokendata_largest_property_version(signer::address_of(creator), token_id.token_data_id);
         assert!(largest_property_version == 2, largest_property_version);
 

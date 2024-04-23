@@ -138,7 +138,7 @@ impl OpenIdSig {
     ) -> anyhow::Result<String> {
         let mut frs = poseidon_bn254::pad_and_pack_bytes_to_scalars_with_len(
             epk.to_bytes().as_slice(),
-            config.max_commited_epk_bytes as usize,
+            config.max_committed_epk_bytes as usize,
         )?;
 
         frs.push(Fr::from(exp_timestamp_secs));

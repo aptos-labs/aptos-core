@@ -588,9 +588,9 @@ test(
     await client.waitForTransaction(txn.hash, { checkSuccess: true });
 
     // Check that Alice and Bob did not pay the fee
-    // Alice final balance is -100000 coins transfered to Bob
+    // Alice final balance is -100000 coins transferred to Bob
     expect(await getBalance(alice)).toBe(aliceBefore - BigInt(100000));
-    // Bob final balance is 100000 coins transfered from Alice
+    // Bob final balance is 100000 coins transferred from Alice
     expect(await getBalance(bob)).toBe(BigInt(100000));
     // Check that feePayer paid the fee
     expect(await getBalance(feePayer)).toBeLessThan(feePayerBefore);
@@ -694,9 +694,9 @@ test(
     await client.waitForTransaction(txn.hash, { checkSuccess: true });
 
     // Check that Alice and Bob did not pay the fee
-    // Alice final balance is -100000 coins transfered to Bob
+    // Alice final balance is -100000 coins transferred to Bob
     expect(await getBalance(alice)).toBe(aliceBefore);
-    // Bob final balance is 100000 coins transfered from Alice
+    // Bob final balance is 100000 coins transferred from Alice
     expect(await getBalance(bob)).toBe(bobBefore);
     // Check that feePayer paid the fee
     expect(await getBalance(feePayer)).toBeLessThan(feePayerBefore);

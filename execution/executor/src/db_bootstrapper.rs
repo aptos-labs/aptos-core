@@ -118,7 +118,7 @@ impl GenesisCommitter {
                 .clone(),
             Some(&self.output.ledger_update_output.sharded_state_cache),
         )?;
-        info!("Genesis commited.");
+        info!("Genesis committed.");
         // DB bootstrapped, avoid anything that could fail after this.
 
         Ok(())

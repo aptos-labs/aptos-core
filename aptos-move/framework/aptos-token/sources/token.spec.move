@@ -379,7 +379,7 @@ spec aptos_token::token {
         types: vector<String>,
     ): TokenId {
         use aptos_std::simple_map;
-        //TODO: Abort condition is complex because of the read_bool funtion in the property_map module.
+        //TODO: Abort condition is complex because of the read_bool function in the property_map module.
         pragma aborts_if_is_partial;
         let creator = token_id.token_data_id.creator;
         let addr = signer::address_of(account);

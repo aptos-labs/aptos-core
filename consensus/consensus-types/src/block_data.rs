@@ -29,7 +29,7 @@ pub enum BlockType {
         author: Author,
         /// Failed authors from the parent's block to this block.
         /// I.e. the list of consecutive proposers from the
-        /// immediately preceeding rounds that didn't produce a successful block.
+        /// immediately preceding rounds that didn't produce a successful block.
         failed_authors: Vec<(Round, Author)>,
     },
     /// NIL blocks don't have authors or signatures: they're generated upon timeouts to fill in the
@@ -37,7 +37,7 @@ pub enum BlockType {
     NilBlock {
         /// Failed authors from the parent's block to this block (including this block)
         /// I.e. the list of consecutive proposers from the
-        /// immediately preceeding rounds that didn't produce a successful block.
+        /// immediately preceding rounds that didn't produce a successful block.
         failed_authors: Vec<(Round, Author)>,
     },
     /// A genesis block is the first committed block in any epoch that is identically constructed on
@@ -176,7 +176,7 @@ impl BlockData {
         matches!(self.block_type, BlockType::NilBlock { .. })
     }
 
-    /// the list of consecutive proposers from the immediately preceeding
+    /// the list of consecutive proposers from the immediately preceding
     /// rounds that didn't produce a successful block
     pub fn failed_authors(&self) -> Option<&Vec<(Round, Author)>> {
         match &self.block_type {

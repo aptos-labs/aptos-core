@@ -7,7 +7,7 @@ use prometheus::{register_histogram_vec, Histogram, HistogramVec};
 pub static API_TEST_SUCCESS: Lazy<HistogramVec> = Lazy::new(|| {
     register_histogram_vec!(
         "api_test_success",
-        "Number of user flows which succesfully passed",
+        "Number of user flows which successfully passed",
         &["test_name", "network_name", "run_id"],
     )
     .unwrap()

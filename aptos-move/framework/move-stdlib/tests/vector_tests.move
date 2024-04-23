@@ -502,9 +502,9 @@ module std::vector_tests {
         assert!(index == 1, 1);
     }
 
-    // index_of will return the index first occurence that is equal
+    // index_of will return the index first occurrence that is equal
     #[test]
-    fun index_of_nonempty_has_multiple_occurences() {
+    fun index_of_nonempty_has_multiple_occurrences() {
         let v = V::empty();
         V::push_back(&mut v, false);
         V::push_back(&mut v, true);
@@ -544,7 +544,7 @@ module std::vector_tests {
     }
 
     #[test]
-    fun find_nonempty_has_multiple_occurences() {
+    fun find_nonempty_has_multiple_occurrences() {
         let v = V::empty();
         V::push_back(&mut v, 1);
         V::push_back(&mut v, 2);

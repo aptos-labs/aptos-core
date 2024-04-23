@@ -34,7 +34,7 @@ const MAX_BUCKETS: usize = 8192;
 /// * Bits are read from left to right. For instance, in the following bitvec
 ///   [0b0001_0000, 0b0000_0000, 0b0000_0000, 0b0000_0001], the 3rd and 31st positions are set.
 /// * Each bit of a u8 is set to 1 if the position is set and to 0 if it's not.
-/// * We only allow setting positions upto u16::MAX. As a result, the size of the inner vector is
+/// * We only allow setting positions up to u16::MAX. As a result, the size of the inner vector is
 ///   limited to 8192 (= 65536 / 8).
 /// * Once a bit has been set, it cannot be unset. As a result, the inner vector cannot shrink.
 /// * The positions can be set in any order.

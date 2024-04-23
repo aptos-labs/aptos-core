@@ -215,7 +215,7 @@ pub trait ReputationHeuristic: Send + Sync {
 }
 
 pub struct NewBlockEventAggregation {
-    // Window sizes are in number of succesfull blocks, not number of rounds.
+    // Window sizes are in number of successful blocks, not number of rounds.
     // i.e. we can be looking at different number of rounds for the same window,
     // dependig on how many failures we have.
     voter_window_size: usize,

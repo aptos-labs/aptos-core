@@ -936,7 +936,7 @@ pub fn update_counters_for_committed_blocks(blocks_to_commit: &[Arc<PipelinedBlo
 pub static EPOCH_MANAGER_ISSUES_DETAILS: Lazy<IntCounterVec> = Lazy::new(|| {
     register_int_counter_vec!(
         "aptos_consensus_epoch_manager_issues",
-        "Count of occurences of different epoch manager processing issues.",
+        "Count of occurrences of different epoch manager processing issues.",
         &["kind"]
     )
     .unwrap()

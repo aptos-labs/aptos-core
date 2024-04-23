@@ -14,7 +14,7 @@ use mockall::{
 };
 
 #[tokio::test]
-async fn test_cachable_requests_compression() {
+async fn test_cacheable_requests_compression() {
     // Create test data
     let start_version = 0;
     let end_version = 454;
@@ -82,7 +82,7 @@ async fn test_cachable_requests_compression() {
 }
 
 #[tokio::test]
-async fn test_cachable_requests_data_versions() {
+async fn test_cacheable_requests_data_versions() {
     // Create test data
     let start_versions = [0, 76, 101, 230, 300, 454];
     let end_version = 454;
@@ -156,7 +156,7 @@ async fn test_cachable_requests_data_versions() {
 }
 
 #[tokio::test]
-async fn test_cachable_requests_eviction() {
+async fn test_cacheable_requests_eviction() {
     // Create test data
     let max_lru_cache_size = StorageServiceConfig::default().max_lru_cache_size;
     let version = 101;

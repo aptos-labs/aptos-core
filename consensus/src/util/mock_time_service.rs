@@ -106,7 +106,7 @@ impl SimulatedTimeService {
     }
 
     /// Update time_limit of this SimulatedTimeService instance and run pending tasks that has
-    /// deadline lower then new time_limit
+    /// deadline lower than new time_limit
     #[allow(dead_code)]
     pub fn update_auto_advance_limit(&mut self, time: Duration) {
         let mut inner = self.inner.lock();

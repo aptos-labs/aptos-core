@@ -805,14 +805,14 @@ pub enum EntryFunctionCall {
         new_beneficiary: AccountAddress,
     },
 
-    /// Allows staker to switch operator without going through the lenghthy process to unstake.
+    /// Allows staker to switch operator without going through the lengthy process to unstake.
     StakingContractSwitchOperator {
         old_operator: AccountAddress,
         new_operator: AccountAddress,
         new_commission_percentage: u64,
     },
 
-    /// Allows staker to switch operator without going through the lenghthy process to unstake, without resetting commission.
+    /// Allows staker to switch operator without going through the lengthy process to unstake, without resetting commission.
     StakingContractSwitchOperatorWithSameCommission {
         old_operator: AccountAddress,
         new_operator: AccountAddress,
@@ -3805,7 +3805,7 @@ pub fn staking_contract_set_beneficiary_for_operator(
     ))
 }
 
-/// Allows staker to switch operator without going through the lenghthy process to unstake.
+/// Allows staker to switch operator without going through the lengthy process to unstake.
 pub fn staking_contract_switch_operator(
     old_operator: AccountAddress,
     new_operator: AccountAddress,
@@ -3829,7 +3829,7 @@ pub fn staking_contract_switch_operator(
     ))
 }
 
-/// Allows staker to switch operator without going through the lenghthy process to unstake, without resetting commission.
+/// Allows staker to switch operator without going through the lengthy process to unstake, without resetting commission.
 pub fn staking_contract_switch_operator_with_same_commission(
     old_operator: AccountAddress,
     new_operator: AccountAddress,
