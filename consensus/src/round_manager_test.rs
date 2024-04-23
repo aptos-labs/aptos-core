@@ -905,7 +905,12 @@ fn no_vote_on_mismatch_round() {
     timed_block_on(&runtime, async {
         let bad_proposal = ProposalMsg::new(
             block_skip_round,
-            SyncInfo::new(genesis_qc.clone(), genesis_qc.clone(), None),
+            SyncInfo::new(
+                genesis_qc.clone(),
+                genesis_qc.clone(),
+                None,
+                Some(genesis_qc.ledger_info().clone()),
+            ),
         );
         assert!(node
             .round_manager
@@ -914,7 +919,12 @@ fn no_vote_on_mismatch_round() {
             .is_err());
         let good_proposal = ProposalMsg::new(
             correct_block.clone(),
-            SyncInfo::new(genesis_qc.clone(), genesis_qc.clone(), None),
+            SyncInfo::new(
+                genesis_qc.clone(),
+                genesis_qc.clone(),
+                None,
+                Some(genesis_qc.ledger_info().clone()),
+            ),
         );
         node.round_manager
             .process_proposal_msg(good_proposal)
@@ -972,6 +982,7 @@ fn sync_info_carried_on_timeout_vote() {
                 block_0_quorum_cert.clone(),
                 block_0_quorum_cert.clone(),
                 None,
+                Some(block_0_quorum_cert.ledger_info().clone()),
             ));
         node.round_manager
             .process_local_timeout(2)
@@ -1027,7 +1038,12 @@ fn no_vote_on_invalid_proposer() {
     timed_block_on(&runtime, async {
         let bad_proposal = ProposalMsg::new(
             block_incorrect_proposer,
-            SyncInfo::new(genesis_qc.clone(), genesis_qc.clone(), None),
+            SyncInfo::new(
+                genesis_qc.clone(),
+                genesis_qc.clone(),
+                None,
+                Some(genesis_qc.ledger_info().clone()),
+            ),
         );
         assert!(node
             .round_manager
@@ -1036,7 +1052,12 @@ fn no_vote_on_invalid_proposer() {
             .is_err());
         let good_proposal = ProposalMsg::new(
             correct_block.clone(),
-            SyncInfo::new(genesis_qc.clone(), genesis_qc.clone(), None),
+            SyncInfo::new(
+                genesis_qc.clone(),
+                genesis_qc.clone(),
+                None,
+                Some(genesis_qc.ledger_info().clone()),
+            ),
         );
 
         node.round_manager
@@ -1096,7 +1117,12 @@ fn new_round_on_timeout_certificate() {
     timed_block_on(&runtime, async {
         let skip_round_proposal = ProposalMsg::new(
             block_skip_round,
-            SyncInfo::new(genesis_qc.clone(), genesis_qc.clone(), Some(tc)),
+            SyncInfo::new(
+                genesis_qc.clone(),
+                genesis_qc.clone(),
+                Some(tc),
+                Some(genesis_qc.ledger_info().clone()),
+            ),
         );
         node.round_manager
             .process_proposal_msg(skip_round_proposal)
@@ -1104,7 +1130,12 @@ fn new_round_on_timeout_certificate() {
             .unwrap();
         let old_good_proposal = ProposalMsg::new(
             correct_block.clone(),
-            SyncInfo::new(genesis_qc.clone(), genesis_qc.clone(), None),
+            SyncInfo::new(
+                genesis_qc.clone(),
+                genesis_qc.clone(),
+                None,
+                Some(genesis_qc.ledger_info().clone()),
+            ),
         );
         assert!(node
             .round_manager
@@ -1166,6 +1197,7 @@ fn reject_invalid_failed_authors() {
                 } else {
                     None
                 },
+                Some(genesis_qc.ledger_info().clone()),
             ),
         )
     };
@@ -1241,7 +1273,15 @@ fn response_on_block_retrieval() {
     )
     .unwrap();
     let block_id = block.id();
-    let proposal = ProposalMsg::new(block, SyncInfo::new(genesis_qc.clone(), genesis_qc, None));
+    let proposal = ProposalMsg::new(
+        block,
+        SyncInfo::new(
+            genesis_qc.clone(),
+            genesis_qc.clone(),
+            None,
+            Some(genesis_qc.ledger_info().clone()),
+        ),
+    );
 
     timed_block_on(&runtime, async {
         node.round_manager
@@ -1381,6 +1421,7 @@ fn recover_on_restart() {
                     proposal.quorum_cert().clone(),
                     genesis_qc.clone(),
                     Some(tc.clone()),
+                    Some(genesis_qc.ledger_info().clone()),
                 ),
             );
             node.round_manager
@@ -1534,7 +1575,12 @@ fn sync_on_partial_newer_sync_info() {
             None,
         );
         // Create a sync info with newer quorum cert but older commit cert
-        let sync_info = SyncInfo::new(block_4_qc.clone(), certificate_for_genesis(), None);
+        let sync_info = SyncInfo::new(
+            block_4_qc.clone(),
+            certificate_for_genesis(),
+            None,
+            Some(certificate_for_genesis().ledger_info().clone()),
+        );
         node.round_manager
             .ensure_round_and_sync_up(
                 sync_info.highest_round() + 1,

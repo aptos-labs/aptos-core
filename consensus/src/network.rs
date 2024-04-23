@@ -736,6 +736,7 @@ impl NetworkTask {
                         },
                         consensus_msg @ (ConsensusMsg::ProposalMsg(_)
                         | ConsensusMsg::VoteMsg(_)
+                        | ConsensusMsg::OrderVoteMsg(_)
                         | ConsensusMsg::SyncInfo(_)
                         | ConsensusMsg::EpochRetrievalRequest(_)
                         | ConsensusMsg::EpochChangeProof(_)) => {

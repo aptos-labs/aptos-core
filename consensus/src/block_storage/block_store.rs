@@ -577,6 +577,8 @@ impl BlockReader for BlockStore {
             self.highest_commit_cert().as_ref().clone(),
             self.highest_2chain_timeout_cert()
                 .map(|tc| tc.as_ref().clone()),
+            Some(self.highest_ordered_cert().as_ref().ledger_info().clone()),
+            Some(self.highest_commit_cert().as_ref().ledger_info().clone()),
         )
     }
 

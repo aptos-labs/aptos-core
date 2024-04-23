@@ -387,6 +387,10 @@ ConsensusMsg:
       BatchResponseV2:
         NEWTYPE:
           TYPENAME: BatchResponse
+    18:
+      OrderVoteMsg:
+        NEWTYPE:
+          TYPENAME: OrderVote
 ContractEvent:
   ENUM:
     0:
@@ -842,6 +846,12 @@ SyncInfo:
     - highest_2chain_timeout_cert:
         OPTION:
           TYPENAME: TwoChainTimeoutCertificate
+    - highest_ordered_decision:
+        OPTION:
+          TYPENAME: LedgerInfoWithSignatures
+    - highest_commit_decision:
+        OPTION:
+          TYPENAME: LedgerInfoWithSignatures
 TableHandle:
   NEWTYPESTRUCT:
     TYPENAME: AccountAddress
@@ -1058,6 +1068,16 @@ VoteMsg:
         TYPENAME: Vote
     - sync_info:
         TYPENAME: SyncInfo
+OrderVote:
+  STRUCT:
+    - vote_data:
+        TYPENAME: VoteData
+    - author:
+        TYPENAME: AccountAddress
+    - ledger_info:
+        TYPENAME: LedgerInfo
+    - signature:
+        TYPENAME: Signature
 WriteOp:
   ENUM:
     0:

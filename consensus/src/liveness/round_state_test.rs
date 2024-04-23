@@ -155,5 +155,10 @@ fn generate_sync_info(
         timeout_round,
         quorum_cert.clone(),
     ));
-    SyncInfo::new(quorum_cert, commit_cert, Some(tc))
+    SyncInfo::new(
+        quorum_cert,
+        commit_cert.clone(),
+        Some(tc),
+        Some(commit_cert.ledger_info().clone()),
+    )
 }
