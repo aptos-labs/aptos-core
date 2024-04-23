@@ -190,6 +190,13 @@ module aptos_framework::coin {
         deleted_withdraw_event_handle_creation_number: u64,
     }
 
+    #[event]
+    /// Module event emitted when a new pair of coin and fungible asset is created.
+    struct PairCreation has drop, store {
+        coin_type: TypeInfo,
+        fungible_asset_metadata_address: address,
+    }
+
     #[resource_group_member(group = aptos_framework::object::ObjectGroup)]
     /// The flag the existence of which indicates the primary fungible store is created by the migration from CoinStore.
     struct MigrationFlag has key {}
@@ -282,7 +289,12 @@ module aptos_framework::coin {
             let metadata_object_signer = &object::generate_signer(&metadata_object_cref);
             move_to(metadata_object_signer, PairedCoinType { type });
             let metadata_obj = object::object_from_constructor_ref(&metadata_object_cref);
+
             table::add(&mut map.coin_to_fungible_asset_map, type, metadata_obj);
+            event::emit(PairCreation {
+                coin_type: type,
+                fungible_asset_metadata_address: object_address(&metadata_obj)
+            });
 
             // Generates all three refs
             let mint_ref = fungible_asset::generate_mint_ref(&metadata_object_cref);

@@ -16,6 +16,7 @@ This module provides the foundation for typesafe Coins.
 -  [Struct `WithdrawEvent`](#0x1_coin_WithdrawEvent)
 -  [Struct `Withdraw`](#0x1_coin_Withdraw)
 -  [Struct `CoinEventHandleDeletion`](#0x1_coin_CoinEventHandleDeletion)
+-  [Struct `PairCreation`](#0x1_coin_PairCreation)
 -  [Resource `MigrationFlag`](#0x1_coin_MigrationFlag)
 -  [Struct `MintCapability`](#0x1_coin_MintCapability)
 -  [Struct `FreezeCapability`](#0x1_coin_FreezeCapability)
@@ -502,6 +503,41 @@ Module event emitted when the event handles related to coin store is deleted.
 </dd>
 <dt>
 <code>deleted_withdraw_event_handle_creation_number: u64</code>
+</dt>
+<dd>
+
+</dd>
+</dl>
+
+
+</details>
+
+<a id="0x1_coin_PairCreation"></a>
+
+## Struct `PairCreation`
+
+Module event emitted when a new pair of coin and fungible asset is created.
+
+
+<pre><code>#[<a href="event.md#0x1_event">event</a>]
+<b>struct</b> <a href="coin.md#0x1_coin_PairCreation">PairCreation</a> <b>has</b> drop, store
+</code></pre>
+
+
+
+<details>
+<summary>Fields</summary>
+
+
+<dl>
+<dt>
+<code>coin_type: <a href="../../aptos-stdlib/doc/type_info.md#0x1_type_info_TypeInfo">type_info::TypeInfo</a></code>
+</dt>
+<dd>
+
+</dd>
+<dt>
+<code>fungible_asset_metadata_address: <b>address</b></code>
 </dt>
 <dd>
 
@@ -1223,7 +1259,12 @@ Get the paired fungible asset metadata object of a coin type, create if not exis
         <b>let</b> metadata_object_signer = &<a href="object.md#0x1_object_generate_signer">object::generate_signer</a>(&metadata_object_cref);
         <b>move_to</b>(metadata_object_signer, <a href="coin.md#0x1_coin_PairedCoinType">PairedCoinType</a> { type });
         <b>let</b> metadata_obj = <a href="object.md#0x1_object_object_from_constructor_ref">object::object_from_constructor_ref</a>(&metadata_object_cref);
+
         <a href="../../aptos-stdlib/doc/table.md#0x1_table_add">table::add</a>(&<b>mut</b> map.coin_to_fungible_asset_map, type, metadata_obj);
+        <a href="event.md#0x1_event_emit">event::emit</a>(<a href="coin.md#0x1_coin_PairCreation">PairCreation</a> {
+            coin_type: type,
+            fungible_asset_metadata_address: object_address(&metadata_obj)
+        });
 
         // Generates all three refs
         <b>let</b> mint_ref = <a href="fungible_asset.md#0x1_fungible_asset_generate_mint_ref">fungible_asset::generate_mint_ref</a>(&metadata_object_cref);
@@ -4284,6 +4325,27 @@ The creator of <code>CoinType</code> must be <code>@aptos_framework</code>.
     symbol: symbol.bytes
 };
 <b>ensures</b> <b>exists</b>&lt;<a href="coin.md#0x1_coin_CoinInfo">CoinInfo</a>&lt;CoinType&gt;&gt;(addr);
+</code></pre>
+
+
+Make sure <code>name</code> and <code>symbol</code> are legal length.
+Only the creator of <code>CoinType</code> can initialize.
+
+
+<a id="0x1_coin_InitializeInternalSchema"></a>
+
+
+<pre><code><b>schema</b> <a href="coin.md#0x1_coin_InitializeInternalSchema">InitializeInternalSchema</a>&lt;CoinType&gt; {
+    <a href="account.md#0x1_account">account</a>: <a href="../../aptos-stdlib/../move-stdlib/doc/signer.md#0x1_signer">signer</a>;
+    name: <a href="../../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u8&gt;;
+    symbol: <a href="../../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u8&gt;;
+    <b>let</b> account_addr = <a href="../../aptos-stdlib/../move-stdlib/doc/signer.md#0x1_signer_address_of">signer::address_of</a>(<a href="account.md#0x1_account">account</a>);
+    <b>let</b> coin_address = <a href="../../aptos-stdlib/doc/type_info.md#0x1_type_info_type_of">type_info::type_of</a>&lt;CoinType&gt;().account_address;
+    <b>aborts_if</b> coin_address != account_addr;
+    <b>aborts_if</b> <b>exists</b>&lt;<a href="coin.md#0x1_coin_CoinInfo">CoinInfo</a>&lt;CoinType&gt;&gt;(account_addr);
+    <b>aborts_if</b> len(name) &gt; <a href="coin.md#0x1_coin_MAX_COIN_NAME_LENGTH">MAX_COIN_NAME_LENGTH</a>;
+    <b>aborts_if</b> len(symbol) &gt; <a href="coin.md#0x1_coin_MAX_COIN_SYMBOL_LENGTH">MAX_COIN_SYMBOL_LENGTH</a>;
+}
 </code></pre>
 
 
