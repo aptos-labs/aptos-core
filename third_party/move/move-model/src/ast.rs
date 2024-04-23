@@ -87,6 +87,12 @@ impl Attribute {
     pub fn has(attrs: &[Attribute], pred: impl Fn(&Attribute) -> bool) -> bool {
         attrs.iter().any(pred)
     }
+
+    pub fn node_id(&self) -> NodeId {
+        match self {
+            Attribute::Assign(id, _, _) | Attribute::Apply(id, _, _) => *id,
+        }
+    }
 }
 
 // =================================================================================================
@@ -1137,7 +1143,7 @@ impl ExpData {
     ///   then visits `else`.
     ///
     /// In every case, if `visitor` returns `false`, then the visit is stopped early; otherwise
-    /// the the visit will continue.
+    /// the visit will continue.
     pub fn visit_positions<F>(&self, visitor: &mut F)
     where
         F: FnMut(VisitorPosition, &ExpData) -> bool,

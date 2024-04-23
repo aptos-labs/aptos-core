@@ -52,3 +52,14 @@ pub(crate) fn build_package(
     }
     BuiltPackage::build(package_path.to_owned(), options)
 }
+
+#[cfg(test)]
+pub(crate) fn build_package_with_compiler_version(
+    package_path: PathBuf,
+    options: BuildOptions,
+    compiler_version: CompilerVersion,
+) -> anyhow::Result<BuiltPackage> {
+    let mut options = options;
+    options.compiler_version = Some(compiler_version);
+    BuiltPackage::build(package_path.to_owned(), options)
+}

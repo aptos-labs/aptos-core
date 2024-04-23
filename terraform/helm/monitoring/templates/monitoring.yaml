@@ -193,9 +193,6 @@ spec:
         checksum/rules.yml: {{ (tpl (.Files.Glob "files/rules/*.yml").AsConfig .) | sha256sum }}
         checksum/dashboards.json: {{ (.Files.Glob "files/dashboards/*.json.gz").AsSecrets | sha256sum }}
     spec:
-      securityContext:
-        seccompProfile:
-          type: RuntimeDefault
       {{- with .Values.monitoring }}
       containers:
       - name: prometheus
@@ -330,6 +327,8 @@ spec:
       securityContext:
         runAsNonRoot: true
         fsGroup: 65534
+        seccompProfile:
+          type: RuntimeDefault
       {{- end }}
       volumes:
       - name: grafana-config

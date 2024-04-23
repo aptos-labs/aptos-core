@@ -261,7 +261,7 @@ export class TransactionWorker extends EventEmitter<TransactionWorkerEvents> {
   }
 
   /**
-   * Stops the the transaction management process.
+   * Stops the transaction management process.
    */
   stop() {
     if (this.taskQueue.isCancelled()) {

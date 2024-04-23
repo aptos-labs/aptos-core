@@ -33,6 +33,7 @@ move-bytecode-verifier = { path = "../../move-bytecode-verifier" }
 move-bytecode-viewer = { path = "../move-bytecode-viewer" }
 move-command-line-common = { path = "../../move-command-line-common" }
 move-compiler = { path = "../../move-compiler" }
+move-compiler-v2 = { path = "../../move-compiler-v2" }
 move-core-types = { path = "../../move-core/types" }
 move-coverage = { path = "../move-coverage" }
 move-disassembler = { path = "../move-disassembler" }
@@ -44,6 +45,7 @@ move-package = { path = "../move-package" }
 move-prover = { path = "../../move-prover" }
 move-resource-viewer = { path = "../move-resource-viewer" }
 move-stdlib = { path = "../../move-stdlib" }
+# move-symbol-pool = { path = "../../move-symbol-pool" }
 move-unit-test = { path = "../move-unit-test" }
 move-vm-runtime = { path = "../../move-vm/runtime", features = ["debugging"] }
 move-vm-test-utils = { path = "../../move-vm/test-utils" }

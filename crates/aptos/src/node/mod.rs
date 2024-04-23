@@ -4,7 +4,7 @@
 pub mod analyze;
 pub mod local_testnet;
 
-use self::local_testnet::RunLocalTestnet;
+use self::local_testnet::RunLocalnet;
 use crate::{
     common::{
         types::{
@@ -76,7 +76,8 @@ pub enum NodeTool {
     ShowValidatorConfig(ShowValidatorConfig),
     ShowValidatorSet(ShowValidatorSet),
     ShowValidatorStake(ShowValidatorStake),
-    RunLocalTestnet(RunLocalTestnet),
+    #[clap(aliases = &["run-local-testnet"])]
+    RunLocalnet(RunLocalnet),
     UpdateConsensusKey(UpdateConsensusKey),
     UpdateValidatorNetworkAddresses(UpdateValidatorNetworkAddresses),
 }
@@ -100,7 +101,7 @@ impl NodeTool {
             ShowValidatorSet(tool) => tool.execute_serialized().await,
             ShowValidatorStake(tool) => tool.execute_serialized().await,
             ShowValidatorConfig(tool) => tool.execute_serialized().await,
-            RunLocalTestnet(tool) => tool
+            RunLocalnet(tool) => tool
                 .execute_serialized_without_logger()
                 .await
                 .map(|_| "".to_string()),

@@ -109,7 +109,7 @@ fn fail_generic(
 }
 
 // Generates a vector of a vector of strings. Used to produce big size arguments
-// that require more than 1 byte lenght when compressed in uleb128
+// that require more than 1 byte length when compressed in uleb128
 fn big_string_vec(first_dim: u64, second_dim: u64, base: &str) -> Vec<u8> {
     let mut outer = vec![];
     for i in 0..first_dim {

@@ -108,6 +108,7 @@ pub enum FeatureFlag {
     MultisigV2Enhancement,
     DelegationPoolAllowlisting,
     ModuleEventMigration,
+    RejectUnstableBytecode,
 }
 
 fn generate_features_blob(writer: &CodeWriter, data: &[u64]) {
@@ -272,6 +273,7 @@ impl From<FeatureFlag> for AptosFeatureFlag {
                 AptosFeatureFlag::DELEGATION_POOL_ALLOWLISTING
             },
             FeatureFlag::ModuleEventMigration => AptosFeatureFlag::MODULE_EVENT_MIGRATION,
+            FeatureFlag::RejectUnstableBytecode => AptosFeatureFlag::REJECT_UNSTABLE_BYTECODE,
         }
     }
 }
@@ -365,6 +367,7 @@ impl From<AptosFeatureFlag> for FeatureFlag {
                 FeatureFlag::DelegationPoolAllowlisting
             },
             AptosFeatureFlag::MODULE_EVENT_MIGRATION => FeatureFlag::ModuleEventMigration,
+            AptosFeatureFlag::REJECT_UNSTABLE_BYTECODE => FeatureFlag::RejectUnstableBytecode,
         }
     }
 }

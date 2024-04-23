@@ -1,7 +1,7 @@
 // Copyright © Aptos Foundation
 // SPDX-License-Identifier: Apache-2.0
 
-use anyhow::{bail, ensure};
+use anyhow::{anyhow, bail, ensure};
 use aptos_consensus_types::common::{Author, Round};
 use aptos_crypto::bls12381::Signature;
 use aptos_crypto_derive::{BCSCryptoHash, CryptoHasher};
@@ -59,7 +59,7 @@ impl TShare for Share {
             .validator
             .address_to_validator_index()
             .get(author)
-            .unwrap();
+            .ok_or_else(|| anyhow!("Share::verify failed with unknown author"))?;
         let maybe_apk = &rand_config.keys.certified_apks[index];
         if let Some(apk) = maybe_apk.get() {
             WVUF::verify_share(

@@ -44,24 +44,3 @@ jobs:
           max_attempts: 5
           timeout_minutes: 20
           command: cd ./ecosystem/typescript/sdk/examples/javascript && pnpm install && pnpm test
-
-  run-python-examples:
-    if: contains(github.event.pull_request.labels.*.name, 'CICD:non-required-tests')
-    runs-on: ubuntu-latest
-    env:
-      APTOS_NODE_URL: https://fullnode.devnet.aptoslabs.com/v1
-      APTOS_FAUCET_URL: https://faucet.devnet.aptoslabs.com
-      FAUCET_AUTH_TOKEN: ${{ secrets.DEVNET_TAP_AUTH_TOKEN }}
-    steps:
-      - uses: actions/checkout@v3
-
-      - uses: ./.github/actions/python-setup
-        with:
-          pyproject_directory: ecosystem/python/sdk
-
-      - uses: nick-fields/retry@7f8f3d9f0f62fe5925341be21c2e8314fd4f7c7c # pin@v2
-        name: py-example-test
-        with:
-          max_attempts: 5
-          timeout_minutes: 20
-          command: cd ./ecosystem/python/sdk && make test && make examples

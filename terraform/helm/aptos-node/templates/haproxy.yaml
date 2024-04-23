@@ -147,9 +147,6 @@ spec:
       annotations:
         checksum/haproxy.cfg: {{ tpl ($.Files.Get "files/haproxy.cfg") $ | sha256sum }}
     spec:
-      securityContext:
-        seccompProfile:
-          type: RuntimeDefault
       {{- with $.Values.haproxy }}
       containers:
       - name: haproxy
@@ -207,6 +204,8 @@ spec:
         runAsNonRoot: false
         runAsUser: 0
         runAsGroup: 65534
+        seccompProfile:
+          type: RuntimeDefault
       {{- end }}
       volumes:
       - name: haproxy-config
