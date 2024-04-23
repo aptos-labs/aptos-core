@@ -396,7 +396,6 @@ fn single_neg_one_array_test() {
     }
 }
 
-<<<<<<< HEAD
 #[test]
 fn single_neg_one_array_large_test() {
     let circuit_handle = TestCircuitHandle::new("single_neg_one_array_large_test.circom").unwrap();
