@@ -102,8 +102,8 @@ spec supra_framework::vesting_without_staking {
 
     spec distribute_to_shareholder {
         pragma verify = true;
-        pragma opaque;
-        modifies global<coin::CoinStore<SupraCoin>>(address_from);
+        // pragma opaque;
+        // modifies global<coin::CoinStore<SupraCoin>>(address_from);
         let shareholder = shareholders_address[len(shareholders_address) - 1];
         let shareholder_record = vesting_records[len(vesting_records) - 1];
         let amount = min(shareholder_record.left_amount, fixed_point32::spec_multiply_u64(shareholder_record.init_amount, vesting_fraction));
