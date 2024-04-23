@@ -34,7 +34,7 @@ enum BenchmarkCommand {
 
 #[derive(Debug, Parser)]
 struct ParamSweepOpt {
-    #[clap(long, default_value = "200000")]
+    #[clap(long, default_value = "20")]
     pub num_accounts: Vec<usize>,
 
     #[clap(long)]
@@ -103,8 +103,8 @@ fn param_sweep(opt: ParamSweepOpt) {
     let run_parallel = !opt.skip_parallel;
     let run_sequential = !opt.skip_sequential;
 
-    let maybe_block_gas_limit = opt.maybe_block_gas_limit;
-
+    let maybe_block_gas_limit = opt.maybe_block_gas_limit; 
+    
     assert!(
         run_sequential || run_parallel,
         "Must run at least one of parallel or sequential"
