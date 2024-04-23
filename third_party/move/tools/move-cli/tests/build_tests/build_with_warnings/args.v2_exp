@@ -1,10 +1,10 @@
 Command `build`:
 BUILDING Test
-[0m[1m[38;5;11mwarning[0m[1m: Unused parameter `x`. Consider removing or prefixing with an underscore: `_x`[0m
-  [0m[34m┌─[0m ./sources/m.move:2:16
-  [0m[34m│[0m
-[0m[34m2[0m [0m[34m│[0m public fun foo([0m[33mx[0m: u64): u64 {
-  [0m[34m│[0m                [0m[33m^[0m
+warning: Unused parameter `x`. Consider removing or prefixing with an underscore: `_x`
+  ┌─ ./sources/m.move:2:16
+  │
+2 │ public fun foo(x: u64): u64 {
+  │                ^
 
 Command `disassemble --package Test --name m`:
 // Move bytecode v7
@@ -19,9 +19,9 @@ B0:
 	3: Ret
 }
 }
-[0m[1m[38;5;11mwarning[0m[1m: Unused parameter `x`. Consider removing or prefixing with an underscore: `_x`[0m
-  [0m[34m┌─[0m ./sources/m.move:2:16
-  [0m[34m│[0m
-[0m[34m2[0m [0m[34m│[0m public fun foo([0m[33mx[0m: u64): u64 {
-  [0m[34m│[0m                [0m[33m^[0m
+warning: Unused parameter `x`. Consider removing or prefixing with an underscore: `_x`
+  ┌─ ./sources/m.move:2:16
+  │
+2 │ public fun foo(x: u64): u64 {
+  │                ^
 
