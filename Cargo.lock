@@ -264,6 +264,8 @@ dependencies = [
  "aptos-types",
  "aptos-vm",
  "aptos-vm-genesis",
+ "aptos-vm-logging",
+ "aptos-vm-types",
  "async-trait",
  "base64 0.13.1",
  "bcs 0.1.4",
@@ -289,6 +291,7 @@ dependencies = [
  "move-coverage",
  "move-disassembler",
  "move-ir-types",
+ "move-model",
  "move-package",
  "move-symbol-pool",
  "move-unit-test",
@@ -312,6 +315,7 @@ dependencies = [
  "tonic 0.11.0",
  "tracing",
  "tracing-subscriber 0.3.18",
+ "url",
  "version-compare",
 ]
 
@@ -348,19 +352,13 @@ dependencies = [
  "aptos-crypto",
  "aptos-infallible",
  "aptos-logger",
- "aptos-profiler",
  "aptos-runtimes",
  "aptos-storage-interface",
+ "aptos-system-utils",
  "aptos-types",
- "async-mutex",
  "bcs 0.1.4",
  "http",
  "hyper",
- "lazy_static",
- "mime",
- "pprof",
- "regex",
- "rstack-self",
  "sha256",
  "tokio",
  "url",
@@ -712,6 +710,7 @@ name = "aptos-cargo-cli"
 version = "0.1.0"
 dependencies = [
  "anyhow",
+ "camino",
  "clap 4.4.14",
  "clap-verbosity-flag",
  "determinator",
@@ -764,6 +763,7 @@ dependencies = [
  "itertools 0.12.1",
  "move-compiler",
  "move-core-types",
+ "move-model",
  "move-package",
  "rocksdb",
  "serde",
@@ -956,6 +956,7 @@ dependencies = [
 name = "aptos-crypto"
 version = "0.0.3"
 dependencies = [
+ "aes-gcm",
  "anyhow",
  "aptos-crypto-derive",
  "ark-bls12-381",
@@ -1476,6 +1477,19 @@ dependencies = [
 ]
 
 [[package]]
+name = "aptos-experimental-layered-map"
+version = "0.1.0"
+dependencies = [
+ "aptos-crypto",
+ "aptos-drop-helper",
+ "aptos-infallible",
+ "aptos-metrics-core",
+ "bitvec 1.0.1",
+ "once_cell",
+ "proptest",
+]
+
+[[package]]
 name = "aptos-experimental-ptx-executor"
 version = "0.1.0"
 dependencies = [
@@ -1948,37 +1962,12 @@ dependencies = [
 ]
 
 [[package]]
-name = "aptos-indexer-grpc-data-access"
-version = "1.0.0"
-dependencies = [
- "anyhow",
- "aptos-protos 1.3.0",
- "async-trait",
- "base64 0.13.1",
- "dashmap",
- "enum_dispatch",
- "google-cloud-storage",
- "prost 0.12.3",
- "redis",
- "redis-test",
- "serde",
- "serde_json",
- "tempfile",
- "thiserror",
- "tokio",
- "tokio-util 0.7.10",
- "tracing",
-]
-
-[[package]]
 name = "aptos-indexer-grpc-data-service"
 version = "1.0.0"
 dependencies = [
  "anyhow",
- "aptos-indexer-grpc-data-access",
  "aptos-indexer-grpc-server-framework",
  "aptos-indexer-grpc-utils",
- "aptos-logger",
  "aptos-metrics-core",
  "aptos-moving-average 0.1.0 (git+https://github.com/aptos-labs/aptos-indexer-processors.git?rev=4801acae7aea30d7e96bbfbe5ec5b04056dfa4cf)",
  "aptos-protos 1.3.0",
@@ -2076,6 +2065,22 @@ dependencies = [
 ]
 
 [[package]]
+name = "aptos-indexer-grpc-in-memory-cache-benchmark"
+version = "0.1.0"
+dependencies = [
+ "anyhow",
+ "aptos-indexer-grpc-utils",
+ "aptos-protos 1.3.0",
+ "futures",
+ "jemallocator",
+ "lazy_static",
+ "once_cell",
+ "redis",
+ "redis-test",
+ "tokio",
+]
+
+[[package]]
 name = "aptos-indexer-grpc-integration-tests"
 version = "0.1.0"
 dependencies = [
@@ -2104,8 +2109,8 @@ name = "aptos-indexer-grpc-server-framework"
 version = "1.0.0"
 dependencies = [
  "anyhow",
- "aptos-admin-service",
  "aptos-metrics-core",
+ "aptos-system-utils",
  "async-trait",
  "backtrace",
  "clap 4.4.14",
@@ -2164,9 +2169,9 @@ dependencies = [
  "chrono",
  "cloud-storage",
  "dashmap",
- "flate2",
  "futures",
  "itertools 0.12.1",
+ "lz4",
  "once_cell",
  "prometheus",
  "prost 0.12.3",
@@ -2325,7 +2330,9 @@ dependencies = [
 name = "aptos-keyless-pepper-service"
 version = "0.1.0"
 dependencies = [
+ "aes-gcm",
  "anyhow",
+ "aptos-crypto",
  "aptos-inspection-service",
  "aptos-keyless-pepper-common",
  "aptos-logger",
@@ -2342,6 +2349,8 @@ dependencies = [
  "jsonwebtoken 8.3.0",
  "jwt",
  "once_cell",
+ "rand 0.7.3",
+ "regex",
  "reqwest",
  "serde",
  "serde_json",
@@ -2463,6 +2472,7 @@ dependencies = [
  "aptos-consensus-types",
  "aptos-crypto",
  "aptos-event-notifications",
+ "aptos-experimental-runtimes",
  "aptos-id-generator",
  "aptos-infallible",
  "aptos-logger",
@@ -2538,7 +2548,6 @@ dependencies = [
  "aptos-gas-schedule",
  "aptos-logger",
  "aptos-memory-usage-tracker",
- "aptos-resource-viewer",
  "aptos-rest-client",
  "aptos-types",
  "aptos-validator-interface",
@@ -2720,6 +2729,7 @@ dependencies = [
  "thiserror",
  "tokio",
  "tokio-retry",
+ "tokio-stream",
  "tokio-util 0.7.10",
 ]
 
@@ -3394,12 +3404,14 @@ dependencies = [
  "aptos-ledger",
  "aptos-rest-client",
  "aptos-types",
+ "base64 0.13.1",
  "bcs 0.1.4",
  "ed25519-dalek-bip32",
  "move-core-types",
  "once_cell",
  "rand 0.7.3",
  "rand_core 0.5.1",
+ "serde_json",
  "tiny-bip39",
  "tokio",
  "url",
@@ -3556,7 +3568,6 @@ dependencies = [
  "bcs 0.1.4",
  "crossbeam-channel",
  "dashmap",
- "move-core-types",
  "once_cell",
  "parking_lot 0.12.1",
  "proptest",
@@ -3643,6 +3654,25 @@ dependencies = [
  "rand 0.7.3",
  "serde",
  "thiserror",
+]
+
+[[package]]
+name = "aptos-system-utils"
+version = "0.1.0"
+dependencies = [
+ "anyhow",
+ "aptos-profiler",
+ "async-mutex",
+ "http",
+ "hyper",
+ "lazy_static",
+ "mime",
+ "pprof",
+ "regex",
+ "rstack-self",
+ "tokio",
+ "tracing",
+ "url",
 ]
 
 [[package]]
@@ -3901,6 +3931,7 @@ dependencies = [
  "move-command-line-common",
  "move-compiler",
  "move-core-types",
+ "move-model",
  "move-resource-viewer",
  "move-transactional-test-runner",
  "move-vm-runtime",
@@ -3987,7 +4018,6 @@ dependencies = [
  "async-trait",
  "bcs 0.1.4",
  "lru 0.7.8",
- "move-binary-format",
  "move-core-types",
  "tokio",
 ]
@@ -5454,6 +5484,19 @@ name = "c_linked_list"
 version = "1.1.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "4964518bd3b4a8190e832886cdc0da9794f12e8e6c1613a9e90ff331c4c8724b"
+
+[[package]]
+name = "calc-dep-sizes"
+version = "0.1.0"
+dependencies = [
+ "anyhow",
+ "clap 4.4.14",
+ "futures",
+ "move-binary-format",
+ "move-core-types",
+ "rayon",
+ "tokio",
+]
 
 [[package]]
 name = "camino"
@@ -6964,6 +7007,7 @@ dependencies = [
  "move-binary-format",
  "move-command-line-common",
  "move-core-types",
+ "move-model",
  "move-package",
  "move-symbol-pool",
  "once_cell",
@@ -8176,7 +8220,7 @@ dependencies = [
  "aho-corasick",
  "bstr 1.9.0",
  "log",
- "regex-automata 0.4.3",
+ "regex-automata 0.4.6",
  "regex-syntax 0.8.2",
 ]
 
@@ -8399,9 +8443,9 @@ checksum = "92620684d99f750bae383ecb3be3748142d6095760afd5cbcf2261e9a279d780"
 
 [[package]]
 name = "h2"
-version = "0.3.24"
+version = "0.3.26"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "bb2c4422095b67ee78da96fbb51a4cc413b3b25883c7717ff7ca1ab31022c9c9"
+checksum = "81fe527a889e1532da5c525686d96d4c2e74cdd345badf8dfef9f6b39dd5f5e8"
 dependencies = [
  "bytes",
  "fnv",
@@ -8917,7 +8961,7 @@ dependencies = [
  "globset",
  "log",
  "memchr",
- "regex-automata 0.4.3",
+ "regex-automata 0.4.6",
  "same-file",
  "walkdir",
  "winapi-util",
@@ -10302,6 +10346,7 @@ dependencies = [
  "move-bytecode-viewer",
  "move-command-line-common",
  "move-compiler",
+ "move-compiler-v2",
  "move-core-types",
  "move-coverage",
  "move-disassembler",
@@ -10383,6 +10428,7 @@ version = "0.1.0"
 dependencies = [
  "abstract-domain-derive",
  "anyhow",
+ "bcs 0.1.4",
  "clap 4.4.14",
  "codespan-reporting",
  "datatest-stable",
@@ -10417,6 +10463,7 @@ dependencies = [
  "itertools 0.10.5",
  "move-command-line-common",
  "move-compiler-v2",
+ "move-model",
  "move-transactional-test-runner",
  "once_cell",
  "walkdir",
@@ -10915,6 +10962,7 @@ dependencies = [
  "move-disassembler",
  "move-ir-compiler",
  "move-ir-types",
+ "move-model",
  "move-resource-viewer",
  "move-stdlib",
  "move-symbol-pool",
@@ -13262,13 +13310,13 @@ dependencies = [
 
 [[package]]
 name = "regex"
-version = "1.10.2"
+version = "1.10.4"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "380b951a9c5e80ddfd6136919eef32310721aa4aacd4889a8d39124b026ab343"
+checksum = "c117dbdfde9c8308975b6a18d71f3f385c89461f7b3fb054288ecf2a2058ba4c"
 dependencies = [
  "aho-corasick",
  "memchr",
- "regex-automata 0.4.3",
+ "regex-automata 0.4.6",
  "regex-syntax 0.8.2",
 ]
 
@@ -13283,9 +13331,9 @@ dependencies = [
 
 [[package]]
 name = "regex-automata"
-version = "0.4.3"
+version = "0.4.6"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "5f804c7828047e88b2d32e2d7fe5a105da8ee3264f01902f796c8e067dc2483f"
+checksum = "86b83b8b9847f9bf95ef68afb0b8e6cdb80f498442f5179a29fad448fcc1eaea"
 dependencies = [
  "aho-corasick",
  "memchr",
@@ -15198,6 +15246,7 @@ dependencies = [
  "anyhow",
  "clap 4.4.14",
  "once_cell",
+ "regex",
  "walkdir",
 ]
 
@@ -16457,6 +16506,12 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "9c8d87e72b64a3b4db28d11ce29237c246188f4f51057d65a7eab63b7987e423"
 
 [[package]]
+name = "wasite"
+version = "0.1.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "b8dad83b4f25e74f184f64c43b150b91efe7647395b42289f38e50566d82855b"
+
+[[package]]
 name = "wasm-bindgen"
 version = "0.2.89"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -16605,11 +16660,12 @@ dependencies = [
 
 [[package]]
 name = "whoami"
-version = "1.4.1"
+version = "1.5.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "22fc3756b8a9133049b26c7f61ab35416c130e8c09b660f5b3958b446f52cc50"
+checksum = "0fec781d48b41f8163426ed18e8fc2864c12937df9ce54c88ede7bd47270893e"
 dependencies = [
- "wasm-bindgen",
+ "redox_syscall 0.4.1",
+ "wasite",
  "web-sys",
 ]
 

@@ -46,6 +46,8 @@ aptos-temppath = { workspace = true }
 aptos-types = { workspace = true }
 aptos-vm = { workspace = true, features = ["testing"] }
 aptos-vm-genesis = { workspace = true }
+aptos-vm-logging = { workspace = true }
+aptos-vm-types = { workspace = true }
 async-trait = { workspace = true }
 base64 = { workspace = true }
 bcs = { workspace = true }
@@ -72,6 +74,7 @@ move-core-types = { workspace = true }
 move-coverage = { workspace = true }
 move-disassembler = { workspace = true }
 move-ir-types = { workspace = true }
+move-model = { workspace = true }
 move-package = { workspace = true }
 move-symbol-pool = { workspace = true }
 move-unit-test = { workspace = true, features = ["debugging"] }
@@ -96,6 +99,7 @@ toml = { workspace = true }
 tonic = { workspace = true }
 tracing = { workspace = true }
 tracing-subscriber = { workspace = true }
+url = { workspace = true }
 version-compare = { workspace = true }
 
 [target.'cfg(unix)'.dependencies]

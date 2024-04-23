@@ -256,6 +256,8 @@ fn test_executor_execute_and_commit_chunk_local_result_mismatch() {
 #[cfg(feature = "consensus-only-perf-test")]
 #[test]
 fn test_executor_execute_and_commit_chunk_without_verify() {
+    use aptos_types::block_executor::config::BlockExecutorConfigFromOnchain;
+
     let first_batch_size = 10;
     let second_batch_size = 10;
 
@@ -285,7 +287,11 @@ fn test_executor_execute_and_commit_chunk_without_verify() {
             .map(|_| encode_mint_transaction(tests::gen_address(rng.gen::<u64>()), 100))
             .collect::<Vec<_>>();
         let output = executor
-            .execute_block((block_id, block(txns)).into(), parent_block_id, None)
+            .execute_block(
+                (block_id, block(txns)).into(),
+                parent_block_id,
+                BlockExecutorConfigFromOnchain::new_no_block_limit(),
+            )
             .unwrap();
         let ledger_info = tests::gen_ledger_info(6, output.root_hash(), block_id, 1);
         executor.commit_blocks(vec![block_id], ledger_info).unwrap();

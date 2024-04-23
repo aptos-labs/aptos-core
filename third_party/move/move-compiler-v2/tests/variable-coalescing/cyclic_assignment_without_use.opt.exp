@@ -12,6 +12,16 @@ public fun m::test($t0: u64) {
   4: return ()
 }
 
+============ after DeadStoreElimination: ================
+
+[variant baseline]
+public fun m::test($t0: u64) {
+     var $t1: u64 [unused]
+     var $t2: u64 [unused]
+     var $t3: u64 [unused]
+  0: return ()
+}
+
 ============ after VariableCoalescingAnnotator: ================
 
 [variant baseline]
@@ -25,6 +35,16 @@ public fun m::test($t0: u64) {
 }
 
 ============ after VariableCoalescingTransformer: ================
+
+[variant baseline]
+public fun m::test($t0: u64) {
+     var $t1: u64 [unused]
+     var $t2: u64 [unused]
+     var $t3: u64 [unused]
+  0: return ()
+}
+
+============ after DeadStoreElimination: ================
 
 [variant baseline]
 public fun m::test($t0: u64) {

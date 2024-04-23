@@ -1310,7 +1310,7 @@ during vault creation for this to succeed.
             to_signer,
             <a href="vault.md#0x1_vault_VaultDelegate">VaultDelegate</a>{vault_address: cap.vault_address, granted_caps: <a href="_empty">vector::empty</a>()}
         );
-        // Add the the delegate <b>to</b> <a href="vault.md#0x1_vault_VaultDelegates">VaultDelegates</a>.
+        // Add the delegate <b>to</b> <a href="vault.md#0x1_vault_VaultDelegates">VaultDelegates</a>.
         <b>let</b> vault_delegates = <b>borrow_global_mut</b>&lt;<a href="vault.md#0x1_vault_VaultDelegates">VaultDelegates</a>&lt;Content&gt;&gt;(cap.vault_address);
         <a href="vault.md#0x1_vault_add_element">add_element</a>(&<b>mut</b> vault_delegates.delegates, addr);
     };

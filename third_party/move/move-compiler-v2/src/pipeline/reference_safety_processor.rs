@@ -1486,9 +1486,12 @@ impl<'env, 'state> LifetimeAnalysisStep<'env, 'state> {
         );
     }
 
-    /// Process a function call. For now we implement standard Move semantics, where every
-    /// output reference is a child of all input references. Here would be the point where to
-    // evaluate lifetime modifiers in future language versions.
+    /// Process a function call. For now we implement standard Move semantics, where
+    /// 1) every output immutable reference is a child of all input references;
+    /// 2) every output mutable reference is a child of all input mutable references,
+    /// because mutable references cannot be derived from immutable references.
+    /// Here would be the point where to
+    /// evaluate lifetime modifiers in future language versions.
     fn call_operation(&mut self, oper: Operation, dests: &[TempIndex], srcs: &[TempIndex]) {
         // Check validness of arguments
         for src in srcs {
@@ -1498,7 +1501,9 @@ impl<'env, 'state> LifetimeAnalysisStep<'env, 'state> {
         for dest in dests {
             self.check_write_local(*dest)
         }
-        // Now draw edges from all reference sources to all reference destinations.
+        // Now draw edges
+        // 1) from all reference sources to all immutable reference destinations.
+        // 2) from all mutable reference sources to all mutable reference destinations.
         let dest_labels = dests
             .iter()
             .filter(|d| self.ty(**d).is_reference())
@@ -1515,6 +1520,11 @@ impl<'env, 'state> LifetimeAnalysisStep<'env, 'state> {
                 for (i, src) in srcs.iter().enumerate() {
                     let src_ty = self.ty(*src);
                     if src_ty.is_reference() {
+                        // dest does not rely on src if
+                        // dest is a mutable reference while src is not
+                        if dest_ty.is_mutable_reference() && !src_ty.is_mutable_reference() {
+                            continue;
+                        }
                         let label = self.state.make_temp(
                             *src,
                             self.code_offset,

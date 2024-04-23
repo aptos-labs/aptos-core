@@ -31,6 +31,41 @@ public fun m::test2($t0: m::W) {
   3: return ()
 }
 
+============ after DeadStoreElimination: ================
+
+[variant baseline]
+fun m::consume($t0: u64) {
+  0: return ()
+}
+
+
+[variant baseline]
+fun m::consume_($t0: m::W) {
+  0: return ()
+}
+
+
+[variant baseline]
+public fun m::test1($t0: u64) {
+     var $t1: u64
+  0: $t1 := move($t0)
+  1: m::consume($t1)
+  2: m::consume($t1)
+  3: return ()
+}
+
+
+[variant baseline]
+public fun m::test2($t0: m::W) {
+     var $t1: m::W
+     var $t2: m::W
+  0: $t1 := move($t0)
+  1: $t2 := copy($t1)
+  2: m::consume_($t2)
+  3: m::consume_($t1)
+  4: return ()
+}
+
 ============ after VariableCoalescingAnnotator: ================
 
 [variant baseline]
@@ -118,6 +153,39 @@ public fun m::test2($t0: m::W) {
   2: m::consume_($t2)
   3: m::consume_($t0)
   4: return ()
+}
+
+============ after DeadStoreElimination: ================
+
+[variant baseline]
+fun m::consume($t0: u64) {
+  0: return ()
+}
+
+
+[variant baseline]
+fun m::consume_($t0: m::W) {
+  0: return ()
+}
+
+
+[variant baseline]
+public fun m::test1($t0: u64) {
+     var $t1: u64 [unused]
+  0: m::consume($t0)
+  1: m::consume($t0)
+  2: return ()
+}
+
+
+[variant baseline]
+public fun m::test2($t0: m::W) {
+     var $t1: m::W [unused]
+     var $t2: m::W
+  0: $t2 := copy($t0)
+  1: m::consume_($t2)
+  2: m::consume_($t0)
+  3: return ()
 }
 
 

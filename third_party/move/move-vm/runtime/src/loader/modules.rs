@@ -40,7 +40,7 @@ use std::{
 /// This trait provides an additional api for the Session to decide where the resolved modules should be stored.
 ///
 /// The default api will store the modules inside MoveVM structure but the caller can also choose to store it
-/// elsewhere as long as it implements this `ModuleStorage` trait. Doing so would allow the the caller, i.e: the
+/// elsewhere as long as it implements this `ModuleStorage` trait. Doing so would allow the caller, i.e: the
 /// adapter layer, to freely decide when to drop or persist the cache as well as determining its own eviction policy.
 pub trait ModuleStorage {
     fn store_module(&self, module_id: &ModuleId, binary: Module) -> Arc<Module>;

@@ -29,4 +29,4 @@ tracing-subscriber = { workspace = true }
 warp = { workspace = true }
 
 [target.'cfg(target_os = "linux")'.dependencies]
-aptos-admin-service = { workspace = true }
+aptos-system-utils = { workspace = true }

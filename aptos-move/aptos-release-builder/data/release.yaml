@@ -8,8 +8,7 @@ proposals:
       description: "Increase max txn gas temporarily for framework upgrade"
     execution_mode: MultiStep
     update_sequence:
-      - DefaultGasWithOverride:
-          feature_version: 13
+      - DefaultGasWithOverrideOld:
           overrides:
             - name: "txn.max_execution_gas"
               value: 3676000000
@@ -22,5 +21,15 @@ proposals:
       - Framework:
           bytecode_version: 6
           git_hash: ~
-      - DefaultGasWithOverride:
-          feature_version: 13
+      - RawScript: aptos-move/aptos-release-builder/data/proposals/randomness_framework_initialization.move
+      - DefaultGas
+  - name: step_3_enable_checking_unstable_bytecode
+    metadata:
+      title: "Enable the check to reject unstable bytecode to be published to mainnet"
+      description: "Reject unstable bytecode to be published to mainnet"
+      discussion_url: "https://github.com/aptos-labs/aptos-core/pull/12814"
+    execution_mode: MultiStep
+    update_sequence:
+      - FeatureFlag:
+          enabled:
+            - reject_unstable_bytecode

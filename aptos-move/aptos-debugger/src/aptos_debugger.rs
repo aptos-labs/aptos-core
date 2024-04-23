@@ -6,7 +6,6 @@ use aptos_gas_meter::{StandardGasAlgebra, StandardGasMeter};
 use aptos_gas_profiling::{GasProfiler, TransactionGasLog};
 use aptos_gas_schedule::{MiscGasParameters, NativeGasParameters, LATEST_GAS_FEATURE_VERSION};
 use aptos_memory_usage_tracker::MemoryTrackedGasMeter;
-use aptos_resource_viewer::{AnnotatedAccountStateBlob, AptosValueAnnotator};
 use aptos_rest_client::Client;
 use aptos_types::{
     account_address::AccountAddress,
@@ -133,7 +132,7 @@ impl AptosDebugger {
 
                     // Deprecated.
                     TransactionPayload::ModuleBundle(..) => {
-                        unreachable!("Module bundle payload has already been checked")
+                        unreachable!("Module bundle payload has already been checked because before this function is called")
                     },
                 };
                 Ok(gas_profiler)
@@ -230,42 +229,6 @@ impl AptosDebugger {
             ret.push(result)
         }
         Ok(ret)
-    }
-
-    pub async fn annotate_account_state_at_version(
-        &self,
-        account: AccountAddress,
-        version: Version,
-    ) -> Result<Option<AnnotatedAccountStateBlob>> {
-        let state_view = DebuggerStateView::new(self.debugger.clone(), version);
-        let remote_storage = state_view.as_move_resolver();
-        let annotator = AptosValueAnnotator::new(&remote_storage);
-        Ok(
-            match self
-                .debugger
-                .get_account_state_by_version(account, version)
-                .await?
-            {
-                Some(account_state) => Some(annotator.view_account_state(&account_state)?),
-                None => None,
-            },
-        )
-    }
-
-    pub async fn annotate_key_accounts_at_version(
-        &self,
-        version: Version,
-    ) -> Result<Vec<(AccountAddress, AnnotatedAccountStateBlob)>> {
-        let accounts = self.debugger.get_admin_accounts(version).await?;
-        let state_view = DebuggerStateView::new(self.debugger.clone(), version);
-        let remote_storage = state_view.as_move_resolver();
-        let annotator = AptosValueAnnotator::new(&remote_storage);
-
-        let mut result = vec![];
-        for (addr, state) in accounts.into_iter() {
-            result.push((addr, annotator.view_account_state(&state)?));
-        }
-        Ok(result)
     }
 
     pub async fn get_latest_version(&self) -> Result<Version> {

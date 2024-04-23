@@ -179,6 +179,24 @@ impl TransactionGasLog {
                     .collect(),
             ),
         );
+        data.insert(
+            "transaction_write".to_string(),
+            convert_op((
+                "transaction_write".to_string(),
+                1,
+                aggregated.transaction_write,
+            )),
+        );
+        data.insert(
+            "event_writes".to_string(),
+            Value::Array(
+                aggregated
+                    .event_writes
+                    .into_iter()
+                    .map(convert_op)
+                    .collect(),
+            ),
+        );
 
         // Storage fee for the transaction itself
         let total_storage = u64::from(self.storage.total) as f64;

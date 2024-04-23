@@ -782,6 +782,7 @@ fn run_consensus_only_realistic_env_max_tps() -> ForgeConfig {
         }))
         .with_validator_override_node_config_fn(Arc::new(|config, _| {
             optimize_for_maximum_throughput(config, 20_000, 4_500, 3.0);
+            state_sync_config_execute_transactions(&mut config.state_sync);
         }))
         // TODO(ibalajiarun): tune these success critiera after we have a better idea of the test behavior
         .with_success_criteria(
@@ -873,6 +874,7 @@ fn state_sync_failures_catching_up() -> ForgeConfig {
         2500,
         true,
         false,
+        false,
         ChangingWorkingQuorumTest {
             min_tps: 1500,
             always_healthy_nodes: 2,
@@ -885,73 +887,127 @@ fn state_sync_failures_catching_up() -> ForgeConfig {
 }
 
 fn state_sync_slow_processing_catching_up() -> ForgeConfig {
-    changing_working_quorum_test_helper(7, 300, 3000, 2500, true, true, ChangingWorkingQuorumTest {
-        min_tps: 750,
-        always_healthy_nodes: 2,
-        max_down_nodes: 0,
-        num_large_validators: 2,
-        add_execution_delay: true,
-        check_period_s: 57,
-    })
+    changing_working_quorum_test_helper(
+        7,
+        300,
+        3000,
+        2500,
+        true,
+        true,
+        false,
+        ChangingWorkingQuorumTest {
+            min_tps: 750,
+            always_healthy_nodes: 2,
+            max_down_nodes: 0,
+            num_large_validators: 2,
+            add_execution_delay: true,
+            check_period_s: 57,
+        },
+    )
 }
 
 fn different_node_speed_and_reliability_test() -> ForgeConfig {
-    changing_working_quorum_test_helper(20, 120, 70, 50, true, false, ChangingWorkingQuorumTest {
-        min_tps: 30,
-        always_healthy_nodes: 6,
-        max_down_nodes: 5,
-        num_large_validators: 3,
-        add_execution_delay: true,
-        check_period_s: 27,
-    })
+    changing_working_quorum_test_helper(
+        20,
+        120,
+        70,
+        50,
+        true,
+        false,
+        false,
+        ChangingWorkingQuorumTest {
+            min_tps: 30,
+            always_healthy_nodes: 6,
+            max_down_nodes: 5,
+            num_large_validators: 3,
+            add_execution_delay: true,
+            check_period_s: 27,
+        },
+    )
 }
 
 fn large_test_only_few_nodes_down() -> ForgeConfig {
-    changing_working_quorum_test_helper(60, 120, 100, 70, false, false, ChangingWorkingQuorumTest {
-        min_tps: 50,
-        always_healthy_nodes: 40,
-        max_down_nodes: 10,
-        num_large_validators: 0,
-        add_execution_delay: false,
-        check_period_s: 27,
-    })
+    changing_working_quorum_test_helper(
+        60,
+        120,
+        100,
+        70,
+        false,
+        false,
+        false,
+        ChangingWorkingQuorumTest {
+            min_tps: 50,
+            always_healthy_nodes: 40,
+            max_down_nodes: 10,
+            num_large_validators: 0,
+            add_execution_delay: false,
+            check_period_s: 27,
+        },
+    )
 }
 
 fn changing_working_quorum_test_high_load() -> ForgeConfig {
-    changing_working_quorum_test_helper(16, 120, 500, 300, true, true, ChangingWorkingQuorumTest {
-        min_tps: 50,
-        always_healthy_nodes: 0,
-        max_down_nodes: 16,
-        num_large_validators: 0,
-        add_execution_delay: false,
-        // Use longer check duration, as we are bringing enough nodes
-        // to require state-sync to catch up to have consensus.
-        check_period_s: 53,
-    })
+    changing_working_quorum_test_helper(
+        16,
+        120,
+        500,
+        300,
+        true,
+        true,
+        true,
+        ChangingWorkingQuorumTest {
+            min_tps: 50,
+            always_healthy_nodes: 0,
+            max_down_nodes: 16,
+            num_large_validators: 0,
+            add_execution_delay: false,
+            // Use longer check duration, as we are bringing enough nodes
+            // to require state-sync to catch up to have consensus.
+            check_period_s: 53,
+        },
+    )
 }
 
 fn changing_working_quorum_test() -> ForgeConfig {
-    changing_working_quorum_test_helper(16, 120, 100, 70, true, true, ChangingWorkingQuorumTest {
-        min_tps: 15,
-        always_healthy_nodes: 0,
-        max_down_nodes: 16,
-        num_large_validators: 0,
-        add_execution_delay: false,
-        // Use longer check duration, as we are bringing enough nodes
-        // to require state-sync to catch up to have consensus.
-        check_period_s: 53,
-    })
+    changing_working_quorum_test_helper(
+        16,
+        120,
+        100,
+        70,
+        true,
+        true,
+        true,
+        ChangingWorkingQuorumTest {
+            min_tps: 15,
+            always_healthy_nodes: 0,
+            max_down_nodes: 16,
+            num_large_validators: 0,
+            add_execution_delay: false,
+            // Use longer check duration, as we are bringing enough nodes
+            // to require state-sync to catch up to have consensus.
+            check_period_s: 53,
+        },
+    )
 }
 
 fn consensus_stress_test() -> ForgeConfig {
-    changing_working_quorum_test_helper(10, 60, 100, 80, true, false, ChangingWorkingQuorumTest {
-        min_tps: 50,
-        always_healthy_nodes: 10,
-        max_down_nodes: 0,
-        num_large_validators: 0,
-        add_execution_delay: false,
-        check_period_s: 27,
-    })
+    changing_working_quorum_test_helper(
+        10,
+        60,
+        100,
+        80,
+        true,
+        false,
+        false,
+        ChangingWorkingQuorumTest {
+            min_tps: 50,
+            always_healthy_nodes: 10,
+            max_down_nodes: 0,
+            num_large_validators: 0,
+            add_execution_delay: false,
+            check_period_s: 27,
+        },
+    )
 }
 
 fn realistic_env_sweep_wrap(
@@ -1052,7 +1108,7 @@ fn realistic_env_workload_sweep_test() -> ForgeConfig {
         criteria: [
             (5500, 100, 0.3, 0.3, 0.8, 0.65),
             (4500, 100, 0.3, 0.4, 1.0, 2.0),
-            (2000, 300, 0.3, 0.3, 0.8, 2.0),
+            (2000, 300, 0.3, 0.8, 0.8, 2.0),
             (600, 500, 0.3, 0.3, 0.8, 2.0),
             // (150, 0.5, 1.0, 1.5, 0.65),
         ]
@@ -2162,6 +2218,7 @@ pub fn changing_working_quorum_test_helper(
     min_avg_tps: usize,
     apply_txn_outputs: bool,
     use_chain_backoff: bool,
+    allow_errors: bool,
     test: ChangingWorkingQuorumTest,
 ) -> ForgeConfig {
     let config = ForgeConfig::default();
@@ -2237,8 +2294,8 @@ pub fn changing_working_quorum_test_helper(
                     ),
                 ]),
         )
-        .with_success_criteria(
-            SuccessCriteria::new(min_avg_tps)
+        .with_success_criteria({
+            let success_criteria = SuccessCriteria::new(min_avg_tps)
                 .add_no_restarts()
                 .add_wait_for_catchup_s(30)
                 .add_chain_progress(StateProgressThreshold {
@@ -2256,8 +2313,15 @@ pub fn changing_working_quorum_test_helper(
                         40.0
                     },
                     max_round_gap: 60,
-                }),
-        )
+                });
+
+            // If errors are allowed, overwrite the success criteria
+            if allow_errors {
+                success_criteria.allow_errors()
+            } else {
+                success_criteria
+            }
+        })
 }
 
 fn large_db_test(

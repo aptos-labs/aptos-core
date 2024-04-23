@@ -404,7 +404,7 @@ B2:
 	7: CopyLoc[1](Arg1: u32)
 	8: Call consume(u32)
 B3:
-	9: CopyLoc[0](Arg0: bool)
+	9: MoveLoc[0](Arg0: bool)
 	10: Not
 	11: BrFalse(15)
 B4:
@@ -437,7 +437,7 @@ B2:
 	11: MoveLoc[3](loc1: W)
 	12: Call consume_(W)
 B3:
-	13: CopyLoc[0](Arg0: bool)
+	13: MoveLoc[0](Arg0: bool)
 	14: Not
 	15: BrFalse(19)
 B4:
