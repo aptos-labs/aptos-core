@@ -422,8 +422,19 @@ module aptos_framework::fungible_asset {
     #[view]
     /// Get the balance of a given store.
     public fun balance<T: key>(store: Object<T>): u64 acquires FungibleStore {
-        if (store_exists(object::object_address(&store))) {
-            borrow_store_resource(&store).balance
+        let store_addr = object::object_address(&store);
+        if (store_exists(store_addr)) {
+            borrow_global<FungibleStore>(store_addr).balance
+        } else {
+            0
+        }
+    }
+
+    #[view]
+    /// Get the balance of a given store.
+    public fun balance_from_address(store_addr: address): u64 acquires FungibleStore {
+        if (store_exists(store_addr)) {
+            borrow_global<FungibleStore>(store_addr).balance
         } else {
             0
         }

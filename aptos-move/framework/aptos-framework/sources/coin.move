@@ -767,23 +767,23 @@ module aptos_framework::coin {
         // };
     }
 
-    public fun burn_from_apt<CoinType>(
-        account_addr: address,
-        amount: u64,
-        burn_cap: &BurnCapability<CoinType>,
-    ) {
-        // Skip burning if amount is zero. This shouldn't error out as it's called as part of transaction fee burning.
-        if (amount == 0) {
-            return
-        };
-        let apt_fa = apt_fa_metadata();
-        let store_addr = primary_fungible_store::primary_store_address(
-            account_addr,
-            apt_fa
-        );
-        let fa = fungible_asset::withdraw_internal(store_addr, amount);
-        fungible_asset::burn_internal(fa);
-    }
+    // public fun burn_from_apt<CoinType>(
+    //     account_addr: address,
+    //     amount: u64,
+    //     burn_cap: &BurnCapability<CoinType>,
+    // ) {
+    //     // Skip burning if amount is zero. This shouldn't error out as it's called as part of transaction fee burning.
+    //     if (amount == 0) {
+    //         return
+    //     };
+    //     let apt_fa = apt_fa_metadata();
+    //     let store_addr = primary_fungible_store::primary_store_address(
+    //         account_addr,
+    //         apt_fa
+    //     );
+    //     let fa = fungible_asset::withdraw_internal(store_addr, amount);
+    //     fungible_asset::burn_internal(fa);
+    // }
 
     /// Deposit the coin balance into the recipient's account and emit an event.
     public fun deposit<CoinType>(
