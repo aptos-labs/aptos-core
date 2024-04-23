@@ -1143,7 +1143,7 @@ impl ExpData {
     ///   then visits `else`.
     ///
     /// In every case, if `visitor` returns `false`, then the visit is stopped early; otherwise
-    /// the the visit will continue.
+    /// the visit will continue.
     pub fn visit_positions<F>(&self, visitor: &mut F)
     where
         F: FnMut(VisitorPosition, &ExpData) -> bool,
