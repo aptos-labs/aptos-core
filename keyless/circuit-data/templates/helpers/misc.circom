@@ -14,8 +14,8 @@ template isWhitespace() {
                        
    signal is_tab <== IsEqual()([char, 9]); // character is a tab space
 
-   signal is_line_break_part_1 <== GreaterEqThan(8)([char, 10]); // character is a newline 
-   signal is_line_break_part_2 <== LessEqThan(8)([char, 13]); // character is a carriage return
+   signal is_line_break_part_1 <== GreaterEqThan(8)([char, 10]); // ASCII bytes values between 10 ...
+   signal is_line_break_part_2 <== LessEqThan(8)([char, 13]); //    ... and 13 inclusive are line break characters
    signal is_line_break <== is_line_break_part_1 * is_line_break_part_2;
 
    signal is_space <== IsEqual()([char, 32]); // ' '
