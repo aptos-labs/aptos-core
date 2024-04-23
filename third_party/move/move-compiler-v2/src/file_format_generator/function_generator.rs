@@ -177,12 +177,7 @@ impl<'a> FunctionGenerator<'a> {
         //   to avoid this.
         self.pinned = ctx.fun.get_pinned_temps(/*include_drop*/ true);
         self.temps = (0..ctx.fun.get_parameter_count())
-            .map(|temp| {
-                (
-                    temp,
-                    TempInfo::new(self.temp_to_local(ctx, None, temp, false)),
-                )
-            })
+            .map(|temp| (temp, TempInfo::new(self.temp_to_local(ctx, None, temp))))
             .collect();
         self.locals = (0..ctx.fun.get_parameter_count())
             .map(|temp| ctx.temp_type(temp).to_owned())
@@ -263,7 +258,7 @@ impl<'a> FunctionGenerator<'a> {
                     std::slice::from_ref(source),
                 );
                 self.abstract_push_args(ctx, vec![*source], Some(mode));
-                let local = self.temp_to_local(ctx.fun_ctx, Some(ctx.attr_id), *dest, true);
+                let local = self.temp_to_local(ctx.fun_ctx, Some(ctx.attr_id), *dest);
                 self.emit(FF::Bytecode::StLoc(local));
                 self.abstract_pop(ctx)
             },
@@ -438,7 +433,7 @@ impl<'a> FunctionGenerator<'a> {
                 );
             },
             Operation::BorrowLoc => {
-                let local = self.temp_to_local(fun_ctx, Some(ctx.attr_id), source[0], true);
+                let local = self.temp_to_local(fun_ctx, Some(ctx.attr_id), source[0]);
                 if fun_ctx.fun.get_local_type(dest[0]).is_mutable_reference() {
                     self.emit(FF::Bytecode::MutBorrowLoc(local))
                 } else {
@@ -782,7 +777,7 @@ impl<'a> FunctionGenerator<'a> {
         self.abstract_flush_stack_before(ctx, stack_to_flush);
         // Finally, push `temps_to_push` onto the stack.
         for (pos, temp) in temps_to_push.iter().enumerate() {
-            let local = self.temp_to_local(fun_ctx, Some(ctx.attr_id), *temp, true);
+            let local = self.temp_to_local(fun_ctx, Some(ctx.attr_id), *temp);
             match push_kind {
                 Some(AssignKind::Move) => {
                     self.emit(FF::Bytecode::MoveLoc(local));
@@ -876,7 +871,7 @@ impl<'a> FunctionGenerator<'a> {
                 || self.pinned.contains(&temp)
             {
                 // Only need to save to a local if the temp is still used afterwards
-                let local = self.temp_to_local(fun_ctx, Some(ctx.attr_id), temp, true);
+                let local = self.temp_to_local(fun_ctx, Some(ctx.attr_id), temp);
                 self.emit(FF::Bytecode::StLoc(local));
             } else {
                 self.emit(FF::Bytecode::Pop)
@@ -933,13 +928,15 @@ impl<'a> FunctionGenerator<'a> {
         local
     }
 
-    /// Allocates a local for the given temporary
+    /// Allocates a local for the given temporary.
+    /// If a local is not already available, then allocates one.
+    /// While allocating one, it adds it to the source map, unless
+    /// it is a parameter (these are recorded elsewhere).
     fn temp_to_local(
         &mut self,
         ctx: &FunctionContext,
         bc_attr_opt: Option<AttrId>,
         temp: TempIndex,
-        add_to_source_map: bool,
     ) -> FF::LocalIndex {
         if let Some(TempInfo { local }) = self.temps.get(&temp) {
             *local
@@ -947,24 +944,26 @@ impl<'a> FunctionGenerator<'a> {
             let idx = self.new_local(ctx, ctx.temp_type(temp).to_owned());
             self.temps.insert(temp, TempInfo::new(idx));
 
-            let loc = if let Some(id) = bc_attr_opt {
-                // Have a bytecode specific location for this local
-                ctx.fun.get_bytecode_loc(id)
-            } else if temp < ctx.fun.get_parameter_count() {
-                // Take location from parameter
-                ctx.fun.func_env.get_parameters()[temp].2.clone()
+            if temp < ctx.fun.get_parameter_count() {
+                // `temp` is a parameter.
+                // Don't add it to the source map here.
+                idx
             } else {
-                // Fall back to function identifier
-                ctx.fun.func_env.get_id_loc()
-            };
-            if add_to_source_map {
+                let loc = if let Some(id) = bc_attr_opt {
+                    // Have a bytecode specific location for this local
+                    ctx.fun.get_bytecode_loc(id)
+                } else {
+                    // Fall back to function identifier
+                    ctx.fun.func_env.get_id_loc()
+                };
+                // Only add to the source map if it wasn't a parameter.
                 let name = ctx.fun.get_local_name(temp);
                 self.gen
                     .source_map
                     .add_local_mapping(ctx.def_idx, ctx.module.source_name(name, loc))
                     .expect(SOURCE_MAP_OK);
+                idx
             }
-            idx
         }
     }
 }
