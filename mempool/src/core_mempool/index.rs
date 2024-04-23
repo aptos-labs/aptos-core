@@ -18,7 +18,7 @@ use std::{
     collections::{btree_set::Iter, BTreeMap, BTreeSet, HashMap},
     iter::Rev,
     ops::Bound,
-    time::Duration,
+    time::{Duration, SystemTime},
 };
 
 pub type AccountTransactions = BTreeMap<u64, MempoolTransaction>;
@@ -405,7 +405,12 @@ impl ParkingLotIndex {
         }
     }
 
-    pub(crate) fn insert(&mut self, txn: &MempoolTransaction) {
+    pub(crate) fn insert(&mut self, txn: &mut MempoolTransaction) {
+        if txn.insertion_info.park_time.is_none() {
+            txn.insertion_info.park_time = Some(SystemTime::now());
+        }
+        txn.was_parked = true;
+
         let sender = &txn.txn.sender();
         let sequence_number = txn.txn.sequence_number();
         let is_new_entry = match self.account_indices.get(sender) {

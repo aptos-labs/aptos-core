@@ -7,13 +7,13 @@ module 0x42::m {
         owner: address
     }
 
-    fun owner_correct(o: Object): address {
+    fun owner_correct(o: Object): address acquires ObjectCore {
         let addr = o.inner;
         borrow_global<ObjectCore>(addr).owner
     }
 
     // In a previous bug, a ReadRef was not generated for `o.inner`
-    fun owner_read_ref_missing(o: Object): address {
+    fun owner_read_ref_missing(o: Object): address acquires ObjectCore {
         borrow_global<ObjectCore>(o.inner).owner
     }
 

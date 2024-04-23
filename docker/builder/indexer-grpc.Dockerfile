@@ -17,6 +17,7 @@ RUN --mount=type=cache,target=/var/cache/apt,sharing=locked \
 COPY --link --from=indexer-builder /aptos/dist/aptos-indexer-grpc-cache-worker /usr/local/bin/aptos-indexer-grpc-cache-worker
 COPY --link --from=indexer-builder /aptos/dist/aptos-indexer-grpc-file-store /usr/local/bin/aptos-indexer-grpc-file-store
 COPY --link --from=indexer-builder /aptos/dist/aptos-indexer-grpc-data-service /usr/local/bin/aptos-indexer-grpc-data-service
+COPY --link --from=indexer-builder /aptos/dist/aptos-indexer-grpc-in-memory-cache-benchmark /usr/local/bin/aptos-indexer-grpc-in-memory-cache-benchmark
 
 # The health check port
 EXPOSE 8080

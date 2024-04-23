@@ -3,10 +3,15 @@
 All notable changes to the Aptos CLI will be captured in this file. This project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html) and the format set out by [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
 ## Unreleased
+- Renamed `run-local-testnet` to `run-localnet`. `run-local-testnet` is still supported for backwards compatibility.
+
+## [3.1.0] - 2024/03/21
 - Update `self_update` dependency to support situations where relevant directories (e.g. `/tmp`) exist on different filesystems.
+- [bugfix] Rename `--value` back to `--override-size-check` for publishing packages
+- Upgraded indexer processors for localnet from cc764f83e26aed1d83ccad0cee3ab579792a0538. This adds support for the `TransactionMetadataProcessor` among other improvements.
 
 ## [3.0.2] - 2024/03/12
-- Increased `max_connections` for postgres container created as part of local testnet to address occasional startup failures due to overloaded DB.
+- Increased `max_connections` for postgres container created as part of localnet to address occasional startup failures due to overloaded DB.
 
 ## [3.0.1] - 2024/03/05
 - Fix bug in `aptos update revela` if default install directory doesn't exist.
@@ -15,46 +20,46 @@ All notable changes to the Aptos CLI will be captured in this file. This project
 - **Breaking Change**: `aptos update` is now `aptos update aptos`.
 - Added `aptos update revela`. This installs / updates the `revela` binary, which is needed for the new `aptos move decompile` subcommand.
 - Extended `aptos move download` with an option `--bytecode` to also download the bytecode of a module
-- Integrated the Revela decompiler which is now available via `aptos move decompile` 
+- Integrated the Revela decompiler which is now available via `aptos move decompile`
 - Extended `aptos move disassemble` and the new `aptos move decompile` to also work on entire packages instead of only single files
 
 ## [2.5.0] - 2024/02/27
 - Updated CLI source compilation to use rust toolchain version 1.75.0 (from 1.74.1).
-- Upgraded indexer processors for local testnet from 9936ec73cef251fb01fd2c47412e064cad3975c2 to d44b2d209f57872ac593299c34751a5531b51352. Upgraded Hasura metadata accordingly.
-- Added support for objects processor in local testnet and enabled it by default.
+- Upgraded indexer processors for localnet from 9936ec73cef251fb01fd2c47412e064cad3975c2 to d44b2d209f57872ac593299c34751a5531b51352. Upgraded Hasura metadata accordingly.
+- Added support for objects processor in localnet and enabled it by default.
 
 ## [2.4.0] - 2024/01/05
 - Hide the V2 compiler from input options until the V2 compiler is ready for release
 - Updated CLI source compilation to use rust toolchain version 1.74.1 (from 1.72.1).
-- Added `for` loop. 
+- Added `for` loop.
   - Syntax: `for (iter in lower_bound..upper_bound) { loop_body }` with integer bounds.
   - Documentation: https://aptos.dev/move/book/loops
-- Upgraded indexer processors for local testnet from 2d5cb211a89a8705674e9e1e741c841dd899c558 to 4801acae7aea30d7e96bbfbe5ec5b04056dfa4cf. Upgraded Hasura metadata accordingly.
+- Upgraded indexer processors for localnet from 2d5cb211a89a8705674e9e1e741c841dd899c558 to 4801acae7aea30d7e96bbfbe5ec5b04056dfa4cf. Upgraded Hasura metadata accordingly.
 - Upgraded Hasura GraphQL engine image from 2.35.0 to 2.36.1.
 
 ## [2.3.2] - 2023/11/28
-- Services in the local testnet now bind to 127.0.0.1 by default (unless the CLI is running inside a container, which most users should not do) rather than 0.0.0.0. You can override this behavior with the `--bind-to` flag. This fixes an issue preventing the local testnet from working on Windows.
+- Services in the localnet now bind to 127.0.0.1 by default (unless the CLI is running inside a container, which most users should not do) rather than 0.0.0.0. You can override this behavior with the `--bind-to` flag. This fixes an issue preventing the localnet from working on Windows.
 
 ## [2.3.1] - 2023/11/07
 ### Updated
-- Updated processor code from https://github.com/aptos-labs/aptos-indexer-processors for the local testnet to 2d5cb211a89a8705674e9e1e741c841dd899c558. 
-- Improved reliability of inter-container networking with local testnet.
+- Updated processor code from https://github.com/aptos-labs/aptos-indexer-processors for the localnet to 2d5cb211a89a8705674e9e1e741c841dd899c558.
+- Improved reliability of inter-container networking with localnet.
 
 ## [2.3.0] - 2023/10/25
 ### Added
 - Added `--node-api-key`. This lets you set an API key for the purpose of not being ratelimited.
 
 ### Updated
-- Made the local testnet exit more quickly if a service fails to start.
-- Updated processor code from https://github.com/aptos-labs/aptos-indexer-processors for the local testnet to bcba94c26c8a6372056d2b69ce411c5719f98965.
+- Made the localnet exit more quickly if a service fails to start.
+- Updated processor code from https://github.com/aptos-labs/aptos-indexer-processors for the localnet to bcba94c26c8a6372056d2b69ce411c5719f98965.
 
 ### Fixed
-- Fixed an infrequent bug that caused startup failures for the local testnet with `--force-restart` + `--with-indexer-api` by using a Docker volume rather than a bind mount for the postgres storage.
+- Fixed an infrequent bug that caused startup failures for the localnet with `--force-restart` + `--with-indexer-api` by using a Docker volume rather than a bind mount for the postgres storage.
 - Fixed an issue where the CLI could not find the Docker socket with some Docker Desktop configurations.
 
 ## [2.2.2] - 2023/10/16
 ### Updated
-- Updated processor code from https://github.com/aptos-labs/aptos-indexer-processors for the local testnet to d6f55d4baba32960ea7be60878552e73ffbe8b7e.
+- Updated processor code from https://github.com/aptos-labs/aptos-indexer-processors for the localnet to d6f55d4baba32960ea7be60878552e73ffbe8b7e.
 
 ## [2.2.1] - 2023/10/13
 ### Fixed
@@ -62,7 +67,7 @@ All notable changes to the Aptos CLI will be captured in this file. This project
 
 ## [2.2.0] - 2023/10/11
 ### Added
-- Added `--with-indexer-api` to `aptos node run-local-testnet`. With this flag you can run a full processor + indexer API stack as part of your local testnet. You must have Docker installed to use this feature. For more information, see https://aptos.dev/nodes/local-testnet/local-testnet-index.
+- Added `--with-indexer-api` to `aptos node run-local-testnet`. With this flag you can run a full processor + indexer API stack as part of your localnet. You must have Docker installed to use this feature. For more information, see https://aptos.dev/nodes/local-testnet/local-testnet-index.
 ### Updated
 - Updated CLI source compilation to use rust toolchain version 1.72.1 (from 1.71.1).
 
@@ -108,7 +113,7 @@ All notable changes to the Aptos CLI will be captured in this file. This project
 
 ## [2.0.1] - 2023/06/05
 ### Fixed
-- Updated txn expiration configuration for the faucet built into the CLI to make local testnet startup more reliable.
+- Updated txn expiration configuration for the faucet built into the CLI to make localnet startup more reliable.
 
 ## [2.0.0] - 2023/06/01
 ### Added

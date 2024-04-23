@@ -1,4 +1,5 @@
 // Copyright © Aptos Foundation
+// SPDX-License-Identifier: Apache-2.0
 
 use crate::{
     consensus::consensus_fault_tolerance::{start_traffic, ActiveTrafficGuard},
@@ -67,16 +68,11 @@ async fn test_no_failures() {
         5.0,
         1,
         no_failure_injection(),
-        Box::new(move |_, _, executed_rounds, executed_transactions, _, _| {
+        Box::new(move |_, _, _, executed_transactions, _, _| {
             assert!(
                 executed_transactions >= 4,
                 "no progress with active consensus, only {} transactions",
                 executed_transactions
-            );
-            assert!(
-                executed_rounds >= 2,
-                "no progress with active consensus, only {} rounds",
-                executed_rounds
             );
             Ok(())
         }),

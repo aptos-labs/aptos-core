@@ -1,4 +1,5 @@
 // Copyright © Aptos Foundation
+// SPDX-License-Identifier: Apache-2.0
 
 use crate::{
     jwks::{rsa::RSA_JWK, unsupported::UnsupportedJWK},
@@ -36,6 +37,12 @@ impl Debug for JWKMoveStruct {
 impl AsMoveValue for JWKMoveStruct {
     fn as_move_value(&self) -> MoveValue {
         MoveValue::Struct(MoveStruct::Runtime(vec![self.variant.as_move_value()]))
+    }
+}
+
+impl From<RSA_JWK> for JWKMoveStruct {
+    fn from(rsa_jwk: RSA_JWK) -> Self {
+        JWKMoveStruct::from(JWK::RSA(rsa_jwk))
     }
 }
 

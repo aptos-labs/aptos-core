@@ -17,9 +17,9 @@ jobs:
       contents: read
       id-token: write
     env:
-      VALIDATOR_IMAGE_REPO: ${{ secrets.GCP_DOCKER_ARTIFACT_REPO }}/validator
-      FAUCET_IMAGE_REPO: ${{ secrets.GCP_DOCKER_ARTIFACT_REPO }}/faucet
-      INDEXER_GRPC_IMAGE_REPO: ${{ secrets.GCP_DOCKER_ARTIFACT_REPO }}/indexer-grpc
+      VALIDATOR_IMAGE_REPO: ${{ vars.GCP_DOCKER_ARTIFACT_REPO }}/validator
+      FAUCET_IMAGE_REPO: ${{ vars.GCP_DOCKER_ARTIFACT_REPO }}/faucet
+      INDEXER_GRPC_IMAGE_REPO: ${{ vars.GCP_DOCKER_ARTIFACT_REPO }}/indexer-grpc
       IMAGE_TAG: ${{ inputs.GIT_SHA || 'devnet' }} # hardcode to a known good build when not running on workflow_call
 
     steps:

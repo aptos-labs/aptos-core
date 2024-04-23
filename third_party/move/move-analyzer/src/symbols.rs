@@ -656,7 +656,7 @@ impl Symbolicator {
                         let failure = true;
                         diagnostics = Some((diags, failure));
                         eprintln!("typed AST compilation failed");
-                        return Ok((files, vec![]));
+                        return Ok((files, vec![], None));
                     },
                 };
                 eprintln!("compiled to typed AST");
@@ -670,7 +670,7 @@ impl Symbolicator {
                         let failure = false;
                         diagnostics = Some((diags, failure));
                         eprintln!("bytecode compilation failed");
-                        return Ok((files, vec![]));
+                        return Ok((files, vec![], None));
                     },
                 };
                 // warning diagnostics (if any) since compilation succeeded
@@ -680,7 +680,7 @@ impl Symbolicator {
                     diagnostics = Some((diags, failure));
                 }
                 eprintln!("compiled to bytecode");
-                Ok((files, units))
+                Ok((files, units, None))
             },
             unimplemented_v2_driver,
         )?;

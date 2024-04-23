@@ -88,7 +88,7 @@ pub enum Commands {
 #[derive(Subcommand, Debug)]
 pub enum InputOptions {
     FromDirectory {
-        /// Path to the local testnet folder. If you are running local testnet via cli, it should be `.aptos/testnet`.
+        /// Path to the localnet folder. If you are running localnet via cli, it should be `.aptos/testnet`.
         #[clap(short, long)]
         test_dir: PathBuf,
     },
@@ -218,7 +218,7 @@ async fn main() -> anyhow::Result<()> {
                 }
             }
 
-            print_configs!(OnChainConsensusConfig, OnChainExecutionConfig, Version);
+            print_configs!(OnChainConsensusConfig, OnChainExecutionConfig, AptosVersion);
 
             if print_gas_schedule {
                 print_configs!(GasScheduleV2, StorageGasSchedule);

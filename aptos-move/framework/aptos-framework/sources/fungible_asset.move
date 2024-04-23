@@ -24,7 +24,7 @@ module aptos_framework::fungible_asset {
     const EMAX_SUPPLY_EXCEEDED: u64 = 5;
     /// Fungible asset do not match when merging.
     const EFUNGIBLE_ASSET_MISMATCH: u64 = 6;
-    /// The mint ref and the the store do not match.
+    /// The mint ref and the store do not match.
     const EMINT_REF_AND_STORE_MISMATCH: u64 = 7;
     /// Account is not the store's owner.
     const ENOT_STORE_OWNER: u64 = 8;
@@ -542,7 +542,7 @@ module aptos_framework::fungible_asset {
         let store = borrow_global_mut<FungibleStore>(store_addr);
         store.balance = store.balance + amount;
 
-        event::emit<Deposit>(Deposit { store: store_addr, amount });
+        event::emit(Deposit { store: store_addr, amount });
     }
 
     /// Extract `amount` of the fungible asset from `store`.
@@ -556,7 +556,7 @@ module aptos_framework::fungible_asset {
         store.balance = store.balance - amount;
 
         let metadata = store.metadata;
-        event::emit<Withdraw>(Withdraw { store: store_addr, amount });
+        event::emit(Withdraw { store: store_addr, amount });
 
         FungibleAsset { metadata, amount }
     }

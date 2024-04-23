@@ -103,6 +103,7 @@ module aptos_std::smart_vector_test {
         assert!(sum == 5050, 0);
     }
 
+    #[test]
     fun smart_vector_map_test() {
         let v = make_smart_vector(100);
         let mapped_v = V::map(v, |x| { x * 2 });

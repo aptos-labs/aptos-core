@@ -47,6 +47,7 @@ This is the reference documentation of the Aptos framework.
 -  [`0x1::primary_fungible_store`](primary_fungible_store.md#0x1_primary_fungible_store)
 -  [`0x1::randomness`](randomness.md#0x1_randomness)
 -  [`0x1::randomness_config`](randomness_config.md#0x1_randomness_config)
+-  [`0x1::randomness_config_seqnum`](randomness_config_seqnum.md#0x1_randomness_config_seqnum)
 -  [`0x1::reconfiguration`](reconfiguration.md#0x1_reconfiguration)
 -  [`0x1::reconfiguration_state`](reconfiguration_state.md#0x1_reconfiguration_state)
 -  [`0x1::reconfiguration_with_dkg`](reconfiguration_with_dkg.md#0x1_reconfiguration_with_dkg)

@@ -12,6 +12,7 @@ edition = "2021"
 [dependencies]
 abstract-domain-derive = { path = "../move-model/bytecode/abstract_domain_derive" }
 anyhow = "1.0.62"
+bcs = { workspace = true }
 move-binary-format = { path = "../move-binary-format" }
 move-bytecode-source-map = { path = "../move-ir-compiler/move-bytecode-source-map" }
 move-command-line-common = { path = "../move-command-line-common" }
@@ -24,21 +25,17 @@ move-model = { path = "../move-model" }
 move-stackless-bytecode = { path = "../move-model/bytecode" }
 move-symbol-pool = { path = "../move-symbol-pool" }
 
-bcs = { workspace = true }
 clap = { version = "4.3.9", features = ["derive", "env"] }
-codespan = "0.11.1"
 codespan-reporting = { version = "0.11.1", features = ["serde", "serialization"] }
 ethnum = "1.0.4"
 flexi_logger = "0.27.4"
 im = "15.0.0"
 itertools = "0.10.0"
-lazy_static = "1.4.0"
 log = { version = "0.4.14", features = ["serde"] }
 num = "0.4.0"
 once_cell = "1.7.2"
 #paste = "1.0.5"
 petgraph = "0.6.4"
-serde = { version = "1.0.124", features = ["derive"] }
 
 [dev-dependencies]
 anyhow = "1.0.52"
@@ -47,6 +44,7 @@ move-command-line-common = { path = "../move-command-line-common" }
 move-ir-types = { path = "../move-ir/types" }
 move-prover-test-utils = { path = "../move-prover/test-utils" }
 move-stdlib = { path = "../move-stdlib" }
+walkdir = "2.3.3"
 
 [lib]
 doctest = false

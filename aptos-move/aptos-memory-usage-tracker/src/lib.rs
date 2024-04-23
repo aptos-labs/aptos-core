@@ -6,7 +6,8 @@ use aptos_gas_algebra::{
 };
 use aptos_gas_meter::AptosGasMeter;
 use aptos_types::{
-    account_config::CORE_CODE_ADDRESS, state_store::state_key::StateKey, write_set::WriteOpSize,
+    account_config::CORE_CODE_ADDRESS, contract_event::ContractEvent,
+    state_store::state_key::StateKey, write_set::WriteOpSize,
 };
 use move_binary_format::{
     errors::{PartialVMError, PartialVMResult, VMResult},
@@ -474,6 +475,10 @@ where
 
     delegate_mut! {
         fn algebra_mut(&mut self) -> &mut Self::Algebra;
+
+        fn charge_io_gas_for_transaction(&mut self, txn_size: NumBytes) -> VMResult<()>;
+
+        fn charge_io_gas_for_event(&mut self, event: &ContractEvent) -> VMResult<()>;
 
         fn charge_io_gas_for_write(&mut self, key: &StateKey, op: &WriteOpSize) -> VMResult<()>;
 

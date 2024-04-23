@@ -1,0 +1,25 @@
+
+Diagnostics:
+error: mutable reference in local `f` requires exclusive access but is borrowed
+  ┌─ tests/reference-safety/mut_borrow_after_invalid.move:8:9
+  │
+8 │         *f;
+  │         ^^ requirement enforced here
+9 │         *s1;
+  │         --- conflicting reference `s1` used here
+
+error: mutable reference in local `a` requires exclusive access but is borrowed
+   ┌─ tests/reference-safety/mut_borrow_after_invalid.move:16:9
+   │
+16 │         *a = 0;
+   │         ^^^^^^ requirement enforced here
+17 │         *b
+   │         -- conflicting reference `b` used here
+
+error: mutable reference in local `a` requires exclusive access but is borrowed
+   ┌─ tests/reference-safety/mut_borrow_after_invalid.move:25:9
+   │
+25 │         *a = 0;
+   │         ^^^^^^ requirement enforced here
+26 │         *c
+   │         -- conflicting reference `c` used here

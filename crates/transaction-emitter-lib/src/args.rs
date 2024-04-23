@@ -5,7 +5,7 @@ use anyhow::{bail, format_err, Result};
 use aptos_config::keys::ConfigKey;
 use aptos_crypto::{ed25519::Ed25519PrivateKey, encoding_type::EncodingType};
 use aptos_sdk::types::chain_id::ChainId;
-use aptos_transaction_generator_lib::args::TransactionTypeArg;
+use aptos_transaction_generator_lib::{args::TransactionTypeArg, AccountType};
 use clap::{ArgGroup, Parser};
 use serde::{Deserialize, Serialize};
 use std::{
@@ -137,6 +137,9 @@ pub struct EmitArgs {
         ignore_case = true
     )]
     pub transaction_type: Vec<TransactionTypeArg>,
+
+    #[clap(long, value_enum, default_value = "local", ignore_case = true)]
+    pub account_type: AccountType,
 
     /// Number of copies of the modules that will be published,
     /// under separate accounts, creating independent contracts,

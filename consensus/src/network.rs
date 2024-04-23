@@ -14,7 +14,10 @@ use crate::{
     network_interface::{ConsensusMsg, ConsensusNetworkClient, RPC},
     pipeline::commit_reliable_broadcast::CommitMessage,
     quorum_store::types::{Batch, BatchMsg, BatchRequest, BatchResponse},
-    rand::rand_gen::network_messages::RandGenMessage,
+    rand::rand_gen::{
+        network_messages::{RandGenMessage, RandMessage},
+        types::{AugmentedData, FastShare, Share},
+    },
 };
 use anyhow::{anyhow, bail, ensure};
 use aptos_channels::{self, aptos_channel, message_queues::QueueStyle};
@@ -412,6 +415,12 @@ impl NetworkSender {
     pub async fn broadcast_vote(&self, vote_msg: VoteMsg) {
         fail_point!("consensus::send::vote", |_| ());
         let msg = ConsensusMsg::VoteMsg(Box::new(vote_msg));
+        self.broadcast(msg).await
+    }
+
+    pub async fn broadcast_fast_share(&self, share: FastShare<Share>) {
+        fail_point!("consensus::send::broadcast_share", |_| ());
+        let msg = RandMessage::<Share, AugmentedData>::FastShare(share).into_network_message();
         self.broadcast(msg).await
     }
 
@@ -834,9 +843,6 @@ impl NetworkTask {
                     {
                         warn!(error = ?e, "aptos channel closed");
                     };
-                },
-                _ => {
-                    // Ignore `NewPeer` and `LostPeer` events
                 },
             });
         }

@@ -8,7 +8,7 @@ use super::{
     },
     health_checker::HealthChecker,
     traits::{ServiceManager, ShutdownStep},
-    RunLocalTestnet,
+    RunLocalnet,
 };
 use anyhow::{bail, Context, Result};
 use async_trait::async_trait;
@@ -29,7 +29,7 @@ const POSTGRES_IMAGE: &str = "postgres:14.11";
 const DATA_PATH_IN_CONTAINER: &str = "/var/lib/mydata";
 const POSTGRES_DEFAULT_PORT: u16 = 5432;
 
-/// Args related to running postgres in the local testnet.
+/// Args related to running postgres in the localnet.
 #[derive(Clone, Debug, Parser)]
 pub struct PostgresArgs {
     /// This is the database to connect to, both when --use-host-postgres is set
@@ -83,7 +83,7 @@ impl PostgresArgs {
     /// we will use that rather than `self.postgres_database`. If `external` is true,
     /// it will give you the string for connecting from the host. If it is false, it
     /// will give you the string for connecting from another container in the network
-    /// we create for all containers in the local testnet.
+    /// we create for all containers in the localnet.
     pub fn get_connection_string(&self, database: Option<&str>, external: bool) -> String {
         let password = match self.use_host_postgres {
             true => match &self.host_postgres_password {
@@ -119,7 +119,7 @@ pub struct PostgresManager {
 }
 
 impl PostgresManager {
-    pub fn new(args: &RunLocalTestnet, test_dir: PathBuf) -> Result<Self> {
+    pub fn new(args: &RunLocalnet, test_dir: PathBuf) -> Result<Self> {
         if args.postgres_args.use_host_postgres
             && args.postgres_args.postgres_database == "postgres"
         {
@@ -275,7 +275,7 @@ impl ServiceManager for PostgresManager {
                 vec![
                     "postgres",
                     "-c",
-                    // The default is 100 as of Postgres 14.11. Given the local testnet
+                    // The default is 100 as of Postgres 14.11. Given the localnet
                     // can be composed of many different processors all with their own
                     // connection pools, 100 is insufficient.
                     "max_connections=200",

@@ -1,4 +1,5 @@
 // Copyright © Aptos Foundation
+// SPDX-License-Identifier: Apache-2.0
 
 use aptos_metrics_core::{register_histogram_vec, register_int_gauge, HistogramVec, IntGauge};
 use once_cell::sync::Lazy;
@@ -17,6 +18,15 @@ pub static DKG_STAGE_SECONDS: Lazy<HistogramVec> = Lazy::new(|| {
         "aptos_dkg_session_stage_seconds",
         "How long it takes to reach different DKG stages",
         &["dealer", "stage"]
+    )
+    .unwrap()
+});
+
+pub static ROUNDING_SECONDS: Lazy<HistogramVec> = Lazy::new(|| {
+    register_histogram_vec!(
+        "aptos_dkg_rounding_seconds",
+        "Rounding seconds and counts by method",
+        &["method"]
     )
     .unwrap()
 });

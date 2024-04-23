@@ -104,6 +104,10 @@ return true.
 -  [Function `keyless_accounts_with_passkeys_feature_enabled`](#0x1_features_keyless_accounts_with_passkeys_feature_enabled)
 -  [Function `get_multisig_v2_enhancement_feature`](#0x1_features_get_multisig_v2_enhancement_feature)
 -  [Function `multisig_v2_enhancement_feature_enabled`](#0x1_features_multisig_v2_enhancement_feature_enabled)
+-  [Function `get_delegation_pool_allowlisting_feature`](#0x1_features_get_delegation_pool_allowlisting_feature)
+-  [Function `delegation_pool_allowlisting_enabled`](#0x1_features_delegation_pool_allowlisting_enabled)
+-  [Function `get_module_event_migration_feature`](#0x1_features_get_module_event_migration_feature)
+-  [Function `module_event_migration_enabled`](#0x1_features_module_event_migration_enabled)
 -  [Function `change_feature_flags`](#0x1_features_change_feature_flags)
 -  [Function `change_feature_flags_internal`](#0x1_features_change_feature_flags_internal)
 -  [Function `change_feature_flags_for_next_epoch`](#0x1_features_change_feature_flags_for_next_epoch)
@@ -385,6 +389,17 @@ Lifetime: transient
 
 
 
+<a id="0x1_features_DELEGATION_POOL_ALLOWLISTING"></a>
+
+Whether delegators allowlisting for delegation pools is supported.
+Lifetime: transient
+
+
+<pre><code><b>const</b> <a href="features.md#0x1_features_DELEGATION_POOL_ALLOWLISTING">DELEGATION_POOL_ALLOWLISTING</a>: u64 = 56;
+</code></pre>
+
+
+
 <a id="0x1_features_DELEGATION_POOL_PARTIAL_GOVERNANCE_VOTING"></a>
 
 Whether enable paritial governance voting on delegation_pool.
@@ -528,6 +543,18 @@ Lifetime: transient
 
 
 <pre><code><b>const</b> <a href="features.md#0x1_features_MODULE_EVENT">MODULE_EVENT</a>: u64 = 26;
+</code></pre>
+
+
+
+<a id="0x1_features_MODULE_EVENT_MIGRATION"></a>
+
+Whether aptos_framwork enables the behavior of module event migration.
+
+Lifetime: transient
+
+
+<pre><code><b>const</b> <a href="features.md#0x1_features_MODULE_EVENT_MIGRATION">MODULE_EVENT_MIGRATION</a>: u64 = 57;
 </code></pre>
 
 
@@ -2425,6 +2452,98 @@ Lifetime: transient
 
 </details>
 
+<a id="0x1_features_get_delegation_pool_allowlisting_feature"></a>
+
+## Function `get_delegation_pool_allowlisting_feature`
+
+
+
+<pre><code><b>public</b> <b>fun</b> <a href="features.md#0x1_features_get_delegation_pool_allowlisting_feature">get_delegation_pool_allowlisting_feature</a>(): u64
+</code></pre>
+
+
+
+<details>
+<summary>Implementation</summary>
+
+
+<pre><code><b>public</b> <b>fun</b> <a href="features.md#0x1_features_get_delegation_pool_allowlisting_feature">get_delegation_pool_allowlisting_feature</a>(): u64 { <a href="features.md#0x1_features_DELEGATION_POOL_ALLOWLISTING">DELEGATION_POOL_ALLOWLISTING</a> }
+</code></pre>
+
+
+
+</details>
+
+<a id="0x1_features_delegation_pool_allowlisting_enabled"></a>
+
+## Function `delegation_pool_allowlisting_enabled`
+
+
+
+<pre><code><b>public</b> <b>fun</b> <a href="features.md#0x1_features_delegation_pool_allowlisting_enabled">delegation_pool_allowlisting_enabled</a>(): bool
+</code></pre>
+
+
+
+<details>
+<summary>Implementation</summary>
+
+
+<pre><code><b>public</b> <b>fun</b> <a href="features.md#0x1_features_delegation_pool_allowlisting_enabled">delegation_pool_allowlisting_enabled</a>(): bool <b>acquires</b> <a href="features.md#0x1_features_Features">Features</a> {
+    <a href="features.md#0x1_features_is_enabled">is_enabled</a>(<a href="features.md#0x1_features_DELEGATION_POOL_ALLOWLISTING">DELEGATION_POOL_ALLOWLISTING</a>)
+}
+</code></pre>
+
+
+
+</details>
+
+<a id="0x1_features_get_module_event_migration_feature"></a>
+
+## Function `get_module_event_migration_feature`
+
+
+
+<pre><code><b>public</b> <b>fun</b> <a href="features.md#0x1_features_get_module_event_migration_feature">get_module_event_migration_feature</a>(): u64
+</code></pre>
+
+
+
+<details>
+<summary>Implementation</summary>
+
+
+<pre><code><b>public</b> <b>fun</b> <a href="features.md#0x1_features_get_module_event_migration_feature">get_module_event_migration_feature</a>(): u64 { <a href="features.md#0x1_features_MODULE_EVENT_MIGRATION">MODULE_EVENT_MIGRATION</a> }
+</code></pre>
+
+
+
+</details>
+
+<a id="0x1_features_module_event_migration_enabled"></a>
+
+## Function `module_event_migration_enabled`
+
+
+
+<pre><code><b>public</b> <b>fun</b> <a href="features.md#0x1_features_module_event_migration_enabled">module_event_migration_enabled</a>(): bool
+</code></pre>
+
+
+
+<details>
+<summary>Implementation</summary>
+
+
+<pre><code><b>public</b> <b>fun</b> <a href="features.md#0x1_features_module_event_migration_enabled">module_event_migration_enabled</a>(): bool <b>acquires</b> <a href="features.md#0x1_features_Features">Features</a> {
+    <a href="features.md#0x1_features_is_enabled">is_enabled</a>(<a href="features.md#0x1_features_MODULE_EVENT_MIGRATION">MODULE_EVENT_MIGRATION</a>)
+}
+</code></pre>
+
+
+
+</details>
+
 <a id="0x1_features_change_feature_flags"></a>
 
 ## Function `change_feature_flags`
@@ -2882,6 +3001,9 @@ Helper to check whether a feature flag is enabled.
 
 
 <pre><code><b>aborts_if</b> <a href="signer.md#0x1_signer_address_of">signer::address_of</a>(framework) != @std;
+<b>pragma</b> opaque;
+<b>modifies</b> <b>global</b>&lt;<a href="features.md#0x1_features_Features">Features</a>&gt;(@std);
+<b>modifies</b> <b>global</b>&lt;<a href="features.md#0x1_features_PendingFeatures">PendingFeatures</a>&gt;(@std);
 </code></pre>
 
 

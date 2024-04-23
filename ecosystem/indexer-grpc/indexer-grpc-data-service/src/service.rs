@@ -19,19 +19,20 @@ use aptos_indexer_grpc_utils::{
     },
     counters::{log_grpc_step, IndexerGrpcStep, NUM_MULTI_FETCH_OVERLAPPED_VERSIONS},
     file_store_operator::FileStoreOperator,
+    in_memory_cache::InMemoryCache,
     time_diff_since_pb_timestamp_in_secs,
     types::RedisUrl,
 };
 use aptos_moving_average::MovingAverage;
 use aptos_protos::{
     indexer::v1::{raw_data_server::RawData, GetTransactionsRequest, TransactionsResponse},
-    transaction::v1::Transaction,
+    transaction::v1::{transaction::TxnData, Transaction},
 };
 use futures::Stream;
 use prost::Message;
 use redis::Client;
 use std::{
-    collections::HashMap,
+    collections::{HashMap, HashSet},
     pin::Pin,
     str::FromStr,
     sync::Arc,
@@ -61,9 +62,9 @@ const RESPONSE_CHANNEL_SEND_TIMEOUT: Duration = Duration::from_secs(120);
 
 const SHORT_CONNECTION_DURATION_IN_SECS: u64 = 10;
 
-const REQUEST_HEADER_APTOS_EMAIL_HEADER: &str = "x-aptos-email";
-const REQUEST_HEADER_APTOS_USER_CLASSIFICATION_HEADER: &str = "x-aptos-user-classification";
-const REQUEST_HEADER_APTOS_API_KEY_NAME: &str = "x-aptos-api-key-name";
+/// This comes from API Gateway. The identifier uniquely identifies the requester, which
+/// in the case of indexer-grpc is always an application.
+const REQUEST_HEADER_APTOS_IDENTIFIER: &str = "x-aptos-identifier";
 const RESPONSE_HEADER_APTOS_CONNECTION_ID_HEADER: &str = "x-aptos-connection-id";
 const SERVICE_TYPE: &str = "data_service";
 
@@ -79,7 +80,9 @@ pub struct RawDataServerWrapper {
     pub redis_client: Arc<redis::Client>,
     pub file_store_config: IndexerGrpcFileStoreConfig,
     pub data_service_response_channel_size: usize,
+    pub sender_addresses_to_ignore: HashSet<String>,
     pub cache_storage_format: StorageFormat,
+    in_memory_cache: Arc<InMemoryCache>,
 }
 
 impl RawDataServerWrapper {
@@ -87,7 +90,9 @@ impl RawDataServerWrapper {
         redis_address: RedisUrl,
         file_store_config: IndexerGrpcFileStoreConfig,
         data_service_response_channel_size: usize,
+        sender_addresses_to_ignore: HashSet<String>,
         cache_storage_format: StorageFormat,
+        in_memory_cache: Arc<InMemoryCache>,
     ) -> anyhow::Result<Self> {
         Ok(Self {
             redis_client: Arc::new(
@@ -97,7 +102,9 @@ impl RawDataServerWrapper {
             ),
             file_store_config,
             data_service_response_channel_size,
+            sender_addresses_to_ignore,
             cache_storage_format,
+            in_memory_cache,
         })
     }
 }
@@ -134,8 +141,7 @@ impl RawData for RawDataServerWrapper {
         };
         CONNECTION_COUNT
             .with_label_values(&[
-                &request_metadata.request_api_key_name,
-                &request_metadata.request_email,
+                &request_metadata.request_identifier,
                 &request_metadata.processor_name,
             ])
             .inc();
@@ -172,6 +178,8 @@ impl RawData for RawDataServerWrapper {
         let redis_client = self.redis_client.clone();
         let cache_storage_format = self.cache_storage_format;
         let request_metadata = Arc::new(request_metadata);
+        let sender_addresses_to_ignore = self.sender_addresses_to_ignore.clone();
+        let in_memory_cache = self.in_memory_cache.clone();
         tokio::spawn({
             let request_metadata = request_metadata.clone();
             async move {
@@ -182,7 +190,9 @@ impl RawData for RawDataServerWrapper {
                     request_metadata,
                     transactions_count,
                     tx,
+                    sender_addresses_to_ignore,
                     current_version,
+                    in_memory_cache,
                 )
                 .await;
             }
@@ -214,7 +224,28 @@ async fn get_data_with_tasks(
     file_store_operator: Arc<Box<dyn FileStoreOperator>>,
     request_metadata: Arc<IndexerGrpcRequestMetadata>,
     cache_storage_format: StorageFormat,
+    in_memory_cache: Arc<InMemoryCache>,
 ) -> DataFetchSubTaskResult {
+    let start_time = Instant::now();
+    let in_memory_transactions = in_memory_cache.get_transactions(start_version).await;
+    if !in_memory_transactions.is_empty() {
+        log_grpc_step(
+            SERVICE_TYPE,
+            IndexerGrpcStep::DataServiceFetchingDataFromInMemoryCache,
+            Some(start_version as i64),
+            Some(in_memory_transactions.last().as_ref().unwrap().version as i64),
+            None,
+            None,
+            Some(start_time.elapsed().as_secs_f64()),
+            None,
+            Some(in_memory_transactions.len() as i64),
+            Some(&request_metadata),
+        );
+        return DataFetchSubTaskResult::BatchSuccess(chunk_transactions(
+            in_memory_transactions,
+            MESSAGE_SIZE_LIMIT,
+        ));
+    }
     let cache_coverage_status = cache_operator
         .check_cache_coverage_status(start_version)
         .await;
@@ -317,12 +348,9 @@ async fn get_data_in_task(
         Ok(TransactionsDataStatus::AheadOfCache) => {
             info!(
                 start_version = start_version,
-                request_name = request_metadata.processor_name.as_str(),
-                request_email = request_metadata.request_email.as_str(),
-                request_api_key_name = request_metadata.request_api_key_name.as_str(),
+                request_identifier = request_metadata.request_identifier.as_str(),
                 processor_name = request_metadata.processor_name.as_str(),
                 connection_id = request_metadata.request_connection_id.as_str(),
-                request_user_classification = request_metadata.request_user_classification.as_str(),
                 duration_in_secs = current_batch_start_time.elapsed().as_secs_f64(),
                 service_type = SERVICE_TYPE,
                 "[Data Service] Requested data is ahead of cache. Sleeping for {} ms.",
@@ -350,7 +378,9 @@ async fn data_fetcher_task(
     request_metadata: Arc<IndexerGrpcRequestMetadata>,
     transactions_count: Option<u64>,
     tx: tokio::sync::mpsc::Sender<Result<TransactionsResponse, Status>>,
+    sender_addresses_to_ignore: HashSet<String>,
     mut current_version: u64,
+    in_memory_cache: Arc<InMemoryCache>,
 ) {
     let mut connection_start_time = Some(std::time::Instant::now());
     let mut transactions_count = transactions_count;
@@ -444,6 +474,7 @@ async fn data_fetcher_task(
             file_store_operator.clone(),
             request_metadata.clone(),
             cache_storage_format,
+            in_memory_cache.clone(),
         )
         .await
         {
@@ -478,15 +509,18 @@ async fn data_fetcher_task(
             .sum::<usize>();
         BYTES_READY_TO_TRANSFER_FROM_SERVER
             .with_label_values(&[
-                &request_metadata.request_api_key_name,
-                &request_metadata.request_email,
+                &request_metadata.request_identifier,
                 &request_metadata.processor_name,
             ])
             .inc_by(bytes_ready_to_transfer as u64);
         // 2. Push the data to the response channel, i.e. stream the data to the client.
         let current_batch_size = transaction_data.as_slice().len();
         let end_of_batch_version = transaction_data.as_slice().last().unwrap().version;
-        let resp_items = get_transactions_responses_builder(transaction_data, chain_id as u32);
+        let resp_items = get_transactions_responses_builder(
+            transaction_data,
+            chain_id as u32,
+            &sender_addresses_to_ignore,
+        );
         let data_latency_in_secs = resp_items
             .last()
             .unwrap()
@@ -503,36 +537,32 @@ async fn data_fetcher_task(
             Ok(_) => {
                 PROCESSED_BATCH_SIZE
                     .with_label_values(&[
-                        request_metadata.request_api_key_name.as_str(),
-                        request_metadata.request_email.as_str(),
+                        request_metadata.request_identifier.as_str(),
                         request_metadata.processor_name.as_str(),
                     ])
                     .set(current_batch_size as i64);
                 // TODO: Reasses whether this metric useful
                 LATEST_PROCESSED_VERSION_OLD
                     .with_label_values(&[
-                        request_metadata.request_api_key_name.as_str(),
-                        request_metadata.request_email.as_str(),
+                        request_metadata.request_identifier.as_str(),
                         request_metadata.processor_name.as_str(),
                     ])
                     .set(end_of_batch_version as i64);
                 PROCESSED_VERSIONS_COUNT
                     .with_label_values(&[
-                        request_metadata.request_api_key_name.as_str(),
-                        request_metadata.request_email.as_str(),
+                        request_metadata.request_identifier.as_str(),
                         request_metadata.processor_name.as_str(),
                     ])
                     .inc_by(current_batch_size as u64);
                 if let Some(data_latency_in_secs) = data_latency_in_secs {
                     PROCESSED_LATENCY_IN_SECS
                         .with_label_values(&[
-                            request_metadata.request_api_key_name.as_str(),
-                            request_metadata.request_email.as_str(),
+                            request_metadata.request_identifier.as_str(),
                             request_metadata.processor_name.as_str(),
                         ])
                         .set(data_latency_in_secs);
                     PROCESSED_LATENCY_IN_SECS_ALL
-                        .with_label_values(&[request_metadata.request_user_classification.as_str()])
+                        .with_label_values(&[])
                         .observe(data_latency_in_secs);
                 }
             },
@@ -550,13 +580,9 @@ async fn data_fetcher_task(
         current_version = end_of_batch_version + 1;
     }
     info!(
-        request_name = request_metadata.processor_name.as_str(),
-        request_email = request_metadata.request_email.as_str(),
-        request_api_key_name = request_metadata.request_api_key_name.as_str(),
+        request_identifier = request_metadata.request_identifier.as_str(),
         processor_name = request_metadata.processor_name.as_str(),
         connection_id = request_metadata.request_connection_id.as_str(),
-        request_user_classification = request_metadata.request_user_classification.as_str(),
-        request_user_classification = request_metadata.request_user_classification.as_str(),
         service_type = SERVICE_TYPE,
         "[Data Service] Client disconnected."
     );
@@ -564,8 +590,7 @@ async fn data_fetcher_task(
         if start_time.elapsed().as_secs() < SHORT_CONNECTION_DURATION_IN_SECS {
             SHORT_CONNECTION_COUNT
                 .with_label_values(&[
-                    request_metadata.request_api_key_name.as_str(),
-                    request_metadata.request_email.as_str(),
+                    request_metadata.request_identifier.as_str(),
                     request_metadata.processor_name.as_str(),
                 ])
                 .inc();
@@ -659,8 +684,11 @@ fn ensure_sequential_transactions(mut batches: Vec<Vec<Transaction>>) -> Vec<Tra
 fn get_transactions_responses_builder(
     transactions: Vec<Transaction>,
     chain_id: u32,
+    sender_addresses_to_ignore: &HashSet<String>,
 ) -> Vec<TransactionsResponse> {
-    let chunks = chunk_transactions(transactions, MESSAGE_SIZE_LIMIT);
+    let filtered_transactions =
+        filter_transactions_for_sender_addresses(transactions, sender_addresses_to_ignore);
+    let chunks = chunk_transactions(filtered_transactions, MESSAGE_SIZE_LIMIT);
     chunks
         .into_iter()
         .map(|chunk| TransactionsResponse {
@@ -827,12 +855,7 @@ fn get_request_metadata(
     req: &Request<GetTransactionsRequest>,
 ) -> tonic::Result<IndexerGrpcRequestMetadata> {
     let request_metadata_pairs = vec![
-        ("request_api_key_name", REQUEST_HEADER_APTOS_API_KEY_NAME),
-        ("request_email", REQUEST_HEADER_APTOS_EMAIL_HEADER),
-        (
-            "request_user_classification",
-            REQUEST_HEADER_APTOS_USER_CLASSIFICATION_HEADER,
-        ),
+        ("request_identifier", REQUEST_HEADER_APTOS_IDENTIFIER),
         ("request_token", GRPC_AUTH_TOKEN_HEADER),
         ("processor_name", GRPC_REQUEST_NAME_HEADER),
     ];
@@ -932,47 +955,117 @@ async fn channel_send_multiple_with_timeout(
     Ok(())
 }
 
-#[test]
-fn test_ensure_sequential_transactions_merges_and_sorts() {
-    let transactions1 = (1..5)
-        .map(|i| Transaction {
-            version: i,
-            ..Default::default()
+fn filter_transactions_for_sender_addresses(
+    transactions: Vec<Transaction>,
+    sender_addresses_to_ignore: &HashSet<String>,
+) -> Vec<Transaction> {
+    transactions
+        .into_iter()
+        .map(|mut txn| {
+            if let Some(TxnData::User(user_transaction)) = txn.txn_data.as_mut() {
+                if let Some(utr) = user_transaction.request.as_mut() {
+                    if sender_addresses_to_ignore.contains(&utr.sender) {
+                        // Wipe the payload and signature.
+                        utr.payload = None;
+                        utr.signature = None;
+                        user_transaction.events = vec![];
+                        txn.info.as_mut().unwrap().changes = vec![];
+                    }
+                }
+            }
+            txn
         })
-        .collect();
-    let transactions2 = (5..10)
-        .map(|i| Transaction {
-            version: i,
-            ..Default::default()
-        })
-        .collect();
-    // No overlap, just normal fetching flow
-    let transactions1 = ensure_sequential_transactions(vec![transactions1, transactions2]);
-    assert_eq!(transactions1.len(), 9);
-    assert_eq!(transactions1.first().unwrap().version, 1);
-    assert_eq!(transactions1.last().unwrap().version, 9);
+        .collect()
+}
 
-    // This is a full overlap
-    let transactions2 = (5..7)
-        .map(|i| Transaction {
-            version: i,
-            ..Default::default()
-        })
-        .collect();
-    let transactions1 = ensure_sequential_transactions(vec![transactions1, transactions2]);
-    assert_eq!(transactions1.len(), 9);
-    assert_eq!(transactions1.first().unwrap().version, 1);
-    assert_eq!(transactions1.last().unwrap().version, 9);
+#[cfg(test)]
+mod tests {
+    use super::{ensure_sequential_transactions, filter_transactions_for_sender_addresses};
+    use aptos_protos::transaction::v1::{
+        transaction::TxnData, Event, Signature, Transaction, TransactionInfo, TransactionPayload,
+        UserTransaction, UserTransactionRequest, WriteSetChange,
+    };
+    use std::collections::HashSet;
 
-    // Partial overlap
-    let transactions2 = (5..12)
-        .map(|i| Transaction {
-            version: i,
+    #[test]
+    fn test_ensure_sequential_transactions_merges_and_sorts() {
+        let transactions1 = (1..5)
+            .map(|i| Transaction {
+                version: i,
+                ..Default::default()
+            })
+            .collect();
+        let transactions2 = (5..10)
+            .map(|i| Transaction {
+                version: i,
+                ..Default::default()
+            })
+            .collect();
+        // No overlap, just normal fetching flow
+        let transactions1 = ensure_sequential_transactions(vec![transactions1, transactions2]);
+        assert_eq!(transactions1.len(), 9);
+        assert_eq!(transactions1.first().unwrap().version, 1);
+        assert_eq!(transactions1.last().unwrap().version, 9);
+
+        // This is a full overlap
+        let transactions2 = (5..7)
+            .map(|i| Transaction {
+                version: i,
+                ..Default::default()
+            })
+            .collect();
+        let transactions1 = ensure_sequential_transactions(vec![transactions1, transactions2]);
+        assert_eq!(transactions1.len(), 9);
+        assert_eq!(transactions1.first().unwrap().version, 1);
+        assert_eq!(transactions1.last().unwrap().version, 9);
+
+        // Partial overlap
+        let transactions2 = (5..12)
+            .map(|i| Transaction {
+                version: i,
+                ..Default::default()
+            })
+            .collect();
+        let transactions1 = ensure_sequential_transactions(vec![transactions1, transactions2]);
+        assert_eq!(transactions1.len(), 11);
+        assert_eq!(transactions1.first().unwrap().version, 1);
+        assert_eq!(transactions1.last().unwrap().version, 11);
+    }
+
+    #[test]
+    fn test_transactions_are_filter_correctly() {
+        let sender_address = "0x1234".to_string();
+        // Create a transaction with a user transaction
+        let txn = Transaction {
+            version: 1,
+            txn_data: Some(TxnData::User(UserTransaction {
+                request: Some(UserTransactionRequest {
+                    sender: sender_address.clone(),
+                    payload: Some(TransactionPayload::default()),
+                    signature: Some(Signature::default()),
+                    ..Default::default()
+                }),
+                events: vec![Event::default()],
+            })),
+            info: Some(TransactionInfo {
+                changes: vec![WriteSetChange::default()],
+                ..Default::default()
+            }),
             ..Default::default()
-        })
-        .collect();
-    let transactions1 = ensure_sequential_transactions(vec![transactions1, transactions2]);
-    assert_eq!(transactions1.len(), 11);
-    assert_eq!(transactions1.first().unwrap().version, 1);
-    assert_eq!(transactions1.last().unwrap().version, 11);
+        };
+        // create ignore list.
+        let ignore_hash_set: HashSet<String> = vec![sender_address].into_iter().collect();
+
+        let filtered_txn = filter_transactions_for_sender_addresses(vec![txn], &ignore_hash_set);
+        assert_eq!(filtered_txn.len(), 1);
+        let txn = filtered_txn.first().unwrap();
+        let user_transaction = match &txn.txn_data {
+            Some(TxnData::User(user_transaction)) => user_transaction,
+            _ => panic!("Expected user transaction"),
+        };
+        assert_eq!(user_transaction.request.as_ref().unwrap().payload, None);
+        assert_eq!(user_transaction.request.as_ref().unwrap().signature, None);
+        assert_eq!(user_transaction.events.len(), 0);
+        assert_eq!(txn.info.as_ref().unwrap().changes.len(), 0);
+    }
 }

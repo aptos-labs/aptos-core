@@ -1,4 +1,4 @@
-//# publish --print-bytecode
+//# publish
 module 0x8675::M {
     fun test1(r: u64): u64 {  // 7 or 2
         let x = 3;

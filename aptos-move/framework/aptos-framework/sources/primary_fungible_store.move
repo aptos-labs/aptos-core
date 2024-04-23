@@ -8,7 +8,7 @@
 /// 2. The fungible asset metadata object calls `ensure_primary_store_exists` to ensure that both the sender's and the
 /// recipient's primary stores exist. If either doesn't, it will be created.
 /// 3. The fungible asset metadata object calls `withdraw` on the sender's primary store to withdraw `amount` of
-/// fungible asset from it. This emits an withdraw event.
+/// fungible asset from it. This emits a withdraw event.
 /// 4. The fungible asset metadata object calls `deposit` on the recipient's primary store to deposit `amount` of
 /// fungible asset to it. This emits an deposit event.
 module aptos_framework::primary_fungible_store {

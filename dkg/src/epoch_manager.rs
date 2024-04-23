@@ -1,4 +1,5 @@
 // Copyright © Aptos Foundation
+// SPDX-License-Identifier: Apache-2.0
 
 use crate::{
     agg_trx_producer::AggTranscriptProducer,
@@ -10,11 +11,12 @@ use crate::{
 use anyhow::Result;
 use aptos_bounded_executor::BoundedExecutor;
 use aptos_channels::{aptos_channel, message_queues::QueueStyle};
+use aptos_config::config::ReliableBroadcastConfig;
 use aptos_event_notifications::{
     EventNotification, EventNotificationListener, ReconfigNotification,
     ReconfigNotificationListener,
 };
-use aptos_logger::{debug, error};
+use aptos_logger::{debug, error, info, warn};
 use aptos_network::{application::interface::NetworkClient, protocols::network::Event};
 use aptos_reliable_broadcast::ReliableBroadcast;
 use aptos_types::{
@@ -23,7 +25,7 @@ use aptos_types::{
     epoch_state::EpochState,
     on_chain_config::{
         OnChainConfigPayload, OnChainConfigProvider, OnChainConsensusConfig,
-        OnChainRandomnessConfig, RandomnessConfigMoveStruct, ValidatorSet,
+        OnChainRandomnessConfig, RandomnessConfigMoveStruct, RandomnessConfigSeqNum, ValidatorSet,
     },
 };
 use aptos_validator_transaction_pool::VTxnPoolState;
@@ -52,6 +54,10 @@ pub struct EpochManager<P: OnChainConfigProvider> {
     // Network utils
     self_sender: aptos_channels::Sender<Event<DKGMessage>>,
     network_sender: DKGNetworkClient<NetworkClient<DKGMessage>>,
+    rb_config: ReliableBroadcastConfig,
+
+    // Randomness overriding.
+    randomness_override_seq_num: u64,
 }
 
 impl<P: OnChainConfigProvider> EpochManager<P> {
@@ -63,6 +69,8 @@ impl<P: OnChainConfigProvider> EpochManager<P> {
         self_sender: aptos_channels::Sender<Event<DKGMessage>>,
         network_sender: DKGNetworkClient<NetworkClient<DKGMessage>>,
         vtxn_pool: VTxnPoolState,
+        rb_config: ReliableBroadcastConfig,
+        randomness_override_seq_num: u64,
     ) -> Self {
         Self {
             dkg_dealer_sk: Arc::new(dkg_dealer_sk),
@@ -76,6 +84,8 @@ impl<P: OnChainConfigProvider> EpochManager<P> {
             network_sender,
             vtxn_pool,
             dkg_start_event_tx: None,
+            rb_config,
+            randomness_override_seq_num,
         }
     }
 
@@ -157,10 +167,27 @@ impl<P: OnChainConfigProvider> EpochManager<P> {
             .get(&self.my_addr)
             .copied();
 
-        let onchain_randomness_config = payload
-            .get::<RandomnessConfigMoveStruct>()
-            .and_then(OnChainRandomnessConfig::try_from)
-            .unwrap_or_else(|_| OnChainRandomnessConfig::default_if_missing());
+        let onchain_randomness_config_seq_num = payload
+            .get::<RandomnessConfigSeqNum>()
+            .unwrap_or_else(|_| RandomnessConfigSeqNum::default_if_missing());
+
+        let randomness_config_move_struct = payload.get::<RandomnessConfigMoveStruct>();
+
+        info!(
+            epoch = epoch_state.epoch,
+            local = self.randomness_override_seq_num,
+            onchain = onchain_randomness_config_seq_num.seq_num,
+            "Checking randomness config override."
+        );
+        if self.randomness_override_seq_num > onchain_randomness_config_seq_num.seq_num {
+            warn!("Randomness will be force-disabled by local config!");
+        }
+
+        let onchain_randomness_config = OnChainRandomnessConfig::from_configs(
+            self.randomness_override_seq_num,
+            onchain_randomness_config_seq_num.seq_num,
+            randomness_config_move_struct.ok(),
+        );
 
         let onchain_consensus_config: anyhow::Result<OnChainConsensusConfig> = payload.get();
         if let Err(error) = &onchain_consensus_config {
@@ -181,9 +208,13 @@ impl<P: OnChainConfigProvider> EpochManager<P> {
             let rb = ReliableBroadcast::new(
                 epoch_state.verifier.get_ordered_account_addresses(),
                 Arc::new(network_sender),
-                ExponentialBackoff::from_millis(5),
+                ExponentialBackoff::from_millis(self.rb_config.backoff_policy_base_ms)
+                    .factor(self.rb_config.backoff_policy_factor)
+                    .max_delay(Duration::from_millis(
+                        self.rb_config.backoff_policy_max_delay_ms,
+                    )),
                 aptos_time_service::TimeService::real(),
-                Duration::from_millis(1000),
+                Duration::from_millis(self.rb_config.rpc_timeout_ms),
                 BoundedExecutor::new(8, tokio::runtime::Handle::current()),
             );
             let agg_trx_producer = AggTranscriptProducer::new(rb);

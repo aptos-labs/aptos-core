@@ -4,7 +4,9 @@
 use crate::traits::{AptosGasMeter, GasAlgebra};
 use aptos_gas_algebra::{Fee, FeePerGasUnit, NumTypeNodes};
 use aptos_gas_schedule::gas_params::{instr::*, txn::*};
-use aptos_types::{state_store::state_key::StateKey, write_set::WriteOpSize};
+use aptos_types::{
+    contract_event::ContractEvent, state_store::state_key::StateKey, write_set::WriteOpSize,
+};
 use move_binary_format::{
     errors::{Location, PartialVMError, PartialVMResult, VMResult},
     file_format::CodeOffset,
@@ -517,6 +519,22 @@ where
         gas_unit_price: FeePerGasUnit,
     ) -> PartialVMResult<()> {
         self.algebra.charge_storage_fee(amount, gas_unit_price)
+    }
+
+    fn charge_io_gas_for_transaction(&mut self, txn_size: NumBytes) -> VMResult<()> {
+        let cost = self.io_pricing().io_gas_per_transaction(txn_size);
+
+        self.algebra
+            .charge_io(cost)
+            .map_err(|e| e.finish(Location::Undefined))
+    }
+
+    fn charge_io_gas_for_event(&mut self, event: &ContractEvent) -> VMResult<()> {
+        let cost = self.io_pricing().io_gas_per_event(event);
+
+        self.algebra
+            .charge_io(cost)
+            .map_err(|e| e.finish(Location::Undefined))
     }
 
     fn charge_io_gas_for_write(&mut self, key: &StateKey, op_size: &WriteOpSize) -> VMResult<()> {

@@ -1,0 +1,37 @@
+
+Diagnostics:
+error: type `NoAbilities` is missing required ability `drop`
+  ┌─ tests/checking/abilities/v1/phantom_params_field_abilities_invalid.move:9:29
+  │
+9 │     struct S1 has drop { a: HasDrop<NoAbilities, NoAbilities> }
+  │                             ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  │
+  = required by instantiating type parameter `T2` of struct `HasDrop`
+  = required by declaration of field `a`
+
+error: type `NoAbilities` is missing required ability `copy`
+   ┌─ tests/checking/abilities/v1/phantom_params_field_abilities_invalid.move:10:29
+   │
+10 │     struct S2 has copy { a: HasCopy<NoAbilities, NoAbilities> }
+   │                             ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+   │
+   = required by instantiating type parameter `T2` of struct `HasCopy`
+   = required by declaration of field `a`
+
+error: type `NoAbilities` is missing required ability `store`
+   ┌─ tests/checking/abilities/v1/phantom_params_field_abilities_invalid.move:11:30
+   │
+11 │     struct S3 has store { a: HasStore<NoAbilities, NoAbilities> }
+   │                              ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+   │
+   = required by instantiating type parameter `T2` of struct `HasStore`
+   = required by declaration of field `a`
+
+error: type `NoAbilities` is missing required ability `store`
+   ┌─ tests/checking/abilities/v1/phantom_params_field_abilities_invalid.move:12:28
+   │
+12 │     struct S4 has key { a: HasStore<NoAbilities, NoAbilities> }
+   │                            ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+   │
+   = required by instantiating type parameter `T2` of struct `HasStore`
+   = required by declaration of field `a`

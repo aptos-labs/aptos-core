@@ -20,7 +20,7 @@ echo "*************** [move-pr] Assuming move root at $MOVE_BASE"
 # Run only tests which would also be run on CI
 export ENV_TEST_ON_CI=1
 
-while getopts "htcgdia" opt; do
+while getopts "htcgdi2a" opt; do
   case $opt in
     h)
       cat <<EOF
@@ -31,6 +31,7 @@ Flags:
     -h   Print this help
     -t   Run tests
     -i   In addition to -t, run integration tests (Aptos framework and e2e tests)
+    -2   Run integration tests with the v2 compiler
     -c   Run xclippy and fmt +nightly
     -g   Run the git checks script (whitespace check). This works
          only for committed clients.
@@ -49,6 +50,9 @@ EOF
     i)
       INTEGRATION_TEST=1
       ;;
+    2)
+      COMPILER_V2_TEST=1
+      ;;
     c)
       CHECK=1
       ;;
@@ -60,6 +64,7 @@ EOF
       ;;
     a)
       INTEGRATION_TEST=1
+      COMPILER_V2_TEST=1
       CHECK=1
       GEN_ARTIFACTS=1
       GIT_CHECKS=1
@@ -91,6 +96,7 @@ MOVE_CRATES="\
   -p move-prover-bytecode-pipeline\
   -p move-prover\
   -p move-docgen\
+  -p move-to-yul\
   -p move-transactional-test-runner\
   -p move-vm-runtime\
   -p move-vm-transactional-tests\
@@ -149,6 +155,15 @@ if [ ! -z "$INTEGRATION_TEST" ]; then
     cd $BASE
     cargo nextest run --cargo-profile $MOVE_PR_PROFILE \
      $MOVE_CRATES $INTEGRATION_TEST_CRATES
+  )
+fi
+
+if [ ! -z "$COMPILER_V2_TEST" ]; then
+  echo "*************** [move-pr] Running integration tests with compiler v2"
+  (
+    cd $BASE
+    MOVE_COMPILER_V2=true cargo nextest run --cargo-profile $MOVE_PR_PROFILE \
+     $INTEGRATION_TEST_CRATES
   )
 fi
 

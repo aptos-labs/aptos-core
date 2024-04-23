@@ -721,7 +721,7 @@ The fungible asset's supply has exceeded maximum.
 
 <a id="0x1_fungible_asset_EMINT_REF_AND_STORE_MISMATCH"></a>
 
-The mint ref and the the store do not match.
+The mint ref and the store do not match.
 
 
 <pre><code><b>const</b> <a href="fungible_asset.md#0x1_fungible_asset_EMINT_REF_AND_STORE_MISMATCH">EMINT_REF_AND_STORE_MISMATCH</a>: u64 = 7;
@@ -1987,7 +1987,7 @@ Destroy an empty fungible asset.
     <b>let</b> store = <b>borrow_global_mut</b>&lt;<a href="fungible_asset.md#0x1_fungible_asset_FungibleStore">FungibleStore</a>&gt;(store_addr);
     store.balance = store.balance + amount;
 
-    <a href="event.md#0x1_event_emit">event::emit</a>&lt;<a href="fungible_asset.md#0x1_fungible_asset_Deposit">Deposit</a>&gt;(<a href="fungible_asset.md#0x1_fungible_asset_Deposit">Deposit</a> { store: store_addr, amount });
+    <a href="event.md#0x1_event_emit">event::emit</a>(<a href="fungible_asset.md#0x1_fungible_asset_Deposit">Deposit</a> { store: store_addr, amount });
 }
 </code></pre>
 
@@ -2021,7 +2021,7 @@ Extract <code>amount</code> of the fungible asset from <code>store</code>.
     store.balance = store.balance - amount;
 
     <b>let</b> metadata = store.metadata;
-    <a href="event.md#0x1_event_emit">event::emit</a>&lt;<a href="fungible_asset.md#0x1_fungible_asset_Withdraw">Withdraw</a>&gt;(<a href="fungible_asset.md#0x1_fungible_asset_Withdraw">Withdraw</a> { store: store_addr, amount });
+    <a href="event.md#0x1_event_emit">event::emit</a>(<a href="fungible_asset.md#0x1_fungible_asset_Withdraw">Withdraw</a> { store: store_addr, amount });
 
     <a href="fungible_asset.md#0x1_fungible_asset_FungibleAsset">FungibleAsset</a> { metadata, amount }
 }
@@ -2336,7 +2336,7 @@ Decrease the supply of a fungible asset by burning.
 
 <tr>
 <td>10</td>
-<td>A store should only be deleted if it's balance is zero.</td>
+<td>A store should only be deleted if its balance is zero.</td>
 <td>Medium</td>
 <td>The remove_store function validates the store's balance and removes the store under the object address.</td>
 <td>Audited that aborts if the balance of the store is not zero. Audited that store is removed from the object address.</td>

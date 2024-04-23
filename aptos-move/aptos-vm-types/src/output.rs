@@ -108,7 +108,7 @@ impl VMOutput {
     /// Materializes delta sets.
     /// Guarantees that if deltas are materialized successfully, the output
     /// has an empty delta set.
-    /// TODO[agg_v2](cleanup) Consolidate materialization paths. See either:
+    /// TODO `[agg_v2](cleanup)` Consolidate materialization paths. See either:
     /// - if we can/should move try_materialize_aggregator_v1_delta_set into
     ///   executor.rs
     /// - move all materialization (including delayed fields) into change_set

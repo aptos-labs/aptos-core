@@ -1,8 +1,9 @@
 // Copyright © Aptos Foundation
+// SPDX-License-Identifier: Apache-2.0
 
 use anyhow::{Context, Result};
 #[cfg(target_os = "linux")]
-use aptos_admin_service::profiling::start_cpu_profiling;
+use aptos_system_utils::profiling::start_cpu_profiling;
 use backtrace::Backtrace;
 use clap::Parser;
 use prometheus::{Encoder, TextEncoder};

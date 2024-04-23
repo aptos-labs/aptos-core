@@ -297,16 +297,16 @@ impl<'e, E: ExecutorView> TDelayedFieldView for StorageAdapter<'e, E> {
         &self,
         delayed_write_set_keys: &HashSet<Self::Identifier>,
         skip: &HashSet<Self::ResourceKey>,
-    ) -> Result<BTreeMap<Self::ResourceKey, (StateValueMetadata, u64)>, PanicError> {
+    ) -> PartialVMResult<BTreeMap<Self::ResourceKey, (StateValueMetadata, u64)>> {
         self.executor_view
             .get_group_reads_needing_exchange(delayed_write_set_keys, skip)
     }
 }
 
 impl<'e, E: ExecutorView> ConfigStorage for StorageAdapter<'e, E> {
-    fn fetch_config(&self, access_path: AccessPath) -> Option<Bytes> {
+    fn fetch_config_bytes(&self, state_key: &StateKey) -> Option<Bytes> {
         self.executor_view
-            .get_resource_bytes(&StateKey::access_path(access_path), None)
+            .get_resource_bytes(state_key, None)
             .ok()?
     }
 }

@@ -1,6 +1,7 @@
 // Copyright © Aptos Foundation
 // SPDX-License-Identifier: Apache-2.0
 
+use super::types::FastShare;
 use crate::{
     network::TConsensusMsg,
     network_interface::ConsensusMsg,
@@ -9,7 +10,7 @@ use crate::{
         RequestShare, TAugmentedData, TShare,
     },
 };
-use anyhow::bail;
+use anyhow::{bail, ensure};
 use aptos_consensus_types::common::Author;
 use aptos_enum_conversion_derive::EnumConversion;
 use aptos_network::{protocols::network::RpcError, ProtocolId};
@@ -28,6 +29,7 @@ pub enum RandMessage<S, D> {
     AugDataSignature(AugDataSignature),
     CertifiedAugData(CertifiedAugData<D>),
     CertifiedAugDataAck(CertifiedAugDataAck),
+    FastShare(FastShare<S>),
 }
 
 impl<S: TShare, D: TAugmentedData> RandMessage<S, D> {
@@ -35,14 +37,23 @@ impl<S: TShare, D: TAugmentedData> RandMessage<S, D> {
         &self,
         epoch_state: &EpochState,
         rand_config: &RandConfig,
+        fast_rand_config: &Option<RandConfig>,
         sender: Author,
     ) -> anyhow::Result<()> {
+        ensure!(self.epoch() == epoch_state.epoch);
         match self {
             RandMessage::RequestShare(_) => Ok(()),
             RandMessage::Share(share) => share.verify(rand_config),
-            RandMessage::AugData(aug_data) => aug_data.verify(rand_config, sender),
+            RandMessage::AugData(aug_data) => {
+                aug_data.verify(rand_config, fast_rand_config, sender)
+            },
             RandMessage::CertifiedAugData(certified_aug_data) => {
                 certified_aug_data.verify(&epoch_state.verifier)
+            },
+            RandMessage::FastShare(share) => {
+                share.share.verify(fast_rand_config.as_ref().ok_or_else(|| {
+                    anyhow::anyhow!("[RandMessage] rand config for fast path not found")
+                })?)
             },
             _ => bail!("[RandMessage] unexpected message type"),
         }
@@ -60,6 +71,7 @@ impl<S: TShare, D: TAugmentedData> TConsensusMsg for RandMessage<S, D> {
             RandMessage::AugDataSignature(signature) => signature.epoch(),
             RandMessage::CertifiedAugData(certified_aug_data) => certified_aug_data.epoch(),
             RandMessage::CertifiedAugDataAck(ack) => ack.epoch(),
+            RandMessage::FastShare(share) => share.share.epoch(),
         }
     }
 

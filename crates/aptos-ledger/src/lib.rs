@@ -55,7 +55,7 @@ pub enum AptosLedgerError {
     #[error("Error - {0}")]
     AptosError(AptosLedgerStatusCode),
 
-    /// Unexpected error, the Option<u16> is the retcode received from ledger transport
+    /// Unexpected error, the `Option<u16>` is the retcode received from ledger transport
     #[error("Unexpected Error: {0} (StatusCode {1:?})")]
     UnexpectedError(String, Option<u16>),
 }
@@ -69,8 +69,8 @@ impl From<LedgerHIDError> for AptosLedgerError {
 #[derive(Debug, Copy, Clone)]
 #[repr(u16)]
 /// Status code returned when communicating with ledger
-/// Most Aptos ones defined here https://github.com/aptos-labs/ledger-app-aptos/blob/main/doc/COMMANDS.md#status-words
-/// Some of the ledger status code defined here - https://www.eftlab.com/knowledge-base/complete-list-of-apdu-responses
+/// Most Aptos ones defined here <https://github.com/aptos-labs/ledger-app-aptos/blob/main/doc/COMMANDS.md#status-words>
+/// Some of the ledger status code defined here - <https://www.eftlab.com/knowledge-base/complete-list-of-apdu-responses>
 pub enum AptosLedgerStatusCode {
     /// Aptos ledger app related status code
 
@@ -294,7 +294,7 @@ pub fn get_app_name() -> Result<String, AptosLedgerError> {
     }
 }
 
-/// Returns the the batch/HashMap of the accounts for the account index in index_range
+/// Returns the batch/HashMap of the accounts for the account index in index_range
 /// Note: We only allow a range of 10 for performance purpose
 ///
 /// # Arguments

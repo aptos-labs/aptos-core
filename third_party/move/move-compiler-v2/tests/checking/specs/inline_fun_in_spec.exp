@@ -6,7 +6,7 @@ module 0x42::m {
       {
         let r: bool = {
           let (a: address): (address) = Tuple(x);
-          Lt(select m::S.f({
+          Lt(select m::S.f<m::S>({
             let (a: address): (address) = Tuple(a);
             global<m::S>(a)
           }), 10)

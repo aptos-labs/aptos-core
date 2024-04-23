@@ -11,15 +11,16 @@ use crate::{
 };
 use anyhow::{anyhow, bail, Context, Result};
 use aptos::governance::GenerateExecutionHash;
+use aptos_gas_schedule::LATEST_GAS_FEATURE_VERSION;
 use aptos_infallible::duration_since_epoch;
 use aptos_rest_client::Client;
 use aptos_temppath::TempPath;
 use aptos_types::{
     account_config::CORE_CODE_ADDRESS,
     on_chain_config::{
-        ExecutionConfigV1, FeatureFlag as AptosFeatureFlag, GasScheduleV2, OnChainConfig,
-        OnChainConsensusConfig, OnChainExecutionConfig, OnChainJWKConsensusConfig,
-        OnChainRandomnessConfig, RandomnessConfigMoveStruct, TransactionShufflerType, Version,
+        AptosVersion, ExecutionConfigV1, FeatureFlag as AptosFeatureFlag, GasScheduleV2,
+        OnChainConfig, OnChainConsensusConfig, OnChainExecutionConfig, OnChainJWKConsensusConfig,
+        OnChainRandomnessConfig, RandomnessConfigMoveStruct, TransactionShufflerType,
     },
 };
 use futures::executor::block_on;
@@ -116,6 +117,12 @@ pub enum ExecutionMode {
 }
 
 #[derive(Serialize, Deserialize, Debug, Clone, Eq, PartialEq)]
+pub struct GasOverrideConfig {
+    feature_version: Option<u64>,
+    overrides: Option<Vec<GasOverride>>,
+}
+
+#[derive(Serialize, Deserialize, Debug, Clone, Eq, PartialEq)]
 pub struct GasOverride {
     name: String,
     value: u64,
@@ -126,10 +133,10 @@ pub enum ReleaseEntry {
     Framework(FrameworkReleaseConfig),
     CustomGas(GasScheduleV2),
     DefaultGas,
-    DefaultGasWithOverride(Vec<GasOverride>),
+    DefaultGasWithOverride(GasOverrideConfig),
     /// Only used before randomness framework upgrade.
-    DefaultGasWithOverrideOld(Vec<GasOverride>),
-    Version(Version),
+    DefaultGasWithOverrideOld(GasOverrideConfig),
+    Version(AptosVersion),
     FeatureFlag(Features),
     Consensus(OnChainConsensusConfig),
     Execution(OnChainExecutionConfig),
@@ -181,7 +188,8 @@ impl ReleaseEntry {
                 }
             },
             ReleaseEntry::DefaultGas => {
-                let gas_schedule = aptos_gas_schedule_updator::current_gas_schedule();
+                let gas_schedule =
+                    aptos_gas_schedule_updator::current_gas_schedule(LATEST_GAS_FEATURE_VERSION);
                 if !fetch_and_equals::<GasScheduleV2>(client, &gas_schedule)? {
                     result.append(&mut gas::generate_gas_upgrade_proposal(
                         true,
@@ -195,8 +203,18 @@ impl ReleaseEntry {
                     )?);
                 }
             },
-            ReleaseEntry::DefaultGasWithOverride(gas_overrides) => {
-                let gas_schedule = gas_override_default(gas_overrides)?;
+            ReleaseEntry::DefaultGasWithOverride(GasOverrideConfig {
+                feature_version,
+                overrides,
+            }) => {
+                let feature_version = feature_version.unwrap_or(LATEST_GAS_FEATURE_VERSION);
+                let gas_schedule = gas_override_default(
+                    feature_version,
+                    overrides
+                        .as_ref()
+                        .map(|overrides| overrides.as_slice())
+                        .unwrap_or(&[]),
+                )?;
                 if !fetch_and_equals::<GasScheduleV2>(client, &gas_schedule)? {
                     result.append(&mut gas::generate_gas_upgrade_proposal(
                         true,
@@ -210,8 +228,18 @@ impl ReleaseEntry {
                     )?);
                 }
             },
-            ReleaseEntry::DefaultGasWithOverrideOld(gas_overrides) => {
-                let gas_schedule = gas_override_default(gas_overrides)?;
+            ReleaseEntry::DefaultGasWithOverrideOld(GasOverrideConfig {
+                feature_version,
+                overrides,
+            }) => {
+                let feature_version = feature_version.unwrap_or(LATEST_GAS_FEATURE_VERSION);
+                let gas_schedule = gas_override_default(
+                    feature_version,
+                    overrides
+                        .as_ref()
+                        .map(|overrides| overrides.as_slice())
+                        .unwrap_or(&[]),
+                )?;
                 if !fetch_and_equals::<GasScheduleV2>(client, &gas_schedule)? {
                     result.append(&mut gas::generate_gas_upgrade_proposal(
                         false,
@@ -226,7 +254,7 @@ impl ReleaseEntry {
                 }
             },
             ReleaseEntry::Version(version) => {
-                if !fetch_and_equals::<Version>(client, version)? {
+                if !fetch_and_equals::<AptosVersion>(client, version)? {
                     result.append(&mut version::generate_version_upgrade_proposal(
                         version,
                         is_testnet,
@@ -389,17 +417,30 @@ impl ReleaseEntry {
             ReleaseEntry::DefaultGas => {
                 if !wait_until_equals(
                     client_opt,
-                    &aptos_gas_schedule_updator::current_gas_schedule(),
+                    &aptos_gas_schedule_updator::current_gas_schedule(LATEST_GAS_FEATURE_VERSION),
                     *MAX_ASYNC_RECONFIG_TIME,
                 ) {
                     bail!("Gas schedule config mismatch: Expected Default");
                 }
             },
-            ReleaseEntry::DefaultGasWithOverrideOld(gas_overrides)
-            | ReleaseEntry::DefaultGasWithOverride(gas_overrides) => {
+            ReleaseEntry::DefaultGasWithOverrideOld(config)
+            | ReleaseEntry::DefaultGasWithOverride(config) => {
+                let GasOverrideConfig {
+                    overrides,
+                    feature_version,
+                } = config;
+
+                let feature_version = feature_version.unwrap_or(LATEST_GAS_FEATURE_VERSION);
+
                 if !wait_until_equals(
                     client_opt,
-                    &gas_override_default(gas_overrides)?,
+                    &gas_override_default(
+                        feature_version,
+                        overrides
+                            .as_ref()
+                            .map(|overrides| overrides.as_slice())
+                            .unwrap_or(&[]),
+                    )?,
                     Duration::from_secs(60),
                 ) {
                     bail!("Gas schedule config mismatch: Expected Default");
@@ -471,8 +512,11 @@ impl ReleaseEntry {
     }
 }
 
-fn gas_override_default(gas_overrides: &[GasOverride]) -> Result<GasScheduleV2> {
-    let mut gas_schedule = aptos_gas_schedule_updator::current_gas_schedule();
+fn gas_override_default(
+    feature_version: u64,
+    gas_overrides: &[GasOverride],
+) -> Result<GasScheduleV2> {
+    let mut gas_schedule = aptos_gas_schedule_updator::current_gas_schedule(feature_version);
     for gas_override in gas_overrides {
         let mut found = false;
         for (name, value) in &mut gas_schedule.entries {
