@@ -130,6 +130,8 @@ pub struct BufferManager {
     previous_commit_time: Instant,
     reset_flag: Arc<AtomicBool>,
     bounded_executor: BoundedExecutor,
+    // Whether to broadcast commit_votes
+    broadcast_commit_votes: bool,
 }
 
 impl BufferManager {
@@ -154,6 +156,7 @@ impl BufferManager {
         ongoing_tasks: Arc<AtomicU64>,
         reset_flag: Arc<AtomicBool>,
         executor: BoundedExecutor,
+        broadcast_commit_votes: bool,
     ) -> Self {
         let buffer = Buffer::<BufferItem>::new();
 
@@ -199,6 +202,7 @@ impl BufferManager {
             previous_commit_time: Instant::now(),
             reset_flag,
             bounded_executor: executor,
+            broadcast_commit_votes,
         }
     }
 
@@ -524,10 +528,28 @@ impl BufferManager {
                 let mut signed_item = item.advance_to_signed(self.author, signature);
                 let signed_item_mut = signed_item.unwrap_signed_mut();
                 let commit_vote = signed_item_mut.commit_vote.clone();
-                let commit_vote = CommitMessage::Vote(commit_vote);
-                signed_item_mut
-                    .rb_handle
-                    .replace((Instant::now(), self.do_reliable_broadcast(commit_vote)));
+                let maybe_proposer = signed_item_mut
+                    .executed_blocks
+                    .last()
+                    .unwrap()
+                    .block()
+                    .author();
+                if self.broadcast_commit_votes || maybe_proposer.is_none() {
+                    let commit_vote = CommitMessage::Vote(commit_vote);
+                    signed_item_mut
+                        .rb_handle
+                        .replace((Instant::now(), self.do_reliable_broadcast(commit_vote)));
+                } else {
+                    let sender = self.commit_msg_tx.clone();
+                    tokio::spawn(async move {
+                        if let Err(e) = sender
+                            .send_commit_vote(commit_vote, maybe_proposer.unwrap())
+                            .await
+                        {
+                            warn!("Failed to send commit vote {:?}", e);
+                        }
+                    });
+                }
                 self.buffer.set(&current_cursor, signed_item);
             } else {
                 self.buffer.set(&current_cursor, item);
