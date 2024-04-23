@@ -220,13 +220,13 @@ fn malicious_field_len() {
     field.value_index = field.whole_field.find(",").unwrap();
     assert_ne!(field.whole_field_len, field.whole_field.len());
 
-    should_pass(field);
+    should_fail(field);
 }
 
 #[test]
 fn malicious_value_len() {
     let mut field = jwt_field_str_malicious_indices(
-        "\"sub\":\"user,fake\"",
+        "\"sub\":\"user,fake\",",
         "sub",
         "user",
         );

@@ -7,6 +7,7 @@ include "helpers/packing.circom";
 include "helpers/hashtofield.circom";
 include "helpers/sha.circom";
 include "helpers/rsa/rsa_verify.circom";
+include "helpers/jwt_field_check.circom";
 include "helpers/rsa/bigint.circom";
 include "../node_modules/circomlib/circuits/poseidon.circom";
 include "../node_modules/circomlib/circuits/bitify.circom";
