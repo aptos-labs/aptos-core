@@ -25,6 +25,10 @@ template JWTFieldCheck(maxKVPairLen, maxNameLen, maxValueLen) {
     signal colon_less_value <== LessThan(20)([colon_index, value_index]);
     colon_less_value === 1;
 
+    // Enforce that field_len >= name_len + value_len + 1 (where the +1 is for the colon). 
+    signal field_len_ok <== GreaterEqThan(20)([field_len, name_len + value_len + 1]);
+    field_len_ok === 1;
+
     signal field_hash <== HashBytesToFieldWithLen(maxKVPairLen)(field, field_len);
 
     signal first_quote <== SelectArrayValue(maxKVPairLen)(field, 0);
