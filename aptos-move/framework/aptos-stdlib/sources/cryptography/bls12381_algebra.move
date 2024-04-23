@@ -270,25 +270,50 @@ module aptos_std::bls12381_algebra {
         // Serialization/deserialization.
         let val_0 = zero<Fq12>();
         let val_1 = one<Fq12>();
-        assert!(FQ12_VAL_0_SERIALIZED == serialize<Fq12, FormatFq12LscLsb>(&val_0), 1);
-        assert!(FQ12_VAL_1_SERIALIZED == serialize<Fq12, FormatFq12LscLsb>(&val_1), 1);
+        assert!(
+            FQ12_VAL_0_SERIALIZED == serialize<Fq12, FormatFq12LscLsb>(&val_0),
+            1
+        );
+        assert!(
+            FQ12_VAL_1_SERIALIZED == serialize<Fq12, FormatFq12LscLsb>(&val_1),
+            1
+        );
         let val_7 = from_u64<Fq12>(7);
-        let val_7_another = std::option::extract(&mut deserialize<Fq12, FormatFq12LscLsb>(&FQ12_VAL_7_SERIALIZED));
+        let val_7_another = std::option::extract(
+            &mut deserialize<Fq12, FormatFq12LscLsb>(&FQ12_VAL_7_SERIALIZED)
+        );
         assert!(eq(&val_7, &val_7_another), 1);
-        assert!(FQ12_VAL_7_SERIALIZED == serialize<Fq12, FormatFq12LscLsb>(&val_7), 1);
-        assert!(std::option::is_none(&deserialize<Fq12, FormatFq12LscLsb>(&x"ffff")), 1);
+        assert!(
+            FQ12_VAL_7_SERIALIZED == serialize<Fq12, FormatFq12LscLsb>(&val_7),
+            1
+        );
+        assert!(
+            std::option::is_none(
+                &deserialize<Fq12, FormatFq12LscLsb>(&x"ffff")
+            ),
+            1
+        );
 
         // Negation.
         let val_minus_7 = neg(&val_7);
-        assert!(FQ12_VAL_7_NEG_SERIALIZED == serialize<Fq12, FormatFq12LscLsb>(&val_minus_7), 1);
+        assert!(
+            FQ12_VAL_7_NEG_SERIALIZED == serialize<Fq12, FormatFq12LscLsb>(&val_minus_7),
+            1
+        );
 
         // Addition.
         let val_9 = from_u64<Fq12>(9);
         let val_2 = from_u64<Fq12>(2);
-        assert!(eq(&val_2, &add(&val_minus_7, &val_9)), 1);
+        assert!(
+            eq(&val_2, &add(&val_minus_7, &val_9)),
+            1
+        );
 
         // Subtraction.
-        assert!(eq(&val_9, &sub(&val_2, &val_minus_7)), 1);
+        assert!(
+            eq(&val_9, &sub(&val_2, &val_minus_7)),
+            1
+        );
 
         // Multiplication.
         let val_63 = from_u64<Fq12>(63);
@@ -296,19 +321,40 @@ module aptos_std::bls12381_algebra {
 
         // division.
         let val_0 = from_u64<Fq12>(0);
-        assert!(eq(&val_7, &std::option::extract(&mut div(&val_63, &val_9))), 1);
-        assert!(std::option::is_none(&div(&val_63, &val_0)), 1);
+        assert!(
+            eq(
+                &val_7,
+                &std::option::extract(&mut div(&val_63, &val_9))
+            ),
+            1
+        );
+        assert!(
+            std::option::is_none(&div(&val_63, &val_0)),
+            1
+        );
 
         // Inversion.
         assert!(eq(&val_minus_7, &neg(&val_7)), 1);
-        assert!(std::option::is_none(&inv(&val_0)), 1);
+        assert!(
+            std::option::is_none(&inv(&val_0)),
+            1
+        );
 
         // Squaring.
         let val_x = rand_insecure<Fq12>();
-        assert!(eq(&mul(&val_x, &val_x), &sqr(&val_x)), 1);
+        assert!(
+            eq(&mul(&val_x, &val_x), &sqr(&val_x)),
+            1
+        );
 
         // Downcasting.
-        assert!(eq(&zero<Gt>(), &std::option::extract(&mut downcast<Fq12, Gt>(&val_1))), 1);
+        assert!(
+            eq(
+                &zero<Gt>(),
+                &std::option::extract(&mut downcast<Fq12, Gt>(&val_1))
+            ),
+            1
+        );
     }
 
     #[test_only]
@@ -340,62 +386,180 @@ module aptos_std::bls12381_algebra {
         let generator = one<G1>();
 
         // Serialization/deserialization.
-        assert!(G1_GENERATOR_SERIALIZED_UNCOMP == serialize<G1, FormatG1Uncompr>(&generator), 1);
-        assert!(G1_GENERATOR_SERIALIZED_COMP == serialize<G1, FormatG1Compr>(&generator), 1);
-        let generator_from_comp = std::option::extract(&mut deserialize<G1, FormatG1Compr>(&G1_GENERATOR_SERIALIZED_COMP
-        ));
-        let generator_from_uncomp = std::option::extract(&mut deserialize<G1, FormatG1Uncompr>(&G1_GENERATOR_SERIALIZED_UNCOMP
-        ));
-        assert!(eq(&generator, &generator_from_comp), 1);
-        assert!(eq(&generator, &generator_from_uncomp), 1);
+        assert!(
+            G1_GENERATOR_SERIALIZED_UNCOMP == serialize<G1, FormatG1Uncompr>(&generator),
+            1
+        );
+        assert!(
+            G1_GENERATOR_SERIALIZED_COMP == serialize<G1, FormatG1Compr>(&generator),
+            1
+        );
+        let generator_from_comp = std::option::extract(
+            &mut deserialize<G1, FormatG1Compr>(&G1_GENERATOR_SERIALIZED_COMP)
+        );
+        let generator_from_uncomp = std::option::extract(
+            &mut deserialize<G1, FormatG1Uncompr>(&G1_GENERATOR_SERIALIZED_UNCOMP)
+        );
+        assert!(
+            eq(&generator, &generator_from_comp),
+            1
+        );
+        assert!(
+            eq(&generator, &generator_from_uncomp),
+            1
+        );
 
         // Deserialization should fail if given a byte array of correct size but the value is not a member.
-        assert!(std::option::is_none(&deserialize<Fq12, FormatFq12LscLsb>(&x"ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff")), 1);
+        assert!(
+            std::option::is_none(
+                &deserialize<Fq12, FormatFq12LscLsb>(
+                    &x"ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff"
+                )
+            ),
+            1
+        );
 
         // Deserialization should fail if given a byte array of wrong size.
-        assert!(std::option::is_none(&deserialize<Fq12, FormatFq12LscLsb>(&x"ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff")), 1);
+        assert!(
+            std::option::is_none(
+                &deserialize<Fq12, FormatFq12LscLsb>(
+                    &x"ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff"
+                )
+            ),
+            1
+        );
 
         assert!(
-            G1_INF_SERIALIZED_UNCOMP == serialize<G1, FormatG1Uncompr>(&point_at_infinity), 1);
-        assert!(G1_INF_SERIALIZED_COMP == serialize<G1, FormatG1Compr>(&point_at_infinity), 1);
-        let inf_from_uncomp = std::option::extract(&mut deserialize<G1, FormatG1Uncompr>(&G1_INF_SERIALIZED_UNCOMP
-        ));
-        let inf_from_comp = std::option::extract(&mut deserialize<G1, FormatG1Compr>(&G1_INF_SERIALIZED_COMP
-        ));
-        assert!(eq(&point_at_infinity, &inf_from_comp), 1);
-        assert!(eq(&point_at_infinity, &inf_from_uncomp), 1);
+            G1_INF_SERIALIZED_UNCOMP == serialize<G1, FormatG1Uncompr>(&point_at_infinity),
+            1
+        );
+        assert!(
+            G1_INF_SERIALIZED_COMP == serialize<G1, FormatG1Compr>(&point_at_infinity),
+            1
+        );
+        let inf_from_uncomp = std::option::extract(
+            &mut deserialize<G1, FormatG1Uncompr>(&G1_INF_SERIALIZED_UNCOMP)
+        );
+        let inf_from_comp = std::option::extract(
+            &mut deserialize<G1, FormatG1Compr>(&G1_INF_SERIALIZED_COMP)
+        );
+        assert!(
+            eq(&point_at_infinity, &inf_from_comp),
+            1
+        );
+        assert!(
+            eq(
+                &point_at_infinity,
+                &inf_from_uncomp
+            ),
+            1
+        );
 
-        let point_7g_from_uncomp = std::option::extract(&mut deserialize<G1, FormatG1Uncompr>(&G1_GENERATOR_MUL_BY_7_SERIALIZED_UNCOMP
-        ));
-        let point_7g_from_comp = std::option::extract(&mut deserialize<G1, FormatG1Compr>(&G1_GENERATOR_MUL_BY_7_SERIALIZED_COMP
-        ));
-        assert!(eq(&point_7g_from_comp, &point_7g_from_uncomp), 1);
+        let point_7g_from_uncomp = std::option::extract(
+            &mut deserialize<G1, FormatG1Uncompr>(
+                &G1_GENERATOR_MUL_BY_7_SERIALIZED_UNCOMP
+            )
+        );
+        let point_7g_from_comp = std::option::extract(
+            &mut deserialize<G1, FormatG1Compr>(
+                &G1_GENERATOR_MUL_BY_7_SERIALIZED_COMP
+            )
+        );
+        assert!(
+            eq(
+                &point_7g_from_comp,
+                &point_7g_from_uncomp
+            ),
+            1
+        );
 
         // Deserialization should fail if given a point on the curve but off its prime-order subgroup, e.g., `(0,2)`.
-        assert!(std::option::is_none(&deserialize<G1, FormatG1Uncompr>(&x"000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000002")), 1);
-        assert!(std::option::is_none(&deserialize<G1, FormatG1Compr>(&x"800000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000")), 1);
+        assert!(
+            std::option::is_none(
+                &deserialize<G1, FormatG1Uncompr>(
+                    &x"000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000002"
+                )
+            ),
+            1
+        );
+        assert!(
+            std::option::is_none(
+                &deserialize<G1, FormatG1Compr>(
+                    &x"800000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000"
+                )
+            ),
+            1
+        );
 
         // Deserialization should fail if given a valid point in (Fq,Fq) but not on the curve.
-        assert!(std::option::is_none(&deserialize<G1, FormatG1Uncompr>(&x"8959e137e0719bf872abb08411010f437a8955bd42f5ba20fca64361af58ce188b1adb96ef229698bb7860b79e24ba12000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000")), 1);
+        assert!(
+            std::option::is_none(
+                &deserialize<G1, FormatG1Uncompr>(
+                    &x"8959e137e0719bf872abb08411010f437a8955bd42f5ba20fca64361af58ce188b1adb96ef229698bb7860b79e24ba12000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000"
+                )
+            ),
+            1
+        );
 
         // Deserialization should fail if given an invalid point (x not in Fq).
-        assert!(std::option::is_none(&deserialize<G1, FormatG1Uncompr>(&x"ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffa76e9853b35f5c9b2002d9e5833fd8f9ab4cd3934a4722a06f6055bfca720c91629811e2ecae7f0cf301b6d07898a90f")), 1);
-        assert!(std::option::is_none(&deserialize<G1, FormatG1Compr>(&x"9fffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff")), 1);
+        assert!(
+            std::option::is_none(
+                &deserialize<G1, FormatG1Uncompr>(
+                    &x"ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffa76e9853b35f5c9b2002d9e5833fd8f9ab4cd3934a4722a06f6055bfca720c91629811e2ecae7f0cf301b6d07898a90f"
+                )
+            ),
+            1
+        );
+        assert!(
+            std::option::is_none(
+                &deserialize<G1, FormatG1Compr>(
+                    &x"9fffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff"
+                )
+            ),
+            1
+        );
 
         // Deserialization should fail if given a byte array of wrong size.
-        assert!(std::option::is_none(&deserialize<G1, FormatG1Uncompr>(&x"000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000020000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000ab")), 1);
-        assert!(std::option::is_none(&deserialize<G1, FormatG1Compr>(&x"000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000ab")), 1);
+        assert!(
+            std::option::is_none(
+                &deserialize<G1, FormatG1Uncompr>(
+                    &x"000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000020000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000ab"
+                )
+            ),
+            1
+        );
+        assert!(
+            std::option::is_none(
+                &deserialize<G1, FormatG1Compr>(
+                    &x"000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000ab"
+                )
+            ),
+            1
+        );
 
         // Scalar multiplication.
         let scalar_7 = from_u64<Fr>(7);
         let point_7g_calc = scalar_mul(&generator, &scalar_7);
-        assert!(eq(&point_7g_calc, &point_7g_from_comp), 1);
-        assert!(G1_GENERATOR_MUL_BY_7_SERIALIZED_UNCOMP == serialize<G1, FormatG1Uncompr>(&point_7g_calc), 1);
-        assert!(G1_GENERATOR_MUL_BY_7_SERIALIZED_COMP == serialize<G1, FormatG1Compr>( &point_7g_calc), 1);
+        assert!(
+            eq(&point_7g_calc, &point_7g_from_comp),
+            1
+        );
+        assert!(
+            G1_GENERATOR_MUL_BY_7_SERIALIZED_UNCOMP == serialize<G1, FormatG1Uncompr>(
+                &point_7g_calc
+            ),
+            1
+        );
+        assert!(
+            G1_GENERATOR_MUL_BY_7_SERIALIZED_COMP == serialize<G1, FormatG1Compr>(
+                &point_7g_calc
+            ),
+            1
+        );
 
         // Multi-scalar multiplication.
         let num_entries = 1;
-        while (num_entries < 10) {
+        while (num_entries <10) {
             let scalars = rand_vector<Fr>(num_entries);
             let elements = rand_vector<G1>(num_entries);
 
@@ -404,7 +568,10 @@ module aptos_std::bls12381_algebra {
             while (i < num_entries) {
                 let element = std::vector::borrow(&elements, i);
                 let scalar = std::vector::borrow(&scalars, i);
-                expected = add(&expected, &scalar_mul(element, scalar));
+                expected = add(
+                    &expected,
+                    &scalar_mul(element, scalar)
+                );
                 i = i + 1;
             };
 
@@ -422,8 +589,18 @@ module aptos_std::bls12381_algebra {
 
         // Negation.
         let point_minus_7g_calc = neg(&point_7g_calc);
-        assert!(G1_GENERATOR_MUL_BY_7_NEG_SERIALIZED_COMP == serialize<G1, FormatG1Compr>(&point_minus_7g_calc), 1);
-        assert!(G1_GENERATOR_MUL_BY_7_NEG_SERIALIZED_UNCOMP == serialize<G1, FormatG1Uncompr>(&point_minus_7g_calc), 1);
+        assert!(
+            G1_GENERATOR_MUL_BY_7_NEG_SERIALIZED_COMP == serialize<G1, FormatG1Compr>(
+                &point_minus_7g_calc
+            ),
+            1
+        );
+        assert!(
+            G1_GENERATOR_MUL_BY_7_NEG_SERIALIZED_UNCOMP == serialize<G1, FormatG1Uncompr>(
+                &point_minus_7g_calc
+            ),
+            1
+        );
 
         // Addition.
         let scalar_9 = from_u64<Fr>(9);
@@ -433,15 +610,35 @@ module aptos_std::bls12381_algebra {
         assert!(eq(&point_2g, &point_2g_calc), 1);
 
         // Subtraction.
-        assert!(eq(&point_9g, &sub(&point_2g, &point_minus_7g_calc)), 1);
+        assert!(
+            eq(
+                &point_9g,
+                &sub(&point_2g, &point_minus_7g_calc)
+            ),
+            1
+        );
 
         // Hash-to-group using suite `BLS12381G1_XMD:SHA-256_SSWU_RO_`.
         // Test vectors source: https://www.ietf.org/archive/id/draft-irtf-cfrg-hash-to-curve-16.html#name-bls12381g1_xmdsha-256_sswu_
-        let actual = hash_to<G1, HashG1XmdSha256SswuRo>(&b"QUUX-V01-CS02-with-BLS12381G1_XMD:SHA-256_SSWU_RO_", &b"");
-        let expected = std::option::extract(&mut deserialize<G1, FormatG1Uncompr>(&x"052926add2207b76ca4fa57a8734416c8dc95e24501772c814278700eed6d1e4e8cf62d9c09db0fac349612b759e79a108ba738453bfed09cb546dbb0783dbb3a5f1f566ed67bb6be0e8c67e2e81a4cc68ee29813bb7994998f3eae0c9c6a265"));
+        let actual = hash_to<G1, HashG1XmdSha256SswuRo>(
+            &b"QUUX-V01-CS02-with-BLS12381G1_XMD:SHA-256_SSWU_RO_",
+            &b""
+        );
+        let expected = std::option::extract(
+            &mut deserialize<G1, FormatG1Uncompr>(
+                &x"052926add2207b76ca4fa57a8734416c8dc95e24501772c814278700eed6d1e4e8cf62d9c09db0fac349612b759e79a108ba738453bfed09cb546dbb0783dbb3a5f1f566ed67bb6be0e8c67e2e81a4cc68ee29813bb7994998f3eae0c9c6a265"
+            )
+        );
         assert!(eq(&expected, &actual), 1);
-        let actual = hash_to<G1, HashG1XmdSha256SswuRo>(&b"QUUX-V01-CS02-with-BLS12381G1_XMD:SHA-256_SSWU_RO_", &b"abcdef0123456789");
-        let expected = std::option::extract(&mut deserialize<G1, FormatG1Uncompr>(&x"11e0b079dea29a68f0383ee94fed1b940995272407e3bb916bbf268c263ddd57a6a27200a784cbc248e84f357ce82d9803a87ae2caf14e8ee52e51fa2ed8eefe80f02457004ba4d486d6aa1f517c0889501dc7413753f9599b099ebcbbd2d709"));
+        let actual = hash_to<G1, HashG1XmdSha256SswuRo>(
+            &b"QUUX-V01-CS02-with-BLS12381G1_XMD:SHA-256_SSWU_RO_",
+            &b"abcdef0123456789"
+        );
+        let expected = std::option::extract(
+            &mut deserialize<G1, FormatG1Uncompr>(
+                &x"11e0b079dea29a68f0383ee94fed1b940995272407e3bb916bbf268c263ddd57a6a27200a784cbc248e84f357ce82d9803a87ae2caf14e8ee52e51fa2ed8eefe80f02457004ba4d486d6aa1f517c0889501dc7413753f9599b099ebcbbd2d709"
+            )
+        );
         assert!(eq(&expected, &actual), 1);
     }
 
@@ -472,51 +669,158 @@ module aptos_std::bls12381_algebra {
         let generator = one<G2>();
 
         // Serialization/deserialization.
-        assert!(G2_GENERATOR_SERIALIZED_COMP == serialize<G2, FormatG2Compr>(&generator), 1);
-        assert!(G2_GENERATOR_SERIALIZED_UNCOMP == serialize<G2, FormatG2Uncompr>(&generator), 1);
-        let generator_from_uncomp = std::option::extract(&mut deserialize<G2, FormatG2Uncompr>(&G2_GENERATOR_SERIALIZED_UNCOMP
-        ));
-        let generator_from_comp = std::option::extract(&mut deserialize<G2, FormatG2Compr>(&G2_GENERATOR_SERIALIZED_COMP
-        ));
-        assert!(eq(&generator, &generator_from_comp), 1);
-        assert!(eq(&generator, &generator_from_uncomp), 1);
-        assert!(G2_INF_SERIALIZED_UNCOMP == serialize<G2, FormatG2Uncompr>(&point_at_infinity), 1);
-        assert!(G2_INF_SERIALIZED_COMP == serialize<G2, FormatG2Compr>(&point_at_infinity), 1);
-        let inf_from_uncomp = std::option::extract(&mut deserialize<G2, FormatG2Uncompr>(&G2_INF_SERIALIZED_UNCOMP));
-        let inf_from_comp = std::option::extract(&mut deserialize<G2, FormatG2Compr>(&G2_INF_SERIALIZED_COMP));
-        assert!(eq(&point_at_infinity, &inf_from_comp), 1);
-        assert!(eq(&point_at_infinity, &inf_from_uncomp), 1);
-        let point_7g_from_uncomp = std::option::extract(&mut deserialize<G2, FormatG2Uncompr>(&G2_GENERATOR_MUL_BY_7_SERIALIZED_UNCOMP
-        ));
-        let point_7g_from_comp = std::option::extract(&mut deserialize<G2, FormatG2Compr>(&G2_GENERATOR_MUL_BY_7_SERIALIZED_COMP
-        ));
-        assert!(eq(&point_7g_from_comp, &point_7g_from_uncomp), 1);
+        assert!(
+            G2_GENERATOR_SERIALIZED_COMP == serialize<G2, FormatG2Compr>(&generator),
+            1
+        );
+        assert!(
+            G2_GENERATOR_SERIALIZED_UNCOMP == serialize<G2, FormatG2Uncompr>(&generator),
+            1
+        );
+        let generator_from_uncomp = std::option::extract(
+            &mut deserialize<G2, FormatG2Uncompr>(&G2_GENERATOR_SERIALIZED_UNCOMP)
+        );
+        let generator_from_comp = std::option::extract(
+            &mut deserialize<G2, FormatG2Compr>(&G2_GENERATOR_SERIALIZED_COMP)
+        );
+        assert!(
+            eq(&generator, &generator_from_comp),
+            1
+        );
+        assert!(
+            eq(&generator, &generator_from_uncomp),
+            1
+        );
+        assert!(
+            G2_INF_SERIALIZED_UNCOMP == serialize<G2, FormatG2Uncompr>(&point_at_infinity),
+            1
+        );
+        assert!(
+            G2_INF_SERIALIZED_COMP == serialize<G2, FormatG2Compr>(&point_at_infinity),
+            1
+        );
+        let inf_from_uncomp = std::option::extract(
+            &mut deserialize<G2, FormatG2Uncompr>(&G2_INF_SERIALIZED_UNCOMP)
+        );
+        let inf_from_comp = std::option::extract(
+            &mut deserialize<G2, FormatG2Compr>(&G2_INF_SERIALIZED_COMP)
+        );
+        assert!(
+            eq(&point_at_infinity, &inf_from_comp),
+            1
+        );
+        assert!(
+            eq(
+                &point_at_infinity,
+                &inf_from_uncomp
+            ),
+            1
+        );
+        let point_7g_from_uncomp = std::option::extract(
+            &mut deserialize<G2, FormatG2Uncompr>(
+                &G2_GENERATOR_MUL_BY_7_SERIALIZED_UNCOMP
+            )
+        );
+        let point_7g_from_comp = std::option::extract(
+            &mut deserialize<G2, FormatG2Compr>(
+                &G2_GENERATOR_MUL_BY_7_SERIALIZED_COMP
+            )
+        );
+        assert!(
+            eq(
+                &point_7g_from_comp,
+                &point_7g_from_uncomp
+            ),
+            1
+        );
 
         // Deserialization should fail if given a point on the curve but not in the prime-order subgroup.
-        assert!(std::option::is_none(&deserialize<G1, FormatG1Uncompr>(&x"f037d4ccd5ee751eba1c1fd4c7edbb76d2b04c3a1f3f554827cf37c3acbc2dbb7cdb320a2727c2462d6c55ca1f637707b96eeebc622c1dbe7c56c34f93887c8751b42bd04f29253a82251c192ef27ece373993b663f4360505299c5bd18c890ddd862a6308796bf47e2265073c1f7d81afd69f9497fc1403e2e97a866129b43b672295229c21116d4a99f3e5c2ae720a31f181dbed8a93e15f909c20cf69d11a8879adbbe6890740def19814e6d4ed23fb0dcbd79291655caf48b466ac9cae04")), 1);
-        assert!(std::option::is_none(&deserialize<G1, FormatG1Compr>(&x"f037d4ccd5ee751eba1c1fd4c7edbb76d2b04c3a1f3f554827cf37c3acbc2dbb7cdb320a2727c2462d6c55ca1f637707b96eeebc622c1dbe7c56c34f93887c8751b42bd04f29253a82251c192ef27ece373993b663f4360505299c5bd18c890d")), 1);
+        assert!(
+            std::option::is_none(
+                &deserialize<G1, FormatG1Uncompr>(
+                    &x"f037d4ccd5ee751eba1c1fd4c7edbb76d2b04c3a1f3f554827cf37c3acbc2dbb7cdb320a2727c2462d6c55ca1f637707b96eeebc622c1dbe7c56c34f93887c8751b42bd04f29253a82251c192ef27ece373993b663f4360505299c5bd18c890ddd862a6308796bf47e2265073c1f7d81afd69f9497fc1403e2e97a866129b43b672295229c21116d4a99f3e5c2ae720a31f181dbed8a93e15f909c20cf69d11a8879adbbe6890740def19814e6d4ed23fb0dcbd79291655caf48b466ac9cae04"
+                )
+            ),
+            1
+        );
+        assert!(
+            std::option::is_none(
+                &deserialize<G1, FormatG1Compr>(
+                    &x"f037d4ccd5ee751eba1c1fd4c7edbb76d2b04c3a1f3f554827cf37c3acbc2dbb7cdb320a2727c2462d6c55ca1f637707b96eeebc622c1dbe7c56c34f93887c8751b42bd04f29253a82251c192ef27ece373993b663f4360505299c5bd18c890d"
+                )
+            ),
+            1
+        );
 
         // Deserialization should fail if given a valid point in (Fq2,Fq2) but not on the curve.
-        assert!(std::option::is_none(&deserialize<G1, FormatG1Uncompr>(&x"f037d4ccd5ee751eba1c1fd4c7edbb76d2b04c3a1f3f554827cf37c3acbc2dbb7cdb320a2727c2462d6c55ca1f637707b96eeebc622c1dbe7c56c34f93887c8751b42bd04f29253a82251c192ef27ece373993b663f4360505299c5bd18c890d000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000")), 1);
+        assert!(
+            std::option::is_none(
+                &deserialize<G1, FormatG1Uncompr>(
+                    &x"f037d4ccd5ee751eba1c1fd4c7edbb76d2b04c3a1f3f554827cf37c3acbc2dbb7cdb320a2727c2462d6c55ca1f637707b96eeebc622c1dbe7c56c34f93887c8751b42bd04f29253a82251c192ef27ece373993b663f4360505299c5bd18c890d000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000"
+                )
+            ),
+            1
+        );
 
         // Deserialization should fail if given an invalid point (x not in Fq2).
-        assert!(std::option::is_none(&deserialize<G1, FormatG1Uncompr>(&x"ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffdd862a6308796bf47e2265073c1f7d81afd69f9497fc1403e2e97a866129b43b672295229c21116d4a99f3e5c2ae720a31f181dbed8a93e15f909c20cf69d11a8879adbbe6890740def19814e6d4ed23fb0dcbd79291655caf48b466ac9cae04")), 1);
-        assert!(std::option::is_none(&deserialize<G1, FormatG1Compr>(&x"ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff")), 1);
+        assert!(
+            std::option::is_none(
+                &deserialize<G1, FormatG1Uncompr>(
+                    &x"ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffdd862a6308796bf47e2265073c1f7d81afd69f9497fc1403e2e97a866129b43b672295229c21116d4a99f3e5c2ae720a31f181dbed8a93e15f909c20cf69d11a8879adbbe6890740def19814e6d4ed23fb0dcbd79291655caf48b466ac9cae04"
+                )
+            ),
+            1
+        );
+        assert!(
+            std::option::is_none(
+                &deserialize<G1, FormatG1Compr>(
+                    &x"ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff"
+                )
+            ),
+            1
+        );
 
         // Deserialization should fail if given a byte array of wrong size.
-        assert!(std::option::is_none(&deserialize<G1, FormatG1Uncompr>(&x"000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000ab")), 1);
-        assert!(std::option::is_none(&deserialize<G1, FormatG1Compr>(&x"000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000ab")), 1);
+        assert!(
+            std::option::is_none(
+                &deserialize<G1, FormatG1Uncompr>(
+                    &x"000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000ab"
+                )
+            ),
+            1
+        );
+        assert!(
+            std::option::is_none(
+                &deserialize<G1, FormatG1Compr>(
+                    &x"000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000ab"
+                )
+            ),
+            1
+        );
 
         // Scalar multiplication.
         let scalar_7 = from_u64<Fr>(7);
         let point_7g_calc = scalar_mul(&generator, &scalar_7);
-        assert!(eq(&point_7g_calc, &point_7g_from_comp), 1);
-        assert!(G2_GENERATOR_MUL_BY_7_SERIALIZED_UNCOMP == serialize<G2, FormatG2Uncompr>(&point_7g_calc), 1);
-        assert!(G2_GENERATOR_MUL_BY_7_SERIALIZED_COMP == serialize<G2, FormatG2Compr>(&point_7g_calc), 1);
+        assert!(
+            eq(&point_7g_calc, &point_7g_from_comp),
+            1
+        );
+        assert!(
+            G2_GENERATOR_MUL_BY_7_SERIALIZED_UNCOMP == serialize<G2, FormatG2Uncompr>(
+                &point_7g_calc
+            ),
+            1
+        );
+        assert!(
+            G2_GENERATOR_MUL_BY_7_SERIALIZED_COMP == serialize<G2, FormatG2Compr>(
+                &point_7g_calc
+            ),
+            1
+        );
 
         // Multi-scalar multiplication.
         let num_entries = 1;
-        while (num_entries < 10) {
+        while (num_entries <10) {
             let scalars = rand_vector<Fr>(num_entries);
             let elements = rand_vector<G2>(num_entries);
 
@@ -525,7 +829,10 @@ module aptos_std::bls12381_algebra {
             while (i < num_entries) {
                 let element = std::vector::borrow(&elements, i);
                 let scalar = std::vector::borrow(&scalars, i);
-                expected = add(&expected, &scalar_mul(element, scalar));
+                expected = add(
+                    &expected,
+                    &scalar_mul(element, scalar)
+                );
                 i = i + 1;
             };
 
@@ -543,8 +850,18 @@ module aptos_std::bls12381_algebra {
 
         // Negation.
         let point_minus_7g_calc = neg(&point_7g_calc);
-        assert!(G2_GENERATOR_MUL_BY_7_NEG_SERIALIZED_COMP == serialize<G2, FormatG2Compr>(&point_minus_7g_calc), 1);
-        assert!(G2_GENERATOR_MUL_BY_7_NEG_SERIALIZED_UNCOMP == serialize<G2, FormatG2Uncompr>(&point_minus_7g_calc), 1);
+        assert!(
+            G2_GENERATOR_MUL_BY_7_NEG_SERIALIZED_COMP == serialize<G2, FormatG2Compr>(
+                &point_minus_7g_calc
+            ),
+            1
+        );
+        assert!(
+            G2_GENERATOR_MUL_BY_7_NEG_SERIALIZED_UNCOMP == serialize<G2, FormatG2Uncompr>(
+                &point_minus_7g_calc
+            ),
+            1
+        );
 
         // Addition.
         let scalar_9 = from_u64<Fr>(9);
@@ -554,15 +871,35 @@ module aptos_std::bls12381_algebra {
         assert!(eq(&point_2g, &point_2g_calc), 1);
 
         // Subtraction.
-        assert!(eq(&point_9g, &sub(&point_2g, &point_minus_7g_calc)), 1);
+        assert!(
+            eq(
+                &point_9g,
+                &sub(&point_2g, &point_minus_7g_calc)
+            ),
+            1
+        );
 
         // Hash-to-group using suite `BLS12381G2_XMD:SHA-256_SSWU_RO_`.
         // Test vectors source: https://www.ietf.org/archive/id/draft-irtf-cfrg-hash-to-curve-16.html#name-bls12381g2_xmdsha-256_sswu_
-        let actual = hash_to<G2, HashG2XmdSha256SswuRo>(&b"QUUX-V01-CS02-with-BLS12381G2_XMD:SHA-256_SSWU_RO_", &b"");
-        let expected = std::option::extract(&mut deserialize<G2, FormatG2Uncompr>(&x"05cb8437535e20ecffaef7752baddf98034139c38452458baeefab379ba13dff5bf5dd71b72418717047f5b0f37da03d0141ebfbdca40eb85b87142e130ab689c673cf60f1a3e98d69335266f30d9b8d4ac44c1038e9dcdd5393faf5c41fb78a12424ac32561493f3fe3c260708a12b7c620e7be00099a974e259ddc7d1f6395c3c811cdd19f1e8dbf3e9ecfdcbab8d60503921d7f6a12805e72940b963c0cf3471c7b2a524950ca195d11062ee75ec076daf2d4bc358c4b190c0c98064fdd92"));
+        let actual = hash_to<G2, HashG2XmdSha256SswuRo>(
+            &b"QUUX-V01-CS02-with-BLS12381G2_XMD:SHA-256_SSWU_RO_",
+            &b""
+        );
+        let expected = std::option::extract(
+            &mut deserialize<G2, FormatG2Uncompr>(
+                &x"05cb8437535e20ecffaef7752baddf98034139c38452458baeefab379ba13dff5bf5dd71b72418717047f5b0f37da03d0141ebfbdca40eb85b87142e130ab689c673cf60f1a3e98d69335266f30d9b8d4ac44c1038e9dcdd5393faf5c41fb78a12424ac32561493f3fe3c260708a12b7c620e7be00099a974e259ddc7d1f6395c3c811cdd19f1e8dbf3e9ecfdcbab8d60503921d7f6a12805e72940b963c0cf3471c7b2a524950ca195d11062ee75ec076daf2d4bc358c4b190c0c98064fdd92"
+            )
+        );
         assert!(eq(&expected, &actual), 1);
-        let actual = hash_to<G2, HashG2XmdSha256SswuRo>(&b"QUUX-V01-CS02-with-BLS12381G2_XMD:SHA-256_SSWU_RO_", &b"abcdef0123456789");
-        let expected = std::option::extract(&mut deserialize<G2, FormatG2Uncompr>(&x"190d119345b94fbd15497bcba94ecf7db2cbfd1e1fe7da034d26cbba169fb3968288b3fafb265f9ebd380512a71c3f2c121982811d2491fde9ba7ed31ef9ca474f0e1501297f68c298e9f4c0028add35aea8bb83d53c08cfc007c1e005723cd00bb5e7572275c567462d91807de765611490205a941a5a6af3b1691bfe596c31225d3aabdf15faff860cb4ef17c7c3be05571a0f8d3c08d094576981f4a3b8eda0a8e771fcdcc8ecceaf1356a6acf17574518acb506e435b639353c2e14827c8"));
+        let actual = hash_to<G2, HashG2XmdSha256SswuRo>(
+            &b"QUUX-V01-CS02-with-BLS12381G2_XMD:SHA-256_SSWU_RO_",
+            &b"abcdef0123456789"
+        );
+        let expected = std::option::extract(
+            &mut deserialize<G2, FormatG2Uncompr>(
+                &x"190d119345b94fbd15497bcba94ecf7db2cbfd1e1fe7da034d26cbba169fb3968288b3fafb265f9ebd380512a71c3f2c121982811d2491fde9ba7ed31ef9ca474f0e1501297f68c298e9f4c0028add35aea8bb83d53c08cfc007c1e005723cd00bb5e7572275c567462d91807de765611490205a941a5a6af3b1691bfe596c31225d3aabdf15faff860cb4ef17c7c3be05571a0f8d3c08d094576981f4a3b8eda0a8e771fcdcc8ecceaf1356a6acf17574518acb506e435b639353c2e14827c8"
+            )
+        );
         assert!(eq(&expected, &actual), 1);
     }
 
@@ -585,31 +922,81 @@ module aptos_std::bls12381_algebra {
         let generator = one<Gt>();
 
         // Serialization/deserialization.
-        assert!(GT_GENERATOR_SERIALIZED == serialize<Gt, FormatGt>(&generator), 1);
-        let generator_from_deser = std::option::extract(&mut deserialize<Gt, FormatGt>(&GT_GENERATOR_SERIALIZED));
-        assert!(eq(&generator, &generator_from_deser), 1);
-        assert!(FQ12_ONE_SERIALIZED == serialize<Gt, FormatGt>(&identity), 1);
-        let identity_from_deser = std::option::extract(&mut deserialize<Gt, FormatGt>(&FQ12_ONE_SERIALIZED));
-        assert!(eq(&identity, &identity_from_deser), 1);
-        let element_7g_from_deser = std::option::extract(&mut deserialize<Gt, FormatGt>(&GT_GENERATOR_MUL_BY_7_SERIALIZED
-        ));
-        assert!(std::option::is_none(&deserialize<Gt, FormatGt>(&x"ffff")), 1);
+        assert!(
+            GT_GENERATOR_SERIALIZED == serialize<Gt, FormatGt>(&generator),
+            1
+        );
+        let generator_from_deser = std::option::extract(
+            &mut deserialize<Gt, FormatGt>(&GT_GENERATOR_SERIALIZED)
+        );
+        assert!(
+            eq(&generator, &generator_from_deser),
+            1
+        );
+        assert!(
+            FQ12_ONE_SERIALIZED == serialize<Gt, FormatGt>(&identity),
+            1
+        );
+        let identity_from_deser = std::option::extract(
+            &mut deserialize<Gt, FormatGt>(&FQ12_ONE_SERIALIZED)
+        );
+        assert!(
+            eq(&identity, &identity_from_deser),
+            1
+        );
+        let element_7g_from_deser = std::option::extract(
+            &mut deserialize<Gt, FormatGt>(&GT_GENERATOR_MUL_BY_7_SERIALIZED)
+        );
+        assert!(
+            std::option::is_none(
+                &deserialize<Gt, FormatGt>(&x"ffff")
+            ),
+            1
+        );
 
         // Deserialization should fail if given an element in Fq12 but not in the prime-order subgroup.
-        assert!(std::option::is_none(&deserialize<Gt, FormatGt>(&x"000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000")), 1);
+        assert!(
+            std::option::is_none(
+                &deserialize<Gt, FormatGt>(
+                    &x"000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000"
+                )
+            ),
+            1
+        );
 
         // Deserialization should fail if given a byte array of wrong size.
-        assert!(std::option::is_none(&deserialize<Gt, FormatGt>(&x"000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000ab")), 1);
+        assert!(
+            std::option::is_none(
+                &deserialize<Gt, FormatGt>(
+                    &x"000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000ab"
+                )
+            ),
+            1
+        );
 
         // Element scalar multiplication.
         let scalar_7 = from_u64<Fr>(7);
         let element_7g_calc = scalar_mul(&generator, &scalar_7);
-        assert!(eq(&element_7g_calc, &element_7g_from_deser), 1);
-        assert!(GT_GENERATOR_MUL_BY_7_SERIALIZED == serialize<Gt, FormatGt>(&element_7g_calc), 1);
+        assert!(
+            eq(
+                &element_7g_calc,
+                &element_7g_from_deser
+            ),
+            1
+        );
+        assert!(
+            GT_GENERATOR_MUL_BY_7_SERIALIZED == serialize<Gt, FormatGt>(&element_7g_calc),
+            1
+        );
 
         // Element negation.
         let element_minus_7g_calc = neg(&element_7g_calc);
-        assert!(GT_GENERATOR_MUL_BY_7_NEG_SERIALIZED == serialize<Gt, FormatGt>(&element_minus_7g_calc), 1);
+        assert!(
+            GT_GENERATOR_MUL_BY_7_NEG_SERIALIZED == serialize<Gt, FormatGt>(
+                &element_minus_7g_calc
+            ),
+            1
+        );
 
         // Element addition.
         let scalar_9 = from_u64<Fr>(9);
@@ -620,14 +1007,52 @@ module aptos_std::bls12381_algebra {
         assert!(eq(&element_2g, &element_2g_calc), 1);
 
         // Subtraction.
-        assert!(eq(&element_9g, &sub(&element_2g, &element_minus_7g_calc)), 1);
+        assert!(
+            eq(
+                &element_9g,
+                &sub(&element_2g, &element_minus_7g_calc)
+            ),
+            1
+        );
 
         // Upcasting to Fq12.
-        assert!(eq(&one<Fq12>(), &upcast<Gt, Fq12>(&identity)), 1);
+        assert!(
+            eq(
+                &one<Fq12>(),
+                &upcast<Gt, Fq12>(&identity)
+            ),
+            1
+        );
     }
 
     #[test_only]
-    use aptos_std::crypto_algebra::{zero, one, from_u64, eq, deserialize, serialize, neg, add, sub, mul, div, inv, rand_insecure, sqr, order, scalar_mul, multi_scalar_mul, double, hash_to, upcast, enable_cryptography_algebra_natives, pairing, multi_pairing, downcast, Element};
+    use aptos_std::crypto_algebra::{
+        zero,
+        one,
+        from_u64,
+        eq,
+        deserialize,
+        serialize,
+        neg,
+        add,
+        sub,
+        mul,
+        div,
+        inv,
+        rand_insecure,
+        sqr,
+        order,
+        scalar_mul,
+        multi_scalar_mul,
+        double,
+        hash_to,
+        upcast,
+        enable_cryptography_algebra_natives,
+        pairing,
+        multi_pairing,
+        downcast,
+        Element
+    };
 
     #[test_only]
     const FR_VAL_0_SERIALIZED_LSB: vector<u8> = x"0000000000000000000000000000000000000000000000000000000000000000";
@@ -650,37 +1075,100 @@ module aptos_std::bls12381_algebra {
         // Serialization/deserialization.
         let val_0 = zero<Fr>();
         let val_1 = one<Fr>();
-        assert!(FR_VAL_0_SERIALIZED_LSB == serialize<Fr, FormatFrLsb>(&val_0), 1);
-        assert!(FR_VAL_1_SERIALIZED_LSB == serialize<Fr, FormatFrLsb>(&val_1), 1);
+        assert!(
+            FR_VAL_0_SERIALIZED_LSB == serialize<Fr, FormatFrLsb>(&val_0),
+            1
+        );
+        assert!(
+            FR_VAL_1_SERIALIZED_LSB == serialize<Fr, FormatFrLsb>(&val_1),
+            1
+        );
         let val_7 = from_u64<Fr>(7);
-        let val_7_2nd = std::option::extract(&mut deserialize<Fr, FormatFrLsb>(&FR_VAL_7_SERIALIZED_LSB));
-        let val_7_3rd = std::option::extract(&mut deserialize<Fr, FormatFrMsb>(&FR_VAL_7_SERIALIZED_MSB));
+        let val_7_2nd = std::option::extract(
+            &mut deserialize<Fr, FormatFrLsb>(&FR_VAL_7_SERIALIZED_LSB)
+        );
+        let val_7_3rd = std::option::extract(
+            &mut deserialize<Fr, FormatFrMsb>(&FR_VAL_7_SERIALIZED_MSB)
+        );
         assert!(eq(&val_7, &val_7_2nd), 1);
         assert!(eq(&val_7, &val_7_3rd), 1);
-        assert!(FR_VAL_7_SERIALIZED_LSB == serialize<Fr, FormatFrLsb>(&val_7), 1);
-        assert!(FR_VAL_7_SERIALIZED_MSB == serialize<Fr, FormatFrMsb>(&val_7), 1);
+        assert!(
+            FR_VAL_7_SERIALIZED_LSB == serialize<Fr, FormatFrLsb>(&val_7),
+            1
+        );
+        assert!(
+            FR_VAL_7_SERIALIZED_MSB == serialize<Fr, FormatFrMsb>(&val_7),
+            1
+        );
 
         // Deserialization should fail if given a byte array of right size but the value is not a member.
-        assert!(std::option::is_none(&deserialize<Fr, FormatFrLsb>(&x"01000000fffffffffe5bfeff02a4bd5305d8a10908d83933487d9d2953a7ed73")), 1);
-        assert!(std::option::is_none(&deserialize<Fr, FormatFrMsb>(&x"73eda753299d7d483339d80809a1d80553bda402fffe5bfeffffffff00000001")), 1);
+        assert!(
+            std::option::is_none(
+                &deserialize<Fr, FormatFrLsb>(
+                    &x"01000000fffffffffe5bfeff02a4bd5305d8a10908d83933487d9d2953a7ed73"
+                )
+            ),
+            1
+        );
+        assert!(
+            std::option::is_none(
+                &deserialize<Fr, FormatFrMsb>(
+                    &x"73eda753299d7d483339d80809a1d80553bda402fffe5bfeffffffff00000001"
+                )
+            ),
+            1
+        );
 
         // Deserialization should fail if given a byte array of wrong size.
-        assert!(std::option::is_none(&deserialize<Fr, FormatFrLsb>(&x"01000000fffffffffe5bfeff02a4bd5305d8a10908d83933487d9d2953a7ed7300")), 1);
-        assert!(std::option::is_none(&deserialize<Fr, FormatFrMsb>(&x"0073eda753299d7d483339d80809a1d80553bda402fffe5bfeffffffff00000001")), 1);
-        assert!(std::option::is_none(&deserialize<Fr, FormatFrLsb>(&x"ffff")), 1);
-        assert!(std::option::is_none(&deserialize<Fr, FormatFrMsb>(&x"ffff")), 1);
+        assert!(
+            std::option::is_none(
+                &deserialize<Fr, FormatFrLsb>(
+                    &x"01000000fffffffffe5bfeff02a4bd5305d8a10908d83933487d9d2953a7ed7300"
+                )
+            ),
+            1
+        );
+        assert!(
+            std::option::is_none(
+                &deserialize<Fr, FormatFrMsb>(
+                    &x"0073eda753299d7d483339d80809a1d80553bda402fffe5bfeffffffff00000001"
+                )
+            ),
+            1
+        );
+        assert!(
+            std::option::is_none(
+                &deserialize<Fr, FormatFrLsb>(&x"ffff")
+            ),
+            1
+        );
+        assert!(
+            std::option::is_none(
+                &deserialize<Fr, FormatFrMsb>(&x"ffff")
+            ),
+            1
+        );
 
         // Negation.
         let val_minus_7 = neg(&val_7);
-        assert!(FR_VAL_7_NEG_SERIALIZED_LSB == serialize<Fr, FormatFrLsb>(&val_minus_7), 1);
+        assert!(
+            FR_VAL_7_NEG_SERIALIZED_LSB == serialize<Fr, FormatFrLsb>(&val_minus_7),
+            1
+        );
 
         // Addition.
         let val_9 = from_u64<Fr>(9);
         let val_2 = from_u64<Fr>(2);
-        assert!(eq(&val_2, &add(&val_minus_7, &val_9)), 1);
+        assert!(
+            eq(&val_2, &add(&val_minus_7, &val_9)),
+            1
+        );
 
         // Subtraction.
-        assert!(eq(&val_9, &sub(&val_2, &val_minus_7)), 1);
+        assert!(
+            eq(&val_9, &sub(&val_2, &val_minus_7)),
+            1
+        );
 
         // Multiplication.
         let val_63 = from_u64<Fr>(63);
@@ -688,16 +1176,31 @@ module aptos_std::bls12381_algebra {
 
         // division.
         let val_0 = from_u64<Fr>(0);
-        assert!(eq(&val_7, &std::option::extract(&mut div(&val_63, &val_9))), 1);
-        assert!(std::option::is_none(&div(&val_63, &val_0)), 1);
+        assert!(
+            eq(
+                &val_7,
+                &std::option::extract(&mut div(&val_63, &val_9))
+            ),
+            1
+        );
+        assert!(
+            std::option::is_none(&div(&val_63, &val_0)),
+            1
+        );
 
         // Inversion.
         assert!(eq(&val_minus_7, &neg(&val_7)), 1);
-        assert!(std::option::is_none(&inv(&val_0)), 1);
+        assert!(
+            std::option::is_none(&inv(&val_0)),
+            1
+        );
 
         // Squaring.
         let val_x = rand_insecure<Fr>();
-        assert!(eq(&mul(&val_x, &val_x), &sqr(&val_x)), 1);
+        assert!(
+            eq(&mul(&val_x, &val_x), &sqr(&val_x)),
+            1
+        );
     }
 
     #[test(fx = @std)]
@@ -709,9 +1212,18 @@ module aptos_std::bls12381_algebra {
         let element_q = rand_insecure<G2>();
         let a = rand_insecure<Fr>();
         let b = rand_insecure<Fr>();
-        let gt_element = pairing<G1, G2,Gt>(&scalar_mul(&element_p, &a), &scalar_mul(&element_q, &b));
-        let gt_element_another = scalar_mul(&pairing<G1, G2,Gt>(&element_p, &element_q), &mul(&a, &b));
-        assert!(eq(&gt_element, &gt_element_another), 1);
+        let gt_element = pairing<G1, G2, Gt>(
+            &scalar_mul(&element_p, &a),
+            &scalar_mul(&element_q, &b)
+        );
+        let gt_element_another = scalar_mul(
+            &pairing<G1, G2, Gt>(&element_p, &element_q),
+            &mul(&a, &b)
+        );
+        assert!(
+            eq(&gt_element, &gt_element_another),
+            1
+        );
     }
 
     #[test(fx = @std)]
@@ -739,16 +1251,19 @@ module aptos_std::bls12381_algebra {
         let q2_b2 = scalar_mul(&element_q2, &b2);
 
         // Naive method.
-        let n0 = pairing<G1, G2,Gt>(&p0_a0, &q0_b0);
-        let n1 = pairing<G1, G2,Gt>(&p1_a1, &q1_b1);
-        let n2 = pairing<G1, G2,Gt>(&p2_a2, &q2_b2);
+        let n0 = pairing<G1, G2, Gt>(&p0_a0, &q0_b0);
+        let n1 = pairing<G1, G2, Gt>(&p1_a1, &q1_b1);
+        let n2 = pairing<G1, G2, Gt>(&p2_a2, &q2_b2);
         let n = zero<Gt>();
         n = add(&n, &n0);
         n = add(&n, &n1);
         n = add(&n, &n2);
 
         // Efficient API.
-        let m = multi_pairing<G1, G2, Gt>(&vector[p0_a0, p1_a1, p2_a2], &vector[q0_b0, q1_b1, q2_b2]);
+        let m = multi_pairing<G1, G2, Gt>(
+            &vector[p0_a0, p1_a1, p2_a2],
+            &vector[q0_b0, q1_b1, q2_b2]
+        );
         assert!(eq(&n, &m), 1);
     }
 
@@ -757,7 +1272,10 @@ module aptos_std::bls12381_algebra {
     fun test_multi_pairing_should_abort_when_sizes_mismatch(fx: signer) {
         enable_cryptography_algebra_natives(&fx);
         let g1_elements = vector[rand_insecure<G1>()];
-        let g2_elements = vector[rand_insecure<G2>(), rand_insecure<G2>()];
+        let g2_elements = vector[
+            rand_insecure<G2>(),
+            rand_insecure<G2>()
+        ];
         multi_pairing<G1, G2, Gt>(&g1_elements, &g2_elements);
     }
 
@@ -766,7 +1284,10 @@ module aptos_std::bls12381_algebra {
     fun test_multi_scalar_mul_should_abort_when_sizes_mismatch(fx: signer) {
         enable_cryptography_algebra_natives(&fx);
         let elements = vector[rand_insecure<G1>()];
-        let scalars = vector[rand_insecure<Fr>(), rand_insecure<Fr>()];
+        let scalars = vector[
+            rand_insecure<Fr>(),
+            rand_insecure<Fr>()
+        ];
         multi_scalar_mul(&elements, &scalars);
     }
 

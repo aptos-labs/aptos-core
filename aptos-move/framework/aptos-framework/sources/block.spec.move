@@ -43,9 +43,13 @@ spec aptos_framework::block {
     spec module {
         use aptos_framework::chain_status;
         // After genesis, `BlockResource` exist.
-        invariant [suspendable] chain_status::is_operating() ==> exists<BlockResource>(@aptos_framework);
+        invariant[suspendable] chain_status::is_operating() ==> exists<BlockResource>(
+            @aptos_framework
+        );
         // After genesis, `CommitHistory` exist.
-        invariant [suspendable] chain_status::is_operating() ==> exists<CommitHistory>(@aptos_framework);
+        invariant[suspendable] chain_status::is_operating() ==> exists<CommitHistory>(
+            @aptos_framework
+        );
     }
 
     spec BlockResource {
@@ -85,8 +89,12 @@ spec aptos_framework::block {
 
         requires chain_status::is_operating();
         requires system_addresses::is_vm(vm);
-        requires event::counter(global<BlockResource>(@aptos_framework).new_block_events) == 0;
-        requires (timestamp::spec_now_microseconds() == 0);
+        requires event::counter(
+            global<BlockResource>(@aptos_framework).new_block_events
+        ) == 0;
+        requires(
+            timestamp::spec_now_microseconds() == 0
+        );
 
         aborts_if false;
     }
@@ -98,8 +106,12 @@ spec aptos_framework::block {
 
         requires chain_status::is_operating();
         requires system_addresses::is_vm(vm);
-        requires (proposer == @vm_reserved) ==> (timestamp::spec_now_microseconds() == timestamp);
-        requires (proposer != @vm_reserved) ==> (timestamp::spec_now_microseconds() < timestamp);
+        requires(proposer == @vm_reserved) ==> (
+            timestamp::spec_now_microseconds() == timestamp
+        );
+        requires(proposer != @vm_reserved) ==> (
+            timestamp::spec_now_microseconds() < timestamp
+        );
         /// [high-level-req-5]
         requires event::counter(event_handle) == new_block_event.height;
 
@@ -112,7 +124,10 @@ spec aptos_framework::block {
     /// The Account is not under the caller until the BlockResource is created for the caller.
     /// Make sure The BlockResource under the caller existed after initializing.
     /// The number of new events created does not exceed MAX_U64.
-    spec initialize(aptos_framework: &signer, epoch_interval_microsecs: u64) {
+    spec initialize(
+        aptos_framework: &signer,
+        epoch_interval_microsecs: u64
+    ) {
         use std::signer;
         /// [high-level-req-1]
         include Initialize;
@@ -142,9 +157,15 @@ spec aptos_framework::block {
         requires chain_status::is_operating();
         requires system_addresses::is_vm(vm);
         /// [high-level-req-4]
-        requires proposer == @vm_reserved || stake::spec_is_current_epoch_validator(proposer);
-        requires (proposer == @vm_reserved) ==> (timestamp::spec_now_microseconds() == timestamp);
-        requires (proposer != @vm_reserved) ==> (timestamp::spec_now_microseconds() < timestamp);
+        requires proposer == @vm_reserved || stake::spec_is_current_epoch_validator(
+            proposer
+        );
+        requires(proposer == @vm_reserved) ==> (
+            timestamp::spec_now_microseconds() == timestamp
+        );
+        requires(proposer != @vm_reserved) ==> (
+            timestamp::spec_now_microseconds() < timestamp
+        );
         requires exists<stake::ValidatorFees>(@aptos_framework);
         requires exists<CoinInfo<AptosCoin>>(@aptos_framework);
         include transaction_fee::RequiresCollectedFeesPerValueLeqBlockAptosSupply;
@@ -215,7 +236,10 @@ spec aptos_framework::block {
     /// The BlockResource existed under the @aptos_framework.
     /// The Configuration existed under the @aptos_framework.
     /// The CurrentTimeMicroseconds existed under the @aptos_framework.
-    spec emit_writeset_block_event(vm_signer: &signer, fake_block_hash: address) {
+    spec emit_writeset_block_event(
+        vm_signer: &signer,
+        fake_block_hash: address
+    ) {
         use aptos_framework::chain_status;
         requires chain_status::is_operating();
         include EmitWritesetBlockEvent;
@@ -229,6 +253,8 @@ spec aptos_framework::block {
         aborts_if addr != @vm_reserved;
         aborts_if !exists<BlockResource>(@aptos_framework);
         aborts_if !exists<reconfiguration::Configuration>(@aptos_framework);
-        aborts_if !exists<timestamp::CurrentTimeMicroseconds>(@aptos_framework);
+        aborts_if !exists<
+            timestamp::CurrentTimeMicroseconds
+        >(@aptos_framework);
     }
 }

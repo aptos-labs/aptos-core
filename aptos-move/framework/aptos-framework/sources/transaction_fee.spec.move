@@ -55,7 +55,9 @@ spec aptos_framework::transaction_fee {
         pragma aborts_if_is_strict;
         // property 1: Given the blockchain is in an operating state, it guarantees that the Aptos framework signer may burn Aptos coins.
         /// [high-level-req-1]
-        invariant [suspendable] chain_status::is_operating() ==> exists<AptosCoinCapabilities>(@aptos_framework);
+        invariant[suspendable] chain_status::is_operating() ==> exists<AptosCoinCapabilities>(
+            @aptos_framework
+        );
     }
 
     spec CollectedFeesPerBlock {
@@ -64,7 +66,10 @@ spec aptos_framework::transaction_fee {
         invariant burn_percentage <= 100;
     }
 
-    spec initialize_fee_collection_and_distribution(aptos_framework: &signer, burn_percentage: u8) {
+    spec initialize_fee_collection_and_distribution(
+        aptos_framework: &signer,
+        burn_percentage: u8
+    ) {
         use std::signer;
         use aptos_framework::stake::ValidatorFees;
         use aptos_framework::aggregator_factory;
@@ -81,7 +86,7 @@ spec aptos_framework::transaction_fee {
         aborts_if !system_addresses::is_aptos_framework_address(aptos_addr);
         aborts_if exists<ValidatorFees>(aptos_addr);
 
-        include system_addresses::AbortsIfNotAptosFramework { account: aptos_framework };
+        include system_addresses::AbortsIfNotAptosFramework {account: aptos_framework};
         include aggregator_factory::CreateAggregatorInternalAbortsIf;
         aborts_if exists<CollectedFeesPerBlock>(aptos_addr);
 
@@ -89,7 +94,10 @@ spec aptos_framework::transaction_fee {
         ensures exists<CollectedFeesPerBlock>(aptos_addr);
     }
 
-    spec upgrade_burn_percentage(aptos_framework: &signer, new_burn_percentage: u8) {
+    spec upgrade_burn_percentage(
+        aptos_framework: &signer,
+        new_burn_percentage: u8
+    ) {
         use std::signer;
 
         // Percentage validation
@@ -106,19 +114,24 @@ spec aptos_framework::transaction_fee {
         include ProcessCollectedFeesRequiresAndEnsures;
 
         // The effect of upgrading the burn percentage
-        ensures exists<CollectedFeesPerBlock>(@aptos_framework) ==>
-            global<CollectedFeesPerBlock>(@aptos_framework).burn_percentage == new_burn_percentage;
+        ensures exists<CollectedFeesPerBlock>(@aptos_framework) ==> global<CollectedFeesPerBlock>(
+            @aptos_framework
+        ).burn_percentage == new_burn_percentage;
     }
 
     spec register_proposer_for_fee_collection(proposer_addr: address) {
         aborts_if false;
         // property 6: Ensure the presence of the resource.
         /// [high-level-req-6.1]
-        ensures is_fees_collection_enabled() ==>
-            option::spec_borrow(global<CollectedFeesPerBlock>(@aptos_framework).proposer) == proposer_addr;
+        ensures is_fees_collection_enabled() ==> option::spec_borrow(
+            global<CollectedFeesPerBlock>(@aptos_framework).proposer
+        ) == proposer_addr;
     }
 
-    spec burn_coin_fraction(coin: &mut Coin<AptosCoin>, burn_percentage: u8) {
+    spec burn_coin_fraction(
+        coin: &mut Coin<AptosCoin>,
+        burn_percentage: u8
+    ) {
         use aptos_framework::coin::CoinInfo;
         use aptos_framework::aptos_coin::AptosCoin;
 
@@ -128,7 +141,9 @@ spec aptos_framework::transaction_fee {
 
         let amount_to_burn = (burn_percentage * coin::value(coin)) / 100;
         // include (amount_to_burn > 0) ==> coin::AbortsIfNotExistCoinInfo<AptosCoin>;
-        include amount_to_burn > 0 ==> coin::CoinSubAbortsIf<AptosCoin> { amount: amount_to_burn };
+        include amount_to_burn > 0 ==> coin::CoinSubAbortsIf<AptosCoin> {
+            amount: amount_to_burn
+        };
         ensures coin.value == old(coin).value - amount_to_burn;
     }
 
@@ -141,12 +156,17 @@ spec aptos_framework::transaction_fee {
         use aptos_framework::aggregator;
         let maybe_supply = coin::get_coin_supply_opt<AptosCoin>();
         // property 6: Ensure the presence of the resource.
-        requires
-            (is_fees_collection_enabled() && option::is_some(maybe_supply)) ==>
-                (aggregator::spec_aggregator_get_val(global<CollectedFeesPerBlock>(@aptos_framework).amount.value) <=
-                    optional_aggregator::optional_aggregator_value(
-                        option::spec_borrow(coin::get_coin_supply_opt<AptosCoin>())
-                    ));
+        requires(
+            is_fees_collection_enabled() && option::is_some(maybe_supply)
+        ) ==> (
+            aggregator::spec_aggregator_get_val(
+                global<CollectedFeesPerBlock>(@aptos_framework).amount.value
+            ) <= optional_aggregator::optional_aggregator_value(
+                option::spec_borrow(
+                    coin::get_coin_supply_opt<AptosCoin>()
+                )
+            )
+        );
     }
 
     spec schema ProcessCollectedFeesRequiresAndEnsures {
@@ -165,26 +185,30 @@ spec aptos_framework::transaction_fee {
         let collected_fees = global<CollectedFeesPerBlock>(@aptos_framework);
         let post post_collected_fees = global<CollectedFeesPerBlock>(@aptos_framework);
         let pre_amount = aggregator::spec_aggregator_get_val(collected_fees.amount.value);
-        let post post_amount = aggregator::spec_aggregator_get_val(post_collected_fees.amount.value);
+        let post post_amount = aggregator::spec_aggregator_get_val(
+            post_collected_fees.amount.value
+        );
         let fees_table = global<stake::ValidatorFees>(@aptos_framework).fees_table;
         let post post_fees_table = global<stake::ValidatorFees>(@aptos_framework).fees_table;
         let proposer = option::spec_borrow(collected_fees.proposer);
-        let fee_to_add = pre_amount - pre_amount * collected_fees.burn_percentage / 100;
-        ensures is_fees_collection_enabled() ==> option::spec_is_none(post_collected_fees.proposer) && post_amount == 0;
-        ensures is_fees_collection_enabled() && aggregator::spec_read(collected_fees.amount.value) > 0 &&
-            option::spec_is_some(collected_fees.proposer) ==>
-            if (proposer != @vm_reserved) {
-                if (table::spec_contains(fees_table, proposer)) {
-                    table::spec_get(post_fees_table, proposer).value == table::spec_get(
-                        fees_table,
-                        proposer
-                    ).value + fee_to_add
-                } else {
-                    table::spec_get(post_fees_table, proposer).value == fee_to_add
-                }
+        let fee_to_add = pre_amount - pre_amount * collected_fees.burn_percentage / 100
+            ;
+        ensures is_fees_collection_enabled() ==> option::spec_is_none(
+            post_collected_fees.proposer
+        ) && post_amount == 0;
+        ensures is_fees_collection_enabled() && aggregator::spec_read(
+            collected_fees.amount.value
+        ) > 0 && option::spec_is_some(collected_fees.proposer) ==> if (proposer != @vm_reserved) {
+            if (table::spec_contains(fees_table, proposer)) {
+                table::spec_get(post_fees_table, proposer).value == table::spec_get(
+                    fees_table, proposer
+                ).value + fee_to_add
             } else {
-                option::spec_is_none(post_collected_fees.proposer) && post_amount == 0
-            };
+                table::spec_get(post_fees_table, proposer).value == fee_to_add
+            }
+        } else {
+            option::spec_is_none(post_collected_fees.proposer) && post_amount == 0
+        };
     }
 
     spec process_collected_fees() {
@@ -199,7 +223,6 @@ spec aptos_framework::transaction_fee {
         use aptos_framework::coin;
         use aptos_framework::coin::{CoinInfo, CoinStore};
 
-
         aborts_if !exists<AptosCoinCapabilities>(@aptos_framework);
 
         // This function essentially calls `coin::burn_coin`, monophormized for `AptosCoin`.
@@ -212,8 +235,11 @@ spec aptos_framework::transaction_fee {
 
         modifies global<CoinStore<AptosCoin>>(account_addr);
 
-        aborts_if amount != 0 && !(exists<CoinInfo<AptosCoin>>(aptos_addr)
-            && exists<CoinStore<AptosCoin>>(account_addr));
+        aborts_if amount != 0 && !(
+            exists<CoinInfo<AptosCoin>>(aptos_addr) && exists<CoinStore<AptosCoin>>(
+                account_addr
+            )
+        );
         aborts_if coin_store.coin.value < amount;
 
         let maybe_supply = global<CoinInfo<AptosCoin>>(aptos_addr).supply;
@@ -227,9 +253,7 @@ spec aptos_framework::transaction_fee {
         aborts_if option::spec_is_some(maybe_supply) && value < amount;
 
         ensures post_coin_store.coin.value == coin_store.coin.value - amount;
-        ensures if (option::spec_is_some(maybe_supply)) {
-            post_value == value - amount
-        } else {
+        ensures if (option::spec_is_some(maybe_supply)) {post_value == value - amount} else {
             option::spec_is_none(post_maybe_supply)
         };
         ensures coin::supply<AptosCoin> == old(coin::supply<AptosCoin>) - amount;
@@ -246,7 +270,7 @@ spec aptos_framework::transaction_fee {
         let aptos_addr = type_info::type_of<AptosCoin>().account_address;
         modifies global<CoinInfo<AptosCoin>>(aptos_addr);
         aborts_if (refund != 0) && !exists<CoinInfo<AptosCoin>>(aptos_addr);
-        include coin::CoinAddAbortsIf<AptosCoin> { amount: refund };
+        include coin::CoinAddAbortsIf<AptosCoin> {amount: refund};
 
         aborts_if !exists<CoinStore<AptosCoin>>(account);
         modifies global<CoinStore<AptosCoin>>(account);
@@ -268,10 +292,10 @@ spec aptos_framework::transaction_fee {
         aborts_if !exists<CollectedFeesPerBlock>(@aptos_framework);
         aborts_if fee > 0 && !exists<coin::CoinStore<AptosCoin>>(account);
         aborts_if fee > 0 && coin_store.coin.value < fee;
-        aborts_if fee > 0 && aggregator::spec_aggregator_get_val(aggr)
-            + fee > aggregator::spec_get_limit(aggr);
-        aborts_if fee > 0 && aggregator::spec_aggregator_get_val(aggr)
-            + fee > MAX_U128;
+        aborts_if fee > 0 && aggregator::spec_aggregator_get_val(aggr) + fee > aggregator::spec_get_limit(
+            aggr
+        );
+        aborts_if fee > 0 && aggregator::spec_aggregator_get_val(aggr) + fee > MAX_U128;
 
         let post post_coin_store = global<coin::CoinStore<AptosCoin>>(account);
         let post post_collected_fees = global<CollectedFeesPerBlock>(@aptos_framework).amount;
@@ -283,7 +307,10 @@ spec aptos_framework::transaction_fee {
 
     /// Ensure caller is admin.
     /// Aborts if `AptosCoinCapabilities` already exists.
-    spec store_aptos_coin_burn_cap(aptos_framework: &signer, burn_cap: BurnCapability<AptosCoin>) {
+    spec store_aptos_coin_burn_cap(
+        aptos_framework: &signer,
+        burn_cap: BurnCapability<AptosCoin>
+    ) {
         use std::signer;
         let addr = signer::address_of(aptos_framework);
         aborts_if !system_addresses::is_aptos_framework_address(addr);
@@ -293,7 +320,10 @@ spec aptos_framework::transaction_fee {
 
     /// Ensure caller is admin.
     /// Aborts if `AptosCoinMintCapability` already exists.
-    spec store_aptos_coin_mint_cap(aptos_framework: &signer, mint_cap: MintCapability<AptosCoin>) {
+    spec store_aptos_coin_mint_cap(
+        aptos_framework: &signer,
+        mint_cap: MintCapability<AptosCoin>
+    ) {
         use std::signer;
         let addr = signer::address_of(aptos_framework);
         aborts_if !system_addresses::is_aptos_framework_address(addr);

@@ -42,7 +42,10 @@ module aptos_framework::randomness_config {
     }
 
     /// Initialize the configuration. Used in genesis or governance.
-    public fun initialize(framework: &signer, config: RandomnessConfig) {
+    public fun initialize(
+        framework: &signer,
+        config: RandomnessConfig
+    ) {
         system_addresses::assert_aptos_framework(framework);
         if (!exists<RandomnessConfig>(@aptos_framework)) {
             move_to(framework, config)
@@ -50,7 +53,10 @@ module aptos_framework::randomness_config {
     }
 
     /// This can be called by on-chain governance to update on-chain consensus configs for the next epoch.
-    public fun set_for_next_epoch(framework: &signer, new_config: RandomnessConfig) {
+    public fun set_for_next_epoch(
+        framework: &signer,
+        new_config: RandomnessConfig
+    ) {
         system_addresses::assert_aptos_framework(framework);
         config_buffer::upsert(new_config);
     }
@@ -70,27 +76,32 @@ module aptos_framework::randomness_config {
     public fun enabled(): bool acquires RandomnessConfig {
         if (exists<RandomnessConfig>(@aptos_framework)) {
             let config = borrow_global<RandomnessConfig>(@aptos_framework);
-            let variant_type_name = *string::bytes(copyable_any::type_name(&config.variant));
+            let variant_type_name = *string::bytes(
+                copyable_any::type_name(&config.variant)
+            );
             variant_type_name != b"0x1::randomness_config::ConfigOff"
-        } else {
-            false
-        }
+        } else { false }
     }
 
     /// Create a `ConfigOff` variant.
     public fun new_off(): RandomnessConfig {
         RandomnessConfig {
-            variant: copyable_any::pack( ConfigOff {} )
+            variant: copyable_any::pack(ConfigOff {})
         }
     }
 
     /// Create a `ConfigV1` variant.
-    public fun new_v1(secrecy_threshold: FixedPoint64, reconstruction_threshold: FixedPoint64): RandomnessConfig {
+    public fun new_v1(
+        secrecy_threshold: FixedPoint64,
+        reconstruction_threshold: FixedPoint64
+    ): RandomnessConfig {
         RandomnessConfig {
-            variant: copyable_any::pack( ConfigV1 {
-                secrecy_threshold,
-                reconstruction_threshold
-            } )
+            variant: copyable_any::pack(
+                ConfigV1 {
+                    secrecy_threshold,
+                    reconstruction_threshold
+                }
+            )
         }
     }
 

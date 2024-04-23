@@ -16,7 +16,10 @@ module aptos_framework::system_addresses {
     }
 
     public fun assert_core_resource_address(addr: address) {
-        assert!(is_core_resource_address(addr), error::permission_denied(ENOT_CORE_RESOURCE_ADDRESS))
+        assert!(
+            is_core_resource_address(addr),
+            error::permission_denied(ENOT_CORE_RESOURCE_ADDRESS)
+        )
     }
 
     public fun is_core_resource_address(addr: address): bool {
@@ -43,16 +46,9 @@ module aptos_framework::system_addresses {
 
     /// Return true if `addr` is 0x0 or under the on chain governance's control.
     public fun is_framework_reserved_address(addr: address): bool {
-        is_aptos_framework_address(addr) ||
-            addr == @0x2 ||
-            addr == @0x3 ||
-            addr == @0x4 ||
-            addr == @0x5 ||
-            addr == @0x6 ||
-            addr == @0x7 ||
-            addr == @0x8 ||
-            addr == @0x9 ||
-            addr == @0xa
+        is_aptos_framework_address(addr) || addr == @0x2 || addr == @0x3 || addr == @0x4
+            || addr == @0x5 || addr == @0x6 || addr == @0x7 || addr == @0x8 || addr == @
+            0x9 || addr == @0xa
     }
 
     /// Return true if `addr` is 0x1.
@@ -62,7 +58,10 @@ module aptos_framework::system_addresses {
 
     /// Assert that the signer has the VM reserved address.
     public fun assert_vm(account: &signer) {
-        assert!(is_vm(account), error::permission_denied(EVM))
+        assert!(
+            is_vm(account),
+            error::permission_denied(EVM)
+        )
     }
 
     /// Return true if `addr` is a reserved address for the VM to call system modules.

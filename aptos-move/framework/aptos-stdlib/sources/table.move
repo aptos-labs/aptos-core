@@ -35,10 +35,9 @@ module aptos_std::table {
 
     /// Acquire an immutable reference to the value which `key` maps to.
     /// Returns specified default value if there is no entry for `key`.
-    public fun borrow_with_default<K: copy + drop, V>(table: &Table<K, V>, key: K, default: &V): &V {
-        if (!contains(table, copy key)) {
-            default
-        } else {
+    public fun borrow_with_default<K: copy + drop, V>(table: &Table<K, V>, key: K, default: &V)
+        : &V {
+        if (!contains(table, copy key)) { default } else {
             borrow(table, copy key)
         }
     }
@@ -51,7 +50,10 @@ module aptos_std::table {
 
     /// Acquire a mutable reference to the value which `key` maps to.
     /// Insert the pair (`key`, `default`) first if there is no entry for `key`.
-    public fun borrow_mut_with_default<K: copy + drop, V: drop>(table: &mut Table<K, V>, key: K, default: V): &mut V {
+    public fun borrow_mut_with_default<K: copy + drop, V: drop>(
+        table: &mut Table<K, V>, key: K,
+        default: V
+    ): &mut V {
         if (!contains(table, copy key)) {
             add(table, copy key, default)
         };
@@ -60,7 +62,10 @@ module aptos_std::table {
 
     /// Insert the pair (`key`, `value`) if there is no entry for `key`.
     /// update the value of the entry for `key` to `value` otherwise
-    public fun upsert<K: copy + drop, V: drop>(table: &mut Table<K, V>, key: K, value: V) {
+    public fun upsert<K: copy + drop, V: drop>(
+        table: &mut Table<K, V>, key: K,
+        value: V
+    ) {
         if (!contains(table, copy key)) {
             add(table, copy key, value)
         } else {
@@ -93,7 +98,10 @@ module aptos_std::table {
     }
 
     #[test_only]
-    struct TableHolder<phantom K: copy + drop, phantom V: drop> has key {
+    struct TableHolder<
+        phantom K: copy + drop,
+        phantom V: drop
+    > has key {
         t: Table<K, V>
     }
 
@@ -117,11 +125,17 @@ module aptos_std::table {
         let key: u64 = 100;
         let error_code: u64 = 1;
         assert!(!contains(&t, key), error_code);
-        assert!(*borrow_with_default(&t, key, &12) == 12, error_code);
+        assert!(
+            *borrow_with_default(&t, key, &12) == 12,
+            error_code
+        );
         add(&mut t, key, 1);
-        assert!(*borrow_with_default(&t, key, &12) == 1, error_code);
+        assert!(
+            *borrow_with_default(&t, key, &12) == 1,
+            error_code
+        );
 
-        move_to(&account, TableHolder{ t });
+        move_to(&account, TableHolder { t });
     }
 
     // ======================================================================================================
@@ -136,7 +150,10 @@ module aptos_std::table {
     // can use this to determine serialization layout.
     native fun new_table_handle<K, V>(): address;
 
-    native fun add_box<K: copy + drop, V, B>(table: &mut Table<K, V>, key: K, val: Box<V>);
+    native fun add_box<K: copy + drop, V, B>(
+        table: &mut Table<K, V>, key: K,
+        val: Box<V>
+    );
 
     native fun borrow_box<K: copy + drop, V, B>(table: &Table<K, V>, key: K): &Box<V>;
 

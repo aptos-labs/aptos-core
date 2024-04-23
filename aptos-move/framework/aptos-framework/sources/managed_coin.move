@@ -6,7 +6,12 @@ module aptos_framework::managed_coin {
     use std::error;
     use std::signer;
 
-    use aptos_framework::coin::{Self, BurnCapability, FreezeCapability, MintCapability};
+    use aptos_framework::coin::{
+        Self,
+        BurnCapability,
+        FreezeCapability,
+        MintCapability
+    };
 
     //
     // Errors
@@ -32,10 +37,7 @@ module aptos_framework::managed_coin {
     //
 
     /// Withdraw an `amount` of coin `CoinType` from `account` and burn it.
-    public entry fun burn<CoinType>(
-        account: &signer,
-        amount: u64,
-    ) acquires Capabilities {
+    public entry fun burn<CoinType>(account: &signer, amount: u64,) acquires Capabilities {
         let account_addr = signer::address_of(account);
 
         assert!(
@@ -66,11 +68,10 @@ module aptos_framework::managed_coin {
             monitor_supply,
         );
 
-        move_to(account, Capabilities<CoinType> {
-            burn_cap,
-            freeze_cap,
-            mint_cap,
-        });
+        move_to(
+            account,
+            Capabilities<CoinType> {burn_cap, freeze_cap, mint_cap,}
+        );
     }
 
     /// Create new coins `CoinType` and deposit them into dst_addr's account.
@@ -130,7 +131,10 @@ module aptos_framework::managed_coin {
             10,
             true
         );
-        assert!(coin::is_coin_initialized<FakeMoney>(), 0);
+        assert!(
+            coin::is_coin_initialized<FakeMoney>(),
+            0
+        );
 
         coin::register<FakeMoney>(&mod_account);
         register<FakeMoney>(&source);
@@ -138,24 +142,46 @@ module aptos_framework::managed_coin {
 
         mint<FakeMoney>(&mod_account, source_addr, 50);
         mint<FakeMoney>(&mod_account, destination_addr, 10);
-        assert!(coin::balance<FakeMoney>(source_addr) == 50, 1);
-        assert!(coin::balance<FakeMoney>(destination_addr) == 10, 2);
+        assert!(
+            coin::balance<FakeMoney>(source_addr) == 50,
+            1
+        );
+        assert!(
+            coin::balance<FakeMoney>(destination_addr) == 10,
+            2
+        );
 
         let supply = coin::supply<FakeMoney>();
         assert!(option::is_some(&supply), 1);
         assert!(option::extract(&mut supply) == 60, 2);
 
         coin::transfer<FakeMoney>(&source, destination_addr, 10);
-        assert!(coin::balance<FakeMoney>(source_addr) == 40, 3);
-        assert!(coin::balance<FakeMoney>(destination_addr) == 20, 4);
+        assert!(
+            coin::balance<FakeMoney>(source_addr) == 40,
+            3
+        );
+        assert!(
+            coin::balance<FakeMoney>(destination_addr) == 20,
+            4
+        );
 
-        coin::transfer<FakeMoney>(&source, signer::address_of(&mod_account), 40);
+        coin::transfer<FakeMoney>(
+            &source,
+            signer::address_of(&mod_account),
+            40
+        );
         burn<FakeMoney>(&mod_account, 40);
 
-        assert!(coin::balance<FakeMoney>(source_addr) == 0, 1);
+        assert!(
+            coin::balance<FakeMoney>(source_addr) == 0,
+            1
+        );
 
         let new_supply = coin::supply<FakeMoney>();
-        assert!(option::extract(&mut new_supply) == 20, 2);
+        assert!(
+            option::extract(&mut new_supply) == 20,
+            2
+        );
     }
 
     #[test(source = @0xa11ce, destination = @0xb0b, mod_account = @0x1)]
@@ -172,7 +198,13 @@ module aptos_framework::managed_coin {
         aptos_framework::account::create_account_for_test(signer::address_of(&mod_account));
         aggregator_factory::initialize_aggregator_factory_for_test(&mod_account);
 
-        initialize<FakeMoney>(&mod_account, b"Fake money", b"FMD", 1, true);
+        initialize<FakeMoney>(
+            &mod_account,
+            b"Fake money",
+            b"FMD",
+            1,
+            true
+        );
         coin::register<FakeMoney>(&mod_account);
         register<FakeMoney>(&source);
         register<FakeMoney>(&destination);
@@ -194,7 +226,13 @@ module aptos_framework::managed_coin {
         aptos_framework::account::create_account_for_test(signer::address_of(&mod_account));
         aggregator_factory::initialize_aggregator_factory_for_test(&mod_account);
 
-        initialize<FakeMoney>(&mod_account, b"Fake money", b"FMD", 1, true);
+        initialize<FakeMoney>(
+            &mod_account,
+            b"Fake money",
+            b"FMD",
+            1,
+            true
+        );
         coin::register<FakeMoney>(&mod_account);
         register<FakeMoney>(&source);
         register<FakeMoney>(&destination);

@@ -2,7 +2,9 @@ spec aptos_framework::dkg {
 
     spec module {
         use aptos_framework::chain_status;
-        invariant [suspendable] chain_status::is_operating() ==> exists<DKGState>(@aptos_framework);
+        invariant[suspendable] chain_status::is_operating() ==> exists<DKGState>(
+            @aptos_framework
+        );
     }
 
     spec initialize(aptos_framework: &signer) {
@@ -18,21 +20,25 @@ spec aptos_framework::dkg {
         target_validator_set: vector<ValidatorConsensusInfo>,
     ) {
         aborts_if !exists<DKGState>(@aptos_framework);
-        aborts_if !exists<timestamp::CurrentTimeMicroseconds>(@aptos_framework);
+        aborts_if !exists<
+            timestamp::CurrentTimeMicroseconds
+        >(@aptos_framework);
     }
 
     spec finish(transcript: vector<u8>) {
         use std::option;
         aborts_if !exists<DKGState>(@aptos_framework);
-        aborts_if option::is_none(global<DKGState>(@aptos_framework).in_progress);
+        aborts_if option::is_none(
+            global<DKGState>(@aptos_framework).in_progress
+        );
     }
 
     spec fun has_incomplete_session(): bool {
         if (exists<DKGState>(@aptos_framework)) {
-            option::spec_is_some(global<DKGState>(@aptos_framework).in_progress)
-        } else {
-            false
-        }
+            option::spec_is_some(
+                global<DKGState>(@aptos_framework).in_progress
+            )
+        } else { false }
     }
 
     spec try_clear_incomplete_session(fx: &signer) {

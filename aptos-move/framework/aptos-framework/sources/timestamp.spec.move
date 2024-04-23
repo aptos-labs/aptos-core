@@ -33,7 +33,9 @@ spec aptos_framework::timestamp {
         use aptos_framework::chain_status;
         /// [high-level-req-1]
         /// [high-level-req-2]
-        invariant [suspendable] chain_status::is_operating() ==> exists<CurrentTimeMicroseconds>(@aptos_framework);
+        invariant[suspendable] chain_status::is_operating() ==> exists<CurrentTimeMicroseconds>(
+            @aptos_framework
+        );
     }
 
     spec update_global_time {

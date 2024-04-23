@@ -22,7 +22,9 @@ spec aptos_framework::execution_config {
         include transaction_fee::RequiresCollectedFeesPerValueLeqBlockAptosSupply;
         requires chain_status::is_genesis();
         requires exists<stake::ValidatorFees>(@aptos_framework);
-        requires exists<staking_config::StakingRewardsConfig>(@aptos_framework);
+        requires exists<
+            staking_config::StakingRewardsConfig
+        >(@aptos_framework);
         requires len(config) > 0;
         include features::spec_periodical_reward_rate_decrease_enabled() ==> staking_config::StakingRewardsConfigEnabledRequirement;
         include aptos_coin::ExistsAptosCoin;

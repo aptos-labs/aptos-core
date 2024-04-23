@@ -1,2 +1,1 @@
-spec aptos_std::ristretto255_elgamal {
-}
+spec aptos_std::ristretto255_elgamal {}

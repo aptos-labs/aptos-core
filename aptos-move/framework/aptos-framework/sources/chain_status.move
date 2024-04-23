@@ -38,11 +38,17 @@ module aptos_framework::chain_status {
 
     /// Helper function to assert operating (not genesis) state.
     public fun assert_operating() {
-        assert!(is_operating(), error::invalid_state(ENOT_OPERATING));
+        assert!(
+            is_operating(),
+            error::invalid_state(ENOT_OPERATING)
+        );
     }
 
     /// Helper function to assert genesis state.
     public fun assert_genesis() {
-        assert!(is_genesis(), error::invalid_state(ENOT_OPERATING));
+        assert!(
+            is_genesis(),
+            error::invalid_state(ENOT_OPERATING)
+        );
     }
 }

@@ -20,20 +20,18 @@ module aptos_framework::guid {
     const EGUID_GENERATOR_NOT_PUBLISHED: u64 = 0;
 
     /// Create and return a new GUID from a trusted module.
-    public(friend) fun create(addr: address, creation_num_ref: &mut u64): GUID {
+    public(friend) fun create(
+        addr: address,
+        creation_num_ref: &mut u64
+    ): GUID {
         let creation_num = *creation_num_ref;
         *creation_num_ref = creation_num + 1;
-        GUID {
-            id: ID {
-                creation_num,
-                addr,
-            }
-        }
+        GUID {id: ID {creation_num, addr,}}
     }
 
     /// Create a non-privileged id from `addr` and `creation_num`
     public fun create_id(addr: address, creation_num: u64): ID {
-        ID { creation_num, addr }
+        ID {creation_num, addr}
     }
 
     /// Get the non-privileged ID associated with a GUID

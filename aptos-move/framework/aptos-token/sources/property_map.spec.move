@@ -4,10 +4,10 @@ spec aptos_token::property_map {
         pragma aborts_if_is_strict;
 
         let MAX_PROPERTY_MAP_SIZE = 1000;
-        let MAX_PROPERTY_NAME_LENGTH  = 128;
+        let MAX_PROPERTY_NAME_LENGTH = 128;
     }
 
-    spec new (
+    spec new(
         keys: vector<String>,
         values: vector<vector<u8>>,
         types: vector<String>
@@ -21,7 +21,7 @@ spec aptos_token::property_map {
         aborts_if !(length == vector::length(types));
     }
 
-    spec new_with_key_and_property_value (
+    spec new_with_key_and_property_value(
         keys: vector<String>,
         values: vector<PropertyValue>
     ): PropertyMap {
@@ -40,12 +40,21 @@ spec aptos_token::property_map {
         aborts_if false;
     }
 
-    spec add(map: &mut PropertyMap, key: String, value: PropertyValue) {
+    spec add(
+        map: &mut PropertyMap, key: String,
+        value: PropertyValue
+    ) {
         use aptos_framework::simple_map;
 
-        aborts_if !(string::length(key) <= MAX_PROPERTY_NAME_LENGTH);
-        aborts_if !(!simple_map::spec_contains_key(map.map, key));
-        aborts_if !(simple_map::spec_len(map.map) < MAX_PROPERTY_MAP_SIZE);
+        aborts_if !(
+            string::length(key) <= MAX_PROPERTY_NAME_LENGTH
+        );
+        aborts_if !(
+            !simple_map::spec_contains_key(map.map, key)
+        );
+        aborts_if !(
+            simple_map::spec_len(map.map) < MAX_PROPERTY_MAP_SIZE
+        );
     }
 
     spec length(map: &PropertyMap): u64 {
@@ -84,9 +93,7 @@ spec aptos_token::property_map {
         aborts_if !aptos_std::from_bcs::deserializable<String>(prop.value);
     }
 
-    spec fun spec_utf8(bytes: vector<u8>): String {
-        String{bytes}
-    }
+    spec fun spec_utf8(bytes: vector<u8>): String {String { bytes }}
 
     spec read_u8(map: &PropertyMap, key: &String): u8 {
         use std::string;
@@ -156,14 +163,11 @@ spec aptos_token::property_map {
         aborts_if false;
     }
 
-    spec remove (
-        map: &mut PropertyMap,
-        key: &String
-    ): (String, PropertyValue) {
+    spec remove(map: &mut PropertyMap, key: &String): (String, PropertyValue) {
         aborts_if !simple_map::spec_contains_key(map.map, key);
     }
 
-    spec update_property_map (
+    spec update_property_map(
         map: &mut PropertyMap,
         keys: vector<String>,
         values: vector<vector<u8>>,
@@ -178,59 +182,48 @@ spec aptos_token::property_map {
         aborts_if !(key_len == typ_len);
     }
 
-    spec update_property_value (
-        map: &mut PropertyMap,
-        key: &String,
+    spec update_property_value(
+        map: &mut PropertyMap, key: &String,
         value: PropertyValue
     ) {
         aborts_if !simple_map::spec_contains_key(map.map, key);
     }
 
-    spec create_property_value_raw (
-        value: vector<u8>,
-        type: String
-    ): PropertyValue {
+    spec create_property_value_raw(value: vector<u8>, type: String): PropertyValue {
         aborts_if false;
     }
 
     /// Abort according to the code
     spec create_property_value<T: copy>(data: &T): PropertyValue {
-        use aptos_std::type_info::{type_name};
+        use aptos_std::type_info::{ type_name };
 
         let name = type_name<T>();
         aborts_if !string::spec_internal_check_utf8(b"bool");
 
-        aborts_if name != spec_utf8(b"bool") &&
-            !string::spec_internal_check_utf8(b"u8");
+        aborts_if name != spec_utf8(b"bool") && !string::spec_internal_check_utf8(b"u8");
 
-        aborts_if name != spec_utf8(b"bool") &&
-            name != spec_utf8(b"u8") &&
-            !string::spec_internal_check_utf8(b"u64");
+        aborts_if name != spec_utf8(b"bool") && name != spec_utf8(b"u8") && !string::spec_internal_check_utf8(
+            b"u64"
+        );
 
-        aborts_if name != spec_utf8(b"bool") &&
-            name != spec_utf8(b"u8") &&
-            name != spec_utf8(b"u64") &&
-            !string::spec_internal_check_utf8(b"u128");
+        aborts_if name != spec_utf8(b"bool") && name != spec_utf8(b"u8") && name != spec_utf8(
+            b"u64"
+        ) && !string::spec_internal_check_utf8(b"u128");
 
-        aborts_if name != spec_utf8(b"bool") &&
-            name != spec_utf8(b"u8") &&
-            name != spec_utf8(b"u64") &&
-            name != spec_utf8(b"u128") &&
-            !string::spec_internal_check_utf8(b"address");
+        aborts_if name != spec_utf8(b"bool") && name != spec_utf8(b"u8") && name != spec_utf8(
+            b"u64"
+        ) && name != spec_utf8(b"u128") && !string::spec_internal_check_utf8(b"address");
 
-        aborts_if name != spec_utf8(b"bool") &&
-            name != spec_utf8(b"u8") &&
-            name != spec_utf8(b"u64") &&
-            name != spec_utf8(b"u128") &&
-            name != spec_utf8(b"address") &&
-            !string::spec_internal_check_utf8(b"0x1::string::String");
+        aborts_if name != spec_utf8(b"bool") && name != spec_utf8(b"u8") && name != spec_utf8(
+            b"u64"
+        ) && name != spec_utf8(b"u128") && name != spec_utf8(b"address") && !string::spec_internal_check_utf8(
+            b"0x1::string::String"
+        );
 
-        aborts_if name != spec_utf8(b"bool") &&
-            name != spec_utf8(b"u8") &&
-            name != spec_utf8(b"u64") &&
-            name != spec_utf8(b"u128") &&
-            name != spec_utf8(b"address") &&
-            name != spec_utf8(b"0x1::string::String") &&
-            !string::spec_internal_check_utf8(b"vector<u8>");
+        aborts_if name != spec_utf8(b"bool") && name != spec_utf8(b"u8") && name != spec_utf8(
+            b"u64"
+        ) && name != spec_utf8(b"u128") && name != spec_utf8(b"address") && name != spec_utf8(
+            b"0x1::string::String"
+        ) && !string::spec_internal_check_utf8(b"vector<u8>");
     }
 }

@@ -12,7 +12,9 @@ module aptos_std::fixed_point64 {
     /// floating-point has less than 16 decimal digits of precision, so
     /// be careful about using floating-point to convert these values to
     /// decimal.
-    struct FixedPoint64 has copy, drop, store { value: u128 }
+    struct FixedPoint64 has copy, drop, store {
+        value: u128
+    }
 
     const MAX_U128: u256 = 340282366920938463463374607431768211455;
 
@@ -36,6 +38,7 @@ module aptos_std::fixed_point64 {
         assert!(x_raw >= y_raw, ENEGATIVE_RESULT);
         create_from_raw_value(x_raw - y_raw)
     }
+
     spec sub {
         pragma opaque;
         aborts_if x.value < y.value with ENEGATIVE_RESULT;
@@ -47,9 +50,13 @@ module aptos_std::fixed_point64 {
         let x_raw = get_raw_value(x);
         let y_raw = get_raw_value(y);
         let result = (x_raw as u256) + (y_raw as u256);
-        assert!(result <= MAX_U128, ERATIO_OUT_OF_RANGE);
+        assert!(
+            result <= MAX_U128,
+            ERATIO_OUT_OF_RANGE
+        );
         create_from_raw_value((result as u128))
     }
+
     spec add {
         pragma opaque;
         aborts_if (x.value as u256) + (y.value as u256) > MAX_U128 with ERATIO_OUT_OF_RANGE;
@@ -71,19 +78,21 @@ module aptos_std::fixed_point64 {
         assert!(product <= MAX_U128, EMULTIPLICATION);
         (product as u128)
     }
+
     spec multiply_u128 {
         pragma opaque;
         include MultiplyAbortsIf;
         ensures result == spec_multiply_u128(val, multiplier);
     }
+
     spec schema MultiplyAbortsIf {
         val: num;
         multiplier: FixedPoint64;
         aborts_if spec_multiply_u128(val, multiplier) > MAX_U128 with EMULTIPLICATION;
     }
-    spec fun spec_multiply_u128(val: num, multiplier: FixedPoint64): num {
-        (val * multiplier.value) >> 64
-    }
+
+    spec fun spec_multiply_u128(val: num, multiplier: FixedPoint64): num {(val * multiplier.value) >>
+            64}
 
     /// Divide a u128 integer by a fixed-point number, truncating any
     /// fractional part of the quotient. This will abort if the divisor
@@ -101,20 +110,21 @@ module aptos_std::fixed_point64 {
         // with an arithmetic error.
         (quotient as u128)
     }
+
     spec divide_u128 {
         pragma opaque;
         include DivideAbortsIf;
         ensures result == spec_divide_u128(val, divisor);
     }
+
     spec schema DivideAbortsIf {
         val: num;
         divisor: FixedPoint64;
         aborts_if divisor.value == 0 with EDIVISION_BY_ZERO;
         aborts_if spec_divide_u128(val, divisor) > MAX_U128 with EDIVISION;
     }
-    spec fun spec_divide_u128(val: num, divisor: FixedPoint64): num {
-        (val << 64) / divisor.value
-    }
+
+    spec fun spec_divide_u128(val: num, divisor: FixedPoint64): num {(val << 64) / divisor.value}
 
     /// Create a fixed-point value from a rational number specified by its
     /// numerator and denominator. Calling this function should be preferred
@@ -133,36 +143,48 @@ module aptos_std::fixed_point64 {
         let scaled_numerator = (numerator as u256) << 64;
         assert!(denominator != 0, EDENOMINATOR);
         let quotient = scaled_numerator / (denominator as u256);
-        assert!(quotient != 0 || numerator == 0, ERATIO_OUT_OF_RANGE);
+        assert!(
+            quotient != 0 || numerator == 0,
+            ERATIO_OUT_OF_RANGE
+        );
         // Return the quotient as a fixed-point number. We first need to check whether the cast
         // can succeed.
-        assert!(quotient <= MAX_U128, ERATIO_OUT_OF_RANGE);
-        FixedPoint64 { value: (quotient as u128) }
+        assert!(
+            quotient <= MAX_U128,
+            ERATIO_OUT_OF_RANGE
+        );
+        FixedPoint64 {value: (quotient as u128)}
     }
+
     spec create_from_rational {
         pragma opaque;
         pragma verify_duration_estimate = 1000; // TODO: set because of timeout (property proved).
         include CreateFromRationalAbortsIf;
         ensures result == spec_create_from_rational(numerator, denominator);
     }
+
     spec schema CreateFromRationalAbortsIf {
         numerator: u128;
         denominator: u128;
-        let scaled_numerator = (numerator as u256)<< 64;
+        let scaled_numerator = (numerator as u256) << 64;
         let scaled_denominator = (denominator as u256);
         let quotient = scaled_numerator / scaled_denominator;
         aborts_if scaled_denominator == 0 with EDENOMINATOR;
         aborts_if quotient == 0 && scaled_numerator != 0 with ERATIO_OUT_OF_RANGE;
         aborts_if quotient > MAX_U128 with ERATIO_OUT_OF_RANGE;
     }
+
     spec fun spec_create_from_rational(numerator: num, denominator: num): FixedPoint64 {
-        FixedPoint64{value: (numerator << 128) / (denominator << 64)}
+        FixedPoint64 {
+            value: (numerator << 128) / (denominator << 64)
+        }
     }
 
     /// Create a fixedpoint value from a raw value.
     public fun create_from_raw_value(value: u128): FixedPoint64 {
         FixedPoint64 { value }
     }
+
     spec create_from_raw_value {
         pragma opaque;
         aborts_if false;
@@ -182,168 +204,219 @@ module aptos_std::fixed_point64 {
     }
 
     /// Returns the smaller of the two FixedPoint64 numbers.
-    public fun min(num1: FixedPoint64, num2: FixedPoint64): FixedPoint64 {
-        if (num1.value < num2.value) {
-            num1
-        } else {
-            num2
-        }
+    public fun min(
+        num1: FixedPoint64,
+        num2: FixedPoint64
+    ): FixedPoint64 {
+        if (num1.value < num2.value) { num1 } else { num2 }
     }
+
     spec min {
         pragma opaque;
         aborts_if false;
         ensures result == spec_min(num1, num2);
     }
-    spec fun spec_min(num1: FixedPoint64, num2: FixedPoint64): FixedPoint64 {
-        if (num1.value < num2.value) {
-            num1
-        } else {
-            num2
-        }
+
+    spec fun spec_min(
+        num1: FixedPoint64,
+        num2: FixedPoint64
+    ): FixedPoint64 {
+        if (num1.value < num2.value) { num1 } else { num2 }
     }
 
     /// Returns the larger of the two FixedPoint64 numbers.
-    public fun max(num1: FixedPoint64, num2: FixedPoint64): FixedPoint64 {
-        if (num1.value > num2.value) {
-            num1
-        } else {
-            num2
-        }
+    public fun max(
+        num1: FixedPoint64,
+        num2: FixedPoint64
+    ): FixedPoint64 {
+        if (num1.value > num2.value) { num1 } else { num2 }
     }
+
     spec max {
         pragma opaque;
         aborts_if false;
         ensures result == spec_max(num1, num2);
     }
-    spec fun spec_max(num1: FixedPoint64, num2: FixedPoint64): FixedPoint64 {
-        if (num1.value > num2.value) {
-            num1
-        } else {
-            num2
-        }
+
+    spec fun spec_max(
+        num1: FixedPoint64,
+        num2: FixedPoint64
+    ): FixedPoint64 {
+        if (num1.value > num2.value) { num1 } else { num2 }
     }
 
     /// Returns true if num1 <= num2
-    public fun less_or_equal(num1: FixedPoint64, num2: FixedPoint64): bool {
+    public fun less_or_equal(
+        num1: FixedPoint64,
+        num2: FixedPoint64
+    ): bool {
         num1.value <= num2.value
     }
+
     spec less_or_equal {
         pragma opaque;
         aborts_if false;
         ensures result == spec_less_or_equal(num1, num2);
     }
-    spec fun spec_less_or_equal(num1: FixedPoint64, num2: FixedPoint64): bool {
-        num1.value <= num2.value
-    }
+
+    spec fun spec_less_or_equal(
+        num1: FixedPoint64,
+        num2: FixedPoint64
+    ): bool {num1.value <= num2.value}
 
     /// Returns true if num1 < num2
-    public fun less(num1: FixedPoint64, num2: FixedPoint64): bool {
+    public fun less(
+        num1: FixedPoint64,
+        num2: FixedPoint64
+    ): bool {
         num1.value < num2.value
     }
+
     spec less {
         pragma opaque;
         aborts_if false;
         ensures result == spec_less(num1, num2);
     }
-    spec fun spec_less(num1: FixedPoint64, num2: FixedPoint64): bool {
-        num1.value < num2.value
-    }
+
+    spec fun spec_less(
+        num1: FixedPoint64,
+        num2: FixedPoint64
+    ): bool {num1.value < num2.value}
 
     /// Returns true if num1 >= num2
-    public fun greater_or_equal(num1: FixedPoint64, num2: FixedPoint64): bool {
+    public fun greater_or_equal(
+        num1: FixedPoint64,
+        num2: FixedPoint64
+    ): bool {
         num1.value >= num2.value
     }
+
     spec greater_or_equal {
         pragma opaque;
         aborts_if false;
         ensures result == spec_greater_or_equal(num1, num2);
     }
-    spec fun spec_greater_or_equal(num1: FixedPoint64, num2: FixedPoint64): bool {
-        num1.value >= num2.value
-    }
+
+    spec fun spec_greater_or_equal(
+        num1: FixedPoint64,
+        num2: FixedPoint64
+    ): bool {num1.value >= num2.value}
 
     /// Returns true if num1 > num2
-    public fun greater(num1: FixedPoint64, num2: FixedPoint64): bool {
+    public fun greater(
+        num1: FixedPoint64,
+        num2: FixedPoint64
+    ): bool {
         num1.value > num2.value
     }
+
     spec greater {
         pragma opaque;
         aborts_if false;
         ensures result == spec_greater(num1, num2);
     }
-    spec fun spec_greater(num1: FixedPoint64, num2: FixedPoint64): bool {
-        num1.value > num2.value
-    }
+
+    spec fun spec_greater(
+        num1: FixedPoint64,
+        num2: FixedPoint64
+    ): bool {num1.value > num2.value}
 
     /// Returns true if num1 = num2
-    public fun equal(num1: FixedPoint64, num2: FixedPoint64): bool {
+    public fun equal(
+        num1: FixedPoint64,
+        num2: FixedPoint64
+    ): bool {
         num1.value == num2.value
     }
+
     spec equal {
         pragma opaque;
         aborts_if false;
         ensures result == spec_equal(num1, num2);
     }
-    spec fun spec_equal(num1: FixedPoint64, num2: FixedPoint64): bool {
-        num1.value == num2.value
-    }
+
+    spec fun spec_equal(
+        num1: FixedPoint64,
+        num2: FixedPoint64
+    ): bool {num1.value == num2.value}
 
     /// Returns true if num1 almost equals to num2, which means abs(num1-num2) <= precision
-    public fun almost_equal(num1: FixedPoint64, num2: FixedPoint64, precision: FixedPoint64): bool {
+    public fun almost_equal(
+        num1: FixedPoint64,
+        num2: FixedPoint64,
+        precision: FixedPoint64
+    ): bool {
         if (num1.value > num2.value) {
-            (num1.value - num2.value <= precision.value)
+            (
+                num1.value - num2.value <= precision.value
+            )
         } else {
-            (num2.value - num1.value <= precision.value)
+            (
+                num2.value - num1.value <= precision.value
+            )
         }
     }
+
     spec almost_equal {
         pragma opaque;
         aborts_if false;
         ensures result == spec_almost_equal(num1, num2, precision);
     }
-    spec fun spec_almost_equal(num1: FixedPoint64, num2: FixedPoint64, precision: FixedPoint64): bool {
+
+    spec fun spec_almost_equal(
+        num1: FixedPoint64,
+        num2: FixedPoint64,
+        precision: FixedPoint64
+    ): bool {
         if (num1.value > num2.value) {
-            (num1.value - num2.value <= precision.value)
+            (
+                num1.value - num2.value <= precision.value
+            )
         } else {
-            (num2.value - num1.value <= precision.value)
+            (
+                num2.value - num1.value <= precision.value
+            )
         }
     }
+
     /// Create a fixedpoint value from a u128 value.
     public fun create_from_u128(val: u128): FixedPoint64 {
         let value = (val as u256) << 64;
-        assert!(value <= MAX_U128, ERATIO_OUT_OF_RANGE);
+        assert!(
+            value <= MAX_U128,
+            ERATIO_OUT_OF_RANGE
+        );
         FixedPoint64 {value: (value as u128)}
     }
+
     spec create_from_u128 {
         pragma opaque;
         include CreateFromU64AbortsIf;
         ensures result == spec_create_from_u128(val);
     }
+
     spec schema CreateFromU64AbortsIf {
         val: num;
         let scaled_value = (val as u256) << 64;
         aborts_if scaled_value > MAX_U128;
     }
-    spec fun spec_create_from_u128(val: num): FixedPoint64 {
-        FixedPoint64 {value: val << 64}
-    }
+
+    spec fun spec_create_from_u128(val: num): FixedPoint64 {FixedPoint64 {value: val << 64}}
 
     /// Returns the largest integer less than or equal to a given number.
     public fun floor(num: FixedPoint64): u128 {
         num.value >> 64
     }
+
     spec floor {
         pragma opaque;
         aborts_if false;
         ensures result == spec_floor(num);
     }
+
     spec fun spec_floor(val: FixedPoint64): u128 {
         let fractional = val.value % (1 << 64);
-        if (fractional == 0) {
-            val.value >> 64
-        } else {
-            (val.value - fractional) >> 64
-        }
+        if (fractional == 0) {val.value >> 64} else {(val.value - fractional) >> 64}
     }
 
     /// Rounds up the given FixedPoint64 to the next largest integer.
@@ -355,6 +428,7 @@ module aptos_std::fixed_point64 {
         let val = ((floored_num as u256) + (1 << 64));
         (val >> 64 as u128)
     }
+
     spec ceil {
         // TODO: set because of timeout (property proved).
         pragma verify_duration_estimate = 1000;
@@ -362,14 +436,11 @@ module aptos_std::fixed_point64 {
         aborts_if false;
         ensures result == spec_ceil(num);
     }
+
     spec fun spec_ceil(val: FixedPoint64): u128 {
         let fractional = val.value % (1 << 64);
         let one = 1 << 64;
-        if (fractional == 0) {
-            val.value >> 64
-        } else {
-            (val.value - fractional + one) >> 64
-        }
+        if (fractional == 0) {val.value >> 64} else {(val.value - fractional + one) >> 64}
     }
 
     /// Returns the value of a FixedPoint64 to the nearest integer.
@@ -382,25 +453,25 @@ module aptos_std::fixed_point64 {
             ceil(num)
         }
     }
+
     spec round {
         pragma opaque;
         aborts_if false;
         ensures result == spec_round(num);
     }
+
     spec fun spec_round(val: FixedPoint64): u128 {
         let fractional = val.value % (1 << 64);
         let boundary = (1 << 64) / 2;
         let one = 1 << 64;
-        if (fractional < boundary) {
-            (val.value - fractional) >> 64
-        } else {
-            (val.value - fractional + one) >> 64
+        if (fractional < boundary) {(val.value - fractional) >> 64} else {(val.value - fractional + one) >> 64
         }
     }
 
     // **************** SPECIFICATIONS ****************
 
-    spec module {} // switch documentation context to module level
+    spec module {
+    } // switch documentation context to module level
 
     spec module {
         pragma aborts_if_is_strict;
@@ -413,7 +484,13 @@ module aptos_std::fixed_point64 {
         let result = sub(x, y);
         // 9/7 - 1/3 = 20/21
         let expected_result = create_from_rational(20, 21);
-        assert_approx_the_same((get_raw_value(result) as u256), (get_raw_value(expected_result) as u256), 16);
+        assert_approx_the_same(
+            (get_raw_value(result) as u256),
+            (
+                get_raw_value(expected_result) as u256
+            ),
+            16
+        );
     }
 
     #[test]

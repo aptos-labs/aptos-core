@@ -53,7 +53,10 @@ spec aptos_framework::version {
     }
 
     /// Abort if resource already exists in `@aptos_framwork` when initializing.
-    spec initialize(aptos_framework: &signer, initial_version: u64) {
+    spec initialize(
+        aptos_framework: &signer,
+        initial_version: u64
+    ) {
         use std::signer;
 
         /// [high-level-req-1]
@@ -62,7 +65,7 @@ spec aptos_framework::version {
         aborts_if exists<SetVersionCapability>(@aptos_framework);
         ensures exists<Version>(@aptos_framework);
         ensures exists<SetVersionCapability>(@aptos_framework);
-        ensures global<Version>(@aptos_framework) == Version { major: initial_version };
+        ensures global<Version>(@aptos_framework) == Version {major: initial_version};
         ensures global<SetVersionCapability>(@aptos_framework) == SetVersionCapability {};
     }
 

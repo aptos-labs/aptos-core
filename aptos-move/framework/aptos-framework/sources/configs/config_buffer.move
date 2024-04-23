@@ -36,9 +36,10 @@ module aptos_framework::config_buffer {
     public fun initialize(aptos_framework: &signer) {
         system_addresses::assert_aptos_framework(aptos_framework);
         if (!exists<PendingConfigs>(@aptos_framework)) {
-            move_to(aptos_framework, PendingConfigs {
-                configs: simple_map::new(),
-            })
+            move_to(
+                aptos_framework,
+                PendingConfigs {configs: simple_map::new(),}
+            )
         }
     }
 
@@ -46,10 +47,11 @@ module aptos_framework::config_buffer {
     public fun does_exist<T: store>(): bool acquires PendingConfigs {
         if (exists<PendingConfigs>(@aptos_framework)) {
             let config = borrow_global<PendingConfigs>(@aptos_framework);
-            simple_map::contains_key(&config.configs, &type_info::type_name<T>())
-        } else {
-            false
-        }
+            simple_map::contains_key(
+                &config.configs,
+                &type_info::type_name<T>()
+            )
+        } else { false }
     }
 
     /// Upsert an on-chain config to the buffer for the next epoch.
@@ -85,14 +87,14 @@ module aptos_framework::config_buffer {
         assert!(!does_exist<DummyConfig>(), 1);
 
         // Insert should work.
-        upsert(DummyConfig { data: 888 });
+        upsert(DummyConfig {data: 888});
         assert!(does_exist<DummyConfig>(), 1);
 
         // Update and extract should work.
-        upsert(DummyConfig { data: 999 });
+        upsert(DummyConfig {data: 999});
         assert!(does_exist<DummyConfig>(), 1);
         let config = extract<DummyConfig>();
-        assert!(config == DummyConfig { data: 999 }, 1);
+        assert!(config == DummyConfig {data: 999}, 1);
         assert!(!does_exist<DummyConfig>(), 1);
     }
 }

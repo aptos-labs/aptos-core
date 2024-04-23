@@ -24,10 +24,7 @@ module aptos_framework::optional_aggregator {
 
     /// Creates a new integer which overflows on exceeding a `limit`.
     fun new_integer(limit: u128): Integer {
-        Integer {
-            value: 0,
-            limit,
-        }
+        Integer {value: 0, limit,}
     }
 
     /// Adds `value` to integer. Aborts on overflowing the limit.
@@ -41,7 +38,10 @@ module aptos_framework::optional_aggregator {
 
     /// Subtracts `value` from integer. Aborts on going below zero.
     fun sub_integer(integer: &mut Integer, value: u128) {
-        assert!(value <= integer.value, error::out_of_range(EAGGREGATOR_UNDERFLOW));
+        assert!(
+            value <= integer.value,
+            error::out_of_range(EAGGREGATOR_UNDERFLOW)
+        );
         integer.value = integer.value - value;
     }
 
@@ -57,7 +57,7 @@ module aptos_framework::optional_aggregator {
 
     /// Destroys an integer.
     fun destroy_integer(integer: Integer) {
-        let Integer { value: _, limit: _ } = integer;
+        let Integer {value: _, limit: _} = integer;
     }
 
     /// Contains either an aggregator or a normal integer, both overflowing on limit.
@@ -72,7 +72,9 @@ module aptos_framework::optional_aggregator {
     public(friend) fun new(limit: u128, parallelizable: bool): OptionalAggregator {
         if (parallelizable) {
             OptionalAggregator {
-                aggregator: option::some(aggregator_factory::create_aggregator_internal(limit)),
+                aggregator: option::some(
+                    aggregator_factory::create_aggregator_internal(limit)
+                ),
                 integer: option::none(),
             }
         } else {
@@ -84,7 +86,9 @@ module aptos_framework::optional_aggregator {
     }
 
     /// Switches between parallelizable and non-parallelizable implementations.
-    public fun switch(optional_aggregator: &mut OptionalAggregator) {
+    public fun switch(
+        optional_aggregator: &mut OptionalAggregator
+    ) {
         let value = read(optional_aggregator);
         switch_and_zero_out(optional_aggregator);
         add(optional_aggregator, value);
@@ -92,7 +96,9 @@ module aptos_framework::optional_aggregator {
 
     /// Switches between parallelizable and non-parallelizable implementations, setting
     /// the value of the new optional aggregator to zero.
-    fun switch_and_zero_out(optional_aggregator: &mut OptionalAggregator) {
+    fun switch_and_zero_out(
+        optional_aggregator: &mut OptionalAggregator
+    ) {
         if (is_parallelizable(optional_aggregator)) {
             switch_to_integer_and_zero_out(optional_aggregator);
         } else {
@@ -105,11 +111,16 @@ module aptos_framework::optional_aggregator {
     fun switch_to_integer_and_zero_out(
         optional_aggregator: &mut OptionalAggregator
     ): u128 {
-        let aggregator = option::extract(&mut optional_aggregator.aggregator);
+        let aggregator = option::extract(
+            &mut optional_aggregator.aggregator
+        );
         let limit = aggregator::limit(&aggregator);
         aggregator::destroy(aggregator);
         let integer = new_integer(limit);
-        option::fill(&mut optional_aggregator.integer, integer);
+        option::fill(
+            &mut optional_aggregator.integer,
+            integer
+        );
         limit
     }
 
@@ -122,12 +133,17 @@ module aptos_framework::optional_aggregator {
         let limit = limit(&integer);
         destroy_integer(integer);
         let aggregator = aggregator_factory::create_aggregator_internal(limit);
-        option::fill(&mut optional_aggregator.aggregator, aggregator);
+        option::fill(
+            &mut optional_aggregator.aggregator,
+            aggregator
+        );
         limit
     }
 
     /// Destroys optional aggregator.
-    public fun destroy(optional_aggregator: OptionalAggregator) {
+    public fun destroy(
+        optional_aggregator: OptionalAggregator
+    ) {
         if (is_parallelizable(&optional_aggregator)) {
             destroy_optional_aggregator(optional_aggregator);
         } else {
@@ -136,8 +152,10 @@ module aptos_framework::optional_aggregator {
     }
 
     /// Destroys parallelizable optional aggregator and returns its limit.
-    fun destroy_optional_aggregator(optional_aggregator: OptionalAggregator): u128 {
-        let OptionalAggregator { aggregator, integer } = optional_aggregator;
+    fun destroy_optional_aggregator(
+        optional_aggregator: OptionalAggregator
+    ): u128 {
+        let OptionalAggregator {aggregator, integer} = optional_aggregator;
         let limit = aggregator::limit(option::borrow(&aggregator));
         aggregator::destroy(option::destroy_some(aggregator));
         option::destroy_none(integer);
@@ -145,8 +163,10 @@ module aptos_framework::optional_aggregator {
     }
 
     /// Destroys non-parallelizable optional aggregator and returns its limit.
-    fun destroy_optional_integer(optional_aggregator: OptionalAggregator): u128 {
-        let OptionalAggregator { aggregator, integer } = optional_aggregator;
+    fun destroy_optional_integer(
+        optional_aggregator: OptionalAggregator
+    ): u128 {
+        let OptionalAggregator {aggregator, integer} = optional_aggregator;
         let limit = limit(option::borrow(&integer));
         destroy_integer(option::destroy_some(integer));
         option::destroy_none(aggregator);
@@ -154,9 +174,14 @@ module aptos_framework::optional_aggregator {
     }
 
     /// Adds `value` to optional aggregator, aborting on exceeding the `limit`.
-    public fun add(optional_aggregator: &mut OptionalAggregator, value: u128) {
+    public fun add(
+        optional_aggregator: &mut OptionalAggregator,
+        value: u128
+    ) {
         if (option::is_some(&optional_aggregator.aggregator)) {
-            let aggregator = option::borrow_mut(&mut optional_aggregator.aggregator);
+            let aggregator = option::borrow_mut(
+                &mut optional_aggregator.aggregator
+            );
             aggregator::add(aggregator, value);
         } else {
             let integer = option::borrow_mut(&mut optional_aggregator.integer);
@@ -165,9 +190,14 @@ module aptos_framework::optional_aggregator {
     }
 
     /// Subtracts `value` from optional aggregator, aborting on going below zero.
-    public fun sub(optional_aggregator: &mut OptionalAggregator, value: u128) {
+    public fun sub(
+        optional_aggregator: &mut OptionalAggregator,
+        value: u128
+    ) {
         if (option::is_some(&optional_aggregator.aggregator)) {
-            let aggregator = option::borrow_mut(&mut optional_aggregator.aggregator);
+            let aggregator = option::borrow_mut(
+                &mut optional_aggregator.aggregator
+            );
             aggregator::sub(aggregator, value);
         } else {
             let integer = option::borrow_mut(&mut optional_aggregator.integer);
@@ -176,7 +206,9 @@ module aptos_framework::optional_aggregator {
     }
 
     /// Returns the value stored in optional aggregator.
-    public fun read(optional_aggregator: &OptionalAggregator): u128 {
+    public fun read(
+        optional_aggregator: &OptionalAggregator
+    ): u128 {
         if (option::is_some(&optional_aggregator.aggregator)) {
             let aggregator = option::borrow(&optional_aggregator.aggregator);
             aggregator::read(aggregator)
@@ -187,7 +219,9 @@ module aptos_framework::optional_aggregator {
     }
 
     /// Returns true if optional aggregator uses parallelizable implementation.
-    public fun is_parallelizable(optional_aggregator: &OptionalAggregator): bool {
+    public fun is_parallelizable(
+        optional_aggregator: &OptionalAggregator
+    ): bool {
         option::is_some(&optional_aggregator.aggregator)
     }
 
@@ -236,10 +270,16 @@ module aptos_framework::optional_aggregator {
         destroy(aggregator);
 
         let aggregator = new(12, false);
-        assert!(destroy_optional_integer(aggregator) == 12, 0);
+        assert!(
+            destroy_optional_integer(aggregator) == 12,
+            0
+        );
 
         let aggregator = new(21, true);
-        assert!(destroy_optional_aggregator(aggregator) == 21, 0);
+        assert!(
+            destroy_optional_aggregator(aggregator) == 21,
+            0
+        );
     }
 
     #[test(account = @aptos_framework)]

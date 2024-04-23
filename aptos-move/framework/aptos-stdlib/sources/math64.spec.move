@@ -19,9 +19,9 @@ spec aptos_std::math64 {
     }
 
     spec clamp(x: u64, lower: u64, upper: u64): u64 {
-        requires (lower <= upper);
+        requires(lower <= upper);
         aborts_if false;
-        ensures (lower <=x && x <= upper) ==> result == x;
+        ensures (lower <= x && x <= upper) ==> result == x;
         ensures (x < lower) ==> result == lower;
         ensures (upper < x) ==> result == upper;
     }
@@ -39,22 +39,17 @@ spec aptos_std::math64 {
         pragma opaque;
         aborts_if [abstract] x == 0;
         ensures [abstract] spec_pow(2, result) <= x;
-        ensures [abstract] x < spec_pow(2, result+1);
+        ensures [abstract] x < spec_pow(2, result + 1);
     }
 
     spec sqrt(x: u64): u64 {
         pragma opaque;
         aborts_if [abstract] false;
         ensures [abstract] x > 0 ==> result * result <= x;
-        ensures [abstract] x > 0 ==> x < (result+1) * (result+1);
+        ensures [abstract] x > 0 ==> x <(result + 1) * (result + 1);
     }
 
     spec fun spec_pow(n: u64, e: u64): u64 {
-        if (e == 0) {
-            1
-        }
-        else {
-            n * spec_pow(n, e-1)
-        }
+        if (e == 0) { 1 } else {n * spec_pow(n, e - 1)}
     }
 }

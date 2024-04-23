@@ -13,9 +13,7 @@ spec aptos_framework::config_buffer {
         if (exists<PendingConfigs>(@aptos_framework)) {
             let config = global<PendingConfigs>(@aptos_framework);
             simple_map::spec_contains_key(config.configs, type_name)
-        } else {
-            false
-        }
+        } else { false }
     }
 
     spec upsert<T: drop + store>(config: T) {

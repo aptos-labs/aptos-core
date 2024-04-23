@@ -24,13 +24,22 @@ module aptos_framework::version {
 
     /// Only called during genesis.
     /// Publishes the Version config.
-    public(friend) fun initialize(aptos_framework: &signer, initial_version: u64) {
+    public(friend) fun initialize(
+        aptos_framework: &signer,
+        initial_version: u64
+    ) {
         system_addresses::assert_aptos_framework(aptos_framework);
 
-        move_to(aptos_framework, Version { major: initial_version });
+        move_to(
+            aptos_framework,
+            Version {major: initial_version}
+        );
         // Give aptos framework account capability to call set version. This allows on chain governance to do it through
         // control of the aptos framework account.
-        move_to(aptos_framework, SetVersionCapability {});
+        move_to(
+            aptos_framework,
+            SetVersionCapability {}
+        );
     }
 
     /// Deprecated by `set_for_next_epoch()`.
@@ -39,11 +48,17 @@ module aptos_framework::version {
     ///
     /// TODO: update all the tests that reference this function, then disable this function.
     public entry fun set_version(account: &signer, major: u64) acquires Version {
-        assert!(exists<SetVersionCapability>(signer::address_of(account)), error::permission_denied(ENOT_AUTHORIZED));
+        assert!(
+            exists<SetVersionCapability>(signer::address_of(account)),
+            error::permission_denied(ENOT_AUTHORIZED)
+        );
         chain_status::assert_genesis();
 
         let old_major = borrow_global<Version>(@aptos_framework).major;
-        assert!(old_major < major, error::invalid_argument(EINVALID_MAJOR_VERSION_NUMBER));
+        assert!(
+            old_major < major,
+            error::invalid_argument(EINVALID_MAJOR_VERSION_NUMBER)
+        );
 
         let config = borrow_global_mut<Version>(@aptos_framework);
         config.major = major;
@@ -57,10 +72,16 @@ module aptos_framework::version {
     /// - `aptos_framework::version::set_for_next_epoch(&framework_signer, new_version);`
     /// - `aptos_framework::aptos_governance::reconfigure(&framework_signer);`
     public entry fun set_for_next_epoch(account: &signer, major: u64) acquires Version {
-        assert!(exists<SetVersionCapability>(signer::address_of(account)), error::permission_denied(ENOT_AUTHORIZED));
+        assert!(
+            exists<SetVersionCapability>(signer::address_of(account)),
+            error::permission_denied(ENOT_AUTHORIZED)
+        );
         let old_major = borrow_global<Version>(@aptos_framework).major;
-        assert!(old_major < major, error::invalid_argument(EINVALID_MAJOR_VERSION_NUMBER));
-        config_buffer::upsert(Version {major});
+        assert!(
+            old_major < major,
+            error::invalid_argument(EINVALID_MAJOR_VERSION_NUMBER)
+        );
+        config_buffer::upsert(Version { major });
     }
 
     /// Only used in reconfigurations to apply the pending `Version`, if there is any.
@@ -74,15 +95,24 @@ module aptos_framework::version {
     /// to update the version.
     fun initialize_for_test(core_resources: &signer) {
         system_addresses::assert_core_resource(core_resources);
-        move_to(core_resources, SetVersionCapability {});
+        move_to(
+            core_resources,
+            SetVersionCapability {}
+        );
     }
 
     #[test(aptos_framework = @aptos_framework)]
     public entry fun test_set_version(aptos_framework: signer) acquires Version {
         initialize(&aptos_framework, 1);
-        assert!(borrow_global<Version>(@aptos_framework).major == 1, 0);
+        assert!(
+            borrow_global<Version>(@aptos_framework).major == 1,
+            0
+        );
         set_version(&aptos_framework, 2);
-        assert!(borrow_global<Version>(@aptos_framework).major == 2, 1);
+        assert!(
+            borrow_global<Version>(@aptos_framework).major == 2,
+            1
+        );
     }
 
     #[test(aptos_framework = @aptos_framework, core_resources = @core_resources)]
@@ -91,10 +121,16 @@ module aptos_framework::version {
         core_resources: signer,
     ) acquires Version {
         initialize(&aptos_framework, 1);
-        assert!(borrow_global<Version>(@aptos_framework).major == 1, 0);
+        assert!(
+            borrow_global<Version>(@aptos_framework).major == 1,
+            0
+        );
         initialize_for_test(&core_resources);
         set_version(&core_resources, 2);
-        assert!(borrow_global<Version>(@aptos_framework).major == 2, 1);
+        assert!(
+            borrow_global<Version>(@aptos_framework).major == 2,
+            1
+        );
     }
 
     #[test(aptos_framework = @aptos_framework, random_account = @0x123)]

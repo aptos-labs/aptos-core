@@ -77,7 +77,10 @@ module aptos_framework::resource_account {
     const ZERO_AUTH_KEY: vector<u8> = x"0000000000000000000000000000000000000000000000000000000000000000";
 
     struct Container has key {
-        store: SimpleMap<address, account::SignerCapability>,
+        store: SimpleMap<
+            address,
+            account::SignerCapability
+        >,
     }
 
     /// Creates a new resource account and rotates the authentication key to either
@@ -110,7 +113,11 @@ module aptos_framework::resource_account {
     ) acquires Container {
         let (resource, resource_signer_cap) = account::create_resource_account(origin, seed);
         coin::register<AptosCoin>(&resource);
-        coin::transfer<AptosCoin>(origin, signer::address_of(&resource), fund_amount);
+        coin::transfer<AptosCoin>(
+            origin,
+            signer::address_of(&resource),
+            fund_amount
+        );
         rotate_account_authentication_key_and_store_capability(
             origin,
             resource,
@@ -145,18 +152,23 @@ module aptos_framework::resource_account {
     ) acquires Container {
         let origin_addr = signer::address_of(origin);
         if (!exists<Container>(origin_addr)) {
-            move_to(origin, Container { store: simple_map::create() })
+            move_to(
+                origin,
+                Container {store: simple_map::create()}
+            )
         };
 
         let container = borrow_global_mut<Container>(origin_addr);
         let resource_addr = signer::address_of(&resource);
-        simple_map::add(&mut container.store, resource_addr, resource_signer_cap);
+        simple_map::add(
+            &mut container.store,
+            resource_addr,
+            resource_signer_cap
+        );
 
         let auth_key = if (vector::is_empty(&optional_auth_key)) {
             account::get_authentication_key(origin_addr)
-        } else {
-            optional_auth_key
-        };
+        } else { optional_auth_key };
         account::rotate_authentication_key_internal(&resource, auth_key);
     }
 
@@ -167,14 +179,29 @@ module aptos_framework::resource_account {
         resource: &signer,
         source_addr: address,
     ): account::SignerCapability acquires Container {
-        assert!(exists<Container>(source_addr), error::not_found(ECONTAINER_NOT_PUBLISHED));
+        assert!(
+            exists<Container>(source_addr),
+            error::not_found(ECONTAINER_NOT_PUBLISHED)
+        );
 
         let resource_addr = signer::address_of(resource);
-        let (resource_signer_cap, empty_container) = {
+        let (
+            resource_signer_cap,
+            empty_container
+        ) = {
             let container = borrow_global_mut<Container>(source_addr);
-            assert!(simple_map::contains_key(&container.store, &resource_addr), error::invalid_argument(EUNAUTHORIZED_NOT_OWNER));
-            let (_resource_addr, signer_cap) = simple_map::remove(&mut container.store, &resource_addr);
-            (signer_cap, simple_map::length(&container.store) == 0)
+            assert!(
+                simple_map::contains_key(&container.store, &resource_addr),
+                error::invalid_argument(EUNAUTHORIZED_NOT_OWNER)
+            );
+            let (_resource_addr, signer_cap) = simple_map::remove(
+                &mut container.store,
+                &resource_addr
+            );
+            (
+                signer_cap,
+                simple_map::length(&container.store) == 0
+            )
         };
 
         if (empty_container) {
@@ -197,7 +224,9 @@ module aptos_framework::resource_account {
         create_resource_account(&user, copy seed, vector::empty());
         let container = borrow_global<Container>(user_addr);
 
-        let resource_addr = aptos_framework::account::create_resource_address(&user_addr, seed);
+        let resource_addr = aptos_framework::account::create_resource_address(
+            &user_addr, seed
+        );
         let resource_cap = simple_map::borrow(&container.store, &resource_addr);
 
         let resource = account::create_signer_with_capability(resource_cap);
@@ -206,7 +235,9 @@ module aptos_framework::resource_account {
 
     #[test(user = @0x1111)]
     #[expected_failure(abort_code = 0x10002, location = aptos_std::simple_map)]
-    public entry fun test_create_account_and_retrieve_cap_resource_address_does_not_exist(user: signer) acquires Container {
+    public entry fun test_create_account_and_retrieve_cap_resource_address_does_not_exist(
+        user: signer
+    ) acquires Container {
         let user_addr = signer::address_of(&user);
         account::create_account(user_addr);
 
@@ -235,7 +266,9 @@ module aptos_framework::resource_account {
         let seed = x"01";
         create_resource_account_and_fund(&user, copy seed, vector::empty(), 10);
 
-        let resource_addr = aptos_framework::account::create_resource_address(&user_addr, seed);
+        let resource_addr = aptos_framework::account::create_resource_address(
+            &user_addr, seed
+        );
         coin::transfer<AptosCoin>(&user, resource_addr, 10);
 
         coin::destroy_burn_cap(burn);
@@ -251,7 +284,9 @@ module aptos_framework::resource_account {
         let seed = x"01";
         create_resource_account(&user, copy seed, vector::empty());
 
-        let resource_addr = aptos_framework::account::create_resource_address(&user_addr, seed);
+        let resource_addr = aptos_framework::account::create_resource_address(
+            &user_addr, seed
+        );
         let (burn, mint) = aptos_framework::aptos_coin::initialize_for_test(&framework);
         let coin = coin::mint<AptosCoin>(100, &mint);
         coin::deposit(resource_addr, coin);

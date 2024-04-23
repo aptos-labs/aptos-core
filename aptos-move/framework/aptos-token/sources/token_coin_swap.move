@@ -44,7 +44,10 @@ module aptos_token::token_coin_swap {
     /// The listing of all tokens for swapping stored at token owner's account
     struct TokenListings<phantom CoinType> has key {
         // key is the token id for swapping and value is the min price of target coin type.
-        listings: Table<TokenId, TokenCoinSwap<CoinType>>,
+        listings: Table<
+            TokenId,
+            TokenCoinSwap<CoinType>
+        >,
         listing_events: EventHandle<TokenListingEvent>,
         swap_events: EventHandle<TokenSwapEvent>,
     }

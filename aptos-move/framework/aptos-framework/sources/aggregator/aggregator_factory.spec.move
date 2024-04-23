@@ -36,7 +36,10 @@ spec aptos_framework::aggregator_factory {
         pragma aborts_if_is_strict;
     }
 
-    spec new_aggregator(aggregator_factory: &mut AggregatorFactory, limit: u128): Aggregator {
+    spec new_aggregator(
+        aggregator_factory: &mut AggregatorFactory,
+        limit: u128
+    ): Aggregator {
         pragma opaque;
         aborts_if false;
         ensures result == spec_new_aggregator(limit);
@@ -60,6 +63,7 @@ spec aptos_framework::aggregator_factory {
         ensures aggregator::spec_get_limit(result) == limit;
         ensures aggregator::spec_aggregator_get_val(result) == 0;
     }
+
     spec schema CreateAggregatorInternalAbortsIf {
         aborts_if !exists<AggregatorFactory>(@aptos_framework);
     }

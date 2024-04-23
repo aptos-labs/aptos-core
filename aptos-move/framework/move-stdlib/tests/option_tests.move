@@ -25,7 +25,10 @@ module std::option_tests {
         assert!(option::contains(&some, &5), 0);
         assert!(option::contains(&some_other, &6), 1);
         assert!(!option::contains(&none, &5), 2);
-        assert!(!option::contains(&some_other, &5), 3);
+        assert!(
+            !option::contains(&some_other, &5),
+            3
+        );
     }
 
     #[test]
@@ -60,16 +63,28 @@ module std::option_tests {
     fun borrow_with_default() {
         let none = option::none<u64>();
         let some = option::some(5);
-        assert!(*option::borrow_with_default(&some, &7) == 5, 0);
-        assert!(*option::borrow_with_default(&none, &7) == 7, 1);
+        assert!(
+            *option::borrow_with_default(&some, &7) == 5,
+            0
+        );
+        assert!(
+            *option::borrow_with_default(&none, &7) == 7,
+            1
+        );
     }
 
     #[test]
     fun get_with_default() {
         let none = option::none<u64>();
         let some = option::some(5);
-        assert!(option::get_with_default(&some, 7) == 5, 0);
-        assert!(option::get_with_default(&none, 7) == 7, 1);
+        assert!(
+            option::get_with_default(&some, 7) == 5,
+            0
+        );
+        assert!(
+            option::get_with_default(&none, 7) == 7,
+            1
+        );
     }
 
     #[test]
@@ -95,14 +110,20 @@ module std::option_tests {
     #[test]
     fun swap_or_fill_some() {
         let some = option::some(5);
-        assert!(option::swap_or_fill(&mut some, 1) == option::some(5), 0);
+        assert!(
+            option::swap_or_fill(&mut some, 1) == option::some(5),
+            0
+        );
         assert!(*option::borrow(&some) == 1, 1);
     }
 
     #[test]
     fun swap_or_fill_none() {
         let none = option::none();
-        assert!(option::swap_or_fill(&mut none, 1) == option::none(), 0);
+        assert!(
+            option::swap_or_fill(&mut none, 1) == option::none(),
+            0
+        );
         assert!(*option::borrow(&none) == 1, 1);
     }
 
@@ -128,13 +149,22 @@ module std::option_tests {
 
     #[test]
     fun destroy_with_default() {
-        assert!(option::destroy_with_default(option::none<u64>(), 4) == 4, 0);
-        assert!(option::destroy_with_default(option::some(4), 5) == 4, 1);
+        assert!(
+            option::destroy_with_default(option::none<u64>(), 4) == 4,
+            0
+        );
+        assert!(
+            option::destroy_with_default(option::some(4), 5) == 4,
+            1
+        );
     }
 
     #[test]
     fun destroy_some() {
-        assert!(option::destroy_some(option::some(4)) == 4, 0);
+        assert!(
+            option::destroy_some(option::some(4)) == 4,
+            0
+        );
     }
 
     #[test]
@@ -171,61 +201,70 @@ module std::option_tests {
     #[test]
     fun test_for_each() {
         let r = 0;
-        option::for_each(option::some(1), |x| r = x);
+        option::for_each(option::some(1),|x| r = x);
         assert!(r == 1, 0);
         r = 0;
-        option::for_each(option::none<u64>(), |x| r = x);
+        option::for_each(
+            option::none<u64>(),
+            |x| r = x
+        );
         assert!(r == 0, 1);
     }
 
     #[test]
     fun test_for_each_ref() {
         let r = 0;
-        option::for_each_ref(&option::some(1), |x| r = *x);
+        option::for_each_ref(&option::some(1),|x| r = *x);
         assert!(r == 1, 0);
         r = 0;
-        option::for_each_ref(&option::none<u64>(), |x| r = *x);
+        option::for_each_ref(
+            &option::none<u64>(),
+            |x| r = *x
+        );
         assert!(r == 0, 1);
     }
 
     #[test]
     fun test_for_each_mut() {
         let o = option::some(0);
-        option::for_each_mut(&mut o, |x| *x = 1);
+        option::for_each_mut(&mut o,|x|*x = 1);
         assert!(o == option::some(1), 0);
     }
 
     #[test]
     fun test_fold() {
-        let r = option::fold(option::some(1), 1, |a, b| a + b);
+        let r = option::fold(option::some(1), 1,|a, b| a + b);
         assert!(r == 2, 0);
-        let r = option::fold(option::none<u64>(), 1, |a, b| a + b);
+        let r = option::fold(
+            option::none<u64>(),
+            1,
+            |a, b| a + b
+        );
         assert!(r == 1, 0);
     }
 
     #[test]
     fun test_map() {
-        let x = option::map(option::some(1), |e| e + 1);
+        let x = option::map(option::some(1),|e| e + 1);
         assert!(option::extract(&mut x) == 2, 0);
     }
 
     #[test]
     fun test_map_ref() {
-        let x = option::map_ref(&option::some(1), |e| *e + 1);
+        let x = option::map_ref(&option::some(1),|e|*e + 1);
         assert!(option::extract(&mut x) == 2, 0);
     }
 
     #[test]
     fun test_filter() {
-        let x = option::filter(option::some(1), |e| *e != 1);
+        let x = option::filter(option::some(1),|e|*e != 1);
         assert!(option::is_none(&x), 0);
     }
 
     #[test]
     fun test_any() {
-        let r = option::any(&option::some(1), |e| *e == 1);
+        let r = option::any(&option::some(1),|e|*e == 1);
         assert!(r, 0);
     }
-
 
 }

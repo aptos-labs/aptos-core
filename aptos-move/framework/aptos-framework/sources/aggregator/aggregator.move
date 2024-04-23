@@ -24,8 +24,7 @@ module aptos_framework::aggregator {
     /// Represents an integer which supports parallel additions and subtractions
     /// across multiple transactions. See the module description for more details.
     struct Aggregator has store {
-        handle: address,
-        key: address,
+        handle: address, key: address,
         limit: u128,
     }
 
@@ -35,10 +34,16 @@ module aptos_framework::aggregator {
     }
 
     /// Adds `value` to aggregator. Aborts on overflowing the limit.
-    public native fun add(aggregator: &mut Aggregator, value: u128);
+    public native fun add(
+        aggregator: &mut Aggregator,
+        value: u128
+    );
 
     /// Subtracts `value` from aggregator. Aborts on going below zero.
-    public native fun sub(aggregator: &mut Aggregator, value: u128);
+    public native fun sub(
+        aggregator: &mut Aggregator,
+        value: u128
+    );
 
     /// Returns a value stored in this aggregator.
     public native fun read(aggregator: &Aggregator): u128;

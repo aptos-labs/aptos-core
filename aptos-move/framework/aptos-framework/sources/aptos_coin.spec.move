@@ -34,7 +34,10 @@ spec aptos_framework::aptos_coin {
         pragma aborts_if_is_strict;
     }
 
-    spec initialize(aptos_framework: &signer): (BurnCapability<AptosCoin>, MintCapability<AptosCoin>) {
+    spec initialize(aptos_framework: &signer): (
+        BurnCapability<AptosCoin>,
+        MintCapability<AptosCoin>
+    ) {
         use aptos_framework::aggregator_factory;
 
         let addr = signer::address_of(aptos_framework);
@@ -43,12 +46,14 @@ spec aptos_framework::aptos_coin {
         aborts_if !string::spec_internal_check_utf8(b"APT");
         aborts_if exists<MintCapStore>(addr);
         aborts_if exists<coin::CoinInfo<AptosCoin>>(addr);
-        aborts_if !exists<aggregator_factory::AggregatorFactory>(addr);
+        aborts_if !exists<
+            aggregator_factory::AggregatorFactory
+        >(addr);
         /// [high-level-req-1]
         ensures exists<MintCapStore>(addr);
         // property 3: The abilities to mint Aptos tokens should be transferable, duplicatable, and destroyable.
         /// [high-level-req-3]
-        ensures global<MintCapStore>(addr).mint_cap ==  MintCapability<AptosCoin> {};
+        ensures global<MintCapStore>(addr).mint_cap == MintCapability<AptosCoin> {};
         ensures exists<coin::CoinInfo<AptosCoin>>(addr);
         ensures result_1 == BurnCapability<AptosCoin> {};
         ensures result_2 == MintCapability<AptosCoin> {};

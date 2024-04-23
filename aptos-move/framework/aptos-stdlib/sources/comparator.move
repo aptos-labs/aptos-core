@@ -45,20 +45,19 @@ module aptos_std::comparator {
             let left_byte = *vector::borrow(&left, idx);
             let right_byte = *vector::borrow(&right, idx);
 
-            if (left_byte < right_byte) {
-                return Result { inner: SMALLER }
-            } else if (left_byte > right_byte) {
-                return Result { inner: GREATER }
-            };
+            if (left_byte < right_byte) {return Result {inner: SMALLER}}
+            else if (left_byte > right_byte) {return Result {inner: GREATER}};
             idx = idx + 1;
         };
 
         if (left_length < right_length) {
-            Result { inner: SMALLER }
-        } else if (left_length > right_length) {
-            Result { inner: GREATER }
-        } else {
-            Result { inner: EQUAL }
+            Result {inner: SMALLER}
+        }
+        else if (left_length > right_length) {
+            Result {inner: GREATER}
+        }
+        else {
+            Result {inner: EQUAL}
         }
     }
 
@@ -70,18 +69,45 @@ module aptos_std::comparator {
         let value1 = string::utf8(b"beta");
         let value2 = string::utf8(b"betaa");
 
-        assert!(is_equal(&compare(&value0, &value0)), 0);
-        assert!(is_equal(&compare(&value1, &value1)), 1);
-        assert!(is_equal(&compare(&value2, &value2)), 2);
+        assert!(
+            is_equal(&compare(&value0, &value0)),
+            0
+        );
+        assert!(
+            is_equal(&compare(&value1, &value1)),
+            1
+        );
+        assert!(
+            is_equal(&compare(&value2, &value2)),
+            2
+        );
 
-        assert!(is_greater_than(&compare(&value0, &value1)), 3);
-        assert!(is_smaller_than(&compare(&value1, &value0)), 4);
+        assert!(
+            is_greater_than(&compare(&value0, &value1)),
+            3
+        );
+        assert!(
+            is_smaller_than(&compare(&value1, &value0)),
+            4
+        );
 
-        assert!(is_smaller_than(&compare(&value0, &value2)), 5);
-        assert!(is_greater_than(&compare(&value2, &value0)), 6);
+        assert!(
+            is_smaller_than(&compare(&value0, &value2)),
+            5
+        );
+        assert!(
+            is_greater_than(&compare(&value2, &value0)),
+            6
+        );
 
-        assert!(is_smaller_than(&compare(&value1, &value2)), 7);
-        assert!(is_greater_than(&compare(&value2, &value1)), 8);
+        assert!(
+            is_smaller_than(&compare(&value1, &value2)),
+            7
+        );
+        assert!(
+            is_greater_than(&compare(&value2, &value1)),
+            8
+        );
     }
 
     #[test]
@@ -91,11 +117,23 @@ module aptos_std::comparator {
         let value0: u128 = 1;
         let value1: u128 = 256;
 
-        assert!(is_equal(&compare(&value0, &value0)), 0);
-        assert!(is_equal(&compare(&value1, &value1)), 1);
+        assert!(
+            is_equal(&compare(&value0, &value0)),
+            0
+        );
+        assert!(
+            is_equal(&compare(&value1, &value1)),
+            1
+        );
 
-        assert!(is_smaller_than(&compare(&value0, &value1)), 2);
-        assert!(is_greater_than(&compare(&value1, &value0)), 3);
+        assert!(
+            is_smaller_than(&compare(&value0, &value1)),
+            2
+        );
+        assert!(
+            is_greater_than(&compare(&value1, &value0)),
+            3
+        );
     }
 
     #[test]
@@ -104,18 +142,45 @@ module aptos_std::comparator {
         let value1: u128 = 152;
         let value2: u128 = 511; // 0x1ff
 
-        assert!(is_equal(&compare(&value0, &value0)), 0);
-        assert!(is_equal(&compare(&value1, &value1)), 1);
-        assert!(is_equal(&compare(&value2, &value2)), 2);
+        assert!(
+            is_equal(&compare(&value0, &value0)),
+            0
+        );
+        assert!(
+            is_equal(&compare(&value1, &value1)),
+            1
+        );
+        assert!(
+            is_equal(&compare(&value2, &value2)),
+            2
+        );
 
-        assert!(is_smaller_than(&compare(&value0, &value1)), 2);
-        assert!(is_greater_than(&compare(&value1, &value0)), 3);
+        assert!(
+            is_smaller_than(&compare(&value0, &value1)),
+            2
+        );
+        assert!(
+            is_greater_than(&compare(&value1, &value0)),
+            3
+        );
 
-        assert!(is_smaller_than(&compare(&value0, &value2)), 3);
-        assert!(is_greater_than(&compare(&value2, &value0)), 4);
+        assert!(
+            is_smaller_than(&compare(&value0, &value2)),
+            3
+        );
+        assert!(
+            is_greater_than(&compare(&value2, &value0)),
+            4
+        );
 
-        assert!(is_smaller_than(&compare(&value1, &value2)), 5);
-        assert!(is_greater_than(&compare(&value2, &value1)), 6);
+        assert!(
+            is_smaller_than(&compare(&value1, &value2)),
+            5
+        );
+        assert!(
+            is_greater_than(&compare(&value2, &value1)),
+            6
+        );
     }
 
     #[test_only]
@@ -163,11 +228,29 @@ module aptos_std::comparator {
         };
 
         assert!(is_equal(&compare(&base, &base)), 0);
-        assert!(is_smaller_than(&compare(&base, &other_0)), 1);
-        assert!(is_greater_than(&compare(&other_0, &base)), 2);
-        assert!(is_smaller_than(&compare(&base, &other_1)), 3);
-        assert!(is_greater_than(&compare(&other_1, &base)), 4);
-        assert!(is_smaller_than(&compare(&base, &other_2)), 5);
-        assert!(is_greater_than(&compare(&other_2, &base)), 6);
+        assert!(
+            is_smaller_than(&compare(&base, &other_0)),
+            1
+        );
+        assert!(
+            is_greater_than(&compare(&other_0, &base)),
+            2
+        );
+        assert!(
+            is_smaller_than(&compare(&base, &other_1)),
+            3
+        );
+        assert!(
+            is_greater_than(&compare(&other_1, &base)),
+            4
+        );
+        assert!(
+            is_smaller_than(&compare(&base, &other_2)),
+            5
+        );
+        assert!(
+            is_greater_than(&compare(&other_2, &base)),
+            6
+        );
     }
 }

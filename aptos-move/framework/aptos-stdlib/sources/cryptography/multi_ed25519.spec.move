@@ -8,6 +8,7 @@ spec aptos_std::multi_ed25519 {
         include NewUnvalidatedPublicKeyFromBytesAbortsIf;
         ensures result == UnvalidatedPublicKey { bytes };
     }
+
     spec schema NewUnvalidatedPublicKeyFromBytesAbortsIf {
         bytes: vector<u8>;
         let length = len(bytes);
@@ -17,15 +18,15 @@ spec aptos_std::multi_ed25519 {
 
     spec new_validated_public_key_from_bytes(bytes: vector<u8>): Option<ValidatedPublicKey> {
         aborts_if false;
-        let cond = len(bytes) % INDIVIDUAL_PUBLIC_KEY_NUM_BYTES == THRESHOLD_SIZE_BYTES
-            && spec_public_key_validate_internal(bytes);
-        ensures cond ==> result == option::spec_some(ValidatedPublicKey{bytes});
+        let cond = len(bytes) % INDIVIDUAL_PUBLIC_KEY_NUM_BYTES == THRESHOLD_SIZE_BYTES &&
+            spec_public_key_validate_internal(bytes);
+        ensures cond ==> result == option::spec_some(ValidatedPublicKey { bytes });
         ensures !cond ==> result == option::spec_none<ValidatedPublicKey>();
     }
 
     spec new_validated_public_key_from_bytes_v2(bytes: vector<u8>): Option<ValidatedPublicKey> {
         let cond = spec_public_key_validate_v2_internal(bytes);
-        ensures cond ==> result == option::spec_some(ValidatedPublicKey{bytes});
+        ensures cond ==> result == option::spec_some(ValidatedPublicKey { bytes });
         ensures !cond ==> result == option::spec_none<ValidatedPublicKey>();
     }
 
@@ -33,6 +34,7 @@ spec aptos_std::multi_ed25519 {
         include NewSignatureFromBytesAbortsIf;
         ensures result == Signature { bytes };
     }
+
     spec schema NewSignatureFromBytesAbortsIf {
         bytes: vector<u8>;
         aborts_if len(bytes) % INDIVIDUAL_SIGNATURE_NUM_BYTES != BITMAP_NUM_OF_BYTES;
@@ -83,7 +85,9 @@ spec aptos_std::multi_ed25519 {
     spec public_key_validate_internal(bytes: vector<u8>): bool {
         pragma opaque;
         aborts_if false;
-        ensures (len(bytes) / INDIVIDUAL_PUBLIC_KEY_NUM_BYTES > MAX_NUMBER_OF_PUBLIC_KEYS) ==> (result == false);
+        ensures (
+            len(bytes) / INDIVIDUAL_PUBLIC_KEY_NUM_BYTES > MAX_NUMBER_OF_PUBLIC_KEYS
+        ) ==> (result == false);
         ensures result == spec_public_key_validate_internal(bytes);
     }
 
@@ -99,24 +103,23 @@ spec aptos_std::multi_ed25519 {
     ): bool {
         pragma opaque;
         aborts_if false;
-        ensures result == spec_signature_verify_strict_internal(multisignature, public_key, message);
+        ensures result == spec_signature_verify_strict_internal(
+            multisignature, public_key, message
+        );
     }
 
     /// # Helper functions
 
     spec fun spec_check_and_get_threshold(bytes: vector<u8>): Option<u8> {
         let len = len(bytes);
-        if (len == 0) {
-            option::none<u8>()
-        } else {
+        if (len == 0) {option::none<u8>()} else {
             let threshold_num_of_bytes = len % INDIVIDUAL_PUBLIC_KEY_NUM_BYTES;
             let num_of_keys = len / INDIVIDUAL_PUBLIC_KEY_NUM_BYTES;
             let threshold_byte = bytes[len - 1];
-            if (num_of_keys == 0 || num_of_keys > MAX_NUMBER_OF_PUBLIC_KEYS || len % INDIVIDUAL_PUBLIC_KEY_NUM_BYTES != 1) {
-                option::none<u8>()
-            } else if (threshold_byte == 0 || threshold_byte > (num_of_keys as u8)) {
-                option::none<u8>()
-            } else {
+            if (
+                num_of_keys == 0 || num_of_keys > MAX_NUMBER_OF_PUBLIC_KEYS || len % INDIVIDUAL_PUBLIC_KEY_NUM_BYTES
+                    != 1) {option::none<u8>()}
+            else if (threshold_byte == 0 || threshold_byte > (num_of_keys as u8)) {option::none<u8>()} else {
                 option::spec_some(threshold_byte)
             }
         }
@@ -134,9 +137,17 @@ spec aptos_std::multi_ed25519 {
 
     spec fun spec_public_key_bytes_to_authentication_key(pk_bytes: vector<u8>): vector<u8>;
 
-    spec fun spec_signature_verify_strict_t<T>(signature: Signature, public_key: UnvalidatedPublicKey, data: T): bool {
+    spec fun spec_signature_verify_strict_t<T>(
+        signature: Signature,
+        public_key: UnvalidatedPublicKey,
+        data: T
+    ): bool {
         let encoded = ed25519::new_signed_message<T>(data);
         let message = bcs::serialize(encoded);
-        spec_signature_verify_strict_internal(signature.bytes, public_key.bytes, message)
+        spec_signature_verify_strict_internal(
+            signature.bytes,
+            public_key.bytes,
+            message
+        )
     }
 }

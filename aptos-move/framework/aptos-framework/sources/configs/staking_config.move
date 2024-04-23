@@ -6,7 +6,11 @@ module aptos_framework::staking_config {
     use aptos_framework::system_addresses;
     use aptos_framework::timestamp;
 
-    use aptos_std::fixed_point64::{Self, FixedPoint64, less_or_equal};
+    use aptos_std::fixed_point64::{
+        Self,
+        FixedPoint64,
+        less_or_equal
+    };
     use aptos_std::math_fixed64;
 
     friend aptos_framework::genesis;
@@ -43,7 +47,6 @@ module aptos_framework::staking_config {
     const ONE_YEAR_IN_SECS: u64 = 31536000;
 
     const MAX_U64: u128 = 18446744073709551615;
-
 
     /// Validator set configurations that will be stored with the @aptos_framework account.
     struct StakingConfig has copy, drop, key {
@@ -105,33 +108,47 @@ module aptos_framework::staking_config {
         // This can fail genesis but is necessary so that any misconfigurations can be corrected before genesis succeeds
         validate_required_stake(minimum_stake, maximum_stake);
 
-        assert!(recurring_lockup_duration_secs > 0, error::invalid_argument(EZERO_LOCKUP_DURATION));
+        assert!(
+            recurring_lockup_duration_secs > 0,
+            error::invalid_argument(EZERO_LOCKUP_DURATION)
+        );
         assert!(
             rewards_rate_denominator > 0,
             error::invalid_argument(EZERO_REWARDS_RATE_DENOMINATOR),
         );
         assert!(
             voting_power_increase_limit > 0 && voting_power_increase_limit <= 50,
-            error::invalid_argument(EINVALID_VOTING_POWER_INCREASE_LIMIT),
+            error::invalid_argument(
+                EINVALID_VOTING_POWER_INCREASE_LIMIT
+            ),
         );
 
         // `rewards_rate` which is the numerator is limited to be `<= MAX_REWARDS_RATE` in order to avoid the arithmetic
         // overflow in the rewards calculation. `rewards_rate_denominator` can be adjusted to get the desired rewards
         // rate (i.e., rewards_rate / rewards_rate_denominator).
-        assert!(rewards_rate <= MAX_REWARDS_RATE, error::invalid_argument(EINVALID_REWARDS_RATE));
+        assert!(
+            rewards_rate <= MAX_REWARDS_RATE,
+            error::invalid_argument(EINVALID_REWARDS_RATE)
+        );
 
         // We assert that (rewards_rate / rewards_rate_denominator <= 1).
-        assert!(rewards_rate <= rewards_rate_denominator, error::invalid_argument(EINVALID_REWARDS_RATE));
+        assert!(
+            rewards_rate <= rewards_rate_denominator,
+            error::invalid_argument(EINVALID_REWARDS_RATE)
+        );
 
-        move_to(aptos_framework, StakingConfig {
-            minimum_stake,
-            maximum_stake,
-            recurring_lockup_duration_secs,
-            allow_validator_set_change,
-            rewards_rate,
-            rewards_rate_denominator,
-            voting_power_increase_limit,
-        });
+        move_to(
+            aptos_framework,
+            StakingConfig {
+                minimum_stake,
+                maximum_stake,
+                recurring_lockup_duration_secs,
+                allow_validator_set_change,
+                rewards_rate,
+                rewards_rate_denominator,
+                voting_power_increase_limit,
+            }
+        );
     }
 
     /// Initialize rewards configurations.
@@ -154,16 +171,21 @@ module aptos_framework::staking_config {
         );
         assert!(
             timestamp::now_seconds() >= last_rewards_rate_period_start_in_secs,
-            error::invalid_argument(EINVALID_LAST_REWARDS_RATE_PERIOD_START)
+            error::invalid_argument(
+                EINVALID_LAST_REWARDS_RATE_PERIOD_START
+            )
         );
 
-        move_to(aptos_framework, StakingRewardsConfig {
-            rewards_rate,
-            min_rewards_rate,
-            rewards_rate_period_in_secs,
-            last_rewards_rate_period_start_in_secs,
-            rewards_rate_decrease_rate,
-        });
+        move_to(
+            aptos_framework,
+            StakingRewardsConfig {
+                rewards_rate,
+                min_rewards_rate,
+                rewards_rate_period_in_secs,
+                last_rewards_rate_period_start_in_secs,
+                rewards_rate_decrease_rate,
+            }
+        );
     }
 
     public fun get(): StakingConfig acquires StakingConfig {
@@ -177,7 +199,10 @@ module aptos_framework::staking_config {
 
     /// Return the required min/max stake.
     public fun get_required_stake(config: &StakingConfig): (u64, u64) {
-        (config.minimum_stake, config.maximum_stake)
+        (
+            config.minimum_stake,
+            config.maximum_stake
+        )
     }
 
     /// Return the recurring lockup duration that every validator is automatically renewed for (unless they unlock and
@@ -189,21 +214,28 @@ module aptos_framework::staking_config {
     /// Return the reward rate of this epoch.
     public fun get_reward_rate(config: &StakingConfig): (u64, u64) acquires StakingRewardsConfig {
         if (features::periodical_reward_rate_decrease_enabled()) {
-            let epoch_rewards_rate = borrow_global<StakingRewardsConfig>(@aptos_framework).rewards_rate;
-            if (fixed_point64::is_zero(epoch_rewards_rate)) {
-                (0u64, 1u64)
-            } else {
+            let epoch_rewards_rate = borrow_global<StakingRewardsConfig>(@aptos_framework)
+                .rewards_rate;
+            if (fixed_point64::is_zero(epoch_rewards_rate)) {(0u64, 1u64) } else {
                 // Maximize denominator for higher precision.
                 // Restriction: nominator <= MAX_REWARDS_RATE && denominator <= MAX_U64
-                let denominator = fixed_point64::divide_u128((MAX_REWARDS_RATE as u128), epoch_rewards_rate);
+                let denominator = fixed_point64::divide_u128(
+                    (MAX_REWARDS_RATE as u128),
+                    epoch_rewards_rate
+                );
                 if (denominator > MAX_U64) {
                     denominator = MAX_U64
                 };
-                let nominator = (fixed_point64::multiply_u128(denominator, epoch_rewards_rate) as u64);
-                (nominator, (denominator as u64))
+                let nominator = (
+                    fixed_point64::multiply_u128(denominator, epoch_rewards_rate) as u64
+                );
+                (nominator,(denominator as u64))
             }
         } else {
-            (config.rewards_rate, config.rewards_rate_denominator)
+            (
+                config.rewards_rate,
+                config.rewards_rate_denominator
+            )
         }
     }
 
@@ -214,26 +246,39 @@ module aptos_framework::staking_config {
 
     /// Calculate and save the latest rewards rate.
     public(friend) fun calculate_and_save_latest_epoch_rewards_rate(): FixedPoint64 acquires StakingRewardsConfig {
-        assert!(features::periodical_reward_rate_decrease_enabled(), error::invalid_state(EDISABLED_FUNCTION));
+        assert!(
+            features::periodical_reward_rate_decrease_enabled(),
+            error::invalid_state(EDISABLED_FUNCTION)
+        );
         let staking_rewards_config = calculate_and_save_latest_rewards_config();
         staking_rewards_config.rewards_rate
     }
 
     /// Calculate and return the up-to-date StakingRewardsConfig.
     fun calculate_and_save_latest_rewards_config(): StakingRewardsConfig acquires StakingRewardsConfig {
-        let staking_rewards_config = borrow_global_mut<StakingRewardsConfig>(@aptos_framework);
+        let staking_rewards_config = borrow_global_mut<StakingRewardsConfig>(
+            @aptos_framework
+        );
         let current_time_in_secs = timestamp::now_seconds();
         assert!(
             current_time_in_secs >= staking_rewards_config.last_rewards_rate_period_start_in_secs,
-            error::invalid_argument(EINVALID_LAST_REWARDS_RATE_PERIOD_START)
+            error::invalid_argument(
+                EINVALID_LAST_REWARDS_RATE_PERIOD_START
+            )
         );
-        if (current_time_in_secs - staking_rewards_config.last_rewards_rate_period_start_in_secs < staking_rewards_config.rewards_rate_period_in_secs) {
-            return *staking_rewards_config
+        if (
+            current_time_in_secs - staking_rewards_config.last_rewards_rate_period_start_in_secs
+                < staking_rewards_config.rewards_rate_period_in_secs) {
+            return*staking_rewards_config
         };
         // Rewards rate decrease rate cannot be greater than 100%. Otherwise rewards rate will be negative.
         assert!(
-            fixed_point64::ceil(staking_rewards_config.rewards_rate_decrease_rate) <= 1,
-            error::invalid_argument(EINVALID_REWARDS_RATE_DECREASE_RATE)
+            fixed_point64::ceil(
+                staking_rewards_config.rewards_rate_decrease_rate
+            ) <= 1,
+            error::invalid_argument(
+                EINVALID_REWARDS_RATE_DECREASE_RATE
+            )
         );
         let new_rate = math_fixed64::mul_div(
             staking_rewards_config.rewards_rate,
@@ -243,13 +288,15 @@ module aptos_framework::staking_config {
             ),
             fixed_point64::create_from_u128(1),
         );
-        new_rate = fixed_point64::max(new_rate, staking_rewards_config.min_rewards_rate);
+        new_rate = fixed_point64::max(
+            new_rate,
+            staking_rewards_config.min_rewards_rate
+        );
 
         staking_rewards_config.rewards_rate = new_rate;
-        staking_rewards_config.last_rewards_rate_period_start_in_secs =
-            staking_rewards_config.last_rewards_rate_period_start_in_secs +
-            staking_rewards_config.rewards_rate_period_in_secs;
-        return *staking_rewards_config
+        staking_rewards_config.last_rewards_rate_period_start_in_secs = staking_rewards_config
+            .last_rewards_rate_period_start_in_secs + staking_rewards_config.rewards_rate_period_in_secs;
+        return*staking_rewards_config
     }
 
     /// Update the min and max stake amounts.
@@ -273,7 +320,10 @@ module aptos_framework::staking_config {
         aptos_framework: &signer,
         new_recurring_lockup_duration_secs: u64,
     ) acquires StakingConfig {
-        assert!(new_recurring_lockup_duration_secs > 0, error::invalid_argument(EZERO_LOCKUP_DURATION));
+        assert!(
+            new_recurring_lockup_duration_secs > 0,
+            error::invalid_argument(EZERO_LOCKUP_DURATION)
+        );
         system_addresses::assert_aptos_framework(aptos_framework);
 
         let staking_config = borrow_global_mut<StakingConfig>(@aptos_framework);
@@ -288,7 +338,10 @@ module aptos_framework::staking_config {
         new_rewards_rate: u64,
         new_rewards_rate_denominator: u64,
     ) acquires StakingConfig {
-        assert!(!features::periodical_reward_rate_decrease_enabled(), error::invalid_state(EDEPRECATED_FUNCTION));
+        assert!(
+            !features::periodical_reward_rate_decrease_enabled(),
+            error::invalid_state(EDEPRECATED_FUNCTION)
+        );
         system_addresses::assert_aptos_framework(aptos_framework);
         assert!(
             new_rewards_rate_denominator > 0,
@@ -297,10 +350,16 @@ module aptos_framework::staking_config {
         // `rewards_rate` which is the numerator is limited to be `<= MAX_REWARDS_RATE` in order to avoid the arithmetic
         // overflow in the rewards calculation. `rewards_rate_denominator` can be adjusted to get the desired rewards
         // rate (i.e., rewards_rate / rewards_rate_denominator).
-        assert!(new_rewards_rate <= MAX_REWARDS_RATE, error::invalid_argument(EINVALID_REWARDS_RATE));
+        assert!(
+            new_rewards_rate <= MAX_REWARDS_RATE,
+            error::invalid_argument(EINVALID_REWARDS_RATE)
+        );
 
         // We assert that (rewards_rate / rewards_rate_denominator <= 1).
-        assert!(new_rewards_rate <= new_rewards_rate_denominator, error::invalid_argument(EINVALID_REWARDS_RATE));
+        assert!(
+            new_rewards_rate <= new_rewards_rate_denominator,
+            error::invalid_argument(EINVALID_REWARDS_RATE)
+        );
 
         let staking_config = borrow_global_mut<StakingConfig>(@aptos_framework);
         staking_config.rewards_rate = new_rewards_rate;
@@ -323,7 +382,9 @@ module aptos_framework::staking_config {
             rewards_rate_decrease_rate,
         );
 
-        let staking_rewards_config = borrow_global_mut<StakingRewardsConfig>(@aptos_framework);
+        let staking_rewards_config = borrow_global_mut<StakingRewardsConfig>(
+            @aptos_framework
+        );
         // Currently rewards_rate_period_in_secs is not allowed to be changed because this could bring complicated
         // logics. At the moment the argument is just a placeholder for future use.
         assert!(
@@ -344,16 +405,25 @@ module aptos_framework::staking_config {
     ) acquires StakingConfig {
         system_addresses::assert_aptos_framework(aptos_framework);
         assert!(
-            new_voting_power_increase_limit > 0 && new_voting_power_increase_limit <= 50,
-            error::invalid_argument(EINVALID_VOTING_POWER_INCREASE_LIMIT),
+            new_voting_power_increase_limit > 0 && new_voting_power_increase_limit <=
+                50,
+            error::invalid_argument(
+                EINVALID_VOTING_POWER_INCREASE_LIMIT
+            ),
         );
 
         let staking_config = borrow_global_mut<StakingConfig>(@aptos_framework);
         staking_config.voting_power_increase_limit = new_voting_power_increase_limit;
     }
 
-    fun validate_required_stake(minimum_stake: u64, maximum_stake: u64) {
-        assert!(minimum_stake <= maximum_stake && maximum_stake > 0, error::invalid_argument(EINVALID_STAKE_RANGE));
+    fun validate_required_stake(
+        minimum_stake: u64,
+        maximum_stake: u64
+    ) {
+        assert!(
+            minimum_stake <= maximum_stake && maximum_stake > 0,
+            error::invalid_argument(EINVALID_STAKE_RANGE)
+        );
     }
 
     fun validate_rewards_config(
@@ -364,7 +434,10 @@ module aptos_framework::staking_config {
     ) {
         // Bound rewards rate to avoid arithmetic overflow.
         assert!(
-            less_or_equal(rewards_rate, fixed_point64::create_from_u128((1u128))),
+            less_or_equal(
+                rewards_rate,
+                fixed_point64::create_from_u128((1u128))
+            ),
             error::invalid_argument(EINVALID_REWARDS_RATE)
         );
         assert!(
@@ -374,7 +447,9 @@ module aptos_framework::staking_config {
         // Rewards rate decrease rate cannot be greater than 100%. Otherwise rewards rate will be negative.
         assert!(
             fixed_point64::ceil(rewards_rate_decrease_rate) <= 1,
-            error::invalid_argument(EINVALID_REWARDS_RATE_DECREASE_RATE)
+            error::invalid_argument(
+                EINVALID_REWARDS_RATE_DECREASE_RATE
+            )
         );
         // This field, rewards_rate_period_in_secs must be greater than 0.
         // TODO: rewards_rate_period_in_secs should be longer than the epoch duration but reading epoch duration causes a circular dependency.
@@ -389,7 +464,16 @@ module aptos_framework::staking_config {
 
     #[test(aptos_framework = @aptos_framework)]
     public entry fun test_change_staking_configs(aptos_framework: signer) acquires StakingConfig {
-        initialize(&aptos_framework, 0, 1, 1, false, 1, 1, 1);
+        initialize(
+            &aptos_framework,
+            0,
+            1,
+            1,
+            false,
+            1,
+            1,
+            1
+        );
 
         update_required_stake(&aptos_framework, 100, 1000);
         update_recurring_lockup_duration_secs(&aptos_framework, 10000);
@@ -399,10 +483,19 @@ module aptos_framework::staking_config {
         let config = borrow_global<StakingConfig>(@aptos_framework);
         assert!(config.minimum_stake == 100, 0);
         assert!(config.maximum_stake == 1000, 1);
-        assert!(config.recurring_lockup_duration_secs == 10000, 3);
+        assert!(
+            config.recurring_lockup_duration_secs == 10000,
+            3
+        );
         assert!(config.rewards_rate == 10, 4);
-        assert!(config.rewards_rate_denominator == 100, 4);
-        assert!(config.voting_power_increase_limit == 10, 5);
+        assert!(
+            config.rewards_rate_denominator == 100,
+            4
+        );
+        assert!(
+            config.voting_power_increase_limit == 10,
+            5
+        );
     }
 
     #[test(aptos_framework = @aptos_framework)]
@@ -418,22 +511,46 @@ module aptos_framework::staking_config {
         );
 
         let epoch_reward_rate = calculate_and_save_latest_epoch_rewards_rate();
-        assert!(equal(epoch_reward_rate, create_from_rational(1, 100)), 0);
+        assert!(
+            equal(
+                epoch_reward_rate,
+                create_from_rational(1, 100)
+            ),
+            0
+        );
         // Rewards rate should not change until the current reward rate period ends.
         timestamp::fast_forward_seconds(ONE_YEAR_IN_SECS / 2);
         epoch_reward_rate = calculate_and_save_latest_epoch_rewards_rate();
-        assert!(equal(epoch_reward_rate, create_from_rational(1, 100)), 1);
+        assert!(
+            equal(
+                epoch_reward_rate,
+                create_from_rational(1, 100)
+            ),
+            1
+        );
 
         // Rewards rate decreases to 1 / 100 * 5000 / 10000 = 5 / 1000.
         timestamp::fast_forward_seconds(ONE_YEAR_IN_SECS / 2);
         epoch_reward_rate = calculate_and_save_latest_epoch_rewards_rate();
-        assert!(equal(epoch_reward_rate, create_from_rational(5, 1000)), 2);
+        assert!(
+            equal(
+                epoch_reward_rate,
+                create_from_rational(5, 1000)
+            ),
+            2
+        );
 
         // Rewards rate decreases to 5 / 1000 * 5000 / 10000 = 2.5 / 1000.
         // But rewards_rate cannot be lower than min_rewards_rate = 3 / 1000.
         timestamp::fast_forward_seconds(ONE_YEAR_IN_SECS);
         epoch_reward_rate = calculate_and_save_latest_epoch_rewards_rate();
-        assert!(equal(epoch_reward_rate, create_from_rational(3, 1000)), 3);
+        assert!(
+            equal(
+                epoch_reward_rate,
+                create_from_rational(3, 1000)
+            ),
+            3
+        );
 
         // Test when rewards_rate_decrease_rate is very small
         update_rewards_config(
@@ -452,7 +569,8 @@ module aptos_framework::staking_config {
                 create_from_rational(2955, 1000000),
                 create_from_rational(1, 100000000)
             ),
-            4);
+            4
+        );
     }
 
     #[test(aptos_framework = @aptos_framework)]
@@ -476,11 +594,35 @@ module aptos_framework::staking_config {
         );
 
         let config = borrow_global<StakingRewardsConfig>(@aptos_framework);
-        assert!(equal(config.rewards_rate, create_from_rational(2, 100)), 0);
-        assert!(equal(config.min_rewards_rate, create_from_rational(6, 1000)), 1);
-        assert!(config.rewards_rate_period_in_secs == ONE_YEAR_IN_SECS, 4);
-        assert!(config.last_rewards_rate_period_start_in_secs == start_time_in_secs, 4);
-        assert!(equal(config.rewards_rate_decrease_rate, create_from_rational(25, 100)), 5);
+        assert!(
+            equal(
+                config.rewards_rate,
+                create_from_rational(2, 100)
+            ),
+            0
+        );
+        assert!(
+            equal(
+                config.min_rewards_rate,
+                create_from_rational(6, 1000)
+            ),
+            1
+        );
+        assert!(
+            config.rewards_rate_period_in_secs == ONE_YEAR_IN_SECS,
+            4
+        );
+        assert!(
+            config.last_rewards_rate_period_start_in_secs == start_time_in_secs,
+            4
+        );
+        assert!(
+            equal(
+                config.rewards_rate_decrease_rate,
+                create_from_rational(25, 100)
+            ),
+            5
+        );
     }
 
     #[test(account = @0x123)]
@@ -503,14 +645,25 @@ module aptos_framework::staking_config {
 
     #[test(account = @0x123)]
     #[expected_failure(abort_code = 0x50003, location = aptos_framework::system_addresses)]
-    public entry fun test_update_voting_power_increase_limit_unauthorized_should_fail(account: signer) acquires StakingConfig {
+    public entry fun test_update_voting_power_increase_limit_unauthorized_should_fail(
+        account: signer
+    ) acquires StakingConfig {
         update_voting_power_increase_limit(&account, 10);
     }
 
     #[test(account = @0x123, aptos_framework = @aptos_framework)]
     #[expected_failure(abort_code = 0x50003, location = aptos_framework::system_addresses)]
-    public entry fun test_update_rewards_config_unauthorized_should_fail(account: signer, aptos_framework: signer) acquires StakingRewardsConfig {
-        features::change_feature_flags_for_testing(&aptos_framework, vector[features::get_periodical_reward_rate_decrease_feature()], vector[]);
+    public entry fun test_update_rewards_config_unauthorized_should_fail(
+        account: signer,
+        aptos_framework: signer
+    ) acquires StakingRewardsConfig {
+        features::change_feature_flags_for_testing(
+            &aptos_framework,
+            vector[
+                features::get_periodical_reward_rate_decrease_feature()
+            ],
+            vector[]
+        );
         update_rewards_config(
             &account,
             create_from_rational(1, 100),
@@ -546,7 +699,9 @@ module aptos_framework::staking_config {
 
     #[test(aptos_framework = @aptos_framework)]
     #[expected_failure(abort_code = 0x10005, location = Self)]
-    public entry fun test_update_rewards_config_rewards_rate_greater_than_1_should_fail(aptos_framework: signer) acquires StakingRewardsConfig {
+    public entry fun test_update_rewards_config_rewards_rate_greater_than_1_should_fail(
+        aptos_framework: signer
+    ) acquires StakingRewardsConfig {
         let start_time_in_secs: u64 = 100001000000;
         initialize_rewards_for_test(
             &aptos_framework,
@@ -567,7 +722,9 @@ module aptos_framework::staking_config {
 
     #[test(aptos_framework = @aptos_framework)]
     #[expected_failure(abort_code = 0x10008, location = Self)]
-    public entry fun test_update_rewards_config_invalid_rewards_rate_decrease_rate_should_fail(aptos_framework: signer) acquires StakingRewardsConfig {
+    public entry fun test_update_rewards_config_invalid_rewards_rate_decrease_rate_should_fail(
+        aptos_framework: signer
+    ) acquires StakingRewardsConfig {
         let start_time_in_secs: u64 = 100001000000;
         initialize_rewards_for_test(
             &aptos_framework,
@@ -588,7 +745,9 @@ module aptos_framework::staking_config {
 
     #[test(aptos_framework = @aptos_framework)]
     #[expected_failure(abort_code = 0x10009, location = Self)]
-    public entry fun test_update_rewards_config_cannot_change_rewards_rate_period(aptos_framework: signer) acquires StakingRewardsConfig {
+    public entry fun test_update_rewards_config_cannot_change_rewards_rate_period(
+        aptos_framework: signer
+    ) acquires StakingRewardsConfig {
         let start_time_in_secs: u64 = 100001000000;
         initialize_rewards_for_test(
             &aptos_framework,
@@ -609,8 +768,16 @@ module aptos_framework::staking_config {
 
     #[test(aptos_framework = @aptos_framework)]
     #[expected_failure(abort_code = 0x3000B, location = Self)]
-    public entry fun test_feature_flag_disabled_get_epoch_rewards_rate_should_fail(aptos_framework: signer) acquires StakingRewardsConfig {
-        features::change_feature_flags_for_testing(&aptos_framework, vector[], vector[features::get_periodical_reward_rate_decrease_feature()]);
+    public entry fun test_feature_flag_disabled_get_epoch_rewards_rate_should_fail(
+        aptos_framework: signer
+    ) acquires StakingRewardsConfig {
+        features::change_feature_flags_for_testing(
+            &aptos_framework,
+            vector[],
+            vector[
+                features::get_periodical_reward_rate_decrease_feature()
+            ]
+        );
         calculate_and_save_latest_epoch_rewards_rate();
     }
 
@@ -643,15 +810,18 @@ module aptos_framework::staking_config {
         voting_power_increase_limit: u64,
     ) {
         if (!exists<StakingConfig>(@aptos_framework)) {
-            move_to(aptos_framework, StakingConfig {
-                minimum_stake,
-                maximum_stake,
-                recurring_lockup_duration_secs,
-                allow_validator_set_change,
-                rewards_rate,
-                rewards_rate_denominator,
-                voting_power_increase_limit,
-            });
+            move_to(
+                aptos_framework,
+                StakingConfig {
+                    minimum_stake,
+                    maximum_stake,
+                    recurring_lockup_duration_secs,
+                    allow_validator_set_change,
+                    rewards_rate,
+                    rewards_rate_denominator,
+                    voting_power_increase_limit,
+                }
+            );
         };
     }
 
@@ -665,9 +835,17 @@ module aptos_framework::staking_config {
         last_rewards_rate_period_start_in_secs: u64,
         rewards_rate_decrease_rate: FixedPoint64,
     ) {
-        features::change_feature_flags_for_testing(aptos_framework, vector[features::get_periodical_reward_rate_decrease_feature()], vector[]);
+        features::change_feature_flags_for_testing(
+            aptos_framework,
+            vector[
+                features::get_periodical_reward_rate_decrease_feature()
+            ],
+            vector[]
+        );
         timestamp::set_time_has_started_for_testing(aptos_framework);
-        timestamp::update_global_time_for_test_secs(last_rewards_rate_period_start_in_secs);
+        timestamp::update_global_time_for_test_secs(
+            last_rewards_rate_period_start_in_secs
+        );
         initialize_rewards(
             aptos_framework,
             rewards_rate,

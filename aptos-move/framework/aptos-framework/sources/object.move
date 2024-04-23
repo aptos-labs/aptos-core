@@ -87,7 +87,8 @@ module aptos_framework::object {
     const OBJECT_FROM_SEED_ADDRESS_SCHEME: u8 = 0xFE;
 
     /// Address where unwanted objects can be forcefully transferred to.
-    const BURN_ADDRESS: address = @0xffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff;
+    const BURN_ADDRESS: address = @0xffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff
+        ;
 
     #[resource_group_member(group = aptos_framework::object::ObjectGroup)]
     /// The core of the object model that defines ownership, transferability, and events.
@@ -178,9 +179,15 @@ module aptos_framework::object {
 
     /// Produces an ObjectId from the given address. This is not verified.
     public fun address_to_object<T: key>(object: address): Object<T> {
-        assert!(exists<ObjectCore>(object), error::not_found(EOBJECT_DOES_NOT_EXIST));
-        assert!(exists_at<T>(object), error::not_found(ERESOURCE_DOES_NOT_EXIST));
-        Object<T> { inner: object }
+        assert!(
+            exists<ObjectCore>(object),
+            error::not_found(EOBJECT_DOES_NOT_EXIST)
+        );
+        assert!(
+            exists_at<T>(object),
+            error::not_found(ERESOURCE_DOES_NOT_EXIST)
+        );
+        Object<T> {inner: object}
     }
 
     /// Returns true if there exists an object or the remnants of an object.
@@ -197,14 +204,21 @@ module aptos_framework::object {
     public fun create_object_address(source: &address, seed: vector<u8>): address {
         let bytes = bcs::to_bytes(source);
         vector::append(&mut bytes, seed);
-        vector::push_back(&mut bytes, OBJECT_FROM_SEED_ADDRESS_SCHEME);
+        vector::push_back(
+            &mut bytes,
+            OBJECT_FROM_SEED_ADDRESS_SCHEME
+        );
         from_bcs::to_address(hash::sha3_256(bytes))
     }
 
     /// Derives an object address from the source address and an object: sha3_256([source | object addr | 0xFC]).
-    public fun create_user_derived_object_address(source: address, derive_from: address): address {
+    public fun create_user_derived_object_address(source: address, derive_from: address)
+        : address {
         let bytes = bcs::to_bytes(&source);
-        vector::append(&mut bytes, bcs::to_bytes(&derive_from));
+        vector::append(
+            &mut bytes,
+            bcs::to_bytes(&derive_from)
+        );
         vector::push_back(&mut bytes, OBJECT_DERIVED_SCHEME);
         from_bcs::to_address(hash::sha3_256(bytes))
     }
@@ -213,7 +227,10 @@ module aptos_framework::object {
     public fun create_guid_object_address(source: address, creation_num: u64): address {
         let id = guid::create_id(source, creation_num);
         let bytes = bcs::to_bytes(&id);
-        vector::push_back(&mut bytes, OBJECT_FROM_GUID_ADDRESS_SCHEME);
+        vector::push_back(
+            &mut bytes,
+            OBJECT_FROM_GUID_ADDRESS_SCHEME
+        );
         from_bcs::to_address(hash::sha3_256(bytes))
     }
 
@@ -239,7 +256,10 @@ module aptos_framework::object {
 
     /// Create a new object whose address is derived based on the creator account address and another object.
     /// Derivde objects, similar to named objects, cannot be deleted.
-    public(friend) fun create_user_derived_object(creator_address: address, derive_ref: &DeriveRef): ConstructorRef {
+    public(friend) fun create_user_derived_object(
+        creator_address: address,
+        derive_ref: &DeriveRef
+    ): ConstructorRef {
         let obj_addr = create_user_derived_object_address(creator_address, derive_ref.self);
         create_object_internal(creator_address, obj_addr, false)
     }
@@ -283,9 +303,15 @@ module aptos_framework::object {
         create_object_from_guid(signer::address_of(creator), guid)
     }
 
-    fun create_object_from_guid(creator_address: address, guid: guid::GUID): ConstructorRef {
+    fun create_object_from_guid(
+        creator_address: address,
+        guid: guid::GUID
+    ): ConstructorRef {
         let bytes = bcs::to_bytes(&guid);
-        vector::push_back(&mut bytes, OBJECT_FROM_GUID_ADDRESS_SCHEME);
+        vector::push_back(
+            &mut bytes,
+            OBJECT_FROM_GUID_ADDRESS_SCHEME
+        );
         let obj_addr = from_bcs::to_address(hash::sha3_256(bytes));
         create_object_internal(creator_address, obj_addr, true)
     }
@@ -295,7 +321,10 @@ module aptos_framework::object {
         object: address,
         can_delete: bool,
     ): ConstructorRef {
-        assert!(!exists<ObjectCore>(object), error::already_exists(EOBJECT_EXISTS));
+        assert!(
+            !exists<ObjectCore>(object),
+            error::already_exists(EOBJECT_EXISTS)
+        );
 
         let object_signer = create_signer(object);
         let guid_creation_num = INIT_GUID_CREATION_NUM;
@@ -310,30 +339,33 @@ module aptos_framework::object {
                 transfer_events: event::new_event_handle(transfer_events_guid),
             },
         );
-        ConstructorRef { self: object, can_delete }
+        ConstructorRef {self: object, can_delete}
     }
 
     // Creation helpers
 
     /// Generates the DeleteRef, which can be used to remove ObjectCore from global storage.
     public fun generate_delete_ref(ref: &ConstructorRef): DeleteRef {
-        assert!(ref.can_delete, error::permission_denied(ECANNOT_DELETE));
-        DeleteRef { self: ref.self }
+        assert!(
+            ref.can_delete,
+            error::permission_denied(ECANNOT_DELETE)
+        );
+        DeleteRef {self: ref.self}
     }
 
     /// Generates the ExtendRef, which can be used to add new events and resources to the object.
     public fun generate_extend_ref(ref: &ConstructorRef): ExtendRef {
-        ExtendRef { self: ref.self }
+        ExtendRef {self: ref.self}
     }
 
     /// Generates the TransferRef, which can be used to manage object transfers.
     public fun generate_transfer_ref(ref: &ConstructorRef): TransferRef {
-        TransferRef { self: ref.self }
+        TransferRef {self: ref.self}
     }
 
     /// Generates the DeriveRef, which can be used to create determnistic derived objects from the current object.
     public fun generate_derive_ref(ref: &ConstructorRef): DeriveRef {
-        DeriveRef { self: ref.self }
+        DeriveRef {self: ref.self}
     }
 
     /// Create a signer for the ConstructorRef
@@ -362,13 +394,14 @@ module aptos_framework::object {
     public fun create_guid(object: &signer): guid::GUID acquires ObjectCore {
         let addr = signer::address_of(object);
         let object_data = borrow_global_mut<ObjectCore>(addr);
-        guid::create(addr, &mut object_data.guid_creation_num)
+        guid::create(
+            addr,
+            &mut object_data.guid_creation_num
+        )
     }
 
     /// Generate a new event handle.
-    public fun new_event_handle<T: drop + store>(
-        object: &signer,
-    ): event::EventHandle<T> acquires ObjectCore {
+    public fun new_event_handle<T: drop + store>(object: &signer,): event::EventHandle<T> acquires ObjectCore {
         event::new_event_handle(create_guid(object))
     }
 
@@ -425,11 +458,8 @@ module aptos_framework::object {
     /// Create a LinearTransferRef for a one-time transfer. This requires that the owner at the
     /// time of generation is the owner at the time of transferring.
     public fun generate_linear_transfer_ref(ref: &TransferRef): LinearTransferRef acquires ObjectCore {
-        let owner = owner(Object<ObjectCore> { inner: ref.self });
-        LinearTransferRef {
-            self: ref.self,
-            owner,
-        }
+        let owner = owner(Object<ObjectCore> {inner: ref.self});
+        LinearTransferRef {self: ref.self, owner,}
     }
 
     /// Transfer to the destination address using a LinearTransferRef.
@@ -544,7 +574,10 @@ module aptos_framework::object {
         while (owner != current_address) {
             count = count + 1;
             if (std::features::max_object_nesting_check_enabled()) {
-                assert!(count < MAXIMUM_OBJECT_NESTING, error::out_of_range(EMAXIMUM_NESTING))
+                assert!(
+                    count < MAXIMUM_OBJECT_NESTING,
+                    error::out_of_range(EMAXIMUM_NESTING)
+                )
             };
             // At this point, the first object exists and so the more likely case is that the
             // object's owner is not an object. So we return a more sensible error.
@@ -566,9 +599,15 @@ module aptos_framework::object {
     /// Original owners can reclaim burnt objects any time in the future by calling unburn.
     public entry fun burn<T: key>(owner: &signer, object: Object<T>) acquires ObjectCore {
         let original_owner = signer::address_of(owner);
-        assert!(is_owner(object, original_owner), error::permission_denied(ENOT_OBJECT_OWNER));
+        assert!(
+            is_owner(object, original_owner),
+            error::permission_denied(ENOT_OBJECT_OWNER)
+        );
         let object_addr = object.inner;
-        move_to(&create_signer(object_addr), TombStone { original_owner });
+        move_to(
+            &create_signer(object_addr),
+            TombStone { original_owner }
+        );
         transfer_raw_inner(object_addr, BURN_ADDRESS);
     }
 
@@ -578,10 +617,18 @@ module aptos_framework::object {
         object: Object<T>,
     ) acquires TombStone, ObjectCore {
         let object_addr = object.inner;
-        assert!(exists<TombStone>(object_addr), error::invalid_argument(EOBJECT_NOT_BURNT));
+        assert!(
+            exists<TombStone>(object_addr),
+            error::invalid_argument(EOBJECT_NOT_BURNT)
+        );
 
-        let TombStone { original_owner: original_owner_addr } = move_from<TombStone>(object_addr);
-        assert!(original_owner_addr == signer::address_of(original_owner), error::permission_denied(ENOT_OBJECT_OWNER));
+        let TombStone {
+            original_owner: original_owner_addr
+        } = move_from<TombStone>(object_addr);
+        assert!(
+            original_owner_addr == signer::address_of(original_owner),
+            error::permission_denied(ENOT_OBJECT_OWNER)
+        );
         transfer_raw_inner(object_addr, original_owner_addr);
     }
 
@@ -628,11 +675,12 @@ module aptos_framework::object {
         while (owner != current_address) {
             count = count + 1;
             if (std::features::max_object_nesting_check_enabled()) {
-                assert!(count < MAXIMUM_OBJECT_NESTING, error::out_of_range(EMAXIMUM_NESTING))
+                assert!(
+                    count < MAXIMUM_OBJECT_NESTING,
+                    error::out_of_range(EMAXIMUM_NESTING)
+                )
             };
-            if (!exists<ObjectCore>(current_address)) {
-                return false
-            };
+            if (!exists<ObjectCore>(current_address)) {return false};
 
             let object = borrow_global<ObjectCore>(current_address);
             current_address = object.owner;
@@ -701,7 +749,7 @@ module aptos_framework::object {
         option::fill(&mut hero_obj.weapon, weapon);
         event::emit_event(
             &mut hero_obj.equip_events,
-            HeroEquipEvent { weapon_id: option::some(weapon) },
+            HeroEquipEvent {weapon_id: option::some(weapon)},
         );
     }
 
@@ -711,12 +759,16 @@ module aptos_framework::object {
         hero: Object<Hero>,
         weapon: Object<Weapon>,
     ) acquires Hero, ObjectCore {
-        transfer(owner, weapon, signer::address_of(owner));
+        transfer(
+            owner,
+            weapon,
+            signer::address_of(owner)
+        );
         let hero = borrow_global_mut<Hero>(object_address(&hero));
         option::extract(&mut hero.weapon);
         event::emit_event(
             &mut hero.equip_events,
-            HeroEquipEvent { weapon_id: option::none() },
+            HeroEquipEvent {weapon_id: option::none()},
         );
     }
 
@@ -770,7 +822,10 @@ module aptos_framework::object {
         std::vector::push_back(&mut bytes, 0);
         std::vector::push_back(&mut bytes, 0);
         std::vector::push_back(&mut bytes, 0);
-        std::vector::push_back(&mut bytes, DERIVE_AUID_ADDRESS_SCHEME);
+        std::vector::push_back(
+            &mut bytes,
+            DERIVE_AUID_ADDRESS_SCHEME
+        );
         let auid2 = aptos_framework::from_bcs::to_address(std::hash::sha3_256(bytes));
         assert!(auid1 == auid2, 0);
     }
@@ -789,7 +844,10 @@ module aptos_framework::object {
 
         // Owner should be able to reclaim.
         unburn(creator, hero);
-        assert!(owner(hero) == signer::address_of(creator), 0);
+        assert!(
+            owner(hero) == signer::address_of(creator),
+            0
+        );
         // Object still frozen.
         assert!(!ungated_transfer_allowed(hero), 0);
     }
@@ -802,8 +860,14 @@ module aptos_framework::object {
         transfer_to_object(creator, weapon, hero);
 
         // Owner should be not be able to burn weapon directly.
-        assert!(owner(weapon) == object_address(&hero), 0);
-        assert!(owns(weapon, signer::address_of(creator)), 0);
+        assert!(
+            owner(weapon) == object_address(&hero),
+            0
+        );
+        assert!(
+            owns(weapon, signer::address_of(creator)),
+            0
+        );
         burn(creator, weapon);
     }
 
@@ -846,17 +910,44 @@ module aptos_framework::object {
         transfer(creator, obj7, object_address(&obj8));
         transfer(creator, obj8, object_address(&obj9));
 
-        assert!(owns(obj9, signer::address_of(creator)), 1);
-        assert!(owns(obj8, signer::address_of(creator)), 1);
-        assert!(owns(obj7, signer::address_of(creator)), 1);
-        assert!(owns(obj6, signer::address_of(creator)), 1);
-        assert!(owns(obj5, signer::address_of(creator)), 1);
-        assert!(owns(obj4, signer::address_of(creator)), 1);
-        assert!(owns(obj3, signer::address_of(creator)), 1);
-        assert!(owns(obj2, signer::address_of(creator)), 1);
+        assert!(
+            owns(obj9, signer::address_of(creator)),
+            1
+        );
+        assert!(
+            owns(obj8, signer::address_of(creator)),
+            1
+        );
+        assert!(
+            owns(obj7, signer::address_of(creator)),
+            1
+        );
+        assert!(
+            owns(obj6, signer::address_of(creator)),
+            1
+        );
+        assert!(
+            owns(obj5, signer::address_of(creator)),
+            1
+        );
+        assert!(
+            owns(obj4, signer::address_of(creator)),
+            1
+        );
+        assert!(
+            owns(obj3, signer::address_of(creator)),
+            1
+        );
+        assert!(
+            owns(obj2, signer::address_of(creator)),
+            1
+        );
 
         // Calling `owns` should fail as the nesting is too deep.
-        assert!(owns(obj1, signer::address_of(creator)), 1);
+        assert!(
+            owns(obj1, signer::address_of(creator)),
+            1
+        );
     }
 
     #[test(creator = @0x123)]

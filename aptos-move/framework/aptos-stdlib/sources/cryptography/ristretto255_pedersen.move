@@ -4,7 +4,13 @@
 /// A Pedersen commitment to a value `v` under _commitment key_ `(g, h)` is `v * g + r * h`, for a random scalar `r`.
 
 module aptos_std::ristretto255_pedersen {
-    use aptos_std::ristretto255::{Self, RistrettoPoint, Scalar, CompressedRistretto, point_compress};
+    use aptos_std::ristretto255::{
+        Self,
+        RistrettoPoint,
+        Scalar,
+        CompressedRistretto,
+        point_compress
+    };
     use std::option::Option;
 
     //
@@ -13,7 +19,7 @@ module aptos_std::ristretto255_pedersen {
 
     /// The default Pedersen randomness base `h` used in our underlying Bulletproofs library.
     /// This is obtained by hashing the compressed Ristretto255 basepoint using SHA3-512 (not SHA2-512).
-    const BULLETPROOF_DEFAULT_PEDERSEN_RAND_BASE : vector<u8> = x"8c9240b456a9e6dc65c377a1048d745f94a08cdb7f44cbcd7b46f34048871134";
+    const BULLETPROOF_DEFAULT_PEDERSEN_RAND_BASE: vector<u8> = x"8c9240b456a9e6dc65c377a1048d745f94a08cdb7f44cbcd7b46f34048871134";
 
     //
     // Structs
@@ -43,14 +49,14 @@ module aptos_std::ristretto255_pedersen {
 
     /// Returns a commitment as a serialized byte array
     public fun commitment_to_bytes(comm: &Commitment): vector<u8> {
-        ristretto255::point_to_bytes(&ristretto255::point_compress(&comm.point))
+        ristretto255::point_to_bytes(
+            &ristretto255::point_compress(&comm.point)
+        )
     }
 
     /// Moves a Ristretto point into a Pedersen commitment.
     public fun commitment_from_point(point: RistrettoPoint): Commitment {
-        Commitment {
-            point
-        }
+        Commitment { point }
     }
 
     /// Deserializes a commitment from a compressed Ristretto point.
@@ -61,14 +67,23 @@ module aptos_std::ristretto255_pedersen {
     }
 
     /// Returns a commitment `v * val_base + r * rand_base` where `(val_base, rand_base)` is the commitment key.
-    public fun new_commitment(v: &Scalar, val_base: &RistrettoPoint, r: &Scalar, rand_base: &RistrettoPoint): Commitment {
+    public fun new_commitment(
+        v: &Scalar,
+        val_base: &RistrettoPoint,
+        r: &Scalar,
+        rand_base: &RistrettoPoint
+    ): Commitment {
         Commitment {
             point: ristretto255::double_scalar_mul(v, val_base, r, rand_base)
         }
     }
 
     /// Returns a commitment `v * G + r * rand_base` where `G` is the Ristretto255 basepoint.
-    public fun new_commitment_with_basepoint(v: &Scalar, r: &Scalar, rand_base: &RistrettoPoint): Commitment {
+    public fun new_commitment_with_basepoint(
+        v: &Scalar,
+        r: &Scalar,
+        rand_base: &RistrettoPoint
+    ): Commitment {
         Commitment {
             point: ristretto255::basepoint_double_mul(r, rand_base, v)
         }
@@ -77,7 +92,9 @@ module aptos_std::ristretto255_pedersen {
     /// Returns a commitment `v * G + r * H` where `G` is the Ristretto255 basepoint and `H` is the default randomness
     /// base used in the Bulletproofs library (i.e., `BULLETPROOF_DEFAULT_PEDERSEN_RAND_BASE`).
     public fun new_commitment_for_bulletproof(v: &Scalar, r: &Scalar): Commitment {
-        let rand_base = ristretto255::new_point_from_bytes(BULLETPROOF_DEFAULT_PEDERSEN_RAND_BASE);
+        let rand_base = ristretto255::new_point_from_bytes(
+            BULLETPROOF_DEFAULT_PEDERSEN_RAND_BASE
+        );
         let rand_base = std::option::extract(&mut rand_base);
 
         Commitment {
@@ -94,7 +111,10 @@ module aptos_std::ristretto255_pedersen {
     }
 
     /// Like `commitment_add` but assigns `lhs = lhs + rhs`.
-    public fun commitment_add_assign(lhs: &mut Commitment, rhs: &Commitment) {
+    public fun commitment_add_assign(
+        lhs: &mut Commitment,
+        rhs: &Commitment
+    ) {
         ristretto255::point_add_assign(&mut lhs.point, &rhs.point);
     }
 
@@ -107,7 +127,10 @@ module aptos_std::ristretto255_pedersen {
     }
 
     /// Like `commitment_add` but assigns `lhs = lhs - rhs`.
-    public fun commitment_sub_assign(lhs: &mut Commitment, rhs: &Commitment) {
+    public fun commitment_sub_assign(
+        lhs: &mut Commitment,
+        rhs: &Commitment
+    ) {
         ristretto255::point_sub_assign(&mut lhs.point, &rhs.point);
     }
 
@@ -153,6 +176,10 @@ module aptos_std::ristretto255_pedersen {
     /// Bulletproof has a default choice for `g` and `h` and this function returns the default `h` as used in the
     /// Bulletproofs Move module.
     public fun randomness_base_for_bulletproof(): RistrettoPoint {
-        std::option::extract(&mut ristretto255::new_point_from_bytes(BULLETPROOF_DEFAULT_PEDERSEN_RAND_BASE))
+        std::option::extract(
+            &mut ristretto255::new_point_from_bytes(
+                BULLETPROOF_DEFAULT_PEDERSEN_RAND_BASE
+            )
+        )
     }
 }

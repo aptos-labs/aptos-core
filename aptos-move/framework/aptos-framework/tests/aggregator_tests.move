@@ -10,10 +10,16 @@ module aptos_framework::aggregator_tests {
         let aggregator = aggregator_factory::create_aggregator(&account, 1000);
 
         aggregator::add(&mut aggregator, 12);
-        assert!(aggregator::read(&aggregator) == 12, 0);
+        assert!(
+            aggregator::read(&aggregator) == 12,
+            0
+        );
 
         aggregator::add(&mut aggregator, 3);
-        assert!(aggregator::read(&aggregator) == 15, 0);
+        assert!(
+            aggregator::read(&aggregator) == 15,
+            0
+        );
 
         aggregator::add(&mut aggregator, 3);
         aggregator::add(&mut aggregator, 2);

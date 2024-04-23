@@ -6,7 +6,7 @@ spec aptos_token::token {
 
     /// The length of the name is up to MAX_COLLECTION_NAME_LENGTH;
     /// The length of the uri is up to MAX_URI_LENGTH;
-    spec create_collection_script (
+    spec create_collection_script(
         creator: &signer,
         name: String,
         description: String,
@@ -59,8 +59,9 @@ spec aptos_token::token {
     spec fun spec_create_tokendata(
         creator: address,
         collection: String,
-        name: String): TokenDataId {
-        TokenDataId { creator, collection, name }
+        name: String
+    ): TokenDataId {
+        TokenDataId {creator, collection, name}
     }
 
     /// only creator of the tokendata can mint tokens
@@ -84,15 +85,13 @@ spec aptos_token::token {
         let token_data = table::spec_get(all_token_data, token_data_id);
         aborts_if token_data_id.creator != signer::address_of(account);
 
-        include CreateTokenDataIdAbortsIf{
-        creator: token_data_address,
-        collection: collection,
-        name: name
+        include CreateTokenDataIdAbortsIf {
+            creator: token_data_address,
+            collection: collection,
+            name: name
         };
 
-        include MintTokenAbortsIf {
-        token_data_id: token_data_id
-        };
+        include MintTokenAbortsIf {token_data_id: token_data_id};
     }
 
     /// The signer is creator.
@@ -119,7 +118,7 @@ spec aptos_token::token {
         };
     }
 
-    spec direct_transfer_script (
+    spec direct_transfer_script(
         sender: &signer,
         receiver: &signer,
         creators_address: address,
@@ -130,7 +129,7 @@ spec aptos_token::token {
     ) {
         // TODO: Unknown error message in direct_transfer function.
         pragma aborts_if_is_partial;
-        include CreateTokenDataIdAbortsIf{
+        include CreateTokenDataIdAbortsIf {
             creator: creators_address,
             collection: collection,
             name: name
@@ -145,9 +144,15 @@ spec aptos_token::token {
         aborts_if !exists<TokenStore>(addr) && !exists<account::Account>(addr);
         aborts_if !exists<TokenStore>(addr) && account_addr.guid_creation_num + 4 >= account::MAX_GUID_CREATION_NUM;
         aborts_if !exists<TokenStore>(addr) && account_addr.guid_creation_num + 4 > MAX_U64;
-        aborts_if !exists<token_event_store::TokenEventStoreV1>(addr) && account_addr.guid_creation_num + 9 > account::MAX_GUID_CREATION_NUM;
-        aborts_if !exists<token_event_store::TokenEventStoreV1>(addr) && account_addr.guid_creation_num + 9 > MAX_U64;
-        aborts_if !exists<token_event_store::TokenEventStoreV1>(addr) && !exists<account::Account>(addr);
+        aborts_if !exists<
+            token_event_store::TokenEventStoreV1
+        >(addr) && account_addr.guid_creation_num + 9 > account::MAX_GUID_CREATION_NUM;
+        aborts_if !exists<
+            token_event_store::TokenEventStoreV1
+        >(addr) && account_addr.guid_creation_num + 9 > MAX_U64;
+        aborts_if !exists<
+            token_event_store::TokenEventStoreV1
+        >(addr) && !exists<account::Account>(addr);
     }
 
     spec transfer_with_opt_in(
@@ -161,7 +166,7 @@ spec aptos_token::token {
     ) {
         //TODO: Abort condition is complex because of transfer function.
         pragma aborts_if_is_partial;
-        include CreateTokenDataIdAbortsIf{
+        include CreateTokenDataIdAbortsIf {
             creator: creator,
             collection: collection_name,
             name: token_name
@@ -180,7 +185,12 @@ spec aptos_token::token {
         //TODO: Abort condition is complex because of the read_bool in the property_map module.
         pragma aborts_if_is_partial;
         let creator_address = signer::address_of(creator);
-        let token_id = spec_create_token_id_raw(creator_address, collection, name, property_version);
+        let token_id = spec_create_token_id_raw(
+            creator_address,
+            collection,
+            name,
+            property_version
+        );
         let creator_addr = token_id.token_data_id.creator;
         let collections = borrow_global_mut<Collections>(creator_address);
         let token_data = table::spec_get(
@@ -189,8 +199,14 @@ spec aptos_token::token {
         );
         aborts_if amount <= 0;
         aborts_if !exists<Collections>(creator_addr);
-        aborts_if !table::spec_contains(collections.token_data, token_id.token_data_id);
-        aborts_if !simple_map::spec_contains_key(token_data.default_properties.map, std::string::spec_utf8(BURNABLE_BY_CREATOR));
+        aborts_if !table::spec_contains(
+            collections.token_data,
+            token_id.token_data_id
+        );
+        aborts_if !simple_map::spec_contains_key(
+            token_data.default_properties.map,
+            std::string::spec_utf8(BURNABLE_BY_CREATOR)
+        );
     }
 
     /// The token_data_id should exist in token_data.
@@ -205,20 +221,29 @@ spec aptos_token::token {
         use aptos_std::simple_map;
         //TODO: Abort condition is complex because of the read_bool in the property_map module.
         pragma aborts_if_is_partial;
-        let token_id = spec_create_token_id_raw(creators_address, collection, name, property_version);
+        let token_id = spec_create_token_id_raw(
+            creators_address,
+            collection,
+            name,
+            property_version
+        );
         let creator_addr = token_id.token_data_id.creator;
         let collections = borrow_global_mut<Collections>(creator_addr);
         let token_data = table::spec_get(
             collections.token_data,
             token_id.token_data_id,
         );
-        include CreateTokenDataIdAbortsIf {
-        creator: creators_address
-        };
+        include CreateTokenDataIdAbortsIf {creator: creators_address};
         aborts_if amount <= 0;
         aborts_if !exists<Collections>(creator_addr);
-        aborts_if !table::spec_contains(collections.token_data, token_id.token_data_id);
-        aborts_if !simple_map::spec_contains_key(token_data.default_properties.map, std::string::spec_utf8(BURNABLE_BY_OWNER));
+        aborts_if !table::spec_contains(
+            collections.token_data,
+            token_id.token_data_id
+        );
+        aborts_if !simple_map::spec_contains_key(
+            token_data.default_properties.map,
+            std::string::spec_utf8(BURNABLE_BY_OWNER)
+        );
         aborts_if !string::spec_internal_check_utf8(BURNABLE_BY_OWNER);
 
     }
@@ -229,51 +254,81 @@ spec aptos_token::token {
         name: String,
         property_version: u64,
     ): TokenId {
-        let token_data_id = TokenDataId { creator, collection, name };
-        TokenId {
-            token_data_id,
-            property_version
-        }
+        let token_data_id = TokenDataId {creator, collection, name};
+        TokenId {token_data_id, property_version}
     }
 
     /// The description of Collection is mutable.
-    spec mutate_collection_description(creator: &signer, collection_name: String, description: String) {
+    spec mutate_collection_description(
+        creator: &signer,
+        collection_name: String,
+        description: String
+    ) {
         let addr = signer::address_of(creator);
         let account = global<account::Account>(addr);
-        let collection_data = table::spec_get(global<Collections>(addr).collection_data, collection_name);
+        let collection_data = table::spec_get(
+            global<Collections>(addr).collection_data,
+            collection_name
+        );
         include AssertCollectionExistsAbortsIf {
             creator_address: addr,
             collection_name: collection_name
         };
         aborts_if !collection_data.mutability_config.description;
-        aborts_if !exists<token_event_store::TokenEventStoreV1>(addr) && !exists<account::Account>(addr);
-        aborts_if !exists<token_event_store::TokenEventStoreV1>(addr) && account.guid_creation_num + 9 >= account::MAX_GUID_CREATION_NUM;
-        aborts_if !exists<token_event_store::TokenEventStoreV1>(addr) && account.guid_creation_num + 9 > MAX_U64;
+        aborts_if !exists<
+            token_event_store::TokenEventStoreV1
+        >(addr) && !exists<account::Account>(addr);
+        aborts_if !exists<
+            token_event_store::TokenEventStoreV1
+        >(addr) && account.guid_creation_num + 9 >= account::MAX_GUID_CREATION_NUM;
+        aborts_if !exists<
+            token_event_store::TokenEventStoreV1
+        >(addr) && account.guid_creation_num + 9 > MAX_U64;
     }
 
     /// The uri of Collection is mutable.
-    spec mutate_collection_uri(creator: &signer, collection_name: String, uri: String) {
+    spec mutate_collection_uri(
+        creator: &signer,
+        collection_name: String,
+        uri: String
+    ) {
         let addr = signer::address_of(creator);
         let account = global<account::Account>(addr);
-        let collection_data = table::spec_get(global<Collections>(addr).collection_data, collection_name);
+        let collection_data = table::spec_get(
+            global<Collections>(addr).collection_data,
+            collection_name
+        );
         aborts_if len(uri.bytes) > MAX_URI_LENGTH;
         include AssertCollectionExistsAbortsIf {
             creator_address: addr,
             collection_name: collection_name
         };
         aborts_if !collection_data.mutability_config.uri;
-        aborts_if !exists<token_event_store::TokenEventStoreV1>(addr) && !exists<account::Account>(addr);
-        aborts_if !exists<token_event_store::TokenEventStoreV1>(addr) && account.guid_creation_num + 9 >= account::MAX_GUID_CREATION_NUM;
-        aborts_if !exists<token_event_store::TokenEventStoreV1>(addr) && account.guid_creation_num + 9 > MAX_U64;
+        aborts_if !exists<
+            token_event_store::TokenEventStoreV1
+        >(addr) && !exists<account::Account>(addr);
+        aborts_if !exists<
+            token_event_store::TokenEventStoreV1
+        >(addr) && account.guid_creation_num + 9 >= account::MAX_GUID_CREATION_NUM;
+        aborts_if !exists<
+            token_event_store::TokenEventStoreV1
+        >(addr) && account.guid_creation_num + 9 > MAX_U64;
     }
 
     /// Cannot change maximum from 0 and cannot change maximum to 0.
     /// The maximum should more than suply.
     /// The maxium of Collection is mutable.
-    spec mutate_collection_maximum(creator: &signer, collection_name: String, maximum: u64) {
+    spec mutate_collection_maximum(
+        creator: &signer,
+        collection_name: String,
+        maximum: u64
+    ) {
         let addr = signer::address_of(creator);
         let account = global<account::Account>(addr);
-        let collection_data = table::spec_get(global<Collections>(addr).collection_data, collection_name);
+        let collection_data = table::spec_get(
+            global<Collections>(addr).collection_data,
+            collection_name
+        );
         include AssertCollectionExistsAbortsIf {
             creator_address: addr,
             collection_name: collection_name
@@ -281,15 +336,25 @@ spec aptos_token::token {
         aborts_if collection_data.maximum == 0 || maximum == 0;
         aborts_if maximum < collection_data.supply;
         aborts_if !collection_data.mutability_config.maximum;
-        aborts_if !exists<token_event_store::TokenEventStoreV1>(addr) && !exists<account::Account>(addr);
-        aborts_if !exists<token_event_store::TokenEventStoreV1>(addr) && account.guid_creation_num + 9 >= account::MAX_GUID_CREATION_NUM;
-        aborts_if !exists<token_event_store::TokenEventStoreV1>(addr) && account.guid_creation_num + 9 > MAX_U64;
+        aborts_if !exists<
+            token_event_store::TokenEventStoreV1
+        >(addr) && !exists<account::Account>(addr);
+        aborts_if !exists<
+            token_event_store::TokenEventStoreV1
+        >(addr) && account.guid_creation_num + 9 >= account::MAX_GUID_CREATION_NUM;
+        aborts_if !exists<
+            token_event_store::TokenEventStoreV1
+        >(addr) && account.guid_creation_num + 9 > MAX_U64;
     }
 
     /// Cannot change maximum from 0 and cannot change maximum to 0.
     /// The maximum should more than suply.
     /// The token maximum is mutable
-    spec mutate_tokendata_maximum(creator: &signer, token_data_id: TokenDataId, maximum: u64) {
+    spec mutate_tokendata_maximum(
+        creator: &signer,
+        token_data_id: TokenDataId,
+        maximum: u64
+    ) {
         let addr = signer::address_of(creator);
         let account = global<account::Account>(addr);
         let all_token_data = global<Collections>(token_data_id.creator).token_data;
@@ -298,9 +363,15 @@ spec aptos_token::token {
         aborts_if token_data.maximum == 0 || maximum == 0;
         aborts_if maximum < token_data.supply;
         aborts_if !token_data.mutability_config.maximum;
-        aborts_if !exists<token_event_store::TokenEventStoreV1>(addr) && !exists<account::Account>(addr);
-        aborts_if !exists<token_event_store::TokenEventStoreV1>(addr) && account.guid_creation_num + 9 >= account::MAX_GUID_CREATION_NUM;
-        aborts_if !exists<token_event_store::TokenEventStoreV1>(addr) && account.guid_creation_num + 9 > MAX_U64;
+        aborts_if !exists<
+            token_event_store::TokenEventStoreV1
+        >(addr) && !exists<account::Account>(addr);
+        aborts_if !exists<
+            token_event_store::TokenEventStoreV1
+        >(addr) && account.guid_creation_num + 9 >= account::MAX_GUID_CREATION_NUM;
+        aborts_if !exists<
+            token_event_store::TokenEventStoreV1
+        >(addr) && account.guid_creation_num + 9 > MAX_U64;
     }
 
     /// The length of uri should less than MAX_URI_LENGTH.
@@ -318,35 +389,61 @@ spec aptos_token::token {
         include AssertTokendataExistsAbortsIf;
         aborts_if len(uri.bytes) > MAX_URI_LENGTH;
         aborts_if !token_data.mutability_config.uri;
-        aborts_if !exists<token_event_store::TokenEventStoreV1>(addr) && !exists<account::Account>(addr);
-        aborts_if !exists<token_event_store::TokenEventStoreV1>(addr) && account.guid_creation_num + 9 >= account::MAX_GUID_CREATION_NUM;
-        aborts_if !exists<token_event_store::TokenEventStoreV1>(addr) && account.guid_creation_num + 9 > MAX_U64;
+        aborts_if !exists<
+            token_event_store::TokenEventStoreV1
+        >(addr) && !exists<account::Account>(addr);
+        aborts_if !exists<
+            token_event_store::TokenEventStoreV1
+        >(addr) && account.guid_creation_num + 9 >= account::MAX_GUID_CREATION_NUM;
+        aborts_if !exists<
+            token_event_store::TokenEventStoreV1
+        >(addr) && account.guid_creation_num + 9 > MAX_U64;
     }
 
-   /// The token royalty is mutable
-    spec mutate_tokendata_royalty(creator: &signer, token_data_id: TokenDataId, royalty: Royalty) {
+    /// The token royalty is mutable
+    spec mutate_tokendata_royalty(
+        creator: &signer,
+        token_data_id: TokenDataId,
+        royalty: Royalty
+    ) {
         include AssertTokendataExistsAbortsIf;
         let addr = signer::address_of(creator);
         let account = global<account::Account>(addr);
         let all_token_data = global<Collections>(token_data_id.creator).token_data;
         let token_data = table::spec_get(all_token_data, token_data_id);
         aborts_if !token_data.mutability_config.royalty;
-        aborts_if !exists<token_event_store::TokenEventStoreV1>(addr) && !exists<account::Account>(addr);
-        aborts_if !exists<token_event_store::TokenEventStoreV1>(addr) && account.guid_creation_num + 9 >= account::MAX_GUID_CREATION_NUM;
-        aborts_if !exists<token_event_store::TokenEventStoreV1>(addr) && account.guid_creation_num + 9 > MAX_U64;
+        aborts_if !exists<
+            token_event_store::TokenEventStoreV1
+        >(addr) && !exists<account::Account>(addr);
+        aborts_if !exists<
+            token_event_store::TokenEventStoreV1
+        >(addr) && account.guid_creation_num + 9 >= account::MAX_GUID_CREATION_NUM;
+        aborts_if !exists<
+            token_event_store::TokenEventStoreV1
+        >(addr) && account.guid_creation_num + 9 > MAX_U64;
     }
 
     /// The token description is mutable
-    spec mutate_tokendata_description(creator: &signer, token_data_id: TokenDataId, description: String) {
+    spec mutate_tokendata_description(
+        creator: &signer,
+        token_data_id: TokenDataId,
+        description: String
+    ) {
         include AssertTokendataExistsAbortsIf;
         let addr = signer::address_of(creator);
         let account = global<account::Account>(addr);
         let all_token_data = global<Collections>(token_data_id.creator).token_data;
         let token_data = table::spec_get(all_token_data, token_data_id);
         aborts_if !token_data.mutability_config.description;
-        aborts_if !exists<token_event_store::TokenEventStoreV1>(addr) && !exists<account::Account>(addr);
-        aborts_if !exists<token_event_store::TokenEventStoreV1>(addr) && account.guid_creation_num + 9 >= account::MAX_GUID_CREATION_NUM;
-        aborts_if !exists<token_event_store::TokenEventStoreV1>(addr) && account.guid_creation_num + 9 > MAX_U64;
+        aborts_if !exists<
+            token_event_store::TokenEventStoreV1
+        >(addr) && !exists<account::Account>(addr);
+        aborts_if !exists<
+            token_event_store::TokenEventStoreV1
+        >(addr) && account.guid_creation_num + 9 >= account::MAX_GUID_CREATION_NUM;
+        aborts_if !exists<
+            token_event_store::TokenEventStoreV1
+        >(addr) && account.guid_creation_num + 9 > MAX_U64;
     }
 
     /// The property map is mutable
@@ -384,14 +481,27 @@ spec aptos_token::token {
         let creator = token_id.token_data_id.creator;
         let addr = signer::address_of(account);
         let all_token_data = global<Collections>(creator).token_data;
-        let token_data = table::spec_get(all_token_data, token_id.token_data_id);
+        let token_data = table::spec_get(
+            all_token_data,
+            token_id.token_data_id
+        );
         aborts_if addr != creator;
         aborts_if !exists<Collections>(creator);
-        aborts_if !table::spec_contains(all_token_data, token_id.token_data_id);
-        aborts_if !token_data.mutability_config.properties && !simple_map::spec_contains_key(token_data.default_properties.map, std::string::spec_utf8(TOKEN_PROPERTY_MUTABLE));
+        aborts_if !table::spec_contains(
+            all_token_data,
+            token_id.token_data_id
+        );
+        aborts_if !token_data.mutability_config.properties && !simple_map::spec_contains_key(
+            token_data.default_properties.map,
+            std::string::spec_utf8(TOKEN_PROPERTY_MUTABLE)
+        );
     }
 
-    spec create_royalty(royalty_points_numerator: u64, royalty_points_denominator: u64, payee_address: address): Royalty {
+    spec create_royalty(
+        royalty_points_numerator: u64,
+        royalty_points_denominator: u64,
+        payee_address: address
+    ): Royalty {
         include CreateRoyaltyAbortsIf;
     }
 
@@ -451,7 +561,10 @@ spec aptos_token::token {
         aborts_if !exists<TokenStore>(addr) && account_addr.guid_creation_num + 4 > MAX_U64;
     }
 
-    spec merge(dst_token: &mut Token, source_token: Token) {
+    spec merge(
+        dst_token: &mut Token,
+        source_token: Token
+    ) {
         aborts_if dst_token.id != source_token.id;
         aborts_if dst_token.amount + source_token.amount > MAX_U64;
     }
@@ -476,27 +589,34 @@ spec aptos_token::token {
         include WithdrawWithEventInternalAbortsIf;
     }
 
-    spec withdraw_with_capability(
-        withdraw_proof: WithdrawCapability,
-    ): Token {
-        let now_seconds = global<timestamp::CurrentTimeMicroseconds>(@aptos_framework).microseconds;
-        aborts_if !exists<timestamp::CurrentTimeMicroseconds>(@aptos_framework);
+    spec withdraw_with_capability(withdraw_proof: WithdrawCapability,): Token {
+        let now_seconds = global<
+            timestamp::CurrentTimeMicroseconds
+        >(@aptos_framework).microseconds;
+        aborts_if !exists<
+            timestamp::CurrentTimeMicroseconds
+        >(@aptos_framework);
         aborts_if now_seconds / timestamp::MICRO_CONVERSION_FACTOR > withdraw_proof.expiration_sec;
-        include WithdrawWithEventInternalAbortsIf{
-        account_addr: withdraw_proof.token_owner,
-        id: withdraw_proof.token_id,
-        amount: withdraw_proof.amount};
+        include WithdrawWithEventInternalAbortsIf {
+            account_addr: withdraw_proof.token_owner,
+            id: withdraw_proof.token_id,
+            amount: withdraw_proof.amount
+        };
     }
 
     spec partial_withdraw_with_capability(
         withdraw_proof: WithdrawCapability,
         withdraw_amount: u64,
     ): (Token, Option<WithdrawCapability>) {
-        let now_seconds = global<timestamp::CurrentTimeMicroseconds>(@aptos_framework).microseconds;
-        aborts_if !exists<timestamp::CurrentTimeMicroseconds>(@aptos_framework);
+        let now_seconds = global<
+            timestamp::CurrentTimeMicroseconds
+        >(@aptos_framework).microseconds;
+        aborts_if !exists<
+            timestamp::CurrentTimeMicroseconds
+        >(@aptos_framework);
         aborts_if now_seconds / timestamp::MICRO_CONVERSION_FACTOR > withdraw_proof.expiration_sec;
         aborts_if withdraw_amount > withdraw_proof.amount;
-        include WithdrawWithEventInternalAbortsIf{
+        include WithdrawWithEventInternalAbortsIf {
             account_addr: withdraw_proof.token_owner,
             id: withdraw_proof.token_id,
             amount: withdraw_amount
@@ -562,7 +682,11 @@ spec aptos_token::token {
 
     /// The length of collection should less than MAX_COLLECTION_NAME_LENGTH
     /// The length of name should less than MAX_NFT_NAME_LENGTH
-    spec check_tokendata_exists(creator: address, collection_name: String, token_name: String): bool {
+    spec check_tokendata_exists(
+        creator: address,
+        collection_name: String,
+        token_name: String
+    ): bool {
         aborts_if !exists<Collections>(creator);
         include CreateTokenDataIdAbortsIf {
             creator: creator,
@@ -594,7 +718,10 @@ spec aptos_token::token {
         let account_addr = signer::address_of(account);
         let collections = global<Collections>(account_addr);
         let token_data_id = spec_create_token_data_id(account_addr, collection, name);
-        let Collection = table::spec_get(collections.collection_data, token_data_id.collection);
+        let Collection = table::spec_get(
+            collections.collection_data,
+            token_data_id.collection
+        );
         let length = len(property_keys);
         aborts_if len(name.bytes) > MAX_NFT_NAME_LENGTH;
         aborts_if len(collection.bytes) > MAX_COLLECTION_NAME_LENGTH;
@@ -606,10 +733,17 @@ spec aptos_token::token {
             collection: collection,
             name: name
         };
-        aborts_if !table::spec_contains(collections.collection_data, collection);
-        aborts_if table::spec_contains(collections.token_data, token_data_id);
+        aborts_if !table::spec_contains(
+            collections.collection_data,
+            collection
+        );
+        aborts_if table::spec_contains(
+            collections.token_data,
+            token_data_id
+        );
         aborts_if Collection.maximum > 0 && Collection.supply + 1 > MAX_U64;
-        aborts_if Collection.maximum > 0 && Collection.maximum < Collection.supply + 1;
+        aborts_if Collection.maximum > 0 && Collection.maximum < Collection.supply + 1
+            ;
         include CreateRoyaltyAbortsIf {
             payee_address: royalty_payee_address
         };
@@ -623,32 +757,50 @@ spec aptos_token::token {
         collection: String,
         name: String,
     ): TokenDataId {
-        TokenDataId { creator, collection, name }
+        TokenDataId {creator, collection, name}
     }
 
-    spec get_collection_supply(creator_address: address, collection_name: String): Option<u64> {
+    spec get_collection_supply(
+        creator_address: address,
+        collection_name: String
+    ): Option<u64> {
         include AssertCollectionExistsAbortsIf;
     }
 
-    spec get_collection_description(creator_address: address, collection_name: String): String {
+    spec get_collection_description(
+        creator_address: address,
+        collection_name: String
+    ): String {
         include AssertCollectionExistsAbortsIf;
     }
 
-    spec get_collection_uri(creator_address: address, collection_name: String): String {
+    spec get_collection_uri(
+        creator_address: address,
+        collection_name: String
+    ): String {
         include AssertCollectionExistsAbortsIf;
     }
 
-    spec get_collection_maximum(creator_address: address, collection_name: String): u64 {
+    spec get_collection_maximum(
+        creator_address: address,
+        collection_name: String
+    ): u64 {
         include AssertCollectionExistsAbortsIf;
     }
 
-    spec get_token_supply(creator_address: address, token_data_id: TokenDataId): Option<u64> {
+    spec get_token_supply(
+        creator_address: address,
+        token_data_id: TokenDataId
+    ): Option<u64> {
         aborts_if !exists<Collections>(creator_address);
         let all_token_data = global<Collections>(creator_address).token_data;
         aborts_if !table::spec_contains(all_token_data, token_data_id);
     }
 
-    spec get_tokendata_largest_property_version(creator_address: address, token_data_id: TokenDataId): u64 {
+    spec get_tokendata_largest_property_version(
+        creator_address: address,
+        token_data_id: TokenDataId
+    ): u64 {
         aborts_if !exists<Collections>(creator_address);
         let all_token_data = global<Collections>(creator_address).token_data;
         aborts_if !table::spec_contains(all_token_data, token_data_id);
@@ -656,18 +808,33 @@ spec aptos_token::token {
 
     /// The length of 'mutate_setting' should more than five.
     /// The mutate_setting shuold have a value.
-    spec create_token_mutability_config(mutate_setting: &vector<bool>): TokenMutabilityConfig  {
+    spec create_token_mutability_config(mutate_setting: &vector<bool>): TokenMutabilityConfig {
         include CreateTokenMutabilityConfigAbortsIf;
     }
 
     spec schema CreateTokenMutabilityConfigAbortsIf {
         mutate_setting: vector<bool>;
-        aborts_if len(mutate_setting) < 5;
-        aborts_if !vector::spec_contains(mutate_setting, mutate_setting[TOKEN_MAX_MUTABLE_IND]);
-        aborts_if !vector::spec_contains(mutate_setting, mutate_setting[TOKEN_URI_MUTABLE_IND]);
-        aborts_if !vector::spec_contains(mutate_setting, mutate_setting[TOKEN_ROYALTY_MUTABLE_IND]);
-        aborts_if !vector::spec_contains(mutate_setting, mutate_setting[TOKEN_DESCRIPTION_MUTABLE_IND]);
-        aborts_if !vector::spec_contains(mutate_setting, mutate_setting[TOKEN_PROPERTY_MUTABLE_IND]);
+        aborts_if len(mutate_setting) <5;
+        aborts_if !vector::spec_contains(
+            mutate_setting,
+            mutate_setting[TOKEN_MAX_MUTABLE_IND]
+        );
+        aborts_if !vector::spec_contains(
+            mutate_setting,
+            mutate_setting[TOKEN_URI_MUTABLE_IND]
+        );
+        aborts_if !vector::spec_contains(
+            mutate_setting,
+            mutate_setting[TOKEN_ROYALTY_MUTABLE_IND]
+        );
+        aborts_if !vector::spec_contains(
+            mutate_setting,
+            mutate_setting[TOKEN_DESCRIPTION_MUTABLE_IND]
+        );
+        aborts_if !vector::spec_contains(
+            mutate_setting,
+            mutate_setting[TOKEN_PROPERTY_MUTABLE_IND]
+        );
     }
 
     spec create_collection_mutability_config {
@@ -676,10 +843,21 @@ spec aptos_token::token {
 
     spec schema CreateCollectionMutabilityConfigAbortsIf {
         mutate_setting: vector<bool>;
-        aborts_if len(mutate_setting) < 3;
-        aborts_if !vector::spec_contains(mutate_setting, mutate_setting[COLLECTION_DESCRIPTION_MUTABLE_IND]);
-        aborts_if !vector::spec_contains(mutate_setting, mutate_setting[COLLECTION_URI_MUTABLE_IND]);
-        aborts_if !vector::spec_contains(mutate_setting, mutate_setting[COLLECTION_MAX_MUTABLE_IND]);
+        aborts_if len(mutate_setting) <3;
+        aborts_if !vector::spec_contains(
+            mutate_setting,
+            mutate_setting[
+                COLLECTION_DESCRIPTION_MUTABLE_IND
+            ]
+        );
+        aborts_if !vector::spec_contains(
+            mutate_setting,
+            mutate_setting[COLLECTION_URI_MUTABLE_IND]
+        );
+        aborts_if !vector::spec_contains(
+            mutate_setting,
+            mutate_setting[COLLECTION_MAX_MUTABLE_IND]
+        );
     }
 
     /// The creator of the TokenDataId is signer.
@@ -788,14 +966,10 @@ spec aptos_token::token {
 
     spec fun spec_balance_of(owner: address, id: TokenId): u64 {
         let token_store = borrow_global<TokenStore>(owner);
-        if (!exists<TokenStore>(owner)) {
-            0
-        }
+        if (!exists<TokenStore>(owner)) { 0 }
         else if (table::spec_contains(token_store.tokens, id)) {
             table::spec_get(token_store.tokens, id).amount
-        } else {
-            0
-        }
+        } else { 0 }
     }
 
     spec get_royalty(token_id: TokenId): Royalty {
@@ -808,7 +982,10 @@ spec aptos_token::token {
         let creator_addr = token_id.token_data_id.creator;
         let all_token_data = global<Collections>(creator_addr).token_data;
         aborts_if spec_balance_of(owner, token_id) <= 0;
-        aborts_if token_id.property_version == 0 && !table::spec_contains(all_token_data, token_id.token_data_id);
+        aborts_if token_id.property_version == 0 && !table::spec_contains(
+            all_token_data,
+            token_id.token_data_id
+        );
         aborts_if token_id.property_version == 0 && !exists<Collections>(creator_addr);
     }
 
@@ -819,7 +996,10 @@ spec aptos_token::token {
         aborts_if !table::spec_contains(all_token_data, token_data_id);
     }
 
-    spec get_tokendata_uri(creator: address, token_data_id: TokenDataId): String {
+    spec get_tokendata_uri(
+        creator: address,
+        token_data_id: TokenDataId
+    ): String {
         aborts_if !exists<Collections>(creator);
         let all_token_data = global<Collections>(creator).token_data;
         aborts_if !table::spec_contains(all_token_data, token_data_id);
@@ -857,7 +1037,10 @@ spec aptos_token::token {
     ): CollectionMutabilityConfig {
         let all_collection_data = global<Collections>(creator).collection_data;
         aborts_if !exists<Collections>(creator);
-        aborts_if !table::spec_contains(all_collection_data, collection_name);
+        aborts_if !table::spec_contains(
+            all_collection_data,
+            collection_name
+        );
     }
 
     spec withdraw_with_event_internal(
@@ -879,7 +1062,7 @@ spec aptos_token::token {
         aborts_if !table::spec_contains(tokens, id);
     }
 
-    spec update_token_property_internal (
+    spec update_token_property_internal(
         token_owner: address,
         token_id: TokenId,
         keys: vector<String>,
@@ -913,7 +1096,10 @@ spec aptos_token::token {
     }
 
     /// The collection_name should exist in collection_data of the creator_address's Collections.
-    spec assert_collection_exists(creator_address: address, collection_name: String) {
+    spec assert_collection_exists(
+        creator_address: address,
+        collection_name: String
+    ) {
         include AssertCollectionExistsAbortsIf;
     }
 
@@ -922,13 +1108,19 @@ spec aptos_token::token {
         collection_name: String;
         let all_collection_data = global<Collections>(creator_address).collection_data;
         aborts_if !exists<Collections>(creator_address);
-        aborts_if !table::spec_contains(all_collection_data, collection_name);
+        aborts_if !table::spec_contains(
+            all_collection_data,
+            collection_name
+        );
     }
 
     /// The creator of token_data_id should be signer.
     /// The  creator of token_data_id exists in Collections.
     /// The token_data_id is in the all_token_data.
-    spec assert_tokendata_exists(creator: &signer, token_data_id: TokenDataId) {
+    spec assert_tokendata_exists(
+        creator: &signer,
+        token_data_id: TokenDataId
+    ) {
         include AssertTokendataExistsAbortsIf;
     }
 

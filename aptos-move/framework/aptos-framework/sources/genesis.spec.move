@@ -77,22 +77,34 @@ spec aptos_framework::genesis {
 
         // property 1: All the core resources and modules should be created during genesis and owned by the Aptos framework account.
         /// [high-level-req-1]
-        ensures exists<aptos_governance::GovernanceResponsbility>(@aptos_framework);
-        ensures exists<consensus_config::ConsensusConfig>(@aptos_framework);
-        ensures exists<execution_config::ExecutionConfig>(@aptos_framework);
+        ensures exists<
+            aptos_governance::GovernanceResponsbility
+        >(@aptos_framework);
+        ensures exists<
+            consensus_config::ConsensusConfig
+        >(@aptos_framework);
+        ensures exists<
+            execution_config::ExecutionConfig
+        >(@aptos_framework);
         ensures exists<version::Version>(@aptos_framework);
         ensures exists<stake::ValidatorSet>(@aptos_framework);
         ensures exists<stake::ValidatorPerformance>(@aptos_framework);
         ensures exists<storage_gas::StorageGasConfig>(@aptos_framework);
         ensures exists<storage_gas::StorageGas>(@aptos_framework);
         ensures exists<gas_schedule::GasScheduleV2>(@aptos_framework);
-        ensures exists<aggregator_factory::AggregatorFactory>(@aptos_framework);
+        ensures exists<
+            aggregator_factory::AggregatorFactory
+        >(@aptos_framework);
         ensures exists<coin::SupplyConfig>(@aptos_framework);
         ensures exists<chain_id::ChainId>(@aptos_framework);
         ensures exists<reconfiguration::Configuration>(@aptos_framework);
         ensures exists<block::BlockResource>(@aptos_framework);
-        ensures exists<state_storage::StateStorageUsage>(@aptos_framework);
-        ensures exists<timestamp::CurrentTimeMicroseconds>(@aptos_framework);
+        ensures exists<
+            state_storage::StateStorageUsage
+        >(@aptos_framework);
+        ensures exists<
+            timestamp::CurrentTimeMicroseconds
+        >(@aptos_framework);
         ensures exists<account::Account>(@aptos_framework);
         ensures exists<version::SetVersionCapability>(@aptos_framework);
         ensures exists<staking_config::StakingConfig>(@aptos_framework);
@@ -104,8 +116,12 @@ spec aptos_framework::genesis {
         /// [high-level-req-3]
         requires !exists<stake::AptosCoinCapabilities>(@aptos_framework);
         ensures exists<stake::AptosCoinCapabilities>(@aptos_framework);
-        requires exists<transaction_fee::AptosCoinCapabilities>(@aptos_framework);
-        ensures exists<transaction_fee::AptosCoinCapabilities>(@aptos_framework);
+        requires exists<
+            transaction_fee::AptosCoinCapabilities
+        >(@aptos_framework);
+        ensures exists<
+            transaction_fee::AptosCoinCapabilities
+        >(@aptos_framework);
     }
 
     spec create_initialize_validators_with_commission {
@@ -142,7 +158,9 @@ spec aptos_framework::genesis {
         pragma delegate_invariants_to_caller;
         // property 4: An initial set of validators should exist before the end of genesis.
         /// [high-level-req-4]
-        requires len(global<stake::ValidatorSet>(@aptos_framework).active_validators) >= 1;
+        requires len(
+            global<stake::ValidatorSet>(@aptos_framework).active_validators
+        ) >= 1;
         // property 5: The end of genesis should be marked on chain.
         /// [high-level-req-5]
         let addr = std::signer::address_of(aptos_framework);
@@ -156,7 +174,9 @@ spec aptos_framework::genesis {
         requires !exists<account::Account>(@aptos_framework);
         requires chain_status::is_operating();
         requires len(execution_config) > 0;
-        requires exists<staking_config::StakingRewardsConfig>(@aptos_framework);
+        requires exists<
+            staking_config::StakingRewardsConfig
+        >(@aptos_framework);
         requires exists<stake::ValidatorFees>(@aptos_framework);
         requires exists<coin::CoinInfo<AptosCoin>>(@aptos_framework);
         include CompareTimeRequires;
@@ -164,7 +184,9 @@ spec aptos_framework::genesis {
     }
 
     spec schema CompareTimeRequires {
-        let staking_rewards_config = global<staking_config::StakingRewardsConfig>(@aptos_framework);
+        let staking_rewards_config = global<
+            staking_config::StakingRewardsConfig
+        >(@aptos_framework);
         requires staking_rewards_config.last_rewards_rate_period_start_in_secs <= timestamp::spec_now_seconds();
     }
 }

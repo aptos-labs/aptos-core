@@ -9,7 +9,7 @@ module aptos_framework::keyless_account {
     use aptos_framework::system_addresses;
 
     /// The training wheels PK needs to be 32 bytes long.
-    const E_TRAINING_WHEELS_PK_WRONG_SIZE : u64 = 1;
+    const E_TRAINING_WHEELS_PK_WRONG_SIZE: u64 = 1;
 
     #[resource_group(scope = global)]
     struct Group {}
@@ -54,18 +54,23 @@ module aptos_framework::keyless_account {
     }
 
     #[test_only]
-    public fun initialize_for_test(fx: &signer, vk: Groth16VerificationKey, constants: Configuration) {
+    public fun initialize_for_test(
+        fx: &signer,
+        vk: Groth16VerificationKey,
+        constants: Configuration
+    ) {
         system_addresses::assert_aptos_framework(fx);
 
         move_to(fx, vk);
         move_to(fx, constants);
     }
 
-    public fun new_groth16_verification_key(alpha_g1: vector<u8>,
-                                            beta_g2: vector<u8>,
-                                            gamma_g2: vector<u8>,
-                                            delta_g2: vector<u8>,
-                                            gamma_abc_g1: vector<vector<u8>>
+    public fun new_groth16_verification_key(
+        alpha_g1: vector<u8>,
+        beta_g2: vector<u8>,
+        gamma_g2: vector<u8>,
+        delta_g2: vector<u8>,
+        gamma_abc_g1: vector<vector<u8>>
     ): Groth16VerificationKey {
         Groth16VerificationKey {
             alpha_g1,
@@ -100,7 +105,10 @@ module aptos_framework::keyless_account {
 
     // Sets the Groth16 verification key, only callable via governance proposal.
     // WARNING: If a malicious key is set, this would lead to stolen funds.
-    public fun update_groth16_verification_key(fx: &signer, vk: Groth16VerificationKey) acquires Groth16VerificationKey {
+    public fun update_groth16_verification_key(
+        fx: &signer,
+        vk: Groth16VerificationKey
+    ) acquires Groth16VerificationKey {
         system_addresses::assert_aptos_framework(fx);
 
         if (exists<Groth16VerificationKey>(signer::address_of(fx))) {
@@ -142,7 +150,10 @@ module aptos_framework::keyless_account {
     public fun update_training_wheels(fx: &signer, pk: Option<vector<u8>>) acquires Configuration {
         system_addresses::assert_aptos_framework(fx);
         if (option::is_some(&pk)) {
-            assert!(vector::length(option::borrow(&pk)) == 32, E_TRAINING_WHEELS_PK_WRONG_SIZE)
+            assert!(
+                vector::length(option::borrow(&pk)) == 32,
+                E_TRAINING_WHEELS_PK_WRONG_SIZE
+            )
         };
 
         let config = borrow_global_mut<Configuration>(signer::address_of(fx));
@@ -150,7 +161,10 @@ module aptos_framework::keyless_account {
     }
 
     // Convenience method to set the max expiration horizon, only callable via governance proposal.
-    public fun update_max_exp_horizon(fx: &signer, max_exp_horizon_secs: u64) acquires Configuration {
+    public fun update_max_exp_horizon(
+        fx: &signer,
+        max_exp_horizon_secs: u64
+    ) acquires Configuration {
         system_addresses::assert_aptos_framework(fx);
 
         let config = borrow_global_mut<Configuration>(signer::address_of(fx));

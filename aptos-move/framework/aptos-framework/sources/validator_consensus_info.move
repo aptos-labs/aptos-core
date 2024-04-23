@@ -17,12 +17,12 @@ module aptos_framework::validator_consensus_info {
     }
 
     /// Create a `ValidatorConsensusInfo` object.
-    public fun new(addr: address, pk_bytes: vector<u8>, voting_power: u64): ValidatorConsensusInfo {
-        ValidatorConsensusInfo {
-            addr,
-            pk_bytes,
-            voting_power,
-        }
+    public fun new(
+        addr: address,
+        pk_bytes: vector<u8>,
+        voting_power: u64
+    ): ValidatorConsensusInfo {
+        ValidatorConsensusInfo {addr, pk_bytes, voting_power,}
     }
 
     /// Get `ValidatorConsensusInfo.addr`.

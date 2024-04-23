@@ -50,10 +50,7 @@ spec aptos_framework::managed_coin {
         pragma aborts_if_is_strict;
     }
 
-    spec burn<CoinType>(
-        account: &signer,
-        amount: u64,
-    ) {
+    spec burn<CoinType>(account: &signer, amount: u64,) {
         use aptos_std::type_info;
 
         let account_addr = signer::address_of(account);
@@ -72,12 +69,12 @@ spec aptos_framework::managed_coin {
         aborts_if coin_store.frozen;
         aborts_if balance < amount;
 
-        let addr =  type_info::type_of<CoinType>().account_address;
+        let addr = type_info::type_of<CoinType>().account_address;
         let maybe_supply = global<coin::CoinInfo<CoinType>>(addr).supply;
         // Ensure the amount won't be overflow.
         aborts_if amount == 0;
         aborts_if !exists<coin::CoinInfo<CoinType>>(addr);
-        include coin::CoinSubAbortsIf<CoinType> { amount:amount };
+        include coin::CoinSubAbortsIf<CoinType> {amount: amount};
 
         // Ensure that the global 'supply' decreases by 'amount'.
         ensures coin::supply<CoinType> == old(coin::supply<CoinType>) - amount;
@@ -123,7 +120,9 @@ spec aptos_framework::managed_coin {
         include coin::CoinAddAbortsIf<CoinType>;
         ensures coin::supply<CoinType> == old(coin::supply<CoinType>) + amount;
         /// [high-level-req-6]
-        ensures global<coin::CoinStore<CoinType>>(dst_addr).coin.value == old(global<coin::CoinStore<CoinType>>(dst_addr)).coin.value + amount;
+        ensures global<coin::CoinStore<CoinType>>(dst_addr).coin.value == old(
+            global<coin::CoinStore<CoinType>>(dst_addr)
+        ).coin.value + amount;
     }
 
     /// An account can only be registered once.
@@ -135,9 +134,13 @@ spec aptos_framework::managed_coin {
         let account_addr = signer::address_of(account);
         let acc = global<account::Account>(account_addr);
 
-        aborts_if !exists<coin::CoinStore<CoinType>>(account_addr) && acc.guid_creation_num + 2 >= account::MAX_GUID_CREATION_NUM;
-        aborts_if !exists<coin::CoinStore<CoinType>>(account_addr) && acc.guid_creation_num + 2 > MAX_U64;
-        aborts_if !exists<coin::CoinStore<CoinType>>(account_addr) && !exists<account::Account>(account_addr);
+        aborts_if !exists<coin::CoinStore<CoinType>>(account_addr) && acc.guid_creation_num
+            + 2 >= account::MAX_GUID_CREATION_NUM;
+        aborts_if !exists<coin::CoinStore<CoinType>>(account_addr) && acc.guid_creation_num
+            + 2 > MAX_U64;
+        aborts_if !exists<coin::CoinStore<CoinType>>(account_addr) && !exists<account::Account>(
+            account_addr
+        );
         aborts_if !exists<coin::CoinStore<CoinType>>(account_addr) && !type_info::spec_is_struct<CoinType>();
         ensures exists<coin::CoinStore<CoinType>>(account_addr);
     }

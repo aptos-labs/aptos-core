@@ -40,8 +40,15 @@ module aptos_std::math64 {
     /// Returns a * b / c going through u128 to prevent intermediate overflow
     public inline fun mul_div(a: u64, b: u64, c: u64): u64 {
         // Inline functions cannot take constants, as then every module using it needs the constant
-        assert!(c != 0, std::error::invalid_argument(4));
-        (((a as u128) * (b as u128) / (c as u128)) as u64)
+        assert!(
+            c != 0,
+            std::error::invalid_argument(4)
+        );
+        (
+            (
+                (a as u128) * (b as u128) / (c as u128)
+            ) as u64
+        )
     }
 
     /// Return x clamped to the interval [lower, upper].
@@ -51,9 +58,7 @@ module aptos_std::math64 {
 
     /// Return the value of n raised to power e
     public fun pow(n: u64, e: u64): u64 {
-        if (e == 0) {
-            1
-        } else {
+        if (e == 0) { 1 } else {
             let p = 1;
             while (e > 1) {
                 if (e % 2 == 1) {
@@ -69,7 +74,10 @@ module aptos_std::math64 {
     /// Returns floor(lg2(x))
     public fun floor_log2(x: u64): u8 {
         let res = 0;
-        assert!(x != 0, std::error::invalid_argument(EINVALID_ARG_FLOOR_LOG2));
+        assert!(
+            x != 0,
+            std::error::invalid_argument(EINVALID_ARG_FLOOR_LOG2)
+        );
         // Effectively the position of the most significant set bit
         let n = 32;
         while (n > 0) {
@@ -86,11 +94,9 @@ module aptos_std::math64 {
     public fun log2(x: u64): FixedPoint32 {
         let integer_part = floor_log2(x);
         // Normalize x to [1, 2) in fixed point 32.
-        let y = (if (x >= 1 << 32) {
-            x >> (integer_part - 32)
-        } else {
-            x << (32 - integer_part)
-        } as u128);
+        let y = (
+            if (x >= 1 << 32) {x >> (integer_part - 32)} else {x << (32 - integer_part)} as u128
+        );
         let frac = 0;
         let delta = 1 << 31;
         while (delta != 0) {
@@ -99,10 +105,13 @@ module aptos_std::math64 {
             y = (y * y) >> 32;
             // x is now in [1, 4)
             // if x in [2, 4) then log x = 1 + log (x / 2)
-            if (y >= (2 << 32)) { frac = frac + delta; y = y >> 1; };
+            if (y >= (2 << 32)) {
+                frac = frac + delta;
+                y = y >> 1;
+            };
             delta = delta >> 1;
         };
-        fixed_point32::create_from_raw_value (((integer_part as u64) << 32) + frac)
+        fixed_point32::create_from_raw_value(((integer_part as u64) << 32) + frac)
     }
 
     /// Returns square root of x, precisely floor(sqrt(x))
@@ -129,10 +138,12 @@ module aptos_std::math64 {
         // (x + y - 1) could spuriously overflow. so we use the later version
         if (x == 0) {
             // Inline functions cannot take constants, as then every module using it needs the constant
-            assert!(y != 0, std::error::invalid_argument(4));
+            assert!(
+                y != 0,
+                std::error::invalid_argument(4)
+            );
             0
-        }
-        else (x - 1) / y + 1
+        } else (x - 1) / y + 1
     }
 
     #[test]
@@ -144,7 +155,13 @@ module aptos_std::math64 {
         assert!(ceil_div(13, 3) == 5, 0);
 
         // No overflow
-        assert!(ceil_div((((1u128<<64) - 9) as u64), 11) == 1676976733973595601, 0);
+        assert!(
+            ceil_div(
+                (((1u128 << 64) - 9) as u64),
+                11
+            ) == 1676976733973595601,
+            0
+        );
     }
 
     #[test]
@@ -196,7 +213,10 @@ module aptos_std::math64 {
 
     #[test]
     public entry fun test_average_does_not_overflow() {
-        let result = average(18446744073709551615, 18446744073709551615);
+        let result = average(
+            18446744073709551615,
+            18446744073709551615
+        );
         assert!(result == 18446744073709551615, 0);
     }
 
@@ -214,10 +234,10 @@ module aptos_std::math64 {
 
     #[test]
     public entry fun test_mul_div() {
-        let tmp: u64 = 1<<63;
-        assert!(mul_div(tmp,tmp,tmp) == tmp, 0);
+        let tmp: u64 = 1 << 63;
+        assert!(mul_div(tmp, tmp, tmp) == tmp, 0);
 
-        assert!(mul_div(tmp,5,5) == tmp, 0);
+        assert!(mul_div(tmp, 5, 5) == tmp, 0);
         // Note that ordering other way is imprecise.
         assert!((tmp / 5) * 5 != tmp, 0);
     }
@@ -231,13 +251,18 @@ module aptos_std::math64 {
     #[test]
     public entry fun test_floor_lg2() {
         let idx: u8 = 0;
-        while (idx < 64) {
-            assert!(floor_log2(1<<idx) == idx, 0);
+        while (idx <64) {
+            assert!(floor_log2(1 << idx) == idx, 0);
             idx = idx + 1;
         };
         idx = 1;
         while (idx <= 64) {
-            assert!(floor_log2((((1u128<<idx) - 1) as u64)) == idx - 1, 0);
+            assert!(
+                floor_log2(
+                    (((1u128 << idx) - 1) as u64)
+                ) == idx - 1,
+                0
+            );
             idx = idx + 1;
         };
     }
@@ -245,23 +270,37 @@ module aptos_std::math64 {
     #[test]
     public entry fun test_log2() {
         let idx: u8 = 0;
-        while (idx < 64) {
-            let res = log2(1<<idx);
-            assert!(fixed_point32::get_raw_value(res) == (idx as u64) << 32, 0);
+        while (idx <64) {
+            let res = log2(1 << idx);
+            assert!(
+                fixed_point32::get_raw_value(res) == (idx as u64) << 32,
+                0
+            );
             idx = idx + 1;
         };
         idx = 10;
         while (idx <= 64) {
-            let res = log2((((1u128<<idx) - 1) as u64));
+            let res = log2(
+                (((1u128 << idx) - 1) as u64)
+            );
             // idx + log2 (1 - 1/2^idx) = idx + ln (1-1/2^idx)/ln2
             // Use 3rd order taylor to approximate expected result
             let expected = (idx as u128) << 32;
-            let taylor1 = ((1 << 32) / ((1u256<<idx)) as u128);
+            let taylor1 = (
+                (1 << 32) / ((1u256 << idx)) as u128
+            );
             let taylor2 = (taylor1 * taylor1) >> 32;
             let taylor3 = (taylor2 * taylor1) >> 32;
-            let expected = expected - ((taylor1 + taylor2 / 2 + taylor3 / 3) << 32) / 2977044472;
+            let expected = expected - ((taylor1 + taylor2 / 2 + taylor3 / 3) << 32) /
+                2977044472;
             // verify it matches to 8 significant digits
-            assert_approx_the_same((fixed_point32::get_raw_value(res) as u128), expected, 8);
+            assert_approx_the_same(
+                (
+                    fixed_point32::get_raw_value(res) as u128
+                ),
+                expected,
+                8
+            );
             idx = idx + 1;
         };
     }
@@ -277,10 +316,12 @@ module aptos_std::math64 {
         let result = sqrt(256);
         assert!(result == 16, 0);
 
-        let result = sqrt(1<<62);
-        assert!(result == 1<<31, 0);
+        let result = sqrt(1 << 62);
+        assert!(result == 1 << 31, 0);
 
-        let result = sqrt((((1u128 << 64) - 1) as u64));
+        let result = sqrt(
+            (((1u128 << 64) - 1) as u64)
+        );
         assert!(result == (1u64 << 32) - 1, 0);
 
         let result = sqrt((1u64 << 63));

@@ -14,7 +14,7 @@ module aptos_std::ristretto255_bulletproofs {
     //
 
     /// The maximum range supported by the Bulletproofs library is $[0, 2^{64})$.
-    const MAX_RANGE_BITS : u64 = 64;
+    const MAX_RANGE_BITS: u64 = 64;
 
     //
     // Error codes
@@ -48,15 +48,13 @@ module aptos_std::ristretto255_bulletproofs {
 
     /// Returns the maximum # of bits that the range proof system can verify proofs for.
     public fun get_max_range_bits(): u64 {
-        MAX_RANGE_BITS
+         MAX_RANGE_BITS
     }
 
     /// Deserializes a range proof from a sequence of bytes. The serialization format is the same as the format in
     /// the zkcrypto's `bulletproofs` library (https://docs.rs/bulletproofs/4.0.0/bulletproofs/struct.RangeProof.html#method.from_bytes).
     public fun range_proof_from_bytes(bytes: vector<u8>): RangeProof {
-        RangeProof {
-            bytes
-        }
+        RangeProof { bytes }
     }
 
     /// Returns the byte-representation of a range proof.
@@ -71,12 +69,23 @@ module aptos_std::ristretto255_bulletproofs {
     ///
     /// WARNING: The DST check is VERY important for security as it prevents proofs computed for one application
     /// (a.k.a., a _domain_) with `dst_1` from verifying in a different application with `dst_2 != dst_1`.
-    public fun verify_range_proof_pedersen(com: &pedersen::Commitment, proof: &RangeProof, num_bits: u64, dst: vector<u8>): bool {
-        assert!(features::bulletproofs_enabled(), error::invalid_state(E_NATIVE_FUN_NOT_AVAILABLE));
+    public fun verify_range_proof_pedersen(
+        com: &pedersen::Commitment,
+        proof: &RangeProof,
+        num_bits: u64,
+        dst: vector<u8>
+    ): bool {
+        assert!(
+            features::bulletproofs_enabled(),
+            error::invalid_state(E_NATIVE_FUN_NOT_AVAILABLE)
+        );
 
         verify_range_proof_internal(
-            ristretto255::point_to_bytes(&pedersen::commitment_as_compressed_point(com)),
-            &ristretto255::basepoint(), &ristretto255::hash_to_point_base(),
+            ristretto255::point_to_bytes(
+                &pedersen::commitment_as_compressed_point(com)
+            ),
+            &ristretto255::basepoint(),
+            &ristretto255::hash_to_point_base(),
             proof.bytes,
             num_bits,
             dst
@@ -87,15 +96,24 @@ module aptos_std::ristretto255_bulletproofs {
     /// for some randomness `r`) satisfies `v` in `[0, 2^num_bits)`. Only works for `num_bits` in `{8, 16, 32, 64}`.
     public fun verify_range_proof(
         com: &RistrettoPoint,
-        val_base: &RistrettoPoint, rand_base: &RistrettoPoint,
-        proof: &RangeProof, num_bits: u64, dst: vector<u8>): bool
-    {
-        assert!(features::bulletproofs_enabled(), error::invalid_state(E_NATIVE_FUN_NOT_AVAILABLE));
+        val_base: &RistrettoPoint,
+        rand_base: &RistrettoPoint,
+        proof: &RangeProof,
+        num_bits: u64,
+        dst: vector<u8>
+    ): bool {
+        assert!(
+            features::bulletproofs_enabled(),
+            error::invalid_state(E_NATIVE_FUN_NOT_AVAILABLE)
+        );
 
         verify_range_proof_internal(
             ristretto255::point_to_bytes(&ristretto255::point_compress(com)),
-            val_base, rand_base,
-            proof.bytes, num_bits, dst
+            val_base,
+            rand_base,
+            proof.bytes,
+            num_bits,
+            dst
         )
     }
 
@@ -103,8 +121,20 @@ module aptos_std::ristretto255_bulletproofs {
     /// Computes a range proof for the Pedersen commitment to 'val' with randomness 'r', under the default Bulletproofs
     /// commitment key; see `pedersen::new_commitment_for_bulletproof`. Returns the said commitment too.
     ///  Only works for `num_bits` in `{8, 16, 32, 64}`.
-    public fun prove_range_pedersen(val: &Scalar, r: &Scalar, num_bits: u64, dst: vector<u8>): (RangeProof, pedersen::Commitment) {
-        let (bytes, compressed_comm) = prove_range_internal(scalar_to_bytes(val), scalar_to_bytes(r), num_bits, dst, &ristretto255::basepoint(), &ristretto255::hash_to_point_base());
+    public fun prove_range_pedersen(
+        val: &Scalar,
+        r: &Scalar,
+        num_bits: u64,
+        dst: vector<u8>
+    ): (RangeProof, pedersen::Commitment) {
+        let (bytes, compressed_comm) = prove_range_internal(
+            scalar_to_bytes(val),
+            scalar_to_bytes(r),
+            num_bits,
+            dst,
+            &ristretto255::basepoint(),
+            &ristretto255::hash_to_point_base()
+        );
         let point = ristretto255::new_compressed_point_from_bytes(compressed_comm);
         let point = &std::option::extract(&mut point);
 
@@ -127,7 +157,8 @@ module aptos_std::ristretto255_bulletproofs {
         rand_base: &RistrettoPoint,
         proof: vector<u8>,
         num_bits: u64,
-        dst: vector<u8>): bool;
+        dst: vector<u8>
+    ): bool;
 
     #[test_only]
     /// Returns a tuple consisting of (1) a range proof for 'val' committed with randomness 'r' under the default Bulletproofs
@@ -141,19 +172,24 @@ module aptos_std::ristretto255_bulletproofs {
         num_bits: u64,
         dst: vector<u8>,
         val_base: &RistrettoPoint,
-        rand_base: &RistrettoPoint): (vector<u8>, vector<u8>);
+        rand_base: &RistrettoPoint
+    ): (vector<u8>, vector<u8>);
 
     //
     // Testing
     //
 
     #[test_only]
-    use aptos_std::ristretto255::{Scalar, scalar_to_bytes, point_equals};
+    use aptos_std::ristretto255::{
+        Scalar,
+        scalar_to_bytes,
+        point_equals
+    };
 
     #[test_only]
     const A_DST: vector<u8> = b"AptosBulletproofs";
     #[test_only]
-    const A_VALUE: vector<u8> = x"870c2fa1b2e9ac45000000000000000000000000000000000000000000000000";  // i.e., 5020644638028926087u64
+    const A_VALUE: vector<u8> = x"870c2fa1b2e9ac45000000000000000000000000000000000000000000000000"; // i.e., 5020644638028926087u64
     #[test_only]
     const A_BLINDER: vector<u8> = x"e7c7b42b75503bfc7b1932783786d227ebf88f79da752b68f6b865a9c179640c";
     // Pedersen commitment to A_VALUE with randomness A_BLINDER
@@ -166,20 +202,38 @@ module aptos_std::ristretto255_bulletproofs {
     #[test(fx = @std)]
     #[expected_failure(abort_code = 0x010003, location = Self)]
     fun test_unsupported_ranges(fx: signer) {
-        features::change_feature_flags_for_testing(&fx, vector[ features::get_bulletproofs_feature() ], vector[]);
+        features::change_feature_flags_for_testing(
+            &fx,
+            vector[
+                features::get_bulletproofs_feature()
+            ],
+            vector[]
+        );
 
         let comm = ristretto255::new_point_from_bytes(A_COMM);
         let comm = std::option::extract(&mut comm);
         let comm = pedersen::commitment_from_point(comm);
 
-        assert!(verify_range_proof_pedersen(
-            &comm,
-            &range_proof_from_bytes(A_RANGE_PROOF_PEDERSEN), 10, A_DST), 1);
+        assert!(
+            verify_range_proof_pedersen(
+                &comm,
+                &range_proof_from_bytes(A_RANGE_PROOF_PEDERSEN),
+                10,
+                A_DST
+            ),
+            1
+        );
     }
 
     #[test(fx = @std)]
     fun test_prover(fx: signer) {
-        features::change_feature_flags_for_testing(&fx, vector[ features::get_bulletproofs_feature() ], vector[]);
+        features::change_feature_flags_for_testing(
+            &fx,
+            vector[
+                features::get_bulletproofs_feature()
+            ],
+            vector[]
+        );
 
         let v = ristretto255::new_scalar_from_u64(59);
         let r = ristretto255::new_scalar_from_bytes(A_BLINDER);
@@ -188,18 +242,36 @@ module aptos_std::ristretto255_bulletproofs {
 
         let (proof, comm) = prove_range_pedersen(&v, &r, num_bits, A_DST);
 
-        assert!(verify_range_proof_pedersen(&comm, &proof, 64, A_DST) == false, 1);
-        assert!(verify_range_proof_pedersen(&comm, &proof, 32, A_DST) == false, 1);
-        assert!(verify_range_proof_pedersen(&comm, &proof, 16, A_DST) == false, 1);
-        assert!(verify_range_proof_pedersen(&comm, &proof, num_bits, A_DST), 1);
+        assert!(
+            verify_range_proof_pedersen(&comm, &proof, 64, A_DST) == false,
+            1
+        );
+        assert!(
+            verify_range_proof_pedersen(&comm, &proof, 32, A_DST) == false,
+            1
+        );
+        assert!(
+            verify_range_proof_pedersen(&comm, &proof, 16, A_DST) == false,
+            1
+        );
+        assert!(
+            verify_range_proof_pedersen(&comm, &proof, num_bits, A_DST),
+            1
+        );
     }
 
     #[test(fx = @std)]
     #[expected_failure(abort_code = 0x010001, location = Self)]
     fun test_empty_range_proof(fx: signer) {
-        features::change_feature_flags_for_testing(&fx, vector[ features::get_bulletproofs_feature() ], vector[]);
+        features::change_feature_flags_for_testing(
+            &fx,
+            vector[
+                features::get_bulletproofs_feature()
+            ],
+            vector[]
+        );
 
-        let proof = &range_proof_from_bytes(vector[ ]);
+        let proof = &range_proof_from_bytes(vector[]);
         let num_bits = 64;
         let com = pedersen::new_commitment_for_bulletproof(
             &ristretto255::scalar_one(),
@@ -212,7 +284,13 @@ module aptos_std::ristretto255_bulletproofs {
 
     #[test(fx = @std)]
     fun test_valid_range_proof_verifies_against_comm(fx: signer) {
-        features::change_feature_flags_for_testing(&fx, vector[ features::get_bulletproofs_feature() ], vector[]);
+        features::change_feature_flags_for_testing(
+            &fx,
+            vector[
+                features::get_bulletproofs_feature()
+            ],
+            vector[]
+        );
 
         let value = ristretto255::new_scalar_from_bytes(A_VALUE);
         let value = std::option::extract(&mut value);
@@ -222,17 +300,37 @@ module aptos_std::ristretto255_bulletproofs {
 
         let comm = pedersen::new_commitment_for_bulletproof(&value, &blinder);
 
-        let expected_comm = std::option::extract(&mut ristretto255::new_point_from_bytes(A_COMM));
-        assert!(point_equals(pedersen::commitment_as_point(&comm), &expected_comm), 1);
+        let expected_comm = std::option::extract(
+            &mut ristretto255::new_point_from_bytes(A_COMM)
+        );
+        assert!(
+            point_equals(
+                pedersen::commitment_as_point(&comm),
+                &expected_comm
+            ),
+            1
+        );
 
-        assert!(verify_range_proof_pedersen(
-            &comm,
-            &range_proof_from_bytes(A_RANGE_PROOF_PEDERSEN), MAX_RANGE_BITS, A_DST), 1);
+        assert!(
+            verify_range_proof_pedersen(
+                &comm,
+                &range_proof_from_bytes(A_RANGE_PROOF_PEDERSEN),
+                MAX_RANGE_BITS,
+                A_DST
+            ),
+            1
+        );
     }
 
     #[test(fx = @std)]
     fun test_invalid_range_proof_fails_verification(fx: signer) {
-        features::change_feature_flags_for_testing(&fx, vector[ features::get_bulletproofs_feature() ], vector[]);
+        features::change_feature_flags_for_testing(
+            &fx,
+            vector[
+                features::get_bulletproofs_feature()
+            ],
+            vector[]
+        );
 
         let comm = ristretto255::new_point_from_bytes(A_COMM);
         let comm = std::option::extract(&mut comm);
@@ -246,8 +344,14 @@ module aptos_std::ristretto255_bulletproofs {
         let byte = std::vector::borrow_mut(&mut range_proof_invalid, pos);
         *byte = *byte + 1;
 
-        assert!(verify_range_proof_pedersen(
-            &comm,
-            &range_proof_from_bytes(range_proof_invalid), MAX_RANGE_BITS, A_DST) == false, 1);
+        assert!(
+            verify_range_proof_pedersen(
+                &comm,
+                &range_proof_from_bytes(range_proof_invalid),
+                MAX_RANGE_BITS,
+                A_DST
+            ) == false,
+            1
+        );
     }
 }

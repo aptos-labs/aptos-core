@@ -4,7 +4,7 @@ module aptos_std::secp256k1 {
     use std::option::Option;
 
     /// An error occurred while deserializing, for example due to wrong input size.
-    const E_DESERIALIZE: u64 = 1;   // This code must be the same, if ever returned from the native Rust implementation.
+    const E_DESERIALIZE: u64 = 1; // This code must be the same, if ever returned from the native Rust implementation.
 
     /// The size of a secp256k1-based ECDSA public key, in bytes.
     const RAW_PUBLIC_KEY_NUM_BYTES: u64 = 64;
@@ -25,13 +25,19 @@ module aptos_std::secp256k1 {
 
     /// Constructs an ECDSASignature struct from the given 64 bytes.
     public fun ecdsa_signature_from_bytes(bytes: vector<u8>): ECDSASignature {
-        assert!(std::vector::length(&bytes) == SIGNATURE_NUM_BYTES, std::error::invalid_argument(E_DESERIALIZE));
+        assert!(
+            std::vector::length(&bytes) == SIGNATURE_NUM_BYTES,
+            std::error::invalid_argument(E_DESERIALIZE)
+        );
         ECDSASignature { bytes }
     }
 
     /// Constructs an ECDSARawPublicKey struct, given a 64-byte raw representation.
     public fun ecdsa_raw_public_key_from_64_bytes(bytes: vector<u8>): ECDSARawPublicKey {
-        assert!(std::vector::length(&bytes) == RAW_PUBLIC_KEY_NUM_BYTES, std::error::invalid_argument(E_DESERIALIZE));
+        assert!(
+            std::vector::length(&bytes) == RAW_PUBLIC_KEY_NUM_BYTES,
+            std::error::invalid_argument(E_DESERIALIZE)
+        );
         ECDSARawPublicKey { bytes }
     }
 
@@ -56,9 +62,15 @@ module aptos_std::secp256k1 {
         recovery_id: u8,
         signature: &ECDSASignature,
     ): Option<ECDSARawPublicKey> {
-        let (pk, success) = ecdsa_recover_internal(message, recovery_id, signature.bytes);
+        let (pk, success) = ecdsa_recover_internal(
+            message,
+            recovery_id,
+            signature.bytes
+        );
         if (success) {
-            std::option::some(ecdsa_raw_public_key_from_64_bytes(pk))
+            std::option::some(
+                ecdsa_raw_public_key_from_64_bytes(pk)
+            )
         } else {
             std::option::none<ECDSARawPublicKey>()
         }
@@ -88,26 +100,38 @@ module aptos_std::secp256k1 {
         let pk = ecdsa_recover(
             hash::sha2_256(b"test aptos secp256k1"),
             0,
-            &ECDSASignature { bytes: x"f7ad936da03f948c14c542020e3c5f4e02aaacd1f20427c11aa6e2fbf8776477646bba0e1a37f9e7c777c423a1d2849baafd7ff6a9930814a43c3f80d59db56f" },
+            &ECDSASignature {
+                bytes: x"f7ad936da03f948c14c542020e3c5f4e02aaacd1f20427c11aa6e2fbf8776477646bba0e1a37f9e7c777c423a1d2849baafd7ff6a9930814a43c3f80d59db56f"
+            },
         );
         assert!(std::option::is_some(&pk), 1);
-        assert!(std::option::extract(&mut pk).bytes == x"4646ae5047316b4230d0086c8acec687f00b1cd9d1dc634f6cb358ac0a9a8ffffe77b4dd0a4bfb95851f3b7355c781dd60f8418fc8a65d14907aff47c903a559", 1);
+        assert!(
+            std::option::extract(&mut pk).bytes == x"4646ae5047316b4230d0086c8acec687f00b1cd9d1dc634f6cb358ac0a9a8ffffe77b4dd0a4bfb95851f3b7355c781dd60f8418fc8a65d14907aff47c903a559",
+            1
+        );
 
         // Flipped bits; Signature stays valid
         let pk = ecdsa_recover(
             hash::sha2_256(b"test aptos secp256k1"),
             0,
             // NOTE: A '7' was flipped to an 'f' here
-            &ECDSASignature { bytes: x"f7ad936da03f948c14c542020e3c5f4e02aaacd1f20427c11aa6e2fbf8776477646bba0e1a37f9e7c7f7c423a1d2849baafd7ff6a9930814a43c3f80d59db56f" },
+            &ECDSASignature {
+                bytes: x"f7ad936da03f948c14c542020e3c5f4e02aaacd1f20427c11aa6e2fbf8776477646bba0e1a37f9e7c7f7c423a1d2849baafd7ff6a9930814a43c3f80d59db56f"
+            },
         );
         assert!(std::option::is_some(&pk), 1);
-        assert!(std::option::extract(&mut pk).bytes != x"4646ae5047316b4230d0086c8acec687f00b1cd9d1dc634f6cb358ac0a9a8ffffe77b4dd0a4bfb95851f3b7355c781dd60f8418fc8a65d14907aff47c903a559", 1);
+        assert!(
+            std::option::extract(&mut pk).bytes != x"4646ae5047316b4230d0086c8acec687f00b1cd9d1dc634f6cb358ac0a9a8ffffe77b4dd0a4bfb95851f3b7355c781dd60f8418fc8a65d14907aff47c903a559",
+            1
+        );
 
         // Flipped bits; Signature becomes invalid
         let pk = ecdsa_recover(
             hash::sha2_256(b"test aptos secp256k1"),
             0,
-            &ECDSASignature { bytes: x"ffad936da03f948c14c542020e3c5f4e02aaacd1f20427c11aa6e2fbf8776477646bba0e1a37f9e7c7f7c423a1d2849baafd7ff6a9930814a43c3f80d59db56f" },
+            &ECDSASignature {
+                bytes: x"ffad936da03f948c14c542020e3c5f4e02aaacd1f20427c11aa6e2fbf8776477646bba0e1a37f9e7c7f7c423a1d2849baafd7ff6a9930814a43c3f80d59db56f"
+            },
         );
         assert!(std::option::is_none(&pk), 1);
     }

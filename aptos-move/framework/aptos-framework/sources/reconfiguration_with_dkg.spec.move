@@ -12,8 +12,7 @@ spec aptos_framework::reconfiguration_with_dkg {
         requires chain_status::is_operating();
         include stake::ResourceRequirement;
         include stake::GetReconfigStartTimeRequirement;
-        include features::spec_periodical_reward_rate_decrease_enabled(
-        ) ==> staking_config::StakingRewardsConfigEnabledRequirement;
+        include features::spec_periodical_reward_rate_decrease_enabled() ==> staking_config::StakingRewardsConfigEnabledRequirement;
         aborts_if false;
         pragma verify_duration_estimate = 600; // TODO: set because of timeout (property proved).
     }
@@ -50,16 +49,27 @@ spec aptos_framework::reconfiguration_with_dkg {
         requires exists<features::Features>(@std);
         include config_buffer::OnNewEpochRequirement<version::Version>;
         include config_buffer::OnNewEpochRequirement<gas_schedule::GasScheduleV2>;
-        include config_buffer::OnNewEpochRequirement<execution_config::ExecutionConfig>;
-        include config_buffer::OnNewEpochRequirement<consensus_config::ConsensusConfig>;
+        include config_buffer::OnNewEpochRequirement<
+            execution_config::ExecutionConfig
+        >;
+        include config_buffer::OnNewEpochRequirement<
+            consensus_config::ConsensusConfig
+        >;
         include config_buffer::OnNewEpochRequirement<jwks::SupportedOIDCProviders>;
-        include config_buffer::OnNewEpochRequirement<randomness_config::RandomnessConfig>;
-        include config_buffer::OnNewEpochRequirement<jwk_consensus_config::JWKConsensusConfig>;
+        include config_buffer::OnNewEpochRequirement<
+            randomness_config::RandomnessConfig
+        >;
+        include config_buffer::OnNewEpochRequirement<
+            jwk_consensus_config::JWKConsensusConfig
+        >;
 
         aborts_if false;
     }
 
-    spec finish_with_dkg_result(account: &signer, dkg_result: vector<u8>) {
+    spec finish_with_dkg_result(
+        account: &signer,
+        dkg_result: vector<u8>
+    ) {
         use aptos_framework::dkg;
         pragma verify = false; // TODO: set because of timeout (property proved).
         include FinishRequirement;

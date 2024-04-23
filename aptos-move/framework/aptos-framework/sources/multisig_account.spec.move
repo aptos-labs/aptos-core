@@ -190,19 +190,33 @@ spec aptos_framework::multisig_account {
         let multisig_account_resource = global<MultisigAccount>(multisig_account);
         aborts_if !exists<MultisigAccount>(multisig_account);
         aborts_if sequence_number == 0 || sequence_number >= multisig_account_resource.next_sequence_number;
-        aborts_if !table::spec_contains(multisig_account_resource.transactions, sequence_number);
-        ensures result == table::spec_get(multisig_account_resource.transactions, sequence_number);
+        aborts_if !table::spec_contains(
+            multisig_account_resource.transactions,
+            sequence_number
+        );
+        ensures result == table::spec_get(
+            multisig_account_resource.transactions,
+            sequence_number
+        );
     }
 
     spec get_next_transaction_payload(
-    multisig_account: address, provided_payload: vector<u8>
+        multisig_account: address,
+        provided_payload: vector<u8>
     ): vector<u8> {
         let multisig_account_resource = global<MultisigAccount>(multisig_account);
-        let sequence_number = multisig_account_resource.last_executed_sequence_number + 1;
-        let transaction = table::spec_get(multisig_account_resource.transactions, sequence_number);
+        let sequence_number = multisig_account_resource.last_executed_sequence_number +
+            1;
+        let transaction = table::spec_get(
+            multisig_account_resource.transactions,
+            sequence_number
+        );
         aborts_if !exists<MultisigAccount>(multisig_account);
         aborts_if multisig_account_resource.last_executed_sequence_number + 1 > MAX_U64;
-        aborts_if !table::spec_contains(multisig_account_resource.transactions, sequence_number);
+        aborts_if !table::spec_contains(
+            multisig_account_resource.transactions,
+            sequence_number
+        );
         ensures option::spec_is_none(transaction.payload) ==> result == provided_payload;
     }
 
@@ -231,8 +245,14 @@ spec aptos_framework::multisig_account {
         let multisig_account_resource = global<MultisigAccount>(multisig_account);
         aborts_if !exists<MultisigAccount>(multisig_account);
         aborts_if sequence_number == 0 || sequence_number >= multisig_account_resource.next_sequence_number;
-        aborts_if !table::spec_contains(multisig_account_resource.transactions, sequence_number);
-        let transaction = table::spec_get(multisig_account_resource.transactions, sequence_number);
+        aborts_if !table::spec_contains(
+            multisig_account_resource.transactions,
+            sequence_number
+        );
+        let transaction = table::spec_get(
+            multisig_account_resource.transactions,
+            sequence_number
+        );
         let votes = transaction.votes;
         let voted = simple_map::spec_contains_key(votes, owner);
         let vote = voted && simple_map::spec_get(votes, owner);

@@ -27,13 +27,13 @@ module aptos_framework::state_storage {
             !exists<StateStorageUsage>(@aptos_framework),
             error::already_exists(ESTATE_STORAGE_USAGE)
         );
-        move_to(aptos_framework, StateStorageUsage {
-            epoch: 0,
-            usage: Usage {
-                items: 0,
-                bytes: 0,
+        move_to(
+            aptos_framework,
+            StateStorageUsage {
+                epoch: 0,
+                usage: Usage {items: 0, bytes: 0,}
             }
-        });
+        );
     }
 
     public(friend) fun on_new_block(epoch: u64) acquires StateStorageUsage {
@@ -54,7 +54,10 @@ module aptos_framework::state_storage {
             error::not_found(ESTATE_STORAGE_USAGE)
         );
         let usage = borrow_global<StateStorageUsage>(@aptos_framework);
-        (usage.usage.items, usage.usage.bytes)
+        (
+            usage.usage.items,
+            usage.usage.bytes
+        )
     }
 
     /// Warning: the result returned is based on the base state view held by the
@@ -71,10 +74,7 @@ module aptos_framework::state_storage {
         );
         let usage = borrow_global_mut<StateStorageUsage>(@aptos_framework);
         usage.epoch = epoch;
-        usage.usage = Usage {
-            items,
-            bytes
-        };
+        usage.usage = Usage {items, bytes};
     }
 
     // ======================== deprecated ============================

@@ -70,7 +70,10 @@ spec aptos_framework::guid {
         aborts_if false;
     }
 
-    spec create(addr: address, creation_num_ref: &mut u64): GUID {
+    spec create(
+        addr: address,
+        creation_num_ref: &mut u64
+    ): GUID {
         aborts_if creation_num_ref + 1 > MAX_U64;
         /// [high-level-req-1]
         ensures result.id.creation_num == old(creation_num_ref);

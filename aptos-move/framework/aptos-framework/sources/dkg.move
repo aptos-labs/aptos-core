@@ -72,16 +72,20 @@ module aptos_framework::dkg {
             target_validator_set,
         };
         let start_time_us = timestamp::now_microseconds();
-        dkg_state.in_progress = std::option::some(DKGSessionState {
-            metadata: new_session_metadata,
-            start_time_us,
-            transcript: vector[],
-        });
+        dkg_state.in_progress = std::option::some(
+            DKGSessionState {
+                metadata: new_session_metadata,
+                start_time_us,
+                transcript: vector[],
+            }
+        );
 
-        emit(DKGStartEvent {
-            start_time_us,
-            session_metadata: new_session_metadata,
-        });
+        emit(
+            DKGStartEvent {
+                start_time_us,
+                session_metadata: new_session_metadata,
+            }
+        );
     }
 
     /// Put a transcript into the currently incomplete DKG session, then mark it completed.
@@ -89,7 +93,10 @@ module aptos_framework::dkg {
     /// Abort if DKG is not in progress.
     public(friend) fun finish(transcript: vector<u8>) acquires DKGState {
         let dkg_state = borrow_global_mut<DKGState>(@aptos_framework);
-        assert!(option::is_some(&dkg_state.in_progress), error::invalid_state(EDKG_NOT_IN_PROGRESS));
+        assert!(
+            option::is_some(&dkg_state.in_progress),
+            error::invalid_state(EDKG_NOT_IN_PROGRESS)
+        );
         let session = option::extract(&mut dkg_state.in_progress);
         session.transcript = transcript;
         dkg_state.last_completed = option::some(session);
