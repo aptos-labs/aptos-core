@@ -10,13 +10,13 @@ include "../node_modules/circomlib/circuits/bitify.circom";
 // We did this instead of a polynomial concatenation check to avoid having to implement a multi-variable concatenation check
 template JWTFieldCheck(maxKVPairLen, maxNameLen, maxValueLen) {
     signal input field[maxKVPairLen]; // ASCII
+    signal input name[maxNameLen];
+    signal input value[maxValueLen];
     signal input field_len; // ASCII
     signal input name_len;
     signal input value_index; // index of value within `field`
     signal input value_len;
     signal input colon_index; // index of colon within `field`
-    signal input name[maxNameLen];
-    signal input value[maxValueLen];
 
     // Enforce that end of name < colon < start of value, so that these 3 parts of the JWT field are in the correct order
     signal colon_greater_name <== LessThan(20)([name_len, colon_index]);
@@ -53,6 +53,7 @@ template JWTFieldCheck(maxKVPairLen, maxNameLen, maxValueLen) {
     signal whitespace_selector_three[maxKVPairLen] <== ArraySelectorComplex(maxKVPairLen)(value_index+value_len+1, field_len-1); // Skip 2 quotes in the value, stop just before the comma/end brace
 
     for (var i = 0; i < maxKVPairLen; i++) {
+        log(i, ": ", whitespace_selector_two[i]);
         (whitespace_selector_one[i] + whitespace_selector_two[i] + whitespace_selector_three[i]) * (1 - is_whitespace[i]) === 0;
     }
 }
