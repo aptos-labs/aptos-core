@@ -21,9 +21,12 @@ use crate::{
     thread_garage::{ThreadGarageExecutor,Baton,ReturnType},
 };
 
+<<<<<<< HEAD
 use rayon::prelude::*;
 
 
+=======
+>>>>>>> 98468b5de5 (change threadgarage generation)
 use aptos_aggregator::{
     delayed_change::{ApplyBase, DelayedChange},
     delta_change_set::serialize,
@@ -63,6 +66,8 @@ use std::{
         atomic::{AtomicBool, AtomicU32, AtomicUsize, Ordering}, Arc, Mutex, Once
     },
 };
+use once_cell::unsync::Lazy;
+
 
 
 pub struct BlockExecutor<T, E, S, L, X> {
