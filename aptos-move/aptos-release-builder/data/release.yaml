@@ -37,7 +37,7 @@ proposals:
     metadata:
       title: "Enable randomness with fast path optimization."
       description: "Enable randomness with fast path optimization."
-      discussion_url: "TBD"
+      discussion_url: "https://github.com/aptos-labs/aptos-core/pull/TBD"
     execution_mode: MultiStep
     update_sequence:
       - Randomness:
