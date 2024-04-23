@@ -10,7 +10,8 @@
 //
 
 use crate::{
-    noise::{stream::NoiseStream, AntiReplayTimestamps, HandshakeAuthMode, NoiseUpgrader},
+    application::storage::PeersAndMetadata,
+    noise::{stream::NoiseStream, AntiReplayTimestamps, NoiseUpgrader},
     testutils::fake_socket::{ReadOnlyTestSocket, ReadWriteTestSocket},
 };
 use aptos_config::network_id::NetworkContext;
@@ -72,15 +73,21 @@ fn generate_first_two_messages() -> (Vec<u8>, Vec<u8>) {
         (initiator_private_key, initiator_public_key, initiator_network_context),
         (responder_private_key, responder_public_key, responder_network_context),
     ) = KEYPAIRS.clone();
+    let peers_and_metadata = PeersAndMetadata::new(&[
+        initiator_network_context.network_id(),
+        responder_network_context.network_id(),
+    ]);
     let initiator = NoiseUpgrader::new(
         initiator_network_context,
         initiator_private_key,
-        HandshakeAuthMode::server_only(&[initiator_network_context.network_id()]),
+        peers_and_metadata.clone(),
+        false,
     );
     let responder = NoiseUpgrader::new(
         responder_network_context,
         responder_private_key,
-        HandshakeAuthMode::server_only(&[responder_network_context.network_id()]),
+        peers_and_metadata,
+        false,
     );
 
     // create exposing socket
@@ -144,10 +151,12 @@ pub fn fuzz_initiator(data: &[u8]) {
         (initiator_private_key, _, initiator_network_context),
         (_, responder_public_key, responder_network_context),
     ) = KEYPAIRS.clone();
+    let peers_and_metadata = PeersAndMetadata::new(&[initiator_network_context.network_id()]);
     let initiator = NoiseUpgrader::new(
         initiator_network_context,
         initiator_private_key,
-        HandshakeAuthMode::server_only(&[initiator_network_context.network_id()]),
+        peers_and_metadata,
+        false,
     );
 
     // setup NoiseStream
@@ -167,10 +176,12 @@ pub fn fuzz_initiator(data: &[u8]) {
 pub fn fuzz_responder(data: &[u8]) {
     // setup responder
     let (_, (responder_private_key, _, responder_network_context)) = KEYPAIRS.clone();
+    let peers_and_metadata = PeersAndMetadata::new(&[responder_network_context.network_id()]);
     let responder = NoiseUpgrader::new(
         responder_network_context,
         responder_private_key,
-        HandshakeAuthMode::server_only(&[responder_network_context.network_id()]),
+        peers_and_metadata,
+        false,
     );
 
     // setup NoiseStream

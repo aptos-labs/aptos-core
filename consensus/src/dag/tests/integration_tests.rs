@@ -15,7 +15,7 @@ use aptos_channels::{aptos_channel, message_queues::QueueStyle};
 use aptos_config::network_id::{NetworkId, PeerNetworkId};
 use aptos_consensus_types::common::Author;
 use aptos_logger::debug;
-use aptos_network::{
+use aptos_network2::{
     application::interface::NetworkClient,
     peer_manager::{ConnectionRequestSender, PeerManagerRequestSender},
     protocols::{

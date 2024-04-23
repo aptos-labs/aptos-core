@@ -18,24 +18,29 @@
 //! - Make the policy for interpreting ping failures pluggable
 //! - Use successful inbound pings as a sign of remote note being healthy
 //! - Ping a peer only in periods of no application-level communication with the peer
+pub use crate::protocols::health_checker::interface::HealthCheckNetworkInterface;
 use crate::{
-    application::interface::NetworkClientInterface,
-    constants::NETWORK_CHANNEL_SIZE,
-    counters,
-    logging::NetworkSchema,
-    peer_manager::ConnectionNotification,
+    application::interface::{NetworkClient, NetworkClientInterface},
+    application::storage::ConnectionNotification,
+    // constants::NETWORK_CHANNEL_SIZE,
+    // counters,
+    // logging::NetworkSchema,
     protocols::{
-        health_checker::interface::HealthCheckNetworkInterface,
+        // health_checker::interface::HealthCheckNetworkInterface,
         network::{
-            Event, NetworkApplicationConfig, NetworkClientConfig, NetworkEvents,
-            NetworkServiceConfig,
+            Event, //NetworkApplicationConfig,
+            // NetworkClientConfig,
+            NetworkEvents,
+            // NetworkServiceConfig,
         },
-        rpc::error::RpcError,
+        RpcError,
     },
     ProtocolId,
 };
-use aptos_channels::{aptos_channel, message_queues::QueueStyle};
-use aptos_config::network_id::{NetworkContext, PeerNetworkId};
+use aptos_config::{
+    config::{NetworkConfig, NodeConfig},
+    network_id::{NetworkContext, NetworkId, PeerNetworkId},
+};
 use aptos_logger::prelude::*;
 use aptos_short_hex_str::AsShortHexStr;
 use aptos_time_service::{TimeService, TimeServiceTrait};
@@ -47,10 +52,14 @@ use futures::{
 };
 use rand::{rngs::SmallRng, Rng, SeedableRng};
 use serde::{Deserialize, Serialize};
-use std::time::Duration;
+use std::{collections::BTreeMap, time::Duration};
+use tokio::runtime::Handle;
+use tokio_stream::wrappers::ReceiverStream;
 
-pub mod builder;
+// pub mod builder;
 mod interface;
+
+#[cfg(disabled)] // TODO: test code needs lots of rework for network2
 #[cfg(test)]
 mod test;
 
@@ -62,22 +71,22 @@ mod test;
 /// around an `channel::Receiver<PeerManagerNotification>`.
 pub type HealthCheckerNetworkEvents = NetworkEvents<HealthCheckerMsg>;
 
-/// Returns a network application config for the health check client and service
-pub fn health_checker_network_config() -> NetworkApplicationConfig {
-    let direct_send_protocols = vec![]; // Health checker doesn't use direct send
-    let rpc_protocols = vec![ProtocolId::HealthCheckerRpc];
-
-    let network_client_config =
-        NetworkClientConfig::new(direct_send_protocols.clone(), rpc_protocols.clone());
-    let network_service_config = NetworkServiceConfig::new(
-        direct_send_protocols,
-        rpc_protocols,
-        aptos_channel::Config::new(NETWORK_CHANNEL_SIZE)
-            .queue_style(QueueStyle::LIFO)
-            .counters(&counters::PENDING_HEALTH_CHECKER_NETWORK_EVENTS),
-    );
-    NetworkApplicationConfig::new(network_client_config, network_service_config)
-}
+// /// Returns a network application config for the health check client and service
+// pub fn health_checker_network_config() -> NetworkApplicationConfig {
+//     let direct_send_protocols = vec![]; // Health checker doesn't use direct send
+//     let rpc_protocols = vec![ProtocolId::HealthCheckerRpc];
+//
+//     let network_client_config =
+//         NetworkClientConfig::new(direct_send_protocols.clone(), rpc_protocols.clone());
+//     let network_service_config = NetworkServiceConfig::new(
+//         direct_send_protocols,
+//         rpc_protocols,
+//         // aptos_channel::Config::new(NETWORK_CHANNEL_SIZE)
+//         //     .queue_style(QueueStyle::LIFO)
+//         //     .counters(&counters::PENDING_HEALTH_CHECKER_NETWORK_EVENTS),
+//     );
+//     NetworkApplicationConfig::new(network_client_config, network_service_config)
+// }
 
 #[derive(Clone, Debug, Deserialize, Serialize)]
 pub enum HealthCheckerMsg {
@@ -91,15 +100,16 @@ pub struct Ping(u32);
 #[derive(Clone, Debug, Deserialize, Serialize)]
 pub struct Pong(u32);
 
-/// The actor performing health checks by running the Ping protocol
-pub struct HealthChecker<NetworkClient> {
+pub fn start(
+    _network_client: NetworkClient<HealthCheckerMsg>,
+    _network_events: NetworkEvents<HealthCheckerMsg>,
+    _time_service: TimeService,
+) {
+}
+
+/// The part that is per Validator/Vfn/Public/etc network
+pub struct HealthCheckerNetwork {
     network_context: NetworkContext,
-    /// A handle to a time service for easily mocking time-related operations.
-    time_service: TimeService,
-    /// Network interface to send requests to the Network Layer
-    network_interface: HealthCheckNetworkInterface<NetworkClient>,
-    /// Random-number generator.
-    rng: SmallRng,
     /// Time we wait between each set of pings.
     ping_interval: Duration,
     /// Ping timeout duration.
@@ -108,6 +118,34 @@ pub struct HealthChecker<NetworkClient> {
     /// disconnecting from it. In the future, this can be replaced with a more general failure
     /// detection policy.
     ping_failures_tolerated: u64,
+}
+
+impl HealthCheckerNetwork {
+    pub fn new(node_config: &NodeConfig, network_config: &NetworkConfig) -> Self {
+        let ping_interval = Duration::from_millis(network_config.ping_interval_ms);
+        let ping_timeout = Duration::from_millis(network_config.ping_timeout_ms);
+        let ping_failures_tolerated = network_config.ping_failures_tolerated;
+        let role = node_config.base.role;
+        let network_context =
+            NetworkContext::new(role, network_config.network_id, network_config.peer_id());
+        HealthCheckerNetwork {
+            network_context,
+            ping_interval,
+            ping_timeout,
+            ping_failures_tolerated,
+        }
+    }
+}
+
+/// The actor performing health checks by running the Ping protocol
+pub struct HealthChecker<NetworkClient> {
+    networks: BTreeMap<NetworkId, HealthCheckerNetwork>,
+    /// A handle to a time service for easily mocking time-related operations.
+    time_service: TimeService,
+    /// Network interface to send requests to the Network Layer
+    network_interface: HealthCheckNetworkInterface<NetworkClient>,
+    /// Random-number generator.
+    rng: SmallRng,
     /// Counter incremented in each round of health checks
     round: u64,
 
@@ -115,24 +153,53 @@ pub struct HealthChecker<NetworkClient> {
     connection_events_injection: Option<tokio::sync::mpsc::Receiver<ConnectionNotification>>,
 }
 
+async fn network_id_ticker(
+    time_service: TimeService,
+    network_id: NetworkId,
+    ping_interval: Duration,
+    sender: tokio::sync::mpsc::Sender<NetworkId>,
+) {
+    let ticker = time_service.interval(ping_interval);
+    tokio::pin!(ticker);
+    let mut sequential_errors = 0;
+    loop {
+        let _ = ticker.select_next_some().await;
+        if let Err(x) = sender.send(network_id).await {
+            error!("{} health checker ticker could not send: {}", network_id, x);
+            sequential_errors += 1;
+            if sequential_errors > 100 {
+                error!("{} health checker ticker giving up", network_id);
+            }
+        } else {
+            sequential_errors = 0;
+        }
+    }
+}
+
 impl<NetworkClient: NetworkClientInterface<HealthCheckerMsg> + Unpin> HealthChecker<NetworkClient> {
     /// Create new instance of the [`HealthChecker`] actor.
     pub fn new(
-        network_context: NetworkContext,
+        // network_context: NetworkContext,
+        networks: Vec<HealthCheckerNetwork>,
         time_service: TimeService,
         network_interface: HealthCheckNetworkInterface<NetworkClient>,
-        ping_interval: Duration,
-        ping_timeout: Duration,
-        ping_failures_tolerated: u64,
+        // ping_interval: Duration,
+        // ping_timeout: Duration,
+        // ping_failures_tolerated: u64,
     ) -> Self {
+        let mut netmap = BTreeMap::new();
+        for net in networks.into_iter() {
+            netmap.insert(net.network_context.network_id(), net);
+        }
         HealthChecker {
-            network_context,
+            networks: netmap,
+            // network_context,
             time_service,
             network_interface,
             rng: SmallRng::from_entropy(),
-            ping_interval,
-            ping_timeout,
-            ping_failures_tolerated,
+            // ping_interval,
+            // ping_timeout,
+            // ping_failures_tolerated,
             round: 0,
             connection_events_injection: None,
         }
@@ -148,15 +215,22 @@ impl<NetworkClient: NetworkClientInterface<HealthCheckerMsg> + Unpin> HealthChec
     }
 
     /// testing_connection_events should be None except in unit test code
-    pub async fn start(mut self) {
+    pub async fn start(mut self, handle: Handle) {
         let mut tick_handlers = FuturesUnordered::new();
-        info!(
-            NetworkSchema::new(&self.network_context),
-            "{} Health checker actor started", self.network_context
-        );
+        info!("Health checker actor started");
 
-        let ticker = self.time_service.interval(self.ping_interval);
-        tokio::pin!(ticker);
+        // let ticker = self.time_service.interval(self.ping_interval);
+        // tokio::pin!(ticker);
+        let (net_ticks_sender, net_ticks) = tokio::sync::mpsc::channel(10);
+        for (network_id, net) in self.networks.iter() {
+            handle.spawn(network_id_ticker(
+                self.time_service.clone(),
+                *network_id,
+                net.ping_interval,
+                net_ticks_sender.clone(),
+            ));
+        }
+        let mut net_ticks = ReceiverStream::new(net_ticks).fuse();
 
         let connection_events = self
             .connection_events_injection
@@ -175,6 +249,7 @@ impl<NetworkClient: NetworkClientInterface<HealthCheckerMsg> + Unpin> HealthChec
                         None => break,
                     };
 
+                    // TODO: subscribe to connect/disconnect events
                     match event {
                         Event::RpcRequest(peer_id, msg, protocol, res_tx) => {
                             match msg {
@@ -182,11 +257,9 @@ impl<NetworkClient: NetworkClientInterface<HealthCheckerMsg> + Unpin> HealthChec
                                 _ => {
                                     warn!(
                                         SecurityEvent::InvalidHealthCheckerMsg,
-                                        NetworkSchema::new(&self.network_context).remote_peer(&peer_id),
+                                        remote_peer = peer_id,
                                         rpc_message = msg,
-                                        "{} Unexpected RPC message from {}",
-                                        self.network_context,
-                                        peer_id
+                                        "Unexpected RPC message",
                                     );
                                     debug_assert!(false, "Unexpected rpc request");
                                 }
@@ -195,10 +268,8 @@ impl<NetworkClient: NetworkClientInterface<HealthCheckerMsg> + Unpin> HealthChec
                         Event::Message(peer_id, msg) => {
                             error!(
                                 SecurityEvent::InvalidNetworkEventHC,
-                                NetworkSchema::new(&self.network_context).remote_peer(&peer_id),
-                                "{} Unexpected direct send from {} msg {:?}",
-                                self.network_context,
-                                peer_id,
+                                remote_peer = peer_id,
+                                "Unexpected direct send, msg: {:?}",
                                 msg,
                             );
                             debug_assert!(false, "Unexpected network event");
@@ -219,57 +290,54 @@ impl<NetworkClient: NetworkClientInterface<HealthCheckerMsg> + Unpin> HealthChec
                         }
                     }
                 }
-                _ = ticker.select_next_some() => {
-                    self.round += 1;
-                    let connected = self.network_interface.connected_peers();
-                    if connected.is_empty() {
-                        trace!(
-                            NetworkSchema::new(&self.network_context),
-                            round = self.round,
-                            "{} No connected peer to ping round: {}",
-                            self.network_context,
-                            self.round
-                        );
-                        continue
-                    }
-
-                    for peer_id in connected {
-                        let nonce = self.rng.gen::<u32>();
-                        trace!(
-                            NetworkSchema::new(&self.network_context),
-                            round = self.round,
-                            "{} Will ping: {} for round: {} nonce: {}",
-                            self.network_context,
-                            peer_id.short_str(),
-                            self.round,
-                            nonce
-                        );
-
-                        tick_handlers.push(Self::ping_peer(
-                            self.network_context,
-                            self.network_interface.network_client(),
-                            peer_id,
-                            self.round,
-                            nonce,
-                            self.ping_timeout,
-                        ));
-                    }
-                }
                 res = tick_handlers.select_next_some() => {
                     let (peer_id, round, nonce, ping_result) = res;
                     self.handle_ping_response(peer_id, round, nonce, ping_result).await;
                 }
+                tick_network_id = net_ticks.select_next_some() => {
+                    if let Some(net) = self.networks.get(&tick_network_id) {
+                        self.round += 1;
+                        let connected = self.network_interface.connected_peers();
+                        if connected.is_empty() {
+                            trace!(
+                                round = self.round,
+                                "{} No connected peer to ping round: {}",
+                                tick_network_id,
+                                self.round
+                            );
+                            continue
+                        }
+
+                        for peer_id in connected {
+                            let nonce = self.rng.gen::<u32>();
+                            trace!(
+                                round = self.round,
+                                "{} Will ping: {} for round: {} nonce: {}",
+                                tick_network_id,
+                                peer_id.short_str(),
+                                self.round,
+                                nonce
+                            );
+
+                            tick_handlers.push(Self::ping_peer(
+                                tick_network_id,
+                                self.network_interface.network_client(),
+                                peer_id,
+                                self.round,
+                                nonce,
+                                net.ping_timeout,
+                            ));
+                        }
+                    }
+                }
             }
         }
-        warn!(
-            NetworkSchema::new(&self.network_context),
-            "{} Health checker actor terminated", self.network_context
-        );
+        warn!("Health checker actor terminated");
     }
 
     fn handle_ping_request(
         &mut self,
-        peer_id: PeerId,
+        peer_id: PeerNetworkId,
         ping: Ping,
         protocol: ProtocolId,
         res_tx: oneshot::Sender<Result<Bytes, RpcError>>,
@@ -278,18 +346,16 @@ impl<NetworkClient: NetworkClientInterface<HealthCheckerMsg> + Unpin> HealthChec
             Ok(msg) => msg,
             Err(e) => {
                 warn!(
-                    NetworkSchema::new(&self.network_context),
                     error = ?e,
-                    "{} Unable to serialize pong response: {}", self.network_context, e
+                    "Unable to serialize pong response: {}", e
                 );
                 return;
             },
         };
+        let peer_id = peer_id.peer_id();
         trace!(
-            NetworkSchema::new(&self.network_context).remote_peer(&peer_id),
-            "{} Sending Pong response to peer: {} with nonce: {}",
-            self.network_context,
-            peer_id.short_str(),
+            "Sending Pong response to peer: {} with nonce: {}",
+            peer_id,
             ping.0,
         );
         // Record Ingress HC here and reset failures.
@@ -300,7 +366,7 @@ impl<NetworkClient: NetworkClientInterface<HealthCheckerMsg> + Unpin> HealthChec
 
     async fn handle_ping_response(
         &mut self,
-        peer_id: PeerId,
+        peer_id: PeerNetworkId,
         round: u64,
         req_nonce: u32,
         ping_result: Result<Pong, RpcError>,
@@ -309,23 +375,19 @@ impl<NetworkClient: NetworkClientInterface<HealthCheckerMsg> + Unpin> HealthChec
             Ok(pong) => {
                 if pong.0 == req_nonce {
                     trace!(
-                        NetworkSchema::new(&self.network_context).remote_peer(&peer_id),
                         rount = round,
-                        "{} Ping successful for peer: {} round: {}",
-                        self.network_context,
-                        peer_id.short_str(),
+                        "Ping successful for peer: {} round: {}",
+                        peer_id,
                         round
                     );
                     // Update last successful ping to current round.
                     // If it's not in storage, don't bother updating it
                     self.network_interface
-                        .reset_peer_round_state(peer_id, round);
+                        .reset_peer_round_state(peer_id.peer_id(), round);
                 } else {
                     warn!(
                         SecurityEvent::InvalidHealthCheckerMsg,
-                        NetworkSchema::new(&self.network_context).remote_peer(&peer_id),
-                        "{} Pong nonce doesn't match Ping nonce. Round: {}, Pong: {}, Ping: {}",
-                        self.network_context,
+                        "Pong nonce doesn't match Ping nonce. Round: {}, Pong: {}, Ping: {}",
                         round,
                         pong.0,
                         req_nonce
@@ -335,18 +397,22 @@ impl<NetworkClient: NetworkClientInterface<HealthCheckerMsg> + Unpin> HealthChec
             },
             Err(err) => {
                 warn!(
-                    NetworkSchema::new(&self.network_context)
-                        .remote_peer(&peer_id),
                     error = ?err,
                     round = round,
-                    "{} Ping failed for peer: {} round: {} with error: {:?}",
-                    self.network_context,
-                    peer_id.short_str(),
+                    "Ping failed for peer: {} round: {} with error: {:?}",
+                    peer_id,
                     round,
                     err
                 );
                 self.network_interface
-                    .increment_peer_round_failure(peer_id, round);
+                    .increment_peer_round_failure(peer_id.peer_id(), round);
+
+                let ping_failures_tolerated =
+                    if let Some(net) = self.networks.get(&peer_id.network_id()) {
+                        net.ping_failures_tolerated
+                    } else {
+                        999
+                    };
 
                 // If the ping failures are now more than
                 // `self.ping_failures_tolerated`, we disconnect from the node.
@@ -354,29 +420,15 @@ impl<NetworkClient: NetworkClientInterface<HealthCheckerMsg> + Unpin> HealthChec
                 // ConnectivityManager or the remote peer to re-establish the connection.
                 let failures = self
                     .network_interface
-                    .get_peer_failures(peer_id)
+                    .get_peer_failures(peer_id.peer_id())
                     .unwrap_or(0);
-                if failures > self.ping_failures_tolerated {
-                    info!(
-                        NetworkSchema::new(&self.network_context).remote_peer(&peer_id),
-                        "{} Disconnecting from peer: {}",
-                        self.network_context,
-                        peer_id.short_str()
-                    );
-                    let peer_network_id =
-                        PeerNetworkId::new(self.network_context.network_id(), peer_id);
-                    if let Err(err) = self
-                        .network_interface
-                        .disconnect_peer(peer_network_id)
-                        .await
-                    {
+                if failures > ping_failures_tolerated {
+                    info!("Disconnecting from peer: {}", peer_id);
+                    if let Err(err) = self.network_interface.disconnect_peer(peer_id).await {
                         warn!(
-                            NetworkSchema::new(&self.network_context)
-                                .remote_peer(&peer_id),
                             error = ?err,
-                            "{} Failed to disconnect from peer: {} with error: {:?}",
-                            self.network_context,
-                            peer_id.short_str(),
+                            "Failed to disconnect from peer: {} with error: {:?}",
+                            peer_id,
                             err
                         );
                     }
@@ -386,23 +438,22 @@ impl<NetworkClient: NetworkClientInterface<HealthCheckerMsg> + Unpin> HealthChec
     }
 
     async fn ping_peer(
-        network_context: NetworkContext,
+        network_id: NetworkId,
         network_client: NetworkClient, // TODO: we shouldn't need to pass the client directly
         peer_id: PeerId,
         round: u64,
         nonce: u32,
         ping_timeout: Duration,
-    ) -> (PeerId, u64, u32, Result<Pong, RpcError>) {
+    ) -> (PeerNetworkId, u64, u32, Result<Pong, RpcError>) {
         trace!(
-            NetworkSchema::new(&network_context).remote_peer(&peer_id),
             round = round,
             "{} Sending Ping request to peer: {} for round: {} nonce: {}",
-            network_context,
+            network_id,
             peer_id.short_str(),
             round,
             nonce
         );
-        let peer_network_id = PeerNetworkId::new(network_context.network_id(), peer_id);
+        let peer_network_id = PeerNetworkId::new(network_id, peer_id);
         let res_pong_msg = network_client
             .send_to_peer_rpc(
                 HealthCheckerMsg::Ping(Ping(nonce)),
@@ -415,6 +466,6 @@ impl<NetworkClient: NetworkClientInterface<HealthCheckerMsg> + Unpin> HealthChec
                 HealthCheckerMsg::Pong(res) => Ok(res),
                 _ => Err(RpcError::InvalidRpcResponse),
             });
-        (peer_id, round, nonce, res_pong_msg)
+        (peer_network_id, round, nonce, res_pong_msg)
     }
 }

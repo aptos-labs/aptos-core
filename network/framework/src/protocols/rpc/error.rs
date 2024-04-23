@@ -4,8 +4,6 @@
 
 //! Rpc protocol errors
 
-use crate::peer_manager::PeerManagerError;
-use anyhow::anyhow;
 use aptos_types::PeerId;
 use futures::channel::{mpsc, oneshot};
 use std::io;
@@ -37,21 +35,14 @@ pub enum RpcError {
     #[error("Error sending on mpsc channel, connection likely shutting down: {0:?}")]
     MpscSendError(#[from] mpsc::SendError),
 
+    #[error("Error sending on mpsc channel, connection likely shutting down")]
+    TokioMpscSendError,
+
     #[error("Too many pending RPCs: {0}")]
     TooManyPending(u32),
 
     #[error("Rpc timed out")]
     TimedOut,
-}
-
-impl From<PeerManagerError> for RpcError {
-    fn from(err: PeerManagerError) -> Self {
-        match err {
-            PeerManagerError::NotConnected(peer_id) => RpcError::NotConnected(peer_id),
-            PeerManagerError::IoError(err) => RpcError::IoError(err),
-            err => RpcError::Error(anyhow!(err)),
-        }
-    }
 }
 
 impl From<oneshot::Canceled> for RpcError {
@@ -63,6 +54,12 @@ impl From<oneshot::Canceled> for RpcError {
 impl From<tokio::time::error::Elapsed> for RpcError {
     fn from(_err: tokio::time::error::Elapsed) -> RpcError {
         RpcError::TimedOut
+    }
+}
+
+impl<T> From<tokio::sync::mpsc::error::SendError<T>> for RpcError {
+    fn from(_err: tokio::sync::mpsc::error::SendError<T>) -> RpcError {
+        RpcError::TokioMpscSendError
     }
 }
 

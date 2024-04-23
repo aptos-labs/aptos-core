@@ -52,6 +52,28 @@ pub enum MultiplexMessage {
     Stream(StreamMessage),
 }
 
+// TODO: principled system of determining the actual overhead bytes.
+// Best guess by inspection was 9 bytes but things failed.
+// Given 4 MiB fragment size, a few bytes wasted is okay?
+pub const STREAM_HEADER_OVERHEAD_BYTES: usize = 20;
+pub const STREAM_FRAGMENT_OVERHEAD_BYTES: usize = 20;
+
+impl MultiplexMessage {
+    pub fn data_len(&self) -> usize {
+        match self {
+            MultiplexMessage::Message(msg) => msg.data_len(),
+            MultiplexMessage::Stream(sm) => sm.data_len(),
+        }
+    }
+
+    pub fn header_len(&self) -> usize {
+        match self {
+            MultiplexMessage::Message(msg) => msg.header_len() + 1,
+            MultiplexMessage::Stream(sm) => sm.header_len() + 1,
+        }
+    }
+}
+
 impl NetworkMessage {
     /// The size of the raw data excluding the headers
     pub fn data_len(&self) -> usize {
@@ -60,6 +82,25 @@ impl NetworkMessage {
             NetworkMessage::RpcRequest(request) => request.raw_request.len(),
             NetworkMessage::RpcResponse(response) => response.raw_response.len(),
             NetworkMessage::DirectSendMsg(message) => message.raw_msg.len(),
+        }
+    }
+
+    /// header_len + data_len should equal BCS serialization size
+    pub fn header_len(&self) -> usize {
+        match self {
+            NetworkMessage::Error(_) => 3,
+            NetworkMessage::RpcRequest(_) => 6,
+            NetworkMessage::RpcResponse(_) => 5,
+            NetworkMessage::DirectSendMsg(_) => 2,
+        }
+    }
+
+    pub fn protocol_id_as_str(&self) -> &'static str {
+        match self {
+            NetworkMessage::Error(_) => "err",
+            NetworkMessage::RpcRequest(r) => r.protocol_id.as_str(),
+            NetworkMessage::RpcResponse(_) => "rpc_resp",
+            NetworkMessage::DirectSendMsg(m) => m.protocol_id.as_str(),
         }
     }
 }
@@ -71,6 +112,8 @@ pub enum ErrorCode {
     ParsingError(ParsingErrorType),
     /// A message was received for a protocol that is not supported over this connection.
     NotSupported(NotSupportedType),
+    /// A command sent internally which causes a peer to disconnect, not an actual message to send.
+    DisconnectCommand,
 }
 
 impl ErrorCode {
@@ -175,12 +218,12 @@ pub fn network_message_frame_codec(max_frame_size: usize) -> LengthDelimitedCode
 /// A `Stream` of inbound `MultiplexMessage`s read and deserialized from an
 /// underlying socket.
 #[pin_project]
-pub struct MultiplexMessageStream<TReadSocket: AsyncRead + Unpin> {
+pub struct MultiplexMessageStream<TReadSocket: AsyncRead + Unpin + Send> {
     #[pin]
     framed_read: FramedRead<Compat<TReadSocket>, LengthDelimitedCodec>,
 }
 
-impl<TReadSocket: AsyncRead + Unpin> MultiplexMessageStream<TReadSocket> {
+impl<TReadSocket: AsyncRead + Unpin + Send> MultiplexMessageStream<TReadSocket> {
     pub fn new(socket: TReadSocket, max_frame_size: usize) -> Self {
         let frame_codec = network_message_frame_codec(max_frame_size);
         let compat_socket = socket.compat();
@@ -189,7 +232,7 @@ impl<TReadSocket: AsyncRead + Unpin> MultiplexMessageStream<TReadSocket> {
     }
 }
 
-impl<TReadSocket: AsyncRead + Unpin> Stream for MultiplexMessageStream<TReadSocket> {
+impl<TReadSocket: AsyncRead + Unpin + Send> Stream for MultiplexMessageStream<TReadSocket> {
     type Item = Result<MultiplexMessage, ReadError>;
 
     fn poll_next(self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Option<Self::Item>> {

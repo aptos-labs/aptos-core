@@ -17,7 +17,7 @@ use aptos_consensus_types::common::{
 };
 use aptos_crypto::HashValue;
 use aptos_infallible::{Mutex, RwLock};
-use aptos_network::application::interface::NetworkClientInterface;
+use aptos_network2::application::interface::NetworkClientInterface;
 use aptos_storage_interface::DbReader;
 use aptos_types::{
     mempool_status::MempoolStatus, transaction::SignedTransaction, vm_status::DiscardedVMStatus,

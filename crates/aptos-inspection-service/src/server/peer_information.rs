@@ -6,10 +6,10 @@ use aptos_config::{
     config::NodeConfig,
     network_id::{NetworkId, PeerNetworkId},
 };
+use aptos_network2::application::storage::PeersAndMetadata;
 use aptos_data_client::{
     client::AptosDataClient, interface::AptosDataClientInterface, peer_states,
 };
-use aptos_network::application::storage::PeersAndMetadata;
 use hyper::{Body, StatusCode};
 use std::{collections::BTreeMap, ops::Deref, sync::Arc};
 
@@ -282,6 +282,7 @@ fn display_trusted_peers(
     for network in registered_networks {
         peer_information_output.push(format!("\t- Network: {}", network));
         if let Ok(trusted_peers) = peers_and_metadata.get_trusted_peers(&network) {
+            let trusted_peers = trusted_peers.read().clone();
             // Sort the peers before displaying them
             let mut sorted_trusted_peers = BTreeMap::new();
             for (peer_id, peer_info) in trusted_peers {

@@ -2,47 +2,42 @@
 // Parts of the project are originally copyright © Meta Platforms, Inc.
 // SPDX-License-Identifier: Apache-2.0
 
+//use tokio::sync::mpsc::error::TryRecvError;
+//use tokio::time::timeout;
+use crate::protocols::wire::messaging::v1::{DirectSendMsg, NetworkMessage, RpcRequest};
 use crate::{
     application::{
         error::Error,
-        interface::{NetworkClient, NetworkClientInterface, NetworkServiceEvents},
+        interface::{NetworkClient, NetworkClientInterface},
         metadata::{ConnectionState, PeerMetadata},
         storage::PeersAndMetadata,
-    },
-    peer_manager::{
-        ConnectionNotification, ConnectionRequestSender, PeerManagerNotification,
-        PeerManagerRequest, PeerManagerRequestSender,
+        ApplicationCollector, ApplicationConnections,
     },
     protocols::{
-        network::{Event, NetworkEvents, NetworkSender, NewNetworkEvents, NewNetworkSender},
-        rpc::InboundRpcRequest,
+        network::ReceivedMessage, //Event, NetworkEvents, NetworkSender,NewNetworkEvents, NewNetworkSender,
         wire::handshake::v1::{ProtocolId, ProtocolIdSet},
     },
     transport::ConnectionMetadata,
 };
-use aptos_channels::{aptos_channel, message_queues::QueueStyle};
 use aptos_config::{
-    config::{Peer, PeerRole, PeerSet},
+    config::{Peer, PeerRole},
     network_id::{NetworkId, PeerNetworkId},
 };
-use aptos_peer_monitoring_service_types::PeerMonitoringMetadata;
-use aptos_types::{account_address::AccountAddress, PeerId};
-use futures::channel::oneshot;
-use futures_util::StreamExt;
-use maplit::hashmap;
+use aptos_types::PeerId;
+//use futures::channel::oneshot;
+// use futures_util::StreamExt;
 use serde::{Deserialize, Serialize};
 use std::{
     collections::{HashMap, HashSet},
     fmt::Debug,
-    hash::Hash,
-    ops::Deref,
+    //hash::Hash,
     sync::Arc,
     time::Duration,
 };
 use tokio::{sync::mpsc::error::TryRecvError, time::timeout};
 
 // Useful test constants for timeouts
-const MAX_CHANNEL_TIMEOUT_SECS: u64 = 1;
+// const MAX_CHANNEL_TIMEOUT_SECS: u64 = 1;
 const MAX_MESSAGE_TIMEOUT_SECS: u64 = 2;
 
 /// Represents a test message sent across the network
@@ -52,6 +47,7 @@ struct DummyMessage {
 }
 
 impl DummyMessage {
+    #[cfg(unused)]
     pub fn new(message_contents: u64) -> Self {
         Self {
             message_contents: Some(message_contents),
@@ -63,6 +59,95 @@ impl DummyMessage {
             message_contents: None,
         }
     }
+}
+
+#[test]
+fn test_application_collector_simple() {
+    let mut apps = ApplicationCollector::new();
+    let (s1, mut r1) = tokio::sync::mpsc::channel::<ReceivedMessage>(10);
+    let ac1 = ApplicationConnections {
+        protocol_id: ProtocolId::ConsensusRpcBcs,
+        sender: s1,
+        label: "consensus".to_string(),
+    };
+    apps.add(ac1);
+    let (s2, mut r2) = tokio::sync::mpsc::channel::<ReceivedMessage>(10);
+    let ac2 = ApplicationConnections {
+        protocol_id: ProtocolId::MempoolDirectSend,
+        sender: s2,
+        label: "mempool".to_string(),
+    };
+    apps.add(ac2);
+
+    let sender = PeerNetworkId::new(NetworkId::Validator, PeerId::random());
+
+    let msg1 = ReceivedMessage {
+        message: NetworkMessage::RpcRequest(RpcRequest {
+            protocol_id: ProtocolId::ConsensusRpcBcs,
+            request_id: 12,
+            priority: 0,
+            raw_request: vec![],
+        }),
+        sender,
+        rx_at: 0,
+    };
+    match apps.get(&ProtocolId::ConsensusRpcBcs) {
+        None => {
+            panic!("missing consensus app");
+        },
+        Some(app) => {
+            let tse = app.sender.try_send(msg1.clone());
+            assert_eq!(Ok(()), tse);
+        },
+    };
+    match r1.try_recv() {
+        Ok(msg) => {
+            assert_eq!(msg, msg1);
+        },
+        Err(err) => {
+            panic!("should have message: {:?}", err);
+        },
+    };
+
+    let msg2 = ReceivedMessage {
+        message: NetworkMessage::DirectSendMsg(DirectSendMsg {
+            protocol_id: ProtocolId::MempoolDirectSend,
+            priority: 0,
+            raw_msg: vec![],
+        }),
+        sender,
+        rx_at: 0,
+    };
+    match apps.get(&ProtocolId::MempoolDirectSend) {
+        None => {
+            panic!("missing mempool app");
+        },
+        Some(app) => {
+            let tse = app.sender.try_send(msg2.clone());
+            assert_eq!(Ok(()), tse);
+        },
+    };
+    match r2.try_recv() {
+        Ok(msg) => {
+            assert_eq!(msg, msg2);
+        },
+        Err(err) => {
+            panic!("should have message: {:?}", err);
+        },
+    };
+
+    match apps.get(&ProtocolId::DiscoveryDirectSend) {
+        None => {
+            // correct!
+        },
+        Some(app) => {
+            panic!("found garbage discovery app: {:?}", app);
+        },
+    };
+
+    let prots: Vec<ProtocolId> = apps.iter().map(|ac| ac.1.protocol_id).collect();
+    let prots_expected = vec![ProtocolId::ConsensusRpcBcs, ProtocolId::MempoolDirectSend];
+    assert_eq!(prots, prots_expected);
 }
 
 #[test]
@@ -231,7 +316,7 @@ fn test_peers_and_metadata_trusted_peers() {
     // Verify that we get an empty trusted peer set for the validator and VFN network
     for network_id in network_ids {
         let trusted_peers = peers_and_metadata.get_trusted_peers(&network_id).unwrap();
-        assert!(trusted_peers.is_empty());
+        assert!(trusted_peers.read().is_empty());
     }
 
     // Update the trusted peer set for the validator network
@@ -239,192 +324,47 @@ fn test_peers_and_metadata_trusted_peers() {
     let peer_id_2 = PeerId::random();
     let peer_1 = Peer::new(vec![], HashSet::new(), PeerRole::Validator);
     let peer_2 = Peer::new(vec![], HashSet::new(), PeerRole::Unknown);
-    insert_trusted_peers(&peers_and_metadata, NetworkId::Validator, vec![
-        (peer_id_1, peer_1),
-        (peer_id_2, peer_2),
-    ]);
+    let trusted_peers = peers_and_metadata
+        .get_trusted_peers(&NetworkId::Validator)
+        .unwrap();
+    trusted_peers.write().insert(peer_id_1, peer_1);
+    trusted_peers.write().insert(peer_id_2, peer_2);
 
     // Verify the validator network contains the expected trusted peers
     let trusted_peers = peers_and_metadata
         .get_trusted_peers(&NetworkId::Validator)
         .unwrap();
-    assert!(trusted_peers.contains_key(&peer_id_1));
-    assert!(trusted_peers.contains_key(&peer_id_2));
-    assert!(!trusted_peers.contains_key(&PeerId::random()));
+    assert!(trusted_peers.read().contains_key(&peer_id_1));
+    assert!(trusted_peers.read().contains_key(&peer_id_2));
+    assert!(!trusted_peers.read().contains_key(&PeerId::random()));
 
     // Update the trusted peer set for the VFN network
     let peer_id_3 = PeerId::random();
     let peer_3 = Peer::new(vec![], HashSet::new(), PeerRole::ValidatorFullNode);
-    insert_trusted_peers(&peers_and_metadata, NetworkId::Vfn, vec![(
-        peer_id_3,
-        peer_3.clone(),
-    )]);
+    let trusted_peers = peers_and_metadata
+        .get_trusted_peers(&NetworkId::Vfn)
+        .unwrap();
+    trusted_peers.write().insert(peer_id_3, peer_3.clone());
 
     // Verify the VFN network contains the expected trusted peers
     let trusted_peers = peers_and_metadata
         .get_trusted_peers(&NetworkId::Vfn)
         .unwrap();
+    let trusted_peers = trusted_peers.read();
     let vfn_peer = trusted_peers.get(&peer_id_3).unwrap();
     assert_eq!(vfn_peer, &peer_3);
 
     // Clear the validator network trusted peer set
-    peers_and_metadata
-        .set_trusted_peers(&NetworkId::Validator, HashMap::new())
+    let trusted_peers = peers_and_metadata
+        .get_trusted_peers(&NetworkId::Validator)
         .unwrap();
+    trusted_peers.write().clear();
 
     // Verify that we get an empty trusted peer set for the validator network
     let trusted_peers = peers_and_metadata
         .get_trusted_peers(&NetworkId::Validator)
         .unwrap();
-    assert!(trusted_peers.is_empty());
-}
-
-#[test]
-fn test_peers_and_metadata_caching() {
-    // Create the peers and metadata container
-    let network_ids = vec![NetworkId::Validator, NetworkId::Vfn];
-    let peers_and_metadata = PeersAndMetadata::new(&network_ids);
-
-    // Verify the states of the internal maps
-    verify_internal_map_states(
-        &network_ids,
-        peers_and_metadata.clone(),
-        HashMap::new(),
-        PeerSet::new(),
-        HashMap::new(),
-    );
-
-    // Create two peers and initialize the connection metadata
-    let (peer_network_id_1, connection_1) = create_peer_and_connection(
-        NetworkId::Vfn,
-        vec![ProtocolId::MempoolDirectSend, ProtocolId::StorageServiceRpc],
-        peers_and_metadata.clone(),
-    );
-    let (peer_network_id_2, connection_2) = create_peer_and_connection(
-        NetworkId::Validator,
-        vec![ProtocolId::MempoolDirectSend, ProtocolId::ConsensusRpcBcs],
-        peers_and_metadata.clone(),
-    );
-
-    // Verify the states of the VFN maps
-    let mut peer_metadata_1 = PeerMetadata::new(connection_1.clone());
-    let expected_peers_and_metadata = hashmap! {
-        peer_network_id_1.peer_id() => peer_metadata_1.clone()
-    };
-    verify_internal_map_states(
-        &[NetworkId::Vfn],
-        peers_and_metadata.clone(),
-        expected_peers_and_metadata.clone(),
-        PeerSet::new(),
-        expected_peers_and_metadata,
-    );
-
-    // Verify the states of the validator maps
-    let peer_metadata_2 = PeerMetadata::new(connection_2.clone());
-    let expected_peers_and_metadata = hashmap! {
-        peer_network_id_2.peer_id() => peer_metadata_2.clone()
-    };
-    verify_internal_map_states(
-        &[NetworkId::Validator],
-        peers_and_metadata.clone(),
-        expected_peers_and_metadata.clone(),
-        PeerSet::new(),
-        expected_peers_and_metadata,
-    );
-
-    // Mark peer 1 as disconnected
-    mark_peer_disconnecting(&peers_and_metadata, peer_network_id_1);
-
-    // Verify the states of the VFN maps
-    peer_metadata_1.connection_state = ConnectionState::Disconnecting;
-    let expected_peers_and_metadata = hashmap! {
-        peer_network_id_1.peer_id() => peer_metadata_1.clone()
-    };
-    verify_internal_map_states(
-        &[NetworkId::Vfn],
-        peers_and_metadata.clone(),
-        expected_peers_and_metadata.clone(),
-        PeerSet::new(),
-        expected_peers_and_metadata.clone(),
-    );
-
-    // Verify the states of the validator maps
-    let expected_peers_and_metadata = hashmap! {
-        peer_network_id_2.peer_id() => peer_metadata_2.clone()
-    };
-    verify_internal_map_states(
-        &[NetworkId::Validator],
-        peers_and_metadata.clone(),
-        expected_peers_and_metadata.clone(),
-        PeerSet::new(),
-        expected_peers_and_metadata.clone(),
-    );
-
-    // Remove peer 2
-    remove_peer_metadata(
-        &peers_and_metadata,
-        peer_network_id_2,
-        connection_2.connection_id.get_inner(),
-    )
-    .unwrap();
-
-    // Verify the states of the VFN maps
-    let expected_peers_and_metadata = hashmap! {
-        peer_network_id_1.peer_id() => peer_metadata_1.clone()
-    };
-    verify_internal_map_states(
-        &[NetworkId::Vfn],
-        peers_and_metadata.clone(),
-        expected_peers_and_metadata.clone(),
-        PeerSet::new(),
-        expected_peers_and_metadata.clone(),
-    );
-
-    // Verify the states of the validator maps
-    verify_internal_map_states(
-        &[NetworkId::Validator],
-        peers_and_metadata.clone(),
-        HashMap::new(),
-        PeerSet::new(),
-        HashMap::new(),
-    );
-
-    // Update the peer metadata for peer 1
-    let peer_monitoring_metadata =
-        PeerMonitoringMetadata::new(Some(1010101.0), None, None, Some("Internal string".into()));
-    peers_and_metadata
-        .update_peer_monitoring_metadata(peer_network_id_1, peer_monitoring_metadata.clone())
-        .unwrap();
-
-    // Verify the states of the VFN maps
-    peer_metadata_1.peer_monitoring_metadata = peer_monitoring_metadata;
-    let expected_peers_and_metadata = hashmap! {
-        peer_network_id_1.peer_id() => peer_metadata_1.clone()
-    };
-    verify_internal_map_states(
-        &[NetworkId::Vfn],
-        peers_and_metadata.clone(),
-        expected_peers_and_metadata.clone(),
-        PeerSet::new(),
-        expected_peers_and_metadata,
-    );
-
-    // Reconnect peer 2
-    peers_and_metadata
-        .insert_connection_metadata(peer_network_id_2, connection_2.clone())
-        .unwrap();
-
-    // Verify the states of the validator maps
-    let expected_peers_and_metadata = hashmap! {
-        peer_network_id_2.peer_id() => peer_metadata_2.clone()
-    };
-    verify_internal_map_states(
-        &[NetworkId::Validator],
-        peers_and_metadata.clone(),
-        expected_peers_and_metadata.clone(),
-        PeerSet::new(),
-        expected_peers_and_metadata.clone(),
-    );
+    assert!(trusted_peers.read().is_empty());
 }
 
 #[tokio::test]
@@ -687,247 +627,247 @@ async fn test_network_client_missing_network_sender() {
         .unwrap();
 }
 
-#[tokio::test]
-async fn test_network_client_senders_no_matching_protocols() {
-    // Create the peers and metadata container
-    let network_ids = vec![NetworkId::Validator, NetworkId::Vfn, NetworkId::Public];
-    let peers_and_metadata = PeersAndMetadata::new(&network_ids);
+// #[tokio::test]
+// async fn test_network_client_senders_no_matching_protocols() { // TODO network2 recreate something like this
+//     // Create the peers and metadata container
+//     let network_ids = vec![NetworkId::Validator, NetworkId::Vfn, NetworkId::Public];
+//     let peers_and_metadata = PeersAndMetadata::new(&network_ids);
+//
+//     // Create a network client with network senders
+//     let (network_senders, _network_events, _outbound_request_receivers, _inbound_request_senders) =
+//         create_network_sender_and_events(&network_ids);
+//     let network_client: NetworkClient<DummyMessage> = NetworkClient::new(
+//         vec![ProtocolId::ConsensusDirectSendBcs],
+//         vec![ProtocolId::StorageServiceRpc],
+//         network_senders,
+//         peers_and_metadata.clone(),
+//     );
+//
+//     // Verify the registered networks and that there are no available peers
+//     check_registered_networks(&peers_and_metadata, network_ids);
+//     check_available_peers(&network_client, vec![]);
+//
+//     // Create two peers and initialize the connection metadata
+//     let (peer_network_id_1, _) = create_peer_and_connection(
+//         NetworkId::Validator,
+//         vec![ProtocolId::StorageServiceRpc],
+//         peers_and_metadata.clone(),
+//     );
+//     let (peer_network_id_2, _) = create_peer_and_connection(
+//         NetworkId::Vfn,
+//         vec![ProtocolId::ConsensusDirectSendBcs],
+//         peers_and_metadata.clone(),
+//     );
+//
+//     // Verify that there are available peers
+//     check_available_peers(&network_client, vec![peer_network_id_1, peer_network_id_2]);
+//
+//     // Verify that sending a message to a peer without a matching protocol fails
+//     network_client
+//         .send_to_peer(DummyMessage::new_empty(), peer_network_id_1)
+//         .unwrap_err();
+//     network_client
+//         .send_to_peer_rpc(
+//             DummyMessage::new_empty(),
+//             Duration::from_secs(MAX_MESSAGE_TIMEOUT_SECS),
+//             peer_network_id_2,
+//         )
+//         .await
+//         .unwrap_err();
+// }
 
-    // Create a network client with network senders
-    let (network_senders, _network_events, _outbound_request_receivers, _inbound_request_senders) =
-        create_network_sender_and_events(&network_ids);
-    let network_client: NetworkClient<DummyMessage> = NetworkClient::new(
-        vec![ProtocolId::ConsensusDirectSendBcs],
-        vec![ProtocolId::StorageServiceRpc],
-        network_senders,
-        peers_and_metadata.clone(),
-    );
+// #[tokio::test]
+// async fn test_network_client_network_senders_direct_send() { // TODO network2 recreate something like this
+//     // Create the peers and metadata container
+//     let network_ids = [NetworkId::Validator, NetworkId::Vfn];
+//     let peers_and_metadata = PeersAndMetadata::new(&network_ids);
+//
+//     // Create two peers and initialize the connection metadata
+//     let (peer_network_id_1, _) = create_peer_and_connection(
+//         NetworkId::Validator,
+//         vec![ProtocolId::MempoolDirectSend],
+//         peers_and_metadata.clone(),
+//     );
+//     let (peer_network_id_2, _) = create_peer_and_connection(
+//         NetworkId::Vfn,
+//         vec![
+//             ProtocolId::ConsensusDirectSendCompressed,
+//             ProtocolId::ConsensusDirectSendJson,
+//             ProtocolId::ConsensusDirectSendBcs,
+//         ],
+//         peers_and_metadata.clone(),
+//     );
+//
+//     // Create a network client with network senders
+//     let (
+//         network_senders,
+//         network_events,
+//         mut outbound_request_receivers,
+//         mut inbound_request_senders,
+//     ) = create_network_sender_and_events(&network_ids);
+//     let network_client: NetworkClient<DummyMessage> = NetworkClient::new(
+//         vec![
+//             ProtocolId::MempoolDirectSend,
+//             ProtocolId::ConsensusDirectSendBcs,
+//             ProtocolId::ConsensusDirectSendJson,
+//             ProtocolId::ConsensusDirectSendCompressed,
+//         ],
+//         vec![],
+//         network_senders,
+//         peers_and_metadata.clone(),
+//     );
+//
+//     // Extract the network and events
+//     let mut network_and_events = network_events.into_network_and_events();
+//     let mut validator_network_events = network_and_events.remove(&NetworkId::Validator).unwrap();
+//     let mut vfn_network_events = network_and_events.remove(&NetworkId::Vfn).unwrap();
+//
+//     // Verify that direct send messages are sent on matching networks and protocols
+//     let dummy_message = DummyMessage::new(10101);
+//     for peer_network_id in &[peer_network_id_1, peer_network_id_2] {
+//         network_client
+//             .send_to_peer(dummy_message.clone(), *peer_network_id)
+//             .unwrap();
+//     }
+//     wait_for_network_event(
+//         peer_network_id_1,
+//         &mut outbound_request_receivers,
+//         &mut inbound_request_senders,
+//         &mut validator_network_events,
+//         false,
+//         Some(ProtocolId::MempoolDirectSend),
+//         None,
+//         dummy_message.clone(),
+//     )
+//     .await;
+//     wait_for_network_event(
+//         peer_network_id_2,
+//         &mut outbound_request_receivers,
+//         &mut inbound_request_senders,
+//         &mut vfn_network_events,
+//         false,
+//         Some(ProtocolId::ConsensusDirectSendBcs),
+//         None,
+//         dummy_message,
+//     )
+//     .await;
+//
+//     // Verify that broadcast messages are sent on matching networks and protocols
+//     let dummy_message = DummyMessage::new(2323);
+//     network_client
+//         .send_to_peers(dummy_message.clone(), &[
+//             peer_network_id_1,
+//             peer_network_id_2,
+//         ])
+//         .unwrap();
+//     wait_for_network_event(
+//         peer_network_id_1,
+//         &mut outbound_request_receivers,
+//         &mut inbound_request_senders,
+//         &mut validator_network_events,
+//         false,
+//         Some(ProtocolId::MempoolDirectSend),
+//         None,
+//         dummy_message.clone(),
+//     )
+//     .await;
+//     wait_for_network_event(
+//         peer_network_id_2,
+//         &mut outbound_request_receivers,
+//         &mut inbound_request_senders,
+//         &mut vfn_network_events,
+//         false,
+//         Some(ProtocolId::ConsensusDirectSendBcs),
+//         None,
+//         dummy_message,
+//     )
+//     .await;
+// }
 
-    // Verify the registered networks and that there are no available peers
-    check_registered_networks(&peers_and_metadata, network_ids);
-    check_available_peers(&network_client, vec![]);
-
-    // Create two peers and initialize the connection metadata
-    let (peer_network_id_1, _) = create_peer_and_connection(
-        NetworkId::Validator,
-        vec![ProtocolId::StorageServiceRpc],
-        peers_and_metadata.clone(),
-    );
-    let (peer_network_id_2, _) = create_peer_and_connection(
-        NetworkId::Vfn,
-        vec![ProtocolId::ConsensusDirectSendBcs],
-        peers_and_metadata.clone(),
-    );
-
-    // Verify that there are available peers
-    check_available_peers(&network_client, vec![peer_network_id_1, peer_network_id_2]);
-
-    // Verify that sending a message to a peer without a matching protocol fails
-    network_client
-        .send_to_peer(DummyMessage::new_empty(), peer_network_id_1)
-        .unwrap_err();
-    network_client
-        .send_to_peer_rpc(
-            DummyMessage::new_empty(),
-            Duration::from_secs(MAX_MESSAGE_TIMEOUT_SECS),
-            peer_network_id_2,
-        )
-        .await
-        .unwrap_err();
-}
-
-#[tokio::test]
-async fn test_network_client_network_senders_direct_send() {
-    // Create the peers and metadata container
-    let network_ids = [NetworkId::Validator, NetworkId::Vfn];
-    let peers_and_metadata = PeersAndMetadata::new(&network_ids);
-
-    // Create two peers and initialize the connection metadata
-    let (peer_network_id_1, _) = create_peer_and_connection(
-        NetworkId::Validator,
-        vec![ProtocolId::MempoolDirectSend],
-        peers_and_metadata.clone(),
-    );
-    let (peer_network_id_2, _) = create_peer_and_connection(
-        NetworkId::Vfn,
-        vec![
-            ProtocolId::ConsensusDirectSendCompressed,
-            ProtocolId::ConsensusDirectSendJson,
-            ProtocolId::ConsensusDirectSendBcs,
-        ],
-        peers_and_metadata.clone(),
-    );
-
-    // Create a network client with network senders
-    let (
-        network_senders,
-        network_events,
-        mut outbound_request_receivers,
-        mut inbound_request_senders,
-    ) = create_network_sender_and_events(&network_ids);
-    let network_client: NetworkClient<DummyMessage> = NetworkClient::new(
-        vec![
-            ProtocolId::MempoolDirectSend,
-            ProtocolId::ConsensusDirectSendBcs,
-            ProtocolId::ConsensusDirectSendJson,
-            ProtocolId::ConsensusDirectSendCompressed,
-        ],
-        vec![],
-        network_senders,
-        peers_and_metadata.clone(),
-    );
-
-    // Extract the network and events
-    let mut network_and_events = network_events.into_network_and_events();
-    let mut validator_network_events = network_and_events.remove(&NetworkId::Validator).unwrap();
-    let mut vfn_network_events = network_and_events.remove(&NetworkId::Vfn).unwrap();
-
-    // Verify that direct send messages are sent on matching networks and protocols
-    let dummy_message = DummyMessage::new(10101);
-    for peer_network_id in &[peer_network_id_1, peer_network_id_2] {
-        network_client
-            .send_to_peer(dummy_message.clone(), *peer_network_id)
-            .unwrap();
-    }
-    wait_for_network_event(
-        peer_network_id_1,
-        &mut outbound_request_receivers,
-        &mut inbound_request_senders,
-        &mut validator_network_events,
-        false,
-        Some(ProtocolId::MempoolDirectSend),
-        None,
-        dummy_message.clone(),
-    )
-    .await;
-    wait_for_network_event(
-        peer_network_id_2,
-        &mut outbound_request_receivers,
-        &mut inbound_request_senders,
-        &mut vfn_network_events,
-        false,
-        Some(ProtocolId::ConsensusDirectSendBcs),
-        None,
-        dummy_message,
-    )
-    .await;
-
-    // Verify that broadcast messages are sent on matching networks and protocols
-    let dummy_message = DummyMessage::new(2323);
-    network_client
-        .send_to_peers(dummy_message.clone(), &[
-            peer_network_id_1,
-            peer_network_id_2,
-        ])
-        .unwrap();
-    wait_for_network_event(
-        peer_network_id_1,
-        &mut outbound_request_receivers,
-        &mut inbound_request_senders,
-        &mut validator_network_events,
-        false,
-        Some(ProtocolId::MempoolDirectSend),
-        None,
-        dummy_message.clone(),
-    )
-    .await;
-    wait_for_network_event(
-        peer_network_id_2,
-        &mut outbound_request_receivers,
-        &mut inbound_request_senders,
-        &mut vfn_network_events,
-        false,
-        Some(ProtocolId::ConsensusDirectSendBcs),
-        None,
-        dummy_message,
-    )
-    .await;
-}
-
-#[tokio::test]
-async fn test_network_client_network_senders_rpc() {
-    // Create the peers and metadata container
-    let network_ids = [NetworkId::Validator, NetworkId::Vfn];
-    let peers_and_metadata = PeersAndMetadata::new(&network_ids);
-
-    // Create two peers and initialize the connection metadata
-    let (peer_network_id_1, _) = create_peer_and_connection(
-        NetworkId::Validator,
-        vec![ProtocolId::StorageServiceRpc],
-        peers_and_metadata.clone(),
-    );
-    let (peer_network_id_2, _) = create_peer_and_connection(
-        NetworkId::Vfn,
-        vec![
-            ProtocolId::ConsensusRpcCompressed,
-            ProtocolId::ConsensusRpcJson,
-            ProtocolId::ConsensusRpcBcs,
-        ],
-        peers_and_metadata.clone(),
-    );
-
-    // Create a network client with network senders
-    let (
-        network_senders,
-        network_events,
-        mut outbound_request_receivers,
-        mut inbound_request_senders,
-    ) = create_network_sender_and_events(&network_ids);
-    let network_client: NetworkClient<DummyMessage> = NetworkClient::new(
-        vec![],
-        vec![
-            ProtocolId::StorageServiceRpc,
-            ProtocolId::ConsensusRpcJson,
-            ProtocolId::ConsensusRpcBcs,
-            ProtocolId::ConsensusRpcCompressed,
-        ],
-        network_senders,
-        peers_and_metadata.clone(),
-    );
-
-    // Extract the network and events
-    let mut network_and_events = network_events.into_network_and_events();
-    let mut validator_network_events = network_and_events.remove(&NetworkId::Validator).unwrap();
-    let mut vfn_network_events = network_and_events.remove(&NetworkId::Vfn).unwrap();
-
-    // Verify that rpc messages are sent on matching networks and protocols
-    let dummy_message = DummyMessage::new(999);
-    let rpc_timeout = Duration::from_secs(MAX_MESSAGE_TIMEOUT_SECS);
-    for peer_network_id in [peer_network_id_1, peer_network_id_2] {
-        let network_client = network_client.clone();
-        let dummy_message = dummy_message.clone();
-
-        // We need to spawn this on a separate thread, otherwise we'll block waiting for the response
-        tokio::spawn(async move {
-            network_client
-                .send_to_peer_rpc(dummy_message.clone(), rpc_timeout, peer_network_id)
-                .await
-                .unwrap()
-        });
-    }
-    wait_for_network_event(
-        peer_network_id_1,
-        &mut outbound_request_receivers,
-        &mut inbound_request_senders,
-        &mut validator_network_events,
-        true,
-        None,
-        Some(ProtocolId::StorageServiceRpc),
-        dummy_message.clone(),
-    )
-    .await;
-    wait_for_network_event(
-        peer_network_id_2,
-        &mut outbound_request_receivers,
-        &mut inbound_request_senders,
-        &mut vfn_network_events,
-        true,
-        None,
-        Some(ProtocolId::ConsensusRpcJson),
-        dummy_message,
-    )
-    .await;
-}
+// #[tokio::test]
+// async fn test_network_client_network_senders_rpc() { // TODO network2 recreate something like this
+//     // Create the peers and metadata container
+//     let network_ids = [NetworkId::Validator, NetworkId::Vfn];
+//     let peers_and_metadata = PeersAndMetadata::new(&network_ids);
+//
+//     // Create two peers and initialize the connection metadata
+//     let (peer_network_id_1, _) = create_peer_and_connection(
+//         NetworkId::Validator,
+//         vec![ProtocolId::StorageServiceRpc],
+//         peers_and_metadata.clone(),
+//     );
+//     let (peer_network_id_2, _) = create_peer_and_connection(
+//         NetworkId::Vfn,
+//         vec![
+//             ProtocolId::ConsensusRpcCompressed,
+//             ProtocolId::ConsensusRpcJson,
+//             ProtocolId::ConsensusRpcBcs,
+//         ],
+//         peers_and_metadata.clone(),
+//     );
+//
+//     // Create a network client with network senders
+//     let (
+//         network_senders,
+//         network_events,
+//         mut outbound_request_receivers,
+//         mut inbound_request_senders,
+//     ) = create_network_sender_and_events(&network_ids);
+//     let network_client: NetworkClient<DummyMessage> = NetworkClient::new(
+//         vec![],
+//         vec![
+//             ProtocolId::StorageServiceRpc,
+//             ProtocolId::ConsensusRpcJson,
+//             ProtocolId::ConsensusRpcBcs,
+//             ProtocolId::ConsensusRpcCompressed,
+//         ],
+//         network_senders,
+//         peers_and_metadata.clone(),
+//     );
+//
+//     // Extract the network and events
+//     let mut network_and_events = network_events.into_network_and_events();
+//     let mut validator_network_events = network_and_events.remove(&NetworkId::Validator).unwrap();
+//     let mut vfn_network_events = network_and_events.remove(&NetworkId::Vfn).unwrap();
+//
+//     // Verify that rpc messages are sent on matching networks and protocols
+//     let dummy_message = DummyMessage::new(999);
+//     let rpc_timeout = Duration::from_secs(MAX_MESSAGE_TIMEOUT_SECS);
+//     for peer_network_id in [peer_network_id_1, peer_network_id_2] {
+//         let network_client = network_client.clone();
+//         let dummy_message = dummy_message.clone();
+//
+//         // We need to spawn this on a separate thread, otherwise we'll block waiting for the response
+//         tokio::spawn(async move {
+//             network_client
+//                 .send_to_peer_rpc(dummy_message.clone(), rpc_timeout, peer_network_id)
+//                 .await
+//                 .unwrap()
+//         });
+//     }
+//     wait_for_network_event(
+//         peer_network_id_1,
+//         &mut outbound_request_receivers,
+//         &mut inbound_request_senders,
+//         &mut validator_network_events,
+//         true,
+//         None,
+//         Some(ProtocolId::StorageServiceRpc),
+//         dummy_message.clone(),
+//     )
+//     .await;
+//     wait_for_network_event(
+//         peer_network_id_2,
+//         &mut outbound_request_receivers,
+//         &mut inbound_request_senders,
+//         &mut vfn_network_events,
+//         true,
+//         None,
+//         Some(ProtocolId::ConsensusRpcJson),
+//         dummy_message,
+//     )
+//     .await;
+// }
 
 /// Verifies that the available peers are correct
 fn check_available_peers(
@@ -991,11 +931,11 @@ fn compare_vectors_ignore_order<T: Clone + Debug + Ord>(
     assert_eq!(vector_1, vector_2);
 }
 
-/// Returns an aptos channel for testing
-fn create_aptos_channel<K: Eq + Hash + Clone, T>(
-) -> (aptos_channel::Sender<K, T>, aptos_channel::Receiver<K, T>) {
-    aptos_channel::new(QueueStyle::FIFO, 10, None)
-}
+// /// Returns an aptos channel for testing
+// fn create_aptos_channel<K: Eq + Hash + Clone, T>(
+// ) -> (aptos_channel::Sender<K, T>, aptos_channel::Receiver<K, T>) {
+//     aptos_channel::new(QueueStyle::FIFO, 10, None)
+// }
 
 /// Creates a set of network senders and events for the specified
 /// network IDs. Also returns the internal inbound and outbound
@@ -1078,26 +1018,6 @@ fn connect_peer(peers_and_metadata: &Arc<PeersAndMetadata>, peer_network_id: Pee
         .unwrap();
 }
 
-/// Inserts the given peers into the trusted peer set for the specified network
-fn insert_trusted_peers(
-    peers_and_metadata: &Arc<PeersAndMetadata>,
-    network_id: NetworkId,
-    peers: Vec<(AccountAddress, Peer)>,
-) {
-    // Get a copy of the trusted peers
-    let mut trusted_peers = peers_and_metadata.get_trusted_peers(&network_id).unwrap();
-
-    // Insert the new peers
-    for (peer_address, peer) in peers {
-        trusted_peers.insert(peer_address, peer);
-    }
-
-    // Update the trusted peers
-    peers_and_metadata
-        .set_trusted_peers(&network_id, trusted_peers)
-        .unwrap();
-}
-
 /// Marks the specified peer as disconnecting
 fn mark_peer_disconnecting(
     peers_and_metadata: &Arc<PeersAndMetadata>,
@@ -1128,41 +1048,7 @@ fn update_connection_metadata(
         .unwrap();
 }
 
-/// Verifies the internal states of the peers and metadata container
-/// using the given expected values.
-fn verify_internal_map_states(
-    network_ids: &[NetworkId],
-    peers_and_metadata: Arc<PeersAndMetadata>,
-    expected_peers_and_metadata: HashMap<PeerId, PeerMetadata>,
-    expected_trusted_peers: PeerSet,
-    expected_cached_peers_and_metadata: HashMap<PeerId, PeerMetadata>,
-) {
-    // Get the internal maps
-    let (peers_and_metadata, trusted_peers, cached_peers_and_metadata) =
-        peers_and_metadata.get_all_internal_maps();
-
-    // Verify the states of the internal maps
-    for network_id in network_ids {
-        // Verify the peers and metadata
-        assert_eq!(
-            peers_and_metadata.get(network_id).unwrap(),
-            &expected_peers_and_metadata
-        );
-
-        // Verify the trusted peers
-        let trusted_peers_for_network = trusted_peers.get(network_id).unwrap();
-        let trusted_peers = trusted_peers_for_network.load().clone().deref().clone();
-        assert_eq!(trusted_peers, expected_trusted_peers.clone());
-
-        // Verify the cached peers and metadata
-        let cached_peers_and_metadata = cached_peers_and_metadata.load().clone().deref().clone();
-        assert_eq!(
-            cached_peers_and_metadata.get(network_id).unwrap(),
-            &expected_cached_peers_and_metadata,
-        );
-    }
-}
-
+#[cfg(obsolete)]
 /// Waits for a network event on the expected channels and
 /// verifies the message contents.
 async fn wait_for_network_event(

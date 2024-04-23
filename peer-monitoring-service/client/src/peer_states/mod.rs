@@ -7,7 +7,7 @@ use crate::{
 };
 use aptos_config::{config::PeerMonitoringServiceConfig, network_id::PeerNetworkId};
 use aptos_logger::{info, sample, sample::SampleRate};
-use aptos_network::application::{interface::NetworkClient, metadata::PeerMetadata};
+use aptos_network2::application::{interface::NetworkClient, metadata::PeerMetadata};
 use aptos_peer_monitoring_service_types::PeerMonitoringServiceMessage;
 use aptos_time_service::TimeService;
 use key_value::PeerStateKey;

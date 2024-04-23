@@ -6,7 +6,7 @@ use aptos_config::{
     config::BaseConfig,
     network_id::{NetworkId, PeerNetworkId},
 };
-use aptos_network::application::storage::PeersAndMetadata;
+use aptos_network2::application::storage::PeersAndMetadata;
 use itertools::Itertools;
 use std::sync::Arc;
 
@@ -146,7 +146,7 @@ mod tests {
         network_id::{NetworkId, PeerNetworkId},
     };
     use aptos_netcore::transport::ConnectionOrigin;
-    use aptos_network::{application::storage::PeersAndMetadata, transport::ConnectionMetadata};
+    use aptos_network2::{application::storage::PeersAndMetadata, transport::ConnectionMetadata};
     use aptos_types::PeerId;
     use maplit::hashmap;
     use std::{assert_eq, sync::Arc};

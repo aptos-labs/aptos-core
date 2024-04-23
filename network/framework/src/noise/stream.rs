@@ -522,8 +522,10 @@ where
 #[cfg(test)]
 mod test {
     use super::*;
+    // use std::sync::Arc;
+    use crate::application::storage::PeersAndMetadata;
     use crate::{
-        noise::{AntiReplayTimestamps, HandshakeAuthMode, NoiseUpgrader},
+        noise::{AntiReplayTimestamps, NoiseUpgrader},
         testutils::fake_socket::{ReadOnlyTestSocket, ReadWriteTestSocket},
     };
     use aptos_config::network_id::NetworkContext;
@@ -554,15 +556,18 @@ mod test {
         let server_peer_id = aptos_types::account_address::from_identity_public_key(server_public);
         let server_network_context = NetworkContext::mock_with_peer_id(server_peer_id);
 
+        let peers_and_metadata = PeersAndMetadata::new(&[client_network_context.network_id()]);
         let client = NoiseUpgrader::new(
             client_network_context,
             client_private,
-            HandshakeAuthMode::server_only(&[client_network_context.network_id()]),
+            peers_and_metadata.clone(),
+            false,
         );
         let server = NoiseUpgrader::new(
             server_network_context,
             server_private,
-            HandshakeAuthMode::server_only(&[server_network_context.network_id()]),
+            peers_and_metadata,
+            false,
         );
 
         ((client, client_public), (server, server_public))
