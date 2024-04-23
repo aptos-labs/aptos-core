@@ -106,7 +106,7 @@ impl SchemaBatch {
 #[derive(Debug)]
 pub struct DB {
     name: String, // for logging
-    inner: rocksdb::DB,
+    inner: rocksdb::DBWithThreadMode<rocksdb::SingleThreaded>,
 }
 
 impl DB {
