@@ -12,11 +12,21 @@ on:
 jobs:
   windows-build:
     runs-on: windows-latest-8-core
+    if: | # Only run on each PR once an appropriate event occurs
+      (
+        github.event_name == 'workflow_dispatch' ||
+        github.event_name == 'push' ||
+        contains(github.event.pull_request.labels.*.name, 'CICD:run-windows-tests') ||
+        github.event.pull_request.auto_merge != null
+      )
     defaults:
       run:
         shell: pwsh
     steps:
-      - uses: actions/checkout@v3
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.pull_request.head.sha }}
+          fetch-depth: 0 # Fetch all git history for accurate target determination
 
       # This action will cache ~/.cargo and ./target (or the equivalent on Windows in
       # this case). See more here:
@@ -34,8 +44,17 @@ jobs:
       - name: Install OpenSSL
         run: vcpkg install openssl:x64-windows-static-md --clean-after-build
 
-      - name: Build the Aptos CLI
-        run: cargo build -p aptos
+      # Output the changed files
+      - name: Output the changed files
+        run: cargo x changed-files -vv
+        shell: bash
 
-      - name: Run the Aptos CLI help command
-        run: cargo run -p aptos -- --help
+      # Output the affected packages
+      - name: Output the affected packages
+        run: cargo x affected-packages -vv
+        shell: bash
+
+      # Build and test the Aptos CLI (if it has changed)
+      - name: Build and test the CLI
+        run: cargo x targeted-cli-tests -vv
+        shell: bash

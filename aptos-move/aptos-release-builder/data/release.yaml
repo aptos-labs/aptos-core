@@ -1,6 +1,6 @@
 ---
 remote_endpoint: ~
-name: "v1.10"
+name: "v1.11"
 proposals:
   - name: step_1_increase_max_txn_gas
     metadata:
@@ -8,163 +8,28 @@ proposals:
       description: "Increase max txn gas temporarily for framework upgrade"
     execution_mode: MultiStep
     update_sequence:
-      - DefaultGasWithOverride:
-          - name: "txn.max_execution_gas"
-            value: 3676000000
+      - DefaultGasWithOverrideOld:
+          overrides:
+            - name: "txn.max_execution_gas"
+              value: 3676000000
   - name: step_2_upgrade_framework
     metadata:
-      title: "Multi-step proposal to upgrade mainnet framework to v1.10"
-      description: "This includes changes in https://github.com/aptos-labs/aptos-core/commits/aptos-release-v1.10"
+      title: "Multi-step proposal to upgrade mainnet framework to v1.11"
+      description: "This includes changes in https://github.com/aptos-labs/aptos-core/commits/aptos-release-v1.11"
     execution_mode: MultiStep
     update_sequence:
       - Framework:
           bytecode_version: 6
           git_hash: ~
+      - RawScript: aptos-move/aptos-release-builder/data/proposals/randomness_framework_initialization.move
       - DefaultGas
-  - name: step_3_storage_fee_for_state_bytes_refundable
+  - name: step_3_enable_checking_unstable_bytecode
     metadata:
-      title: "AIP-65: Storage Fee for State Bytes refundable"
-      description: "AIP-65: This refunds storage fee charged according to the size of a state slot and stop penalizing large state items by charging non-refundable storage fee each time it is updated."
-      discussion_url: "https://github.com/aptos-foundation/AIPs/issues/328"
+      title: "Enable the check to reject unstable bytecode to be published to mainnet"
+      description: "Reject unstable bytecode to be published to mainnet"
+      discussion_url: "https://github.com/aptos-labs/aptos-core/pull/12814"
     execution_mode: MultiStep
     update_sequence:
       - FeatureFlag:
           enabled:
-            - refundable_bytes
-  - name: step_4_enable_fairness_shuffler
-    metadata:
-      title: "AIP-68: Reordering transactions in a block for fairness"
-      description: "AIP-68: This AIP proposes to update the Transaction Shuffler logic to add other aspects of fairness to how transactions are ordered in the block."
-      discussion_url: "https://github.com/aptos-foundation/AIPs/issues/333"
-    execution_mode: MultiStep
-    update_sequence:
-      - Execution:
-          V4:
-            transaction_shuffler_type:
-              fairness:
-                sender_conflict_window_size: 32
-                module_conflict_window_size: 2
-                entry_fun_conflict_window_size: 3
-            block_gas_limit_type:
-              complex_limit_v1:
-                effective_block_gas_limit: 20000
-                execution_gas_effective_multiplier: 1
-                io_gas_effective_multiplier: 1
-                conflict_penalty_window: 6
-                use_granular_resource_group_conflicts: false
-                use_module_publishing_block_conflict: true
-                block_output_limit: 3145728
-                include_user_txn_size_in_block_output: true
-                add_block_limit_outcome_onchain: false
-            transaction_deduper_type: txn_hash_and_authenticator_v1
-  - name: step_5_passkey_authenticator
-    metadata:
-      title: "AIP-66: Passkey Accounts"
-      description: "AIP-66: The first WebAuthn Authenticator for Aptos, enabling users to utilize passkeys and other WebAuthn credentials for transaction authentication."
-      discussion_url: "https://github.com/aptos-foundation/AIPs/issues/322"
-    execution_mode: MultiStep
-    update_sequence:
-      - FeatureFlag:
-          enabled:
-            - web_authn_signature
-  - name: step_6_object_code_deployment
-    metadata:
-      title: "AIP-54: Object Code Deployment"
-      description: "AIP-54: Introduces a method to deploy code to objects, allowing more modular and resource efficient development."
-      discussion_url: "https://github.com/aptos-foundation/AIPs/issues/259"
-    execution_mode: MultiStep
-    update_sequence:
-      - FeatureFlag:
-          enabled:
-            - object_code_deployment
-  - name: step_7_enable_aggregator_v2_api
-    metadata:
-      title: "AIP-47: Enable Aggregator v2 API"
-      description: "AIP-47: This AIP revamps and expands upon the current concept of Aggregators. Enabling their usage for control flow, and storing their values elsewhere. This step only enables new APIs."
-      discussion_url: "https://github.com/aptos-foundation/AIPs/issues/226"
-    execution_mode: MultiStep
-    update_sequence:
-      - FeatureFlag:
-          enabled:
-            - aggregator_v2_api
-  - name: step_8_enable_concurrent_digital_assets
-    metadata:
-      title: "AIP-43: Enable Concurrent Digital Assets (Token V2)"
-      description: "AIP-43: This AIP proposes a solution to speedup minting and burning of Digital Assets (Token v2), by parallelizing them"
-      discussion_url: "https://github.com/aptos-foundation/AIPs/issues/209"
-    execution_mode: MultiStep
-    update_sequence:
-      - FeatureFlag:
-          enabled:
-            - concurrent_token_v2
-  - name: step_9_enable_aggregator_v2_parallelism
-    metadata:
-      title: "AIP-47: Enable Aggregator v2 parallelism"
-      description: "AIP-47: This step enables the backend that makes execution of Aggregators V2 parallel."
-      discussion_url: "https://github.com/aptos-foundation/AIPs/issues/226"
-    execution_mode: MultiStep
-    update_sequence:
-      - FeatureFlag:
-          enabled:
-            - aggregator_v2_delayed_fields
-            - resource_groups_split_in_vm_change_set
-  - name: step_10_enable_validator_txn
-    metadata:
-      title: "AIP-64: Validator Transaction Type"
-      description: "AIP-64: This AIP introduces a new transaction type for validators to perform on-chain operations."
-      discussion_url: "https://github.com/aptos-foundation/AIPs/issues/327"
-    execution_mode: MultiStep
-    update_sequence:
-      - Consensus:
-          V3:
-            alg:
-              Jolteon:
-                main:
-                  decoupled_execution: true
-                  back_pressure_limit: 10
-                  exclude_round: 40
-                  proposer_election_type:
-                    leader_reputation:
-                      proposer_and_voter_v2:
-                        active_weight: 1000
-                        inactive_weight: 10
-                        failed_weight: 1
-                        failure_threshold_percent: 10
-                        proposer_window_num_validators_multiplier: 10
-                        voter_window_num_validators_multiplier: 1
-                        weight_by_voting_power: true
-                        use_history_from_previous_epoch_max_count: 5
-                  max_failed_authors_to_store: 10
-                quorum_store_enabled: true
-            vtxn:
-              V1:
-                per_block_limit_txn_count: 2
-                per_block_limit_total_bytes: 2097152
-  - name: step_11_enable_jwk_consensus
-    metadata:
-      title: "AIP-67: Native Consensus for JSON Web Key (JWK)"
-      description: "AIP-67: This AIP proposes a solution for validators to agree on OpenID Connect providers' JSON Web Keys."
-      discussion_url: "https://github.com/aptos-foundation/AIPs/issues/331"
-    execution_mode: MultiStep
-    update_sequence:
-      - RawScript: aptos-move/aptos-release-builder/data/proposals/aip_67_initialization.move
-      - FeatureFlag:
-          enabled:
-            - jwk_consensus
-  - name: step_12_enable_keyless_accounts
-    metadata:
-      title: "AIP-61: Keyless accounts"
-      description: "Enable keyless blockchain accounts, allowing users to transact directly using their Web2 accounts instead of managing a secret key"
-      discussion_url: "https://github.com/aptos-foundation/AIPs/issues/297"
-    execution_mode: MultiStep
-    update_sequence:
-      - FeatureFlag:
-          enabled:
-            - keyless_accounts
-  - name: step_13_start_watching_google_jwks
-    metadata:
-      title: "Start JWK consensus for Google"
-      description: "JWK Consensus (AIP-67) for Google enables Google-based keyless accounts (AIP-61)."
-    execution_mode: MultiStep
-    update_sequence:
-      - RawScript: aptos-move/aptos-release-builder/data/proposals/start_jwk_consensus_for_google.move
+            - reject_unstable_bytecode

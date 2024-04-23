@@ -26,6 +26,13 @@ concurrency:
 jobs:
   check:
     runs-on: ubuntu-latest
+    if: | # Only run on each PR once an appropriate event occurs
+      (
+        github.event_name == 'workflow_dispatch' ||
+        github.event_name == 'push' ||
+        contains(github.event.pull_request.labels.*.name, 'CICD:run-e2e-tests') ||
+        github.event.pull_request.auto_merge != null
+      )
     steps:
       - uses: actions/checkout@v3
 

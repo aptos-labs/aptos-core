@@ -156,9 +156,16 @@ module aptos_framework::object {
         self: address,
     }
 
-    #[event]
     /// Emitted whenever the object's owner field is changed.
     struct TransferEvent has drop, store {
+        object: address,
+        from: address,
+        to: address,
+    }
+
+    #[event]
+    /// Emitted whenever the object's owner field is changed.
+    struct Transfer has drop, store {
         object: address,
         from: address,
         to: address,
@@ -432,13 +439,15 @@ module aptos_framework::object {
             object.owner == ref.owner,
             error::permission_denied(ENOT_OBJECT_OWNER),
         );
-        event::emit(
-            TransferEvent {
-                object: ref.self,
-                from: object.owner,
-                to,
-            },
-        );
+        if (std::features::module_event_migration_enabled()) {
+            event::emit(
+                Transfer {
+                    object: ref.self,
+                    from: object.owner,
+                    to,
+                },
+            );
+        };
         event::emit_event(
             &mut object.transfer_events,
             TransferEvent {
@@ -487,7 +496,7 @@ module aptos_framework::object {
         let object_core = borrow_global_mut<ObjectCore>(object);
         if (object_core.owner != to) {
             event::emit(
-                TransferEvent {
+                Transfer {
                     object,
                     from: object_core.owner,
                     to,
@@ -749,7 +758,7 @@ module aptos_framework::object {
     fun test_correct_auid(fx: signer) {
         use std::features;
         let feature = features::get_auids();
-        features::change_feature_flags(&fx, vector[feature], vector[]);
+        features::change_feature_flags_for_testing(&fx, vector[feature], vector[]);
 
         let auid1 = aptos_framework::transaction_context::generate_auid_address();
         let bytes = aptos_framework::transaction_context::get_transaction_hash();
@@ -816,7 +825,7 @@ module aptos_framework::object {
         use std::features;
         let feature = features::get_max_object_nesting_check_feature();
         let fx = account::create_signer_for_test(@0x1);
-        features::change_feature_flags(&fx, vector[feature], vector[]);
+        features::change_feature_flags_for_testing(&fx, vector[feature], vector[]);
 
         let obj1 = create_simple_object(creator, b"1");
         let obj2 = create_simple_object(creator, b"2");
@@ -856,7 +865,7 @@ module aptos_framework::object {
         use std::features;
         let feature = features::get_max_object_nesting_check_feature();
         let fx = account::create_signer_for_test(@0x1);
-        features::change_feature_flags(&fx, vector[feature], vector[]);
+        features::change_feature_flags_for_testing(&fx, vector[feature], vector[]);
 
         let obj1 = create_simple_object(creator, b"1");
         let obj2 = create_simple_object(creator, b"2");
@@ -887,7 +896,7 @@ module aptos_framework::object {
         use std::features;
         let feature = features::get_max_object_nesting_check_feature();
         let fx = account::create_signer_for_test(@0x1);
-        features::change_feature_flags(&fx, vector[feature], vector[]);
+        features::change_feature_flags_for_testing(&fx, vector[feature], vector[]);
 
         let obj1 = create_simple_object(creator, b"1");
         // This creates a cycle (self-loop) in ownership.
@@ -902,7 +911,7 @@ module aptos_framework::object {
         use std::features;
         let feature = features::get_max_object_nesting_check_feature();
         let fx = account::create_signer_for_test(@0x1);
-        features::change_feature_flags(&fx, vector[feature], vector[]);
+        features::change_feature_flags_for_testing(&fx, vector[feature], vector[]);
 
         let obj1 = create_simple_object(creator, b"1");
         // This creates a cycle (self-loop) in ownership.

@@ -1,4 +1,5 @@
 // Copyright © Aptos Foundation
+// SPDX-License-Identifier: Apache-2.0
 
 use crate::{keyless::Claims, move_any::AsMoveAny, move_utils::as_move_value::AsMoveValue};
 use anyhow::{anyhow, bail, ensure, Result};
@@ -43,6 +44,17 @@ impl RSA_JWK {
             alg: alg.to_string(),
             e: e.to_string(),
             n: n.to_string(),
+        }
+    }
+
+    // The private key to this JWK is found under INTERNAL_TEST_OIDC_PROVIDER_PRIVATE_KEY in aptos-keyless-prod in gcloud secrets
+    pub fn secure_test_jwk() -> RSA_JWK {
+        RSA_JWK {
+            kid:"test-rsa".to_owned(),
+            kty:"RSA".to_owned(),
+            alg:"RS256".to_owned(),
+            e:"AQAB".to_owned(),
+            n:"y5Efs1ZzisLLKCARSvTztgWj5JFP3778dZWt-od78fmOZFxem3a_aYbOXSJToRp862do0PxJ4PDMpmqwV5f7KplFI6NswQV-WPufQH8IaHXZtuPdCjPOcHybcDiLkO12d0dG6iZQUzypjAJf63APcadio-4JDNWlGC5_Ow_XQ9lIY71kTMiT9lkCCd0ZxqEifGtnJe5xSoZoaMRKrvlOw-R6iVjLUtPAk5hyUX95LDKxwAR-oshnj7gmATejga2EvH9ozdn3M8Go11PSDa04OQxPcA25OoDTfxLvT28LRpSXrbmUWZ-O_lGtDl3ZAtjIguYGEobTk4N11eRssC95Cw".to_owned()
         }
     }
 

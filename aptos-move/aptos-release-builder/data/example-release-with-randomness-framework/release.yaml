@@ -1,0 +1,73 @@
+---
+remote_endpoint: ~
+name: example-after-randomness-enabled
+proposals:
+  - name: all_configs
+    metadata:
+      title: ""
+      description: ""
+      source_code_url: ""
+      discussion_url: ""
+    execution_mode: RootSigner
+    update_sequence:
+      - FeatureFlag:
+          enabled:
+            - bls12381_structures
+          disabled:
+            - bn254_structures
+      - Consensus:
+          V3:
+            alg:
+              Jolteon:
+                main:
+                  decoupled_execution: true
+                  back_pressure_limit: 10
+                  exclude_round: 40
+                  proposer_election_type:
+                    leader_reputation:
+                      proposer_and_voter_v2:
+                        active_weight: 1000
+                        inactive_weight: 10
+                        failed_weight: 1
+                        failure_threshold_percent: 10
+                        proposer_window_num_validators_multiplier: 10
+                        voter_window_num_validators_multiplier: 1
+                        weight_by_voting_power: true
+                        use_history_from_previous_epoch_max_count: 5
+                  max_failed_authors_to_store: 10
+                quorum_store_enabled: true
+            vtxn:
+              V1:
+                per_block_limit_txn_count: 3
+                per_block_limit_total_bytes: 2097152
+      - Execution:
+          V4:
+            transaction_shuffler_type:
+              fairness:
+                sender_conflict_window_size: 256
+                module_conflict_window_size: 2
+                entry_fun_conflict_window_size: 3
+            block_gas_limit_type:
+              complex_limit_v1:
+                effective_block_gas_limit: 80001
+                execution_gas_effective_multiplier: 1
+                io_gas_effective_multiplier: 1
+                conflict_penalty_window: 6
+                use_granular_resource_group_conflicts: false
+                use_module_publishing_block_conflict: true
+                block_output_limit: 12582912
+                include_user_txn_size_in_block_output: true
+                add_block_limit_outcome_onchain: false
+            transaction_deduper_type: txn_hash_and_authenticator_v1
+      - Version:
+          major: 999
+      - OidcProviderOps:
+          - Upsert:
+              issuer: "https://accounts.google.com"
+              config_url: "https://accounts.google.com/.well-known/openid-configuration"
+          - Remove:
+              issuer: "https://www.facebook.com"
+              keep_observed_jwks: true
+      - DefaultGasWithOverride:
+          - name: "txn.max_execution_gas"
+            value: 9999999998

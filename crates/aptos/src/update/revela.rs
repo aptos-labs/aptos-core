@@ -88,7 +88,7 @@ impl BinaryUpdater for RevelaUpdateTool {
         let build_info = cli_build_information();
         let target = match build_info.get(BUILD_OS).context("Failed to determine build info of current CLI")?.as_str() {
             "linux-aarch64" | "linux-x86_64" => "unknown-linux-gnu",
-            "macos-aarch64" | "macos-x86" => "apple-darwin",
+            "macos-aarch64" | "macos-x86_64" => "apple-darwin",
             "windows-x86_64" => "pc-windows-gnu",
             wildcard => bail!("Self-updating is not supported on your OS ({}) right now, please download the binary manually", wildcard),
         };

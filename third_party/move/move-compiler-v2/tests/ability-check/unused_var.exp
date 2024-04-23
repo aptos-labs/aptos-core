@@ -1,25 +1,10 @@
 
 Diagnostics:
-warning: Function `0x42::explicate_drop::unused_var` is unused: it has no current callers and is private to its module.
-  ┌─ tests/ability-check/unused_var.move:2:6
-  │
-2 │     fun unused_var() {
-  │         ^^^^^^^^^^
-
-warning: Function `0x42::explicate_drop::unused_arg` is unused: it has no current callers and is private to its module.
-  ┌─ tests/ability-check/unused_var.move:6:6
-  │
-6 │     fun unused_arg<T: drop>(x: T) {
-  │         ^^^^^^^^^^
-
 warning: Unused parameter `x`. Consider removing or prefixing with an underscore: `_x`
   ┌─ tests/ability-check/unused_var.move:6:26
   │
 6 │     fun unused_arg<T: drop>(x: T) {
   │                             ^
 
-warning: Function `0x42::explicate_drop::unused_call_assign` is unused: it has no current callers and is private to its module.
-   ┌─ tests/ability-check/unused_var.move:13:6
-   │
-13 │     fun unused_call_assign() {
-   │         ^^^^^^^^^^^^^^^^^^
+
+============ bytecode verification succeeded ========

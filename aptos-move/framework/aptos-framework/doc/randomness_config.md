@@ -9,6 +9,7 @@ Structs and functions for on-chain randomness configurations.
 -  [Resource `RandomnessConfig`](#0x1_randomness_config_RandomnessConfig)
 -  [Struct `ConfigOff`](#0x1_randomness_config_ConfigOff)
 -  [Struct `ConfigV1`](#0x1_randomness_config_ConfigV1)
+-  [Struct `ConfigV2`](#0x1_randomness_config_ConfigV2)
 -  [Constants](#@Constants_0)
 -  [Function `initialize`](#0x1_randomness_config_initialize)
 -  [Function `set_for_next_epoch`](#0x1_randomness_config_set_for_next_epoch)
@@ -123,6 +124,46 @@ A randomness config variant indicating the feature is enabled.
 
 </details>
 
+<a id="0x1_randomness_config_ConfigV2"></a>
+
+## Struct `ConfigV2`
+
+A randomness config variant indicating the feature is enabled with fast path.
+
+
+<pre><code><b>struct</b> <a href="randomness_config.md#0x1_randomness_config_ConfigV2">ConfigV2</a> <b>has</b> <b>copy</b>, drop, store
+</code></pre>
+
+
+
+<details>
+<summary>Fields</summary>
+
+
+<dl>
+<dt>
+<code>secrecy_threshold: <a href="../../aptos-stdlib/doc/fixed_point64.md#0x1_fixed_point64_FixedPoint64">fixed_point64::FixedPoint64</a></code>
+</dt>
+<dd>
+ Any validator subset should not be able to reconstruct randomness if <code>subset_power / total_power &lt;= secrecy_threshold</code>,
+</dd>
+<dt>
+<code>reconstruction_threshold: <a href="../../aptos-stdlib/doc/fixed_point64.md#0x1_fixed_point64_FixedPoint64">fixed_point64::FixedPoint64</a></code>
+</dt>
+<dd>
+ Any validator subset should be able to reconstruct randomness if <code>subset_power / total_power &gt; reconstruction_threshold</code>.
+</dd>
+<dt>
+<code>fast_path_secrecy_threshold: <a href="../../aptos-stdlib/doc/fixed_point64.md#0x1_fixed_point64_FixedPoint64">fixed_point64::FixedPoint64</a></code>
+</dt>
+<dd>
+ Any validator subset should not be able to reconstruct randomness via the fast path if <code>subset_power / total_power &lt;= fast_path_secrecy_threshold</code>,
+</dd>
+</dl>
+
+
+</details>
+
 <a id="@Constants_0"></a>
 
 ## Constants
@@ -155,7 +196,9 @@ Initialize the configuration. Used in genesis or governance.
 
 <pre><code><b>public</b> <b>fun</b> <a href="randomness_config.md#0x1_randomness_config_initialize">initialize</a>(framework: &<a href="../../aptos-stdlib/../move-stdlib/doc/signer.md#0x1_signer">signer</a>, config: <a href="randomness_config.md#0x1_randomness_config_RandomnessConfig">RandomnessConfig</a>) {
     <a href="system_addresses.md#0x1_system_addresses_assert_aptos_framework">system_addresses::assert_aptos_framework</a>(framework);
-    <b>move_to</b>(framework, config)
+    <b>if</b> (!<b>exists</b>&lt;<a href="randomness_config.md#0x1_randomness_config_RandomnessConfig">RandomnessConfig</a>&gt;(@aptos_framework)) {
+        <b>move_to</b>(framework, config)
+    }
 }
 </code></pre>
 
@@ -340,6 +383,12 @@ Get the currently effective randomness configuration object.
 <a id="@Specification_1"></a>
 
 ## Specification
+
+
+
+<pre><code><b>invariant</b> [suspendable] <a href="chain_status.md#0x1_chain_status_is_operating">chain_status::is_operating</a>() ==&gt; <b>exists</b>&lt;<a href="randomness_config.md#0x1_randomness_config_RandomnessConfig">RandomnessConfig</a>&gt;(@aptos_framework);
+</code></pre>
+
 
 
 <a id="@Specification_1_current"></a>

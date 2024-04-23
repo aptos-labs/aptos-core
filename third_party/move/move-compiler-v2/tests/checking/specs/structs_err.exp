@@ -30,8 +30,8 @@ error: cannot return `G<u64>` from a function with result type `G<bool>`
 45 │       G{x: x, y: y}
    │       ^^^^^^^^^^^^^
 
-error: the type expected 1 type argument but 2 were provided
+error: expected 1 type argument but 2 were provided
    ┌─ tests/checking/specs/structs_err.move:50:7
    │
 50 │       G<u64, bool>{x: x, y: y}
-   │       ^^^^^^^^^^^^^^^^^^^^^^^^
+   │       ^

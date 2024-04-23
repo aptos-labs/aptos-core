@@ -7,11 +7,7 @@
 pub use crate::protocols::rpc::error::RpcError;
 use crate::{
     error::NetworkError,
-    peer_manager::{
-        ConnectionNotification, ConnectionRequestSender, PeerManagerNotification,
-        PeerManagerRequestSender,
-    },
-    transport::ConnectionMetadata,
+    peer_manager::{ConnectionRequestSender, PeerManagerNotification, PeerManagerRequestSender},
     ProtocolId,
 };
 use aptos_channels::{aptos_channel, message_queues::QueueStyle};
@@ -21,7 +17,7 @@ use aptos_types::{network_address::NetworkAddress, PeerId};
 use bytes::Bytes;
 use futures::{
     channel::oneshot,
-    stream::{FusedStream, Map, Select, Stream, StreamExt},
+    stream::{FusedStream, Stream, StreamExt},
     task::{Context, Poll},
 };
 use futures_util::FutureExt;
@@ -57,10 +53,6 @@ pub enum Event<TMessage> {
         ProtocolId,
         oneshot::Sender<Result<Bytes, RpcError>>,
     ),
-    /// Peer which we have a newly established connection with.
-    NewPeer(ConnectionMetadata),
-    /// Peer with which we've lost our connection.
-    LostPeer(ConnectionMetadata),
 }
 
 /// impl PartialEq for simpler testing
@@ -73,8 +65,6 @@ impl<TMessage: PartialEq> PartialEq for Event<TMessage> {
             (RpcRequest(pid1, msg1, proto1, _), RpcRequest(pid2, msg2, proto2, _)) => {
                 pid1 == pid2 && msg1 == msg2 && proto1 == proto2
             },
-            (NewPeer(metadata1), NewPeer(metadata2)) => metadata1 == metadata2,
-            (LostPeer(metadata1), LostPeer(metadata2)) => metadata1 == metadata2,
             _ => false,
         }
     }
@@ -156,13 +146,7 @@ impl NetworkApplicationConfig {
 #[pin_project]
 pub struct NetworkEvents<TMessage> {
     #[pin]
-    event_stream: Select<
-        aptos_channel::Receiver<PeerId, Event<TMessage>>,
-        Map<
-            aptos_channel::Receiver<PeerId, ConnectionNotification>,
-            fn(ConnectionNotification) -> Event<TMessage>,
-        >,
-    >,
+    event_stream: aptos_channel::Receiver<PeerId, Event<TMessage>>,
     _marker: PhantomData<TMessage>,
 }
 
@@ -170,7 +154,6 @@ pub struct NetworkEvents<TMessage> {
 pub trait NewNetworkEvents {
     fn new(
         peer_mgr_notifs_rx: aptos_channel::Receiver<(PeerId, ProtocolId), PeerManagerNotification>,
-        connection_notifs_rx: aptos_channel::Receiver<PeerId, ConnectionNotification>,
         max_parallel_deserialization_tasks: Option<usize>,
     ) -> Self;
 }
@@ -178,7 +161,6 @@ pub trait NewNetworkEvents {
 impl<TMessage: Message + Send + 'static> NewNetworkEvents for NetworkEvents<TMessage> {
     fn new(
         peer_mgr_notifs_rx: aptos_channel::Receiver<(PeerId, ProtocolId), PeerManagerNotification>,
-        connection_notifs_rx: aptos_channel::Receiver<PeerId, ConnectionNotification>,
         max_parallel_deserialization_tasks: Option<usize>,
     ) -> Self {
         // Create a channel for deserialized messages
@@ -222,15 +204,8 @@ impl<TMessage: Message + Send + 'static> NewNetworkEvents for NetworkEvents<TMes
                 .await
         });
 
-        // Process the control messages
-        let control_event_stream = connection_notifs_rx
-            .map(control_msg_to_event as fn(ConnectionNotification) -> Event<TMessage>);
-
         Self {
-            event_stream: ::futures::stream::select(
-                deserialized_message_receiver,
-                control_event_stream,
-            ),
+            event_stream: deserialized_message_receiver,
             _marker: PhantomData,
         }
     }
@@ -282,13 +257,6 @@ fn request_to_network_event<TMessage: Message, Request: SerializedRequest>(
             );
             None
         },
-    }
-}
-
-fn control_msg_to_event<TMessage>(notif: ConnectionNotification) -> Event<TMessage> {
-    match notif {
-        ConnectionNotification::NewPeer(metadata, _context) => Event::NewPeer(metadata),
-        ConnectionNotification::LostPeer(metadata, _context, _reason) => Event::LostPeer(metadata),
     }
 }
 
@@ -355,7 +323,7 @@ impl<TMessage> NetworkSender<TMessage> {
     }
 }
 
-impl<TMessage: Message> NetworkSender<TMessage> {
+impl<TMessage: Message + Send + 'static> NetworkSender<TMessage> {
     /// Send a protobuf message to a single recipient. Provides a wrapper over
     /// `[peer_manager::PeerManagerRequestSender::send_to]`.
     pub fn send_to(
@@ -394,13 +362,19 @@ impl<TMessage: Message> NetworkSender<TMessage> {
         req_msg: TMessage,
         timeout: Duration,
     ) -> Result<TMessage, RpcError> {
-        // serialize request
-        let req_data = protocol.to_bytes(&req_msg)?.into();
+        // Serialize the request using a blocking task
+        let req_data = tokio::task::spawn_blocking(move || protocol.to_bytes(&req_msg))
+            .await??
+            .into();
+
+        // Send the request and wait for the response
         let res_data = self
             .peer_mgr_reqs_tx
             .send_rpc(recipient, protocol, req_data, timeout)
             .await?;
-        let res_msg: TMessage = protocol.from_bytes(&res_data)?;
+
+        // Deserialize the response using a blocking task
+        let res_msg = tokio::task::spawn_blocking(move || protocol.from_bytes(&res_data)).await??;
         Ok(res_msg)
     }
 }

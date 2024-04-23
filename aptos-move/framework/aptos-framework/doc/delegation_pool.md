@@ -123,6 +123,7 @@ transferred to A
 -  [Resource `GovernanceRecords`](#0x1_delegation_pool_GovernanceRecords)
 -  [Resource `BeneficiaryForOperator`](#0x1_delegation_pool_BeneficiaryForOperator)
 -  [Resource `NextCommissionPercentage`](#0x1_delegation_pool_NextCommissionPercentage)
+-  [Resource `DelegationPoolAllowlisting`](#0x1_delegation_pool_DelegationPoolAllowlisting)
 -  [Struct `AddStakeEvent`](#0x1_delegation_pool_AddStakeEvent)
 -  [Struct `ReactivateStakeEvent`](#0x1_delegation_pool_ReactivateStakeEvent)
 -  [Struct `UnlockStakeEvent`](#0x1_delegation_pool_UnlockStakeEvent)
@@ -134,6 +135,11 @@ transferred to A
 -  [Struct `DelegateVotingPowerEvent`](#0x1_delegation_pool_DelegateVotingPowerEvent)
 -  [Struct `SetBeneficiaryForOperator`](#0x1_delegation_pool_SetBeneficiaryForOperator)
 -  [Struct `CommissionPercentageChange`](#0x1_delegation_pool_CommissionPercentageChange)
+-  [Struct `EnableDelegatorsAllowlisting`](#0x1_delegation_pool_EnableDelegatorsAllowlisting)
+-  [Struct `DisableDelegatorsAllowlisting`](#0x1_delegation_pool_DisableDelegatorsAllowlisting)
+-  [Struct `AllowlistDelegator`](#0x1_delegation_pool_AllowlistDelegator)
+-  [Struct `RemoveDelegatorFromAllowlist`](#0x1_delegation_pool_RemoveDelegatorFromAllowlist)
+-  [Struct `EvictDelegator`](#0x1_delegation_pool_EvictDelegator)
 -  [Constants](#@Constants_0)
 -  [Function `owner_cap_exists`](#0x1_delegation_pool_owner_cap_exists)
 -  [Function `get_owned_pool_address`](#0x1_delegation_pool_get_owned_pool_address)
@@ -154,6 +160,9 @@ transferred to A
 -  [Function `calculate_and_update_delegator_voter`](#0x1_delegation_pool_calculate_and_update_delegator_voter)
 -  [Function `get_expected_stake_pool_address`](#0x1_delegation_pool_get_expected_stake_pool_address)
 -  [Function `min_remaining_secs_for_commission_change`](#0x1_delegation_pool_min_remaining_secs_for_commission_change)
+-  [Function `allowlisting_enabled`](#0x1_delegation_pool_allowlisting_enabled)
+-  [Function `delegator_allowlisted`](#0x1_delegation_pool_delegator_allowlisted)
+-  [Function `get_delegators_allowlist`](#0x1_delegation_pool_get_delegators_allowlist)
 -  [Function `initialize_delegation_pool`](#0x1_delegation_pool_initialize_delegation_pool)
 -  [Function `beneficiary_for_operator`](#0x1_delegation_pool_beneficiary_for_operator)
 -  [Function `enable_partial_governance_voting`](#0x1_delegation_pool_enable_partial_governance_voting)
@@ -164,6 +173,8 @@ transferred to A
 -  [Function `assert_min_active_balance`](#0x1_delegation_pool_assert_min_active_balance)
 -  [Function `assert_min_pending_inactive_balance`](#0x1_delegation_pool_assert_min_pending_inactive_balance)
 -  [Function `assert_partial_governance_voting_enabled`](#0x1_delegation_pool_assert_partial_governance_voting_enabled)
+-  [Function `assert_allowlisting_enabled`](#0x1_delegation_pool_assert_allowlisting_enabled)
+-  [Function `assert_delegator_allowlisted`](#0x1_delegation_pool_assert_delegator_allowlisted)
 -  [Function `coins_to_redeem_to_ensure_min_stake`](#0x1_delegation_pool_coins_to_redeem_to_ensure_min_stake)
 -  [Function `coins_to_transfer_to_ensure_min_stake`](#0x1_delegation_pool_coins_to_transfer_to_ensure_min_stake)
 -  [Function `retrieve_stake_pool_owner`](#0x1_delegation_pool_retrieve_stake_pool_owner)
@@ -179,13 +190,20 @@ transferred to A
 -  [Function `calculate_total_voting_power`](#0x1_delegation_pool_calculate_total_voting_power)
 -  [Function `calculate_and_update_delegator_voter_internal`](#0x1_delegation_pool_calculate_and_update_delegator_voter_internal)
 -  [Function `calculate_and_update_delegated_votes`](#0x1_delegation_pool_calculate_and_update_delegated_votes)
+-  [Function `borrow_mut_delegators_allowlist`](#0x1_delegation_pool_borrow_mut_delegators_allowlist)
 -  [Function `set_operator`](#0x1_delegation_pool_set_operator)
 -  [Function `set_beneficiary_for_operator`](#0x1_delegation_pool_set_beneficiary_for_operator)
 -  [Function `update_commission_percentage`](#0x1_delegation_pool_update_commission_percentage)
 -  [Function `set_delegated_voter`](#0x1_delegation_pool_set_delegated_voter)
 -  [Function `delegate_voting_power`](#0x1_delegation_pool_delegate_voting_power)
+-  [Function `enable_delegators_allowlisting`](#0x1_delegation_pool_enable_delegators_allowlisting)
+-  [Function `disable_delegators_allowlisting`](#0x1_delegation_pool_disable_delegators_allowlisting)
+-  [Function `allowlist_delegator`](#0x1_delegation_pool_allowlist_delegator)
+-  [Function `remove_delegator_from_allowlist`](#0x1_delegation_pool_remove_delegator_from_allowlist)
+-  [Function `evict_delegator`](#0x1_delegation_pool_evict_delegator)
 -  [Function `add_stake`](#0x1_delegation_pool_add_stake)
 -  [Function `unlock`](#0x1_delegation_pool_unlock)
+-  [Function `unlock_internal`](#0x1_delegation_pool_unlock_internal)
 -  [Function `reactivate_stake`](#0x1_delegation_pool_reactivate_stake)
 -  [Function `withdraw`](#0x1_delegation_pool_withdraw)
 -  [Function `withdraw_internal`](#0x1_delegation_pool_withdraw_internal)
@@ -225,6 +243,7 @@ transferred to A
 <b>use</b> <a href="stake.md#0x1_stake">0x1::stake</a>;
 <b>use</b> <a href="staking_config.md#0x1_staking_config">0x1::staking_config</a>;
 <b>use</b> <a href="../../aptos-stdlib/doc/table.md#0x1_table">0x1::table</a>;
+<b>use</b> <a href="../../aptos-stdlib/doc/table_with_length.md#0x1_table_with_length">0x1::table_with_length</a>;
 <b>use</b> <a href="timestamp.md#0x1_timestamp">0x1::timestamp</a>;
 <b>use</b> <a href="../../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector">0x1::vector</a>;
 </code></pre>
@@ -416,7 +435,7 @@ Capability that represents ownership over privileged operations on the underlyin
 
 ## Struct `VoteDelegation`
 
-Track delgated voter of each delegator.
+Track delegated voter of each delegator.
 
 
 <pre><code><b>struct</b> <a href="delegation_pool.md#0x1_delegation_pool_VoteDelegation">VoteDelegation</a> <b>has</b> <b>copy</b>, drop, store
@@ -456,7 +475,7 @@ Track delgated voter of each delegator.
 
 ## Struct `DelegatedVotes`
 
-Track total voteing power of each voter.
+Track total voting power of each voter.
 
 
 <pre><code><b>struct</b> <a href="delegation_pool.md#0x1_delegation_pool_DelegatedVotes">DelegatedVotes</a> <b>has</b> <b>copy</b>, drop, store
@@ -614,6 +633,36 @@ This struct should be stored in the delegation pool resource account.
 </dd>
 <dt>
 <code>effective_after_secs: u64</code>
+</dt>
+<dd>
+
+</dd>
+</dl>
+
+
+</details>
+
+<a id="0x1_delegation_pool_DelegationPoolAllowlisting"></a>
+
+## Resource `DelegationPoolAllowlisting`
+
+Tracks a delegation pool's allowlist of delegators.
+If allowlisting is enabled, existing delegators are not implicitly allowlisted and they can be individually
+evicted later by the pool owner.
+
+
+<pre><code><b>struct</b> <a href="delegation_pool.md#0x1_delegation_pool_DelegationPoolAllowlisting">DelegationPoolAllowlisting</a> <b>has</b> key
+</code></pre>
+
+
+
+<details>
+<summary>Fields</summary>
+
+
+<dl>
+<dt>
+<code>allowlist: <a href="../../aptos-stdlib/doc/smart_table.md#0x1_smart_table_SmartTable">smart_table::SmartTable</a>&lt;<b>address</b>, bool&gt;</code>
 </dt>
 <dd>
 
@@ -1091,6 +1140,164 @@ This struct should be stored in the delegation pool resource account.
 
 </details>
 
+<a id="0x1_delegation_pool_EnableDelegatorsAllowlisting"></a>
+
+## Struct `EnableDelegatorsAllowlisting`
+
+
+
+<pre><code>#[<a href="event.md#0x1_event">event</a>]
+<b>struct</b> <a href="delegation_pool.md#0x1_delegation_pool_EnableDelegatorsAllowlisting">EnableDelegatorsAllowlisting</a> <b>has</b> drop, store
+</code></pre>
+
+
+
+<details>
+<summary>Fields</summary>
+
+
+<dl>
+<dt>
+<code>pool_address: <b>address</b></code>
+</dt>
+<dd>
+
+</dd>
+</dl>
+
+
+</details>
+
+<a id="0x1_delegation_pool_DisableDelegatorsAllowlisting"></a>
+
+## Struct `DisableDelegatorsAllowlisting`
+
+
+
+<pre><code>#[<a href="event.md#0x1_event">event</a>]
+<b>struct</b> <a href="delegation_pool.md#0x1_delegation_pool_DisableDelegatorsAllowlisting">DisableDelegatorsAllowlisting</a> <b>has</b> drop, store
+</code></pre>
+
+
+
+<details>
+<summary>Fields</summary>
+
+
+<dl>
+<dt>
+<code>pool_address: <b>address</b></code>
+</dt>
+<dd>
+
+</dd>
+</dl>
+
+
+</details>
+
+<a id="0x1_delegation_pool_AllowlistDelegator"></a>
+
+## Struct `AllowlistDelegator`
+
+
+
+<pre><code>#[<a href="event.md#0x1_event">event</a>]
+<b>struct</b> <a href="delegation_pool.md#0x1_delegation_pool_AllowlistDelegator">AllowlistDelegator</a> <b>has</b> drop, store
+</code></pre>
+
+
+
+<details>
+<summary>Fields</summary>
+
+
+<dl>
+<dt>
+<code>pool_address: <b>address</b></code>
+</dt>
+<dd>
+
+</dd>
+<dt>
+<code>delegator_address: <b>address</b></code>
+</dt>
+<dd>
+
+</dd>
+</dl>
+
+
+</details>
+
+<a id="0x1_delegation_pool_RemoveDelegatorFromAllowlist"></a>
+
+## Struct `RemoveDelegatorFromAllowlist`
+
+
+
+<pre><code>#[<a href="event.md#0x1_event">event</a>]
+<b>struct</b> <a href="delegation_pool.md#0x1_delegation_pool_RemoveDelegatorFromAllowlist">RemoveDelegatorFromAllowlist</a> <b>has</b> drop, store
+</code></pre>
+
+
+
+<details>
+<summary>Fields</summary>
+
+
+<dl>
+<dt>
+<code>pool_address: <b>address</b></code>
+</dt>
+<dd>
+
+</dd>
+<dt>
+<code>delegator_address: <b>address</b></code>
+</dt>
+<dd>
+
+</dd>
+</dl>
+
+
+</details>
+
+<a id="0x1_delegation_pool_EvictDelegator"></a>
+
+## Struct `EvictDelegator`
+
+
+
+<pre><code>#[<a href="event.md#0x1_event">event</a>]
+<b>struct</b> <a href="delegation_pool.md#0x1_delegation_pool_EvictDelegator">EvictDelegator</a> <b>has</b> drop, store
+</code></pre>
+
+
+
+<details>
+<summary>Fields</summary>
+
+
+<dl>
+<dt>
+<code>pool_address: <b>address</b></code>
+</dt>
+<dd>
+
+</dd>
+<dt>
+<code>delegator_address: <b>address</b></code>
+</dt>
+<dd>
+
+</dd>
+</dl>
+
+
+</details>
+
 <a id="@Constants_0"></a>
 
 ## Constants
@@ -1194,6 +1401,26 @@ The stake pool has already voted on the proposal before enabling partial governa
 
 
 
+<a id="0x1_delegation_pool_ECANNOT_EVICT_ALLOWLISTED_DELEGATOR"></a>
+
+Cannot evict an allowlisted delegator, should remove them from the allowlist first.
+
+
+<pre><code><b>const</b> <a href="delegation_pool.md#0x1_delegation_pool_ECANNOT_EVICT_ALLOWLISTED_DELEGATOR">ECANNOT_EVICT_ALLOWLISTED_DELEGATOR</a>: u64 = 26;
+</code></pre>
+
+
+
+<a id="0x1_delegation_pool_ECANNOT_UNLOCK_NULL_SHAREHOLDER"></a>
+
+Cannot unlock the accumulated active stake of NULL_SHAREHOLDER(0x0).
+
+
+<pre><code><b>const</b> <a href="delegation_pool.md#0x1_delegation_pool_ECANNOT_UNLOCK_NULL_SHAREHOLDER">ECANNOT_UNLOCK_NULL_SHAREHOLDER</a>: u64 = 27;
+</code></pre>
+
+
+
 <a id="0x1_delegation_pool_ECOMMISSION_RATE_CHANGE_NOT_SUPPORTED"></a>
 
 Changing operator commission rate in delegation pool is not supported.
@@ -1224,12 +1451,42 @@ Delegation pool does not exist at the provided pool address.
 
 
 
+<a id="0x1_delegation_pool_EDELEGATORS_ALLOWLISTING_NOT_ENABLED"></a>
+
+Delegators allowlisting should be enabled to perform this operation.
+
+
+<pre><code><b>const</b> <a href="delegation_pool.md#0x1_delegation_pool_EDELEGATORS_ALLOWLISTING_NOT_ENABLED">EDELEGATORS_ALLOWLISTING_NOT_ENABLED</a>: u64 = 24;
+</code></pre>
+
+
+
+<a id="0x1_delegation_pool_EDELEGATORS_ALLOWLISTING_NOT_SUPPORTED"></a>
+
+Delegators allowlisting is not supported.
+
+
+<pre><code><b>const</b> <a href="delegation_pool.md#0x1_delegation_pool_EDELEGATORS_ALLOWLISTING_NOT_SUPPORTED">EDELEGATORS_ALLOWLISTING_NOT_SUPPORTED</a>: u64 = 23;
+</code></pre>
+
+
+
 <a id="0x1_delegation_pool_EDELEGATOR_ACTIVE_BALANCE_TOO_LOW"></a>
 
 Delegator's active balance cannot be less than <code><a href="delegation_pool.md#0x1_delegation_pool_MIN_COINS_ON_SHARES_POOL">MIN_COINS_ON_SHARES_POOL</a></code>.
 
 
 <pre><code><b>const</b> <a href="delegation_pool.md#0x1_delegation_pool_EDELEGATOR_ACTIVE_BALANCE_TOO_LOW">EDELEGATOR_ACTIVE_BALANCE_TOO_LOW</a>: u64 = 8;
+</code></pre>
+
+
+
+<a id="0x1_delegation_pool_EDELEGATOR_NOT_ALLOWLISTED"></a>
+
+Cannot add/reactivate stake unless being allowlisted by the pool owner.
+
+
+<pre><code><b>const</b> <a href="delegation_pool.md#0x1_delegation_pool_EDELEGATOR_NOT_ALLOWLISTED">EDELEGATOR_NOT_ALLOWLISTED</a>: u64 = 25;
 </code></pre>
 
 
@@ -1266,7 +1523,7 @@ There is not enough <code>active</code> stake on the stake pool to <code>unlock<
 
 <a id="0x1_delegation_pool_EOPERATOR_BENEFICIARY_CHANGE_NOT_SUPPORTED"></a>
 
-Chaning beneficiaries for operators is not supported.
+Changing beneficiaries for operators is not supported.
 
 
 <pre><code><b>const</b> <a href="delegation_pool.md#0x1_delegation_pool_EOPERATOR_BENEFICIARY_CHANGE_NOT_SUPPORTED">EOPERATOR_BENEFICIARY_CHANGE_NOT_SUPPORTED</a>: u64 = 19;
@@ -1362,7 +1619,7 @@ Maximum operator percentage fee(of double digit precision): 22.85% is represente
 Minimum coins to exist on a shares pool at all times.
 Enforced per delegator for both active and pending_inactive pools.
 This constraint ensures the share price cannot overly increase and lead to
-substantial loses when buying shares (can lose at most 1 share which may
+substantial losses when buying shares (can lose at most 1 share which may
 be worth a lot if current share price is high).
 This constraint is not enforced on inactive pools as they only allow redeems
 (can lose at most 1 coin regardless of current share price).
@@ -1487,7 +1744,7 @@ Return whether a delegation pool exists at supplied address <code>addr</code>.
 
 ## Function `partial_governance_voting_enabled`
 
-Return whether a delegation pool has already enabled partial govnernance voting.
+Return whether a delegation pool has already enabled partial governance voting.
 
 
 <pre><code>#[view]
@@ -2044,6 +2301,100 @@ Return the minimum remaining time in seconds for commission change, which is one
 
 </details>
 
+<a id="0x1_delegation_pool_allowlisting_enabled"></a>
+
+## Function `allowlisting_enabled`
+
+Return whether allowlisting is enabled for the provided delegation pool.
+
+
+<pre><code>#[view]
+<b>public</b> <b>fun</b> <a href="delegation_pool.md#0x1_delegation_pool_allowlisting_enabled">allowlisting_enabled</a>(pool_address: <b>address</b>): bool
+</code></pre>
+
+
+
+<details>
+<summary>Implementation</summary>
+
+
+<pre><code><b>public</b> <b>fun</b> <a href="delegation_pool.md#0x1_delegation_pool_allowlisting_enabled">allowlisting_enabled</a>(pool_address: <b>address</b>): bool {
+    <a href="delegation_pool.md#0x1_delegation_pool_assert_delegation_pool_exists">assert_delegation_pool_exists</a>(pool_address);
+    <b>exists</b>&lt;<a href="delegation_pool.md#0x1_delegation_pool_DelegationPoolAllowlisting">DelegationPoolAllowlisting</a>&gt;(pool_address)
+}
+</code></pre>
+
+
+
+</details>
+
+<a id="0x1_delegation_pool_delegator_allowlisted"></a>
+
+## Function `delegator_allowlisted`
+
+Return whether the provided delegator is allowlisted.
+A delegator is allowlisted if:
+- allowlisting is disabled on the pool
+- delegator is part of the allowlist
+
+
+<pre><code>#[view]
+<b>public</b> <b>fun</b> <a href="delegation_pool.md#0x1_delegation_pool_delegator_allowlisted">delegator_allowlisted</a>(pool_address: <b>address</b>, delegator_address: <b>address</b>): bool
+</code></pre>
+
+
+
+<details>
+<summary>Implementation</summary>
+
+
+<pre><code><b>public</b> <b>fun</b> <a href="delegation_pool.md#0x1_delegation_pool_delegator_allowlisted">delegator_allowlisted</a>(
+    pool_address: <b>address</b>,
+    delegator_address: <b>address</b>,
+): bool <b>acquires</b> <a href="delegation_pool.md#0x1_delegation_pool_DelegationPoolAllowlisting">DelegationPoolAllowlisting</a> {
+    <b>if</b> (!<a href="delegation_pool.md#0x1_delegation_pool_allowlisting_enabled">allowlisting_enabled</a>(pool_address)) { <b>return</b> <b>true</b> };
+    <a href="../../aptos-stdlib/doc/smart_table.md#0x1_smart_table_contains">smart_table::contains</a>(<b>freeze</b>(<a href="delegation_pool.md#0x1_delegation_pool_borrow_mut_delegators_allowlist">borrow_mut_delegators_allowlist</a>(pool_address)), delegator_address)
+}
+</code></pre>
+
+
+
+</details>
+
+<a id="0x1_delegation_pool_get_delegators_allowlist"></a>
+
+## Function `get_delegators_allowlist`
+
+Return allowlist or revert if allowlisting is not enabled for the provided delegation pool.
+
+
+<pre><code>#[view]
+<b>public</b> <b>fun</b> <a href="delegation_pool.md#0x1_delegation_pool_get_delegators_allowlist">get_delegators_allowlist</a>(pool_address: <b>address</b>): <a href="../../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;<b>address</b>&gt;
+</code></pre>
+
+
+
+<details>
+<summary>Implementation</summary>
+
+
+<pre><code><b>public</b> <b>fun</b> <a href="delegation_pool.md#0x1_delegation_pool_get_delegators_allowlist">get_delegators_allowlist</a>(
+    pool_address: <b>address</b>,
+): <a href="../../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;<b>address</b>&gt; <b>acquires</b> <a href="delegation_pool.md#0x1_delegation_pool_DelegationPoolAllowlisting">DelegationPoolAllowlisting</a> {
+    <a href="delegation_pool.md#0x1_delegation_pool_assert_allowlisting_enabled">assert_allowlisting_enabled</a>(pool_address);
+
+    <b>let</b> allowlist = <a href="../../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector">vector</a>[];
+    <a href="../../aptos-stdlib/doc/smart_table.md#0x1_smart_table_for_each_ref">smart_table::for_each_ref</a>(<b>freeze</b>(<a href="delegation_pool.md#0x1_delegation_pool_borrow_mut_delegators_allowlist">borrow_mut_delegators_allowlist</a>(pool_address)), |delegator, _v| {
+        <a href="../../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector_push_back">vector::push_back</a>(&<b>mut</b> allowlist, *delegator);
+    });
+    allowlist
+}
+</code></pre>
+
+
+
+</details>
+
 <a id="0x1_delegation_pool_initialize_delegation_pool"></a>
 
 ## Function `initialize_delegation_pool`
@@ -2108,7 +2459,7 @@ Ownership over setting the operator/voter is granted to <code>owner</code> who h
     // save delegation pool ownership and resource <a href="account.md#0x1_account">account</a> <b>address</b> (inner <a href="stake.md#0x1_stake">stake</a> pool <b>address</b>) on `owner`
     <b>move_to</b>(owner, <a href="delegation_pool.md#0x1_delegation_pool_DelegationPoolOwnership">DelegationPoolOwnership</a> { pool_address });
 
-    // All delegation pool enable partial governace <a href="voting.md#0x1_voting">voting</a> by default once the feature flag is enabled.
+    // All delegation pool enable partial governance <a href="voting.md#0x1_voting">voting</a> by default once the feature flag is enabled.
     <b>if</b> (<a href="../../aptos-stdlib/../move-stdlib/doc/features.md#0x1_features_partial_governance_voting_enabled">features::partial_governance_voting_enabled</a>() && <a href="../../aptos-stdlib/../move-stdlib/doc/features.md#0x1_features_delegation_pool_partial_governance_voting_enabled">features::delegation_pool_partial_governance_voting_enabled</a>()) {
         <a href="delegation_pool.md#0x1_delegation_pool_enable_partial_governance_voting">enable_partial_governance_voting</a>(pool_address);
     }
@@ -2154,7 +2505,7 @@ Return the beneficiary address of the operator.
 ## Function `enable_partial_governance_voting`
 
 Enable partial governance voting on a stake pool. The voter of this stake pool will be managed by this module.
-THe existing voter will be replaced. The function is permissionless.
+The existing voter will be replaced. The function is permissionless.
 
 
 <pre><code><b>public</b> entry <b>fun</b> <a href="delegation_pool.md#0x1_delegation_pool_enable_partial_governance_voting">enable_partial_governance_voting</a>(pool_address: <b>address</b>)
@@ -2438,6 +2789,60 @@ voting power in THIS delegation pool must be not less than the minimum required 
 <pre><code><b>fun</b> <a href="delegation_pool.md#0x1_delegation_pool_assert_partial_governance_voting_enabled">assert_partial_governance_voting_enabled</a>(pool_address: <b>address</b>) {
     <a href="delegation_pool.md#0x1_delegation_pool_assert_delegation_pool_exists">assert_delegation_pool_exists</a>(pool_address);
     <b>assert</b>!(<a href="delegation_pool.md#0x1_delegation_pool_partial_governance_voting_enabled">partial_governance_voting_enabled</a>(pool_address), <a href="../../aptos-stdlib/../move-stdlib/doc/error.md#0x1_error_invalid_state">error::invalid_state</a>(<a href="delegation_pool.md#0x1_delegation_pool_EPARTIAL_GOVERNANCE_VOTING_NOT_ENABLED">EPARTIAL_GOVERNANCE_VOTING_NOT_ENABLED</a>));
+}
+</code></pre>
+
+
+
+</details>
+
+<a id="0x1_delegation_pool_assert_allowlisting_enabled"></a>
+
+## Function `assert_allowlisting_enabled`
+
+
+
+<pre><code><b>fun</b> <a href="delegation_pool.md#0x1_delegation_pool_assert_allowlisting_enabled">assert_allowlisting_enabled</a>(pool_address: <b>address</b>)
+</code></pre>
+
+
+
+<details>
+<summary>Implementation</summary>
+
+
+<pre><code><b>fun</b> <a href="delegation_pool.md#0x1_delegation_pool_assert_allowlisting_enabled">assert_allowlisting_enabled</a>(pool_address: <b>address</b>) {
+    <b>assert</b>!(<a href="delegation_pool.md#0x1_delegation_pool_allowlisting_enabled">allowlisting_enabled</a>(pool_address), <a href="../../aptos-stdlib/../move-stdlib/doc/error.md#0x1_error_invalid_state">error::invalid_state</a>(<a href="delegation_pool.md#0x1_delegation_pool_EDELEGATORS_ALLOWLISTING_NOT_ENABLED">EDELEGATORS_ALLOWLISTING_NOT_ENABLED</a>));
+}
+</code></pre>
+
+
+
+</details>
+
+<a id="0x1_delegation_pool_assert_delegator_allowlisted"></a>
+
+## Function `assert_delegator_allowlisted`
+
+
+
+<pre><code><b>fun</b> <a href="delegation_pool.md#0x1_delegation_pool_assert_delegator_allowlisted">assert_delegator_allowlisted</a>(pool_address: <b>address</b>, delegator_address: <b>address</b>)
+</code></pre>
+
+
+
+<details>
+<summary>Implementation</summary>
+
+
+<pre><code><b>fun</b> <a href="delegation_pool.md#0x1_delegation_pool_assert_delegator_allowlisted">assert_delegator_allowlisted</a>(
+    pool_address: <b>address</b>,
+    delegator_address: <b>address</b>,
+) <b>acquires</b> <a href="delegation_pool.md#0x1_delegation_pool_DelegationPoolAllowlisting">DelegationPoolAllowlisting</a> {
+    <b>assert</b>!(
+        <a href="delegation_pool.md#0x1_delegation_pool_delegator_allowlisted">delegator_allowlisted</a>(pool_address, delegator_address),
+        <a href="../../aptos-stdlib/../move-stdlib/doc/error.md#0x1_error_permission_denied">error::permission_denied</a>(<a href="delegation_pool.md#0x1_delegation_pool_EDELEGATOR_NOT_ALLOWLISTED">EDELEGATOR_NOT_ALLOWLISTED</a>)
+    );
 }
 </code></pre>
 
@@ -2927,6 +3332,32 @@ Update DelegatedVotes of a voter to up-to-date then return the total voting powe
 
 </details>
 
+<a id="0x1_delegation_pool_borrow_mut_delegators_allowlist"></a>
+
+## Function `borrow_mut_delegators_allowlist`
+
+
+
+<pre><code><b>fun</b> <a href="delegation_pool.md#0x1_delegation_pool_borrow_mut_delegators_allowlist">borrow_mut_delegators_allowlist</a>(pool_address: <b>address</b>): &<b>mut</b> <a href="../../aptos-stdlib/doc/smart_table.md#0x1_smart_table_SmartTable">smart_table::SmartTable</a>&lt;<b>address</b>, bool&gt;
+</code></pre>
+
+
+
+<details>
+<summary>Implementation</summary>
+
+
+<pre><code>inline <b>fun</b> <a href="delegation_pool.md#0x1_delegation_pool_borrow_mut_delegators_allowlist">borrow_mut_delegators_allowlist</a>(
+    pool_address: <b>address</b>
+): &<b>mut</b> SmartTable&lt;<b>address</b>, bool&gt; <b>acquires</b> <a href="delegation_pool.md#0x1_delegation_pool_DelegationPoolAllowlisting">DelegationPoolAllowlisting</a> {
+    &<b>mut</b> <b>borrow_global_mut</b>&lt;<a href="delegation_pool.md#0x1_delegation_pool_DelegationPoolAllowlisting">DelegationPoolAllowlisting</a>&gt;(pool_address).allowlist
+}
+</code></pre>
+
+
+
+</details>
+
 <a id="0x1_delegation_pool_set_operator"></a>
 
 ## Function `set_operator`
@@ -2964,7 +3395,7 @@ Allows an owner to change the operator of the underlying stake pool.
 ## Function `set_beneficiary_for_operator`
 
 Allows an operator to change its beneficiary. Any existing unpaid commission rewards will be paid to the new
-beneficiary. To ensures payment to the current beneficiary, one should first call <code>synchronize_delegation_pool</code>
+beneficiary. To ensure payment to the current beneficiary, one should first call <code>synchronize_delegation_pool</code>
 before switching the beneficiary. An operator can set one beneficiary for delegation pools, not a separate
 one for each pool.
 
@@ -3174,6 +3605,191 @@ this change won't take effects until the next lockup period.
 
 </details>
 
+<a id="0x1_delegation_pool_enable_delegators_allowlisting"></a>
+
+## Function `enable_delegators_allowlisting`
+
+Enable delegators allowlisting as the pool owner.
+
+
+<pre><code><b>public</b> entry <b>fun</b> <a href="delegation_pool.md#0x1_delegation_pool_enable_delegators_allowlisting">enable_delegators_allowlisting</a>(owner: &<a href="../../aptos-stdlib/../move-stdlib/doc/signer.md#0x1_signer">signer</a>)
+</code></pre>
+
+
+
+<details>
+<summary>Implementation</summary>
+
+
+<pre><code><b>public</b> entry <b>fun</b> <a href="delegation_pool.md#0x1_delegation_pool_enable_delegators_allowlisting">enable_delegators_allowlisting</a>(
+    owner: &<a href="../../aptos-stdlib/../move-stdlib/doc/signer.md#0x1_signer">signer</a>,
+) <b>acquires</b> <a href="delegation_pool.md#0x1_delegation_pool_DelegationPoolOwnership">DelegationPoolOwnership</a>, <a href="delegation_pool.md#0x1_delegation_pool_DelegationPool">DelegationPool</a> {
+    <b>assert</b>!(
+        <a href="../../aptos-stdlib/../move-stdlib/doc/features.md#0x1_features_delegation_pool_allowlisting_enabled">features::delegation_pool_allowlisting_enabled</a>(),
+        <a href="../../aptos-stdlib/../move-stdlib/doc/error.md#0x1_error_invalid_state">error::invalid_state</a>(<a href="delegation_pool.md#0x1_delegation_pool_EDELEGATORS_ALLOWLISTING_NOT_SUPPORTED">EDELEGATORS_ALLOWLISTING_NOT_SUPPORTED</a>)
+    );
+
+    <b>let</b> pool_address = <a href="delegation_pool.md#0x1_delegation_pool_get_owned_pool_address">get_owned_pool_address</a>(<a href="../../aptos-stdlib/../move-stdlib/doc/signer.md#0x1_signer_address_of">signer::address_of</a>(owner));
+    <b>if</b> (<a href="delegation_pool.md#0x1_delegation_pool_allowlisting_enabled">allowlisting_enabled</a>(pool_address)) { <b>return</b> };
+
+    <b>let</b> pool_signer = <a href="delegation_pool.md#0x1_delegation_pool_retrieve_stake_pool_owner">retrieve_stake_pool_owner</a>(<b>borrow_global</b>&lt;<a href="delegation_pool.md#0x1_delegation_pool_DelegationPool">DelegationPool</a>&gt;(pool_address));
+    <b>move_to</b>(&pool_signer, <a href="delegation_pool.md#0x1_delegation_pool_DelegationPoolAllowlisting">DelegationPoolAllowlisting</a> { allowlist: <a href="../../aptos-stdlib/doc/smart_table.md#0x1_smart_table_new">smart_table::new</a>&lt;<b>address</b>, bool&gt;() });
+
+    <a href="event.md#0x1_event_emit">event::emit</a>(<a href="delegation_pool.md#0x1_delegation_pool_EnableDelegatorsAllowlisting">EnableDelegatorsAllowlisting</a> { pool_address });
+}
+</code></pre>
+
+
+
+</details>
+
+<a id="0x1_delegation_pool_disable_delegators_allowlisting"></a>
+
+## Function `disable_delegators_allowlisting`
+
+Disable delegators allowlisting as the pool owner. The existing allowlist will be emptied.
+
+
+<pre><code><b>public</b> entry <b>fun</b> <a href="delegation_pool.md#0x1_delegation_pool_disable_delegators_allowlisting">disable_delegators_allowlisting</a>(owner: &<a href="../../aptos-stdlib/../move-stdlib/doc/signer.md#0x1_signer">signer</a>)
+</code></pre>
+
+
+
+<details>
+<summary>Implementation</summary>
+
+
+<pre><code><b>public</b> entry <b>fun</b> <a href="delegation_pool.md#0x1_delegation_pool_disable_delegators_allowlisting">disable_delegators_allowlisting</a>(
+    owner: &<a href="../../aptos-stdlib/../move-stdlib/doc/signer.md#0x1_signer">signer</a>,
+) <b>acquires</b> <a href="delegation_pool.md#0x1_delegation_pool_DelegationPoolOwnership">DelegationPoolOwnership</a>, <a href="delegation_pool.md#0x1_delegation_pool_DelegationPoolAllowlisting">DelegationPoolAllowlisting</a> {
+    <b>let</b> pool_address = <a href="delegation_pool.md#0x1_delegation_pool_get_owned_pool_address">get_owned_pool_address</a>(<a href="../../aptos-stdlib/../move-stdlib/doc/signer.md#0x1_signer_address_of">signer::address_of</a>(owner));
+    <a href="delegation_pool.md#0x1_delegation_pool_assert_allowlisting_enabled">assert_allowlisting_enabled</a>(pool_address);
+
+    <b>let</b> <a href="delegation_pool.md#0x1_delegation_pool_DelegationPoolAllowlisting">DelegationPoolAllowlisting</a> { allowlist } = <b>move_from</b>&lt;<a href="delegation_pool.md#0x1_delegation_pool_DelegationPoolAllowlisting">DelegationPoolAllowlisting</a>&gt;(pool_address);
+    // <b>if</b> the allowlist becomes too large, the owner can always remove some delegators
+    <a href="../../aptos-stdlib/doc/smart_table.md#0x1_smart_table_destroy">smart_table::destroy</a>(allowlist);
+
+    <a href="event.md#0x1_event_emit">event::emit</a>(<a href="delegation_pool.md#0x1_delegation_pool_DisableDelegatorsAllowlisting">DisableDelegatorsAllowlisting</a> { pool_address });
+}
+</code></pre>
+
+
+
+</details>
+
+<a id="0x1_delegation_pool_allowlist_delegator"></a>
+
+## Function `allowlist_delegator`
+
+Allowlist a delegator as the pool owner.
+
+
+<pre><code><b>public</b> entry <b>fun</b> <a href="delegation_pool.md#0x1_delegation_pool_allowlist_delegator">allowlist_delegator</a>(owner: &<a href="../../aptos-stdlib/../move-stdlib/doc/signer.md#0x1_signer">signer</a>, delegator_address: <b>address</b>)
+</code></pre>
+
+
+
+<details>
+<summary>Implementation</summary>
+
+
+<pre><code><b>public</b> entry <b>fun</b> <a href="delegation_pool.md#0x1_delegation_pool_allowlist_delegator">allowlist_delegator</a>(
+    owner: &<a href="../../aptos-stdlib/../move-stdlib/doc/signer.md#0x1_signer">signer</a>,
+    delegator_address: <b>address</b>,
+) <b>acquires</b> <a href="delegation_pool.md#0x1_delegation_pool_DelegationPoolOwnership">DelegationPoolOwnership</a>, <a href="delegation_pool.md#0x1_delegation_pool_DelegationPoolAllowlisting">DelegationPoolAllowlisting</a> {
+    <b>let</b> pool_address = <a href="delegation_pool.md#0x1_delegation_pool_get_owned_pool_address">get_owned_pool_address</a>(<a href="../../aptos-stdlib/../move-stdlib/doc/signer.md#0x1_signer_address_of">signer::address_of</a>(owner));
+    <a href="delegation_pool.md#0x1_delegation_pool_assert_allowlisting_enabled">assert_allowlisting_enabled</a>(pool_address);
+
+    <b>if</b> (<a href="delegation_pool.md#0x1_delegation_pool_delegator_allowlisted">delegator_allowlisted</a>(pool_address, delegator_address)) { <b>return</b> };
+
+    <a href="../../aptos-stdlib/doc/smart_table.md#0x1_smart_table_add">smart_table::add</a>(<a href="delegation_pool.md#0x1_delegation_pool_borrow_mut_delegators_allowlist">borrow_mut_delegators_allowlist</a>(pool_address), delegator_address, <b>true</b>);
+
+    <a href="event.md#0x1_event_emit">event::emit</a>(<a href="delegation_pool.md#0x1_delegation_pool_AllowlistDelegator">AllowlistDelegator</a> { pool_address, delegator_address });
+}
+</code></pre>
+
+
+
+</details>
+
+<a id="0x1_delegation_pool_remove_delegator_from_allowlist"></a>
+
+## Function `remove_delegator_from_allowlist`
+
+Remove a delegator from the allowlist as the pool owner, but do not unlock their stake.
+
+
+<pre><code><b>public</b> entry <b>fun</b> <a href="delegation_pool.md#0x1_delegation_pool_remove_delegator_from_allowlist">remove_delegator_from_allowlist</a>(owner: &<a href="../../aptos-stdlib/../move-stdlib/doc/signer.md#0x1_signer">signer</a>, delegator_address: <b>address</b>)
+</code></pre>
+
+
+
+<details>
+<summary>Implementation</summary>
+
+
+<pre><code><b>public</b> entry <b>fun</b> <a href="delegation_pool.md#0x1_delegation_pool_remove_delegator_from_allowlist">remove_delegator_from_allowlist</a>(
+    owner: &<a href="../../aptos-stdlib/../move-stdlib/doc/signer.md#0x1_signer">signer</a>,
+    delegator_address: <b>address</b>,
+) <b>acquires</b> <a href="delegation_pool.md#0x1_delegation_pool_DelegationPoolOwnership">DelegationPoolOwnership</a>, <a href="delegation_pool.md#0x1_delegation_pool_DelegationPoolAllowlisting">DelegationPoolAllowlisting</a> {
+    <b>let</b> pool_address = <a href="delegation_pool.md#0x1_delegation_pool_get_owned_pool_address">get_owned_pool_address</a>(<a href="../../aptos-stdlib/../move-stdlib/doc/signer.md#0x1_signer_address_of">signer::address_of</a>(owner));
+    <a href="delegation_pool.md#0x1_delegation_pool_assert_allowlisting_enabled">assert_allowlisting_enabled</a>(pool_address);
+
+    <b>if</b> (!<a href="delegation_pool.md#0x1_delegation_pool_delegator_allowlisted">delegator_allowlisted</a>(pool_address, delegator_address)) { <b>return</b> };
+
+    <a href="../../aptos-stdlib/doc/smart_table.md#0x1_smart_table_remove">smart_table::remove</a>(<a href="delegation_pool.md#0x1_delegation_pool_borrow_mut_delegators_allowlist">borrow_mut_delegators_allowlist</a>(pool_address), delegator_address);
+
+    <a href="event.md#0x1_event_emit">event::emit</a>(<a href="delegation_pool.md#0x1_delegation_pool_RemoveDelegatorFromAllowlist">RemoveDelegatorFromAllowlist</a> { pool_address, delegator_address });
+}
+</code></pre>
+
+
+
+</details>
+
+<a id="0x1_delegation_pool_evict_delegator"></a>
+
+## Function `evict_delegator`
+
+Evict a delegator that is not allowlisted by unlocking their entire stake.
+
+
+<pre><code><b>public</b> entry <b>fun</b> <a href="delegation_pool.md#0x1_delegation_pool_evict_delegator">evict_delegator</a>(owner: &<a href="../../aptos-stdlib/../move-stdlib/doc/signer.md#0x1_signer">signer</a>, delegator_address: <b>address</b>)
+</code></pre>
+
+
+
+<details>
+<summary>Implementation</summary>
+
+
+<pre><code><b>public</b> entry <b>fun</b> <a href="delegation_pool.md#0x1_delegation_pool_evict_delegator">evict_delegator</a>(
+    owner: &<a href="../../aptos-stdlib/../move-stdlib/doc/signer.md#0x1_signer">signer</a>,
+    delegator_address: <b>address</b>,
+) <b>acquires</b> <a href="delegation_pool.md#0x1_delegation_pool_DelegationPoolOwnership">DelegationPoolOwnership</a>, <a href="delegation_pool.md#0x1_delegation_pool_DelegationPool">DelegationPool</a>, <a href="delegation_pool.md#0x1_delegation_pool_GovernanceRecords">GovernanceRecords</a>, <a href="delegation_pool.md#0x1_delegation_pool_BeneficiaryForOperator">BeneficiaryForOperator</a>, <a href="delegation_pool.md#0x1_delegation_pool_NextCommissionPercentage">NextCommissionPercentage</a>, <a href="delegation_pool.md#0x1_delegation_pool_DelegationPoolAllowlisting">DelegationPoolAllowlisting</a> {
+    <b>let</b> pool_address = <a href="delegation_pool.md#0x1_delegation_pool_get_owned_pool_address">get_owned_pool_address</a>(<a href="../../aptos-stdlib/../move-stdlib/doc/signer.md#0x1_signer_address_of">signer::address_of</a>(owner));
+    <a href="delegation_pool.md#0x1_delegation_pool_assert_allowlisting_enabled">assert_allowlisting_enabled</a>(pool_address);
+    <b>assert</b>!(
+        !<a href="delegation_pool.md#0x1_delegation_pool_delegator_allowlisted">delegator_allowlisted</a>(pool_address, delegator_address),
+        <a href="../../aptos-stdlib/../move-stdlib/doc/error.md#0x1_error_invalid_state">error::invalid_state</a>(<a href="delegation_pool.md#0x1_delegation_pool_ECANNOT_EVICT_ALLOWLISTED_DELEGATOR">ECANNOT_EVICT_ALLOWLISTED_DELEGATOR</a>)
+    );
+
+    // synchronize pool in order <b>to</b> query latest balance of delegator
+    <a href="delegation_pool.md#0x1_delegation_pool_synchronize_delegation_pool">synchronize_delegation_pool</a>(pool_address);
+
+    <b>let</b> pool = <b>borrow_global</b>&lt;<a href="delegation_pool.md#0x1_delegation_pool_DelegationPool">DelegationPool</a>&gt;(pool_address);
+    <b>if</b> (<a href="delegation_pool.md#0x1_delegation_pool_get_delegator_active_shares">get_delegator_active_shares</a>(pool, delegator_address) == 0) { <b>return</b> };
+
+    <a href="delegation_pool.md#0x1_delegation_pool_unlock_internal">unlock_internal</a>(delegator_address, pool_address, <a href="../../aptos-stdlib/doc/pool_u64.md#0x1_pool_u64_balance">pool_u64::balance</a>(&pool.active_shares, delegator_address));
+
+    <a href="event.md#0x1_event_emit">event::emit</a>(<a href="delegation_pool.md#0x1_delegation_pool_EvictDelegator">EvictDelegator</a> { pool_address, delegator_address });
+}
+</code></pre>
+
+
+
+</details>
+
 <a id="0x1_delegation_pool_add_stake"></a>
 
 ## Function `add_stake`
@@ -3190,9 +3806,17 @@ Add <code>amount</code> of coins to the delegation pool <code>pool_address</code
 <summary>Implementation</summary>
 
 
-<pre><code><b>public</b> entry <b>fun</b> <a href="delegation_pool.md#0x1_delegation_pool_add_stake">add_stake</a>(delegator: &<a href="../../aptos-stdlib/../move-stdlib/doc/signer.md#0x1_signer">signer</a>, pool_address: <b>address</b>, amount: u64) <b>acquires</b> <a href="delegation_pool.md#0x1_delegation_pool_DelegationPool">DelegationPool</a>, <a href="delegation_pool.md#0x1_delegation_pool_GovernanceRecords">GovernanceRecords</a>, <a href="delegation_pool.md#0x1_delegation_pool_BeneficiaryForOperator">BeneficiaryForOperator</a>, <a href="delegation_pool.md#0x1_delegation_pool_NextCommissionPercentage">NextCommissionPercentage</a> {
+<pre><code><b>public</b> entry <b>fun</b> <a href="delegation_pool.md#0x1_delegation_pool_add_stake">add_stake</a>(
+    delegator: &<a href="../../aptos-stdlib/../move-stdlib/doc/signer.md#0x1_signer">signer</a>,
+    pool_address: <b>address</b>,
+    amount: u64
+) <b>acquires</b> <a href="delegation_pool.md#0x1_delegation_pool_DelegationPool">DelegationPool</a>, <a href="delegation_pool.md#0x1_delegation_pool_GovernanceRecords">GovernanceRecords</a>, <a href="delegation_pool.md#0x1_delegation_pool_BeneficiaryForOperator">BeneficiaryForOperator</a>, <a href="delegation_pool.md#0x1_delegation_pool_NextCommissionPercentage">NextCommissionPercentage</a>, <a href="delegation_pool.md#0x1_delegation_pool_DelegationPoolAllowlisting">DelegationPoolAllowlisting</a> {
     // short-circuit <b>if</b> amount <b>to</b> add is 0 so no <a href="event.md#0x1_event">event</a> is emitted
     <b>if</b> (amount == 0) { <b>return</b> };
+
+    <b>let</b> delegator_address = <a href="../../aptos-stdlib/../move-stdlib/doc/signer.md#0x1_signer_address_of">signer::address_of</a>(delegator);
+    <a href="delegation_pool.md#0x1_delegation_pool_assert_delegator_allowlisted">assert_delegator_allowlisted</a>(pool_address, delegator_address);
+
     // synchronize delegation and <a href="stake.md#0x1_stake">stake</a> pools before <a href="../../aptos-stdlib/doc/any.md#0x1_any">any</a> user operation
     <a href="delegation_pool.md#0x1_delegation_pool_synchronize_delegation_pool">synchronize_delegation_pool</a>(pool_address);
 
@@ -3200,7 +3824,6 @@ Add <code>amount</code> of coins to the delegation pool <code>pool_address</code
     <b>let</b> add_stake_fee = <a href="delegation_pool.md#0x1_delegation_pool_get_add_stake_fee">get_add_stake_fee</a>(pool_address, amount);
 
     <b>let</b> pool = <b>borrow_global_mut</b>&lt;<a href="delegation_pool.md#0x1_delegation_pool_DelegationPool">DelegationPool</a>&gt;(pool_address);
-    <b>let</b> delegator_address = <a href="../../aptos-stdlib/../move-stdlib/doc/signer.md#0x1_signer_address_of">signer::address_of</a>(delegator);
 
     // <a href="stake.md#0x1_stake">stake</a> the entire amount <b>to</b> the <a href="stake.md#0x1_stake">stake</a> pool
     <a href="aptos_account.md#0x1_aptos_account_transfer">aptos_account::transfer</a>(delegator, pool_address, amount);
@@ -3249,20 +3872,53 @@ at most how much active stake there is on the stake pool.
 <summary>Implementation</summary>
 
 
-<pre><code><b>public</b> entry <b>fun</b> <a href="delegation_pool.md#0x1_delegation_pool_unlock">unlock</a>(delegator: &<a href="../../aptos-stdlib/../move-stdlib/doc/signer.md#0x1_signer">signer</a>, pool_address: <b>address</b>, amount: u64) <b>acquires</b> <a href="delegation_pool.md#0x1_delegation_pool_DelegationPool">DelegationPool</a>, <a href="delegation_pool.md#0x1_delegation_pool_GovernanceRecords">GovernanceRecords</a>, <a href="delegation_pool.md#0x1_delegation_pool_BeneficiaryForOperator">BeneficiaryForOperator</a>, <a href="delegation_pool.md#0x1_delegation_pool_NextCommissionPercentage">NextCommissionPercentage</a> {
+<pre><code><b>public</b> entry <b>fun</b> <a href="delegation_pool.md#0x1_delegation_pool_unlock">unlock</a>(
+    delegator: &<a href="../../aptos-stdlib/../move-stdlib/doc/signer.md#0x1_signer">signer</a>,
+    pool_address: <b>address</b>,
+    amount: u64
+) <b>acquires</b> <a href="delegation_pool.md#0x1_delegation_pool_DelegationPool">DelegationPool</a>, <a href="delegation_pool.md#0x1_delegation_pool_GovernanceRecords">GovernanceRecords</a>, <a href="delegation_pool.md#0x1_delegation_pool_BeneficiaryForOperator">BeneficiaryForOperator</a>, <a href="delegation_pool.md#0x1_delegation_pool_NextCommissionPercentage">NextCommissionPercentage</a> {
     // short-circuit <b>if</b> amount <b>to</b> unlock is 0 so no <a href="event.md#0x1_event">event</a> is emitted
     <b>if</b> (amount == 0) { <b>return</b> };
+
+    // synchronize delegation and <a href="stake.md#0x1_stake">stake</a> pools before <a href="../../aptos-stdlib/doc/any.md#0x1_any">any</a> user operation
+    <a href="delegation_pool.md#0x1_delegation_pool_synchronize_delegation_pool">synchronize_delegation_pool</a>(pool_address);
+
+    <b>let</b> delegator_address = <a href="../../aptos-stdlib/../move-stdlib/doc/signer.md#0x1_signer_address_of">signer::address_of</a>(delegator);
+    <a href="delegation_pool.md#0x1_delegation_pool_unlock_internal">unlock_internal</a>(delegator_address, pool_address, amount);
+}
+</code></pre>
+
+
+
+</details>
+
+<a id="0x1_delegation_pool_unlock_internal"></a>
+
+## Function `unlock_internal`
+
+
+
+<pre><code><b>fun</b> <a href="delegation_pool.md#0x1_delegation_pool_unlock_internal">unlock_internal</a>(delegator_address: <b>address</b>, pool_address: <b>address</b>, amount: u64)
+</code></pre>
+
+
+
+<details>
+<summary>Implementation</summary>
+
+
+<pre><code><b>fun</b> <a href="delegation_pool.md#0x1_delegation_pool_unlock_internal">unlock_internal</a>(
+    delegator_address: <b>address</b>,
+    pool_address: <b>address</b>,
+    amount: u64
+) <b>acquires</b> <a href="delegation_pool.md#0x1_delegation_pool_DelegationPool">DelegationPool</a>, <a href="delegation_pool.md#0x1_delegation_pool_GovernanceRecords">GovernanceRecords</a> {
+    <b>assert</b>!(delegator_address != <a href="delegation_pool.md#0x1_delegation_pool_NULL_SHAREHOLDER">NULL_SHAREHOLDER</a>, <a href="../../aptos-stdlib/../move-stdlib/doc/error.md#0x1_error_invalid_argument">error::invalid_argument</a>(<a href="delegation_pool.md#0x1_delegation_pool_ECANNOT_UNLOCK_NULL_SHAREHOLDER">ECANNOT_UNLOCK_NULL_SHAREHOLDER</a>));
 
     // fail unlock of more <a href="stake.md#0x1_stake">stake</a> than `active` on the <a href="stake.md#0x1_stake">stake</a> pool
     <b>let</b> (active, _, _, _) = <a href="stake.md#0x1_stake_get_stake">stake::get_stake</a>(pool_address);
     <b>assert</b>!(amount &lt;= active, <a href="../../aptos-stdlib/../move-stdlib/doc/error.md#0x1_error_invalid_argument">error::invalid_argument</a>(<a href="delegation_pool.md#0x1_delegation_pool_ENOT_ENOUGH_ACTIVE_STAKE_TO_UNLOCK">ENOT_ENOUGH_ACTIVE_STAKE_TO_UNLOCK</a>));
 
-    // synchronize delegation and <a href="stake.md#0x1_stake">stake</a> pools before <a href="../../aptos-stdlib/doc/any.md#0x1_any">any</a> user operation
-    <a href="delegation_pool.md#0x1_delegation_pool_synchronize_delegation_pool">synchronize_delegation_pool</a>(pool_address);
-
     <b>let</b> pool = <b>borrow_global_mut</b>&lt;<a href="delegation_pool.md#0x1_delegation_pool_DelegationPool">DelegationPool</a>&gt;(pool_address);
-    <b>let</b> delegator_address = <a href="../../aptos-stdlib/../move-stdlib/doc/signer.md#0x1_signer_address_of">signer::address_of</a>(delegator);
-
     amount = <a href="delegation_pool.md#0x1_delegation_pool_coins_to_transfer_to_ensure_min_stake">coins_to_transfer_to_ensure_min_stake</a>(
         &pool.active_shares,
         <a href="delegation_pool.md#0x1_delegation_pool_pending_inactive_shares_pool">pending_inactive_shares_pool</a>(pool),
@@ -3307,15 +3963,21 @@ Move <code>amount</code> of coins from pending_inactive to active.
 <summary>Implementation</summary>
 
 
-<pre><code><b>public</b> entry <b>fun</b> <a href="delegation_pool.md#0x1_delegation_pool_reactivate_stake">reactivate_stake</a>(delegator: &<a href="../../aptos-stdlib/../move-stdlib/doc/signer.md#0x1_signer">signer</a>, pool_address: <b>address</b>, amount: u64) <b>acquires</b> <a href="delegation_pool.md#0x1_delegation_pool_DelegationPool">DelegationPool</a>, <a href="delegation_pool.md#0x1_delegation_pool_GovernanceRecords">GovernanceRecords</a>, <a href="delegation_pool.md#0x1_delegation_pool_BeneficiaryForOperator">BeneficiaryForOperator</a>, <a href="delegation_pool.md#0x1_delegation_pool_NextCommissionPercentage">NextCommissionPercentage</a> {
+<pre><code><b>public</b> entry <b>fun</b> <a href="delegation_pool.md#0x1_delegation_pool_reactivate_stake">reactivate_stake</a>(
+    delegator: &<a href="../../aptos-stdlib/../move-stdlib/doc/signer.md#0x1_signer">signer</a>,
+    pool_address: <b>address</b>,
+    amount: u64
+) <b>acquires</b> <a href="delegation_pool.md#0x1_delegation_pool_DelegationPool">DelegationPool</a>, <a href="delegation_pool.md#0x1_delegation_pool_GovernanceRecords">GovernanceRecords</a>, <a href="delegation_pool.md#0x1_delegation_pool_BeneficiaryForOperator">BeneficiaryForOperator</a>, <a href="delegation_pool.md#0x1_delegation_pool_NextCommissionPercentage">NextCommissionPercentage</a>, <a href="delegation_pool.md#0x1_delegation_pool_DelegationPoolAllowlisting">DelegationPoolAllowlisting</a> {
     // short-circuit <b>if</b> amount <b>to</b> reactivate is 0 so no <a href="event.md#0x1_event">event</a> is emitted
     <b>if</b> (amount == 0) { <b>return</b> };
+
+    <b>let</b> delegator_address = <a href="../../aptos-stdlib/../move-stdlib/doc/signer.md#0x1_signer_address_of">signer::address_of</a>(delegator);
+    <a href="delegation_pool.md#0x1_delegation_pool_assert_delegator_allowlisted">assert_delegator_allowlisted</a>(pool_address, delegator_address);
+
     // synchronize delegation and <a href="stake.md#0x1_stake">stake</a> pools before <a href="../../aptos-stdlib/doc/any.md#0x1_any">any</a> user operation
     <a href="delegation_pool.md#0x1_delegation_pool_synchronize_delegation_pool">synchronize_delegation_pool</a>(pool_address);
 
     <b>let</b> pool = <b>borrow_global_mut</b>&lt;<a href="delegation_pool.md#0x1_delegation_pool_DelegationPool">DelegationPool</a>&gt;(pool_address);
-    <b>let</b> delegator_address = <a href="../../aptos-stdlib/../move-stdlib/doc/signer.md#0x1_signer_address_of">signer::address_of</a>(delegator);
-
     amount = <a href="delegation_pool.md#0x1_delegation_pool_coins_to_transfer_to_ensure_min_stake">coins_to_transfer_to_ensure_min_stake</a>(
         <a href="delegation_pool.md#0x1_delegation_pool_pending_inactive_shares_pool">pending_inactive_shares_pool</a>(pool),
         &pool.active_shares,

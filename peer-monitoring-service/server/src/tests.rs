@@ -59,7 +59,6 @@ use aptos_types::{
     },
     PeerId,
 };
-use cfg_block::cfg_block;
 use futures::channel::oneshot;
 use maplit::btreemap;
 use mockall::mock;
@@ -386,39 +385,6 @@ async fn test_latency_ping_request() {
     }
 }
 
-cfg_block! {
-    #[cfg(feature = "network-perf-test")] { // Disabled by default
-        #[tokio::test]
-        async fn test_performance_monitoring_request() {
-            // Create the peer monitoring client and server
-            let (mut mock_client, service, _, _) = MockClient::new(None, None, None);
-            tokio::spawn(service.start());
-
-            // Process several performance monitoring requests
-            for i in 0..10 {
-                let request = PeerMonitoringServiceRequest::PerformanceMonitoringRequest(
-                    aptos_peer_monitoring_service_types::request::PerformanceMonitoringRequest {
-                        request_counter: i,
-                        data: [0; 100].to_vec(), // 100 bytes of zero's
-                    },
-                );
-                let response = mock_client.send_request(request).await.unwrap();
-                match response {
-                    PeerMonitoringServiceResponse::PerformanceMonitoring(
-                        performance_monitoring_response,
-                    ) => {
-                        assert_eq!(performance_monitoring_response.response_counter, i);
-                    },
-                    _ => panic!(
-                        "Expected performance monitoring response but got: {:?}",
-                        response
-                    ),
-                }
-            }
-        }
-    }
-}
-
 /// A simple utility function to create a new connection metadata for tests
 fn create_connection_metadata(peer_id: AccountAddress, peer_role: PeerRole) -> ConnectionMetadata {
     ConnectionMetadata::new(
@@ -539,13 +505,8 @@ impl MockClient {
             .queue_style(QueueStyle::FIFO)
             .counters(&metrics::PENDING_PEER_MONITORING_SERVER_NETWORK_EVENTS);
             let (peer_manager_notifier, peer_manager_notification_receiver) = queue_cfg.build();
-            let (_, connection_notification_receiver) = queue_cfg.build();
 
-            let network_events = NetworkEvents::new(
-                peer_manager_notification_receiver,
-                connection_notification_receiver,
-                None,
-            );
+            let network_events = NetworkEvents::new(peer_manager_notification_receiver, None);
             network_and_events.insert(network_id, network_events);
             peer_manager_notifiers.insert(network_id, peer_manager_notifier);
         }

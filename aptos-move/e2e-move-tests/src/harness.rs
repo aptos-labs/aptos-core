@@ -9,13 +9,14 @@ use aptos_gas_schedule::{
     AptosGasParameters, FromOnChainGasSchedule, InitialGasSchedule, ToOnChainGasSchedule,
 };
 use aptos_language_e2e_tests::{
-    account::{Account, AccountData},
+    account::{Account, AccountData, TransactionBuilder},
     executor::FakeExecutor,
 };
 use aptos_types::{
     access_path::AccessPath,
     account_address::AccountAddress,
     account_config::{AccountResource, CoinStoreResource, CORE_CODE_ADDRESS},
+    chain_id::ChainId,
     contract_event::ContractEvent,
     move_utils::MemberId,
     on_chain_config::{FeatureFlag, GasScheduleV2, OnChainConfig},
@@ -75,7 +76,7 @@ pub struct MoveHarness {
     /// The last counted transaction sequence number, by account address.
     txn_seq_no: BTreeMap<AccountAddress, u64>,
 
-    default_gas_unit_price: u64,
+    pub default_gas_unit_price: u64,
     max_gas_per_txn: u64,
 }
 
@@ -237,12 +238,12 @@ impl MoveHarness {
         result
     }
 
-    /// Creates a transaction, based on provided payload.
-    pub fn create_transaction_payload(
+    /// Creates a transaction without signing it
+    pub fn create_transaction_without_sign(
         &mut self,
         account: &Account,
         payload: TransactionPayload,
-    ) -> SignedTransaction {
+    ) -> TransactionBuilder {
         let on_chain_seq_no = self.sequence_number(account.address());
         let seq_no_ref = self.txn_seq_no.get_mut(account.address()).unwrap();
         let seq_no = std::cmp::max(on_chain_seq_no, *seq_no_ref);
@@ -253,6 +254,27 @@ impl MoveHarness {
             .max_gas_amount(self.max_gas_per_txn)
             .gas_unit_price(self.default_gas_unit_price)
             .payload(payload)
+    }
+
+    /// Creates a transaction, based on provided payload.
+    /// The chain_id is by default for test
+    pub fn create_transaction_payload(
+        &mut self,
+        account: &Account,
+        payload: TransactionPayload,
+    ) -> SignedTransaction {
+        self.create_transaction_without_sign(account, payload)
+            .sign()
+    }
+
+    /// Creates a transaction to be sent to mainnet
+    pub fn create_transaction_payload_mainnet(
+        &mut self,
+        account: &Account,
+        payload: TransactionPayload,
+    ) -> SignedTransaction {
+        self.create_transaction_without_sign(account, payload)
+            .chain_id(ChainId::mainnet())
             .sign()
     }
 
@@ -264,6 +286,17 @@ impl MoveHarness {
         payload: TransactionPayload,
     ) -> TransactionStatus {
         let txn = self.create_transaction_payload(account, payload);
+        self.run(txn)
+    }
+
+    /// Runs a transaction sent to mainnet
+    pub fn run_transaction_payload_mainnet(
+        &mut self,
+        account: &Account,
+        payload: TransactionPayload,
+    ) -> TransactionStatus {
+        let txn = self.create_transaction_payload_mainnet(account, payload);
+        assert!(self.chain_id_is_mainnet(&CORE_CODE_ADDRESS));
         self.run(txn)
     }
 
@@ -734,7 +767,7 @@ impl MoveHarness {
         let enabled = enabled.into_iter().map(|f| f as u64).collect::<Vec<_>>();
         let disabled = disabled.into_iter().map(|f| f as u64).collect::<Vec<_>>();
         self.executor
-            .exec("features", "change_feature_flags", vec![], vec![
+            .exec("features", "change_feature_flags_internal", vec![], vec![
                 MoveValue::Signer(*acc.address())
                     .simple_serialize()
                     .unwrap(),
@@ -764,14 +797,19 @@ impl MoveHarness {
             entries,
         };
         let schedule_bytes = bcs::to_bytes(&gas_schedule).expect("bcs");
+        let core_signer_arg = MoveValue::Signer(AccountAddress::ONE)
+            .simple_serialize()
+            .unwrap();
         self.executor
-            .exec("gas_schedule", "set_gas_schedule", vec![], vec![
-                MoveValue::Signer(AccountAddress::ONE)
-                    .simple_serialize()
-                    .unwrap(),
+            .exec("gas_schedule", "set_for_next_epoch", vec![], vec![
+                core_signer_arg.clone(),
                 MoveValue::vector_u8(schedule_bytes)
                     .simple_serialize()
                     .unwrap(),
+            ]);
+        self.executor
+            .exec("aptos_governance", "force_end_epoch", vec![], vec![
+                core_signer_arg,
             ]);
     }
 
@@ -788,6 +826,12 @@ impl MoveHarness {
         self.read_resource::<AccountResource>(addr, AccountResource::struct_tag())
             .unwrap()
             .sequence_number()
+    }
+
+    fn chain_id_is_mainnet(&self, addr: &AccountAddress) -> bool {
+        self.read_resource::<ChainId>(addr, ChainId::struct_tag())
+            .unwrap()
+            .is_mainnet()
     }
 
     pub fn modify_gas_schedule_raw(&mut self, modify: impl FnOnce(&mut GasScheduleV2)) {
@@ -939,7 +983,7 @@ impl MoveHarness {
 
 impl BlockSplit {
     pub fn arbitrary(len: usize) -> BoxedStrategy<BlockSplit> {
-        // skip last choice if lenght is not big enough for it.
+        // skip last choice if length is not big enough for it.
         (0..(if len > 1 { 3 } else { 2 }))
             .prop_flat_map(move |enum_type| {
                 // making running a test with a full block likely
@@ -1037,7 +1081,7 @@ macro_rules! assert_out_of_gas {
 #[macro_export]
 macro_rules! assert_abort {
     // identity needs to be before pattern (both with and without message),
-    // as if we pass variable - it matches the pattern arm, but value is not used, but overriden.
+    // as if we pass variable - it matches the pattern arm, but value is not used, but overridden.
     // Opposite order and test_asserts_variable_used / test_asserts_variable_used_with_message tests
     // would fail
     ($s:expr, $c:ident $(,)?) => {{
@@ -1087,7 +1131,7 @@ macro_rules! assert_abort {
 #[macro_export]
 macro_rules! assert_abort_ref {
     // identity needs to be before pattern (both with and without message),
-    // as if we pass variable - it matches the pattern arm, but value is not used, but overriden.
+    // as if we pass variable - it matches the pattern arm, but value is not used, but overridden.
     // Opposite order and test_asserts_variable_used / test_asserts_variable_used_with_message tests
     // would fail
     ($s:expr, $c:ident $(,)?) => {{

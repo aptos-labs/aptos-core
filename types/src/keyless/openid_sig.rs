@@ -1,4 +1,5 @@
 // Copyright © Aptos Foundation
+// SPDX-License-Identifier: Apache-2.0
 
 use crate::{
     jwks::rsa::RSA_JWK,
@@ -18,10 +19,10 @@ use std::collections::BTreeMap;
 
 #[derive(Clone, Debug, Deserialize, PartialEq, Eq, Hash, Serialize)]
 pub struct OpenIdSig {
-    /// The decoded bytes of the JWS signature in the JWT (https://datatracker.ietf.org/doc/html/rfc7515#section-3)
+    /// The decoded bytes of the JWS signature in the JWT (<https://datatracker.ietf.org/doc/html/rfc7515#section-3>)
     #[serde(with = "serde_bytes")]
     pub jwt_sig: Vec<u8>,
-    /// The decoded/plaintext JSON payload of the JWT (https://datatracker.ietf.org/doc/html/rfc7519#section-3)
+    /// The decoded/plaintext JSON payload of the JWT (<https://datatracker.ietf.org/doc/html/rfc7519#section-3>)
     pub jwt_payload_json: String,
     /// The name of the key in the claim that maps to the user identifier; e.g., "sub" or "email"
     pub uid_key: String,
@@ -179,7 +180,7 @@ pub struct Claims {
 }
 
 impl Claims {
-    fn get_uid_val(&self, uid_key: &String) -> anyhow::Result<String> {
+    pub fn get_uid_val(&self, uid_key: &String) -> anyhow::Result<String> {
         match uid_key.as_str() {
             "email" => {
                 let email_verified = self

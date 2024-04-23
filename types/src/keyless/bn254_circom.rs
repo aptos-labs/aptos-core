@@ -1,4 +1,5 @@
 // Copyright © Aptos Foundation
+// SPDX-License-Identifier: Apache-2.0
 
 use super::circuit_constants::MAX_EXTRA_FIELD_BYTES;
 use crate::{
@@ -381,6 +382,15 @@ mod test {
     // representation of it.
     fn print_groth16_pvk() {
         let groth16_vk: Groth16VerificationKey = devnet_prepared_vk().into();
+
+        println!("alpha_g1: {:?}", hex::encode(groth16_vk.alpha_g1.clone()));
+        println!("beta_g2: {:?}", hex::encode(groth16_vk.beta_g2.clone()));
+        println!("gamma_g2: {:?}", hex::encode(groth16_vk.gamma_g2.clone()));
+        println!("delta_g2: {:?}", hex::encode(groth16_vk.delta_g2.clone()));
+        let gamma_abc_g1 = groth16_vk.gamma_abc_g1.clone();
+        println!("gamma_abc_g1_0: {:?}", hex::encode(gamma_abc_g1[0].clone()));
+        println!("gamma_abc_g1_1: {:?}", hex::encode(gamma_abc_g1[1].clone()));
+
         let same_pvk: PreparedVerifyingKey<Bn254> = groth16_vk.try_into().unwrap();
 
         assert_eq!(same_pvk, devnet_prepared_vk());

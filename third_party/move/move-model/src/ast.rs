@@ -87,6 +87,12 @@ impl Attribute {
     pub fn has(attrs: &[Attribute], pred: impl Fn(&Attribute) -> bool) -> bool {
         attrs.iter().any(pred)
     }
+
+    pub fn node_id(&self) -> NodeId {
+        match self {
+            Attribute::Assign(id, _, _) | Attribute::Apply(id, _, _) => *id,
+        }
+    }
 }
 
 // =================================================================================================
@@ -353,6 +359,51 @@ impl Spec {
         }
         result
     }
+
+    pub fn visit_positions<F>(&self, visitor: &mut F)
+    where
+        F: FnMut(VisitorPosition, &ExpData) -> Option<()>,
+    {
+        let _ = ExpData::visit_positions_spec_impl(self, visitor);
+    }
+
+    pub fn visit_post_order<F>(&self, visitor: &mut F)
+    where
+        F: FnMut(&ExpData),
+    {
+        self.visit_positions(&mut |pos, exp| {
+            if matches!(pos, VisitorPosition::Post) {
+                visitor(exp);
+            }
+            Some(())
+        });
+    }
+
+    /// Returns the temporaries used in this spec block. Result is ordered by occurrence.
+    pub fn used_temporaries_with_types(&self, env: &GlobalEnv) -> Vec<(TempIndex, Type)> {
+        let mut temps = vec![];
+        let mut visitor = |e: &ExpData| {
+            if let ExpData::Temporary(id, idx) = e {
+                if !temps.iter().any(|(i, _)| i == idx) {
+                    temps.push((*idx, env.get_node_type(*id)));
+                }
+            }
+        };
+        self.visit_post_order(&mut visitor);
+        temps
+    }
+
+    /// Returns the temporaries used in this spec block. Result is ordered by occurrence.
+    pub fn used_temporaries(&self) -> BTreeSet<TempIndex> {
+        let mut temps = BTreeSet::new();
+        let mut visitor = |e: &ExpData| {
+            if let ExpData::Temporary(_, idx) = e {
+                temps.insert(*idx);
+            }
+        };
+        self.visit_post_order(&mut visitor);
+        temps
+    }
 }
 
 /// Information about a specification block in the source. This is used for documentation
@@ -598,6 +649,7 @@ pub enum RewriteResult {
 }
 
 /// Visitor position
+#[derive(Clone)]
 pub enum VisitorPosition {
     Pre,              // before visiting any subexpressions
     MidMutate,        // after RHS and before LHS of Mutate expression.
@@ -857,14 +909,27 @@ impl ExpData {
         result
     }
 
-    /// Returns the temporaries used in this expression. Result is ordered by occurrence.
-    pub fn used_temporaries(&self, env: &GlobalEnv) -> Vec<(TempIndex, Type)> {
+    /// Returns the temporaries used in this expression, with types. Result is ordered by occurrence.
+    pub fn used_temporaries_with_types(&self, env: &GlobalEnv) -> Vec<(TempIndex, Type)> {
         let mut temps = vec![];
         let mut visitor = |e: &ExpData| {
             if let ExpData::Temporary(id, idx) = e {
                 if !temps.iter().any(|(i, _)| i == idx) {
                     temps.push((*idx, env.get_node_type(*id)));
                 }
+            }
+            true // keep going
+        };
+        self.visit_post_order(&mut visitor);
+        temps
+    }
+
+    /// Returns the temporaries used in this spec block.
+    pub fn used_temporaries(&self) -> BTreeSet<TempIndex> {
+        let mut temps = BTreeSet::new();
+        let mut visitor = |e: &ExpData| {
+            if let ExpData::Temporary(_, idx) = e {
+                temps.insert(*idx);
             }
             true // keep going
         };
@@ -1078,18 +1143,27 @@ impl ExpData {
     ///   then visits `else`.
     ///
     /// In every case, if `visitor` returns `false`, then the visit is stopped early; otherwise
-    /// the the visit will continue.
+    /// the visit will continue.
     pub fn visit_positions<F>(&self, visitor: &mut F)
     where
         F: FnMut(VisitorPosition, &ExpData) -> bool,
     {
-        let _ = self.visit_positions_impl(&mut |x, e| {
+        self.visit_positions_all_visits_return_true(visitor);
+    }
+
+    /// Same as `visit_positions`, but returns false iff any visit of a subexpression returns false
+    pub fn visit_positions_all_visits_return_true<F>(&self, visitor: &mut F) -> bool
+    where
+        F: FnMut(VisitorPosition, &ExpData) -> bool,
+    {
+        self.visit_positions_impl(&mut |x, e| {
             if visitor(x, e) {
                 Some(())
             } else {
                 None
             }
-        });
+        })
+        .is_some()
     }
 
     /// Visitor implementation uses `Option<()>` to implement short-cutting without verbosity.
@@ -1183,6 +1257,9 @@ impl ExpData {
         }
         for cond in spec.update_map.values() {
             Self::visit_positions_cond_impl(cond, visitor)?;
+        }
+        for update in spec.update_map.values() {
+            Self::visit_positions_cond_impl(update, visitor)?;
         }
         Some(())
     }
@@ -1498,7 +1575,7 @@ pub enum Operation {
     Deref,
     MoveTo,
     MoveFrom,
-    Freeze,
+    Freeze(/*explicit*/ bool),
     Abort,
     Vector,
 
@@ -2347,7 +2424,7 @@ impl Operation {
             Deref => false,            // Move-related
             MoveTo => false,           // Move-related
             MoveFrom => false,         // Move-related
-            Freeze => false,           // Move-related
+            Freeze(_) => false,        // Move-related
             Abort => false,            // Move-related
             Vector => false,           // Move-related
 

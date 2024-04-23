@@ -104,6 +104,7 @@ This module provides the foundation for typesafe Coins.
 <b>use</b> <a href="aggregator_factory.md#0x1_aggregator_factory">0x1::aggregator_factory</a>;
 <b>use</b> <a href="../../aptos-stdlib/../move-stdlib/doc/error.md#0x1_error">0x1::error</a>;
 <b>use</b> <a href="event.md#0x1_event">0x1::event</a>;
+<b>use</b> <a href="../../aptos-stdlib/../move-stdlib/doc/features.md#0x1_features">0x1::features</a>;
 <b>use</b> <a href="../../aptos-stdlib/../move-stdlib/doc/option.md#0x1_option">0x1::option</a>;
 <b>use</b> <a href="optional_aggregator.md#0x1_optional_aggregator">0x1::optional_aggregator</a>;
 <b>use</b> <a href="../../aptos-stdlib/../move-stdlib/doc/signer.md#0x1_signer">0x1::signer</a>;
@@ -1313,11 +1314,13 @@ Deposit the coin balance into the recipient's account and emit an event.
         !coin_store.frozen,
         <a href="../../aptos-stdlib/../move-stdlib/doc/error.md#0x1_error_permission_denied">error::permission_denied</a>(<a href="coin.md#0x1_coin_EFROZEN">EFROZEN</a>),
     );
+    <b>if</b> (std::features::module_event_migration_enabled()) {
+        <a href="event.md#0x1_event_emit">event::emit</a>(<a href="coin.md#0x1_coin_Deposit">Deposit</a>&lt;CoinType&gt; { <a href="account.md#0x1_account">account</a>: account_addr, amount: <a href="coin.md#0x1_coin">coin</a>.value });
+    };
     <a href="event.md#0x1_event_emit_event">event::emit_event</a>&lt;<a href="coin.md#0x1_coin_DepositEvent">DepositEvent</a>&gt;(
         &<b>mut</b> coin_store.deposit_events,
         <a href="coin.md#0x1_coin_DepositEvent">DepositEvent</a> { amount: <a href="coin.md#0x1_coin">coin</a>.value },
     );
-    <a href="event.md#0x1_event_emit">event::emit</a>(<a href="coin.md#0x1_coin_Deposit">Deposit</a>&lt;CoinType&gt; { <a href="account.md#0x1_account">account</a>: account_addr, amount: <a href="coin.md#0x1_coin">coin</a>.value });
 
     <a href="coin.md#0x1_coin_merge">merge</a>(&<b>mut</b> coin_store.<a href="coin.md#0x1_coin">coin</a>, <a href="coin.md#0x1_coin">coin</a>);
 }
@@ -1902,11 +1905,13 @@ Withdraw specified <code>amount</code> of coin <code>CoinType</code> from the si
         <a href="../../aptos-stdlib/../move-stdlib/doc/error.md#0x1_error_permission_denied">error::permission_denied</a>(<a href="coin.md#0x1_coin_EFROZEN">EFROZEN</a>),
     );
 
+    <b>if</b> (std::features::module_event_migration_enabled()) {
+        <a href="event.md#0x1_event_emit">event::emit</a>(<a href="coin.md#0x1_coin_Withdraw">Withdraw</a>&lt;CoinType&gt; { <a href="account.md#0x1_account">account</a>: account_addr, amount });
+    };
     <a href="event.md#0x1_event_emit_event">event::emit_event</a>&lt;<a href="coin.md#0x1_coin_WithdrawEvent">WithdrawEvent</a>&gt;(
         &<b>mut</b> coin_store.withdraw_events,
         <a href="coin.md#0x1_coin_WithdrawEvent">WithdrawEvent</a> { amount },
     );
-    <a href="event.md#0x1_event_emit">event::emit</a>(<a href="coin.md#0x1_coin_Withdraw">Withdraw</a>&lt;CoinType&gt; { <a href="account.md#0x1_account">account</a>: account_addr, amount });
 
     <a href="coin.md#0x1_coin_extract">extract</a>(&<b>mut</b> coin_store.<a href="coin.md#0x1_coin">coin</a>, amount)
 }
@@ -2087,7 +2092,7 @@ Destroy a burn capability.
 
 <tr>
 <td>7</td>
-<td>It should always be possible to (1) determine if a coin exists, and (2) determine if a user registered an account with a particular coin. If a coin exists, it should always be possible to request the following</td>
+<td>It should always be possible to (1) determine if a coin exists, and (2) determine if a user registered an account with a particular coin. If a coin exists, it should always be possible to request the following information of the coin: (1) Name, (2) Symbol, and (3) Supply.</td>
 <td>Low</td>
 <td>The following functions should never abort: (1) is_coin_initialized, and (2) is_account_registered. The following functions should not abort if the coin exists: (1) name, (2) symbol, and (3) supply.</td>
 <td>Formally Verified in corresponding functions: <a href="#high-level-req-7.1">is_coin_initialized</a>, <a href="#high-level-req-7.2">is_account_registered</a>, <a href="#high-level-req-7.3">name</a>, <a href="#high-level-req-7.4">symbol</a> and <a href="#high-level-req-7.5">supply</a>.</td>

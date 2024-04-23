@@ -2,7 +2,10 @@
 
 Start the pepper service in terminal 1.
 ```bash
-VUF_KEY_SEED_HEX=ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff cargo run -p aptos-keyless-pepper-service
+ACCOUNT_MANAGER_0_ISSUER=https://accounts.google.com \
+  ACCOUNT_MANAGER_0_AUD=407408718192.apps.googleusercontent.com \
+  VUF_KEY_SEED_HEX=ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff \
+  cargo run -p aptos-keyless-pepper-service
 ```
 NOTE: `ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff00` is a dummy VUF private key seed.
 

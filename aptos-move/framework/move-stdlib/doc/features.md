@@ -104,7 +104,12 @@ return true.
 -  [Function `keyless_accounts_with_passkeys_feature_enabled`](#0x1_features_keyless_accounts_with_passkeys_feature_enabled)
 -  [Function `get_multisig_v2_enhancement_feature`](#0x1_features_get_multisig_v2_enhancement_feature)
 -  [Function `multisig_v2_enhancement_feature_enabled`](#0x1_features_multisig_v2_enhancement_feature_enabled)
+-  [Function `get_delegation_pool_allowlisting_feature`](#0x1_features_get_delegation_pool_allowlisting_feature)
+-  [Function `delegation_pool_allowlisting_enabled`](#0x1_features_delegation_pool_allowlisting_enabled)
+-  [Function `get_module_event_migration_feature`](#0x1_features_get_module_event_migration_feature)
+-  [Function `module_event_migration_enabled`](#0x1_features_module_event_migration_enabled)
 -  [Function `change_feature_flags`](#0x1_features_change_feature_flags)
+-  [Function `change_feature_flags_internal`](#0x1_features_change_feature_flags_internal)
 -  [Function `change_feature_flags_for_next_epoch`](#0x1_features_change_feature_flags_for_next_epoch)
 -  [Function `on_new_epoch`](#0x1_features_on_new_epoch)
 -  [Function `is_enabled`](#0x1_features_is_enabled)
@@ -112,13 +117,14 @@ return true.
 -  [Function `contains`](#0x1_features_contains)
 -  [Function `apply_diff`](#0x1_features_apply_diff)
 -  [Function `ensure_vm_or_framework_signer`](#0x1_features_ensure_vm_or_framework_signer)
+-  [Function `change_feature_flags_for_verification`](#0x1_features_change_feature_flags_for_verification)
 -  [Specification](#@Specification_1)
     -  [Resource `Features`](#@Specification_1_Features)
     -  [Resource `PendingFeatures`](#@Specification_1_PendingFeatures)
     -  [Function `periodical_reward_rate_decrease_enabled`](#@Specification_1_periodical_reward_rate_decrease_enabled)
     -  [Function `partial_governance_voting_enabled`](#@Specification_1_partial_governance_voting_enabled)
     -  [Function `module_event_enabled`](#@Specification_1_module_event_enabled)
-    -  [Function `change_feature_flags`](#@Specification_1_change_feature_flags)
+    -  [Function `change_feature_flags_internal`](#@Specification_1_change_feature_flags_internal)
     -  [Function `change_feature_flags_for_next_epoch`](#@Specification_1_change_feature_flags_for_next_epoch)
     -  [Function `on_new_epoch`](#@Specification_1_on_new_epoch)
     -  [Function `is_enabled`](#@Specification_1_is_enabled)
@@ -383,6 +389,17 @@ Lifetime: transient
 
 
 
+<a id="0x1_features_DELEGATION_POOL_ALLOWLISTING"></a>
+
+Whether delegators allowlisting for delegation pools is supported.
+Lifetime: transient
+
+
+<pre><code><b>const</b> <a href="features.md#0x1_features_DELEGATION_POOL_ALLOWLISTING">DELEGATION_POOL_ALLOWLISTING</a>: u64 = 56;
+</code></pre>
+
+
+
 <a id="0x1_features_DELEGATION_POOL_PARTIAL_GOVERNANCE_VOTING"></a>
 
 Whether enable paritial governance voting on delegation_pool.
@@ -390,6 +407,15 @@ Lifetime: transient
 
 
 <pre><code><b>const</b> <a href="features.md#0x1_features_DELEGATION_POOL_PARTIAL_GOVERNANCE_VOTING">DELEGATION_POOL_PARTIAL_GOVERNANCE_VOTING</a>: u64 = 21;
+</code></pre>
+
+
+
+<a id="0x1_features_EAPI_DISABLED"></a>
+
+
+
+<pre><code><b>const</b> <a href="features.md#0x1_features_EAPI_DISABLED">EAPI_DISABLED</a>: u64 = 2;
 </code></pre>
 
 
@@ -517,6 +543,18 @@ Lifetime: transient
 
 
 <pre><code><b>const</b> <a href="features.md#0x1_features_MODULE_EVENT">MODULE_EVENT</a>: u64 = 26;
+</code></pre>
+
+
+
+<a id="0x1_features_MODULE_EVENT_MIGRATION"></a>
+
+Whether aptos_framwork enables the behavior of module event migration.
+
+Lifetime: transient
+
+
+<pre><code><b>const</b> <a href="features.md#0x1_features_MODULE_EVENT_MIGRATION">MODULE_EVENT_MIGRATION</a>: u64 = 57;
 </code></pre>
 
 
@@ -2414,14 +2452,13 @@ Lifetime: transient
 
 </details>
 
-<a id="0x1_features_change_feature_flags"></a>
+<a id="0x1_features_get_delegation_pool_allowlisting_feature"></a>
 
-## Function `change_feature_flags`
-
-Function to enable and disable features. Can only be called by a signer of @std.
+## Function `get_delegation_pool_allowlisting_feature`
 
 
-<pre><code><b>public</b> <b>fun</b> <a href="features.md#0x1_features_change_feature_flags">change_feature_flags</a>(framework: &<a href="signer.md#0x1_signer">signer</a>, enable: <a href="vector.md#0x1_vector">vector</a>&lt;u64&gt;, disable: <a href="vector.md#0x1_vector">vector</a>&lt;u64&gt;)
+
+<pre><code><b>public</b> <b>fun</b> <a href="features.md#0x1_features_get_delegation_pool_allowlisting_feature">get_delegation_pool_allowlisting_feature</a>(): u64
 </code></pre>
 
 
@@ -2430,8 +2467,129 @@ Function to enable and disable features. Can only be called by a signer of @std.
 <summary>Implementation</summary>
 
 
-<pre><code><b>public</b> <b>fun</b> <a href="features.md#0x1_features_change_feature_flags">change_feature_flags</a>(framework: &<a href="signer.md#0x1_signer">signer</a>, enable: <a href="vector.md#0x1_vector">vector</a>&lt;u64&gt;, disable: <a href="vector.md#0x1_vector">vector</a>&lt;u64&gt;)
-<b>acquires</b> <a href="features.md#0x1_features_Features">Features</a> {
+<pre><code><b>public</b> <b>fun</b> <a href="features.md#0x1_features_get_delegation_pool_allowlisting_feature">get_delegation_pool_allowlisting_feature</a>(): u64 { <a href="features.md#0x1_features_DELEGATION_POOL_ALLOWLISTING">DELEGATION_POOL_ALLOWLISTING</a> }
+</code></pre>
+
+
+
+</details>
+
+<a id="0x1_features_delegation_pool_allowlisting_enabled"></a>
+
+## Function `delegation_pool_allowlisting_enabled`
+
+
+
+<pre><code><b>public</b> <b>fun</b> <a href="features.md#0x1_features_delegation_pool_allowlisting_enabled">delegation_pool_allowlisting_enabled</a>(): bool
+</code></pre>
+
+
+
+<details>
+<summary>Implementation</summary>
+
+
+<pre><code><b>public</b> <b>fun</b> <a href="features.md#0x1_features_delegation_pool_allowlisting_enabled">delegation_pool_allowlisting_enabled</a>(): bool <b>acquires</b> <a href="features.md#0x1_features_Features">Features</a> {
+    <a href="features.md#0x1_features_is_enabled">is_enabled</a>(<a href="features.md#0x1_features_DELEGATION_POOL_ALLOWLISTING">DELEGATION_POOL_ALLOWLISTING</a>)
+}
+</code></pre>
+
+
+
+</details>
+
+<a id="0x1_features_get_module_event_migration_feature"></a>
+
+## Function `get_module_event_migration_feature`
+
+
+
+<pre><code><b>public</b> <b>fun</b> <a href="features.md#0x1_features_get_module_event_migration_feature">get_module_event_migration_feature</a>(): u64
+</code></pre>
+
+
+
+<details>
+<summary>Implementation</summary>
+
+
+<pre><code><b>public</b> <b>fun</b> <a href="features.md#0x1_features_get_module_event_migration_feature">get_module_event_migration_feature</a>(): u64 { <a href="features.md#0x1_features_MODULE_EVENT_MIGRATION">MODULE_EVENT_MIGRATION</a> }
+</code></pre>
+
+
+
+</details>
+
+<a id="0x1_features_module_event_migration_enabled"></a>
+
+## Function `module_event_migration_enabled`
+
+
+
+<pre><code><b>public</b> <b>fun</b> <a href="features.md#0x1_features_module_event_migration_enabled">module_event_migration_enabled</a>(): bool
+</code></pre>
+
+
+
+<details>
+<summary>Implementation</summary>
+
+
+<pre><code><b>public</b> <b>fun</b> <a href="features.md#0x1_features_module_event_migration_enabled">module_event_migration_enabled</a>(): bool <b>acquires</b> <a href="features.md#0x1_features_Features">Features</a> {
+    <a href="features.md#0x1_features_is_enabled">is_enabled</a>(<a href="features.md#0x1_features_MODULE_EVENT_MIGRATION">MODULE_EVENT_MIGRATION</a>)
+}
+</code></pre>
+
+
+
+</details>
+
+<a id="0x1_features_change_feature_flags"></a>
+
+## Function `change_feature_flags`
+
+Deprecated to prevent validator set changes during DKG.
+
+Genesis/tests should use <code><a href="features.md#0x1_features_change_feature_flags_internal">change_feature_flags_internal</a>()</code> for feature vec initialization.
+
+Governance proposals should use <code><a href="features.md#0x1_features_change_feature_flags_for_next_epoch">change_feature_flags_for_next_epoch</a>()</code> to enable/disable features.
+
+
+<pre><code><b>public</b> <b>fun</b> <a href="features.md#0x1_features_change_feature_flags">change_feature_flags</a>(_framework: &<a href="signer.md#0x1_signer">signer</a>, _enable: <a href="vector.md#0x1_vector">vector</a>&lt;u64&gt;, _disable: <a href="vector.md#0x1_vector">vector</a>&lt;u64&gt;)
+</code></pre>
+
+
+
+<details>
+<summary>Implementation</summary>
+
+
+<pre><code><b>public</b> <b>fun</b> <a href="features.md#0x1_features_change_feature_flags">change_feature_flags</a>(_framework: &<a href="signer.md#0x1_signer">signer</a>, _enable: <a href="vector.md#0x1_vector">vector</a>&lt;u64&gt;, _disable: <a href="vector.md#0x1_vector">vector</a>&lt;u64&gt;) {
+    <b>abort</b>(<a href="error.md#0x1_error_invalid_state">error::invalid_state</a>(<a href="features.md#0x1_features_EAPI_DISABLED">EAPI_DISABLED</a>))
+}
+</code></pre>
+
+
+
+</details>
+
+<a id="0x1_features_change_feature_flags_internal"></a>
+
+## Function `change_feature_flags_internal`
+
+Update feature flags directly. Only used in genesis/tests.
+
+
+<pre><code><b>fun</b> <a href="features.md#0x1_features_change_feature_flags_internal">change_feature_flags_internal</a>(framework: &<a href="signer.md#0x1_signer">signer</a>, enable: <a href="vector.md#0x1_vector">vector</a>&lt;u64&gt;, disable: <a href="vector.md#0x1_vector">vector</a>&lt;u64&gt;)
+</code></pre>
+
+
+
+<details>
+<summary>Implementation</summary>
+
+
+<pre><code><b>fun</b> <a href="features.md#0x1_features_change_feature_flags_internal">change_feature_flags_internal</a>(framework: &<a href="signer.md#0x1_signer">signer</a>, enable: <a href="vector.md#0x1_vector">vector</a>&lt;u64&gt;, disable: <a href="vector.md#0x1_vector">vector</a>&lt;u64&gt;) <b>acquires</b> <a href="features.md#0x1_features_Features">Features</a> {
     <b>assert</b>!(<a href="signer.md#0x1_signer_address_of">signer::address_of</a>(framework) == @std, <a href="error.md#0x1_error_permission_denied">error::permission_denied</a>(<a href="features.md#0x1_features_EFRAMEWORK_SIGNER_NEEDED">EFRAMEWORK_SIGNER_NEEDED</a>));
     <b>if</b> (!<b>exists</b>&lt;<a href="features.md#0x1_features_Features">Features</a>&gt;(@std)) {
         <b>move_to</b>&lt;<a href="features.md#0x1_features_Features">Features</a>&gt;(framework, <a href="features.md#0x1_features_Features">Features</a> { <a href="features.md#0x1_features">features</a>: <a href="vector.md#0x1_vector">vector</a>[] })
@@ -2454,12 +2612,7 @@ Function to enable and disable features. Can only be called by a signer of @std.
 
 ## Function `change_feature_flags_for_next_epoch`
 
-Enable and disable features *for the next epoch*.
-
-NOTE: when it takes effects depend on feature <code><a href="features.md#0x1_features_RECONFIGURE_WITH_DKG">RECONFIGURE_WITH_DKG</a></code>.
-See <code>aptos_framework::aptos_governance::reconfigure()</code> for more details.
-
-Can only be called by a signer of @std.
+Enable and disable features for the next epoch.
 
 
 <pre><code><b>public</b> <b>fun</b> <a href="features.md#0x1_features_change_feature_flags_for_next_epoch">change_feature_flags_for_next_epoch</a>(framework: &<a href="signer.md#0x1_signer">signer</a>, enable: <a href="vector.md#0x1_vector">vector</a>&lt;u64&gt;, disable: <a href="vector.md#0x1_vector">vector</a>&lt;u64&gt;)
@@ -2671,6 +2824,31 @@ Helper to check whether a feature flag is enabled.
 
 </details>
 
+<a id="0x1_features_change_feature_flags_for_verification"></a>
+
+## Function `change_feature_flags_for_verification`
+
+
+
+<pre><code>#[verify_only]
+<b>public</b> <b>fun</b> <a href="features.md#0x1_features_change_feature_flags_for_verification">change_feature_flags_for_verification</a>(framework: &<a href="signer.md#0x1_signer">signer</a>, enable: <a href="vector.md#0x1_vector">vector</a>&lt;u64&gt;, disable: <a href="vector.md#0x1_vector">vector</a>&lt;u64&gt;)
+</code></pre>
+
+
+
+<details>
+<summary>Implementation</summary>
+
+
+<pre><code><b>public</b> <b>fun</b> <a href="features.md#0x1_features_change_feature_flags_for_verification">change_feature_flags_for_verification</a>(framework: &<a href="signer.md#0x1_signer">signer</a>, enable: <a href="vector.md#0x1_vector">vector</a>&lt;u64&gt;, disable: <a href="vector.md#0x1_vector">vector</a>&lt;u64&gt;) <b>acquires</b> <a href="features.md#0x1_features_Features">Features</a> {
+    <a href="features.md#0x1_features_change_feature_flags_internal">change_feature_flags_internal</a>(framework, enable, disable)
+}
+</code></pre>
+
+
+
+</details>
+
 <a id="@Specification_1"></a>
 
 ## Specification
@@ -2793,12 +2971,12 @@ Helper to check whether a feature flag is enabled.
 
 
 
-<a id="@Specification_1_change_feature_flags"></a>
+<a id="@Specification_1_change_feature_flags_internal"></a>
 
-### Function `change_feature_flags`
+### Function `change_feature_flags_internal`
 
 
-<pre><code><b>public</b> <b>fun</b> <a href="features.md#0x1_features_change_feature_flags">change_feature_flags</a>(framework: &<a href="signer.md#0x1_signer">signer</a>, enable: <a href="vector.md#0x1_vector">vector</a>&lt;u64&gt;, disable: <a href="vector.md#0x1_vector">vector</a>&lt;u64&gt;)
+<pre><code><b>fun</b> <a href="features.md#0x1_features_change_feature_flags_internal">change_feature_flags_internal</a>(framework: &<a href="signer.md#0x1_signer">signer</a>, enable: <a href="vector.md#0x1_vector">vector</a>&lt;u64&gt;, disable: <a href="vector.md#0x1_vector">vector</a>&lt;u64&gt;)
 </code></pre>
 
 
@@ -2823,6 +3001,9 @@ Helper to check whether a feature flag is enabled.
 
 
 <pre><code><b>aborts_if</b> <a href="signer.md#0x1_signer_address_of">signer::address_of</a>(framework) != @std;
+<b>pragma</b> opaque;
+<b>modifies</b> <b>global</b>&lt;<a href="features.md#0x1_features_Features">Features</a>&gt;(@std);
+<b>modifies</b> <b>global</b>&lt;<a href="features.md#0x1_features_PendingFeatures">PendingFeatures</a>&gt;(@std);
 </code></pre>
 
 

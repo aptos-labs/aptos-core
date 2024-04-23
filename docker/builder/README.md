@@ -41,7 +41,7 @@ Using a builder step allows us to cache the build artifacts and reuse them acros
 
 > Note: If building a CLI tool, consider adding it to the `tools` image instead of creating a new image.
 
-> Note: If your requirements doesn't fit into the instructions below, please reach out to the team for help.
+> Note: If your requirements don't fit into the instructions below, please reach out to the team for help.
 
 1. Modify the `cargo build` step in `build-tools.sh` to include the new binary.
 2. Create a new Dockerfile by cloning an existing target Dockerfile (e.g. `validator.Dockerfile`). When you use a `RUN` instruction, try to use a mount cache as they can improve build times by caching the output of the command.
@@ -57,7 +57,7 @@ FROM tools-builder
    ```
    COPY --link --from=node-builder /aptos/dist/aptos-node /usr/local/bin/
    ```
-5. Add a new target defition in [docker-bake-rust-all.hcl](docker-bake-rust-all.hcl) file by copying another target (e.g. `validator`). The target definition should have the following fields:
+5. Add a new target definition in [docker-bake-rust-all.hcl](docker-bake-rust-all.hcl) file by copying another target (e.g. `validator`). The target definition should have the following fields:
 
    - `inherits`
    - `target`: Name of the target. This should be the same as the name of the Dockerfile.

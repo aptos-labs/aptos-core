@@ -1,0 +1,17 @@
+
+Diagnostics:
+error: Invalid operation: pack of `C::T` can only be done within the defining module `0x43::C`
+  ┌─ tests/visibility-checker/v1-typing/pack_unpack_private.move:7:16
+  │
+7 │     public fun foo(): C::T {
+  │                ^^^
+8 │         C::T {}
+  │         ------- packed here
+
+error: Invalid operation: unpack of `C::T` can only be done within the defining module `0x43::C`
+   ┌─ tests/visibility-checker/v1-typing/pack_unpack_private.move:10:16
+   │
+10 │     public fun bar(c: C::T) {
+   │                ^^^
+11 │         let C::T {} = c;
+   │             ------- unpacked here

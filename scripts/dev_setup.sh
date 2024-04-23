@@ -497,6 +497,12 @@ function install_cargo_sort {
   fi
 }
 
+function install_cargo_machete {
+  if ! command -v cargo-machete &>/dev/null; then
+    cargo install cargo-machete --locked
+  fi
+}
+
 function install_cargo_nextest {
   if ! command -v cargo-nextest &>/dev/null; then
     cargo install cargo-nextest --locked
@@ -1010,6 +1016,7 @@ if [[ "$INSTALL_BUILD_TOOLS" == "true" ]]; then
   install_rustup_components_and_nightly
 
   install_cargo_sort
+  install_cargo_machete
   install_cargo_nextest
   install_grcov
   install_pkg git "$PACKAGE_MANAGER"

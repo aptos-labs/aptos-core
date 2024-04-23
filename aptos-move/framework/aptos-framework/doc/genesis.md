@@ -873,7 +873,7 @@ The last step of genesis.
         rewards_rate_denominator,
         voting_power_increase_limit
     );
-    <a href="../../aptos-stdlib/../move-stdlib/doc/features.md#0x1_features_change_feature_flags">features::change_feature_flags</a>(aptos_framework, <a href="../../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector">vector</a>[1, 2], <a href="../../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector">vector</a>[]);
+    <a href="../../aptos-stdlib/../move-stdlib/doc/features.md#0x1_features_change_feature_flags_for_verification">features::change_feature_flags_for_verification</a>(aptos_framework, <a href="../../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector">vector</a>[1, 2], <a href="../../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector">vector</a>[]);
     <a href="genesis.md#0x1_genesis_initialize_aptos_coin">initialize_aptos_coin</a>(aptos_framework);
     <a href="aptos_governance.md#0x1_aptos_governance_initialize_for_verification">aptos_governance::initialize_for_verification</a>(
         aptos_framework,
@@ -920,7 +920,7 @@ The last step of genesis.
 <td>2</td>
 <td>Addresses ranging from 0x0 - 0xa should be reserved for the framework and part of aptos governance.</td>
 <td>Critical</td>
-<td>The function genesis::initialize calls account::create_framework_reserved_account for addresses 0x0, 0x2, 0x3, 0x4, ..., 0xa which creates an account and authentication_key for them. This should be formally the reserved addresses, and at the end of the function, an Account resource exists.</td>
+<td>The function genesis::initialize calls account::create_framework_reserved_account for addresses 0x0, 0x2, 0x3, 0x4, ..., 0xa which creates an account and authentication_key for them. This should be formally verified by ensuring that at the beginning of the genesis::initialize function no Account resource exists for the reserved addresses, and at the end of the function, an Account resource exists.</td>
 <td>Formally verified via <a href="#high-level-req-2">initialize</a>.</td>
 </tr>
 
@@ -928,7 +928,7 @@ The last step of genesis.
 <td>3</td>
 <td>The Aptos coin should be initialized during genesis and only the Aptos framework account should own the mint and burn capabilities for the APT token.</td>
 <td>Critical</td>
-<td>Both mint and burn capabilities are wrapped inside the stake::AptosCoinCapabilities and</td>
+<td>Both mint and burn capabilities are wrapped inside the stake::AptosCoinCapabilities and transaction_fee::AptosCoinCapabilities resources which are stored under the aptos framework account.</td>
 <td>Formally verified via <a href="#high-level-req-3">initialize_aptos_coin</a>.</td>
 </tr>
 

@@ -20,6 +20,10 @@ pub static PROCESSED_STRUCT_LOG_COUNT: Lazy<IntCounter> = Lazy::new(|| {
     .unwrap()
 });
 
+/// Count of error!() logs
+pub static ERROR_LOG_COUNT: Lazy<IntCounter> =
+    Lazy::new(|| register_int_counter!("aptos_error_log_count", "Count of error!() logs").unwrap());
+
 /// Metric for when we fail to log during sending to the queue
 pub static STRUCT_LOG_QUEUE_ERROR_COUNT: Lazy<IntCounter> = Lazy::new(|| {
     register_int_counter!(

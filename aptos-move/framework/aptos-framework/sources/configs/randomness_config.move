@@ -31,10 +31,22 @@ module aptos_framework::randomness_config {
         reconstruction_threshold: FixedPoint64,
     }
 
+    /// A randomness config variant indicating the feature is enabled with fast path.
+    struct ConfigV2 has copy, drop, store {
+        /// Any validator subset should not be able to reconstruct randomness if `subset_power / total_power <= secrecy_threshold`,
+        secrecy_threshold: FixedPoint64,
+        /// Any validator subset should be able to reconstruct randomness if `subset_power / total_power > reconstruction_threshold`.
+        reconstruction_threshold: FixedPoint64,
+        /// Any validator subset should not be able to reconstruct randomness via the fast path if `subset_power / total_power <= fast_path_secrecy_threshold`,
+        fast_path_secrecy_threshold: FixedPoint64,
+    }
+
     /// Initialize the configuration. Used in genesis or governance.
     public fun initialize(framework: &signer, config: RandomnessConfig) {
         system_addresses::assert_aptos_framework(framework);
-        move_to(framework, config)
+        if (!exists<RandomnessConfig>(@aptos_framework)) {
+            move_to(framework, config)
+        }
     }
 
     /// This can be called by on-chain governance to update on-chain consensus configs for the next epoch.

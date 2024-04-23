@@ -76,7 +76,7 @@ impl<'r, 'l> SessionExt<'r, 'l> {
                 // We allow serialization of native values here because we want to
                 // temporarily store native values (via encoding to ensure deterministic
                 // gas charging) in block storage.
-                serialize_and_allow_delayed_values(&value, &layout)
+                serialize_and_allow_delayed_values(&value, &layout)?
                     .map(|bytes| (bytes.into(), Some(Arc::new(layout))))
             } else {
                 // Otherwise, there should be no native values so ensure
@@ -107,7 +107,7 @@ impl<'r, 'l> SessionExt<'r, 'l> {
         let aggregator_context: NativeAggregatorContext = extensions.remove();
         let aggregator_change_set = aggregator_context
             .into_change_set()
-            .map_err(|e| PartialVMError::from(e).finish(Location::Undefined))?;
+            .map_err(|e| e.finish(Location::Undefined))?;
 
         let event_context: NativeEventContext = extensions.remove();
         let events = event_context.into_events();

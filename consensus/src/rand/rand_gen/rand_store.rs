@@ -5,7 +5,7 @@ use crate::{
     block_storage::tracing::{observe_block, BlockStage},
     rand::rand_gen::{
         rand_manager::Sender,
-        types::{RandConfig, RandShare, TShare},
+        types::{PathType, RandConfig, RandShare, TShare, FUTURE_ROUNDS_TO_ACCEPT},
     },
 };
 use anyhow::ensure;
@@ -14,20 +14,20 @@ use aptos_types::randomness::{RandMetadata, Randomness};
 use itertools::Either;
 use std::collections::{BTreeMap, HashMap, HashSet};
 
-const FUTURE_ROUNDS_TO_ACCEPT: u64 = 200;
-
 pub struct ShareAggregator<S> {
     author: Author,
     shares: HashMap<Author, RandShare<S>>,
     total_weight: u64,
+    path_type: PathType,
 }
 
 impl<S: TShare> ShareAggregator<S> {
-    pub fn new(author: Author) -> Self {
+    pub fn new(author: Author, path_type: PathType) -> Self {
         Self {
             author,
             shares: HashMap::new(),
             total_weight: 0,
+            path_type,
         }
     }
 
@@ -46,8 +46,21 @@ impl<S: TShare> ShareAggregator<S> {
         if self.total_weight < rand_config.threshold() {
             return Either::Left(self);
         }
-        // timestamp records the time when the block is created
-        observe_block(rand_metadata.timestamp, BlockStage::RAND_ADD_ENOUGH_SHARE);
+        match self.path_type {
+            PathType::Fast => {
+                observe_block(
+                    rand_metadata.timestamp,
+                    BlockStage::RAND_ADD_ENOUGH_SHARE_FAST,
+                );
+            },
+            PathType::Slow => {
+                observe_block(
+                    rand_metadata.timestamp,
+                    BlockStage::RAND_ADD_ENOUGH_SHARE_SLOW,
+                );
+            },
+        }
+
         let rand_config = rand_config.clone();
         let self_share = self
             .get_self_share()
@@ -93,8 +106,8 @@ enum RandItem<S> {
 }
 
 impl<S: TShare> RandItem<S> {
-    fn new(author: Author) -> Self {
-        Self::PendingMetadata(ShareAggregator::new(author))
+    fn new(author: Author, path_type: PathType) -> Self {
+        Self::PendingMetadata(ShareAggregator::new(author, path_type))
     }
 
     fn total_weights(&self) -> Option<u64> {
@@ -134,7 +147,7 @@ impl<S: TShare> RandItem<S> {
     }
 
     fn try_aggregate(&mut self, rand_config: &RandConfig, decision_tx: Sender<Randomness>) {
-        let item = std::mem::replace(self, Self::new(Author::ONE));
+        let item = std::mem::replace(self, Self::new(Author::ONE, PathType::Slow));
         let new_item = match item {
             RandItem::PendingDecision {
                 share_aggregator,
@@ -152,7 +165,7 @@ impl<S: TShare> RandItem<S> {
     }
 
     fn add_metadata(&mut self, rand_config: &RandConfig, rand_metadata: RandMetadata) {
-        let item = std::mem::replace(self, Self::new(Author::ONE));
+        let item = std::mem::replace(self, Self::new(Author::ONE, PathType::Slow));
         let new_item = match item {
             RandItem::PendingMetadata(mut share_aggregator) => {
                 share_aggregator.retain(rand_config, &rand_metadata);
@@ -194,6 +207,8 @@ pub struct RandStore<S> {
     author: Author,
     rand_config: RandConfig,
     rand_map: BTreeMap<Round, RandItem<S>>,
+    fast_rand_config: Option<RandConfig>,
+    fast_rand_map: Option<BTreeMap<Round, RandItem<S>>>,
     highest_known_round: u64,
     decision_tx: Sender<Randomness>,
 }
@@ -203,6 +218,7 @@ impl<S: TShare> RandStore<S> {
         epoch: u64,
         author: Author,
         rand_config: RandConfig,
+        fast_rand_config: Option<RandConfig>,
         decision_tx: Sender<Randomness>,
     ) -> Self {
         Self {
@@ -210,6 +226,8 @@ impl<S: TShare> RandStore<S> {
             author,
             rand_config,
             rand_map: BTreeMap::new(),
+            fast_rand_config: fast_rand_config.clone(),
+            fast_rand_map: fast_rand_config.map(|_| BTreeMap::new()),
             highest_known_round: 0,
             decision_tx,
         }
@@ -223,12 +241,22 @@ impl<S: TShare> RandStore<S> {
         let rand_item = self
             .rand_map
             .entry(rand_metadata.round())
-            .or_insert_with(|| RandItem::new(self.author));
+            .or_insert_with(|| RandItem::new(self.author, PathType::Slow));
         rand_item.add_metadata(&self.rand_config, rand_metadata.clone());
         rand_item.try_aggregate(&self.rand_config, self.decision_tx.clone());
+        // fast path
+        if let (Some(fast_rand_map), Some(fast_rand_config)) =
+            (self.fast_rand_map.as_mut(), self.fast_rand_config.as_ref())
+        {
+            let fast_rand_item = fast_rand_map
+                .entry(rand_metadata.round())
+                .or_insert_with(|| RandItem::new(self.author, PathType::Fast));
+            fast_rand_item.add_metadata(fast_rand_config, rand_metadata.clone());
+            fast_rand_item.try_aggregate(fast_rand_config, self.decision_tx.clone());
+        }
     }
 
-    pub fn add_share(&mut self, share: RandShare<S>) -> anyhow::Result<bool> {
+    pub fn add_share(&mut self, share: RandShare<S>, path: PathType) -> anyhow::Result<bool> {
         ensure!(
             share.metadata().epoch() == self.epoch,
             "Share from different epoch"
@@ -238,12 +266,28 @@ impl<S: TShare> RandStore<S> {
             "Share from future round"
         );
         let rand_metadata = share.metadata().clone();
-        let rand_item = self
-            .rand_map
-            .entry(rand_metadata.round())
-            .or_insert_with(|| RandItem::new(self.author));
-        rand_item.add_share(share, &self.rand_config)?;
-        rand_item.try_aggregate(&self.rand_config, self.decision_tx.clone());
+
+        let (rand_config, rand_item) = if path == PathType::Fast {
+            match (self.fast_rand_config.as_ref(), self.fast_rand_map.as_mut()) {
+                (Some(fast_rand_config), Some(fast_rand_map)) => (
+                    fast_rand_config,
+                    fast_rand_map
+                        .entry(rand_metadata.round())
+                        .or_insert_with(|| RandItem::new(self.author, path)),
+                ),
+                _ => anyhow::bail!("Fast path not enabled"),
+            }
+        } else {
+            (
+                &self.rand_config,
+                self.rand_map
+                    .entry(rand_metadata.round())
+                    .or_insert_with(|| RandItem::new(self.author, PathType::Slow)),
+            )
+        };
+
+        rand_item.add_share(share, rand_config)?;
+        rand_item.try_aggregate(rand_config, self.decision_tx.clone());
         Ok(rand_item.has_decision())
     }
 
@@ -279,7 +323,7 @@ mod tests {
         block_queue::QueueItem,
         rand_store::{RandItem, RandStore, ShareAggregator},
         test_utils::{create_ordered_blocks, create_share, create_share_for_round},
-        types::{MockShare, RandConfig},
+        types::{MockShare, PathType, RandConfig},
     };
     use aptos_consensus_types::common::Author;
     use aptos_crypto::{bls12381, HashValue, Uniform};
@@ -368,12 +412,13 @@ mod tests {
             let pk_shares = (0..num_validators)
                 .map(|id| {
                     transcript
+                        .main
                         .get_public_key_share(&dkg_pub_params.pvss_config.wconfig, &Player { id })
                 })
                 .collect::<Vec<_>>();
             let vuf_pub_params = WvufPP::from(&dkg_pub_params.pvss_config.pp);
 
-            let (ask, apk) = WVUF::augment_key_pair(&vuf_pub_params, sk, pk, &mut rng);
+            let (ask, apk) = WVUF::augment_key_pair(&vuf_pub_params, sk.main, pk.main, &mut rng);
 
             let rand_keys = RandKeys::new(ask, apk, pk_shares, num_validators);
             let weights: Vec<usize> = weights.into_iter().map(|x| x as usize).collect();
@@ -400,7 +445,7 @@ mod tests {
     #[test]
     fn test_share_aggregator() {
         let ctxt = TestContext::new(vec![1, 2, 3], 0);
-        let mut aggr = ShareAggregator::new(ctxt.authors[0]);
+        let mut aggr = ShareAggregator::new(ctxt.authors[0], PathType::Slow);
         aggr.add_share(
             1,
             create_share_for_round(ctxt.target_epoch, 1, ctxt.authors[0]),
@@ -434,7 +479,7 @@ mod tests {
             create_share_for_round(ctxt.target_epoch, 1, ctxt.authors[2]),
         ];
 
-        let mut item = RandItem::<MockShare>::new(ctxt.authors[1]);
+        let mut item = RandItem::<MockShare>::new(ctxt.authors[1], PathType::Slow);
         for share in shares.iter() {
             item.add_share(share.clone(), &ctxt.rand_config).unwrap();
         }
@@ -447,7 +492,7 @@ mod tests {
         item.try_aggregate(&ctxt.rand_config, tx);
         assert!(item.has_decision());
 
-        let mut item = RandItem::<MockShare>::new(ctxt.authors[0]);
+        let mut item = RandItem::<MockShare>::new(ctxt.authors[0], PathType::Slow);
         item.add_metadata(
             &ctxt.rand_config,
             RandMetadata::new(ctxt.target_epoch, 2, HashValue::zero(), 1700000000),
@@ -466,6 +511,7 @@ mod tests {
             ctxt.target_epoch,
             ctxt.authors[1],
             ctxt.rand_config.clone(),
+            None,
             decision_tx,
         );
 
@@ -480,7 +526,7 @@ mod tests {
             .iter()
             .map(|author| create_share(metadata_1[0].clone(), *author))
         {
-            rand_store.add_share(share).unwrap();
+            rand_store.add_share(share, PathType::Slow).unwrap();
         }
         assert!(decision_rx.try_next().is_err());
         for metadata in blocks_1.all_rand_metadata() {
@@ -498,7 +544,7 @@ mod tests {
             .iter()
             .map(|author| create_share(metadata_2[0].clone(), *author))
         {
-            rand_store.add_share(share).unwrap();
+            rand_store.add_share(share, PathType::Slow).unwrap();
         }
         assert!(decision_rx.next().await.is_some());
     }

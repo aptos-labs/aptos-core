@@ -21,8 +21,14 @@ use aptos_types::{
     account_config::{self, aptos_test_root_address, events::NewEpochEvent, CORE_CODE_ADDRESS},
     chain_id::ChainId,
     contract_event::{ContractEvent, ContractEventV1},
-    keyless,
-    keyless::{Groth16VerificationKey, DEVNET_VERIFICATION_KEY, KEYLESS_ACCOUNT_MODULE_NAME},
+    jwks::{
+        patch::{PatchJWKMoveStruct, PatchUpsertJWK},
+        rsa::RSA_JWK,
+    },
+    keyless::{
+        self, test_utils::get_sample_iss, Groth16VerificationKey, DEVNET_VERIFICATION_KEY,
+        KEYLESS_ACCOUNT_MODULE_NAME,
+    },
     move_utils::as_move_value::AsMoveValue,
     on_chain_config::{
         FeatureFlag, Features, GasScheduleV2, OnChainConsensusConfig, OnChainExecutionConfig,
@@ -463,7 +469,7 @@ fn initialize_features(session: &mut SessionExt, features_override: Option<Vec<F
     exec_function(
         session,
         "features",
-        "change_feature_flags",
+        "change_feature_flags_internal",
         vec![],
         serialized_values,
     );
@@ -628,19 +634,20 @@ fn initialize_keyless_accounts(session: &mut SessionExt, chain_id: ChainId) {
                 vk.as_move_value(),
             ]),
         );
-    }
-    if !chain_id.id() > 100 {
+
+        let patch: PatchJWKMoveStruct = PatchUpsertJWK {
+            issuer: get_sample_iss(),
+            jwk: RSA_JWK::secure_test_jwk().into(),
+        }
+        .into();
         exec_function(
             session,
             JWKS_MODULE_NAME,
-            "upsert_oidc_provider",
+            "set_patches",
             vec![],
             serialize_values(&vec![
                 MoveValue::Signer(CORE_CODE_ADDRESS),
-                "https://accounts.google.com".to_string().as_move_value(),
-                "https://accounts.google.com/.well-known/openid-configuration"
-                    .to_string()
-                    .as_move_value(),
+                MoveValue::Vector(vec![patch.as_move_value()]),
             ]),
         );
     }
@@ -1066,7 +1073,7 @@ pub fn test_genesis_module_publishing() {
 pub fn test_mainnet_end_to_end() {
     use aptos_types::{
         account_address,
-        on_chain_config::{OnChainConfig, ValidatorSet},
+        on_chain_config::ValidatorSet,
         state_store::state_key::StateKey,
         write_set::{TransactionWrite, WriteSet},
     };
@@ -1271,8 +1278,7 @@ pub fn test_mainnet_end_to_end() {
 
     let WriteSet::V0(writeset) = changeset.write_set();
 
-    let state_key =
-        StateKey::access_path(ValidatorSet::access_path().expect("access path in test"));
+    let state_key = StateKey::on_chain_config::<ValidatorSet>();
     let bytes = writeset
         .get(&state_key)
         .unwrap()

@@ -120,6 +120,7 @@ impl ReleaseTarget {
                 skip_fetch_latest_git_deps: true,
                 bytecode_version: None,
                 compiler_version: None,
+                language_version: None,
                 skip_attribute_checks: false,
                 check_test_code: false,
                 known_attributes: extended_checks::get_all_attribute_names().clone(),

@@ -876,7 +876,9 @@ impl CliTestFramework {
         PublishPackage {
             move_options: self.move_options(account_strs),
             txn_options: self.transaction_options(index, gas_options),
-            override_size_check_option: OverrideSizeCheckOption { value: false },
+            override_size_check_option: OverrideSizeCheckOption {
+                override_size_check: false,
+            },
             included_artifacts_args: IncludedArtifactsArgs {
                 included_artifacts: included_artifacts.unwrap_or(IncludedArtifacts::Sparse),
             },
@@ -1056,6 +1058,7 @@ impl CliTestFramework {
             skip_fetch_latest_git_deps: true,
             bytecode_version: None,
             compiler_version: None,
+            language_version: None,
             skip_attribute_checks: false,
             check_test_code: false,
         }

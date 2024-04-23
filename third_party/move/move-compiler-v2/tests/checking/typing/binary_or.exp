@@ -9,7 +9,7 @@ module 0x8675309::M {
         true;
         true;
         Or(Copy(x), Move(x));
-        Or(select M::R.f(r), select M::R.f(r));
+        Or(select M::R.f<M::R>(r), select M::R.f<M::R>(r));
         true;
         {
           let M::R{ f: _ }: M::R = r;

@@ -13,7 +13,7 @@ The transfer flow works as below:
 2. The fungible asset metadata object calls <code>ensure_primary_store_exists</code> to ensure that both the sender's and the
 recipient's primary stores exist. If either doesn't, it will be created.
 3. The fungible asset metadata object calls <code>withdraw</code> on the sender's primary store to withdraw <code>amount</code> of
-fungible asset from it. This emits an withdraw event.
+fungible asset from it. This emits a withdraw event.
 4. The fungible asset metadata object calls <code>deposit</code> on the recipient's primary store to deposit <code>amount</code> of
 fungible asset to it. This emits an deposit event.
 
@@ -638,7 +638,7 @@ Transfer <code>amount</code> of FA from the primary store of <code>from</code> t
 <td>1</td>
 <td>Creating a fungible asset with primary store support should initiate a derived reference and store it under the metadata object.</td>
 <td>Medium</td>
-<td>The function create_primary_store_enabled_fungible_asset makes an existing object, fungible, via for the object and then stores it under the object address.</td>
+<td>The function create_primary_store_enabled_fungible_asset makes an existing object, fungible, via the fungible_asset::add_fungibility function and initializes the DeriveRefPod resource by generating a DeriveRef for the object and then stores it under the object address.</td>
 <td>Audited that the DeriveRefPod has been properly initialized and stored under the metadata object.</td>
 </tr>
 
@@ -678,7 +678,7 @@ Transfer <code>amount</code> of FA from the primary store of <code>from</code> t
 <td>6</td>
 <td>The action of depositing a fungible asset of the same type as the store should never fail if the store is not frozen.</td>
 <td>Medium</td>
-<td>The function deposit fetches the owner's store, if it doesn't exist it will be created, and then deposits the fungible asset to it. The function deposit_with_ref fetches the owner's store, if it doesn't exist Depositing fails if the metadata of the FungibleStore and FungibleAsset differs.</td>
+<td>The function deposit fetches the owner's store, if it doesn't exist it will be created, and then deposits the fungible asset to it. The function deposit_with_ref fetches the owner's store, if it doesn't exist it will be created, and then deposit the fungible asset via the fungible_asset::deposit_with_ref function. Depositing fails if the metadata of the FungibleStore and FungibleAsset differs.</td>
 <td>Audited that it aborts if the store is frozen (deposit). Audited that the balance of the store is increased by the deposit amount (deposit, deposit_with_ref). Audited that it aborts if the metadata of the store and the asset differs (deposit, deposit_with_ref).</td>
 </tr>
 
@@ -686,7 +686,7 @@ Transfer <code>amount</code> of FA from the primary store of <code>from</code> t
 <td>7</td>
 <td>Withdrawing should only be allowed to the owner of an existing store with sufficient balance.</td>
 <td>Critical</td>
-<td>The withdraw function fetches the owner's store via the primary_store function and then calls store. The withdraw_with_ref function fetches the store of the owner via primary_store function and calls the and the balance of the store.</td>
+<td>The withdraw function fetches the owner's store via the primary_store function and then calls fungible_asset::withdraw which validates the owner of the store, checks the frozen status and the balance of the store. The withdraw_with_ref function fetches the store of the owner via primary_store function and calls the fungible_asset::withdraw_with_ref which validates transfer_ref's metadata with the withdrawing stores metadata, and the balance of the store.</td>
 <td>Audited that it aborts if the owner doesn't own the store (withdraw). Audited that it aborts if the store is frozen (withdraw). Audited that it aborts if the transfer ref's metadata doesn't match the withdrawing store's metadata (withdraw_with_ref). Audited that it aborts if the store doesn't have sufficient balance. Audited that the store is not burned. Audited that the balance of the store is decreased by the amount withdrawn.</td>
 </tr>
 
@@ -694,7 +694,7 @@ Transfer <code>amount</code> of FA from the primary store of <code>from</code> t
 <td>8</td>
 <td>Only the fungible store owner is allowed to unburn a burned store.</td>
 <td>High</td>
-<td>The function may_be_unburn checks if the store is burned and then proceeds to call</td>
+<td>The function may_be_unburn checks if the store is burned and then proceeds to call object::unburn which ensures that the owner of the object matches the address of the signer.</td>
 <td>Audited that the store is unburned successfully.</td>
 </tr>
 
@@ -702,7 +702,7 @@ Transfer <code>amount</code> of FA from the primary store of <code>from</code> t
 <td>9</td>
 <td>Only the owner of a primary store can transfer its balance to any recipient's primary store.</td>
 <td>High</td>
-<td>The function transfer fetches sender and recipient's primary stores, if the sender's store is withdraws the assets from the sender's store and then deposits to the recipient's store. The function transfer_with_ref fetches the sender's and recipient's stores and calls the the asset to the recipient with the ref.</td>
+<td>The function transfer fetches sender and recipient's primary stores, if the sender's store is burned it unburns the store and calls the fungile_asset::transfer to proceed with the transfer, which first withdraws the assets from the sender's store and then deposits to the recipient's store. The function transfer_with_ref fetches the sender's and recipient's stores and calls the fungible_asset::transfer_with_ref function which withdraws the asset with the ref from the sender and deposits the asset to the recipient with the ref.</td>
 <td>Audited the deposit and withdraw (transfer). Audited the deposit_with_ref and withdraw_with_ref (transfer_with_ref). Audited that the store balance of the sender is decreased by the specified amount and its added to the recipients store. (transfer, transfer_with_ref) Audited that the sender's store is not burned (transfer).</td>
 </tr>
 

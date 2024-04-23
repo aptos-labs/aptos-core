@@ -633,13 +633,20 @@ impl CompiledPackage {
         let mut paths = src_deps;
         paths.push(sources_package_paths.clone());
 
-        let (file_map, all_compiled_units) = match config.compiler_version.unwrap_or_default() {
+        let effective_compiler_version = config.compiler_version.unwrap_or_default();
+        let effective_language_version = config.language_version.unwrap_or_default();
+        effective_compiler_version.check_language_support(effective_language_version)?;
+
+        let (file_map, all_compiled_units, _optional_global_env) = match config
+            .compiler_version
+            .unwrap_or_default()
+        {
             CompilerVersion::V1 => {
                 let compiler =
                     Compiler::from_package_paths(paths, bytecode_deps, flags, &known_attributes);
                 compiler_driver_v1(compiler)?
             },
-            CompilerVersion::V2 => {
+            CompilerVersion::V2_0 => {
                 let to_str_vec = |ps: &[Symbol]| {
                     ps.iter()
                         .map(move |s| s.as_str().to_owned())
@@ -677,6 +684,8 @@ impl CompiledPackage {
                         .collect(),
                     skip_attribute_checks,
                     known_attributes: known_attributes.clone(),
+                    language_version: Some(effective_language_version),
+                    compile_test_code: flags.keep_testing_functions(),
                     ..Default::default()
                 };
                 compiler_driver_v2(options)?
@@ -1089,7 +1098,11 @@ pub fn unimplemented_v2_driver(_options: move_compiler_v2::Options) -> CompilerD
 pub fn build_and_report_v2_driver(options: move_compiler_v2::Options) -> CompilerDriverResult {
     let mut writer = StandardStream::stderr(ColorChoice::Auto);
     match move_compiler_v2::run_move_compiler(&mut writer, options) {
-        Ok((env, units)) => Ok((move_compiler_v2::make_files_source_text(&env), units)),
+        Ok((env, units)) => Ok((
+            move_compiler_v2::make_files_source_text(&env),
+            units,
+            Some(env),
+        )),
         Err(_) => {
             // Error reported, exit
             std::process::exit(1);
@@ -1103,5 +1116,9 @@ pub fn build_and_report_no_exit_v2_driver(
 ) -> CompilerDriverResult {
     let mut writer = StandardStream::stderr(ColorChoice::Auto);
     let (env, units) = move_compiler_v2::run_move_compiler(&mut writer, options)?;
-    Ok((move_compiler_v2::make_files_source_text(&env), units))
+    Ok((
+        move_compiler_v2::make_files_source_text(&env),
+        units,
+        Some(env),
+    ))
 }
