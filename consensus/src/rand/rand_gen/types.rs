@@ -9,8 +9,8 @@ use aptos_dkg::{
     pvss::{Player, WeightedConfig},
     weighted_vuf::traits::WeightedVUF,
 };
+use aptos_experimental_runtimes::thread_manager::THREAD_MANAGER;
 use aptos_logger::debug;
-use aptos_runtimes::spawn_rayon_thread_pool;
 use aptos_types::{
     aggregate_signature::AggregateSignature,
     randomness::{
@@ -109,22 +109,16 @@ impl TShare for Share {
         }
 
         let proof = WVUF::aggregate_shares(&rand_config.wconfig, &apks_and_proofs);
-        let pool =
-            spawn_rayon_thread_pool("wvuf".to_string(), Some(NUM_THREADS_FOR_WVUF_DERIVATION));
         let eval = WVUF::derive_eval(
             &rand_config.wconfig,
             &rand_config.vuf_pp,
             rand_metadata.to_bytes().as_slice(),
             &rand_config.get_all_certified_apk(),
             &proof,
-            &pool,
+            THREAD_MANAGER.get_exe_cpu_pool(),
         )
         .expect("All APK should exist");
-        debug!(
-            "WVUF derivation time: {} ms, number of threads: {}",
-            timer.elapsed().as_millis(),
-            NUM_THREADS_FOR_WVUF_DERIVATION
-        );
+        debug!("WVUF derivation time: {} ms", timer.elapsed().as_millis());
         let eval_bytes = bcs::to_bytes(&eval).unwrap();
         let rand_bytes = Sha3_256::digest(eval_bytes.as_slice()).to_vec();
         Randomness::new(rand_metadata.clone(), rand_bytes)
