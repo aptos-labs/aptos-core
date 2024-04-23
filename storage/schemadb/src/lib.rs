@@ -101,7 +101,7 @@ impl SchemaBatch {
     }
 }
 
-type InnerDB = rocksdb::DBWithThreadMode<rocksdb::SingleThreaded>;
+pub(crate) type InnerDB = rocksdb::DBWithThreadMode<rocksdb::SingleThreaded>;
 
 /// This DB is a schematized RocksDB wrapper where all data passed in and out are typed according to
 /// [`Schema`]s.
