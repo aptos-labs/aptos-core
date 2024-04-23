@@ -2310,12 +2310,10 @@ version = "0.1.0"
 dependencies = [
  "aptos-infallible",
  "aptos-log-derive",
- "aptos-node-identity",
  "backtrace",
  "chrono",
  "console-subscriber",
  "erased-serde",
- "futures",
  "hostname",
  "once_cell",
  "pretty_assertions",
@@ -2324,7 +2322,6 @@ dependencies = [
  "serde_json",
  "strum 0.24.1",
  "strum_macros 0.24.3",
- "tokio",
  "tracing",
  "tracing-subscriber 0.3.18",
 ]

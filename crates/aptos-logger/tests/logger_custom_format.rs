@@ -26,7 +26,6 @@ fn test_custom_formatter() {
     let writer = VecWriter::default();
     let logs = writer.logs.clone();
     AptosData::builder()
-        .is_async(false)
         .printer(Box::new(writer))
         .custom_format(|entry| {
             use std::fmt::Write;
