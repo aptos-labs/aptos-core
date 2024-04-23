@@ -14,6 +14,8 @@ use tempfile::{tempdir, NamedTempFile, TempDir};
 #[cfg(test)]
 mod base64;
 #[cfg(test)]
+mod bigint;
+#[cfg(test)]
 mod packing;
 #[cfg(test)]
 mod sha;
