@@ -220,7 +220,12 @@ script {{
     }}
 }}
 "#, consensus_config_bytes, target_randomness_status);
-    let txn_result = aptos_cli.run_script(root_idx, script.as_str()).await;
+    let gas_options = GasOptions {
+        gas_unit_price: Some(1),
+        max_gas: Some(2000000),
+        expiration_secs: 120,
+    };
+    let txn_result = aptos_cli.run_script_with_gas_options(root_idx, script.as_str(), Some(gas_options)).await;
     info!("txn_result={:?}", txn_result);
     assert!(txn_result.unwrap().success.unwrap());
 }
