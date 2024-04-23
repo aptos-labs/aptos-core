@@ -941,6 +941,16 @@ The value of aggregatable coin used for transaction fees redistribution does not
 
 
 
+<a id="0x1_coin_EAPT_MIGRATION_NOT_ENABLED"></a>
+
+The migration of APT from coin to fungible asset is not enabled yet.
+
+
+<pre><code><b>const</b> <a href="coin.md#0x1_coin_EAPT_MIGRATION_NOT_ENABLED">EAPT_MIGRATION_NOT_ENABLED</a>: u64 = 27;
+</code></pre>
+
+
+
 <a id="0x1_coin_EBURN_REF_NOT_FOUND"></a>
 
 The BurnRef does not exist.
@@ -1081,12 +1091,12 @@ CoinStore is frozen. Coins cannot be deposited or withdrawn
 
 
 
-<a id="0x1_coin_EMIGRATION_NOT_ENABLED"></a>
+<a id="0x1_coin_EMIGRATION_FRAMEWORK_NOT_ENABLED"></a>
 
-The migration from coin to fungible asset is not enabled yet.
+The migration process from coin to fungible asset is not enabled yet.
 
 
-<pre><code><b>const</b> <a href="coin.md#0x1_coin_EMIGRATION_NOT_ENABLED">EMIGRATION_NOT_ENABLED</a>: u64 = 26;
+<pre><code><b>const</b> <a href="coin.md#0x1_coin_EMIGRATION_FRAMEWORK_NOT_ENABLED">EMIGRATION_FRAMEWORK_NOT_ENABLED</a>: u64 = 26;
 </code></pre>
 
 
@@ -1231,7 +1241,7 @@ Get the paired fungible asset metadata object of a coin type, create if not exis
 <pre><code><b>public</b>(<b>friend</b>) <b>fun</b> <a href="coin.md#0x1_coin_ensure_paired_metadata">ensure_paired_metadata</a>&lt;CoinType&gt;(): Object&lt;Metadata&gt; <b>acquires</b> <a href="coin.md#0x1_coin_CoinConversionMap">CoinConversionMap</a>, <a href="coin.md#0x1_coin_CoinInfo">CoinInfo</a> {
     <b>assert</b>!(
         <a href="../../aptos-stdlib/../move-stdlib/doc/features.md#0x1_features_coin_to_fungible_asset_migration_feature_enabled">features::coin_to_fungible_asset_migration_feature_enabled</a>(),
-        <a href="../../aptos-stdlib/../move-stdlib/doc/error.md#0x1_error_invalid_state">error::invalid_state</a>(<a href="coin.md#0x1_coin_EMIGRATION_NOT_ENABLED">EMIGRATION_NOT_ENABLED</a>)
+        <a href="../../aptos-stdlib/../move-stdlib/doc/error.md#0x1_error_invalid_state">error::invalid_state</a>(<a href="coin.md#0x1_coin_EMIGRATION_FRAMEWORK_NOT_ENABLED">EMIGRATION_FRAMEWORK_NOT_ENABLED</a>)
     );
     <b>if</b> (!<b>exists</b>&lt;<a href="coin.md#0x1_coin_CoinConversionMap">CoinConversionMap</a>&gt;(@aptos_framework)) {
         <b>move_to</b>(&<a href="create_signer.md#0x1_create_signer_create_signer">create_signer::create_signer</a>(@aptos_framework), <a href="coin.md#0x1_coin_CoinConversionMap">CoinConversionMap</a> {
@@ -1243,6 +1253,10 @@ Get the paired fungible asset metadata object of a coin type, create if not exis
     <b>if</b> (!<a href="../../aptos-stdlib/doc/table.md#0x1_table_contains">table::contains</a>(&map.coin_to_fungible_asset_map, type)) {
         <b>let</b> metadata_object_cref =
             <b>if</b> (<a href="../../aptos-stdlib/doc/type_info.md#0x1_type_info_type_name">type_info::type_name</a>&lt;CoinType&gt;() == <a href="../../aptos-stdlib/../move-stdlib/doc/string.md#0x1_string_utf8">string::utf8</a>(b"<a href="aptos_coin.md#0x1_aptos_coin_AptosCoin">0x1::aptos_coin::AptosCoin</a>")) {
+                <b>assert</b>!(
+                    <a href="../../aptos-stdlib/../move-stdlib/doc/features.md#0x1_features_apt_migration_to_funible_asset_feature_enabled">features::apt_migration_to_funible_asset_feature_enabled</a>(),
+                    <a href="../../aptos-stdlib/../move-stdlib/doc/error.md#0x1_error_invalid_state">error::invalid_state</a>(<a href="coin.md#0x1_coin_EAPT_MIGRATION_NOT_ENABLED">EAPT_MIGRATION_NOT_ENABLED</a>)
+                );
                 <a href="object.md#0x1_object_create_sticky_object_at_address">object::create_sticky_object_at_address</a>(@aptos_framework, @aptos_fungible_asset)
             } <b>else</b> {
                 <a href="object.md#0x1_object_create_sticky_object">object::create_sticky_object</a>(<a href="coin.md#0x1_coin_coin_address">coin_address</a>&lt;CoinType&gt;())
@@ -4325,27 +4339,6 @@ The creator of <code>CoinType</code> must be <code>@aptos_framework</code>.
     symbol: symbol.bytes
 };
 <b>ensures</b> <b>exists</b>&lt;<a href="coin.md#0x1_coin_CoinInfo">CoinInfo</a>&lt;CoinType&gt;&gt;(addr);
-</code></pre>
-
-
-Make sure <code>name</code> and <code>symbol</code> are legal length.
-Only the creator of <code>CoinType</code> can initialize.
-
-
-<a id="0x1_coin_InitializeInternalSchema"></a>
-
-
-<pre><code><b>schema</b> <a href="coin.md#0x1_coin_InitializeInternalSchema">InitializeInternalSchema</a>&lt;CoinType&gt; {
-    <a href="account.md#0x1_account">account</a>: <a href="../../aptos-stdlib/../move-stdlib/doc/signer.md#0x1_signer">signer</a>;
-    name: <a href="../../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u8&gt;;
-    symbol: <a href="../../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u8&gt;;
-    <b>let</b> account_addr = <a href="../../aptos-stdlib/../move-stdlib/doc/signer.md#0x1_signer_address_of">signer::address_of</a>(<a href="account.md#0x1_account">account</a>);
-    <b>let</b> coin_address = <a href="../../aptos-stdlib/doc/type_info.md#0x1_type_info_type_of">type_info::type_of</a>&lt;CoinType&gt;().account_address;
-    <b>aborts_if</b> coin_address != account_addr;
-    <b>aborts_if</b> <b>exists</b>&lt;<a href="coin.md#0x1_coin_CoinInfo">CoinInfo</a>&lt;CoinType&gt;&gt;(account_addr);
-    <b>aborts_if</b> len(name) &gt; <a href="coin.md#0x1_coin_MAX_COIN_NAME_LENGTH">MAX_COIN_NAME_LENGTH</a>;
-    <b>aborts_if</b> len(symbol) &gt; <a href="coin.md#0x1_coin_MAX_COIN_SYMBOL_LENGTH">MAX_COIN_SYMBOL_LENGTH</a>;
-}
 </code></pre>
 
 

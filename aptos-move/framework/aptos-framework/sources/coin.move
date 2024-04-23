@@ -98,8 +98,12 @@ module aptos_framework::coin {
     /// The BurnRef does not exist.
     const EBURN_REF_NOT_FOUND: u64 = 25;
 
-    /// The migration from coin to fungible asset is not enabled yet.
-    const EMIGRATION_NOT_ENABLED: u64 = 26;
+    /// The migration process from coin to fungible asset is not enabled yet.
+    const EMIGRATION_FRAMEWORK_NOT_ENABLED: u64 = 26;
+
+    /// The migration of APT from coin to fungible asset is not enabled yet.
+    const EAPT_MIGRATION_NOT_ENABLED: u64 = 27;
+
     //
     // Constants
     //
@@ -261,7 +265,7 @@ module aptos_framework::coin {
     public(friend) fun ensure_paired_metadata<CoinType>(): Object<Metadata> acquires CoinConversionMap, CoinInfo {
         assert!(
             features::coin_to_fungible_asset_migration_feature_enabled(),
-            error::invalid_state(EMIGRATION_NOT_ENABLED)
+            error::invalid_state(EMIGRATION_FRAMEWORK_NOT_ENABLED)
         );
         if (!exists<CoinConversionMap>(@aptos_framework)) {
             move_to(&create_signer::create_signer(@aptos_framework), CoinConversionMap {
@@ -273,6 +277,10 @@ module aptos_framework::coin {
         if (!table::contains(&map.coin_to_fungible_asset_map, type)) {
             let metadata_object_cref =
                 if (type_info::type_name<CoinType>() == string::utf8(b"0x1::aptos_coin::AptosCoin")) {
+                    assert!(
+                        features::apt_migration_to_funible_asset_feature_enabled(),
+                        error::invalid_state(EAPT_MIGRATION_NOT_ENABLED)
+                    );
                     object::create_sticky_object_at_address(@aptos_framework, @aptos_fungible_asset)
                 } else {
                     object::create_sticky_object(coin_address<CoinType>())

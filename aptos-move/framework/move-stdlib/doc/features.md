@@ -114,6 +114,8 @@ return true.
 -  [Function `coin_to_fungible_asset_migration_feature_enabled`](#0x1_features_coin_to_fungible_asset_migration_feature_enabled)
 -  [Function `get_primary_apt_fungible_store_at_user_address_feature`](#0x1_features_get_primary_apt_fungible_store_at_user_address_feature)
 -  [Function `primary_apt_fungible_store_at_user_address_enabled`](#0x1_features_primary_apt_fungible_store_at_user_address_enabled)
+-  [Function `get_apt_migration_to_funible_asset_feature`](#0x1_features_get_apt_migration_to_funible_asset_feature)
+-  [Function `apt_migration_to_funible_asset_feature_enabled`](#0x1_features_apt_migration_to_funible_asset_feature_enabled)
 -  [Function `change_feature_flags`](#0x1_features_change_feature_flags)
 -  [Function `change_feature_flags_internal`](#0x1_features_change_feature_flags_internal)
 -  [Function `change_feature_flags_for_next_epoch`](#0x1_features_change_feature_flags_for_next_epoch)
@@ -251,6 +253,15 @@ Lifetime: transient
 
 
 <pre><code><b>const</b> <a href="features.md#0x1_features_APTOS_UNIQUE_IDENTIFIERS">APTOS_UNIQUE_IDENTIFIERS</a>: u64 = 23;
+</code></pre>
+
+
+
+<a id="0x1_features_APT_MIGRATION_TO_FUNGIBLE_ASSET"></a>
+
+
+
+<pre><code><b>const</b> <a href="features.md#0x1_features_APT_MIGRATION_TO_FUNGIBLE_ASSET">APT_MIGRATION_TO_FUNGIBLE_ASSET</a>: u64 = 61;
 </code></pre>
 
 
@@ -2716,6 +2727,52 @@ Lifetime: transient
 
 <pre><code><b>public</b> <b>fun</b> <a href="features.md#0x1_features_primary_apt_fungible_store_at_user_address_enabled">primary_apt_fungible_store_at_user_address_enabled</a>(): bool <b>acquires</b> <a href="features.md#0x1_features_Features">Features</a> {
     <a href="features.md#0x1_features_is_enabled">is_enabled</a>(<a href="features.md#0x1_features_PRIMARY_APT_FUNGIBLE_STORE_AT_USER_ADDRESS">PRIMARY_APT_FUNGIBLE_STORE_AT_USER_ADDRESS</a>)
+}
+</code></pre>
+
+
+
+</details>
+
+<a id="0x1_features_get_apt_migration_to_funible_asset_feature"></a>
+
+## Function `get_apt_migration_to_funible_asset_feature`
+
+
+
+<pre><code><b>public</b> <b>fun</b> <a href="features.md#0x1_features_get_apt_migration_to_funible_asset_feature">get_apt_migration_to_funible_asset_feature</a>(): u64
+</code></pre>
+
+
+
+<details>
+<summary>Implementation</summary>
+
+
+<pre><code><b>public</b> <b>fun</b> <a href="features.md#0x1_features_get_apt_migration_to_funible_asset_feature">get_apt_migration_to_funible_asset_feature</a>(): u64 { <a href="features.md#0x1_features_APT_MIGRATION_TO_FUNGIBLE_ASSET">APT_MIGRATION_TO_FUNGIBLE_ASSET</a> }
+</code></pre>
+
+
+
+</details>
+
+<a id="0x1_features_apt_migration_to_funible_asset_feature_enabled"></a>
+
+## Function `apt_migration_to_funible_asset_feature_enabled`
+
+
+
+<pre><code><b>public</b> <b>fun</b> <a href="features.md#0x1_features_apt_migration_to_funible_asset_feature_enabled">apt_migration_to_funible_asset_feature_enabled</a>(): bool
+</code></pre>
+
+
+
+<details>
+<summary>Implementation</summary>
+
+
+<pre><code><b>public</b> <b>fun</b> <a href="features.md#0x1_features_apt_migration_to_funible_asset_feature_enabled">apt_migration_to_funible_asset_feature_enabled</a>(): bool <b>acquires</b> <a href="features.md#0x1_features_Features">Features</a> {
+    <a href="features.md#0x1_features_is_enabled">is_enabled</a>(<a href="features.md#0x1_features_APT_MIGRATION_TO_FUNGIBLE_ASSET">APT_MIGRATION_TO_FUNGIBLE_ASSET</a>)
 }
 </code></pre>
 
