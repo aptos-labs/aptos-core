@@ -423,7 +423,7 @@ fn single_neg_one_array_small_test() {
 }
 
 #[test]
-/*fn check_substr_inclusion_poly_test() {
+fn check_substr_inclusion_poly_test() {
     let circuit_handle = TestCircuitHandle::new("check_substr_inclusion_poly_test.circom").unwrap();
 
     let max_str_len = 100;
@@ -441,7 +441,7 @@ fn single_neg_one_array_small_test() {
         let result = circuit_handle.gen_witness(circuit_input_signals);
         assert!(result.is_ok());
     }
-}*/
+}
 
 /*#[test]
 fn check_substr_inclusion_poly_test() {
