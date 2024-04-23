@@ -1027,7 +1027,7 @@ module aptos_framework::account {
     acquires Account {
         let addr: address = @0x1234; // Define test address
         create_account(addr); // Initialize account resource
-        // Assert sequence number intializes to 0
+        // Assert sequence number initializes to 0
         assert!(borrow_global<Account>(addr).sequence_number == 0, 0);
         increment_sequence_number_for_test(addr); // Increment sequence number
         // Assert correct mock value post-increment

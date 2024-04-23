@@ -367,7 +367,7 @@ fn test_api(use_root_hash: bool) {
         let p = expected_weights[i] as f32 / total_weights as f32;
         let expected = (1000.0 * p) as i32;
         let std_dev = (1000.0 * p * (1.0 - p)).pow(0.5);
-        // We've run the election enough times, to expect occurances to be close to the average
+        // We've run the election enough times, to expect occurrences to be close to the average
         // (each test is independent, as seed is different for every cycle)
         // We check that difference from average is below 3 standard deviations,
         // which will approximately be true in 99.7% of cases.

@@ -3268,7 +3268,7 @@ module aptos_framework::stake {
 
         end_epoch();
 
-        // Epoch ended. Validators must have recieved their rewards and, most importantly,
+        // Epoch ended. Validators must have received their rewards and, most importantly,
         // their fees.
         assert_no_fees_for_validator(validator_1_address);
         assert_no_fees_for_validator(validator_2_address);

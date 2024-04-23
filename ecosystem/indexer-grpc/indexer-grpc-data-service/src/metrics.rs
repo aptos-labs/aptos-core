@@ -90,7 +90,7 @@ pub static SHORT_CONNECTION_COUNT: Lazy<IntCounterVec> = Lazy::new(|| {
     .unwrap()
 });
 
-/// Count of bytes transfered to the client. This only represents the bytes prepared and ready
+/// Count of bytes transferred to the client. This only represents the bytes prepared and ready
 /// to send to the client. It does not represent the bytes actually sent to the client.
 pub static BYTES_READY_TO_TRANSFER_FROM_SERVER: Lazy<IntCounterVec> = Lazy::new(|| {
     register_int_counter_vec!(

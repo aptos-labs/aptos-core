@@ -119,7 +119,7 @@ pub fn encode_aptos_mainnet_genesis_transaction(
     assert!(!genesis_config.is_test, "This is mainnet!");
     validate_genesis_config(genesis_config);
 
-    // Create a Move VM session so we can invoke on-chain genesis intializations.
+    // Create a Move VM session so we can invoke on-chain genesis initializations.
     let mut state_view = GenesisStateView::new();
     for (module_bytes, module) in framework.code_and_compiled_modules() {
         state_view.add_module(&module.self_id(), module_bytes);
@@ -237,7 +237,7 @@ pub fn encode_genesis_change_set(
 ) -> ChangeSet {
     validate_genesis_config(genesis_config);
 
-    // Create a Move VM session so we can invoke on-chain genesis intializations.
+    // Create a Move VM session so we can invoke on-chain genesis initializations.
     let mut state_view = GenesisStateView::new();
     for (module_bytes, module) in framework.code_and_compiled_modules() {
         state_view.add_module(&module.self_id(), module_bytes);
@@ -872,7 +872,7 @@ pub struct Validator {
     /// its own operator).
     pub operator_address: AccountAddress,
     pub voter_address: AccountAddress,
-    /// Amount to stake for consensus. Also the intial amount minted to the owner account.
+    /// Amount to stake for consensus. Also the initial amount minted to the owner account.
     pub stake_amount: u64,
 
     /// bls12381 public key used to sign consensus messages.

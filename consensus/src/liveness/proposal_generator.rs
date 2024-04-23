@@ -488,7 +488,7 @@ impl ProposalGenerator {
     }
 
     /// Compute the list of consecutive proposers from the
-    /// immediately preceeding rounds that didn't produce a successful block
+    /// immediately preceding rounds that didn't produce a successful block
     pub fn compute_failed_authors(
         &self,
         round: Round,

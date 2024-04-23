@@ -482,7 +482,7 @@ Initalize the token listing for a token owner
 
 ## Function `initialize_token_store_escrow`
 
-Intialize the token escrow
+Initialize the token escrow
 
 
 <pre><code><b>fun</b> <a href="token_coin_swap.md#0x3_token_coin_swap_initialize_token_store_escrow">initialize_token_store_escrow</a>(_token_owner: &<a href="../../aptos-framework/../aptos-stdlib/../move-stdlib/doc/signer.md#0x1_signer">signer</a>)

@@ -438,7 +438,7 @@ pub mod policy {
 
         fn name(&self, name: &str, engine: &VaultEngine) -> String {
             if let Some(namespace) = &self.namespace {
-                format!("{}{}{}", namespace, engine.ns_seperator(), name)
+                format!("{}{}{}", namespace, engine.ns_separator(), name)
             } else {
                 name.into()
             }
@@ -539,7 +539,7 @@ pub mod policy {
             }
         }
 
-        fn ns_seperator(&self) -> &str {
+        fn ns_separator(&self) -> &str {
             match self {
                 VaultEngine::KVSecrets => NAMESPACE_SEPARATOR,
                 VaultEngine::Transit => TRANSIT_NAMESPACE_SEPARATOR,

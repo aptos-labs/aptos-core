@@ -40,7 +40,7 @@ impl BlockExecutorConfigFromOnchain {
     pub const fn on_but_large_for_test() -> Self {
         Self {
             block_gas_limit_type:
-                // present, so code is excercised, but large to not limit blocks
+                // present, so code is exercised, but large to not limit blocks
                 BlockGasLimitType::ComplexLimitV1 {
                     effective_block_gas_limit: 1_000_000_000,
                     execution_gas_effective_multiplier: 1,

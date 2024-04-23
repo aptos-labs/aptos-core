@@ -123,7 +123,7 @@ fn create_round_state() -> RoundState {
 
 // Creates an RoundManager for fuzzing
 fn create_node_for_fuzzing() -> RoundManager {
-    // signer is re-used accross fuzzing runs
+    // signer is re-used across fuzzing runs
     let signer = FUZZING_SIGNER.clone();
 
     // TODO: remove

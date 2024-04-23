@@ -666,7 +666,7 @@ module aptos_framework::staking_contract {
         unlock_stake(staker, operator, staker_rewards);
     }
 
-    /// Allows staker to switch operator without going through the lenghthy process to unstake, without resetting commission.
+    /// Allows staker to switch operator without going through the lengthhy process to unstake, without resetting commission.
     public entry fun switch_operator_with_same_commission(
         staker: &signer,
         old_operator: address,
@@ -679,7 +679,7 @@ module aptos_framework::staking_contract {
         switch_operator(staker, old_operator, new_operator, commission_percentage);
     }
 
-    /// Allows staker to switch operator without going through the lenghthy process to unstake.
+    /// Allows staker to switch operator without going through the lengthhy process to unstake.
     public entry fun switch_operator(
         staker: &signer,
         old_operator: address,

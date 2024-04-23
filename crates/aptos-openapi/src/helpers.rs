@@ -141,7 +141,7 @@ macro_rules! impl_poem_type {
 
 /// This macro implements the traits necessary for using a type as a parameter
 /// in a poem-openapi endpoint handler, specifically as an argument like `Path<T>`.
-/// A type must impl FromStr for this to work, hence why it is a seperate macro.
+/// A type must impl FromStr for this to work, hence why it is a separate macro.
 #[macro_export]
 macro_rules! impl_poem_parameter {
     ($($ty:ty),*) => {

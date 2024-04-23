@@ -57,7 +57,7 @@ impl ReliableTransactionSubmitter for DbReliableTransactionSubmitter {
 
         for txn in txns {
             // Pipeline commit makes sure all initialization transactions
-            // get committed succesfully on-chain
+            // get committed successfully on-chain
             while txn.sequence_number() >= self.query_sequence_number(txn.sender()).await? {
                 tokio::time::sleep(Duration::from_millis(10)).await;
             }

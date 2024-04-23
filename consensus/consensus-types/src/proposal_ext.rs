@@ -15,7 +15,7 @@ pub enum ProposalExt {
         author: Author,
         /// Failed authors from the parent's block to this block.
         /// I.e. the list of consecutive proposers from the
-        /// immediately preceeding rounds that didn't produce a successful block.
+        /// immediately preceding rounds that didn't produce a successful block.
         failed_authors: Vec<(Round, Author)>,
     },
 }

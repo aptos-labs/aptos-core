@@ -192,12 +192,12 @@ export class TokenClient {
   /**
    * Transfers specified amount of tokens from account to receiver
    *
-   * @param account AptosAccount where token from which tokens will be transfered
-   * @param receiver  Hex-encoded 32 byte Aptos account address to which tokens will be transfered
+   * @param account AptosAccount where token from which tokens will be transferred
+   * @param receiver  Hex-encoded 32 byte Aptos account address to which tokens will be transferred
    * @param creator Hex-encoded 32 byte Aptos account address to which created tokens
    * @param collectionName Name of collection where token is stored
    * @param name Token name
-   * @param amount Amount of tokens which will be transfered
+   * @param amount Amount of tokens which will be transferred
    * @param property_version the version of token PropertyMap with a default value 0.
    * @returns The hash of the transaction submitted to the API
    */
@@ -454,7 +454,7 @@ export class TokenClient {
    * @param collectionName Name of collection where token is stored
    * @param name Token name
    * @param property_version the version of token PropertyMap
-   * @param amount Amount of tokens which will be transfered
+   * @param amount Amount of tokens which will be transferred
    * @returns The hash of the transaction submitted to the API
    */
   async transferWithOptIn(
@@ -485,7 +485,7 @@ export class TokenClient {
    * @param ownerAddress address of the token owner
    * @param collectionName Name of collection where token is stored
    * @param name Token name
-   * @param amount Amount of tokens which will be transfered
+   * @param amount Amount of tokens which will be transferred
    * @param property_version the version of token PropertyMap
    * @returns The hash of the transaction submitted to the API
    */
@@ -517,7 +517,7 @@ export class TokenClient {
    * @param creatorAddress address of the token creator
    * @param collectionName Name of collection where token is stored
    * @param name Token name
-   * @param amount Amount of tokens which will be transfered
+   * @param amount Amount of tokens which will be transferred
    * @param property_version the version of token PropertyMap
    * @returns The hash of the transaction submitted to the API
    */

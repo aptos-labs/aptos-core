@@ -913,7 +913,7 @@ module dao_platform::nft_dao {
         // Test transfer fund proposal
         //
 
-        // intialize with some fund in the DAO resource account
+        // initialize with some fund in the DAO resource account
         let (burn_cap, mint_cap) = aptos_coin::initialize_for_test(aptos_framework);
         let coins = coin::mint(100, &mint_cap);
         coin::register<AptosCoin>(creator);

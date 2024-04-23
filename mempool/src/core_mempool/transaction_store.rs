@@ -62,7 +62,7 @@ pub struct TransactionStore {
     // Index for looking up transaction by hash.
     // Transactions are stored by AccountAddress + sequence number.
     // This index stores map of transaction committed hash to (AccountAddress, sequence number) pair.
-    // Using transaction commited hash because from end user's point view, a transaction should only have
+    // Using transaction committed hash because from end user's point view, a transaction should only have
     // one valid hash.
     hash_index: HashMap<HashValue, (AccountAddress, u64)>,
     // estimated size in bytes

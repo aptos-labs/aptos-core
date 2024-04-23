@@ -210,7 +210,7 @@ impl<T: StorageReaderInterface> Handler<T> {
                 StorageServiceResponse::new(data_response, request.use_compression)
                     .map_err(|error| error.into())
             },
-            _ => self.process_cachable_request(peer_network_id, request),
+            _ => self.process_cacheable_request(peer_network_id, request),
         }
     }
 
@@ -367,7 +367,7 @@ impl<T: StorageReaderInterface> Handler<T> {
 
     /// Processes a storage service request for which the response
     /// might already be cached.
-    fn process_cachable_request(
+    fn process_cacheable_request(
         &self,
         peer_network_id: &PeerNetworkId,
         request: &StorageServiceRequest,

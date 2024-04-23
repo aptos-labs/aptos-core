@@ -1,4 +1,4 @@
-/// This demonstrates how to use a resource group accross modules
+/// This demonstrates how to use a resource group across modules
 module resource_groups_secondary::secondary {
     use std::signer;
     use resource_groups_primary::primary;

@@ -156,7 +156,7 @@ The 288-byte Groth16 verification key (VK) for the ZK relation that implements k
  The training wheels PK, if training wheels are on
 </dd>
 <dt>
-<code>max_commited_epk_bytes: u16</code>
+<code>max_committed_epk_bytes: u16</code>
 </dt>
 <dd>
  The max length of an ephemeral public key supported in our circuit (93 bytes)
@@ -240,7 +240,7 @@ The training wheels PK needs to be 32 bytes long.
 
 
 
-<pre><code><b>public</b> <b>fun</b> <a href="keyless_account.md#0x1_keyless_account_new_configuration">new_configuration</a>(override_aud_val: <a href="../../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;<a href="../../aptos-stdlib/../move-stdlib/doc/string.md#0x1_string_String">string::String</a>&gt;, max_signatures_per_txn: u16, max_exp_horizon_secs: u64, training_wheels_pubkey: <a href="../../aptos-stdlib/../move-stdlib/doc/option.md#0x1_option_Option">option::Option</a>&lt;<a href="../../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u8&gt;&gt;, max_commited_epk_bytes: u16, max_iss_val_bytes: u16, max_extra_field_bytes: u16, max_jwt_header_b64_bytes: u32): <a href="keyless_account.md#0x1_keyless_account_Configuration">keyless_account::Configuration</a>
+<pre><code><b>public</b> <b>fun</b> <a href="keyless_account.md#0x1_keyless_account_new_configuration">new_configuration</a>(override_aud_val: <a href="../../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;<a href="../../aptos-stdlib/../move-stdlib/doc/string.md#0x1_string_String">string::String</a>&gt;, max_signatures_per_txn: u16, max_exp_horizon_secs: u64, training_wheels_pubkey: <a href="../../aptos-stdlib/../move-stdlib/doc/option.md#0x1_option_Option">option::Option</a>&lt;<a href="../../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u8&gt;&gt;, max_committed_epk_bytes: u16, max_iss_val_bytes: u16, max_extra_field_bytes: u16, max_jwt_header_b64_bytes: u32): <a href="keyless_account.md#0x1_keyless_account_Configuration">keyless_account::Configuration</a>
 </code></pre>
 
 
@@ -254,7 +254,7 @@ The training wheels PK needs to be 32 bytes long.
     max_signatures_per_txn: u16,
     max_exp_horizon_secs: u64,
     training_wheels_pubkey: Option&lt;<a href="../../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u8&gt;&gt;,
-    max_commited_epk_bytes: u16,
+    max_committed_epk_bytes: u16,
     max_iss_val_bytes: u16,
     max_extra_field_bytes: u16,
     max_jwt_header_b64_bytes: u32
@@ -264,7 +264,7 @@ The training wheels PK needs to be 32 bytes long.
         max_signatures_per_txn,
         max_exp_horizon_secs,
         training_wheels_pubkey,
-        max_commited_epk_bytes,
+        max_committed_epk_bytes,
         max_iss_val_bytes,
         max_extra_field_bytes,
         max_jwt_header_b64_bytes,
@@ -336,7 +336,7 @@ The training wheels PK needs to be 32 bytes long.
             max_signatures_per_txn: _,
             max_exp_horizon_secs: _,
             training_wheels_pubkey: _,
-            max_commited_epk_bytes: _,
+            max_committed_epk_bytes: _,
             max_iss_val_bytes: _,
             max_extra_field_bytes: _,
             max_jwt_header_b64_bytes: _,

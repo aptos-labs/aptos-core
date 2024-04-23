@@ -383,7 +383,7 @@ This operation will cost more gas when it adds new bucket.
 ## Function `pop_back`
 
 Pop an element from the end of vector <code>v</code>. It doesn't shrink the buckets even if they're empty.
-Call <code>shrink_to_fit</code> explicity to deallocate empty buckets.
+Call <code>shrink_to_fit</code> explicitly to deallocate empty buckets.
 Aborts if <code>v</code> is empty.
 
 

@@ -141,7 +141,7 @@ const ASSET_SYMBOL = "MEME";
     const freezeAccountsSerializer = new BCS.Serializer();
     BCS.serializeVector([AccountAddress.fromHex(owner1.address())], freezeAccountsSerializer);
 
-    // Create freeze tx payload. The last paramter can be set to `false` to unfreeze.
+    // Create freeze tx payload. The last parameter can be set to `false` to unfreeze.
     const freezeTxPayload = new MultiSigTransactionPayload(
       EntryFunction.natural(
         `${MODULE_ADDR}::managed_fungible_asset`,

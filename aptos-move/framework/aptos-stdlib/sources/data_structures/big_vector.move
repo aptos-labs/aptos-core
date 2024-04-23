@@ -106,7 +106,7 @@ module aptos_std::big_vector {
     }
 
     /// Pop an element from the end of vector `v`. It doesn't shrink the buckets even if they're empty.
-    /// Call `shrink_to_fit` explicity to deallocate empty buckets.
+    /// Call `shrink_to_fit` explicitly to deallocate empty buckets.
     /// Aborts if `v` is empty.
     public fun pop_back<T>(v: &mut BigVector<T>): T {
         assert!(!is_empty(v), error::invalid_state(EVECTOR_EMPTY));

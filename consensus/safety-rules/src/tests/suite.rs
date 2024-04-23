@@ -589,7 +589,7 @@ fn test_2chain_timeout(constructor: &Callback) {
     ));
 }
 
-/// Test that we can succesfully sign a valid commit vote
+/// Test that we can successfully sign a valid commit vote
 fn test_sign_commit_vote(constructor: &Callback) {
     // we construct a chain of proposals
     // genesis -- a1 -- a2 -- a3
