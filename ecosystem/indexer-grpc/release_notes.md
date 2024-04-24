@@ -2,6 +2,23 @@
 
 This file keeps track of the changes for indexer grpc.
 
+## 2024.04.24
+
+We currently offer reference implementations in Python and Typescript for processors (e.g., the NFT marketplace v2 example). Some of you might have used them and realized that there are issues, notably:
+* Python implementation sometimes stalls
+* Our typescript implementation is slow and has issues processing large amounts of data (e.g., gets stuck from version 300M - 400M on mainnet)
+* Marketplace v2 data is very limited, so it is basically unusable.
+
+The team’s short-term goal is to release a proper SDK, so to that end, we’ll deprecate support for the current Python / Typescript examples (as well as the marketplace v2 APIs) and focus on building the Rust, Typescript, and Python SDKs in that order of priority.
+
+Within a couple of weeks, we’ll stop processing the following tables, and around June 1, 2024, we’ll remove them from the APIs:
+* `current_nft_marketplace_auctions`
+* `current_nft_marketplace_collection_offers`
+* `current_nft_marketplace_listings`
+* `current_nft_marketplace_token_offers`
+* `nft_marketplace_activities`
+
+From our data, we see that these APIs aren’t used often. The bigger impact may be for partners running their own Python / Typescript processors. We encourage partners to migrate to Rust, which is the only officially supported language at the moment. We’ll keep the Python and Typescript code in the repo but will not support them or update them for the moment.
 
 ## [1.0.0] - 2023.05.23
 
