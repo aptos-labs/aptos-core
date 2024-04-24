@@ -94,6 +94,21 @@ module aptos_framework::randomness_config {
         }
     }
 
+    /// Create a `ConfigV2` variant.
+    public fun new_v2(
+        secrecy_threshold: FixedPoint64,
+        reconstruction_threshold: FixedPoint64,
+        fast_path_secrecy_threshold: FixedPoint64,
+    ): RandomnessConfig {
+        RandomnessConfig {
+            variant: copyable_any::pack( ConfigV2 {
+                secrecy_threshold,
+                reconstruction_threshold,
+                fast_path_secrecy_threshold,
+            } )
+        }
+    }
+
     /// Get the currently effective randomness configuration object.
     public fun current(): RandomnessConfig acquires RandomnessConfig {
         if (exists<RandomnessConfig>(@aptos_framework)) {

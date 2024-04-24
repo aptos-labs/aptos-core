@@ -465,7 +465,7 @@ export class TypeTagParser {
         bail("Can't convert generic type since no typeTags were specified.");
       }
       // a generic tokenVal has the format of `T<digit>`, for example `T1`.
-      // The digit (i.e 1) indicates the the index of this type in the typeTags array.
+      // The digit (i.e 1) indicates the index of this type in the typeTags array.
       // For a tokenVal == T1, should be parsed as the type in typeTags[1]
       const idx = parseInt(tokenVal.substring(1), 10);
       return new TypeTagParser(this.typeTags[idx]).parseTypeTag();

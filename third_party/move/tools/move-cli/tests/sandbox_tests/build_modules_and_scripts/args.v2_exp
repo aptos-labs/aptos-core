@@ -1,0 +1,6 @@
+Command `-v sandbox publish`:
+Error: Module and/or script names found that would cause failures on case insensitive file systems when compiling package 'build_modules_and_scripts':
+The following modules and/or scripts would collide as 'script1' on the file system:
+	Script 'script1' at path './scripts/script1.move'
+	Script 'script1' at path './scripts/script2.move'
+Please rename these scripts and/or modules to resolve these conflicts.
