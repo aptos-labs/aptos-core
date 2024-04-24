@@ -6,7 +6,7 @@ use crate::{
         execution_wait_phase::ExecutionWaitRequest,
         pipeline_phase::{CountedRequest, StatelessPipeline},
     },
-    state_computer::PipelineExecutionResult,
+    state_computer::{PipelineExecutionResult, StateComputeResultFut, SyncStateComputeResultFut},
     state_replication::StateComputer,
 };
 use aptos_consensus_types::pipelined_block::PipelinedBlock;
@@ -17,7 +17,7 @@ use async_trait::async_trait;
 use dashmap::DashMap;
 use futures::TryFutureExt;
 use std::{
-    collections::HashMap, fmt::{Debug, Display, Formatter}, sync::Arc
+    collections::HashMap, fmt::{Debug, Display, Formatter}, pin::Pin, sync::Arc
 };
 
 /// [ This class is used when consensus.decoupled = true ]
@@ -45,14 +45,14 @@ impl Display for ExecutionRequest {
 
 pub struct ExecutionSchedulePhase {
     execution_proxy: Arc<dyn StateComputer>,
-    pre_execution_results: Option<Arc<DashMap<HashValue, PipelineExecutionResult>>>,
+    pre_execution_futures: Arc<DashMap<HashValue, SyncStateComputeResultFut>>,
 }
 
 impl ExecutionSchedulePhase {
-    pub fn new(execution_proxy: Arc<dyn StateComputer>, pre_execution_results: Option<Arc<DashMap<HashValue, PipelineExecutionResult>>>) -> Self {
+    pub fn new(execution_proxy: Arc<dyn StateComputer>, pre_execution_futures: Arc<DashMap<HashValue, SyncStateComputeResultFut>>) -> Self {
         Self { 
             execution_proxy,
-            pre_execution_results,
+            pre_execution_futures,
         }
     }
 }
@@ -81,20 +81,19 @@ impl StatelessPipeline for ExecutionSchedulePhase {
 
         // Call schedule_compute() for each block here (not in the fut being returned) to
         // make sure they are scheduled in order.
-        let mut futs = HashMap::new();
-        let mut pre_execution_results: HashMap<HashValue, PipelineExecutionResult> = HashMap::new();
+        let mut futs = vec![];
         for b in &ordered_blocks {
-            if let Some(results) = &self.pre_execution_results {
-                if results.contains_key(&b.id()) {
-                    pre_execution_results.insert(b.id(), results.get(&b.id()).unwrap().value().clone());
-                    continue;
-                }
-            }
-            let fut = self
-                .execution_proxy
-                .schedule_compute(b.block(), b.parent_id(), b.randomness().cloned())
-                .await;
-            futs.insert(b.id(), fut);
+            let fut = if self.pre_execution_futures.contains_key(&b.id()) {
+                debug!("[PreExecution] block of epoch {} round {} was pre-executed", b.epoch(), b.round());
+                self.pre_execution_futures.remove(&b.id()).unwrap().1
+            } else {
+                debug!("[PreExecution] block of epoch {} round {} was not pre-executed", b.epoch(), b.round());
+                self
+                    .execution_proxy
+                    .schedule_compute(b.block(), b.parent_id(), b.randomness().cloned())
+                    .await
+            };
+            futs.push(fut)
         }
 
         // In the future being returned, wait for the compute results in order.
@@ -102,18 +101,10 @@ impl StatelessPipeline for ExecutionSchedulePhase {
         //      ExecutionWait phase is never kicked off.
         let fut = tokio::task::spawn(async move {
             let mut results = vec![];
-            for block in ordered_blocks {
-                if pre_execution_results.contains_key(&block.id()) {
-                    debug!("[PreExecution] block of epoch {} round {} was pre-executed", block.epoch(), block.round());
-                    let execution_result = pre_execution_results.get(&block.id()).unwrap().clone();
-                    let PipelineExecutionResult { input_txns, result } = execution_result;
-                    results.push(block.set_execution_result(input_txns, result));
-                } else {
-                    debug!("[PreExecution] block of epoch {} round {} was not pre-executed", block.epoch(), block.round());
-                    let fut = futs.remove(&block.id()).unwrap();
-                    let PipelineExecutionResult { input_txns, result } = fut.await?;
-                    results.push(block.set_execution_result(input_txns, result));
-                }
+            for (block, fut) in itertools::zip_eq(ordered_blocks, futs) {
+                debug!("try to receive compute result for block {}", block.id());
+                let PipelineExecutionResult { input_txns, result } = fut.await?;
+                results.push(block.set_execution_result(input_txns, result));
             }
             drop(lifetime_guard);
             Ok(results)

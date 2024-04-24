@@ -33,11 +33,14 @@ use aptos_types::{
     transaction::{SignedTransaction, Transaction},
 };
 use fail::fail_point;
-use futures::{future::BoxFuture, SinkExt, StreamExt};
-use std::{boxed::Box, sync::Arc};
+use futures::{future::BoxFuture, Future, SinkExt, StreamExt};
+use std::{boxed::Box, pin::Pin, sync::Arc};
 use tokio::sync::Mutex as AsyncMutex;
 
 pub type StateComputeResultFut = BoxFuture<'static, ExecutorResult<PipelineExecutionResult>>;
+
+pub type SyncBoxFuture<'a, T> = Pin<Box<dyn Future<Output = T> + Send + Sync + 'a>>;
+pub type SyncStateComputeResultFut = SyncBoxFuture<'static, ExecutorResult<PipelineExecutionResult>>;
 
 #[derive(Debug, PartialEq, Eq, Clone)]
 pub struct PipelineExecutionResult {
@@ -167,7 +170,7 @@ impl StateComputer for ExecutionProxy {
         // The parent block id.
         parent_block_id: HashValue,
         randomness: Option<Randomness>,
-    ) -> StateComputeResultFut {
+    ) -> SyncStateComputeResultFut {
         let block_id = block.id();
         debug!(
             block = %block,
@@ -243,15 +246,16 @@ impl StateComputer for ExecutionProxy {
             } else {
                 let user_txn_status = &compute_status[compute_status.len() - user_txns.len()..];
 
-                // notify mempool about failed transaction
-                if let Err(e) = txn_notifier
-                    .notify_failed_txn(user_txns, user_txn_status)
-                    .await
-                {
-                    error!(
-                        error = ?e, "Failed to notify mempool of rejected txns",
-                    );
-                }
+                // daniel todo: make it Sync
+                // // notify mempool about failed transaction
+                // if let Err(e) = txn_notifier
+                //     .notify_failed_txn(user_txns, user_txn_status)
+                //     .await
+                // {
+                //     error!(
+                //         error = ?e, "Failed to notify mempool of rejected txns",
+                //     );
+                // }
             }
 
             Ok(pipeline_execution_result)

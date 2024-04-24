@@ -6,7 +6,7 @@
 use crate::{
     block_preparer::BlockPreparer,
     monitor,
-    state_computer::{PipelineExecutionResult, StateComputeResultFut},
+    state_computer::{PipelineExecutionResult, StateComputeResultFut, SyncStateComputeResultFut},
 };
 use aptos_consensus_types::block::Block;
 use aptos_crypto::HashValue;
@@ -68,7 +68,7 @@ impl ExecutionPipeline {
         parent_block_id: HashValue,
         txn_generator: BlockPreparer,
         block_executor_onchain_config: BlockExecutorConfigFromOnchain,
-    ) -> StateComputeResultFut {
+    ) -> SyncStateComputeResultFut {
         let (result_tx, result_rx) = oneshot::channel();
         let block_id = block.id();
         self.prepare_block_tx

@@ -52,10 +52,10 @@ pub fn prepare_phases_and_buffer_manager(
     let ongoing_tasks = Arc::new(AtomicU64::new(0));
 
     // PreExecution Phase
-    let pre_execution_results = Arc::new(DashMap::new());
+    let pre_execution_futures = Arc::new(DashMap::new());
     let (pre_execution_phase_request_tx, pre_execution_phase_request_rx) =
         create_channel::<CountedRequest<PreExecutionRequest>>();
-    let pre_execution_phase_processor = PreExecutionPhase::new(execution_proxy.clone(), pre_execution_results.clone());
+    let pre_execution_phase_processor = PreExecutionPhase::new(execution_proxy.clone(), pre_execution_futures.clone());
     let pre_execution_phase = PipelinePhase::new(
         pre_execution_phase_request_rx,
         None,
@@ -68,7 +68,7 @@ pub fn prepare_phases_and_buffer_manager(
         create_channel::<CountedRequest<ExecutionRequest>>();
     let (execution_schedule_phase_response_tx, execution_schedule_phase_response_rx) =
         create_channel::<ExecutionWaitRequest>();
-    let execution_schedule_phase_processor = ExecutionSchedulePhase::new(execution_proxy, Some(pre_execution_results));
+    let execution_schedule_phase_processor = ExecutionSchedulePhase::new(execution_proxy, pre_execution_futures);
     let execution_schedule_phase = PipelinePhase::new(
         execution_schedule_phase_request_rx,
         Some(execution_schedule_phase_response_tx),

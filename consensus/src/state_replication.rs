@@ -5,7 +5,7 @@
 use crate::{
     error::StateSyncError,
     payload_manager::PayloadManager,
-    state_computer::{PipelineExecutionResult, StateComputeResultFut},
+    state_computer::{PipelineExecutionResult, StateComputeResultFut, SyncStateComputeResultFut},
     transaction_deduper::TransactionDeduper,
     transaction_shuffler::TransactionShuffler,
 };
@@ -50,7 +50,7 @@ pub trait StateComputer: Send + Sync {
         // The parent block root hash.
         _parent_block_id: HashValue,
         _randomness: Option<Randomness>,
-    ) -> StateComputeResultFut {
+    ) -> SyncStateComputeResultFut {
         unimplemented!("This state computer does not support scheduling");
     }
 

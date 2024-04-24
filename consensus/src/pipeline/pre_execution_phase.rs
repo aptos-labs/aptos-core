@@ -3,7 +3,7 @@
 
 use crate::{
     pipeline::pipeline_phase::StatelessPipeline,
-    state_computer::PipelineExecutionResult,
+    state_computer::{PipelineExecutionResult, SyncStateComputeResultFut},
     state_replication::StateComputer,
 };
 use aptos_consensus_types::pipelined_block::PipelinedBlock;
@@ -21,14 +21,14 @@ pub struct PreExecutionRequest {
 
 pub struct PreExecutionPhase {
     execution_proxy: Arc<dyn StateComputer>,
-    pre_execution_results: Arc<DashMap<HashValue, PipelineExecutionResult>>,
+    pre_execution_futures: Arc<DashMap<HashValue, SyncStateComputeResultFut>>,
 }
 
 impl PreExecutionPhase {
-    pub fn new(execution_proxy: Arc<dyn StateComputer>, pre_execution_results: Arc<DashMap<HashValue, PipelineExecutionResult>>) -> Self {
+    pub fn new(execution_proxy: Arc<dyn StateComputer>, pre_execution_futures: Arc<DashMap<HashValue, SyncStateComputeResultFut>>) -> Self {
         Self { 
             execution_proxy,
-            pre_execution_results,
+            pre_execution_futures,
         }
     }
 }
@@ -45,31 +45,17 @@ impl StatelessPipeline for PreExecutionPhase {
             block,
         } = req;
 
-        if self.pre_execution_results.contains_key(&block.id()) {
+        if self.pre_execution_futures.contains_key(&block.id()) {
             return;
         }
+
+        debug!("[PreExecution] pre-execute block of epoch {} round {}", block.epoch(), block.round());
 
         let fut = self
             .execution_proxy
             .schedule_compute(block.block(), block.parent_id(), block.randomness().cloned())
             .await;
 
-        let epoch = block.epoch();
-        let round = block.round();
-        let execution_results = tokio::task::spawn(async move {
-            debug!("[PreExecution] pre-execute block of epoch {} round {}", epoch, round);
-            Ok(fut.await?)
-        })
-        .map_err(ExecutorError::internal_err)
-        .and_then(|res| async { res });
-
-        match execution_results.await {
-            Ok(execution_result) => {
-                self.pre_execution_results.insert(block.id(), execution_result);
-            }
-            Err(e) => {
-                warn!("[PreExecution] pre-execution failed for block of epoch {} round {}: {:?}", epoch, round, e);
-            }
-        }
+        self.pre_execution_futures.insert(block.id(), fut);
     }
 }
