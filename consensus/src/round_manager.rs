@@ -38,7 +38,7 @@ use aptos_consensus_types::{
     proof_of_store::{ProofCache, ProofOfStoreMsg, SignedBatchInfoMsg},
     proposal_msg::{ProposalMsg, VersionedProposalMsg},
     quorum_cert::QuorumCert,
-    sync_info::{SyncInfo, VersionedSyncInfo},
+    sync_info::VersionedSyncInfo,
     timeout_2chain::TwoChainTimeoutCertificate,
     vote::Vote,
     vote_msg::{VersionedVoteMsg, VoteMsg},
@@ -70,13 +70,10 @@ use tokio::{
 
 #[derive(Serialize, Clone)]
 pub enum UnverifiedEvent {
-    ProposalMsg(Box<ProposalMsg>),
-    VersionedProposalMsg(Box<VersionedProposalMsg>),
-    VoteMsg(Box<VoteMsg>),
-    VersionedVoteMsg(Box<VersionedVoteMsg>),
+    ProposalMsg(Box<VersionedProposalMsg>),
+    VoteMsg(Box<VersionedVoteMsg>),
     OrderVoteMsg(Box<OrderVote>),
-    SyncInfo(Box<SyncInfo>),
-    VersionedSyncInfo(Box<VersionedSyncInfo>),
+    SyncInfo(Box<VersionedSyncInfo>),
     BatchMsg(Box<BatchMsg>),
     SignedBatchInfo(Box<SignedBatchInfoMsg>),
     ProofOfStoreMsg(Box<ProofOfStoreMsg>),
@@ -107,15 +104,6 @@ impl UnverifiedEvent {
                 }
                 VerifiedEvent::ProposalMsg(p)
             },
-            UnverifiedEvent::VersionedProposalMsg(p) => {
-                if !self_message {
-                    p.verify(validator, proof_cache, quorum_store_enabled)?;
-                    counters::VERIFY_MSG
-                        .with_label_values(&["versioned_proposal"])
-                        .observe(start_time.elapsed().as_secs_f64());
-                }
-                VerifiedEvent::VersionedProposalMsg(p)
-            },
             UnverifiedEvent::VoteMsg(v) => {
                 if !self_message {
                     v.verify(validator)?;
@@ -124,15 +112,6 @@ impl UnverifiedEvent {
                         .observe(start_time.elapsed().as_secs_f64());
                 }
                 VerifiedEvent::VoteMsg(v)
-            },
-            UnverifiedEvent::VersionedVoteMsg(v) => {
-                if !self_message {
-                    v.verify(validator)?;
-                    counters::VERIFY_MSG
-                        .with_label_values(&["versioned_vote"])
-                        .observe(start_time.elapsed().as_secs_f64());
-                }
-                VerifiedEvent::VersionedVoteMsg(v)
             },
             UnverifiedEvent::OrderVoteMsg(v) => {
                 if !self_message {
@@ -145,7 +124,6 @@ impl UnverifiedEvent {
             },
             // sync info verification is on-demand (verified when it's used)
             UnverifiedEvent::SyncInfo(s) => VerifiedEvent::UnverifiedSyncInfo(s),
-            UnverifiedEvent::VersionedSyncInfo(s) => VerifiedEvent::UnverifiedVersionedSyncInfo(s),
             UnverifiedEvent::BatchMsg(b) => {
                 if !self_message {
                     b.verify(peer_id, max_num_batches)?;
@@ -184,12 +162,9 @@ impl UnverifiedEvent {
     pub fn epoch(&self) -> anyhow::Result<u64> {
         match self {
             UnverifiedEvent::ProposalMsg(p) => Ok(p.epoch()),
-            UnverifiedEvent::VersionedProposalMsg(p) => Ok(p.epoch()),
             UnverifiedEvent::VoteMsg(v) => Ok(v.epoch()),
-            UnverifiedEvent::VersionedVoteMsg(v) => Ok(v.epoch()),
             UnverifiedEvent::OrderVoteMsg(v) => Ok(v.epoch()),
             UnverifiedEvent::SyncInfo(s) => Ok(s.epoch()),
-            UnverifiedEvent::VersionedSyncInfo(s) => Ok(s.epoch()),
             UnverifiedEvent::BatchMsg(b) => b.epoch(),
             UnverifiedEvent::SignedBatchInfo(sd) => sd.epoch(),
             UnverifiedEvent::ProofOfStoreMsg(p) => p.epoch(),
@@ -200,13 +175,19 @@ impl UnverifiedEvent {
 impl From<ConsensusMsg> for UnverifiedEvent {
     fn from(value: ConsensusMsg) -> Self {
         match value {
-            ConsensusMsg::ProposalMsg(m) => UnverifiedEvent::ProposalMsg(m),
-            ConsensusMsg::VersionedProposalMsg(m) => UnverifiedEvent::VersionedProposalMsg(m),
-            ConsensusMsg::VoteMsg(m) => UnverifiedEvent::VoteMsg(m),
-            ConsensusMsg::VersionedVoteMsg(m) => UnverifiedEvent::VersionedVoteMsg(m),
+            ConsensusMsg::ProposalMsg(m) => {
+                UnverifiedEvent::ProposalMsg(Box::new(VersionedProposalMsg::V1(*m)))
+            },
+            ConsensusMsg::VersionedProposalMsg(m) => UnverifiedEvent::ProposalMsg(m),
+            ConsensusMsg::VoteMsg(m) => {
+                UnverifiedEvent::VoteMsg(Box::new(VersionedVoteMsg::V1(*m)))
+            },
+            ConsensusMsg::VersionedVoteMsg(m) => UnverifiedEvent::VoteMsg(m),
             ConsensusMsg::OrderVoteMsg(m) => UnverifiedEvent::OrderVoteMsg(m),
-            ConsensusMsg::SyncInfo(m) => UnverifiedEvent::SyncInfo(m),
-            ConsensusMsg::VersionedSyncInfo(m) => UnverifiedEvent::VersionedSyncInfo(m),
+            ConsensusMsg::SyncInfo(m) => {
+                UnverifiedEvent::SyncInfo(Box::new(VersionedSyncInfo::V1(*m)))
+            },
+            ConsensusMsg::VersionedSyncInfo(m) => UnverifiedEvent::SyncInfo(m),
             ConsensusMsg::BatchMsg(m) => UnverifiedEvent::BatchMsg(m),
             ConsensusMsg::SignedBatchInfo(m) => UnverifiedEvent::SignedBatchInfo(m),
             ConsensusMsg::ProofOfStoreMsg(m) => UnverifiedEvent::ProofOfStoreMsg(m),
@@ -218,14 +199,11 @@ impl From<ConsensusMsg> for UnverifiedEvent {
 #[derive(Debug)]
 pub enum VerifiedEvent {
     // network messages
-    ProposalMsg(Box<ProposalMsg>),
-    VersionedProposalMsg(Box<VersionedProposalMsg>),
+    ProposalMsg(Box<VersionedProposalMsg>),
     VerifiedProposalMsg(Box<Block>),
-    VoteMsg(Box<VoteMsg>),
-    VersionedVoteMsg(Box<VersionedVoteMsg>),
+    VoteMsg(Box<VersionedVoteMsg>),
     OrderVoteMsg(Box<OrderVote>),
-    UnverifiedSyncInfo(Box<SyncInfo>),
-    UnverifiedVersionedSyncInfo(Box<VersionedSyncInfo>),
+    UnverifiedSyncInfo(Box<VersionedSyncInfo>),
     BatchMsg(Box<BatchMsg>),
     SignedBatchInfo(Box<SignedBatchInfoMsg>),
     ProofOfStoreMsg(Box<ProofOfStoreMsg>),
@@ -1202,13 +1180,7 @@ impl RoundManager {
                             VerifiedEvent::ProposalMsg(proposal_msg) => {
                                 monitor!(
                                     "process_proposal",
-                                    self.process_proposal_msg(VersionedProposalMsg::V1(*proposal_msg)).await
-                                )
-                            }
-                            VerifiedEvent::VersionedProposalMsg(versioned_proposal_msg) => {
-                                monitor!(
-                                    "process_proposal",
-                                    self.process_proposal_msg(*versioned_proposal_msg).await
+                                    self.process_proposal_msg(*proposal_msg).await
                                 )
                             }
                             VerifiedEvent::VerifiedProposalMsg(proposal_msg) => {
@@ -1232,10 +1204,7 @@ impl RoundManager {
                 (peer_id, event) = event_rx.select_next_some() => {
                     let result = match event {
                         VerifiedEvent::VoteMsg(vote_msg) => {
-                            monitor!("process_vote", self.process_vote_msg(VersionedVoteMsg::V1(*vote_msg)).await)
-                        }
-                        VerifiedEvent::VersionedVoteMsg(versioned_vote_msg) => {
-                            monitor!("process_versioned_vote", self.process_vote_msg(*versioned_vote_msg).await)
+                            monitor!("process_vote", self.process_vote_msg(*vote_msg).await)
                         }
                         VerifiedEvent::OrderVoteMsg(order_vote_msg) => {
                             monitor!("process_order_vote", self.process_order_vote_msg(*order_vote_msg).await)
@@ -1243,13 +1212,7 @@ impl RoundManager {
                         VerifiedEvent::UnverifiedSyncInfo(sync_info) => {
                             monitor!(
                                 "process_sync_info",
-                                self.process_sync_info_msg(VersionedSyncInfo::V1(*sync_info), peer_id).await
-                            )
-                        }
-                        VerifiedEvent::UnverifiedVersionedSyncInfo(versioned_sync_info) => {
-                            monitor!(
-                                "process_versioned_sync_info",
-                                self.process_sync_info_msg(*versioned_sync_info, peer_id).await
+                                self.process_sync_info_msg(*sync_info, peer_id).await
                             )
                         }
                         VerifiedEvent::LocalTimeout(round) => monitor!(

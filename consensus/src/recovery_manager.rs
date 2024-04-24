@@ -139,28 +139,13 @@ impl RecoveryManager {
                         VerifiedEvent::ProposalMsg(proposal_msg) => {
                             monitor!(
                                 "process_recovery",
-                                self.process_proposal_msg(VersionedProposalMsg::V1(*proposal_msg)).await
-                            )
-                        }
-                        VerifiedEvent::VersionedProposalMsg(proposal_msg) => {
-                            monitor!(
-                                "process_recovery",
                                 self.process_proposal_msg(*proposal_msg).await
                             )
                         }
                         VerifiedEvent::VoteMsg(vote_msg) => {
-                            monitor!("process_recovery", self.process_vote_msg(VersionedVoteMsg::V1(*vote_msg)).await)
-                        }
-                        VerifiedEvent::VersionedVoteMsg(vote_msg) => {
                             monitor!("process_recovery", self.process_vote_msg(*vote_msg).await)
                         }
                         VerifiedEvent::UnverifiedSyncInfo(sync_info) => {
-                            monitor!(
-                                "process_recovery",
-                                self.sync_up(&VersionedSyncInfo::V1(sync_info.as_ref().clone()), peer_id).await
-                            )
-                        }
-                        VerifiedEvent::UnverifiedVersionedSyncInfo(sync_info) => {
                             monitor!(
                                 "process_recovery",
                                 self.sync_up(&sync_info, peer_id).await

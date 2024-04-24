@@ -290,13 +290,6 @@ impl SyncInfo {
     pub fn epoch(&self) -> u64 {
         self.highest_quorum_cert.certified_block().epoch()
     }
-
-    pub fn has_newer_certificates(&self, other: &SyncInfo) -> bool {
-        self.highest_certified_round() > other.highest_certified_round()
-            || self.highest_timeout_round() > other.highest_timeout_round()
-            || self.highest_ordered_round() > other.highest_ordered_round()
-            || self.highest_commit_round() > other.highest_commit_round()
-    }
 }
 
 #[derive(Deserialize, Serialize, Clone, Eq, PartialEq)]
@@ -481,12 +474,5 @@ impl SyncInfoV2 {
 
     pub fn epoch(&self) -> u64 {
         self.highest_quorum_cert.certified_block().epoch()
-    }
-
-    pub fn has_newer_certificates(&self, other: &SyncInfo) -> bool {
-        self.highest_certified_round() > other.highest_certified_round()
-            || self.highest_timeout_round() > other.highest_timeout_round()
-            || self.highest_ordered_round() > other.highest_ordered_round()
-            || self.highest_commit_round() > other.highest_commit_round()
     }
 }
