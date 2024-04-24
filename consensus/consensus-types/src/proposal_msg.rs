@@ -2,12 +2,86 @@
 // Parts of the project are originally copyright © Meta Platforms, Inc.
 // SPDX-License-Identifier: Apache-2.0
 
-use crate::{block::Block, common::Author, proof_of_store::ProofCache, sync_info::SyncInfo};
+use crate::{
+    block::Block,
+    common::Author,
+    proof_of_store::ProofCache,
+    sync_info::{SyncInfo, VersionedSyncInfo},
+};
 use anyhow::{anyhow, ensure, format_err, Context, Result};
 use aptos_short_hex_str::AsShortHexStr;
 use aptos_types::validator_verifier::ValidatorVerifier;
 use serde::{Deserialize, Serialize};
 use std::fmt;
+
+/// ProposalMsg contains the required information for the proposer election protocol to make its
+/// choice (typically depends on round and proposer info). This struct is versioned to support
+/// upgrades.
+#[derive(Clone, Debug, Deserialize, Eq, PartialEq, Serialize)]
+pub enum VersionedProposalMsg {
+    V1(ProposalMsg),
+    V2(ProposalMsgV2),
+}
+
+impl VersionedProposalMsg {
+    pub fn proposal(&self) -> &Block {
+        match self {
+            VersionedProposalMsg::V1(msg) => msg.proposal(),
+            VersionedProposalMsg::V2(msg) => msg.proposal(),
+        }
+    }
+
+    pub fn take_proposal(self) -> Block {
+        match self {
+            VersionedProposalMsg::V1(msg) => msg.take_proposal(),
+            VersionedProposalMsg::V2(msg) => msg.take_proposal(),
+        }
+    }
+
+    pub fn sync_info(&self) -> VersionedSyncInfo {
+        match self {
+            VersionedProposalMsg::V1(msg) => VersionedSyncInfo::new_v1(msg.sync_info().clone()),
+            VersionedProposalMsg::V2(msg) => msg.sync_info().clone(),
+        }
+    }
+
+    pub fn epoch(&self) -> u64 {
+        match self {
+            VersionedProposalMsg::V1(msg) => msg.epoch(),
+            VersionedProposalMsg::V2(msg) => msg.epoch(),
+        }
+    }
+
+    pub fn verify(
+        &self,
+        validator: &ValidatorVerifier,
+        proof_cache: &ProofCache,
+        quorum_store_enabled: bool,
+    ) -> Result<()> {
+        match self {
+            VersionedProposalMsg::V1(msg) => {
+                msg.verify(validator, proof_cache, quorum_store_enabled)
+            },
+            VersionedProposalMsg::V2(msg) => {
+                msg.verify(validator, proof_cache, quorum_store_enabled)
+            },
+        }
+    }
+
+    pub fn proposer(&self) -> Author {
+        match self {
+            VersionedProposalMsg::V1(msg) => msg.proposer(),
+            VersionedProposalMsg::V2(msg) => msg.proposer(),
+        }
+    }
+
+    pub fn verify_well_formed(&self) -> Result<()> {
+        match self {
+            VersionedProposalMsg::V1(msg) => msg.verify_well_formed(),
+            VersionedProposalMsg::V2(msg) => msg.verify_well_formed(),
+        }
+    }
+}
 
 /// ProposalMsg contains the required information for the proposer election protocol to make its
 /// choice (typically depends on round and proposer info).
@@ -127,5 +201,116 @@ impl fmt::Display for ProposalMsg {
             Some(author) => write!(f, "{}]", author.short_str()),
             None => write!(f, "NIL]"),
         }
+    }
+}
+
+// TODO: There is a lot of duplicaition of code between ProposalMsg and ProposalMsgV2.
+#[derive(Clone, Debug, Deserialize, Eq, PartialEq, Serialize)]
+
+pub struct ProposalMsgV2 {
+    proposal: Block,
+    sync_info: VersionedSyncInfo,
+}
+
+impl ProposalMsgV2 {
+    /// Creates a new proposal.
+    pub fn new(proposal: Block, sync_info: VersionedSyncInfo) -> Self {
+        Self {
+            proposal,
+            sync_info,
+        }
+    }
+
+    pub fn epoch(&self) -> u64 {
+        self.proposal.epoch()
+    }
+
+    /// Verifies that the ProposalMsg is well-formed.
+    pub fn verify_well_formed(&self) -> Result<()> {
+        ensure!(
+            !self.proposal.is_nil_block(),
+            "Proposal {} for a NIL block",
+            self.proposal
+        );
+        self.proposal
+            .verify_well_formed()
+            .context("Fail to verify ProposalMsg's block")?;
+        ensure!(
+            self.proposal.round() > 0,
+            "Proposal for {} has an incorrect round of 0",
+            self.proposal,
+        );
+        ensure!(
+            self.proposal.epoch() == self.sync_info.epoch(),
+            "ProposalMsg has different epoch number from SyncInfo"
+        );
+        ensure!(
+            self.proposal.parent_id()
+                == self.sync_info.highest_quorum_cert().certified_block().id(),
+            "Proposal HQC in SyncInfo certifies {}, but block parent id is {}",
+            self.sync_info.highest_quorum_cert().certified_block().id(),
+            self.proposal.parent_id(),
+        );
+        let previous_round = self
+            .proposal
+            .round()
+            .checked_sub(1)
+            .ok_or_else(|| anyhow!("proposal round overflowed!"))?;
+
+        let highest_certified_round = std::cmp::max(
+            self.proposal.quorum_cert().certified_block().round(),
+            self.sync_info.highest_timeout_round(),
+        );
+        ensure!(
+            previous_round == highest_certified_round,
+            "Proposal {} does not have a certified round {}",
+            self.proposal,
+            previous_round
+        );
+        ensure!(
+            self.proposal.author().is_some(),
+            "Proposal {} does not define an author",
+            self.proposal
+        );
+        Ok(())
+    }
+
+    pub fn proposal(&self) -> &Block {
+        &self.proposal
+    }
+
+    pub fn take_proposal(self) -> Block {
+        self.proposal
+    }
+
+    pub fn sync_info(&self) -> &VersionedSyncInfo {
+        &self.sync_info
+    }
+
+    pub fn proposer(&self) -> Author {
+        self.proposal
+            .author()
+            .expect("Proposal should be verified having an author")
+    }
+
+    pub fn verify(
+        &self,
+        validator: &ValidatorVerifier,
+        proof_cache: &ProofCache,
+        quorum_store_enabled: bool,
+    ) -> Result<()> {
+        self.proposal().payload().map_or(Ok(()), |p| {
+            p.verify(validator, proof_cache, quorum_store_enabled)
+        })?;
+
+        self.proposal()
+            .validate_signature(validator)
+            .map_err(|e| format_err!("{:?}", e))?;
+        // if there is a timeout certificate, verify its signatures
+        if let Some(tc) = self.sync_info.highest_2chain_timeout_cert() {
+            tc.verify(validator).map_err(|e| format_err!("{:?}", e))?;
+        }
+        // Note that we postpone the verification of SyncInfo until it's being used.
+        self.verify_well_formed()
     }
 }

@@ -26,7 +26,7 @@ use aptos_config::{
     config::{ConsensusConfig, QcAggregatorType},
     network_id::NetworkId,
 };
-use aptos_consensus_types::proposal_msg::ProposalMsg;
+use aptos_consensus_types::proposal_msg::VersionedProposalMsg;
 use aptos_infallible::Mutex;
 use aptos_network::{
     application::{interface::NetworkClient, storage::PeersAndMetadata},
@@ -227,7 +227,7 @@ pub fn fuzz_proposal(data: &[u8]) {
     // create node
     let mut round_manager = create_node_for_fuzzing();
 
-    let proposal: ProposalMsg = match serde_json::from_slice(data) {
+    let proposal = VersionedProposalMsg::V1(match serde_json::from_slice(data) {
         Ok(xx) => xx,
         Err(_) => {
             if cfg!(test) {
@@ -235,7 +235,7 @@ pub fn fuzz_proposal(data: &[u8]) {
             }
             return;
         },
-    };
+    });
 
     let proposal = match proposal.verify_well_formed() {
         Ok(_) => proposal,

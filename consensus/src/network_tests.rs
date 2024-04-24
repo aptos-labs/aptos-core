@@ -301,8 +301,15 @@ impl NetworkPlayground {
     fn get_message_round(msg: ConsensusMsg) -> Option<u64> {
         match msg {
             ConsensusMsg::ProposalMsg(proposal_msg) => Some(proposal_msg.proposal().round()),
+            ConsensusMsg::VersionedProposalMsg(proposal_msg) => {
+                Some(proposal_msg.proposal().round())
+            },
             ConsensusMsg::VoteMsg(vote_msg) => Some(vote_msg.vote().vote_data().proposed().round()),
+            ConsensusMsg::VersionedVoteMsg(vote_msg) => {
+                Some(vote_msg.vote().vote_data().proposed().round())
+            },
             ConsensusMsg::SyncInfo(sync_info) => Some(sync_info.highest_certified_round()),
+            ConsensusMsg::VersionedSyncInfo(sync_info) => Some(sync_info.highest_certified_round()),
             ConsensusMsg::CommitVoteMsg(commit_vote) => Some(commit_vote.commit_info().round()),
             _ => None,
         }
@@ -316,11 +323,13 @@ impl NetworkPlayground {
     /// Returns true for proposal messages only.
     pub fn proposals_only(msg: &(Author, ConsensusMsg)) -> bool {
         matches!(&msg.1, ConsensusMsg::ProposalMsg(_))
+            || matches!(&msg.1, ConsensusMsg::VersionedProposalMsg(_))
     }
 
     /// Returns true for vote messages only.
     pub fn votes_only(msg: &(Author, ConsensusMsg)) -> bool {
         matches!(&msg.1, ConsensusMsg::VoteMsg(_))
+            || matches!(msg.1, ConsensusMsg::VersionedVoteMsg(_))
     }
 
     pub fn extend_author_to_twin_ids(&mut self, author: Author, twin_id: TwinId) {
@@ -488,6 +497,8 @@ mod tests {
     use aptos_consensus_types::{
         block_retrieval::{BlockRetrievalRequest, BlockRetrievalResponse, BlockRetrievalStatus},
         common::Payload,
+        proposal_msg::VersionedProposalMsg,
+        vote_msg::VersionedVoteMsg,
     };
     use aptos_crypto::HashValue;
     use aptos_network::{
@@ -660,7 +671,10 @@ mod tests {
             for r in receivers.iter_mut().take(5).skip(2) {
                 let (_, msg) = r.consensus_messages.next().await.unwrap();
                 match msg {
-                    ConsensusMsg::VoteMsg(v) => assert_eq!(*v, vote_msg),
+                    ConsensusMsg::VoteMsg(v) => assert_eq!(*v, vote_msg.clone()),
+                    ConsensusMsg::VersionedVoteMsg(v) => {
+                        assert_eq!(*v, VersionedVoteMsg::V1(vote_msg.clone()))
+                    },
                     _ => panic!("unexpected messages"),
                 }
             }
@@ -671,7 +685,10 @@ mod tests {
             for r in receivers.iter_mut().take(num_nodes - 1) {
                 let (_, msg) = r.consensus_messages.next().await.unwrap();
                 match msg {
-                    ConsensusMsg::ProposalMsg(p) => assert_eq!(*p, proposal),
+                    ConsensusMsg::ProposalMsg(p) => assert_eq!(*p, proposal.clone()),
+                    ConsensusMsg::VersionedProposalMsg(p) => {
+                        assert_eq!(*p, VersionedProposalMsg::V1(proposal.clone()))
+                    },
                     _ => panic!("unexpected messages"),
                 }
             }

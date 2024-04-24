@@ -18,8 +18,12 @@ use crate::{
 };
 use anyhow::{bail, ensure, format_err, Context};
 use aptos_consensus_types::{
-    block::Block, common::Round, pipelined_block::PipelinedBlock, quorum_cert::QuorumCert,
-    sync_info::SyncInfo, timeout_2chain::TwoChainTimeoutCertificate,
+    block::Block,
+    common::Round,
+    pipelined_block::PipelinedBlock,
+    quorum_cert::QuorumCert,
+    sync_info::{SyncInfo, VersionedSyncInfo},
+    timeout_2chain::TwoChainTimeoutCertificate,
 };
 use aptos_crypto::{hash::ACCUMULATOR_PLACEHOLDER_HASH, HashValue};
 use aptos_executor_types::StateComputeResult;
@@ -578,6 +582,16 @@ impl BlockReader for BlockStore {
             self.highest_2chain_timeout_cert()
                 .map(|tc| tc.as_ref().clone()),
         )
+    }
+
+    fn versioned_sync_info(&self) -> VersionedSyncInfo {
+        VersionedSyncInfo::new_v1(SyncInfo::new_decoupled(
+            self.highest_quorum_cert().as_ref().clone(),
+            self.highest_ordered_cert().as_ref().clone(),
+            self.highest_commit_cert().as_ref().clone(),
+            self.highest_2chain_timeout_cert()
+                .map(|tc| tc.as_ref().clone()),
+        ))
     }
 
     fn vote_back_pressure(&self) -> bool {

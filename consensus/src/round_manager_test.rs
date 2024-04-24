@@ -40,10 +40,10 @@ use aptos_consensus_types::{
     block_retrieval::{BlockRetrievalRequest, BlockRetrievalStatus},
     common::{Author, Payload, Round},
     pipeline::commit_decision::CommitDecision,
-    proposal_msg::ProposalMsg,
-    sync_info::SyncInfo,
+    proposal_msg::{ProposalMsg, VersionedProposalMsg},
+    sync_info::{SyncInfo, VersionedSyncInfo},
     timeout_2chain::{TwoChainTimeout, TwoChainTimeoutWithPartialSignatures},
-    vote_msg::VoteMsg,
+    vote_msg::VersionedVoteMsg,
 };
 use aptos_crypto::HashValue;
 use aptos_infallible::Mutex;
@@ -415,9 +415,10 @@ impl NodeSetup {
         }
     }
 
-    pub async fn next_proposal(&mut self) -> ProposalMsg {
+    pub async fn next_proposal(&mut self) -> VersionedProposalMsg {
         match self.next_network_message().await {
-            ConsensusMsg::ProposalMsg(p) => *p,
+            ConsensusMsg::ProposalMsg(p) => VersionedProposalMsg::V1(*p),
+            ConsensusMsg::VersionedProposalMsg(p) => *p,
             msg => panic!(
                 "Unexpected Consensus Message: {:?} on node {}",
                 msg,
@@ -426,9 +427,10 @@ impl NodeSetup {
         }
     }
 
-    pub async fn next_vote(&mut self) -> VoteMsg {
+    pub async fn next_vote(&mut self) -> VersionedVoteMsg {
         match self.next_network_message().await {
-            ConsensusMsg::VoteMsg(v) => *v,
+            ConsensusMsg::VoteMsg(v) => VersionedVoteMsg::V1(*v),
+            ConsensusMsg::VersionedVoteMsg(v) => *v,
             msg => panic!(
                 "Unexpected Consensus Message: {:?} on node {}",
                 msg,
@@ -903,19 +905,19 @@ fn no_vote_on_mismatch_round() {
     )
     .unwrap();
     timed_block_on(&runtime, async {
-        let bad_proposal = ProposalMsg::new(
+        let bad_proposal = VersionedProposalMsg::V1(ProposalMsg::new(
             block_skip_round,
             SyncInfo::new(genesis_qc.clone(), genesis_qc.clone(), None),
-        );
+        ));
         assert!(node
             .round_manager
             .process_proposal_msg(bad_proposal)
             .await
             .is_err());
-        let good_proposal = ProposalMsg::new(
+        let good_proposal = VersionedProposalMsg::V1(ProposalMsg::new(
             correct_block.clone(),
             SyncInfo::new(genesis_qc.clone(), genesis_qc.clone(), None),
-        );
+        ));
         node.round_manager
             .process_proposal_msg(good_proposal)
             .await
@@ -1025,19 +1027,19 @@ fn no_vote_on_invalid_proposer() {
     )
     .unwrap();
     timed_block_on(&runtime, async {
-        let bad_proposal = ProposalMsg::new(
+        let bad_proposal = VersionedProposalMsg::V1(ProposalMsg::new(
             block_incorrect_proposer,
             SyncInfo::new(genesis_qc.clone(), genesis_qc.clone(), None),
-        );
+        ));
         assert!(node
             .round_manager
             .process_proposal_msg(bad_proposal)
             .await
             .is_err());
-        let good_proposal = ProposalMsg::new(
+        let good_proposal = VersionedProposalMsg::V1(ProposalMsg::new(
             correct_block.clone(),
             SyncInfo::new(genesis_qc.clone(), genesis_qc.clone(), None),
-        );
+        ));
 
         node.round_manager
             .process_proposal_msg(good_proposal.clone())
@@ -1094,18 +1096,18 @@ fn new_round_on_timeout_certificate() {
         .aggregate_signatures(&generate_validator_verifier(&[node.signer.clone()]))
         .unwrap();
     timed_block_on(&runtime, async {
-        let skip_round_proposal = ProposalMsg::new(
+        let skip_round_proposal = VersionedProposalMsg::V1(ProposalMsg::new(
             block_skip_round,
             SyncInfo::new(genesis_qc.clone(), genesis_qc.clone(), Some(tc)),
-        );
+        ));
         node.round_manager
             .process_proposal_msg(skip_round_proposal)
             .await
             .unwrap();
-        let old_good_proposal = ProposalMsg::new(
+        let old_good_proposal = VersionedProposalMsg::V1(ProposalMsg::new(
             correct_block.clone(),
             SyncInfo::new(genesis_qc.clone(), genesis_qc.clone(), None),
-        );
+        ));
         assert!(node
             .round_manager
             .process_proposal_msg(old_good_proposal)
@@ -1156,7 +1158,7 @@ fn reject_invalid_failed_authors() {
             failed_authors,
         )
         .unwrap();
-        ProposalMsg::new(
+        VersionedProposalMsg::V1(ProposalMsg::new(
             block,
             SyncInfo::new(
                 genesis_qc.clone(),
@@ -1167,7 +1169,7 @@ fn reject_invalid_failed_authors() {
                     None
                 },
             ),
-        )
+        ))
     };
 
     let extra_failed_authors_proposal = create_proposal(2, vec![(1, Author::random())]);
@@ -1241,7 +1243,10 @@ fn response_on_block_retrieval() {
     )
     .unwrap();
     let block_id = block.id();
-    let proposal = ProposalMsg::new(block, SyncInfo::new(genesis_qc.clone(), genesis_qc, None));
+    let proposal = VersionedProposalMsg::V1(ProposalMsg::new(
+        block,
+        SyncInfo::new(genesis_qc.clone(), genesis_qc, None),
+    ));
 
     timed_block_on(&runtime, async {
         node.round_manager
@@ -1375,14 +1380,14 @@ fn recover_on_restart() {
 
     timed_block_on(&runtime, async {
         for (proposal, tc) in &data {
-            let proposal_msg = ProposalMsg::new(
+            let proposal_msg = VersionedProposalMsg::V1(ProposalMsg::new(
                 proposal.clone(),
                 SyncInfo::new(
                     proposal.quorum_cert().clone(),
                     genesis_qc.clone(),
                     Some(tc.clone()),
                 ),
-            );
+            ));
             node.round_manager
                 .process_proposal_msg(proposal_msg)
                 .await
@@ -1534,7 +1539,11 @@ fn sync_on_partial_newer_sync_info() {
             None,
         );
         // Create a sync info with newer quorum cert but older commit cert
-        let sync_info = SyncInfo::new(block_4_qc.clone(), certificate_for_genesis(), None);
+        let sync_info = VersionedSyncInfo::V1(SyncInfo::new(
+            block_4_qc.clone(),
+            certificate_for_genesis(),
+            None,
+        ));
         node.round_manager
             .ensure_round_and_sync_up(
                 sync_info.highest_round() + 1,
@@ -2004,12 +2013,12 @@ pub fn forking_retrieval_test() {
         for (proposal, node) in proposals.into_iter().zip(nodes.iter_mut()) {
             node.pending_network_events.push(Event::Message(
                 node.signer.author(),
-                ConsensusMsg::ProposalMsg(Box::new(proposal)),
+                ConsensusMsg::VersionedProposalMsg(Box::new(proposal)),
             ));
         }
         behind_node_obj.pending_network_events.push(Event::Message(
             behind_node_obj.signer.author(),
-            ConsensusMsg::ProposalMsg(Box::new(proposal_msg)),
+            ConsensusMsg::VersionedProposalMsg(Box::new(proposal_msg)),
         ));
 
         nodes.push(behind_node_obj);
@@ -2033,6 +2042,7 @@ pub fn forking_retrieval_test() {
     let next_message = timed_block_on(&runtime, nodes[proposal_node].next_network_message());
     match next_message {
         ConsensusMsg::VoteMsg(_) => info!("Skip extra vote msg"),
+        ConsensusMsg::VersionedVoteMsg(_) => info!("Skip extra vote msg"),
         ConsensusMsg::ProposalMsg(msg) => {
             // put the message back in the queue.
             // actual peer doesn't matter, it is ignored, so use self.

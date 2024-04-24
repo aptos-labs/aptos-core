@@ -3,7 +3,9 @@
 // SPDX-License-Identifier: Apache-2.0
 
 use aptos_consensus_types::{
-    pipelined_block::PipelinedBlock, quorum_cert::QuorumCert, sync_info::SyncInfo,
+    pipelined_block::PipelinedBlock,
+    quorum_cert::QuorumCert,
+    sync_info::{SyncInfo, VersionedSyncInfo},
     timeout_2chain::TwoChainTimeoutCertificate,
 };
 use aptos_crypto::HashValue;
@@ -57,6 +59,9 @@ pub trait BlockReader: Send + Sync {
 
     /// Return the combination of highest quorum cert, timeout cert and commit cert.
     fn sync_info(&self) -> SyncInfo;
+
+    /// Return the combination of highest quorum cert, timeout cert and commit cert.
+    fn versioned_sync_info(&self) -> VersionedSyncInfo;
 
     /// Return if the consensus is backpressured
     fn vote_back_pressure(&self) -> bool;

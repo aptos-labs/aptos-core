@@ -22,7 +22,7 @@ use aptos_consensus_types::{
     },
     common::Author,
     quorum_cert::QuorumCert,
-    sync_info::SyncInfo,
+    sync_info::VersionedSyncInfo,
 };
 use aptos_crypto::HashValue;
 use aptos_logger::prelude::*;
@@ -79,29 +79,84 @@ impl BlockStore {
     /// Inserts sync_info.quorum_cert into block store as the last step
     pub async fn add_certs(
         &self,
-        sync_info: &SyncInfo,
+        sync_info: &VersionedSyncInfo,
         mut retriever: BlockRetriever,
     ) -> anyhow::Result<()> {
-        self.sync_to_highest_commit_cert(
-            sync_info.highest_commit_cert().ledger_info(),
-            &retriever.network,
-        )
-        .await;
-        self.sync_to_highest_ordered_cert(
-            sync_info.highest_ordered_cert().clone(),
-            sync_info.highest_commit_cert().clone(),
-            &mut retriever,
-        )
-        .await?;
+        match sync_info {
+            VersionedSyncInfo::V1(sync_info) => {
+                self.sync_to_highest_commit_decision(
+                    sync_info.highest_commit_cert().ledger_info(),
+                    &retriever.network,
+                )
+                .await;
+                self.sync_to_highest_ordered_cert(
+                    sync_info.highest_ordered_cert().clone(),
+                    sync_info.highest_commit_cert().clone(),
+                    &mut retriever,
+                )
+                .await?;
 
-        self.insert_quorum_cert(sync_info.highest_ordered_cert(), &mut retriever)
-            .await?;
-
+                self.insert_quorum_cert(sync_info.highest_ordered_cert(), &mut retriever)
+                    .await?;
+            },
+            VersionedSyncInfo::V2(sync_info) => {
+                self.sync_to_highest_commit_decision(
+                    sync_info.highest_commit_decision(),
+                    &retriever.network,
+                )
+                .await;
+                self.sync_to_highest_quroum_cert(
+                    sync_info.highest_quorum_cert().clone(),
+                    sync_info.highest_commit_decision().clone(),
+                    &mut retriever,
+                )
+                .await?;
+            },
+        }
         self.insert_quorum_cert(sync_info.highest_quorum_cert(), &mut retriever)
             .await?;
 
         if let Some(tc) = sync_info.highest_2chain_timeout_cert() {
             self.insert_2chain_timeout_certificate(Arc::new(tc.clone()))?;
+        }
+        Ok(())
+    }
+
+    async fn sync_to_highest_quroum_cert(
+        &self,
+        highest_qc: QuorumCert,
+        highest_commit_decision: LedgerInfoWithSignatures,
+        retriever: &mut BlockRetriever,
+    ) -> anyhow::Result<()> {
+        if !self.need_sync_for_ledger_info(&highest_commit_decision) {
+            return Ok(());
+        }
+        let (root, root_metadata, blocks, quorum_certs) = Self::fast_forward_sync_v2(
+            &highest_qc,
+            &highest_commit_decision,
+            retriever,
+            self.storage.clone(),
+            self.execution_client.clone(),
+            self.payload_manager.clone(),
+        )
+        .await?
+        .take();
+        info!(
+            LogSchema::new(LogEvent::CommitViaSync).round(self.ordered_root().round()),
+            committed_round = root.0.round(),
+            block_id = root.0.id(),
+        );
+        self.rebuild(root, root_metadata, blocks, quorum_certs)
+            .await;
+
+        if highest_commit_decision.ledger_info().ends_epoch() {
+            retriever
+                .network
+                .send_epoch_change(EpochChangeProof::new(
+                    vec![highest_qc.ledger_info().clone()],
+                    /* more = */ false,
+                ))
+                .await;
         }
         Ok(())
     }
@@ -342,8 +397,108 @@ impl BlockStore {
         Ok(recovery_data)
     }
 
+    pub async fn fast_forward_sync_v2<'a>(
+        highest_quorum_cert: &'a QuorumCert,
+        highest_commit_decision: &'a LedgerInfoWithSignatures,
+        retriever: &'a mut BlockRetriever,
+        storage: Arc<dyn PersistentLivenessStorage>,
+        execution_client: Arc<dyn TExecutionClient>,
+        payload_manager: Arc<PayloadManager>,
+    ) -> anyhow::Result<RecoveryData> {
+        info!(
+            LogSchema::new(LogEvent::StateSync).remote_peer(retriever.preferred_peer),
+            "Start state sync to commit decsion: {}, quorum cert: {}",
+            highest_commit_decision,
+            highest_quorum_cert,
+        );
+
+        // we fetch the blocks from
+        let num_blocks = highest_quorum_cert.certified_block().round()
+            - highest_commit_decision.ledger_info().round()
+            + 1;
+
+        // although unlikely, we might wrap num_blocks around on a 32-bit machine
+        assert!(num_blocks < std::usize::MAX as u64);
+
+        let blocks = retriever
+            .retrieve_block_for_qc(
+                highest_quorum_cert,
+                num_blocks,
+                highest_commit_decision.commit_info().id(),
+            )
+            .await?;
+
+        assert_eq!(
+            blocks.first().expect("blocks are empty").id(),
+            highest_quorum_cert.certified_block().id(),
+            "Expecting in the retrieval response, first block should be {}, but got {}",
+            highest_quorum_cert.certified_block().id(),
+            blocks.first().expect("blocks are empty").id(),
+        );
+
+        // Confirm retrieval ended when it hit the last block we care about, even if it didn't reach all num_blocks blocks.
+        assert_eq!(
+            blocks.last().expect("blocks are empty").id(),
+            highest_commit_decision.commit_info().id()
+        );
+
+        let mut quorum_certs = vec![highest_quorum_cert.clone()];
+        quorum_certs.extend(
+            blocks
+                .iter()
+                .take(blocks.len() - 1)
+                .map(|block| block.quorum_cert().clone()),
+        );
+
+        assert_eq!(blocks.len(), quorum_certs.len());
+        for (i, block) in blocks.iter().enumerate() {
+            assert_eq!(block.id(), quorum_certs[i].certified_block().id());
+            if let Some(payload) = block.payload() {
+                payload_manager.prefetch_payload_data(payload, block.timestamp_usecs());
+            }
+        }
+
+        // Check early that recovery will succeed, and return before corrupting our state in case it will not.
+        LedgerRecoveryData::new(highest_commit_decision.clone())
+            .find_root(&mut blocks.clone(), &mut quorum_certs.clone())
+            .with_context(|| {
+                // for better readability
+                quorum_certs.sort_by_key(|qc| qc.certified_block().round());
+                format!(
+                    "\nRoot: {:?}\nBlocks in db: {}\nQuorum Certs in db: {}\n",
+                    highest_commit_decision.commit_info(),
+                    blocks
+                        .iter()
+                        .map(|b| format!("\n\t{}", b))
+                        .collect::<Vec<String>>()
+                        .concat(),
+                    quorum_certs
+                        .iter()
+                        .map(|qc| format!("\n\t{}", qc))
+                        .collect::<Vec<String>>()
+                        .concat(),
+                )
+            })?;
+
+        storage.save_tree(blocks.clone(), quorum_certs.clone())?;
+
+        execution_client
+            .sync_to(highest_commit_decision.clone())
+            .await?;
+
+        // we do not need to update block_tree.highest_commit_decision_ledger_info here
+        // because the block_tree is going to rebuild itself.
+
+        let recovery_data = match storage.start() {
+            LivenessStorageData::FullRecoveryData(recovery_data) => recovery_data,
+            _ => panic!("Failed to construct recovery data after fast forward sync"),
+        };
+
+        Ok(recovery_data)
+    }
+
     /// Fast forward in the decoupled-execution pipeline if the block exists there
-    async fn sync_to_highest_commit_cert(
+    async fn sync_to_highest_commit_decision(
         &self,
         ledger_info: &LedgerInfoWithSignatures,
         network: &Arc<NetworkSender>,

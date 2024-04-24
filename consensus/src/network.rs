@@ -27,9 +27,9 @@ use aptos_consensus_types::{
     common::Author,
     pipeline::{commit_decision::CommitDecision, commit_vote::CommitVote},
     proof_of_store::{ProofOfStore, ProofOfStoreMsg, SignedBatchInfo, SignedBatchInfoMsg},
-    proposal_msg::ProposalMsg,
-    sync_info::SyncInfo,
-    vote_msg::VoteMsg,
+    proposal_msg::{ProposalMsg, VersionedProposalMsg},
+    sync_info::{SyncInfo, VersionedSyncInfo},
+    vote_msg::{VersionedVoteMsg, VoteMsg},
 };
 use aptos_logger::prelude::*;
 use aptos_network::{
@@ -382,9 +382,21 @@ impl NetworkSender {
         self.broadcast(msg).await
     }
 
+    pub async fn broadcast_versioned_proposal(&self, proposal_msg: VersionedProposalMsg) {
+        fail_point!("consensus::send::broadcast_proposal", |_| ());
+        let msg = ConsensusMsg::VersionedProposalMsg(Box::new(proposal_msg));
+        self.broadcast(msg).await
+    }
+
     pub async fn broadcast_sync_info(&self, sync_info_msg: SyncInfo) {
         fail_point!("consensus::send::broadcast_sync_info", |_| ());
         let msg = ConsensusMsg::SyncInfo(Box::new(sync_info_msg));
+        self.broadcast(msg).await
+    }
+
+    pub async fn broadcast_versioned_sync_info(&self, sync_info_msg: VersionedSyncInfo) {
+        fail_point!("consensus::send::broadcast_sync_info", |_| ());
+        let msg = ConsensusMsg::VersionedSyncInfo(Box::new(sync_info_msg));
         self.broadcast(msg).await
     }
 
@@ -415,6 +427,12 @@ impl NetworkSender {
     pub async fn broadcast_vote(&self, vote_msg: VoteMsg) {
         fail_point!("consensus::send::vote", |_| ());
         let msg = ConsensusMsg::VoteMsg(Box::new(vote_msg));
+        self.broadcast(msg).await
+    }
+
+    pub async fn broadcast_versioned_vote(&self, vote_msg: VersionedVoteMsg) {
+        fail_point!("consensus::send::vote", |_| ());
+        let msg = ConsensusMsg::VersionedVoteMsg(Box::new(vote_msg));
         self.broadcast(msg).await
     }
 

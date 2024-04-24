@@ -1431,8 +1431,12 @@ impl<P: OnChainConfigProvider> EpochManager<P> {
     ) -> anyhow::Result<Option<UnverifiedEvent>> {
         match msg {
             ConsensusMsg::ProposalMsg(_)
+            | ConsensusMsg::VersionedProposalMsg(_)
             | ConsensusMsg::SyncInfo(_)
+            | ConsensusMsg::VersionedSyncInfo(_)
             | ConsensusMsg::VoteMsg(_)
+            | ConsensusMsg::VersionedVoteMsg(_)
+            | ConsensusMsg::OrderVoteMsg(_)
             | ConsensusMsg::CommitVoteMsg(_)
             | ConsensusMsg::CommitDecisionMsg(_)
             | ConsensusMsg::BatchMsg(_)

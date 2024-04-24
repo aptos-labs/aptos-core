@@ -14,11 +14,12 @@ use aptos_config::network_id::{NetworkId, PeerNetworkId};
 use aptos_consensus_types::{
     block_retrieval::{BlockRetrievalRequest, BlockRetrievalResponse},
     epoch_retrieval::EpochRetrievalRequest,
+    order_vote::OrderVote,
     pipeline::{commit_decision::CommitDecision, commit_vote::CommitVote},
     proof_of_store::{ProofOfStoreMsg, SignedBatchInfoMsg},
-    proposal_msg::ProposalMsg,
-    sync_info::SyncInfo,
-    vote_msg::VoteMsg,
+    proposal_msg::{ProposalMsg, VersionedProposalMsg},
+    sync_info::{SyncInfo, VersionedSyncInfo},
+    vote_msg::{VersionedVoteMsg, VoteMsg},
 };
 use aptos_network::{
     application::{error::Error, interface::NetworkClientInterface},
@@ -41,16 +42,27 @@ pub enum ConsensusMsg {
     /// ProposalMsg contains the required information for the proposer election protocol to make
     /// its choice (typically depends on round and proposer info).
     ProposalMsg(Box<ProposalMsg>),
+    /// ProposalMsg contains the required information for the proposer election protocol to make
+    /// its choice (typically depends on round and proposer info). This struct is versioned to
+    /// support upgrades.
+    VersionedProposalMsg(Box<VersionedProposalMsg>),
     /// This struct describes basic synchronization metadata.
     SyncInfo(Box<SyncInfo>),
+    /// This struct describes basic synchronization metadata. This struct is versioned to support
+    /// upgrades.
+    VersionedSyncInfo(Box<VersionedSyncInfo>),
     /// A vector of LedgerInfo with contiguous increasing epoch numbers to prove a sequence of
     /// epoch changes from the first LedgerInfo's epoch.
     EpochChangeProof(Box<EpochChangeProof>),
     /// VoteMsg is the struct that is ultimately sent by the voter in response for receiving a
     /// proposal.
     VoteMsg(Box<VoteMsg>),
+    /// VersionedVoteMsg is the struct that is ultimately sent by the voter in response for
+    /// receiving a proposal. This struct is versioned to support upgrades.
+    VersionedVoteMsg(Box<VersionedVoteMsg>),
     /// CommitProposal is the struct that is sent by the validator after execution to propose
     /// on the committed state hash root.
+    OrderVoteMsg(Box<OrderVote>),
     CommitVoteMsg(Box<CommitVote>),
     /// CommitDecision is the struct that is sent by the validator after collecting no fewer
     /// than 2f + 1 signatures on the commit proposal. This part is not on the critical path, but
@@ -87,9 +99,13 @@ impl ConsensusMsg {
             ConsensusMsg::BlockRetrievalResponse(_) => "BlockRetrievalResponse",
             ConsensusMsg::EpochRetrievalRequest(_) => "EpochRetrievalRequest",
             ConsensusMsg::ProposalMsg(_) => "ProposalMsg",
+            ConsensusMsg::VersionedProposalMsg(_) => "VersionedProposalMsg",
             ConsensusMsg::SyncInfo(_) => "SyncInfo",
+            ConsensusMsg::VersionedSyncInfo(_) => "VersionedSyncInfo",
             ConsensusMsg::EpochChangeProof(_) => "EpochChangeProof",
             ConsensusMsg::VoteMsg(_) => "VoteMsg",
+            ConsensusMsg::VersionedVoteMsg(_) => "VersionedVoteMsg",
+            ConsensusMsg::OrderVoteMsg(_) => "OrderVoteMsg",
             ConsensusMsg::CommitVoteMsg(_) => "CommitVoteMsg",
             ConsensusMsg::CommitDecisionMsg(_) => "CommitDecisionMsg",
             ConsensusMsg::BatchMsg(_) => "BatchMsg",

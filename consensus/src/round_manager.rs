@@ -34,13 +34,14 @@ use aptos_consensus_types::{
     block_data::BlockType,
     common::{Author, Round},
     delayed_qc_msg::DelayedQcMsg,
+    order_vote::OrderVote,
     proof_of_store::{ProofCache, ProofOfStoreMsg, SignedBatchInfoMsg},
-    proposal_msg::ProposalMsg,
+    proposal_msg::{ProposalMsg, VersionedProposalMsg},
     quorum_cert::QuorumCert,
-    sync_info::SyncInfo,
+    sync_info::{SyncInfo, VersionedSyncInfo},
     timeout_2chain::TwoChainTimeoutCertificate,
     vote::Vote,
-    vote_msg::VoteMsg,
+    vote_msg::{VersionedVoteMsg, VoteMsg},
 };
 use aptos_infallible::{checked, Mutex};
 use aptos_logger::prelude::*;
@@ -70,8 +71,12 @@ use tokio::{
 #[derive(Serialize, Clone)]
 pub enum UnverifiedEvent {
     ProposalMsg(Box<ProposalMsg>),
+    VersionedProposalMsg(Box<VersionedProposalMsg>),
     VoteMsg(Box<VoteMsg>),
+    VersionedVoteMsg(Box<VersionedVoteMsg>),
+    OrderVoteMsg(Box<OrderVote>),
     SyncInfo(Box<SyncInfo>),
+    VersionedSyncInfo(Box<VersionedSyncInfo>),
     BatchMsg(Box<BatchMsg>),
     SignedBatchInfo(Box<SignedBatchInfoMsg>),
     ProofOfStoreMsg(Box<ProofOfStoreMsg>),
@@ -102,6 +107,15 @@ impl UnverifiedEvent {
                 }
                 VerifiedEvent::ProposalMsg(p)
             },
+            UnverifiedEvent::VersionedProposalMsg(p) => {
+                if !self_message {
+                    p.verify(validator, proof_cache, quorum_store_enabled)?;
+                    counters::VERIFY_MSG
+                        .with_label_values(&["versioned_proposal"])
+                        .observe(start_time.elapsed().as_secs_f64());
+                }
+                VerifiedEvent::VersionedProposalMsg(p)
+            },
             UnverifiedEvent::VoteMsg(v) => {
                 if !self_message {
                     v.verify(validator)?;
@@ -111,8 +125,27 @@ impl UnverifiedEvent {
                 }
                 VerifiedEvent::VoteMsg(v)
             },
+            UnverifiedEvent::VersionedVoteMsg(v) => {
+                if !self_message {
+                    v.verify(validator)?;
+                    counters::VERIFY_MSG
+                        .with_label_values(&["versioned_vote"])
+                        .observe(start_time.elapsed().as_secs_f64());
+                }
+                VerifiedEvent::VersionedVoteMsg(v)
+            },
+            UnverifiedEvent::OrderVoteMsg(v) => {
+                if !self_message {
+                    v.verify(validator)?;
+                    counters::VERIFY_MSG
+                        .with_label_values(&["order_vote"])
+                        .observe(start_time.elapsed().as_secs_f64());
+                }
+                VerifiedEvent::OrderVoteMsg(v)
+            },
             // sync info verification is on-demand (verified when it's used)
             UnverifiedEvent::SyncInfo(s) => VerifiedEvent::UnverifiedSyncInfo(s),
+            UnverifiedEvent::VersionedSyncInfo(s) => VerifiedEvent::UnverifiedVersionedSyncInfo(s),
             UnverifiedEvent::BatchMsg(b) => {
                 if !self_message {
                     b.verify(peer_id, max_num_batches)?;
@@ -151,8 +184,12 @@ impl UnverifiedEvent {
     pub fn epoch(&self) -> anyhow::Result<u64> {
         match self {
             UnverifiedEvent::ProposalMsg(p) => Ok(p.epoch()),
+            UnverifiedEvent::VersionedProposalMsg(p) => Ok(p.epoch()),
             UnverifiedEvent::VoteMsg(v) => Ok(v.epoch()),
+            UnverifiedEvent::VersionedVoteMsg(v) => Ok(v.epoch()),
+            UnverifiedEvent::OrderVoteMsg(v) => Ok(v.epoch()),
             UnverifiedEvent::SyncInfo(s) => Ok(s.epoch()),
+            UnverifiedEvent::VersionedSyncInfo(s) => Ok(s.epoch()),
             UnverifiedEvent::BatchMsg(b) => b.epoch(),
             UnverifiedEvent::SignedBatchInfo(sd) => sd.epoch(),
             UnverifiedEvent::ProofOfStoreMsg(p) => p.epoch(),
@@ -164,8 +201,12 @@ impl From<ConsensusMsg> for UnverifiedEvent {
     fn from(value: ConsensusMsg) -> Self {
         match value {
             ConsensusMsg::ProposalMsg(m) => UnverifiedEvent::ProposalMsg(m),
+            ConsensusMsg::VersionedProposalMsg(m) => UnverifiedEvent::VersionedProposalMsg(m),
             ConsensusMsg::VoteMsg(m) => UnverifiedEvent::VoteMsg(m),
+            ConsensusMsg::VersionedVoteMsg(m) => UnverifiedEvent::VersionedVoteMsg(m),
+            ConsensusMsg::OrderVoteMsg(m) => UnverifiedEvent::OrderVoteMsg(m),
             ConsensusMsg::SyncInfo(m) => UnverifiedEvent::SyncInfo(m),
+            ConsensusMsg::VersionedSyncInfo(m) => UnverifiedEvent::VersionedSyncInfo(m),
             ConsensusMsg::BatchMsg(m) => UnverifiedEvent::BatchMsg(m),
             ConsensusMsg::SignedBatchInfo(m) => UnverifiedEvent::SignedBatchInfo(m),
             ConsensusMsg::ProofOfStoreMsg(m) => UnverifiedEvent::ProofOfStoreMsg(m),
@@ -178,9 +219,13 @@ impl From<ConsensusMsg> for UnverifiedEvent {
 pub enum VerifiedEvent {
     // network messages
     ProposalMsg(Box<ProposalMsg>),
+    VersionedProposalMsg(Box<VersionedProposalMsg>),
     VerifiedProposalMsg(Box<Block>),
     VoteMsg(Box<VoteMsg>),
+    VersionedVoteMsg(Box<VersionedVoteMsg>),
+    OrderVoteMsg(Box<OrderVote>),
     UnverifiedSyncInfo(Box<SyncInfo>),
+    UnverifiedVersionedSyncInfo(Box<VersionedSyncInfo>),
     BatchMsg(Box<BatchMsg>),
     SignedBatchInfo(Box<SignedBatchInfoMsg>),
     ProofOfStoreMsg(Box<ProofOfStoreMsg>),
@@ -432,7 +477,10 @@ impl RoundManager {
     /// Process the proposal message:
     /// 1. ensure after processing sync info, we're at the same round as the proposal
     /// 2. execute and decide whether to vote for the proposal
-    pub async fn process_proposal_msg(&mut self, proposal_msg: ProposalMsg) -> anyhow::Result<()> {
+    pub async fn process_proposal_msg(
+        &mut self,
+        proposal_msg: VersionedProposalMsg,
+    ) -> anyhow::Result<()> {
         fail_point!("consensus::process_proposal_msg", |_| {
             Err(anyhow::anyhow!("Injected error in process_proposal_msg"))
         });
@@ -452,7 +500,7 @@ impl RoundManager {
         if self
             .ensure_round_and_sync_up(
                 proposal_msg.proposal().round(),
-                proposal_msg.sync_info(),
+                &proposal_msg.sync_info(),
                 proposal_msg.proposer(),
             )
             .await
@@ -501,8 +549,12 @@ impl RoundManager {
     }
 
     /// Sync to the sync info sending from peer if it has newer certificates.
-    async fn sync_up(&mut self, sync_info: &SyncInfo, author: Author) -> anyhow::Result<()> {
-        let local_sync_info = self.block_store.sync_info();
+    async fn sync_up(
+        &mut self,
+        sync_info: &VersionedSyncInfo,
+        author: Author,
+    ) -> anyhow::Result<()> {
+        let local_sync_info = self.block_store.versioned_sync_info();
         if sync_info.has_newer_certificates(&local_sync_info) {
             info!(
                 self.new_log(LogEvent::ReceiveNewCertificate)
@@ -543,7 +595,7 @@ impl RoundManager {
     pub async fn ensure_round_and_sync_up(
         &mut self,
         message_round: Round,
-        sync_info: &SyncInfo,
+        sync_info: &VersionedSyncInfo,
         author: Author,
     ) -> anyhow::Result<bool> {
         if message_round < self.round_state.current_round() {
@@ -562,7 +614,7 @@ impl RoundManager {
     /// Process the SyncInfo sent by peers to catch up to latest state.
     pub async fn process_sync_info_msg(
         &mut self,
-        sync_info: SyncInfo,
+        sync_info: VersionedSyncInfo,
         peer: Author,
     ) -> anyhow::Result<()> {
         fail_point!("consensus::process_sync_info_msg", |_| {
@@ -920,13 +972,17 @@ impl RoundManager {
         Ok(vote)
     }
 
+    async fn process_order_vote_msg(&mut self, _order_vote_msg: OrderVote) -> anyhow::Result<()> {
+        Ok(())
+    }
+
     /// Upon new vote:
     /// 1. Ensures we're processing the vote from the same round as local round
     /// 2. Filter out votes for rounds that should not be processed by this validator (to avoid
     /// potential attacks).
     /// 2. Add the vote to the pending votes and check whether it finishes a QC.
     /// 3. Once the QC/TC successfully formed, notify the RoundState.
-    pub async fn process_vote_msg(&mut self, vote_msg: VoteMsg) -> anyhow::Result<()> {
+    pub async fn process_vote_msg(&mut self, vote_msg: VersionedVoteMsg) -> anyhow::Result<()> {
         fail_point!("consensus::process_vote_msg", |_| {
             Err(anyhow::anyhow!("Injected error in process_vote_msg"))
         });
@@ -934,7 +990,7 @@ impl RoundManager {
         if self
             .ensure_round_and_sync_up(
                 vote_msg.vote().vote_data().proposed().round(),
-                vote_msg.sync_info(),
+                &vote_msg.sync_info(),
                 vote_msg.vote().author(),
             )
             .await
@@ -1146,7 +1202,13 @@ impl RoundManager {
                             VerifiedEvent::ProposalMsg(proposal_msg) => {
                                 monitor!(
                                     "process_proposal",
-                                    self.process_proposal_msg(*proposal_msg).await
+                                    self.process_proposal_msg(VersionedProposalMsg::V1(*proposal_msg)).await
+                                )
+                            }
+                            VerifiedEvent::VersionedProposalMsg(versioned_proposal_msg) => {
+                                monitor!(
+                                    "process_proposal",
+                                    self.process_proposal_msg(*versioned_proposal_msg).await
                                 )
                             }
                             VerifiedEvent::VerifiedProposalMsg(proposal_msg) => {
@@ -1170,12 +1232,24 @@ impl RoundManager {
                 (peer_id, event) = event_rx.select_next_some() => {
                     let result = match event {
                         VerifiedEvent::VoteMsg(vote_msg) => {
-                            monitor!("process_vote", self.process_vote_msg(*vote_msg).await)
+                            monitor!("process_vote", self.process_vote_msg(VersionedVoteMsg::V1(*vote_msg)).await)
+                        }
+                        VerifiedEvent::VersionedVoteMsg(versioned_vote_msg) => {
+                            monitor!("process_versioned_vote", self.process_vote_msg(*versioned_vote_msg).await)
+                        }
+                        VerifiedEvent::OrderVoteMsg(order_vote_msg) => {
+                            monitor!("process_order_vote", self.process_order_vote_msg(*order_vote_msg).await)
                         }
                         VerifiedEvent::UnverifiedSyncInfo(sync_info) => {
                             monitor!(
                                 "process_sync_info",
-                                self.process_sync_info_msg(*sync_info, peer_id).await
+                                self.process_sync_info_msg(VersionedSyncInfo::V1(*sync_info), peer_id).await
+                            )
+                        }
+                        VerifiedEvent::UnverifiedVersionedSyncInfo(versioned_sync_info) => {
+                            monitor!(
+                                "process_versioned_sync_info",
+                                self.process_sync_info_msg(*versioned_sync_info, peer_id).await
                             )
                         }
                         VerifiedEvent::LocalTimeout(round) => monitor!(
