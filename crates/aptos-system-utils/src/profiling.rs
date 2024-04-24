@@ -1,9 +1,8 @@
 // Copyright © Aptos Foundation
 // SPDX-License-Identifier: Apache-2.0
 
-use crate::server::utils::{reply_with, reply_with_status};
+use crate::utils::{reply_with, reply_with_status};
 use anyhow::{anyhow, ensure};
-use aptos_logger::info;
 use async_mutex::Mutex;
 use http::header::{HeaderValue, CONTENT_DISPOSITION, CONTENT_LENGTH, CONTENT_TYPE};
 use hyper::{Body, Request, Response, StatusCode};
@@ -11,6 +10,7 @@ use lazy_static::lazy_static;
 use pprof::protos::Message;
 use regex::Regex;
 use std::{collections::HashMap, time::Duration};
+use tracing::info;
 
 lazy_static! {
     static ref CPU_PROFILE_MUTEX: Mutex<()> = Mutex::new(());

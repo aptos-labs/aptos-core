@@ -27,7 +27,7 @@ def test_stake_initialize_stake_owner(run_helper: RunHelper, test_name=None):
     if result.get("success") != True:
         raise TestError("Did not initialize stake owner successfully")
 
-    # make sure the the stake pool initialized on chain
+    # make sure the stake pool initialized on chain
     response = run_helper.run_command(
         test_name,
         [

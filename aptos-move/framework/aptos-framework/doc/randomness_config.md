@@ -17,6 +17,7 @@ Structs and functions for on-chain randomness configurations.
 -  [Function `enabled`](#0x1_randomness_config_enabled)
 -  [Function `new_off`](#0x1_randomness_config_new_off)
 -  [Function `new_v1`](#0x1_randomness_config_new_v1)
+-  [Function `new_v2`](#0x1_randomness_config_new_v2)
 -  [Function `current`](#0x1_randomness_config_current)
 -  [Specification](#@Specification_1)
     -  [Function `current`](#@Specification_1_current)
@@ -342,6 +343,41 @@ Create a <code><a href="randomness_config.md#0x1_randomness_config_ConfigV1">Con
         variant: <a href="../../aptos-stdlib/doc/copyable_any.md#0x1_copyable_any_pack">copyable_any::pack</a>( <a href="randomness_config.md#0x1_randomness_config_ConfigV1">ConfigV1</a> {
             secrecy_threshold,
             reconstruction_threshold
+        } )
+    }
+}
+</code></pre>
+
+
+
+</details>
+
+<a id="0x1_randomness_config_new_v2"></a>
+
+## Function `new_v2`
+
+Create a <code><a href="randomness_config.md#0x1_randomness_config_ConfigV2">ConfigV2</a></code> variant.
+
+
+<pre><code><b>public</b> <b>fun</b> <a href="randomness_config.md#0x1_randomness_config_new_v2">new_v2</a>(secrecy_threshold: <a href="../../aptos-stdlib/doc/fixed_point64.md#0x1_fixed_point64_FixedPoint64">fixed_point64::FixedPoint64</a>, reconstruction_threshold: <a href="../../aptos-stdlib/doc/fixed_point64.md#0x1_fixed_point64_FixedPoint64">fixed_point64::FixedPoint64</a>, fast_path_secrecy_threshold: <a href="../../aptos-stdlib/doc/fixed_point64.md#0x1_fixed_point64_FixedPoint64">fixed_point64::FixedPoint64</a>): <a href="randomness_config.md#0x1_randomness_config_RandomnessConfig">randomness_config::RandomnessConfig</a>
+</code></pre>
+
+
+
+<details>
+<summary>Implementation</summary>
+
+
+<pre><code><b>public</b> <b>fun</b> <a href="randomness_config.md#0x1_randomness_config_new_v2">new_v2</a>(
+    secrecy_threshold: FixedPoint64,
+    reconstruction_threshold: FixedPoint64,
+    fast_path_secrecy_threshold: FixedPoint64,
+): <a href="randomness_config.md#0x1_randomness_config_RandomnessConfig">RandomnessConfig</a> {
+    <a href="randomness_config.md#0x1_randomness_config_RandomnessConfig">RandomnessConfig</a> {
+        variant: <a href="../../aptos-stdlib/doc/copyable_any.md#0x1_copyable_any_pack">copyable_any::pack</a>( <a href="randomness_config.md#0x1_randomness_config_ConfigV2">ConfigV2</a> {
+            secrecy_threshold,
+            reconstruction_threshold,
+            fast_path_secrecy_threshold,
         } )
     }
 }

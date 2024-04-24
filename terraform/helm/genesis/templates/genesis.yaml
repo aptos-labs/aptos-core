@@ -31,7 +31,9 @@ data:
     {{- with .Values.chain.on_chain_execution_config}}
     on_chain_execution_config: {{ . | toJson }}
     {{- end}}
-
+    {{- with .Values.chain.jwk_consensus_config_override }}
+    jwk_consensus_config_override: {{ . | toJson }}
+    {{- end}}
 ---
 
 apiVersion: v1
@@ -91,9 +93,6 @@ spec:
         app.kubernetes.io/name: genesis
     spec:
       restartPolicy: Never
-      securityContext:
-        seccompProfile:
-          type: RuntimeDefault
       containers:
       - name: genesis
         image: {{ .Values.genesis.image.repo }}:{{ .Values.genesis.image.tag | default .Values.imageTag }}
@@ -181,6 +180,8 @@ spec:
         runAsUser: 6180
         runAsGroup: 6180
         fsGroup: 6180
+        seccompProfile:
+          type: RuntimeDefault
       {{- end }}
       volumes:
       - name: layout

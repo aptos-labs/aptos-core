@@ -11,7 +11,7 @@ error: caller does not have permission to modify `B::T` at given address
    =         addr1 = <redacted>
    =         addr2 = <redacted>
    =     at tests/sources/functional/ModifiesErrorTest.move:37: mutate_at_test_incorrect
-   =         addr1 = <redacted>
+   =         x0 = <redacted>
    =     at tests/sources/functional/ModifiesErrorTest.move:38: mutate_at_test_incorrect
 
 error: caller does not have permission to modify `B::T` at given address
@@ -26,9 +26,9 @@ error: caller does not have permission to modify `B::T` at given address
    =         account = <redacted>
    =         addr2 = <redacted>
    =     at tests/sources/functional/ModifiesErrorTest.move:51: move_to_test_incorrect
-   =         account = <redacted>
+   =         x0 = <redacted>
    =     at tests/sources/functional/ModifiesErrorTest.move:52: move_to_test_incorrect
-   =         addr2 = <redacted>
+   =         <redacted> = <redacted>
 
 error: caller does not have permission to modify `B::T` at given address
    ┌─ tests/sources/functional/ModifiesErrorTest.move:65:17
@@ -42,7 +42,7 @@ error: caller does not have permission to modify `B::T` at given address
    =         addr1 = <redacted>
    =         addr2 = <redacted>
    =     at tests/sources/functional/ModifiesErrorTest.move:64: move_from_test_incorrect
-   =         addr1 = <redacted>
+   =         x0 = <redacted>
    =     at tests/sources/functional/ModifiesErrorTest.move:65: move_from_test_incorrect
 
 error: caller does not have permission to modify `A::S` at given address
@@ -58,7 +58,7 @@ error: caller does not have permission to modify `A::S` at given address
    =         addr1 = <redacted>
    =         addr2 = <redacted>
    =     at tests/sources/functional/ModifiesErrorTest.move:78: mutate_S_test1_incorrect
-   =         addr1 = <redacted>
+   =         x0 = <redacted>
    =     at tests/sources/functional/ModifiesErrorTest.move:79: mutate_S_test1_incorrect
 
 error: unknown assertion failed
@@ -72,8 +72,8 @@ error: unknown assertion failed
    =     at tests/sources/functional/ModifiesErrorTest.move:90: mutate_S_test2_incorrect
    =         addr = <redacted>
    =     at tests/sources/functional/ModifiesErrorTest.move:91: mutate_S_test2_incorrect
-   =         addr = <redacted>
+   =         x0 = <redacted>
    =     at tests/sources/functional/ModifiesErrorTest.move:92: mutate_S_test2_incorrect
    =     at tests/sources/functional/ModifiesErrorTest.move:93: mutate_S_test2_incorrect
-   =         x0 = <redacted>
+   =         x1 = <redacted>
    =     at tests/sources/functional/ModifiesErrorTest.move:95: mutate_S_test2_incorrect

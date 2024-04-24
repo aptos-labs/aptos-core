@@ -352,19 +352,13 @@ dependencies = [
  "aptos-crypto",
  "aptos-infallible",
  "aptos-logger",
- "aptos-profiler",
  "aptos-runtimes",
  "aptos-storage-interface",
+ "aptos-system-utils",
  "aptos-types",
- "async-mutex",
  "bcs 0.1.4",
  "http",
  "hyper",
- "lazy_static",
- "mime",
- "pprof",
- "regex",
- "rstack-self",
  "sha256",
  "tokio",
  "url",
@@ -2115,8 +2109,8 @@ name = "aptos-indexer-grpc-server-framework"
 version = "1.0.0"
 dependencies = [
  "anyhow",
- "aptos-admin-service",
  "aptos-metrics-core",
+ "aptos-system-utils",
  "async-trait",
  "backtrace",
  "clap 4.4.14",
@@ -2478,6 +2472,7 @@ dependencies = [
  "aptos-consensus-types",
  "aptos-crypto",
  "aptos-event-notifications",
+ "aptos-experimental-runtimes",
  "aptos-id-generator",
  "aptos-infallible",
  "aptos-logger",
@@ -2734,6 +2729,7 @@ dependencies = [
  "thiserror",
  "tokio",
  "tokio-retry",
+ "tokio-stream",
  "tokio-util 0.7.10",
 ]
 
@@ -3658,6 +3654,25 @@ dependencies = [
  "rand 0.7.3",
  "serde",
  "thiserror",
+]
+
+[[package]]
+name = "aptos-system-utils"
+version = "0.1.0"
+dependencies = [
+ "anyhow",
+ "aptos-profiler",
+ "async-mutex",
+ "http",
+ "hyper",
+ "lazy_static",
+ "mime",
+ "pprof",
+ "regex",
+ "rstack-self",
+ "tokio",
+ "tracing",
+ "url",
 ]
 
 [[package]]

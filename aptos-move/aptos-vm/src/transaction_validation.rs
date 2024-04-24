@@ -178,7 +178,7 @@ pub(crate) fn run_script_prologue(
 }
 
 /// Run the prologue for a multisig transaction. This needs to verify that:
-/// 1. The the multisig tx exists
+/// 1. The multisig tx exists
 /// 2. It has received enough approvals to meet the signature threshold of the multisig account
 /// 3. If only the payload hash was stored on chain, the provided payload in execution should
 /// match that hash.

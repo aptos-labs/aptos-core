@@ -241,7 +241,7 @@ impl Interpreter {
                         let err = set_err_info!(frame, err);
                         self.attach_state_if_invariant_violation(err, &frame)
                     })?;
-                    // Note: the caller will find the the callee's return values at the top of the shared operand stack
+                    // Note: the caller will find the callee's return values at the top of the shared operand stack
                     current_frame = frame;
                 },
                 ExitCode::CallGeneric(idx) => {
