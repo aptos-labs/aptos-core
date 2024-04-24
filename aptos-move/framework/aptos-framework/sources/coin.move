@@ -254,7 +254,8 @@ module aptos_framework::coin {
     #[view]
     /// Get the paired fungible asset metadata object of a coin type. If not exist, return option::none().
     public fun paired_metadata<CoinType>(): Option<Object<Metadata>> acquires CoinConversionMap {
-        if (exists<CoinConversionMap>(@aptos_framework)) {
+        if (exists<CoinConversionMap>(@aptos_framework) && features::coin_to_fungible_asset_migration_feature_enabled(
+        )) {
             let map = &borrow_global<CoinConversionMap>(@aptos_framework).coin_to_fungible_asset_map;
             let type = type_info::type_of<CoinType>();
             if (table::contains(map, type)) {
@@ -278,22 +279,22 @@ module aptos_framework::coin {
         aptos_framework: &signer
     ) acquires CoinConversionMap, CoinInfo {
         system_addresses::assert_aptos_framework(aptos_framework);
-        create_pairing_if_not_exist<CoinType>(true);
+        create_and_return_paired_metadata_if_not_exist<CoinType>(true);
     }
 
     inline fun is_apt<CoinType>(): bool {
         type_info::type_name<CoinType>() == string::utf8(b"0x1::aptos_coin::AptosCoin")
     }
 
-    inline fun create_pairing_if_not_exist<CoinType>(allow_apt_creation: bool): Object<Metadata> {
+    inline fun create_and_return_paired_metadata_if_not_exist<CoinType>(allow_apt_creation: bool): Object<Metadata> {
+        assert!(
+            features::coin_to_fungible_asset_migration_feature_enabled(),
+            error::invalid_state(EMIGRATION_FRAMEWORK_NOT_ENABLED)
+        );
         assert!(exists<CoinConversionMap>(@aptos_framework), error::not_found(ECOIN_CONVERSION_MAP_NOT_FOUND));
         let map = borrow_global_mut<CoinConversionMap>(@aptos_framework);
         let type = type_info::type_of<CoinType>();
         if (!table::contains(&map.coin_to_fungible_asset_map, type)) {
-            assert!(
-                features::coin_to_fungible_asset_migration_feature_enabled(),
-                error::invalid_state(EMIGRATION_FRAMEWORK_NOT_ENABLED)
-            );
             let is_apt = is_apt<CoinType>();
             assert!(!is_apt || allow_apt_creation, error::invalid_state(EAPT_PAIRING_IS_NOT_ENABLED));
             let metadata_object_cref =
@@ -340,7 +341,7 @@ module aptos_framework::coin {
 
     /// Get the paired fungible asset metadata object of a coin type, create if not exist.
     public(friend) fun ensure_paired_metadata<CoinType>(): Object<Metadata> acquires CoinConversionMap, CoinInfo {
-        create_pairing_if_not_exist<CoinType>(false)
+        create_and_return_paired_metadata_if_not_exist<CoinType>(false)
     }
 
     #[view]
