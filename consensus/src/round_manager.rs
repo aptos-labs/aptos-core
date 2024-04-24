@@ -815,12 +815,12 @@ impl RoundManager {
     }
 
     pub async fn process_verified_proposal(&mut self, proposal: Block) -> anyhow::Result<()> {
-        // experimental: pre-execute the proposal
-        let pipelined_block = PipelinedBlock::new_ordered(proposal.clone());
-        self.execution_client
-            .pre_execute(pipelined_block)
-            .await
-            .context("[PreExecution] Failed to pre-execute the block")?;
+        // // daniel experimental: pre-execute the proposal
+        // let pipelined_block = PipelinedBlock::new_ordered(proposal.clone());
+        // self.execution_client
+        //     .pre_execute(pipelined_block)
+        //     .await
+        //     .context("[PreExecution] Failed to pre-execute the block")?;
 
         let proposal_round = proposal.round();
         let vote = self
