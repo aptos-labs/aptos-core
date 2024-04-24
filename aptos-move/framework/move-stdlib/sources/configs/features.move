@@ -369,7 +369,9 @@ module std::features {
 
     /// Deprecated by `aptos_framework::randomness_config::RandomnessConfig`.
     const RECONFIGURE_WITH_DKG: u64 = 45;
+
     public fun get_reconfigure_with_dkg_feature(): u64 { RECONFIGURE_WITH_DKG }
+
     public fun reconfigure_with_dkg_enabled(): bool acquires Features {
         is_enabled(RECONFIGURE_WITH_DKG)
     }
@@ -476,6 +478,38 @@ module std::features {
         is_enabled(MODULE_EVENT_MIGRATION)
     }
 
+    /// Whether the transaction context extension is enabled. This feature allows the module
+    /// `transaction_context` to provide contextual information about the user transaction.
+    ///
+    /// Lifetime: transient
+    const TRANSACTION_CONTEXT_EXTENSION: u64 = 59;
+
+    public fun get_transaction_context_extension_feature(): u64 { TRANSACTION_CONTEXT_EXTENSION }
+
+    public fun transaction_context_extension_enabled(): bool acquires Features {
+        is_enabled(TRANSACTION_CONTEXT_EXTENSION)
+    }
+
+    /// Whether migration from coin to fungible asset feature is enabled.
+    ///
+    /// Lifetime: transient
+    const COIN_TO_FUNGIBLE_ASSET_MIGRATION: u64 = 60;
+
+    public fun get_coin_to_fungible_asset_migration_feature(): u64 { COIN_TO_FUNGIBLE_ASSET_MIGRATION }
+
+    public fun coin_to_fungible_asset_migration_feature_enabled(): bool acquires Features {
+        is_enabled(COIN_TO_FUNGIBLE_ASSET_MIGRATION)
+    }
+
+    const PRIMARY_APT_FUNGIBLE_STORE_AT_USER_ADDRESS: u64 = 61;
+
+    public fun get_primary_apt_fungible_store_at_user_address_feature(
+    ): u64 { PRIMARY_APT_FUNGIBLE_STORE_AT_USER_ADDRESS }
+
+    public fun primary_apt_fungible_store_at_user_address_enabled(): bool acquires Features {
+        is_enabled(PRIMARY_APT_FUNGIBLE_STORE_AT_USER_ADDRESS)
+    }
+
     // ============================================================================================
     // Feature Flag Implementation
 
@@ -499,7 +533,7 @@ module std::features {
     ///
     /// Governance proposals should use `change_feature_flags_for_next_epoch()` to enable/disable features.
     public fun change_feature_flags(_framework: &signer, _enable: vector<u64>, _disable: vector<u64>) {
-        abort(error::invalid_state(EAPI_DISABLED))
+        abort (error::invalid_state(EAPI_DISABLED))
     }
 
     /// Update feature flags directly. Only used in genesis/tests.
@@ -518,7 +552,11 @@ module std::features {
     }
 
     /// Enable and disable features for the next epoch.
-    public fun change_feature_flags_for_next_epoch(framework: &signer, enable: vector<u64>, disable: vector<u64>) acquires PendingFeatures, Features {
+    public fun change_feature_flags_for_next_epoch(
+        framework: &signer,
+        enable: vector<u64>,
+        disable: vector<u64>
+    ) acquires PendingFeatures, Features {
         assert!(signer::address_of(framework) == @std, error::permission_denied(EFRAMEWORK_SIGNER_NEEDED));
 
         // Figure out the baseline feature vec that the diff will be applied to.
@@ -594,12 +632,20 @@ module std::features {
     }
 
     #[verify_only]
-    public fun change_feature_flags_for_verification(framework: &signer, enable: vector<u64>, disable: vector<u64>) acquires Features {
+    public fun change_feature_flags_for_verification(
+        framework: &signer,
+        enable: vector<u64>,
+        disable: vector<u64>
+    ) acquires Features {
         change_feature_flags_internal(framework, enable, disable)
     }
 
     #[test_only]
-    public fun change_feature_flags_for_testing(framework: &signer, enable: vector<u64>, disable: vector<u64>) acquires Features {
+    public fun change_feature_flags_for_testing(
+        framework: &signer,
+        enable: vector<u64>,
+        disable: vector<u64>
+    ) acquires Features {
         change_feature_flags_internal(framework, enable, disable)
     }
 

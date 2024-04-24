@@ -46,17 +46,38 @@ static SAMPLE_NONCE: Lazy<String> = Lazy::new(|| {
 
 pub(crate) const SAMPLE_TEST_ISS_VALUE: &str = "test.oidc.provider";
 
-/// TODO(keyless): Use a multiline format here, for diff-friendliness
 pub(crate) static SAMPLE_JWT_PAYLOAD_JSON: Lazy<String> = Lazy::new(|| {
     format!(
-        r#"{{"iss":"{}","azp":"407408718192.apps.googleusercontent.com","aud":"407408718192.apps.googleusercontent.com","sub":"113990307082899718775","hd":"aptoslabs.com","email":"michael@aptoslabs.com","email_verified":true,"at_hash":"bxIESuI59IoZb5alCASqBg","name":"Michael Straka","picture":"https://lh3.googleusercontent.com/a/ACg8ocJvY4kVUBRtLxe1IqKWL5i7tBDJzFp9YuWVXMzwPpbs=s96-c","given_name":"Michael","family_name":"Straka","locale":"en","iat":1700255944,"exp":2700259544,"nonce":"{}"}}"#,
+        r#"{{
+            "iss":"{}",
+            "azp":"407408718192.apps.googleusercontent.com",
+            "aud":"407408718192.apps.googleusercontent.com",
+            "sub":"113990307082899718775",
+            "hd":"aptoslabs.com",
+            "email":"michael@aptoslabs.com",
+            "email_verified":true,
+            "at_hash":"bxIESuI59IoZb5alCASqBg",
+            "name":"Michael Straka",
+            "picture":"https://lh3.googleusercontent.com/a/ACg8ocJvY4kVUBRtLxe1IqKWL5i7tBDJzFp9YuWVXMzwPpbs=s96-c",
+            "given_name":"Michael",
+            {}
+            "locale":"en",
+            "iat":1700255944,
+            "exp":2700259544,
+            "nonce":"{}"
+         }}"#,
         SAMPLE_TEST_ISS_VALUE,
+        SAMPLE_JWT_EXTRA_FIELD.as_str(),
         SAMPLE_NONCE.as_str()
     )
 });
 
 /// Consistent with what is in `SAMPLE_JWT_PAYLOAD_JSON`
-pub(crate) const SAMPLE_JWT_EXTRA_FIELD: &str = r#""family_name":"Straka","#;
+pub(crate) const SAMPLE_JWT_EXTRA_FIELD_KEY: &str = "family_name";
+
+/// Consistent with what is in `SAMPLE_JWT_PAYLOAD_JSON`
+pub(crate) static SAMPLE_JWT_EXTRA_FIELD: Lazy<String> =
+    Lazy::new(|| format!(r#""{}":"Straka","#, SAMPLE_JWT_EXTRA_FIELD_KEY));
 
 /// The JWT parsed as a struct
 pub(crate) static SAMPLE_JWT_PARSED: Lazy<Claims> =
@@ -65,7 +86,7 @@ pub(crate) static SAMPLE_JWT_PARSED: Lazy<Claims> =
 /// The JWK under which the JWT is signed, taken from https://token.dev
 pub(crate) static SAMPLE_JWK: Lazy<RSA_JWK> = Lazy::new(|| {
     RSA_JWK {
-    kid: "test_jwk".to_owned(),
+    kid: "test-rsa".to_owned(),
     kty: "RSA".to_owned(),
     alg: "RS256".to_owned(),
     e: "AQAB".to_owned(),
@@ -129,7 +150,11 @@ pub(crate) static SAMPLE_ESK: Lazy<Ed25519PrivateKey> =
 pub(crate) static SAMPLE_EPK: Lazy<EphemeralPublicKey> =
     Lazy::new(|| EphemeralPublicKey::ed25519(SAMPLE_ESK.public_key()));
 
-pub(crate) static SAMPLE_EPK_BLINDER: Lazy<Vec<u8>> = Lazy::new(|| vec![42u8]);
+pub(crate) static SAMPLE_EPK_BLINDER: Lazy<Vec<u8>> = Lazy::new(|| {
+    let mut byte_vector = vec![0; 31];
+    byte_vector[0] = 42;
+    byte_vector
+});
 
 pub(crate) static SAMPLE_PK: Lazy<KeylessPublicKey> = Lazy::new(|| {
     assert_eq!(SAMPLE_UID_KEY, "sub");
@@ -153,9 +178,9 @@ pub(crate) static SAMPLE_PK: Lazy<KeylessPublicKey> = Lazy::new(|| {
 /// https://github.com/aptos-labs/devnet-groth16-keys/commit/02e5675f46ce97f8b61a4638e7a0aaeaa4351f76
 pub(crate) static SAMPLE_PROOF: Lazy<Groth16Proof> = Lazy::new(|| {
     Groth16Proof::new(
-        G1Bytes::new_from_vec(hex::decode("bc1b31c0d35d8ea1086640f209dc1fda01d9b57e7aff138687549ece67f45780").unwrap()).unwrap(),
-        G2Bytes::new_from_vec(hex::decode("7104f991a6324f8e8287e2f6e32b225b65b90ed33d02a8105652c889ecf8b50672bbc55caf9ff0fcd07d5c26fbaa6ffd0d24c690aed4ee8ee8cebfdfc51e2d1b").unwrap()).unwrap(),
-        G1Bytes::new_from_vec(hex::decode("246c9d4b5029b41274dfa53491061f6d1358a7a1b02988f9959091e5f871aba2").unwrap()).unwrap(),
+        G1Bytes::new_from_vec(hex::decode("0093f692e4b0fb2e04acf52b862abf7d629a729cc1cd888ff46843dd4ced0d2e").unwrap()).unwrap(),
+        G2Bytes::new_from_vec(hex::decode("2e8deaf247490013eef4d8bbb1a407e72bf932cd141ef9347b1b49c0c4cc5a12b1ffd67e3b1119b384f4c821df35f9d3540f027c3766a4a4acc67cc0d804ff28").unwrap()).unwrap(),
+        G1Bytes::new_from_vec(hex::decode("a94683ea56b099fafb157321a52ddd7578f1ba5dc85acef3e231d1b5f1c03713").unwrap()).unwrap(),
     )
 });
 
@@ -166,8 +191,8 @@ pub(crate) static SAMPLE_PROOF: Lazy<Groth16Proof> = Lazy::new(|| {
 /// https://github.com/aptos-labs/devnet-groth16-keys/commit/02e5675f46ce97f8b61a4638e7a0aaeaa4351f76
 pub(crate) static SAMPLE_PROOF_NO_EXTRA_FIELD: Lazy<Groth16Proof> = Lazy::new(|| {
     Groth16Proof::new(
-        G1Bytes::new_from_vec(hex::decode("8f350299bbbd9d3d9940c893186f0a187d488214f6e2de928afc44ccd314d10d").unwrap()).unwrap(),
-        G2Bytes::new_from_vec(hex::decode("d90534077ba332278b4850218855a1e370aa77aaaf4c7ae35b5ba42d4073e40b9b89a667f74e608558baab4f44758ffeff0b081d46735c8044f7e03f57e0d012").unwrap()).unwrap(),
-        G1Bytes::new_from_vec(hex::decode("96ce90fd67ede76d4b6eb19a116f2a52b9f4e86d82c6d94a18731de8d2794819").unwrap()).unwrap(),
+        G1Bytes::new_from_vec(hex::decode("6bfcb02a4a0c4aaefa70b3d5a535d1a306c2b23cc6bb23f0c25992e5e3839324").unwrap()).unwrap(),
+        G2Bytes::new_from_vec(hex::decode("55af188580d37264a4876560bbe763b608be566849697778830aa0d47ab27129434d02b33179a6c39c648f1bf0c3074e48c5b58a63aba83b3567a7fc6de87202").unwrap()).unwrap(),
+        G1Bytes::new_from_vec(hex::decode("49513acd5cf07b77d1558387d14b69ebe55a95a886ebb735dc73d456b1116113").unwrap()).unwrap(),
     )
 });

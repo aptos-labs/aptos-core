@@ -928,7 +928,10 @@ impl<'a> FunctionGenerator<'a> {
         local
     }
 
-    /// Allocates a local for the given temporary
+    /// Allocates a local for the given temporary.
+    /// If a local is not already available, then allocates one.
+    /// While allocating one, it adds it to the source map, unless
+    /// it is a parameter (these are recorded elsewhere).
     fn temp_to_local(
         &mut self,
         ctx: &FunctionContext,
@@ -941,23 +944,26 @@ impl<'a> FunctionGenerator<'a> {
             let idx = self.new_local(ctx, ctx.temp_type(temp).to_owned());
             self.temps.insert(temp, TempInfo::new(idx));
 
-            let loc = if let Some(id) = bc_attr_opt {
-                // Have a bytecode specific location for this local
-                ctx.fun.get_bytecode_loc(id)
-            } else if temp < ctx.fun.get_parameter_count() {
-                // Take location from parameter
-                ctx.fun.func_env.get_parameters()[temp].2.clone()
+            if temp < ctx.fun.get_parameter_count() {
+                // `temp` is a parameter.
+                // Don't add it to the source map here.
+                idx
             } else {
-                // Fall back to function identifier
-                ctx.fun.func_env.get_id_loc()
-            };
-            let name = ctx.fun.get_local_name(temp);
-            self.gen
-                .source_map
-                .add_local_mapping(ctx.def_idx, ctx.module.source_name(name, loc))
-                .expect(SOURCE_MAP_OK);
-
-            idx
+                let loc = if let Some(id) = bc_attr_opt {
+                    // Have a bytecode specific location for this local
+                    ctx.fun.get_bytecode_loc(id)
+                } else {
+                    // Fall back to function identifier
+                    ctx.fun.func_env.get_id_loc()
+                };
+                // Only add to the source map if it wasn't a parameter.
+                let name = ctx.fun.get_local_name(temp);
+                self.gen
+                    .source_map
+                    .add_local_mapping(ctx.def_idx, ctx.module.source_name(name, loc))
+                    .expect(SOURCE_MAP_OK);
+                idx
+            }
         }
     }
 }

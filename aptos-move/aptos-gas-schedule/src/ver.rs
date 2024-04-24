@@ -8,6 +8,8 @@
 ///   - Changing how gas is calculated in any way
 ///
 /// Change log:
+/// - V17
+///   - Gas for keyless
 /// - V16
 ///   - IO Gas for the transaction itself and events in the transaction output
 /// - V15
@@ -55,4 +57,4 @@
 ///       global operations.
 /// - V1
 ///   - TBA
-pub const LATEST_GAS_FEATURE_VERSION: u64 = 16;
+pub const LATEST_GAS_FEATURE_VERSION: u64 = 17;

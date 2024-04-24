@@ -9,7 +9,7 @@ pub const OUT_EXT: &str = "out";
 /// Extension for expected output files
 pub const EXP_EXT: &str = "exp";
 /// Extension for expected output files compiled by v2
-pub const EXP_EXT_V2: &str = "exp.v2";
+pub const EXP_EXT_V2: &str = "v2_exp";
 
 /// If any of these env vars is set, the test harness should overwrite
 /// the existing .exp files with the output instead of checking

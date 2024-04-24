@@ -554,4 +554,10 @@ where
             .charge_execution(MIN_TRANSACTION_GAS_UNITS + INTRINSIC_GAS_PER_BYTE * excess)
             .map_err(|e| e.finish(Location::Undefined))
     }
+
+    fn charge_keyless(&mut self) -> VMResult<()> {
+        self.algebra
+            .charge_execution(KEYLESS_BASE_COST)
+            .map_err(|e| e.finish(Location::Undefined))
+    }
 }

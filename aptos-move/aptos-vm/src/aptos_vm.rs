@@ -15,7 +15,7 @@ use crate::{
             abort_hook::AbortHookSession, epilogue::EpilogueSession, prologue::PrologueSession,
             user::UserSession,
         },
-        AptosMoveResolver, MoveVmExt, SessionExt, SessionId,
+        AptosMoveResolver, MoveVmExt, SessionExt, SessionId, UserTransactionContext,
     },
     sharded_block_executor::{executor_client::ExecutorClient, ShardedBlockExecutor},
     system_module_names::*,
@@ -274,8 +274,10 @@ impl AptosVM {
         &self,
         resolver: &'r S,
         session_id: SessionId,
+        user_transaction_context_opt: Option<UserTransactionContext>,
     ) -> SessionExt<'r, '_> {
-        self.move_vm.new_session(resolver, session_id)
+        self.move_vm
+            .new_session(resolver, session_id, user_transaction_context_opt)
     }
 
     #[inline(always)]
@@ -817,6 +819,9 @@ impl AptosVM {
         });
 
         gas_meter.charge_intrinsic_gas_for_transaction(txn_data.transaction_size())?;
+        if txn_data.is_keyless() {
+            gas_meter.charge_keyless()?;
+        }
 
         match payload {
             TransactionPayload::Script(script) => {
@@ -1001,6 +1006,9 @@ impl AptosVM {
         });
 
         gas_meter.charge_intrinsic_gas_for_transaction(txn_data.transaction_size())?;
+        if txn_data.is_keyless() {
+            gas_meter.charge_keyless()?;
+        }
 
         // Step 1: Obtain the payload. If any errors happen here, the entire transaction should fail
         let invariant_violation_error = || {
@@ -1568,6 +1576,7 @@ impl AptosVM {
             keyless_validation::validate_authenticators(
                 &authenticators,
                 self.features(),
+                self.gas_feature_version,
                 resolver,
             )?;
         }
@@ -1817,7 +1826,7 @@ impl AptosVM {
                 Ok(change)
             },
             WriteSetPayload::Script { script, execute_as } => {
-                let mut tmp_session = self.new_session(resolver, session_id);
+                let mut tmp_session = self.new_session(resolver, session_id, None);
                 let senders = match txn_sender {
                     None => vec![*execute_as],
                     Some(sender) => vec![sender, *execute_as],
@@ -1941,7 +1950,7 @@ impl AptosVM {
         });
 
         let mut gas_meter = UnmeteredGasMeter;
-        let mut session = self.new_session(resolver, SessionId::block_meta(&block_metadata));
+        let mut session = self.new_session(resolver, SessionId::block_meta(&block_metadata), None);
 
         let args = serialize_values(
             &block_metadata.get_prologue_move_args(account_config::reserved_vm_address()),
@@ -1983,8 +1992,11 @@ impl AptosVM {
         });
 
         let mut gas_meter = UnmeteredGasMeter;
-        let mut session =
-            self.new_session(resolver, SessionId::block_meta_ext(&block_metadata_ext));
+        let mut session = self.new_session(
+            resolver,
+            SessionId::block_meta_ext(&block_metadata_ext),
+            None,
+        );
 
         let block_metadata_with_randomness = match block_metadata_ext {
             BlockMetadataExt::V0(_) => unreachable!(),
@@ -2071,7 +2083,7 @@ impl AptosVM {
             Err(e) => return ViewFunctionOutput::new(Err(anyhow::Error::msg(format!("{}", e))), 0),
         };
 
-        let mut session = vm.new_session(&resolver, SessionId::Void);
+        let mut session = vm.new_session(&resolver, SessionId::Void, None);
         let execution_result = Self::execute_view_function_in_vm(
             &mut session,
             &vm,
@@ -2480,7 +2492,11 @@ impl VMValidator for AptosVM {
         let mut txn_data = TransactionMetadata::new(&txn);
 
         let resolver = self.as_move_resolver(&state_view);
-        let mut session = self.new_session(&resolver, SessionId::prologue_meta(&txn_data));
+        let mut session = self.new_session(
+            &resolver,
+            SessionId::prologue_meta(&txn_data),
+            Some(txn_data.as_user_transaction_context()),
+        );
         let required_deposit = if let Ok(gas_params) = &self.gas_params {
             self.get_required_deposit(
                 &mut session,

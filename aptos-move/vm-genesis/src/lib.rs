@@ -138,7 +138,7 @@ pub fn encode_aptos_mainnet_genesis_transaction(
     )
     .unwrap();
     let id1 = HashValue::zero();
-    let mut session = move_vm.new_session(&data_cache, SessionId::genesis(id1));
+    let mut session = move_vm.new_session(&data_cache, SessionId::genesis(id1), None);
 
     // On-chain genesis process.
     let consensus_config = OnChainConsensusConfig::default_for_genesis();
@@ -179,7 +179,7 @@ pub fn encode_aptos_mainnet_genesis_transaction(
     let mut id2_arr = [0u8; 32];
     id2_arr[31] = 1;
     let id2 = HashValue::new(id2_arr);
-    let mut session = move_vm.new_session(&data_cache, SessionId::genesis(id2));
+    let mut session = move_vm.new_session(&data_cache, SessionId::genesis(id2), None);
     publish_framework(&mut session, framework);
     let additional_change_set = session.finish(&configs).unwrap();
     change_set
@@ -256,7 +256,7 @@ pub fn encode_genesis_change_set(
     )
     .unwrap();
     let id1 = HashValue::zero();
-    let mut session = move_vm.new_session(&data_cache, SessionId::genesis(id1));
+    let mut session = move_vm.new_session(&data_cache, SessionId::genesis(id1), None);
 
     // On-chain genesis process.
     initialize(
@@ -316,7 +316,7 @@ pub fn encode_genesis_change_set(
     let mut id2_arr = [0u8; 32];
     id2_arr[31] = 1;
     let id2 = HashValue::new(id2_arr);
-    let mut session = move_vm.new_session(&data_cache, SessionId::genesis(id2));
+    let mut session = move_vm.new_session(&data_cache, SessionId::genesis(id2), None);
     publish_framework(&mut session, framework);
     let additional_change_set = session.finish(&configs).unwrap();
     change_set
@@ -1077,7 +1077,7 @@ pub fn test_genesis_module_publishing() {
     )
     .unwrap();
     let id1 = HashValue::zero();
-    let mut session = move_vm.new_session(&data_cache, SessionId::genesis(id1));
+    let mut session = move_vm.new_session(&data_cache, SessionId::genesis(id1), None);
     publish_framework(&mut session, aptos_cached_packages::head_release_bundle());
 }
 

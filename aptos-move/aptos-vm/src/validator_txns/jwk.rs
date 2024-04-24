@@ -129,7 +129,7 @@ impl AptosVM {
 
         // All verification passed. Apply the `observed`.
         let mut gas_meter = UnmeteredGasMeter;
-        let mut session = self.new_session(resolver, session_id);
+        let mut session = self.new_session(resolver, session_id, None);
         let args = vec![
             MoveValue::Signer(AccountAddress::ONE),
             vec![observed].as_move_value(),

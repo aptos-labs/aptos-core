@@ -1,0 +1,197 @@
+Command `sandbox publish`:
+Command `sandbox run scripts/print_stack_trace.move --dry-run`:
+Call Stack:
+    [0] main
+
+        Code:
+            [9] FreezeRef
+            [10] LdU64(1)
+            [11] VecImmBorrow(1)
+          > [12] CallGeneric(0)
+            [13] StLoc(1)
+            [14] ImmBorrowLoc(1)
+            [15] CallGeneric(1)
+
+        Locals:
+            [0] [true, false]
+            [1] -
+            [2] -
+
+
+    [1] 0000000000000000000000000000000000000000000000000000000000000002::N::foo<bool, u64>
+
+        Code:
+            [1] StLoc(0)
+            [2] MutBorrowLoc(0)
+            [3] LdU64(4)
+          > [4] Call(1)
+            [5] StLoc(1)
+            [6] StLoc(2)
+            [7] MoveLoc(2)
+
+        Locals:
+            [0] 3
+            [1] -
+            [2] -
+            [3] -
+            [4] -
+
+
+    [2] 0000000000000000000000000000000000000000000000000000000000000002::M::sum
+
+        Code:
+            [12] CopyLoc(0)
+            [13] MoveLoc(3)
+            [14] Sub
+          > [15] Call(0)
+            [16] StLoc(4)
+            [17] MoveLoc(0)
+            [18] MoveLoc(4)
+
+        Locals:
+            [0] 4
+            [1] -
+            [2] -
+            [3] -
+            [4] -
+
+
+    [3] 0000000000000000000000000000000000000000000000000000000000000002::M::sum
+
+        Code:
+            [12] CopyLoc(0)
+            [13] MoveLoc(3)
+            [14] Sub
+          > [15] Call(0)
+            [16] StLoc(4)
+            [17] MoveLoc(0)
+            [18] MoveLoc(4)
+
+        Locals:
+            [0] 3
+            [1] -
+            [2] -
+            [3] -
+            [4] -
+
+
+    [4] 0000000000000000000000000000000000000000000000000000000000000002::M::sum
+
+        Code:
+            [12] CopyLoc(0)
+            [13] MoveLoc(3)
+            [14] Sub
+          > [15] Call(0)
+            [16] StLoc(4)
+            [17] MoveLoc(0)
+            [18] MoveLoc(4)
+
+        Locals:
+            [0] 2
+            [1] -
+            [2] -
+            [3] -
+            [4] -
+
+
+Operand Stack:
+    [0] false
+    [1] 3
+
+[debug] 10
+Call Stack:
+    [0] main
+
+        Code:
+            [16] StLoc(2)
+            [17] MoveLoc(2)
+            [18] Pop
+          > [19] CallGeneric(2)
+            [20] Pop
+            [21] Ret
+
+        Locals:
+            [0] [true, false]
+            [1] 10
+            [2] -
+
+
+    [1] 0000000000000000000000000000000000000000000000000000000000000002::N::foo<u8, bool>
+
+        Code:
+            [1] StLoc(0)
+            [2] MutBorrowLoc(0)
+            [3] LdU64(4)
+          > [4] Call(1)
+            [5] StLoc(1)
+            [6] StLoc(2)
+            [7] MoveLoc(2)
+
+        Locals:
+            [0] 3
+            [1] -
+            [2] -
+            [3] -
+            [4] -
+
+
+    [2] 0000000000000000000000000000000000000000000000000000000000000002::M::sum
+
+        Code:
+            [12] CopyLoc(0)
+            [13] MoveLoc(3)
+            [14] Sub
+          > [15] Call(0)
+            [16] StLoc(4)
+            [17] MoveLoc(0)
+            [18] MoveLoc(4)
+
+        Locals:
+            [0] 4
+            [1] -
+            [2] -
+            [3] -
+            [4] -
+
+
+    [3] 0000000000000000000000000000000000000000000000000000000000000002::M::sum
+
+        Code:
+            [12] CopyLoc(0)
+            [13] MoveLoc(3)
+            [14] Sub
+          > [15] Call(0)
+            [16] StLoc(4)
+            [17] MoveLoc(0)
+            [18] MoveLoc(4)
+
+        Locals:
+            [0] 3
+            [1] -
+            [2] -
+            [3] -
+            [4] -
+
+
+    [4] 0000000000000000000000000000000000000000000000000000000000000002::M::sum
+
+        Code:
+            [12] CopyLoc(0)
+            [13] MoveLoc(3)
+            [14] Sub
+          > [15] Call(0)
+            [16] StLoc(4)
+            [17] MoveLoc(0)
+            [18] MoveLoc(4)
+
+        Locals:
+            [0] 2
+            [1] -
+            [2] -
+            [3] -
+            [4] -
+
+
+Operand Stack:
+    [0] 3
+

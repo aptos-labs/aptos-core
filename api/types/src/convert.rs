@@ -42,7 +42,7 @@ use move_core_types::{
     resolver::ModuleResolver,
     value::{MoveStructLayout, MoveTypeLayout},
 };
-use move_resource_viewer::MoveValueAnnotator;
+use move_resource_viewer::{Limiter, MoveValueAnnotator};
 use serde_json::Value;
 use std::{
     convert::{TryFrom, TryInto},
@@ -81,8 +81,13 @@ impl<'a, R: ModuleResolver + ?Sized> MoveConverter<'a, R> {
         &self,
         data: impl Iterator<Item = (StructTag, &'b [u8])>,
     ) -> Result<Vec<MoveResource>> {
-        data.map(|(typ, bytes)| self.try_into_resource(&typ, bytes))
-            .collect()
+        let mut limiter = Limiter::default();
+        data.map(|(typ, bytes)| {
+            self.inner
+                .view_resource_with_limit(&typ, bytes, &mut limiter)?
+                .try_into()
+        })
+        .collect()
     }
 
     pub fn try_into_resource(&self, typ: &StructTag, bytes: &'_ [u8]) -> Result<MoveResource> {

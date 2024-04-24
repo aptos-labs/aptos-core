@@ -3159,7 +3159,8 @@ Staking_contract exists the stacker/operator pair.
 Staking_contract exists the stacker/operator pair.
 
 
-<pre><code><b>pragma</b> aborts_if_is_partial;
+<pre><code><b>pragma</b> verify_duration_estimate = 120;
+<b>pragma</b> aborts_if_is_partial;
 <b>let</b> staker_address = <a href="../../aptos-stdlib/../move-stdlib/doc/signer.md#0x1_signer_address_of">signer::address_of</a>(staker);
 <b>include</b> <a href="staking_contract.md#0x1_staking_contract_ContractExistsAbortsIf">ContractExistsAbortsIf</a> { staker: staker_address, operator: old_operator };
 </code></pre>
@@ -3216,7 +3217,8 @@ Staking_contract exists the stacker/operator pair.
 Staking_contract exists the stacker/operator pair.
 
 
-<pre><code><b>pragma</b> aborts_if_is_partial;
+<pre><code><b>pragma</b> verify_duration_estimate = 120;
+<b>pragma</b> aborts_if_is_partial;
 <b>include</b> <a href="staking_contract.md#0x1_staking_contract_ContractExistsAbortsIf">ContractExistsAbortsIf</a>;
 </code></pre>
 
@@ -3235,7 +3237,8 @@ The StakePool exists under the pool_address of StakingContract.
 The value of inactive and pending_inactive in the stake_pool is up to MAX_U64.
 
 
-<pre><code><b>pragma</b> aborts_if_is_partial;
+<pre><code><b>pragma</b> verify_duration_estimate = 120;
+<b>pragma</b> aborts_if_is_partial;
 <b>let</b> pool_address = <a href="staking_contract.md#0x1_staking_contract">staking_contract</a>.pool_address;
 <b>let</b> stake_pool = <b>borrow_global</b>&lt;<a href="stake.md#0x1_stake_StakePool">stake::StakePool</a>&gt;(pool_address);
 <b>aborts_if</b> !<b>exists</b>&lt;<a href="stake.md#0x1_stake_StakePool">stake::StakePool</a>&gt;(pool_address);
