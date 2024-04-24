@@ -325,7 +325,7 @@ impl TransactionsApi {
         let ledger_info = self.context.get_latest_ledger_info()?;
         println!("ledger_info: {:?}", ledger_info);
         let signed_transaction = self.get_signed_transaction(&ledger_info, data)?;
-        panic!("signed_transaction: {:?}", signed_transaction);
+        println!("signed_transaction: {:?}", signed_transaction);
         let res = self.create(&accept_type, &ledger_info, signed_transaction)
             .await?;
         println!("sumitted transaction");
