@@ -232,16 +232,17 @@ impl ConsensusDB {
     }
 
     pub fn put<S: Schema>(&self, key: &S::Key, value: &S::Value) -> Result<(), DbError> {
-        let batch = SchemaBatch::new();
-        batch.put::<S>(key, value)?;
-        self.commit(batch)?;
+        // let batch = SchemaBatch::new();
+        // batch.put::<S>(key, value)?;
+        // self.commit(batch)?;
         Ok(())
     }
 
     pub fn delete<S: Schema>(&self, keys: Vec<S::Key>) -> Result<(), DbError> {
-        let batch = SchemaBatch::new();
-        keys.iter().try_for_each(|key| batch.delete::<S>(key))?;
-        self.commit(batch)
+        // let batch = SchemaBatch::new();
+        // keys.iter().try_for_each(|key| batch.delete::<S>(key))?;
+        // self.commit(batch)
+        Ok(())
     }
 
     pub fn get_all<S: Schema>(&self) -> Result<Vec<(S::Key, S::Value)>, DbError> {
