@@ -14,7 +14,6 @@
 ///   - Gas & limits for dependencies
 /// - V14
 ///   - Gas for type creation
-/// - V13
 ///   - Storage Fee: Make state bytes refundable and remove the per slot free quota, gated by flag REFUNDABLE_BYTES
 /// - V13
 ///   (skipped due to testnet mis-operation)
