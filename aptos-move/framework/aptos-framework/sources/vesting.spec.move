@@ -108,7 +108,8 @@ spec aptos_framework::vesting {
         pragma aborts_if_is_strict;
         // property 2: The vesting pool should not exceed a maximum of 30 shareholders.
         /// [high-level-spec-2]
-        invariant forall pool: Pool: len(pool.shareholders) <= MAXIMUM_SHAREHOLDERS;
+        invariant forall a: address where exists<VestingContract>(a):
+            global<VestingContract>(a).grant_pool.shareholders_limit <= MAXIMUM_SHAREHOLDERS;
     }
 
     spec stake_pool_address(vesting_contract_address: address): address {
