@@ -76,7 +76,7 @@ use std::{
     thread,
     time::Duration,
 };
-use suites::dag::get_dag_test;
+use suites::dag::{get_dag_test, run_dag_consensus_only_realistic_env_max_tps};
 use tokio::{runtime::Runtime, select};
 use url::Url;
 
@@ -559,7 +559,7 @@ fn get_test_suite(
         "state_sync_failures_catching_up" => state_sync_failures_catching_up(),
         "twin_validator_test" => twin_validator_test(),
         "large_db_simple_test" => large_db_simple_test(),
-        "consensus_only_realistic_env_max_tps" => run_consensus_only_realistic_env_max_tps(),
+        "consensus_only_realistic_env_max_tps" => run_dag_consensus_only_realistic_env_max_tps(),
         "quorum_store_reconfig_enable_test" => quorum_store_reconfig_enable_test(),
         "mainnet_like_simulation_test" => mainnet_like_simulation_test(),
         "gather_metrics" => gather_metrics(),
