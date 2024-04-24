@@ -1065,6 +1065,7 @@ impl TransactionsApi {
 
     /// Submits a single transaction, and converts mempool codes to errors
     async fn create_internal(&self, txn: SignedTransaction) -> Result<(), AptosError> {
+        println!("create_internal");
         let (mempool_status, vm_status_opt) = self
             .context
             .submit_transaction(txn)
