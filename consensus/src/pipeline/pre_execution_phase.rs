@@ -9,7 +9,7 @@ use crate::{
 use aptos_consensus_types::pipelined_block::PipelinedBlock;
 use aptos_crypto::HashValue;
 use aptos_executor_types::ExecutorError;
-use aptos_logger::{debug, warn};
+use aptos_logger::{debug, info, warn};
 use async_trait::async_trait;
 use dashmap::DashMap;
 use futures::TryFutureExt;
@@ -45,17 +45,16 @@ impl StatelessPipeline for PreExecutionPhase {
             block,
         } = req;
 
-        if self.pre_execution_futures.contains_key(&block.id()) {
-            return;
+        match self.pre_execution_futures.entry(block.id()) {
+            dashmap::mapref::entry::Entry::Occupied(entry) => {}
+            dashmap::mapref::entry::Entry::Vacant(entry) => {
+                info!("[PreExecution] pre-execute block of epoch {} round {} id {}", block.epoch(), block.round(), block.id());
+                let fut = self
+                    .execution_proxy
+                    .schedule_compute(block.block(), block.parent_id(), block.randomness().cloned())
+                    .await;
+                entry.insert(fut);
+            }
         }
-
-        debug!("[PreExecution] pre-execute block of epoch {} round {}", block.epoch(), block.round());
-
-        let fut = self
-            .execution_proxy
-            .schedule_compute(block.block(), block.parent_id(), block.randomness().cloned())
-            .await;
-
-        self.pre_execution_futures.insert(block.id(), fut);
     }
 }

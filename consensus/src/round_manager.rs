@@ -196,7 +196,6 @@ pub struct RoundManager {
     randomness_config: OnChainRandomnessConfig,
     jwk_consensus_config: OnChainJWKConsensusConfig,
     fast_rand_config: Option<RandConfig>,
-    execution_client: Arc<dyn TExecutionClient>,
 }
 
 impl RoundManager {
@@ -216,7 +215,6 @@ impl RoundManager {
         randomness_config: OnChainRandomnessConfig,
         jwk_consensus_config: OnChainJWKConsensusConfig,
         fast_rand_config: Option<RandConfig>,
-        execution_client: Arc<dyn TExecutionClient>,
     ) -> Self {
         // when decoupled execution is false,
         // the counter is still static.
@@ -244,7 +242,6 @@ impl RoundManager {
             randomness_config,
             jwk_consensus_config,
             fast_rand_config,
-            execution_client,
         }
     }
 
@@ -815,12 +812,6 @@ impl RoundManager {
     }
 
     pub async fn process_verified_proposal(&mut self, proposal: Block) -> anyhow::Result<()> {
-        // daniel experimental: pre-execute the proposal
-        let pipelined_block = PipelinedBlock::new_ordered(proposal.clone());
-        self.execution_client
-            .pre_execute(pipelined_block)
-            .await;
-
         let proposal_round = proposal.round();
         let vote = self
             .execute_and_vote(proposal)

@@ -72,7 +72,7 @@ pub trait TExecutionClient: Send + Sync {
     /// This is needed for some DAG tests. Clean this up as a TODO.
     fn get_execution_channel(&self) -> Option<UnboundedSender<OrderedBlocks>>;
 
-    async fn pre_execute(&self, block: PipelinedBlock);
+    async fn pre_execute(&self, block: &Arc<PipelinedBlock>);
 
     /// Send ordered blocks to the real execution phase through the channel.
     async fn finalize_order(
@@ -335,7 +335,7 @@ impl TExecutionClient for ExecutionProxyClient {
 
     async fn pre_execute(
         &self,
-        block: PipelinedBlock,
+        block: &Arc<PipelinedBlock>,
     ) {
         let pre_execute_tx = self.handle.read().pre_execute_tx.clone();
 
@@ -346,7 +346,7 @@ impl TExecutionClient for ExecutionProxyClient {
 
         if pre_execute_tx
             .unwrap()
-            .send(block)
+            .send((**block).clone())
             .await
             .is_err()
         {
@@ -508,7 +508,7 @@ impl TExecutionClient for DummyExecutionClient {
         None
     }
 
-    async fn pre_execute(&self, _block: PipelinedBlock) {}
+    async fn pre_execute(&self, _block: &Arc<PipelinedBlock>) {}
 
     async fn finalize_order(
         &self,

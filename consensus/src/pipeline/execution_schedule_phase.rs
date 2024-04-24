@@ -12,7 +12,7 @@ use crate::{
 use aptos_consensus_types::pipelined_block::PipelinedBlock;
 use aptos_crypto::HashValue;
 use aptos_executor_types::ExecutorError;
-use aptos_logger::debug;
+use aptos_logger::{debug, info};
 use async_trait::async_trait;
 use dashmap::DashMap;
 use futures::TryFutureExt;
@@ -81,30 +81,40 @@ impl StatelessPipeline for ExecutionSchedulePhase {
 
         // Call schedule_compute() for each block here (not in the fut being returned) to
         // make sure they are scheduled in order.
-        let mut futs = vec![];
-        for b in &ordered_blocks {
-            let fut = if self.pre_execution_futures.contains_key(&b.id()) {
-                debug!("[PreExecution] block of epoch {} round {} was pre-executed", b.epoch(), b.round());
-                self.pre_execution_futures.remove(&b.id()).unwrap().1
-            } else {
-                debug!("[PreExecution] block of epoch {} round {} was not pre-executed", b.epoch(), b.round());
-                self
-                    .execution_proxy
-                    .schedule_compute(b.block(), b.parent_id(), b.randomness().cloned())
-                    .await
-            };
-            futs.push(fut)
+        for block in &ordered_blocks {
+            match self.pre_execution_futures.entry(block.id()) {
+                dashmap::mapref::entry::Entry::Occupied(entry) => {
+                    info!("[PreExecution] block was pre-executed, epoch {} round {} id {}", block.epoch(), block.round(), block.id());
+                }
+                dashmap::mapref::entry::Entry::Vacant(entry) => {
+                    info!("[PreExecution] block was not pre-executed, epoch {} round {} id {}", block.epoch(), block.round(), block.id());
+                    let fut = self
+                        .execution_proxy
+                        .schedule_compute(block.block(), block.parent_id(), block.randomness().cloned())
+                        .await;
+                    entry.insert(fut);
+                }
+            }
         }
+
+        let execution_futures = self.pre_execution_futures.clone();
 
         // In the future being returned, wait for the compute results in order.
         // n.b. Must `spawn()` here to make sure lifetime_guard will be released even if
         //      ExecutionWait phase is never kicked off.
         let fut = tokio::task::spawn(async move {
             let mut results = vec![];
-            for (block, fut) in itertools::zip_eq(ordered_blocks, futs) {
-                debug!("try to receive compute result for block {}", block.id());
-                let PipelineExecutionResult { input_txns, result } = fut.await?;
-                results.push(block.set_execution_result(input_txns, result));
+            for block in ordered_blocks {
+                debug!("[Execution] try to receive compute result for block, epoch {} round {} id {}", block.epoch(), block.round(), block.id());
+                if let Some((_, fut)) = execution_futures.remove(&block.id()) {
+                    let PipelineExecutionResult { input_txns, result } = fut.await?;
+                    results.push(block.set_execution_result(input_txns, result));
+                } else {
+                    return Err(ExecutorError::internal_err(format!(
+                        "Failed to find compute result for block {}",
+                        block.id()
+                    )));
+                }
             }
             drop(lifetime_guard);
             Ok(results)

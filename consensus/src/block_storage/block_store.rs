@@ -339,7 +339,14 @@ impl BlockStore {
         self.storage
             .save_tree(vec![pipelined_block.block().clone()], vec![])
             .context("Insert block failed when saving block")?;
-        self.inner.write().insert_block(pipelined_block)
+        let result = self.inner.write().insert_block(pipelined_block);
+        if let Ok(block) = &result {
+            // daniel experimental: pre-execute the proposal
+            self.execution_client
+                .pre_execute(block)
+                .await;
+        }
+        result
     }
 
     /// Validates quorum certificates and inserts it into block tree assuming dependencies exist.
