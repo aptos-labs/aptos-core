@@ -3983,6 +3983,7 @@ dependencies = [
  "rand 0.7.3",
  "rayon",
  "regex",
+ "reqwest",
  "ring 0.16.20",
  "rsa 0.9.6",
  "serde",
