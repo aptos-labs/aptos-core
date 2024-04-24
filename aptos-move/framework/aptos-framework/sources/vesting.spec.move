@@ -409,6 +409,8 @@ spec aptos_framework::vesting {
         admin: &signer,
         contract_address: address,
     ) {
+        // TODO: set because of timeout (property proved)
+        pragma verify_duration_estimate = 300;
         aborts_if !exists<VestingContract>(contract_address);
         let vesting_contract = global<VestingContract>(contract_address);
         aborts_if signer::address_of(admin) != vesting_contract.admin;

@@ -315,6 +315,8 @@ spec aptos_framework::stake {
     }
 
     spec unlock_with_cap(amount: u64, owner_cap: &OwnerCapability) {
+        // TODO: set because of timeout (property proved)
+        pragma verify_duration_estimate = 300;
         let pool_address = owner_cap.pool_address;
         let pre_stake_pool = global<StakePool>(pool_address);
         let post stake_pool = global<StakePool>(pool_address);
@@ -455,6 +457,8 @@ spec aptos_framework::stake {
     }
 
     spec next_validator_consensus_infos {
+        // TODO: set because of timeout (property proved)
+        pragma verify_duration_estimate = 300;
         aborts_if false;
         include ResourceRequirement;
         include GetReconfigStartTimeRequirement;

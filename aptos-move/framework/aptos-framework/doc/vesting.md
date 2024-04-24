@@ -3485,7 +3485,8 @@ This address should be deterministic for the same admin and vesting contract cre
 <pre><code><b>pragma</b> verify = <b>true</b>;
 <b>pragma</b> aborts_if_is_strict;
 // This enforces <a id="high-level-spec-2" href="#high-level-req">high-level requirement 2</a>:
-<b>invariant</b> <b>forall</b> pool: Pool: len(pool.shareholders) &lt;= <a href="vesting.md#0x1_vesting_MAXIMUM_SHAREHOLDERS">MAXIMUM_SHAREHOLDERS</a>;
+<b>invariant</b> <b>forall</b> a: <b>address</b> <b>where</b> <b>exists</b>&lt;<a href="vesting.md#0x1_vesting_VestingContract">VestingContract</a>&gt;(a):
+    <b>global</b>&lt;<a href="vesting.md#0x1_vesting_VestingContract">VestingContract</a>&gt;(a).grant_pool.shareholders_limit &lt;= <a href="vesting.md#0x1_vesting_MAXIMUM_SHAREHOLDERS">MAXIMUM_SHAREHOLDERS</a>;
 </code></pre>
 
 
@@ -3931,19 +3932,6 @@ This address should be deterministic for the same admin and vesting contract cre
 
 
 
-
-<a id="0x1_vesting_PreconditionAbortsIf"></a>
-
-
-<pre><code><b>schema</b> <a href="vesting.md#0x1_vesting_PreconditionAbortsIf">PreconditionAbortsIf</a> {
-    contract_addresses: <a href="../../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;<b>address</b>&gt;;
-    <b>requires</b> <b>forall</b> i in 0..len(contract_addresses): <a href="../../aptos-stdlib/doc/simple_map.md#0x1_simple_map_spec_get">simple_map::spec_get</a>(<b>global</b>&lt;<a href="staking_contract.md#0x1_staking_contract_Store">staking_contract::Store</a>&gt;(contract_addresses[i]).staking_contracts, <b>global</b>&lt;<a href="vesting.md#0x1_vesting_VestingContract">VestingContract</a>&gt;(contract_addresses[i]).staking.operator).commission_percentage &gt;= 0
-        && <a href="../../aptos-stdlib/doc/simple_map.md#0x1_simple_map_spec_get">simple_map::spec_get</a>(<b>global</b>&lt;<a href="staking_contract.md#0x1_staking_contract_Store">staking_contract::Store</a>&gt;(contract_addresses[i]).staking_contracts, <b>global</b>&lt;<a href="vesting.md#0x1_vesting_VestingContract">VestingContract</a>&gt;(contract_addresses[i]).staking.operator).commission_percentage &lt;= 100;
-}
-</code></pre>
-
-
-
 <a id="@Specification_1_distribute"></a>
 
 ### Function `distribute`
@@ -4108,7 +4096,8 @@ This address should be deterministic for the same admin and vesting contract cre
 
 
 
-<pre><code><b>aborts_if</b> !<b>exists</b>&lt;<a href="vesting.md#0x1_vesting_VestingContract">VestingContract</a>&gt;(contract_address);
+<pre><code><b>pragma</b> verify_duration_estimate = 300;
+<b>aborts_if</b> !<b>exists</b>&lt;<a href="vesting.md#0x1_vesting_VestingContract">VestingContract</a>&gt;(contract_address);
 <b>let</b> vesting_contract = <b>global</b>&lt;<a href="vesting.md#0x1_vesting_VestingContract">VestingContract</a>&gt;(contract_address);
 <b>aborts_if</b> <a href="../../aptos-stdlib/../move-stdlib/doc/signer.md#0x1_signer_address_of">signer::address_of</a>(admin) != vesting_contract.admin;
 <b>let</b> operator = vesting_contract.staking.operator;
