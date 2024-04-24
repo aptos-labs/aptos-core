@@ -538,14 +538,16 @@ impl StateKey {
         )
     }
 
+    #[inline]
     pub fn encode(&self) -> Result<Bytes> {
         Ok(self
             .0
             .encoded
-            .get_or_init(|| self.inner().encode().expect("failed to encode."))
+            .get_or_init(#[inline(always)] || self.inner().encode().expect("failed to encode."))
             .clone())
     }
 
+    #[inline]
     fn crypto_hash(&self) -> HashValue {
         *self.0.hash_value.get_or_init(|| {
             let mut state = StateKeyInnerHasher::default();
@@ -565,6 +567,7 @@ impl StateKey {
 impl CryptoHash for StateKey {
     type Hasher = DummyHasher;
 
+    #[inline]
     fn hash(&self) -> HashValue {
         self.crypto_hash()
     }
