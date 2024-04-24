@@ -175,8 +175,8 @@ module aptos_framework::aptos_coin {
 
     #[test_only]
     public fun ensure_initialized_with_apt_fa_metadata_for_test() {
+        let aptos_framework = account::create_signer_for_test(@aptos_framework);
         if (!exists<MintCapStore>(@aptos_framework)) {
-            let aptos_framework = account::create_signer_for_test(@aptos_framework);
             if (!aggregator_factory::aggregator_factory_exists_for_testing()) {
                 aggregator_factory::initialize_aggregator_factory_for_test(&aptos_framework);
             };
@@ -184,13 +184,17 @@ module aptos_framework::aptos_coin {
             coin::destroy_burn_cap(burn_cap);
             coin::destroy_mint_cap(mint_cap);
         };
-        coin::ensure_paired_metadata<AptosCoin>();
+        coin::create_coin_conversion_map(&aptos_framework);
+        coin::create_pairing<AptosCoin>(&aptos_framework);
     }
 
     #[test_only]
     public fun initialize_for_test(aptos_framework: &signer): (BurnCapability<AptosCoin>, MintCapability<AptosCoin>) {
         aggregator_factory::initialize_aggregator_factory_for_test(aptos_framework);
-        initialize(aptos_framework)
+        let (burn_cap, mint_cap) = initialize(aptos_framework);
+        coin::create_coin_conversion_map(aptos_framework);
+        coin::create_pairing<AptosCoin>(aptos_framework);
+        (burn_cap, mint_cap)
     }
 
     // This is particularly useful if the aggregator_factory is already initialized via another call path.
@@ -198,7 +202,10 @@ module aptos_framework::aptos_coin {
     public fun initialize_for_test_without_aggregator_factory(
         aptos_framework: &signer
     ): (BurnCapability<AptosCoin>, MintCapability<AptosCoin>) {
-        initialize(aptos_framework)
+        let (burn_cap, mint_cap) = initialize(aptos_framework);
+        coin::create_coin_conversion_map(aptos_framework);
+        coin::create_pairing<AptosCoin>(aptos_framework);
+        (burn_cap, mint_cap)
     }
 
     #[test_only]

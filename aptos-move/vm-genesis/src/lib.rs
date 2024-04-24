@@ -53,6 +53,7 @@ use move_vm_types::gas::UnmeteredGasMeter;
 use once_cell::sync::Lazy;
 use rand::prelude::*;
 use serde::{Deserialize, Serialize};
+use std::str::FromStr;
 
 // The seed is arbitrarily picked to produce a consistent key. XXX make this more formal?
 const GENESIS_SEED: [u8; 32] = [42; 32];
@@ -60,6 +61,7 @@ const GENESIS_SEED: [u8; 32] = [42; 32];
 const GENESIS_MODULE_NAME: &str = "genesis";
 const GOVERNANCE_MODULE_NAME: &str = "aptos_governance";
 const CODE_MODULE_NAME: &str = "code";
+const COIN_MODULE_NAME: &str = "coin";
 const VERSION_MODULE_NAME: &str = "version";
 const JWK_CONSENSUS_CONFIG_MODULE_NAME: &str = "jwk_consensus_config";
 const JWKS_MODULE_NAME: &str = "jwks";
@@ -92,6 +94,8 @@ pub struct GenesisConfiguration {
     pub initial_features_override: Option<Features>,
     pub randomness_config_override: Option<OnChainRandomnessConfig>,
     pub jwk_consensus_config_override: Option<OnChainJWKConsensusConfig>,
+    pub create_coin_conversion_map: bool,
+    pub enable_apt_migration: bool,
 }
 
 pub static GENESIS_KEYPAIR: Lazy<(Ed25519PrivateKey, Ed25519PublicKey)> = Lazy::new(|| {
@@ -279,6 +283,9 @@ pub fn encode_genesis_change_set(
     } else {
         initialize_aptos_coin(&mut session);
     }
+    initialize_coin_conversion_map(&mut session, genesis_config.create_coin_conversion_map);
+    initialize_apt_migration(&mut session, genesis_config.enable_apt_migration);
+
     initialize_config_buffer(&mut session);
     initialize_dkg(&mut session);
     initialize_reconfiguration_state(&mut session);
@@ -620,6 +627,30 @@ fn initialize_on_chain_governance(session: &mut SessionExt, genesis_config: &Gen
             MoveValue::U64(genesis_config.voting_duration_secs),
         ]),
     );
+}
+
+fn initialize_coin_conversion_map(session: &mut SessionExt, enabled: bool) {
+    if enabled {
+        exec_function(
+            session,
+            COIN_MODULE_NAME,
+            "create_coin_conversion_map",
+            vec![],
+            serialize_values(&vec![MoveValue::Signer(CORE_CODE_ADDRESS)]),
+        )
+    }
+}
+
+fn initialize_apt_migration(session: &mut SessionExt, enabled: bool) {
+    if enabled {
+        exec_function(
+            session,
+            COIN_MODULE_NAME,
+            "create_pairing",
+            vec![TypeTag::from_str("0x1::aptos_coin::AptosCoin").unwrap()],
+            serialize_values(&vec![MoveValue::Signer(CORE_CODE_ADDRESS)]),
+        )
+    }
 }
 
 fn initialize_keyless_accounts(session: &mut SessionExt, chain_id: ChainId) {
@@ -977,6 +1008,8 @@ pub fn generate_test_genesis(
             initial_features_override: None,
             randomness_config_override: None,
             jwk_consensus_config_override: None,
+            create_coin_conversion_map: true,
+            enable_apt_migration: true,
         },
         &OnChainConsensusConfig::default_for_genesis(),
         &OnChainExecutionConfig::default_for_genesis(),
@@ -1027,6 +1060,8 @@ fn mainnet_genesis_config() -> GenesisConfiguration {
         initial_features_override: None,
         randomness_config_override: None,
         jwk_consensus_config_override: None,
+        create_coin_conversion_map: true,
+        enable_apt_migration: true,
     }
 }
 

@@ -510,14 +510,6 @@ module std::features {
         is_enabled(PRIMARY_APT_FUNGIBLE_STORE_AT_USER_ADDRESS)
     }
 
-    const APT_MIGRATION_TO_FUNGIBLE_ASSET: u64 = 61;
-
-    public fun get_apt_migration_to_funible_asset_feature(): u64 { APT_MIGRATION_TO_FUNGIBLE_ASSET }
-
-    public fun apt_migration_to_funible_asset_feature_enabled(): bool acquires Features {
-        is_enabled(APT_MIGRATION_TO_FUNGIBLE_ASSET)
-    }
-
     // ============================================================================================
     // Feature Flag Implementation
 

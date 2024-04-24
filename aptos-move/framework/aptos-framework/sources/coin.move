@@ -101,8 +101,11 @@ module aptos_framework::coin {
     /// The migration process from coin to fungible asset is not enabled yet.
     const EMIGRATION_FRAMEWORK_NOT_ENABLED: u64 = 26;
 
-    /// The migration of APT from coin to fungible asset is not enabled yet.
-    const EAPT_MIGRATION_NOT_ENABLED: u64 = 27;
+    /// The coin converison map is not created yet.
+    const ECOIN_CONVERSION_MAP_NOT_FOUND: u64 = 27;
+
+    /// APT pairing is not eanbled yet.
+    const EAPT_PAIRING_IS_NOT_ENABLED: u64 = 28;
 
     //
     // Constants
@@ -261,26 +264,40 @@ module aptos_framework::coin {
         option::none()
     }
 
-    /// Get the paired fungible asset metadata object of a coin type, create if not exist.
-    public(friend) fun ensure_paired_metadata<CoinType>(): Object<Metadata> acquires CoinConversionMap, CoinInfo {
-        assert!(
-            features::coin_to_fungible_asset_migration_feature_enabled(),
-            error::invalid_state(EMIGRATION_FRAMEWORK_NOT_ENABLED)
-        );
+    public entry fun create_coin_conversion_map(aptos_framework: &signer) {
+        system_addresses::assert_aptos_framework(aptos_framework);
         if (!exists<CoinConversionMap>(@aptos_framework)) {
-            move_to(&create_signer::create_signer(@aptos_framework), CoinConversionMap {
+            move_to(aptos_framework, CoinConversionMap {
                 coin_to_fungible_asset_map: table::new(),
             })
         };
+    }
+
+    /// Create APT pairing by passing `AptosCoin`.
+    public entry fun create_pairing<CoinType>(
+        aptos_framework: &signer
+    ) acquires CoinConversionMap, CoinInfo {
+        system_addresses::assert_aptos_framework(aptos_framework);
+        create_pairing_if_not_exist<CoinType>(true);
+    }
+
+    inline fun is_apt<CoinType>(): bool {
+        type_info::type_name<CoinType>() == string::utf8(b"0x1::aptos_coin::AptosCoin")
+    }
+
+    inline fun create_pairing_if_not_exist<CoinType>(allow_apt_creation: bool): Object<Metadata> {
+        assert!(exists<CoinConversionMap>(@aptos_framework), error::not_found(ECOIN_CONVERSION_MAP_NOT_FOUND));
         let map = borrow_global_mut<CoinConversionMap>(@aptos_framework);
         let type = type_info::type_of<CoinType>();
         if (!table::contains(&map.coin_to_fungible_asset_map, type)) {
+            assert!(
+                features::coin_to_fungible_asset_migration_feature_enabled(),
+                error::invalid_state(EMIGRATION_FRAMEWORK_NOT_ENABLED)
+            );
+            let is_apt = is_apt<CoinType>();
+            assert!(!is_apt || allow_apt_creation, error::invalid_state(EAPT_PAIRING_IS_NOT_ENABLED));
             let metadata_object_cref =
-                if (type_info::type_name<CoinType>() == string::utf8(b"0x1::aptos_coin::AptosCoin")) {
-                    assert!(
-                        features::apt_migration_to_funible_asset_feature_enabled(),
-                        error::invalid_state(EAPT_MIGRATION_NOT_ENABLED)
-                    );
+                if (is_apt) {
                     object::create_sticky_object_at_address(@aptos_framework, @aptos_fungible_asset)
                 } else {
                     object::create_sticky_object(coin_address<CoinType>())
@@ -294,7 +311,9 @@ module aptos_framework::coin {
                 string::utf8(b""),
                 string::utf8(b""),
             );
+
             let metadata_object_signer = &object::generate_signer(&metadata_object_cref);
+            let type = type_info::type_of<CoinType>();
             move_to(metadata_object_signer, PairedCoinType { type });
             let metadata_obj = object::object_from_constructor_ref(&metadata_object_cref);
 
@@ -317,6 +336,11 @@ module aptos_framework::coin {
             );
         };
         *table::borrow(&map.coin_to_fungible_asset_map, type)
+    }
+
+    /// Get the paired fungible asset metadata object of a coin type, create if not exist.
+    public(friend) fun ensure_paired_metadata<CoinType>(): Object<Metadata> acquires CoinConversionMap, CoinInfo {
+        create_pairing_if_not_exist<CoinType>(false)
     }
 
     #[view]
@@ -1259,6 +1283,7 @@ module aptos_framework::coin {
             monitor_supply
         );
         create_coin_store<FakeMoney>(account);
+        create_coin_conversion_map(account);
         (burn_cap, freeze_cap, mint_cap)
     }
 
@@ -1293,11 +1318,8 @@ module aptos_framework::coin {
         let name = string::utf8(b"Fake money");
         let symbol = string::utf8(b"FMD");
 
-        aggregator_factory::initialize_aggregator_factory_for_test(&source);
-        let (burn_cap, freeze_cap, mint_cap) = initialize<FakeMoney>(
+        let (burn_cap, freeze_cap, mint_cap) = initialize_and_register_fake_money(
             &source,
-            name,
-            symbol,
             18,
             true
         );

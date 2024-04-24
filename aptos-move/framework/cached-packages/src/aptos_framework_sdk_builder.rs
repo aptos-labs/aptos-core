@@ -272,6 +272,13 @@ pub enum EntryFunctionCall {
         code: Vec<Vec<u8>>,
     },
 
+    CoinCreateCoinConversionMap {},
+
+    /// Create APT pairing by passing `AptosCoin`.
+    CoinCreatePairing {
+        coin_type: TypeTag,
+    },
+
     /// Voluntarily migrate to fungible store for `CoinType` if not yet.
     CoinMigrateToFungibleStore {
         coin_type: TypeTag,
@@ -1136,6 +1143,8 @@ impl EntryFunctionCall {
                 metadata_serialized,
                 code,
             } => code_publish_package_txn(metadata_serialized, code),
+            CoinCreateCoinConversionMap {} => coin_create_coin_conversion_map(),
+            CoinCreatePairing { coin_type } => coin_create_pairing(coin_type),
             CoinMigrateToFungibleStore { coin_type } => coin_migrate_to_fungible_store(coin_type),
             CoinTransfer {
                 coin_type,
@@ -2236,6 +2245,37 @@ pub fn code_publish_package_txn(
             bcs::to_bytes(&metadata_serialized).unwrap(),
             bcs::to_bytes(&code).unwrap(),
         ],
+    ))
+}
+
+pub fn coin_create_coin_conversion_map() -> TransactionPayload {
+    TransactionPayload::EntryFunction(EntryFunction::new(
+        ModuleId::new(
+            AccountAddress::new([
+                0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+                0, 0, 0, 1,
+            ]),
+            ident_str!("coin").to_owned(),
+        ),
+        ident_str!("create_coin_conversion_map").to_owned(),
+        vec![],
+        vec![],
+    ))
+}
+
+/// Create APT pairing by passing `AptosCoin`.
+pub fn coin_create_pairing(coin_type: TypeTag) -> TransactionPayload {
+    TransactionPayload::EntryFunction(EntryFunction::new(
+        ModuleId::new(
+            AccountAddress::new([
+                0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+                0, 0, 0, 1,
+            ]),
+            ident_str!("coin").to_owned(),
+        ),
+        ident_str!("create_pairing").to_owned(),
+        vec![coin_type],
+        vec![],
     ))
 }
 
@@ -4854,6 +4894,26 @@ mod decoder {
         }
     }
 
+    pub fn coin_create_coin_conversion_map(
+        payload: &TransactionPayload,
+    ) -> Option<EntryFunctionCall> {
+        if let TransactionPayload::EntryFunction(_script) = payload {
+            Some(EntryFunctionCall::CoinCreateCoinConversionMap {})
+        } else {
+            None
+        }
+    }
+
+    pub fn coin_create_pairing(payload: &TransactionPayload) -> Option<EntryFunctionCall> {
+        if let TransactionPayload::EntryFunction(script) = payload {
+            Some(EntryFunctionCall::CoinCreatePairing {
+                coin_type: script.ty_args().get(0)?.clone(),
+            })
+        } else {
+            None
+        }
+    }
+
     pub fn coin_migrate_to_fungible_store(
         payload: &TransactionPayload,
     ) -> Option<EntryFunctionCall> {
@@ -6320,6 +6380,14 @@ static SCRIPT_FUNCTION_DECODER_MAP: once_cell::sync::Lazy<EntryFunctionDecoderMa
         map.insert(
             "code_publish_package_txn".to_string(),
             Box::new(decoder::code_publish_package_txn),
+        );
+        map.insert(
+            "coin_create_coin_conversion_map".to_string(),
+            Box::new(decoder::coin_create_coin_conversion_map),
+        );
+        map.insert(
+            "coin_create_pairing".to_string(),
+            Box::new(decoder::coin_create_pairing),
         );
         map.insert(
             "coin_migrate_to_fungible_store".to_string(),

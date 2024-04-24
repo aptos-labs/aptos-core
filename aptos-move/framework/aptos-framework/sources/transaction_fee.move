@@ -248,8 +248,6 @@ module aptos_framework::transaction_fee {
     #[test_only]
     use aptos_framework::aggregator_factory;
     #[test_only]
-    use aptos_framework::coin;
-    #[test_only]
     use aptos_framework::object;
 
     #[test(aptos_framework = @aptos_framework)]
