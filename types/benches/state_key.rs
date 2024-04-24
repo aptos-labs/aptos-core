@@ -1,10 +1,10 @@
 // Copyright (c) Aptos Foundation
 // SPDX-License-Identifier: Apache-2.0
 
-use aptos_types::{account_config::AccountResource, state_store::state_key::StateKeyRegistry};
+use aptos_types::account_config::AccountResource;
 use criterion::{criterion_group, criterion_main, Criterion};
 use fxhash::FxHasher;
-use move_core_types::{account_address::AccountAddress, move_resource::MoveStructType};
+use move_core_types::move_resource::MoveStructType;
 use std::{
     collections::hash_map::DefaultHasher,
     hash::{Hash, Hasher},
@@ -12,12 +12,7 @@ use std::{
 
 fn hashing(c: &mut Criterion) {
     let mut group = c.benchmark_group("hashing");
-    let address = AccountAddress::from_hex_literal("0xA550C18").unwrap();
     let struct_tag = AccountResource::struct_tag();
-
-    group.bench_function("hash_address_and_name", |b| {
-        b.iter(|| StateKeyRegistry::hash_address_and_name(&address, struct_tag.name.as_bytes()))
-    });
 
     group.bench_function("default_hasher_struct_tag", |b| {
         b.iter(|| {
