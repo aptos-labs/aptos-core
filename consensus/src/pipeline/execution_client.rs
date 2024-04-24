@@ -72,6 +72,8 @@ pub trait TExecutionClient: Send + Sync {
     /// This is needed for some DAG tests. Clean this up as a TODO.
     fn get_execution_channel(&self) -> Option<UnboundedSender<OrderedBlocks>>;
 
+    async fn pre_execute(&self, block: PipelinedBlock) -> ExecutorResult<()>;
+
     /// Send ordered blocks to the real execution phase through the channel.
     async fn finalize_order(
         &self,
@@ -94,6 +96,7 @@ pub trait TExecutionClient: Send + Sync {
 }
 
 struct BufferManagerHandle {
+    pub pre_execute_tx: Option<UnboundedSender<PipelinedBlock>>,
     pub execute_tx: Option<UnboundedSender<OrderedBlocks>>,
     pub commit_tx: Option<aptos_channel::Sender<AccountAddress, IncomingCommitRequest>>,
     pub reset_tx_to_buffer_manager: Option<UnboundedSender<ResetRequest>>,
@@ -103,6 +106,7 @@ struct BufferManagerHandle {
 impl BufferManagerHandle {
     pub fn new() -> Self {
         Self {
+            pre_execute_tx: None,
             execute_tx: None,
             commit_tx: None,
             reset_tx_to_buffer_manager: None,
@@ -112,11 +116,13 @@ impl BufferManagerHandle {
 
     pub fn init(
         &mut self,
+        pre_execute_tx: UnboundedSender<PipelinedBlock>,
         execute_tx: UnboundedSender<OrderedBlocks>,
         commit_tx: aptos_channel::Sender<AccountAddress, IncomingCommitRequest>,
         reset_tx_to_buffer_manager: UnboundedSender<ResetRequest>,
         reset_tx_to_rand_manager: Option<UnboundedSender<ResetRequest>>,
     ) {
+        self.pre_execute_tx = Some(pre_execute_tx);
         self.execute_tx = Some(execute_tx);
         self.commit_tx = Some(commit_tx);
         self.reset_tx_to_buffer_manager = Some(reset_tx_to_buffer_manager);
@@ -131,6 +137,7 @@ impl BufferManagerHandle {
     ) {
         let reset_tx_to_rand_manager = self.reset_tx_to_rand_manager.take();
         let reset_tx_to_buffer_manager = self.reset_tx_to_buffer_manager.take();
+        self.pre_execute_tx = None;
         self.execute_tx = None;
         self.commit_tx = None;
         (reset_tx_to_rand_manager, reset_tx_to_buffer_manager)
@@ -238,7 +245,10 @@ impl ExecutionProxyClient {
                 (ordered_block_tx, ordered_block_rx, None)
             };
 
+        let (pre_execute_block_tx, pre_execute_block_rx) = unbounded();
+
         self.handle.write().init(
+            pre_execute_block_tx,
             execution_ready_block_tx,
             commit_msg_tx,
             reset_buffer_manager_tx,
@@ -258,6 +268,7 @@ impl ExecutionProxyClient {
             network_sender,
             commit_msg_rx,
             self.execution_proxy.clone(),
+            pre_execute_block_rx,
             execution_ready_block_rx,
             reset_buffer_manager_rx,
             epoch_state,
@@ -318,6 +329,29 @@ impl TExecutionClient for ExecutionProxyClient {
 
     fn get_execution_channel(&self) -> Option<UnboundedSender<OrderedBlocks>> {
         self.handle.read().execute_tx.clone()
+    }
+
+    async fn pre_execute(
+        &self,
+        block: PipelinedBlock,
+    ) -> ExecutorResult<()> {
+        let pre_execute_tx = self.handle.read().pre_execute_tx.clone();
+
+        if pre_execute_tx.is_none() {
+            debug!("Failed to send to buffer manager, maybe epoch ends");
+            return Ok(());
+        }
+
+        if pre_execute_tx
+            .unwrap()
+            .send(block)
+            .await
+            .is_err()
+        {
+            debug!("Failed to send to buffer manager, maybe epoch ends");
+        }
+
+        Ok(())
     }
 
     async fn finalize_order(
@@ -472,6 +506,10 @@ impl TExecutionClient for DummyExecutionClient {
 
     fn get_execution_channel(&self) -> Option<UnboundedSender<OrderedBlocks>> {
         None
+    }
+
+    async fn pre_execute(&self, _block: PipelinedBlock) -> ExecutorResult<()> {
+        Ok(())
     }
 
     async fn finalize_order(

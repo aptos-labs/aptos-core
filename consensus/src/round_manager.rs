@@ -6,41 +6,18 @@ use crate::{
     block_storage::{
         tracing::{observe_block, BlockStage},
         BlockReader, BlockRetriever, BlockStore,
-    },
-    counters::{self, PROPOSED_VTXN_BYTES, PROPOSED_VTXN_COUNT},
-    error::{error_kind, VerifyError},
-    liveness::{
+    }, counters::{self, PROPOSED_VTXN_BYTES, PROPOSED_VTXN_COUNT}, error::{error_kind, VerifyError}, liveness::{
         proposal_generator::ProposalGenerator,
         proposer_election::ProposerElection,
         round_state::{NewRoundEvent, NewRoundReason, RoundState, RoundStateLogSchema},
         unequivocal_proposer_election::UnequivocalProposerElection,
-    },
-    logging::{LogEvent, LogSchema},
-    metrics_safety_rules::MetricsSafetyRules,
-    monitor,
-    network::NetworkSender,
-    network_interface::ConsensusMsg,
-    pending_votes::VoteReceptionResult,
-    persistent_liveness_storage::PersistentLivenessStorage,
-    quorum_store::types::BatchMsg,
-    rand::rand_gen::types::{FastShare, RandConfig, Share, TShare},
-    util::is_vtxn_expected,
+    }, logging::{LogEvent, LogSchema}, metrics_safety_rules::MetricsSafetyRules, monitor, network::NetworkSender, network_interface::ConsensusMsg, pending_votes::VoteReceptionResult, persistent_liveness_storage::PersistentLivenessStorage, pipeline::execution_client::TExecutionClient, quorum_store::types::BatchMsg, rand::rand_gen::types::{FastShare, RandConfig, Share, TShare}, util::is_vtxn_expected
 };
 use anyhow::{bail, ensure, Context};
 use aptos_channels::aptos_channel;
 use aptos_config::config::ConsensusConfig;
 use aptos_consensus_types::{
-    block::Block,
-    block_data::BlockType,
-    common::{Author, Round},
-    delayed_qc_msg::DelayedQcMsg,
-    proof_of_store::{ProofCache, ProofOfStoreMsg, SignedBatchInfoMsg},
-    proposal_msg::ProposalMsg,
-    quorum_cert::QuorumCert,
-    sync_info::SyncInfo,
-    timeout_2chain::TwoChainTimeoutCertificate,
-    vote::Vote,
-    vote_msg::VoteMsg,
+    block::Block, block_data::BlockType, common::{Author, Round}, delayed_qc_msg::DelayedQcMsg, pipelined_block::{self, PipelinedBlock}, proof_of_store::{ProofCache, ProofOfStoreMsg, SignedBatchInfoMsg}, proposal_msg::ProposalMsg, quorum_cert::QuorumCert, sync_info::SyncInfo, timeout_2chain::TwoChainTimeoutCertificate, vote::Vote, vote_msg::VoteMsg
 };
 use aptos_infallible::{checked, Mutex};
 use aptos_logger::prelude::*;
@@ -219,6 +196,7 @@ pub struct RoundManager {
     randomness_config: OnChainRandomnessConfig,
     jwk_consensus_config: OnChainJWKConsensusConfig,
     fast_rand_config: Option<RandConfig>,
+    execution_client: Arc<dyn TExecutionClient>,
 }
 
 impl RoundManager {
@@ -238,6 +216,7 @@ impl RoundManager {
         randomness_config: OnChainRandomnessConfig,
         jwk_consensus_config: OnChainJWKConsensusConfig,
         fast_rand_config: Option<RandConfig>,
+        execution_client: Arc<dyn TExecutionClient>,
     ) -> Self {
         // when decoupled execution is false,
         // the counter is still static.
@@ -265,6 +244,7 @@ impl RoundManager {
             randomness_config,
             jwk_consensus_config,
             fast_rand_config,
+            execution_client,
         }
     }
 
@@ -835,6 +815,13 @@ impl RoundManager {
     }
 
     pub async fn process_verified_proposal(&mut self, proposal: Block) -> anyhow::Result<()> {
+        // experimental: pre-execute the proposal
+        let pipelined_block = PipelinedBlock::new_ordered(proposal.clone());
+        self.execution_client
+            .pre_execute(pipelined_block)
+            .await
+            .context("[PreExecution] Failed to pre-execute the block")?;
+
         let proposal_round = proposal.round();
         let vote = self
             .execute_and_vote(proposal)

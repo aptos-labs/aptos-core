@@ -11,7 +11,7 @@ use crate::{
         buffer::{Buffer, Cursor},
         buffer_item::BufferItem,
         commit_reliable_broadcast::{AckState, CommitMessage},
-        execution_schedule_phase::ExecutionRequest,
+        execution_schedule_phase::{ExecutionRequest, ExecutionType},
         execution_wait_phase::{ExecutionResponse, ExecutionWaitRequest},
         persisting_phase::PersistingRequest,
         pipeline_phase::CountedRequest,
@@ -112,6 +112,8 @@ pub struct BufferManager {
     // we don't hear back from the persisting phase
     persisting_phase_tx: Sender<CountedRequest<PersistingRequest>>,
 
+    pre_execute_block_rx: UnboundedReceiver<PipelinedBlock>,
+
     block_rx: UnboundedReceiver<OrderedBlocks>,
     reset_rx: UnboundedReceiver<ResetRequest>,
     stop: bool,
@@ -148,6 +150,7 @@ impl BufferManager {
             IncomingCommitRequest,
         >,
         persisting_phase_tx: Sender<CountedRequest<PersistingRequest>>,
+        pre_execute_block_rx: UnboundedReceiver<PipelinedBlock>,
         block_rx: UnboundedReceiver<OrderedBlocks>,
         reset_rx: UnboundedReceiver<ResetRequest>,
         epoch_state: Arc<EpochState>,
@@ -188,6 +191,8 @@ impl BufferManager {
             commit_msg_rx: Some(commit_msg_rx),
 
             persisting_phase_tx,
+
+            pre_execute_block_rx,
 
             block_rx,
             reset_rx,
@@ -235,6 +240,18 @@ impl BufferManager {
         });
     }
 
+    async fn process_pre_execute_block(&mut self, block: PipelinedBlock) {
+        let request = self.create_new_request(ExecutionRequest {
+            ordered_blocks: vec![block.clone()],
+            lifetime_guard: self.create_new_request(()),
+            execution_type: ExecutionType::PreExecution,
+        });
+        self.execution_schedule_phase_tx
+            .send(request)
+            .await
+            .expect("Failed to send execution schedule request");
+    }
+
     /// process incoming ordered blocks
     /// push them into the buffer and update the roots if they are none.
     async fn process_ordered_blocks(&mut self, ordered_blocks: OrderedBlocks) {
@@ -253,6 +270,7 @@ impl BufferManager {
         let request = self.create_new_request(ExecutionRequest {
             ordered_blocks: ordered_blocks.clone(),
             lifetime_guard: self.create_new_request(()),
+            execution_type: ExecutionType::Execution,
         });
         self.execution_schedule_phase_tx
             .send(request)
@@ -285,6 +303,7 @@ impl BufferManager {
             let request = self.create_new_request(ExecutionRequest {
                 ordered_blocks,
                 lifetime_guard: self.create_new_request(()),
+                execution_type: ExecutionType::Execution,
             });
             let sender = self.execution_schedule_phase_tx.clone();
             Self::spawn_retry_request(sender, request, Duration::from_millis(100));
@@ -732,6 +751,9 @@ impl BufferManager {
         while !self.stop {
             // advancing the root will trigger sending requests to the pipeline
             ::futures::select! {
+                block = self.pre_execute_block_rx.select_next_some() => {
+                    self.process_pre_execute_block(block).await;
+                }
                 blocks = self.block_rx.select_next_some() => {
                     monitor!("buffer_manager_process_ordered", {
                     self.process_ordered_blocks(blocks).await;

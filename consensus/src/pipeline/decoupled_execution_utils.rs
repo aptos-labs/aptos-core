@@ -16,7 +16,7 @@ use crate::{
 };
 use aptos_bounded_executor::BoundedExecutor;
 use aptos_channels::aptos_channel::Receiver;
-use aptos_consensus_types::common::Author;
+use aptos_consensus_types::{common::Author, pipelined_block::PipelinedBlock};
 use aptos_types::{account_address::AccountAddress, epoch_state::EpochState};
 use futures::channel::mpsc::UnboundedReceiver;
 use std::sync::{
@@ -32,6 +32,7 @@ pub fn prepare_phases_and_buffer_manager(
     commit_msg_tx: NetworkSender,
     commit_msg_rx: Receiver<AccountAddress, IncomingCommitRequest>,
     persisting_proxy: Arc<dyn StateComputer>,
+    pre_execute_block_rx: UnboundedReceiver<PipelinedBlock>,
     block_rx: UnboundedReceiver<OrderedBlocks>,
     sync_rx: UnboundedReceiver<ResetRequest>,
     epoch_state: Arc<EpochState>,
@@ -113,6 +114,7 @@ pub fn prepare_phases_and_buffer_manager(
             Arc::new(commit_msg_tx),
             commit_msg_rx,
             persisting_phase_request_tx,
+            pre_execute_block_rx,
             block_rx,
             sync_rx,
             epoch_state,

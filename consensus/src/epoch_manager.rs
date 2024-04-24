@@ -869,6 +869,7 @@ impl<P: OnChainConfigProvider> EpochManager<P> {
             onchain_randomness_config,
             onchain_jwk_consensus_config,
             fast_rand_config,
+            self.execution_client.clone(),
         );
 
         round_manager.init(last_vote).await;
