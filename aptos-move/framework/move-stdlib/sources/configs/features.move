@@ -501,7 +501,7 @@ module std::features {
         is_enabled(COIN_TO_FUNGIBLE_ASSET_MIGRATION)
     }
 
-    const PRIMARY_APT_FUNGIBLE_STORE_AT_USER_ADDRESS: u64 = 60;
+    const PRIMARY_APT_FUNGIBLE_STORE_AT_USER_ADDRESS: u64 = 61;
 
     public fun get_primary_apt_fungible_store_at_user_address_feature(
     ): u64 { PRIMARY_APT_FUNGIBLE_STORE_AT_USER_ADDRESS }

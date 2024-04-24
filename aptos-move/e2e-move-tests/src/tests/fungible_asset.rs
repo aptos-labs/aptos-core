@@ -37,6 +37,7 @@ fn test_basic_fungible_token() {
 
     let alice = h.new_account_at(AccountAddress::from_hex_literal("0xcafe").unwrap());
     let bob = h.new_account_at(AccountAddress::from_hex_literal("0xface").unwrap());
+    let root = h.aptos_framework_account();
 
     let mut build_options = aptos_framework::BuildOptions::default();
     build_options
@@ -56,6 +57,17 @@ fn test_basic_fungible_token() {
         build_options,
     );
     assert_success!(result);
+
+    assert_success!(h.run_entry_function(
+        &root,
+        str::parse(&format!(
+            "0x{}::coin::create_coin_conversion_map",
+            (*root.address()).to_hex()
+        ))
+        .unwrap(),
+        vec![],
+        vec![],
+    ));
 
     let metadata = h
         .execute_view_function(
@@ -164,7 +176,29 @@ fn test_coin_to_fungible_asset_migration() {
     let alice = h.new_account_at(AccountAddress::from_hex_literal("0xcafe").unwrap());
     let alice_primary_store_addr =
         account_address::create_derived_object_address(*alice.address(), AccountAddress::TEN);
+    let root = h.aptos_framework_account();
 
+    assert_success!(h.run_entry_function(
+        &root,
+        str::parse(&format!(
+            "0x{}::coin::create_coin_conversion_map",
+            (*root.address()).to_hex()
+        ))
+        .unwrap(),
+        vec![],
+        vec![],
+    ));
+
+    assert_success!(h.run_entry_function(
+        &root,
+        str::parse(&format!(
+            "0x{}::coin::create_pairing",
+            (*root.address()).to_hex()
+        ))
+        .unwrap(),
+        vec![TypeTag::from_str("0x1::aptos_coin::AptosCoin").unwrap()],
+        vec![],
+    ));
     assert!(h
         .read_resource_from_resource_group::<FungibleStore>(
             &alice_primary_store_addr,

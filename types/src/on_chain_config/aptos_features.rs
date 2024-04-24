@@ -131,7 +131,6 @@ impl FeatureFlag {
             FeatureFlag::REJECT_UNSTABLE_BYTECODE,
             FeatureFlag::TRANSACTION_CONTEXT_EXTENSION,
             FeatureFlag::COIN_TO_FUNGIBLE_ASSET_MIGRATION,
-            FeatureFlag::PRIMARY_APT_FUNGIBLE_STORE_AT_USER_ADDRESS,
         ]
     }
 }
