@@ -443,6 +443,71 @@ fn check_substr_inclusion_poly_test() {
     }
 }
 
+#[test]
+fn check_substr_inclusion_poly_no_padding_test() {
+    let circuit_handle = TestCircuitHandle::new("check_substr_inclusion_poly_no_padding_test.circom").unwrap();
+
+    let string = "Hello World!";
+    let max_str_len = string.len();
+    let max_substr_len = 11;
+    let config = CircuitPaddingConfig::new().max_length("str", max_str_len).max_length("substr", max_substr_len);
+    let string_len = string.len();
+    let string_hash = poseidon_bn254::pad_and_hash_string(&string, max_str_len).unwrap();
+    let substring_len = 3;
+    for start_index in 0..string_len-substring_len {
+        let substring = &string[start_index..start_index+substring_len];//"lo Wor";
+
+        let circuit_input_signals = CircuitInputSignals::new().str_input("str", string).str_input("substr", substring).u64_input("substr_len", substring_len as u64).u64_input("start_index", start_index as u64).fr_input("str_hash", string_hash).pad(&config).unwrap();
+
+        let result = circuit_handle.gen_witness(circuit_input_signals);
+        println!("{:?}", result);
+        println!("{}", string.len());
+        assert!(result.is_ok());
+    }
+}
+
+#[test]
+fn check_substr_inclusion_poly_same_test() {
+    let circuit_handle = TestCircuitHandle::new("check_substr_inclusion_poly_test.circom").unwrap();
+
+    let string = "Hello World!";
+    let max_str_len = 100;
+    let max_substr_len = 20;
+    let config = CircuitPaddingConfig::new().max_length("str", max_str_len).max_length("substr", max_substr_len);
+    let string_hash = poseidon_bn254::pad_and_hash_string(&string, max_str_len).unwrap();
+    let substring = string;
+    let substring_len = substring.len();
+    let start_index = 0;
+
+    let circuit_input_signals = CircuitInputSignals::new().str_input("str", string).str_input("substr", substring).u64_input("substr_len", substring_len as u64).u64_input("start_index", start_index as u64).fr_input("str_hash", string_hash).pad(&config).unwrap();
+
+    let result = circuit_handle.gen_witness(circuit_input_signals);
+    assert!(result.is_ok());
+}
+
+#[test]
+fn check_substr_inclusion_poly_large_test() {
+    let circuit_handle = TestCircuitHandle::new("check_substr_inclusion_poly_large_test.circom").unwrap();
+
+    let max_str_len = 2000;
+    let max_substr_len = 1000;
+    let config = CircuitPaddingConfig::new().max_length("str", max_str_len).max_length("substr", max_substr_len);
+    let string = "Once upon a midnight dreary, while I pondered, weak and weary,
+Over many a quaint and curious volume of forgotten lore—
+    While I nodded, nearly napping, suddenly there came a tapping,
+As of some one gently rapping, rapping at my chamber door.
+“’Tis some visitor,” I muttered, “tapping at my chamber door—";
+    let string_hash = poseidon_bn254::pad_and_hash_string("dummy string", 30).unwrap(); // Hash is not checked in the substring inclusion protocol and so can be arbitrary here
+    let substring = &string[45..70];
+    let substring_len = substring.len();
+    let start_index = 45;
+
+    let circuit_input_signals = CircuitInputSignals::new().str_input("str", string).str_input("substr", substring).u64_input("substr_len", substring_len as u64).u64_input("start_index", start_index).fr_input("str_hash", string_hash).pad(&config).unwrap();
+
+    let result = circuit_handle.gen_witness(circuit_input_signals);
+    assert!(result.is_ok());
+}
+
 /*#[test]
 fn check_substr_inclusion_poly_test() {
     let circuit_handle = TestCircuitHandle::new("check_substr_inclusion_poly_test.circom").unwrap();
