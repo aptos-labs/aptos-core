@@ -991,6 +991,15 @@ impl AnySignature {
         Self::Keyless { signature }
     }
 
+    pub fn name(&self) -> &'static str {
+        match self {
+            Self::Ed25519 { .. } => "Ed25519",
+            Self::Secp256k1Ecdsa { .. } => "Secp256k1Ecdsa",
+            Self::WebAuthn { .. } => "WebAuthn",
+            Self::Keyless { .. } => "Keyless",
+        }
+    }
+
     pub fn verify<T: Serialize + CryptoHash>(
         &self,
         public_key: &AnyPublicKey,
