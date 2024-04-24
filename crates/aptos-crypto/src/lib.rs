@@ -15,7 +15,6 @@ pub mod error;
 pub mod hash;
 pub mod hkdf;
 pub mod multi_ed25519;
-pub mod noise;
 pub mod secp256k1_ecdsa;
 pub mod secp256r1_ecdsa;
 pub mod test_utils;
