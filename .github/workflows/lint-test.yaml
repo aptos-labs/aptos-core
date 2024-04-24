@@ -134,6 +134,8 @@ jobs:
     steps:
       - uses: actions/checkout@v4
         if: needs.file_change_determinator.outputs.only_docs_changed != 'true'
+      - name: Collect Workflow Telemetry
+        uses: catchpoint/workflow-telemetry-action@v2
       - name: Run rust unit tests
         uses: ./.github/actions/rust-unit-tests
         if: needs.file_change_determinator.outputs.only_docs_changed != 'true'
