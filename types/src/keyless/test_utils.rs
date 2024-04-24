@@ -197,12 +197,26 @@ pub fn maul_raw_groth16_txn(
 
 #[cfg(test)]
 mod test {
-    use crate::keyless::{
-        circuit_testcases::{SAMPLE_EPK, SAMPLE_EPK_BLINDER, SAMPLE_EXP_DATE, SAMPLE_JWK},
-        get_public_inputs_hash,
-        test_utils::get_sample_groth16_sig_and_pk,
-        Configuration, OpenIdSig,
+    use crate::{
+        keyless::{
+            circuit_testcases::{
+                SAMPLE_EPK, SAMPLE_EPK_BLINDER, SAMPLE_EXP_DATE, SAMPLE_EXP_HORIZON_SECS,
+                SAMPLE_JWK, SAMPLE_JWT_EXTRA_FIELD_KEY,
+            },
+            get_public_inputs_hash,
+            test_utils::{
+                get_sample_epk_blinder, get_sample_esk, get_sample_exp_date,
+                get_sample_groth16_sig_and_pk, get_sample_jwt_token, get_sample_pepper,
+            },
+            Configuration, Groth16Proof, OpenIdSig, DEVNET_VERIFICATION_KEY,
+        },
+        transaction::authenticator::EphemeralPublicKey,
     };
+    use aptos_crypto::PrivateKey;
+    use ark_ff::PrimeField;
+    use reqwest::Client;
+    use serde_json::{json, Value};
+    use std::ops::Deref;
 
     /// Since our proof generation toolkit is incomplete; currently doing it here.
     #[test]
@@ -226,5 +240,93 @@ mod test {
         let public_inputs_hash = get_public_inputs_hash(&sig, &pk, &SAMPLE_JWK, &config).unwrap();
 
         println!("Public inputs hash: {}", public_inputs_hash);
+    }
+
+    #[derive(Debug, serde::Deserialize)]
+    struct ProverResponse {
+        proof: Groth16Proof,
+        #[serde(with = "hex")]
+        public_inputs_hash: [u8; 32],
+    }
+
+    // Run the prover service locally - https://github.com/aptos-labs/prover-service
+    // Then run ./scripts/dev_setup.sh
+    // Lastly run ./scripts/run_test_server.sh
+    #[ignore]
+    #[tokio::test]
+    async fn fetch_sample_proofs_from_prover() {
+        let client = Client::new();
+
+        let body = json!({
+            "jwt_b64": get_sample_jwt_token(),
+            "epk": hex::encode(bcs::to_bytes(&EphemeralPublicKey::ed25519(get_sample_esk().public_key())).unwrap()),
+            "epk_blinder": hex::encode(get_sample_epk_blinder()),
+            "exp_date_secs": get_sample_exp_date(),
+            "exp_horizon_secs": SAMPLE_EXP_HORIZON_SECS,
+            "pepper": hex::encode(get_sample_pepper().to_bytes()),
+            "uid_key": "sub",
+            "extra_field": SAMPLE_JWT_EXTRA_FIELD_KEY
+        });
+        make_prover_request(&client, body, "SAMPLE_PROOF").await;
+
+        let body = json!({
+            "jwt_b64": get_sample_jwt_token(),
+            "epk": hex::encode(bcs::to_bytes(&EphemeralPublicKey::ed25519(get_sample_esk().public_key())).unwrap()),
+            "epk_blinder": hex::encode(get_sample_epk_blinder()),
+            "exp_date_secs": get_sample_exp_date(),
+            "exp_horizon_secs": SAMPLE_EXP_HORIZON_SECS,
+            "pepper": hex::encode(get_sample_pepper().to_bytes()),
+            "uid_key": "sub"
+        });
+        make_prover_request(&client, body, "SAMPLE_PROOF_NO_EXTRA_FIELD").await;
+    }
+
+    async fn make_prover_request(
+        client: &Client,
+        body: Value,
+        test_proof_name: &str,
+    ) -> ProverResponse {
+        let url = "http://localhost:8080/v0/prove";
+
+        // Send the POST request and await the response
+        let response = client.post(url).json(&body).send().await.unwrap();
+
+        // Check if the request was successful
+        if response.status().is_success() {
+            let prover_response = response.json::<ProverResponse>().await.unwrap();
+            let proof = prover_response.proof;
+            let public_inputs_hash =
+                ark_bn254::Fr::from_le_bytes_mod_order(&prover_response.public_inputs_hash);
+            // Verify the proof with the test verifying key.  If this fails the verifying key does not match the proving used
+            // to generate the proof.
+            proof
+                .verify_proof(public_inputs_hash, DEVNET_VERIFICATION_KEY.deref())
+                .unwrap();
+
+            let code = format!(
+                r#"
+            Groth16Proof::new(
+                G1Bytes::new_from_vec(hex::decode("{}").unwrap()).unwrap(),
+                G2Bytes::new_from_vec(hex::decode("{}").unwrap()).unwrap(),
+                G1Bytes::new_from_vec(hex::decode("{}").unwrap()).unwrap(),
+            )
+            "#,
+                hex::encode(proof.get_a().0),
+                hex::encode(proof.get_b().0),
+                hex::encode(proof.get_c().0)
+            );
+            println!();
+            println!(
+                "----- Update the {} in circuit_testcases.rs with the output below -----",
+                test_proof_name
+            );
+            println!("{}", code);
+            println!("----------------------------------------------------------------------------------");
+            return prover_response;
+        } else {
+            // Print an error message if the request failed
+            println!("Request failed with status code: {}", response.status());
+            panic!("Prover request failed")
+        }
     }
 }
