@@ -293,7 +293,7 @@ impl ForgeConfig {
                     existing_db_tag.clone().into();
             }
 
-            // helm_values["validator"]["storage"]["size"] = "2048Gi".into();
+            helm_values["validator"]["storage"]["size"] = "512Gi".into();
             // validator resource overrides
             if let Some(cpu_cores) = validator_resource_override.cpu_cores {
                 helm_values["validator"]["resources"]["requests"]["cpu"] = cpu_cores.into();
