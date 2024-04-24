@@ -642,9 +642,14 @@ where
         Ok(total_refund)
     }
 
-    fn charge_intrinsic_gas_for_transaction(&mut self, txn_size: NumBytes) -> VMResult<()> {
-        let (cost, res) =
-            self.delegate_charge(|base| base.charge_intrinsic_gas_for_transaction(txn_size));
+    fn charge_intrinsic_gas_for_transaction(
+        &mut self,
+        txn_size: NumBytes,
+        multiplier: NumBytes,
+    ) -> VMResult<()> {
+        let (cost, res) = self.delegate_charge(|base| {
+            base.charge_intrinsic_gas_for_transaction(txn_size, multiplier)
+        });
 
         self.intrinsic_cost = Some(cost);
 

@@ -15,7 +15,7 @@ use aptos_vm_types::storage::{
     io_pricing::IoPricing, space_pricing::DiskSpacePricing, StorageGasParameters,
 };
 use move_core_types::{
-    gas_algebra::NumArgs,
+    gas_algebra::{NumArgs, NumBytes},
     language_storage::CORE_CODE_ADDRESS,
     vm_status::{StatusCode, VMStatus},
 };
@@ -186,8 +186,13 @@ pub(crate) fn check_gas(
     // The submitted transactions max gas units needs to be at least enough to cover the
     // intrinsic cost of the transaction as calculated against the size of the
     // underlying `RawTransaction`.
+    let multiplier = if txn_metadata.is_keyless() {
+        txn_gas_params.keyless_multiplier
+    } else {
+        NumBytes::one()
+    };
     let intrinsic_gas = txn_gas_params
-        .calculate_intrinsic_gas(raw_bytes_len)
+        .calculate_intrinsic_gas(raw_bytes_len, multiplier)
         .evaluate(gas_feature_version, &gas_params.vm)
         .to_unit_round_up_with_params(txn_gas_params);
 

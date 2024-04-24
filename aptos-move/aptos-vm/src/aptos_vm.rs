@@ -816,7 +816,13 @@ impl AptosVM {
             })
         });
 
-        gas_meter.charge_intrinsic_gas_for_transaction(txn_data.transaction_size())?;
+        let multiplier = if txn_data.is_keyless() {
+            let gas_params = get_or_vm_startup_failure(&self.gas_params, log_context)?;
+            gas_params.vm.txn.keyless_multiplier
+        } else {
+            NumBytes::one()
+        };
+        gas_meter.charge_intrinsic_gas_for_transaction(txn_data.transaction_size(), multiplier)?;
 
         match payload {
             TransactionPayload::Script(script) => {
@@ -1000,7 +1006,13 @@ impl AptosVM {
             ))
         });
 
-        gas_meter.charge_intrinsic_gas_for_transaction(txn_data.transaction_size())?;
+        let multiplier = if txn_data.is_keyless() {
+            let gas_params = get_or_vm_startup_failure(&self.gas_params, log_context)?;
+            gas_params.vm.txn.keyless_multiplier
+        } else {
+            NumBytes::one()
+        };
+        gas_meter.charge_intrinsic_gas_for_transaction(txn_data.transaction_size(), multiplier)?;
 
         // Step 1: Obtain the payload. If any errors happen here, the entire transaction should fail
         let invariant_violation_error = || {

@@ -22,8 +22,9 @@ crate::gas_schedule::macros::define_gas_parameters!(
     [
         // The flat minimum amount of gas required for any transaction.
         // Charged at the start of execution.
+        // It is variable to charge more for more expensive authenticators, e.g., keyless
         [
-            min_transaction_gas_units: InternalGas,
+            min_transaction_gas_units: InternalGasPerByte,
             "min_transaction_gas_units",
             2_760_000
         ],
@@ -230,6 +231,11 @@ crate::gas_schedule::macros::define_gas_parameters!(
             { 15.. => "max_total_dependency_size" },
             1024 * 1024 * 12 / 10, // 1.2 MB
         ],
+        [
+            keyless_multiplier: NumBytes,
+            { 16.. => "keyless_multiplier" },
+            150,
+        ]
     ]
 );
 
@@ -249,12 +255,13 @@ impl TransactionGasParameters {
     pub fn calculate_intrinsic_gas(
         &self,
         transaction_size: NumBytes,
+        multiplier: NumBytes,
     ) -> impl GasExpression<VMGasParameters, Unit = InternalGasUnit> {
         let excess = transaction_size
             .checked_sub(self.large_transaction_cutoff)
             .unwrap_or_else(|| 0.into());
 
-        MIN_TRANSACTION_GAS_UNITS + INTRINSIC_GAS_PER_BYTE * excess
+        MIN_TRANSACTION_GAS_UNITS * multiplier + INTRINSIC_GAS_PER_BYTE * excess
     }
 }
 
