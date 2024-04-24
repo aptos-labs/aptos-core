@@ -121,12 +121,12 @@ crate::gas_schedule::macros::define_gas_parameters!(
         [
             storage_io_per_event_byte_write: InternalGasPerByte,
             { 16.. => "storage_io_per_event_byte_write" },
-            0,
+            89,
         ],
         [
             storage_io_per_transaction_byte_write: InternalGasPerByte,
             { 16.. => "storage_io_per_transaction_byte_write" },
-            0,
+            89,
         ],
         [memory_quota: AbstractValueSize, { 1.. => "memory_quota" }, 10_000_000],
         [
