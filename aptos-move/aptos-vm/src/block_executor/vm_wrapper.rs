@@ -19,6 +19,19 @@ use aptos_vm_types::resolver::{ExecutorView, ResourceGroupView};
 use fail::fail_point;
 use move_core_types::vm_status::{StatusCode, VMStatus};
 
+use std::time::{Duration, Instant};
+
+fn spin_wait(time: usize)
+{
+    let start = Instant::now();
+    let duration = Duration::from_micros(time as u64);
+
+    loop {
+        if start.elapsed() >= duration {
+            break;
+        }
+    }
+}
 pub(crate) struct AptosExecutorTask<'a, S> {
     vm: AptosVM,
     base_view: &'a S,
@@ -55,6 +68,8 @@ impl<'a, S: 'a + StateView + Sync> ExecutorTask for AptosExecutorTask<'a, S> {
         fail_point!("aptos_vm::vm_wrapper::execute_transaction", |_| {
             ExecutionStatus::DelayedFieldsCodeInvariantError("fail points error".into())
         });
+
+        spin_wait(1000);
 
         let log_context = AdapterLogSchema::new(self.base_view.id(), txn_idx as usize);
         let resolver = self

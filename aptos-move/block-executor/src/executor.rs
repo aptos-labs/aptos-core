@@ -61,7 +61,6 @@ use std::{
         Arc,
     },
 };
-use once_cell::unsync::Lazy;
 
 
 pub struct BlockExecutor<T, E, S, L, X> {
@@ -104,6 +103,7 @@ where
         }
     }
 
+
     fn execute(
         idx_to_execute: TxnIndex,
         incarnation: Incarnation,
@@ -114,6 +114,8 @@ where
         base_view: &S,
         latest_view: ParallelState<T, X>,
     ) -> Result<bool, PanicOr<ParallelBlockExecutionError>> {
+        //add artificial sleep here to extend running time of transaction
+        
         let _timer = TASK_EXECUTE_SECONDS.start_timer();
         let txn = &signature_verified_block[idx_to_execute as usize];
 
