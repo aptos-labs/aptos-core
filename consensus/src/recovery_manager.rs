@@ -15,7 +15,8 @@ use crate::{
 use anyhow::{anyhow, ensure, Context, Result};
 use aptos_channels::aptos_channel;
 use aptos_consensus_types::{
-    common::Author, proposal_msg::ProposalMsg, sync_info::SyncInfo, vote_msg::VoteMsg,
+    common::Author, proposal_msg::VersionedProposalMsg, sync_info::VersionedSyncInfo,
+    vote_msg::VersionedVoteMsg,
 };
 use aptos_logger::prelude::*;
 use aptos_types::{block_info::Round, epoch_state::EpochState};
@@ -58,20 +59,24 @@ impl RecoveryManager {
 
     pub async fn process_proposal_msg(
         &mut self,
-        proposal_msg: ProposalMsg,
+        proposal_msg: VersionedProposalMsg,
     ) -> Result<RecoveryData> {
         let author = proposal_msg.proposer();
         let sync_info = proposal_msg.sync_info();
-        self.sync_up(sync_info, author).await
+        self.sync_up(&sync_info, author).await
     }
 
-    pub async fn process_vote_msg(&mut self, vote_msg: VoteMsg) -> Result<RecoveryData> {
+    pub async fn process_vote_msg(&mut self, vote_msg: VersionedVoteMsg) -> Result<RecoveryData> {
         let author = vote_msg.vote().author();
         let sync_info = vote_msg.sync_info();
-        self.sync_up(sync_info, author).await
+        self.sync_up(&sync_info, author).await
     }
 
-    pub async fn sync_up(&mut self, sync_info: &SyncInfo, peer: Author) -> Result<RecoveryData> {
+    pub async fn sync_up(
+        &mut self,
+        sync_info: &VersionedSyncInfo,
+        peer: Author,
+    ) -> Result<RecoveryData> {
         sync_info.verify(&self.epoch_state.verifier)?;
         ensure!(
             sync_info.highest_round() > self.last_committed_round,
@@ -90,16 +95,30 @@ impl RecoveryManager {
                 .collect(),
             self.max_blocks_to_request,
         );
-        let recovery_data = BlockStore::fast_forward_sync(
-            sync_info.highest_ordered_cert(),
-            sync_info.highest_commit_cert(),
-            &mut retriever,
-            self.storage.clone(),
-            self.execution_client.clone(),
-            self.payload_manager.clone(),
-        )
-        .await?;
-
+        let recovery_data = match sync_info {
+            VersionedSyncInfo::V1(sync_info) => {
+                BlockStore::fast_forward_sync(
+                    sync_info.highest_ordered_cert(),
+                    sync_info.highest_commit_cert(),
+                    &mut retriever,
+                    self.storage.clone(),
+                    self.execution_client.clone(),
+                    self.payload_manager.clone(),
+                )
+                .await?
+            },
+            VersionedSyncInfo::V2(sync_info) => {
+                BlockStore::fast_forward_sync_v2(
+                    sync_info.highest_quorum_cert(),
+                    sync_info.highest_commit_decision(),
+                    &mut retriever,
+                    self.storage.clone(),
+                    self.execution_client.clone(),
+                    self.payload_manager.clone(),
+                )
+                .await?
+            },
+        };
         Ok(recovery_data)
     }
 
@@ -120,13 +139,28 @@ impl RecoveryManager {
                         VerifiedEvent::ProposalMsg(proposal_msg) => {
                             monitor!(
                                 "process_recovery",
+                                self.process_proposal_msg(VersionedProposalMsg::V1(*proposal_msg)).await
+                            )
+                        }
+                        VerifiedEvent::VersionedProposalMsg(proposal_msg) => {
+                            monitor!(
+                                "process_recovery",
                                 self.process_proposal_msg(*proposal_msg).await
                             )
                         }
                         VerifiedEvent::VoteMsg(vote_msg) => {
+                            monitor!("process_recovery", self.process_vote_msg(VersionedVoteMsg::V1(*vote_msg)).await)
+                        }
+                        VerifiedEvent::VersionedVoteMsg(vote_msg) => {
                             monitor!("process_recovery", self.process_vote_msg(*vote_msg).await)
                         }
                         VerifiedEvent::UnverifiedSyncInfo(sync_info) => {
+                            monitor!(
+                                "process_recovery",
+                                self.sync_up(&VersionedSyncInfo::V1(sync_info.as_ref().clone()), peer_id).await
+                            )
+                        }
+                        VerifiedEvent::UnverifiedVersionedSyncInfo(sync_info) => {
                             monitor!(
                                 "process_recovery",
                                 self.sync_up(&sync_info, peer_id).await

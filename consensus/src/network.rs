@@ -753,21 +753,39 @@ impl NetworkTask {
                             };
                         },
                         consensus_msg @ (ConsensusMsg::ProposalMsg(_)
+                        | ConsensusMsg::VersionedProposalMsg(_)
                         | ConsensusMsg::VoteMsg(_)
+                        | ConsensusMsg::VersionedVoteMsg(_)
                         | ConsensusMsg::SyncInfo(_)
+                        | ConsensusMsg::VersionedSyncInfo(_)
                         | ConsensusMsg::EpochRetrievalRequest(_)
                         | ConsensusMsg::EpochChangeProof(_)) => {
-                            if let ConsensusMsg::ProposalMsg(proposal) = &consensus_msg {
-                                observe_block(
-                                    proposal.proposal().timestamp_usecs(),
-                                    BlockStage::NETWORK_RECEIVED,
-                                );
-                                info!(
-                                    LogSchema::new(LogEvent::NetworkReceiveProposal)
-                                        .remote_peer(peer_id),
-                                    block_round = proposal.proposal().round(),
-                                    block_hash = proposal.proposal().id(),
-                                );
+                            match &consensus_msg {
+                                ConsensusMsg::ProposalMsg(proposal) => {
+                                    observe_block(
+                                        proposal.proposal().timestamp_usecs(),
+                                        BlockStage::NETWORK_RECEIVED,
+                                    );
+                                    info!(
+                                        LogSchema::new(LogEvent::NetworkReceiveProposal)
+                                            .remote_peer(peer_id),
+                                        block_round = proposal.proposal().round(),
+                                        block_hash = proposal.proposal().id(),
+                                    );
+                                },
+                                ConsensusMsg::VersionedProposalMsg(proposal) => {
+                                    observe_block(
+                                        proposal.proposal().timestamp_usecs(),
+                                        BlockStage::NETWORK_RECEIVED,
+                                    );
+                                    info!(
+                                        LogSchema::new(LogEvent::NetworkReceiveProposal)
+                                            .remote_peer(peer_id),
+                                        block_round = proposal.proposal().round(),
+                                        block_hash = proposal.proposal().id(),
+                                    );
+                                },
+                                _ => {},
                             }
                             Self::push_msg(peer_id, consensus_msg, &self.consensus_messages_tx);
                         },
