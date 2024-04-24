@@ -99,11 +99,14 @@ pub const SUBMITTED_BY_CLIENT_LABEL: &str = "client";
 pub const SUBMITTED_BY_DOWNSTREAM_LABEL: &str = "downstream";
 pub const SUBMITTED_BY_PEER_VALIDATOR_LABEL: &str = "peer_validator";
 
-// Histogram buckets that expand DEFAULT_BUCKETS with larger timescales and some constant sized
-// buckets between: 50-250ms (every 25ms), 250ms-5s (250ms), 5-10s (1s), and 10-25s (2.5s).
+// Histogram buckets with a large range of 0-500s and some constant sized buckets between:
+// 0-1.5s (every 25ms), 1.5-2s (every 100ms), 2-5s (250ms), 5-10s (1s), and 10-25s (2.5s).
 const MEMPOOL_LATENCY_BUCKETS: &[f64] = &[
-    0.005, 0.01, 0.025, 0.05, 0.075, 0.1, 0.125, 0.15, 0.175, 0.2, 0.225, 0.25, 0.5, 0.75, 1.0,
-    1.25, 1.5, 1.75, 2.0, 2.25, 2.5, 2.75, 3.0, 3.25, 3.5, 3.75, 4.0, 4.25, 4.5, 4.75, 5.0, 6.0,
+    0.025, 0.05, 0.075, 0.1, 0.125, 0.15, 0.175, 0.2, 0.225, 0.250, 0.275, 0.3, 0.325, 0.35, 0.375,
+    0.4, 0.425, 0.45, 0.475, 0.5, 0.525, 0.55, 0.575, 0.6, 0.625, 0.65, 0.675, 0.7, 0.725, 0.75,
+    0.775, 0.8, 0.825, 0.85, 0.875, 0.9, 0.925, 0.95, 0.975, 1.0, 1.025, 1.05, 1.075, 1.1, 1.125,
+    1.15, 1.175, 1.2, 1.225, 1.25, 1.275, 1.3, 1.325, 1.35, 1.375, 1.4, 1.425, 1.45, 1.475, 1.5,
+    1.6, 1.7, 1.8, 1.9, 2.0, 2.25, 2.5, 2.75, 3.0, 3.25, 3.5, 3.75, 4.0, 4.25, 4.5, 4.75, 5.0, 6.0,
     7.0, 8.0, 9.0, 10.0, 12.5, 15.0, 17.5, 20.0, 22.5, 25.0, 50.0, 100.0, 250.0, 500.0,
 ];
 
