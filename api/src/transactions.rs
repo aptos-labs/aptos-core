@@ -314,7 +314,7 @@ impl TransactionsApi {
                     AptosErrorCode::InvalidInput,
                 )
             })?;
-        println!("transaction verified")
+        println!("transaction verified");
         fail_point_poem("endpoint_submit_transaction")?;
         if !self.context.node_config.api.transaction_submission_enabled {
             return Err(api_disabled("Submit transaction"));
