@@ -428,8 +428,9 @@ impl DagDriver {
             match rx.await {
                 Ok(bolt_ret) => match bolt_ret {
                     BoltBCRet::Node(ret) => {
+                        let result = ret.await;
                         debug!("[Bolt] node broadcast done, dag_id: {}", dag_id);
-                        ret.await
+                        result
                     },
                     _ => unreachable!(),
                 },

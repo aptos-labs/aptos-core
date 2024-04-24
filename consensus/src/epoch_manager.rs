@@ -1567,6 +1567,7 @@ impl<P: OnChainConfigProvider> EpochManager<P> {
 
         match request.epoch() {
             Some(epoch) if epoch != self.epoch() => {
+                debug!("different epoch rpc request {:?}", request);
                 monitor!(
                     "process_different_epoch_rpc_request",
                     self.process_different_epoch(epoch, peer_id)
