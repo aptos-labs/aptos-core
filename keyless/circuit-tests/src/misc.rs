@@ -7,8 +7,6 @@ use aptos_keyless_common::input_processing::{
     circuit_input_signals::{CircuitInputSignals, Padded}, config::CircuitPaddingConfig,
 };
 
-#[cfg(test)]
-mod jwt_field_check_tests;
 
 #[test]
 fn is_whitespace_test() {

@@ -19,29 +19,32 @@ template ParseJWTFieldWithQuotedValue(maxKVPairLen, maxNameLen, maxValueLen) {
     signal input value_len;
     signal input colon_index; // index of colon within `field`
 
-    // Enforce that end of name < colon < start of value, so that these 3 parts of the JWT field are in the correct order
+    // Enforce that end of name < colon < start of value and that field_len >=
+    // name_len + value_len + 1 (where the +1 is for the colon), so that the
+    // parts of the JWT field are in the correct order
     signal colon_greater_name <== LessThan(20)([name_len, colon_index]);
     colon_greater_name === 1;
     signal colon_less_value <== LessThan(20)([colon_index, value_index]);
     colon_less_value === 1;
-
-    // Enforce that field_len >= name_len + value_len + 1 (where the +1 is for the colon). 
     signal field_len_ok <== GreaterEqThan(20)([field_len, name_len + value_len + 1]);
     field_len_ok === 1;
 
     signal field_hash <== HashBytesToFieldWithLen(maxKVPairLen)(field, field_len);
 
-    signal first_quote <== SelectArrayValue(maxKVPairLen)(field, 0);
-    first_quote === 34; // '"'
+    signal name_first_quote <== SelectArrayValue(maxKVPairLen)(field, 0);
+    name_first_quote === 34; // '"'
     CheckSubstrInclusionPoly(maxKVPairLen, maxNameLen)(field, field_hash, name, name_len, 1);
-    signal second_quote <== SelectArrayValue(maxKVPairLen)(field, name_len+1);
-    second_quote === 34; // '"'
+    signal name_second_quote <== SelectArrayValue(maxKVPairLen)(field, name_len+1);
+    name_second_quote === 34; // '"'
 
     signal colon <== SelectArrayValue(maxKVPairLen)(field, colon_index);
     colon === 58; // ':'
 
-    // Note: we don't check for quotes around values, since some JSON values (e.g., integers, booleans) don't have quotes
+    signal value_first_quote <== SelectArrayValue(maxKVPairLen)(field, value_index-1);
+    value_first_quote === 34; // '"'
     CheckSubstrInclusionPoly(maxKVPairLen, maxValueLen)(field, field_hash, value, value_len, value_index);
+    signal value_second_quote <== SelectArrayValue(maxKVPairLen)(field, value_index+value_len);
+    value_second_quote === 34; // '"'
 
     // Enforce last character of `field` is comma or end brace
     signal last_char <== SelectArrayValue(maxKVPairLen)(field, field_len-1);
@@ -73,28 +76,29 @@ template ParseJWTFieldWithUnquotedValue(maxKVPairLen, maxNameLen, maxValueLen) {
     signal input value_len;
     signal input colon_index; // index of colon within `field`
 
-    // Enforce that end of name < colon < start of value, so that these 3 parts of the JWT field are in the correct order
+    // Enforce that end of name < colon < start of value and that field_len >=
+    // name_len + value_len + 1 (where the +1 is for the colon), so that the
+    // parts of the JWT field are in the correct order
     signal colon_greater_name <== LessThan(20)([name_len, colon_index]);
     colon_greater_name === 1;
     signal colon_less_value <== LessThan(20)([colon_index, value_index]);
     colon_less_value === 1;
-
-    // Enforce that field_len >= name_len + value_len + 1 (where the +1 is for the colon). 
     signal field_len_ok <== GreaterEqThan(20)([field_len, name_len + value_len + 1]);
     field_len_ok === 1;
 
+
     signal field_hash <== HashBytesToFieldWithLen(maxKVPairLen)(field, field_len);
 
-    signal first_quote <== SelectArrayValue(maxKVPairLen)(field, 0);
-    first_quote === 34; // '"'
+    signal name_first_quote <== SelectArrayValue(maxKVPairLen)(field, 0);
+    name_first_quote === 34; // '"'
     CheckSubstrInclusionPoly(maxKVPairLen, maxNameLen)(field, field_hash, name, name_len, 1);
-    signal second_quote <== SelectArrayValue(maxKVPairLen)(field, name_len+1);
-    second_quote === 34; // '"'
+    signal name_second_quote <== SelectArrayValue(maxKVPairLen)(field, name_len+1);
+    name_second_quote === 34; // '"'
 
     signal colon <== SelectArrayValue(maxKVPairLen)(field, colon_index);
     colon === 58; // ':'
 
-    // Note: we don't check for quotes around values, since some JSON values (e.g., integers, booleans) don't have quotes
+    // Don't check for quotes around values, since this is the unquoted variant
     CheckSubstrInclusionPoly(maxKVPairLen, maxValueLen)(field, field_hash, value, value_len, value_index);
 
     // Enforce last character of `field` is comma or end brace
@@ -108,8 +112,8 @@ template ParseJWTFieldWithUnquotedValue(maxKVPairLen, maxNameLen, maxValueLen) {
     }
 
     signal whitespace_selector_one[maxKVPairLen] <== ArraySelectorComplex(maxKVPairLen)(name_len+2, colon_index); // Skip 2 quotes around name, stop 1 index before the colon
-    signal whitespace_selector_two[maxKVPairLen] <== ArraySelectorComplex(maxKVPairLen)(colon_index+1, value_index-1); // Skip 2 quotes around value, stop 1 index before the value
-    signal whitespace_selector_three[maxKVPairLen] <== ArraySelectorComplex(maxKVPairLen)(value_index+value_len+1, field_len-1); // Skip 2 quotes in the value, stop just before the comma/end brace
+    signal whitespace_selector_two[maxKVPairLen] <== ArraySelectorComplex(maxKVPairLen)(colon_index+1, value_index); 
+    signal whitespace_selector_three[maxKVPairLen] <== ArraySelectorComplex(maxKVPairLen)(value_index+value_len, field_len-1); 
 
     for (var i = 0; i < maxKVPairLen; i++) {
         log(i, ": ", whitespace_selector_two[i]);
