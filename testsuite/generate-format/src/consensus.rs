@@ -117,7 +117,9 @@ pub fn get_registry() -> Result<Registry> {
     tracer.trace_type::<aptos_consensus_types::block_data::BlockType>(&samples)?;
     tracer.trace_type::<aptos_consensus_types::block_retrieval::BlockRetrievalStatus>(&samples)?;
     tracer.trace_type::<aptos_consensus_types::common::Payload>(&samples)?;
-
+    tracer.trace_type::<aptos_consensus_types::vote_msg::VersionedVoteMsg>(&samples)?;
+    tracer.trace_type::<aptos_consensus_types::sync_info::VersionedSyncInfo>(&samples)?;
+    tracer.trace_type::<aptos_consensus_types::proposal_msg::VersionedProposalMsg>(&samples)?;
     // aliases within StructTag
     tracer.ignore_aliases("StructTag", &["type_params"])?;
 

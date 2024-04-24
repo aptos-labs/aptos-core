@@ -60,9 +60,11 @@ pub enum ConsensusMsg {
     /// VersionedVoteMsg is the struct that is ultimately sent by the voter in response for
     /// receiving a proposal. This struct is versioned to support upgrades.
     VersionedVoteMsg(Box<VersionedVoteMsg>),
+    /// OrderVoteMsg is the struct that is broadcasted by a validator on receiving quorum certificate
+    /// on a block.
+    OrderVoteMsg(Box<OrderVote>),
     /// CommitProposal is the struct that is sent by the validator after execution to propose
     /// on the committed state hash root.
-    OrderVoteMsg(Box<OrderVote>),
     CommitVoteMsg(Box<CommitVote>),
     /// CommitDecision is the struct that is sent by the validator after collecting no fewer
     /// than 2f + 1 signatures on the commit proposal. This part is not on the critical path, but

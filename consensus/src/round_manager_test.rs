@@ -2057,7 +2057,10 @@ pub fn forking_retrieval_test() {
             let peer = nodes[proposal_node].signer.author();
             nodes[proposal_node]
                 .pending_network_events
-                .push(Event::Message(peer, ConsensusMsg::VersionedProposalMsg(msg)))
+                .push(Event::Message(
+                    peer, 
+                    ConsensusMsg::VersionedProposalMsg(msg)
+                ))
         },
         _ => panic!("unexpected network message {:?}", next_message),
     }

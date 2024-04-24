@@ -332,58 +332,74 @@ ConsensusMsg:
         NEWTYPE:
           TYPENAME: ProposalMsg
     4:
+      VersionedProposalMsg:
+        NEWTYPE:
+          TYPENAME: VersionedProposalMsg
+    5:
       SyncInfo:
         NEWTYPE:
           TYPENAME: SyncInfo
-    5:
+    6:
+      VersionedSyncInfo:
+        NEWTYPE:
+          TYPENAME: VersionedSyncInfo
+    7:
       EpochChangeProof:
         NEWTYPE:
           TYPENAME: EpochChangeProof
-    6:
+    8:
       VoteMsg:
         NEWTYPE:
           TYPENAME: VoteMsg
-    7:
+    9:
+      VersionedVoteMsg:
+        NEWTYPE:
+          TYPENAME: VersionedVoteMsg
+    10:
+      OrderVoteMsg:
+        NEWTYPE:
+          TYPENAME: OrderVote
+    11:
       CommitVoteMsg:
         NEWTYPE:
           TYPENAME: CommitVote
-    8:
+    12:
       CommitDecisionMsg:
         NEWTYPE:
           TYPENAME: CommitDecision
-    9:
+    13:
       BatchMsg:
         NEWTYPE:
           TYPENAME: BatchMsg
-    10:
+    14:
       BatchRequestMsg:
         NEWTYPE:
           TYPENAME: BatchRequest
-    11:
+    15:
       BatchResponse:
         NEWTYPE:
           TYPENAME: Batch
-    12:
+    16:
       SignedBatchInfo:
         NEWTYPE:
           TYPENAME: SignedBatchInfoMsg
-    13:
+    17:
       ProofOfStoreMsg:
         NEWTYPE:
           TYPENAME: ProofOfStoreMsg
-    14:
+    18:
       DAGMessage:
         NEWTYPE:
           TYPENAME: DAGNetworkMessage
-    15:
+    19:
       CommitMessage:
         NEWTYPE:
           TYPENAME: CommitMessage
-    16:
+    20:
       RandGenMessage:
         NEWTYPE:
           TYPENAME: RandGenMessage
-    17:
+    21:
       BatchResponseV2:
         NEWTYPE:
           TYPENAME: BatchResponse
@@ -690,6 +706,22 @@ ProposalMsg:
         TYPENAME: Block
     - sync_info:
         TYPENAME: SyncInfo
+ProposalMsgV2:
+  STRUCT:
+    - proposal:
+        TYPENAME: Block
+    - sync_info:
+        TYPENAME: VersionedSyncInfo
+VersionedProposalMsg:
+  ENUM:
+    0:
+      V1:
+        NEWTYPE:
+          TYPENAME: ProposalMsg
+    1:
+      V2:
+        NEWTYPE:
+          TYPENAME: ProposalMsgV2
 ProviderJWKs:
   STRUCT:
     - issuer: BYTES
@@ -835,6 +867,28 @@ SyncInfo:
     - highest_2chain_timeout_cert:
         OPTION:
           TYPENAME: TwoChainTimeoutCertificate
+SyncInfoV2:
+  STRUCT:
+    - highest_quorum_cert:
+        TYPENAME: QuorumCert
+    - highest_ordered_decision:
+        OPTION:
+          TYPENAME: LedgerInfoWithSignatures
+    - highest_commit_decision:
+        TYPENAME: LedgerInfoWithSignatures
+    - highest_2chain_timeout_cert:
+        OPTION:
+          TYPENAME: TwoChainTimeoutCertificate
+VersionedSyncInfo:
+  ENUM:
+    0:
+      V1:
+        NEWTYPE:
+          TYPENAME: SyncInfo
+    1:
+      V2:
+        NEWTYPE:
+          TYPENAME: SyncInfoV2
 TableHandle:
   NEWTYPESTRUCT:
     TYPENAME: AccountAddress
@@ -1024,6 +1078,14 @@ ValidatorVerifier:
     - validator_infos:
         SEQ:
           TYPENAME: ValidatorConsensusInfo
+OrderVote:
+  STRUCT:
+    - author:
+        TYPENAME: AccountAddress
+    - ledger_info:
+        TYPENAME: LedgerInfo
+    - signature:
+        TYPENAME: Signature
 Vote:
   STRUCT:
     - vote_data:
@@ -1051,6 +1113,22 @@ VoteMsg:
         TYPENAME: Vote
     - sync_info:
         TYPENAME: SyncInfo
+VoteMsgV2:
+  STRUCT:
+    - vote:
+        TYPENAME: Vote
+    - sync_info:
+        TYPENAME: VersionedSyncInfo
+VersionedVoteMsg:
+  ENUM:
+    0:
+      V1:
+        NEWTYPE:
+          TYPENAME: VoteMsg
+    1:
+      V2:
+        NEWTYPE:
+          TYPENAME: VoteMsgV2
 WriteOp:
   ENUM:
     0:
