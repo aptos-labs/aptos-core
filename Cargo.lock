@@ -203,12 +203,6 @@ dependencies = [
 ]
 
 [[package]]
-name = "antidote"
-version = "1.0.0"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "34fde25430d87a9388dadbe6e34d7f72a462c8b43ac8d309b42b0a8505d7e2a5"
-
-[[package]]
 name = "anyhow"
 version = "1.0.82"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -235,37 +229,6 @@ dependencies = [
  "aptos-types",
  "proptest",
  "rand 0.7.3",
-]
-
-[[package]]
-name = "aptos-admin-service"
-version = "0.1.0"
-dependencies = [
- "anyhow",
- "aptos-config",
- "aptos-consensus",
- "aptos-consensus-types",
- "aptos-crypto",
- "aptos-infallible",
- "aptos-logger",
- "aptos-profiler",
- "aptos-runtimes",
- "aptos-storage-interface",
- "aptos-types",
- "async-mutex",
- "bcs 0.1.4",
- "futures",
- "http 0.2.12",
- "hyper",
- "lazy_static",
- "mime",
- "pprof",
- "regex",
- "rstack-self",
- "sha256",
- "tokio",
- "tokio-scoped",
- "url",
 ]
 
 [[package]]
@@ -707,87 +670,6 @@ dependencies = [
 ]
 
 [[package]]
-name = "aptos-consensus"
-version = "0.1.0"
-dependencies = [
- "anyhow",
- "aptos-bitvec",
- "aptos-bounded-executor",
- "aptos-cached-packages",
- "aptos-channels",
- "aptos-collections",
- "aptos-config",
- "aptos-consensus-notifications",
- "aptos-consensus-types",
- "aptos-crypto",
- "aptos-crypto-derive",
- "aptos-dkg",
- "aptos-enum-conversion-derive",
- "aptos-event-notifications",
- "aptos-executor",
- "aptos-executor-test-helpers",
- "aptos-executor-types",
- "aptos-experimental-runtimes",
- "aptos-fallible",
- "aptos-global-constants",
- "aptos-infallible",
- "aptos-keygen",
- "aptos-logger",
- "aptos-mempool",
- "aptos-metrics-core",
- "aptos-network",
- "aptos-reliable-broadcast",
- "aptos-runtimes",
- "aptos-safety-rules",
- "aptos-schemadb",
- "aptos-secure-storage",
- "aptos-short-hex-str",
- "aptos-storage-interface",
- "aptos-temppath",
- "aptos-time-service",
- "aptos-types",
- "aptos-validator-transaction-pool",
- "aptos-vm",
- "aptos-vm-validator",
- "arc-swap",
- "async-trait",
- "bcs 0.1.4",
- "byteorder",
- "bytes",
- "chrono",
- "claims",
- "clap 4.5.4",
- "dashmap",
- "enum_dispatch",
- "fail 0.5.1",
- "futures",
- "futures-channel",
- "hex",
- "itertools 0.10.5",
- "maplit",
- "mirai-annotations",
- "move-core-types",
- "num-derive",
- "num-traits",
- "once_cell",
- "proptest",
- "rand 0.7.3",
- "rayon",
- "scopeguard",
- "serde",
- "serde_bytes",
- "serde_json",
- "serde_yaml 0.8.26",
- "sha3 0.9.1",
- "strum_macros 0.24.3",
- "tempfile",
- "thiserror",
- "tokio",
- "tokio-metrics",
- "tokio-retry",
-]
-
-[[package]]
 name = "aptos-consensus-notifications"
 version = "0.1.0"
 dependencies = [
@@ -1074,20 +956,6 @@ dependencies = [
  "clap 4.5.4",
  "itertools 0.10.5",
  "owo-colors",
- "tokio",
-]
-
-[[package]]
-name = "aptos-debugger"
-version = "0.1.0"
-dependencies = [
- "anyhow",
- "aptos-consensus",
- "aptos-db-tool",
- "aptos-logger",
- "aptos-move-debugger",
- "aptos-push-metrics",
- "clap 4.5.4",
  "tokio",
 ]
 
@@ -1782,39 +1650,6 @@ dependencies = [
 ]
 
 [[package]]
-name = "aptos-indexer-grpc-cache-worker"
-version = "1.0.0"
-dependencies = [
- "anyhow",
- "aptos-config",
- "aptos-indexer-grpc-server-framework",
- "aptos-indexer-grpc-utils",
- "aptos-metrics-core",
- "aptos-moving-average",
- "aptos-protos",
- "aptos-runtimes",
- "async-trait",
- "backoff",
- "base64 0.13.1",
- "clap 4.5.4",
- "futures",
- "futures-core",
- "jemallocator",
- "once_cell",
- "prost 0.12.4",
- "redis",
- "reqwest",
- "serde",
- "serde_json",
- "serde_yaml 0.8.26",
- "tempfile",
- "tokio",
- "tonic 0.11.0",
- "tracing",
- "url",
-]
-
-[[package]]
 name = "aptos-indexer-grpc-data-access"
 version = "1.0.0"
 dependencies = [
@@ -1852,65 +1687,6 @@ dependencies = [
  "tracing",
  "tracing-subscriber 0.3.18",
  "warp",
-]
-
-[[package]]
-name = "aptos-indexer-grpc-data-service"
-version = "1.0.0"
-dependencies = [
- "anyhow",
- "aptos-indexer-grpc-data-access",
- "aptos-indexer-grpc-server-framework",
- "aptos-indexer-grpc-utils",
- "aptos-logger",
- "aptos-metrics-core",
- "aptos-moving-average",
- "aptos-protos",
- "aptos-runtimes",
- "async-trait",
- "base64 0.13.1",
- "clap 4.5.4",
- "cloud-storage",
- "futures",
- "jemallocator",
- "once_cell",
- "prost 0.12.4",
- "redis",
- "serde",
- "serde_json",
- "tokio",
- "tokio-stream",
- "tonic 0.11.0",
- "tonic-reflection",
- "tracing",
- "uuid",
-]
-
-[[package]]
-name = "aptos-indexer-grpc-file-store"
-version = "1.0.0"
-dependencies = [
- "anyhow",
- "aptos-indexer-grpc-server-framework",
- "aptos-indexer-grpc-utils",
- "aptos-metrics-core",
- "aptos-moving-average",
- "aptos-protos",
- "aptos-runtimes",
- "async-trait",
- "base64 0.13.1",
- "clap 4.5.4",
- "cloud-storage",
- "futures",
- "futures-util",
- "jemallocator",
- "once_cell",
- "prost 0.12.4",
- "redis",
- "serde",
- "serde_json",
- "tokio",
- "tracing",
 ]
 
 [[package]]
@@ -1969,29 +1745,6 @@ dependencies = [
  "tokio-stream",
  "tonic 0.11.0",
  "tonic-reflection",
-]
-
-[[package]]
-name = "aptos-indexer-grpc-server-framework"
-version = "1.0.0"
-dependencies = [
- "anyhow",
- "aptos-admin-service",
- "aptos-metrics-core",
- "aptos-runtimes",
- "async-trait",
- "backtrace",
- "clap 4.5.4",
- "futures",
- "prometheus",
- "serde",
- "serde_yaml 0.8.26",
- "tempfile",
- "tokio",
- "toml 0.7.8",
- "tracing",
- "tracing-subscriber 0.3.18",
- "warp",
 ]
 
 [[package]]
@@ -2419,41 +2172,6 @@ dependencies = [
 ]
 
 [[package]]
-name = "aptos-move-debugger"
-version = "0.1.0"
-dependencies = [
- "anyhow",
- "aptos-consensus",
- "aptos-crypto",
- "aptos-gas-meter",
- "aptos-gas-profiling",
- "aptos-gas-schedule",
- "aptos-logger",
- "aptos-memory-usage-tracker",
- "aptos-resource-viewer",
- "aptos-rest-client",
- "aptos-table-natives",
- "aptos-types",
- "aptos-validator-interface",
- "aptos-vm",
- "aptos-vm-logging",
- "aptos-vm-types",
- "bcs 0.1.4",
- "clap 4.5.4",
- "move-binary-format",
- "move-cli",
- "move-compiler",
- "move-core-types",
- "move-resource-viewer",
- "move-vm-runtime",
- "move-vm-test-utils",
- "regex",
- "reqwest",
- "tokio",
- "url",
-]
-
-[[package]]
 name = "aptos-move-e2e-benchmark"
 version = "0.1.0"
 dependencies = [
@@ -2717,39 +2435,6 @@ dependencies = [
  "serde_yaml 0.8.26",
  "tokio",
  "url",
-]
-
-[[package]]
-name = "aptos-nft-metadata-crawler-parser"
-version = "0.1.0"
-dependencies = [
- "anyhow",
- "aptos-indexer-grpc-server-framework",
- "aptos-metrics-core",
- "aptos-runtimes",
- "async-trait",
- "backoff",
- "base64 0.13.1",
- "bytes",
- "chrono",
- "clap 4.5.4",
- "csv",
- "diesel",
- "diesel_migrations",
- "field_count",
- "futures",
- "google-cloud-storage",
- "image",
- "once_cell",
- "regex",
- "reqwest",
- "serde",
- "serde_json",
- "sha256",
- "tokio",
- "tracing",
- "url",
- "warp",
 ]
 
 [[package]]
@@ -4304,15 +3989,6 @@ dependencies = [
 ]
 
 [[package]]
-name = "async-mutex"
-version = "1.4.0"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "479db852db25d9dbf6204e6cb6253698f175c15726470f78af0d918e99d6156e"
-dependencies = [
- "event-listener 2.5.3",
-]
-
-[[package]]
 name = "async-object-pool"
 version = "0.1.4"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -4782,12 +4458,6 @@ name = "bit-vec"
 version = "0.6.3"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "349f9b6a179ed607305526ca489b34ad0a41aed5f7980fa90eb03160b69598fb"
-
-[[package]]
-name = "bit_field"
-version = "0.10.2"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "dc827186963e592360843fb5ba4b973e145841266c1357f7180c43526f2e5b61"
 
 [[package]]
 name = "bitflags"
@@ -6428,27 +6098,6 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "56ce8c6da7551ec6c462cbaf3bfbc75131ebbfa1c944aeaa9dab51ca1c5f0c3b"
 
 [[package]]
-name = "dw"
-version = "0.2.0"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "ef0ed82b765c2ab79fb48e4bf2c95bd583202f4078a702bc714cc6e6f3ca80c3"
-dependencies = [
- "dw-sys",
- "foreign-types 0.5.0",
- "libc",
-]
-
-[[package]]
-name = "dw-sys"
-version = "0.1.0"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "14eb35c87ff6626cd1021bb32bc7d9a5372ea72547e1eaf0343a841d9d55a973"
-dependencies = [
- "libc",
- "pkg-config",
-]
-
-[[package]]
 name = "e2e-move-tests"
 version = "0.1.0"
 dependencies = [
@@ -6991,22 +6640,6 @@ dependencies = [
 ]
 
 [[package]]
-name = "exr"
-version = "1.72.0"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "887d93f60543e9a9362ef8a21beedd0a833c5d9610e18c67abe15a5963dcb1a4"
-dependencies = [
- "bit_field",
- "flume",
- "half 2.4.1",
- "lebe",
- "miniz_oxide",
- "rayon-core",
- "smallvec",
- "zune-inflate",
-]
-
-[[package]]
 name = "fail"
 version = "0.4.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -7216,15 +6849,6 @@ dependencies = [
 ]
 
 [[package]]
-name = "flume"
-version = "0.11.0"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "55ac459de2512911e4b674ce33cf20befaba382d05b62b008afc1c8b57cbf181"
-dependencies = [
- "spin 0.9.8",
-]
-
-[[package]]
 name = "fnv"
 version = "1.0.7"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -7236,28 +6860,7 @@ version = "0.3.2"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "f6f339eb8adc052cd2ca78910fda869aefa38d22d5cb648e6485e4d3fc06f3b1"
 dependencies = [
- "foreign-types-shared 0.1.1",
-]
-
-[[package]]
-name = "foreign-types"
-version = "0.5.0"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "d737d9aa519fb7b749cbc3b962edcf310a8dd1f4b67c91c4f83975dbdd17d965"
-dependencies = [
- "foreign-types-macros",
- "foreign-types-shared 0.3.1",
-]
-
-[[package]]
-name = "foreign-types-macros"
-version = "0.2.3"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "1a5c6c585bc94aaf2c7b51dd4c2ba22680844aba4c687be581871a6f518c5742"
-dependencies = [
- "proc-macro2 1.0.81",
- "quote 1.0.36",
- "syn 2.0.60",
+ "foreign-types-shared",
 ]
 
 [[package]]
@@ -7265,12 +6868,6 @@ name = "foreign-types-shared"
 version = "0.1.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "00b0228411908ca8685dba7fc2cdd70ec9990a6e753e89b6ac91a84c40fbaf4b"
-
-[[package]]
-name = "foreign-types-shared"
-version = "0.3.1"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "aa9a19cbb55df58761df49b23516a86d432839add4af60fc256da840f66ed35b"
 
 [[package]]
 name = "form_urlencoded"
@@ -7481,27 +7078,6 @@ dependencies = [
 ]
 
 [[package]]
-name = "generate-format"
-version = "0.1.0"
-dependencies = [
- "aptos-api-types",
- "aptos-config",
- "aptos-consensus",
- "aptos-consensus-types",
- "aptos-crypto",
- "aptos-crypto-derive",
- "aptos-network",
- "aptos-types",
- "bcs 0.1.4",
- "clap 4.5.4",
- "move-core-types",
- "rand 0.7.3",
- "serde",
- "serde-reflection",
- "serde_yaml 0.8.26",
-]
-
-[[package]]
 name = "generic-array"
 version = "0.12.4"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -7577,16 +7153,6 @@ checksum = "f0d8a4362ccb29cb0b265253fb0a2728f592895ee6854fd9bc13f2ffda266ff1"
 dependencies = [
  "opaque-debug 0.3.1",
  "polyval",
-]
-
-[[package]]
-name = "gif"
-version = "0.13.1"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "3fb2d69b19215e18bb912fa30f7ce15846e301408695e44e0ef719f1da9e19f2"
-dependencies = [
- "color_quant",
- "weezl",
 ]
 
 [[package]]
@@ -8352,13 +7918,8 @@ dependencies = [
  "bytemuck",
  "byteorder",
  "color_quant",
- "exr",
- "gif",
- "jpeg-decoder",
  "num-traits",
  "png",
- "qoi",
- "tiff",
 ]
 
 [[package]]
@@ -8691,15 +8252,6 @@ dependencies = [
 ]
 
 [[package]]
-name = "jpeg-decoder"
-version = "0.3.1"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "f5d4a7da358eff58addd2877a45865158f0d78c911d43a5784ceb7bbf52833b0"
-dependencies = [
- "rayon",
-]
-
-[[package]]
 name = "js-sys"
 version = "0.3.69"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -8846,12 +8398,6 @@ name = "lazycell"
 version = "1.3.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "830d08ce1d1d941e6b30645f1a0eb5643013d835ce3779a5fc208261dbe10f55"
-
-[[package]]
-name = "lebe"
-version = "0.5.2"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "03087c2bad5e1034e8cace5926dec053fb3790248370865f5117a7d0213354c8"
 
 [[package]]
 name = "ledger-apdu"
@@ -10848,7 +10394,7 @@ checksum = "95a0481286a310808298130d22dd1fef0fa571e05a8f44ec801801e84b216b1f"
 dependencies = [
  "bitflags 2.5.0",
  "cfg-if",
- "foreign-types 0.3.2",
+ "foreign-types",
  "libc",
  "once_cell",
  "openssl-macros",
@@ -12138,15 +11684,6 @@ dependencies = [
 ]
 
 [[package]]
-name = "qoi"
-version = "0.4.1"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "7f6d64c71eb498fe9eae14ce4ec935c555749aef511cca85b5568910d6e48001"
-dependencies = [
- "bytemuck",
-]
-
-[[package]]
 name = "qstring"
 version = "0.7.2"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -12741,34 +12278,6 @@ dependencies = [
  "spki 0.7.3",
  "subtle",
  "zeroize",
-]
-
-[[package]]
-name = "rstack"
-version = "0.3.3"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "e7df9d3ebd4f17b52e6134efe2fa20021c80688cbe823d481a729a993b730493"
-dependencies = [
- "cfg-if",
- "dw",
- "lazy_static",
- "libc",
- "log",
-]
-
-[[package]]
-name = "rstack-self"
-version = "0.3.0"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "6dd5030da3aba0ec731502f74ec38e63798eea6bc8b8ba5972129afe3eababd2"
-dependencies = [
- "antidote",
- "backtrace",
- "bincode",
- "lazy_static",
- "libc",
- "rstack",
- "serde",
 ]
 
 [[package]]
@@ -13437,19 +12946,6 @@ dependencies = [
 ]
 
 [[package]]
-name = "sha256"
-version = "1.5.0"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "18278f6a914fa3070aa316493f7d2ddfb9ac86ebc06fa3b83bffda487e9065b0"
-dependencies = [
- "async-trait",
- "bytes",
- "hex",
- "sha2 0.10.8",
- "tokio",
-]
-
-[[package]]
 name = "sha3"
 version = "0.8.2"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -13768,9 +13264,6 @@ name = "spin"
 version = "0.9.8"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "6980e8d7511241f8acf4aebddbb1ff938df5eebe98691418c4468d0b72a96a67"
-dependencies = [
- "lock_api",
-]
 
 [[package]]
 name = "spki"
@@ -14282,17 +13775,6 @@ dependencies = [
 ]
 
 [[package]]
-name = "tiff"
-version = "0.9.1"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "ba1310fcea54c6a9a4fd1aad794ecc02c31682f6bfbecdf460bf19533eed1e3e"
-dependencies = [
- "flate2",
- "jpeg-decoder",
- "weezl",
-]
-
-[[package]]
 name = "time"
 version = "0.3.36"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -14420,18 +13902,6 @@ dependencies = [
 ]
 
 [[package]]
-name = "tokio-metrics"
-version = "0.3.1"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "eace09241d62c98b7eeb1107d4c5c64ca3bd7da92e8c218c153ab3a78f9be112"
-dependencies = [
- "futures-util",
- "pin-project-lite",
- "tokio",
- "tokio-stream",
-]
-
-[[package]]
 name = "tokio-native-tls"
 version = "0.3.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -14482,16 +13952,6 @@ dependencies = [
  "rustls 0.22.4",
  "rustls-pki-types",
  "tokio",
-]
-
-[[package]]
-name = "tokio-scoped"
-version = "0.2.0"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "e4beb8ba13bc53ac53ce1d52b42f02e5d8060f0f42138862869beb769722b256"
-dependencies = [
- "tokio",
- "tokio-stream",
 ]
 
 [[package]]
@@ -15241,10 +14701,6 @@ name = "uuid"
 version = "1.8.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "a183cf7feeba97b4dd1c0d46788634f6221d87fa961b305bed08c851829efcc0"
-dependencies = [
- "getrandom 0.2.14",
- "serde",
-]
 
 [[package]]
 name = "valuable"
@@ -15508,12 +14964,6 @@ name = "webpki-roots"
 version = "0.25.4"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "5f20c57d8d7db6d3b86154206ae5d8fba62dd39573114de97c2cb0578251f8e1"
-
-[[package]]
-name = "weezl"
-version = "0.1.8"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "53a85b86a771b1c87058196170769dd264f66c0782acf1ae6cc51bfd64b39082"
 
 [[package]]
 name = "which"
@@ -15982,13 +15432,4 @@ checksum = "c253a4914af5bafc8fa8c86ee400827e83cf6ec01195ec1f1ed8441bf00d65aa"
 dependencies = [
  "cc",
  "pkg-config",
-]
-
-[[package]]
-name = "zune-inflate"
-version = "0.2.54"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "73ab332fe2f6680068f3582b16a24f90ad7096d5d39b974d1c0aff0125116f02"
-dependencies = [
- "simd-adler32",
 ]

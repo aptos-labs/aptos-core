@@ -8,7 +8,6 @@ members = [
     "api/types",
     "aptos-move/aptos-abstract-gas-usage",
     "aptos-move/aptos-aggregator",
-    "aptos-move/aptos-debugger",
     "aptos-move/aptos-gas-algebra",
     "aptos-move/aptos-gas-meter",
     "aptos-move/aptos-gas-profiling",
@@ -41,10 +40,8 @@ members = [
     "aptos-utils",
     "config",
     "config/global-constants",
-    "consensus",
     "consensus/consensus-types",
     "consensus/safety-rules",
-    "crates/aptos-admin-service",
     "crates/aptos-api-tester",
     "crates/aptos-bcs-utils",
     "crates/aptos-bitvec",
@@ -53,7 +50,6 @@ members = [
     "crates/aptos-compression",
     "crates/aptos-crypto",
     "crates/aptos-crypto-derive",
-    "crates/aptos-debugger",
     "crates/aptos-dkg",
     "crates/aptos-drop-helper",
     "crates/aptos-enum-conversion-derive",
@@ -101,15 +97,10 @@ members = [
     "crates/validator-transaction-pool",
     "devtools/aptos-cargo-cli",
     "dkg",
-    "ecosystem/indexer-grpc/indexer-grpc-cache-worker",
     "ecosystem/indexer-grpc/indexer-grpc-data-access",
-    "ecosystem/indexer-grpc/indexer-grpc-data-service",
-    "ecosystem/indexer-grpc/indexer-grpc-file-store",
     "ecosystem/indexer-grpc/indexer-grpc-fullnode",
-    "ecosystem/indexer-grpc/indexer-grpc-server-framework",
     "ecosystem/indexer-grpc/indexer-grpc-table-info",
     "ecosystem/indexer-grpc/indexer-grpc-utils",
-    "ecosystem/nft-metadata-crawler-parser",
     "ecosystem/node-checker",
     "ecosystem/node-checker/fn-check-client",
     "execution/block-partitioner",
@@ -163,7 +154,6 @@ members = [
     "testsuite/dos/sender",
     "testsuite/fuzzer",
     "testsuite/fuzzer/fuzz",
-    "testsuite/generate-format",
     "testsuite/module-publish",
     # third_party/move
     "third_party/move/extensions/async/move-async-vm",
@@ -232,7 +222,6 @@ members = [
 # For more, see the "Conditional compilation for tests" section in documentation/coding_guidelines.md.
 default-members = [
     "consensus/safety-rules",
-    "crates/aptos-debugger",
     "crates/aptos-faucet/service",
     "crates/aptos-keygen",
     "crates/aptos-rate-limiter",
@@ -257,7 +246,6 @@ rust-version = "1.75.0"
 # Internal crate dependencies.
 # Please do not add any test features here: they should be declared by the individual crate.
 aptos-accumulator = { path = "storage/accumulator" }
-aptos-admin-service = { path = "crates/aptos-admin-service" }
 aptos-aggregator = { path = "aptos-move/aptos-aggregator" }
 aptos-api = { path = "api" }
 aptos-api-test-context = { path = "api/test-context" }
@@ -274,7 +262,6 @@ aptos-channels = { path = "crates/channel" }
 aptos-cli-common = { path = "crates/aptos-cli-common" }
 aptos-collections = { path = "crates/aptos-collections" }
 aptos-compression = { path = "crates/aptos-compression" }
-aptos-consensus = { path = "consensus" }
 aptos-consensus-notifications = { path = "state-sync/inter-component/consensus-notifications" }
 aptos-consensus-types = { path = "consensus/consensus-types" }
 aptos-config = { path = "config" }
@@ -286,7 +273,6 @@ aptos-data-streaming-service = { path = "state-sync/data-streaming-service" }
 aptos-db = { path = "storage/aptosdb" }
 aptos-db-indexer = { path = "storage/indexer" }
 aptos-db-tool = { path = "storage/db-tool" }
-aptos-debugger = { path = "crates/aptos-debugger" }
 aptos-dkg = { path = "crates/aptos-dkg" }
 aptos-dkg-runtime = { path = "dkg" }
 aptos-drop-helper = { path = "crates/aptos-drop-helper" }
@@ -318,14 +304,10 @@ aptos-github-client = { path = "crates/aptos-github-client" }
 aptos-global-constants = { path = "config/global-constants" }
 aptos-id-generator = { path = "crates/aptos-id-generator" }
 aptos-indexer = { path = "crates/indexer" }
-aptos-indexer-grpc-cache-worker = { path = "ecosystem/indexer-grpc/indexer-grpc-cache-worker" }
-aptos-indexer-grpc-data-service = { path = "ecosystem/indexer-grpc/indexer-grpc-data-service" }
 aptos-indexer-grpc-data-access = { path = "ecosystem/indexer-grpc/indexer-grpc-data-access" }
-aptos-indexer-grpc-file-store = { path = "ecosystem/indexer-grpc/indexer-grpc-file-store" }
 aptos-indexer-grpc-fullnode = { path = "ecosystem/indexer-grpc/indexer-grpc-fullnode" }
 aptos-indexer-grpc-table-info = { path = "ecosystem/indexer-grpc/indexer-grpc-table-info" }
 aptos-indexer-grpc-utils = { path = "ecosystem/indexer-grpc/indexer-grpc-utils" }
-aptos-indexer-grpc-server-framework = { path = "ecosystem/indexer-grpc/indexer-grpc-server-framework" }
 aptos-infallible = { path = "crates/aptos-infallible" }
 aptos-jellyfish-merkle = { path = "storage/jellyfish-merkle" }
 aptos-jwk-consensus = { path = "crates/aptos-jwk-consensus" }
@@ -339,7 +321,6 @@ aptos-mempool = { path = "mempool" }
 aptos-mempool-notifications = { path = "state-sync/inter-component/mempool-notifications" }
 aptos-memsocket = { path = "network/memsocket" }
 aptos-metrics-core = { path = "crates/aptos-metrics-core" }
-aptos-move-debugger = { path = "aptos-move/aptos-debugger" }
 aptos-move-examples = { path = "aptos-move/move-examples" }
 aptos-move-e2e-benchmark = { path = "aptos-move/e2e-benchmark" }
 aptos-mvhashmap = { path = "aptos-move/mvhashmap" }
@@ -350,7 +331,6 @@ aptos-network-benchmark = { path = "network/benchmark" }
 aptos-network-builder = { path = "network/builder" }
 aptos-network-checker = { path = "crates/aptos-network-checker" }
 aptos-network-discovery = { path = "network/discovery" }
-aptos-nft-metadata-crawler-parser = { path = "ecosystem/nft-metadata-crawler-parser" }
 aptos-node-checker = { path = "ecosystem/node-checker" }
 aptos-node-identity = { path = "crates/aptos-node-identity" }
 aptos-node-resource-metrics = { path = "crates/node-resource-metrics" }
