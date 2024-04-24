@@ -94,8 +94,6 @@ pub struct GenesisConfiguration {
     pub initial_features_override: Option<Features>,
     pub randomness_config_override: Option<OnChainRandomnessConfig>,
     pub jwk_consensus_config_override: Option<OnChainJWKConsensusConfig>,
-    pub create_coin_conversion_map: bool,
-    pub enable_apt_migration: bool,
 }
 
 pub static GENESIS_KEYPAIR: Lazy<(Ed25519PrivateKey, Ed25519PublicKey)> = Lazy::new(|| {
@@ -283,9 +281,6 @@ pub fn encode_genesis_change_set(
     } else {
         initialize_aptos_coin(&mut session);
     }
-    initialize_coin_conversion_map(&mut session, genesis_config.create_coin_conversion_map);
-    initialize_apt_migration(&mut session, genesis_config.enable_apt_migration);
-
     initialize_config_buffer(&mut session);
     initialize_dkg(&mut session);
     initialize_reconfiguration_state(&mut session);
@@ -1008,8 +1003,6 @@ pub fn generate_test_genesis(
             initial_features_override: None,
             randomness_config_override: None,
             jwk_consensus_config_override: None,
-            create_coin_conversion_map: true,
-            enable_apt_migration: true,
         },
         &OnChainConsensusConfig::default_for_genesis(),
         &OnChainExecutionConfig::default_for_genesis(),
@@ -1060,8 +1053,6 @@ fn mainnet_genesis_config() -> GenesisConfiguration {
         initial_features_override: None,
         randomness_config_override: None,
         jwk_consensus_config_override: None,
-        create_coin_conversion_map: true,
-        enable_apt_migration: true,
     }
 }
 
