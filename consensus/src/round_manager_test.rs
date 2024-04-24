@@ -2051,6 +2051,14 @@ pub fn forking_retrieval_test() {
                 .pending_network_events
                 .push(Event::Message(peer, ConsensusMsg::ProposalMsg(msg)))
         },
+        ConsensusMsg::VersionedProposalMsg(msg) => {
+            // put the message back in the queue.
+            // actual peer doesn't matter, it is ignored, so use self.
+            let peer = nodes[proposal_node].signer.author();
+            nodes[proposal_node]
+                .pending_network_events
+                .push(Event::Message(peer, ConsensusMsg::VersionedProposalMsg(msg)))
+        },
         _ => panic!("unexpected network message {:?}", next_message),
     }
     process_and_vote_on_proposal(
