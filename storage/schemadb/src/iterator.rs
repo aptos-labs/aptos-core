@@ -12,10 +12,12 @@ pub enum ScanDirection {
     Backward,
 }
 
+type InnerDBIterator<'a> = rocksdb::DBRawIteratorWithThreadMode<'a, crate::InnerDB>;
+
 /// DB Iterator parameterized on [`Schema`] that seeks with [`Schema::Key`] and yields
 /// [`Schema::Key`] and [`Schema::Value`]
 pub struct SchemaIterator<'a, S> {
-    db_iter: rocksdb::DBRawIterator<'a>,
+    db_iter: InnerDBIterator<'a>,
     direction: ScanDirection,
     phantom: PhantomData<S>,
 }
@@ -24,7 +26,7 @@ impl<'a, S> SchemaIterator<'a, S>
 where
     S: Schema,
 {
-    pub(crate) fn new(db_iter: rocksdb::DBRawIterator<'a>, direction: ScanDirection) -> Self {
+    pub(crate) fn new(db_iter: InnerDBIterator<'a>, direction: ScanDirection) -> Self {
         SchemaIterator {
             db_iter,
             direction,

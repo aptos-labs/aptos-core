@@ -9,23 +9,19 @@ members = [
     "aptos-move/aptos-abstract-gas-usage",
     "aptos-move/aptos-aggregator",
     "aptos-move/aptos-debugger",
-    "aptos-move/aptos-e2e-comparison-testing",
     "aptos-move/aptos-gas-algebra",
-    "aptos-move/aptos-gas-calibration",
     "aptos-move/aptos-gas-meter",
     "aptos-move/aptos-gas-profiling",
     "aptos-move/aptos-gas-schedule",
     "aptos-move/aptos-gas-schedule-updator",
     "aptos-move/aptos-memory-usage-tracker",
     "aptos-move/aptos-native-interface",
-    "aptos-move/aptos-release-builder",
     "aptos-move/aptos-resource-viewer",
     "aptos-move/aptos-sdk-builder",
     "aptos-move/aptos-transaction-benchmarks",
     "aptos-move/aptos-transactional-test-harness",
     "aptos-move/aptos-validator-interface",
     "aptos-move/aptos-vm",
-    "aptos-move/aptos-vm-benchmarks",
     "aptos-move/aptos-vm-logging",
     "aptos-move/aptos-vm-profiling",
     "aptos-move/aptos-vm-types",
@@ -42,14 +38,12 @@ members = [
     "aptos-move/package-builder",
     "aptos-move/vm-genesis",
     "aptos-move/writeset-transaction-generator",
-    "aptos-node",
     "aptos-utils",
     "config",
     "config/global-constants",
     "consensus",
     "consensus/consensus-types",
     "consensus/safety-rules",
-    "crates/aptos",
     "crates/aptos-admin-service",
     "crates/aptos-api-tester",
     "crates/aptos-bcs-utils",
@@ -71,7 +65,6 @@ members = [
     "crates/aptos-github-client",
     "crates/aptos-id-generator",
     "crates/aptos-infallible",
-    "crates/aptos-inspection-service",
     "crates/aptos-jwk-consensus",
     "crates/aptos-keygen",
     "crates/aptos-ledger",
@@ -87,12 +80,8 @@ members = [
     "crates/aptos-rate-limiter",
     "crates/aptos-rest-client",
     "crates/aptos-retrier",
-    "crates/aptos-rosetta",
-    "crates/aptos-rosetta-cli",
     "crates/aptos-runtimes",
     "crates/aptos-speculative-state-helper",
-    "crates/aptos-telemetry",
-    "crates/aptos-telemetry-service",
     "crates/aptos-temppath",
     "crates/aptos-time-service",
     "crates/aptos-warp-webserver",
@@ -117,7 +106,6 @@ members = [
     "ecosystem/indexer-grpc/indexer-grpc-data-service",
     "ecosystem/indexer-grpc/indexer-grpc-file-store",
     "ecosystem/indexer-grpc/indexer-grpc-fullnode",
-    "ecosystem/indexer-grpc/indexer-grpc-integration-tests",
     "ecosystem/indexer-grpc/indexer-grpc-server-framework",
     "ecosystem/indexer-grpc/indexer-grpc-table-info",
     "ecosystem/indexer-grpc/indexer-grpc-utils",
@@ -173,14 +161,10 @@ members = [
     "testsuite/dos/http_test",
     "testsuite/dos/listener",
     "testsuite/dos/sender",
-    "testsuite/forge",
-    "testsuite/forge-cli",
     "testsuite/fuzzer",
     "testsuite/fuzzer/fuzz",
     "testsuite/generate-format",
     "testsuite/module-publish",
-    "testsuite/smoke-test",
-    "testsuite/testcases",
     # third_party/move
     "third_party/move/extensions/async/move-async-vm",
     "third_party/move/extensions/move-table-extension",
@@ -247,14 +231,11 @@ members = [
 #
 # For more, see the "Conditional compilation for tests" section in documentation/coding_guidelines.md.
 default-members = [
-    "aptos-node",
     "consensus/safety-rules",
-    "crates/aptos",
     "crates/aptos-debugger",
     "crates/aptos-faucet/service",
     "crates/aptos-keygen",
     "crates/aptos-rate-limiter",
-    "crates/aptos-rosetta",
     "crates/transaction-emitter",
     "aptos-move/framework",
     "storage/backup/backup-cli",
@@ -275,7 +256,6 @@ rust-version = "1.75.0"
 [workspace.dependencies]
 # Internal crate dependencies.
 # Please do not add any test features here: they should be declared by the individual crate.
-aptos = { path = "crates/aptos" }
 aptos-accumulator = { path = "storage/accumulator" }
 aptos-admin-service = { path = "crates/aptos-admin-service" }
 aptos-aggregator = { path = "aptos-move/aptos-aggregator" }
@@ -325,13 +305,11 @@ aptos-faucet-core = { path = "crates/aptos-faucet/core" }
 aptos-faucet-service = { path = "crates/aptos-faucet/service" }
 aptos-faucet-metrics-server = { path = "crates/aptos-faucet/metrics-server" }
 aptos-fallible = { path = "crates/fallible" }
-aptos-forge = { path = "testsuite/forge" }
 aptos-framework = { path = "aptos-move/framework" }
 fuzzer = { path = "testsuite/fuzzer" }
 aptos-abstract-gas-usage = { path = "aptos-move/aptos-abstract-gas-usage" }
 aptos-gas-meter = { path = "aptos-move/aptos-gas-meter" }
 aptos-gas-algebra = { path = "aptos-move/aptos-gas-algebra" }
-aptos-gas-calibration = { path = "aptos-move/aptos-gas-calibration" }
 aptos-gas-profiling = { path = "aptos-move/aptos-gas-profiling" }
 aptos-gas-schedule = { path = "aptos-move/aptos-gas-schedule" }
 aptos-gas-schedule-updator = { path = "aptos-move/aptos-gas-schedule-updator" }
@@ -349,7 +327,6 @@ aptos-indexer-grpc-table-info = { path = "ecosystem/indexer-grpc/indexer-grpc-ta
 aptos-indexer-grpc-utils = { path = "ecosystem/indexer-grpc/indexer-grpc-utils" }
 aptos-indexer-grpc-server-framework = { path = "ecosystem/indexer-grpc/indexer-grpc-server-framework" }
 aptos-infallible = { path = "crates/aptos-infallible" }
-aptos-inspection-service = { path = "crates/aptos-inspection-service" }
 aptos-jellyfish-merkle = { path = "storage/jellyfish-merkle" }
 aptos-jwk-consensus = { path = "crates/aptos-jwk-consensus" }
 aptos-keygen = { path = "crates/aptos-keygen" }
@@ -374,7 +351,6 @@ aptos-network-builder = { path = "network/builder" }
 aptos-network-checker = { path = "crates/aptos-network-checker" }
 aptos-network-discovery = { path = "network/discovery" }
 aptos-nft-metadata-crawler-parser = { path = "ecosystem/nft-metadata-crawler-parser" }
-aptos-node = { path = "aptos-node" }
 aptos-node-checker = { path = "ecosystem/node-checker" }
 aptos-node-identity = { path = "crates/aptos-node-identity" }
 aptos-node-resource-metrics = { path = "crates/node-resource-metrics" }
@@ -392,13 +368,11 @@ aptos-protos = { path = "protos/rust" }
 aptos-proxy = { path = "crates/proxy" }
 aptos-push-metrics = { path = "crates/aptos-push-metrics" }
 aptos-rate-limiter = { path = "crates/aptos-rate-limiter" }
-aptos-release-builder = { path = "aptos-move/aptos-release-builder" }
 aptos-reliable-broadcast = { path = "crates/reliable-broadcast" }
 aptos-resource-viewer = { path = "aptos-move/aptos-resource-viewer" }
 aptos-rest-client = { path = "crates/aptos-rest-client" }
 aptos-retrier = { path = "crates/aptos-retrier" }
 aptos-rocksdb-options = { path = "storage/rocksdb-options" }
-aptos-rosetta = { path = "crates/aptos-rosetta" }
 aptos-runtimes = { path = "crates/aptos-runtimes" }
 aptos-safety-rules = { path = "consensus/safety-rules" }
 aptos-schemadb = { path = "storage/schemadb" }
@@ -415,8 +389,6 @@ aptos-storage-service-client = { path = "state-sync/storage-service/client" }
 aptos-storage-service-notifications = { path = "state-sync/inter-component/storage-service-notifications" }
 aptos-storage-service-types = { path = "state-sync/storage-service/types" }
 aptos-storage-service-server = { path = "state-sync/storage-service/server" }
-aptos-telemetry = { path = "crates/aptos-telemetry" }
-aptos-telemetry-service = { path = "crates/aptos-telemetry-service" }
 aptos-temppath = { path = "crates/aptos-temppath" }
 aptos-testcases = { path = "testsuite/testcases" }
 aptos-time-service = { path = "crates/aptos-time-service", features = [
@@ -725,7 +697,7 @@ walkdir = "2.3.3"
 warp = { version = "0.3.5", features = ["tls"] }
 warp-reverse-proxy = "1.0.0"
 which = "4.2.5"
-x25519-dalek = "1.2.0" #Set to this version to be compatible with Sovereign Labs
+x25519-dalek = { git = "https://github.com/aptos-labs/x25519-dalek", branch = "zeroize_v1" } #Set to this version to be compatible with Sovereign Labs
 zeroize = "1.6.0" #Set to this version to be compatible with Sovereign Labs
 
 # MOVE DEPENDENCIES

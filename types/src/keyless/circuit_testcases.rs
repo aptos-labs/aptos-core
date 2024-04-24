@@ -8,7 +8,8 @@ use crate::{
     keyless::{
         base64url_encode_str,
         bn254_circom::{G1Bytes, G2Bytes},
-        Claims, Configuration, Groth16Proof, IdCommitment, KeylessPublicKey, OpenIdSig, Pepper,
+        configuration, Claims, Configuration, Groth16Proof, IdCommitment, KeylessPublicKey,
+        OpenIdSig, Pepper,
     },
     transaction::authenticator::EphemeralPublicKey,
 };
@@ -115,7 +116,7 @@ pub(crate) const SAMPLE_UID_KEY: &str = "sub";
 pub(crate) const SAMPLE_EXP_DATE: u64 = 111_111_111_111;
 
 /// ~31,710 years
-pub(crate) const SAMPLE_EXP_HORIZON_SECS: u64 = 999_999_999_999;
+pub(crate) const SAMPLE_EXP_HORIZON_SECS: u64 = configuration::TESTING_EXP_HORIZON_SECS;
 
 pub(crate) static SAMPLE_PEPPER: Lazy<Pepper> = Lazy::new(|| Pepper::from_number(76));
 

@@ -48,12 +48,12 @@ impl Mempool {
     }
 
     /// This function will be called once the transaction has been stored.
-    pub(crate) fn commit_transaction(&mut self, sender: &AccountAddress, sequence_number: u64) {
+    pub fn commit_transaction(&mut self, sender: &AccountAddress, sequence_number: u64) {
         self.transactions
             .commit_transaction(sender, sequence_number);
     }
 
-    pub(crate) fn log_commit_transaction(
+    pub fn log_commit_transaction(
         &self,
         sender: &AccountAddress,
         sequence_number: u64,
@@ -96,7 +96,7 @@ impl Mempool {
         }
     }
 
-    pub(crate) fn reject_transaction(
+    pub fn reject_transaction(
         &mut self,
         sender: &AccountAddress,
         sequence_number: u64,
@@ -119,7 +119,7 @@ impl Mempool {
             .reject_transaction(sender, sequence_number, hash);
     }
 
-    pub(crate) fn log_txn_latency(
+    pub fn log_txn_latency(
         insertion_info: &InsertionInfo,
         bucket: &str,
         stage: &'static str,
@@ -186,13 +186,13 @@ impl Mempool {
         }
     }
 
-    pub(crate) fn get_by_hash(&self, hash: HashValue) -> Option<SignedTransaction> {
+    pub fn get_by_hash(&self, hash: HashValue) -> Option<SignedTransaction> {
         self.transactions.get_by_hash(hash)
     }
 
     /// Used to add a transaction to the Mempool.
     /// Performs basic validation: checks account's sequence number.
-    pub(crate) fn add_txn(
+    pub fn add_txn(
         &mut self,
         txn: SignedTransaction,
         ranking_score: u64,
@@ -257,7 +257,7 @@ impl Mempool {
     /// `exclude_transactions` - transactions that were sent to Consensus but were not committed yet
     ///  mempool should filter out such transactions.
     #[allow(clippy::explicit_counter_loop)]
-    pub(crate) fn get_batch(
+    pub fn get_batch(
         &self,
         max_txns: u64,
         max_bytes: u64,
@@ -420,18 +420,18 @@ impl Mempool {
     /// Periodic core mempool garbage collection.
     /// Removes all expired transactions and clears expired entries in metrics
     /// cache and sequence number cache.
-    pub(crate) fn gc(&mut self) {
+    pub fn gc(&mut self) {
         let now = aptos_infallible::duration_since_epoch();
         self.transactions.gc_by_system_ttl(now);
     }
 
     /// Garbage collection based on client-specified expiration time.
-    pub(crate) fn gc_by_expiration_time(&mut self, block_time: Duration) {
+    pub fn gc_by_expiration_time(&mut self, block_time: Duration) {
         self.transactions.gc_by_expiration_time(block_time);
     }
 
     /// Returns block of transactions and new last_timeline_id.
-    pub(crate) fn read_timeline(
+    pub fn read_timeline(
         &self,
         timeline_id: &MultiBucketTimelineIndexIds,
         count: usize,
@@ -440,7 +440,7 @@ impl Mempool {
     }
 
     /// Read transactions from timeline from `start_id` (exclusive) to `end_id` (inclusive).
-    pub(crate) fn timeline_range(
+    pub fn timeline_range(
         &self,
         start_end_pairs: &Vec<(u64, u64)>,
     ) -> Vec<SignedTransaction> {
