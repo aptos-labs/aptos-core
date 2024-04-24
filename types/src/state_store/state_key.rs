@@ -361,10 +361,10 @@ where
 
 static GLOBAL_REGISTRY: Lazy<StateKeyRegistry> = Lazy::new(StateKeyRegistry::new_empty);
 
-const NUM_RESOURCE_SHARDS: usize = 4;
-const NUM_RESOURCE_GROUP_SHARDS: usize = 4;
-const NUM_MODULE_SHARDS: usize = 4;
-const NUM_TABLE_ITEM_SHARDS: usize = 4;
+const NUM_RESOURCE_SHARDS: usize = 8;
+const NUM_RESOURCE_GROUP_SHARDS: usize = 8;
+const NUM_MODULE_SHARDS: usize = 8;
+const NUM_TABLE_ITEM_SHARDS: usize = 8;
 const NUM_RAW_SHARDS: usize = 4;
 
 pub struct StateKeyRegistry {
@@ -383,10 +383,10 @@ impl StateKeyRegistry {
         // `arr!` macro is not working with named constants, but the compiler checks these numbers
         // match the NUM_*_SHARDS declared
         Self {
-            resource_shards: arr![TwoLevelRegistry::new_empty("resource"); 4],
-            resource_group_shards: arr![TwoLevelRegistry::new_empty("resource_group"); 4],
-            module_shards: arr![TwoLevelRegistry::new_empty("module"); 4],
-            table_item_shards: arr![TwoLevelRegistry::new_empty("table_item"); 4],
+            resource_shards: arr![TwoLevelRegistry::new_empty("resource"); 8],
+            resource_group_shards: arr![TwoLevelRegistry::new_empty("resource_group"); 8],
+            module_shards: arr![TwoLevelRegistry::new_empty("module"); 8],
+            table_item_shards: arr![TwoLevelRegistry::new_empty("table_item"); 8],
             raw_shards: arr![TwoLevelRegistry::new_empty("raw"); 4],
         }
     }
