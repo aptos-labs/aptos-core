@@ -2,6 +2,7 @@
 // SPDX-License-Identifier: Apache-2.0
 
 use crate::traits::{FromOnChainGasSchedule, InitialGasSchedule, ToOnChainGasSchedule};
+use aptos_logger::info;
 use std::collections::BTreeMap;
 
 mod aptos_framework;
@@ -46,13 +47,15 @@ impl FromOnChainGasSchedule for AptosGasParameters {
         gas_schedule: &BTreeMap<String, u64>,
         feature_version: u64,
     ) -> Result<Self, String> {
-        Ok(Self {
-            vm: FromOnChainGasSchedule::from_on_chain_gas_schedule(gas_schedule, feature_version)?,
-            natives: FromOnChainGasSchedule::from_on_chain_gas_schedule(
-                gas_schedule,
-                feature_version,
-            )?,
-        })
+        let vm = FromOnChainGasSchedule::from_on_chain_gas_schedule(gas_schedule, feature_version)?;
+        info!("[TRANSACTION_CONTEXT] vm gas parameters: {:?}", vm);
+        let natives =
+            FromOnChainGasSchedule::from_on_chain_gas_schedule(gas_schedule, feature_version)?;
+        info!(
+            "[TRANSACTION_CONTEXT] natives gas parameters: {:?}",
+            natives
+        );
+        Ok(Self { vm, natives })
     }
 }
 

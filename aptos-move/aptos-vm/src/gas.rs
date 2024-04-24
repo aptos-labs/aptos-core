@@ -7,7 +7,7 @@ use aptos_gas_schedule::{
     gas_params::txn::KEYLESS_BASE_COST, AptosGasParameters, FromOnChainGasSchedule,
     MiscGasParameters, NativeGasParameters,
 };
-use aptos_logger::{enabled, Level};
+use aptos_logger::{enabled, info, Level};
 use aptos_types::on_chain_config::{
     ApprovedExecutionHashes, ConfigStorage, Features, GasSchedule, GasScheduleV2, OnChainConfig,
 };
@@ -37,10 +37,17 @@ pub(crate) fn get_gas_config_from_storage(
         },
         None => match GasSchedule::fetch_config(config_storage) {
             Some(gas_schedule) => {
+                info!(
+                    "[TRANSACTION_CONTEXT] the fetched gas schedule: {:?}",
+                    gas_schedule
+                );
                 let map = gas_schedule.to_btree_map();
                 (AptosGasParameters::from_on_chain_gas_schedule(&map, 0), 0)
             },
-            None => (Err("Neither gas schedule v2 nor v1 exists.".to_string()), 0),
+            None => {
+                info!("[TRANSACTION_CONTEXT] Neither gas schedule v2 nor v1 exists.");
+                (Err("Neither gas schedule v2 nor v1 exists.".to_string()), 0)
+            },
         },
     }
 }
