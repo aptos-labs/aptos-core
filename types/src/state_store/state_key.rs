@@ -30,7 +30,7 @@ use move_core_types::{
 };
 use num_derive::{FromPrimitive, ToPrimitive};
 use num_traits::FromPrimitive;
-use once_cell::sync::Lazy;
+use once_cell::sync::{Lazy, OnceCell};
 use serde::{Deserialize, Deserializer, Serialize, Serializer};
 use std::{
     borrow::Borrow,
@@ -40,7 +40,6 @@ use std::{
     fmt::{Debug, Formatter},
     hash::{Hash, Hasher},
     io::Write,
-    ops::Deref,
     sync::{Arc, Weak},
 };
 use thiserror::Error;
@@ -162,42 +161,19 @@ impl StateKeyInner {
 }
 
 #[derive(Debug)]
-struct EntryInner {
+struct Entry {
     pub deserialized: StateKeyInner,
     // pub serialized: Bytes,
-    pub encoded: Bytes,
-    pub hash_value: HashValue,
+    pub encoded: OnceCell<Bytes>,
+    pub hash_value: OnceCell<HashValue>,
 }
 
-/// n.b. Wrapping it so EntryInner is constructed outside the lock while Entry is only constructed
-///      and dropped if it's ever added to the registry.
-#[derive(Debug)]
-struct Entry(EntryInner);
-
-impl Deref for Entry {
-    type Target = EntryInner;
-
-    fn deref(&self) -> &Self::Target {
-        &self.0
-    }
-}
-
-impl EntryInner {
-    pub fn from_deserialized(deserialized: StateKeyInner) -> Self {
-        // FIXME(aldenhu): deal with error
-        let encoded = deserialized
-            .encode()
-            .expect("Failed to encode StateKeyInner.");
-
-        let mut state = StateKeyInnerHasher::default();
-        // FIXME(aldenhu): check error processing
-        state.update(&encoded);
-        let hash_value = state.finish();
-
+impl Entry {
+    fn new(deserialized: StateKeyInner) -> Self {
         Self {
             deserialized,
-            encoded,
-            hash_value,
+            encoded: OnceCell::new(),
+            hash_value: OnceCell::new(),
         }
     }
 }
@@ -284,7 +260,7 @@ where
 
         const MAX_TRIES: usize = 1024;
 
-        let maybe_add = EntryInner::from_deserialized(inner_gen());
+        let maybe_add = inner_gen();
 
         for _ in 0..MAX_TRIES {
             let mut locked = self.inner.write();
@@ -292,14 +268,14 @@ where
             match locked.get_mut(key1) {
                 None => {
                     let mut map2 = locked.entry(key1.to_owned()).insert(HashMap::new());
-                    let entry = Arc::new(Entry(maybe_add));
+                    let entry = Arc::new(Entry::new(maybe_add));
                     map2.get_mut()
                         .insert(key2.to_owned(), Arc::downgrade(&entry));
                     return entry;
                 },
                 Some(map2) => match map2.get(key2) {
                     None => {
-                        let entry = Arc::new(Entry(maybe_add));
+                        let entry = Arc::new(Entry::new(maybe_add));
                         map2.insert(key2.to_owned(), Arc::downgrade(&entry));
                         return entry;
                     },
@@ -461,7 +437,7 @@ impl StateKey {
     }
 
     pub fn get_shard_id(&self) -> u8 {
-        self.0.hash_value.nibble(0)
+        self.crypto_hash().nibble(0)
     }
 
     pub fn is_aptos_code(&self) -> bool {
@@ -563,7 +539,20 @@ impl StateKey {
     }
 
     pub fn encode(&self) -> Result<Bytes> {
-        Ok(self.0.encoded.clone())
+        Ok(self
+            .0
+            .encoded
+            .get_or_init(|| self.inner().encode().expect("failed to encode."))
+            .clone())
+    }
+
+    fn crypto_hash(&self) -> HashValue {
+        *self.0.hash_value.get_or_init(|| {
+            let mut state = StateKeyInnerHasher::default();
+            // FIXME(aldenhu): check error processing
+            state.update(&self.encode().expect("failed to encode."));
+            state.finish()
+        })
     }
 
     pub fn decode(_val: &[u8]) -> Result<Self, StateKeyDecodeErr> {
@@ -577,7 +566,7 @@ impl CryptoHash for StateKey {
     type Hasher = DummyHasher;
 
     fn hash(&self) -> HashValue {
-        self.0.hash_value
+        self.crypto_hash()
     }
 }
 
@@ -613,7 +602,7 @@ impl Eq for StateKey {}
 impl Hash for StateKey {
     fn hash<H: std::hash::Hasher>(&self, state: &mut H) {
         // FIXME(aldenhu): does it make a difference to hash less bytes?
-        state.write(&self.0.hash_value.as_ref()[0..16])
+        state.write(&self.crypto_hash().as_ref()[0..16])
     }
 }
 
