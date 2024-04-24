@@ -590,6 +590,7 @@ mirai-annotations = "1.12.0"
 mockall = "0.11.4"
 more-asserts = "0.3.0"
 native-tls = "0.2.10"
+nohash-hasher = "0.2.0"
 ntest = "0.9.0"
 num-bigint = { version = "0.3.2", features = ["rand"] }
 num_cpus = "1.13.1"

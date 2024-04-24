@@ -40,6 +40,7 @@ move-binary-format = { workspace = true }
 move-core-types = { workspace = true }
 move-table-extension = { workspace = true }
 move-vm-types = { workspace = true }
+nohash-hasher = { workspace = true }
 num-bigint = { workspace = true }
 num-derive = { workspace = true }
 num-traits = { workspace = true }

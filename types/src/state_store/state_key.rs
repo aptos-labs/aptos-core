@@ -236,6 +236,7 @@ pub struct PreHashed<T> {
 }
 
 impl<T: Hash> PreHashed<T> {
+    #[inline]
     pub fn new(inner: T) -> Self {
         let mut hasher = ahash::AHasher::default();
         inner.hash(&mut hasher);
@@ -245,6 +246,7 @@ impl<T: Hash> PreHashed<T> {
 }
 
 impl<T: Hash> Hash for PreHashed<T> {
+    #[inline]
     fn hash<H: Hasher>(&self, state: &mut H) {
         state.write_u64(self.hash)
     }
@@ -267,6 +269,7 @@ macro_rules! impl_prehashed_equivalent_by_ref {
 macro_rules! impl_prehashed_equivalent_by_borrow {
     ($borrowed:ty, $owned:ty) => {
         impl Equivalent<PreHashed<$owned>> for PreHashed<&$borrowed> {
+            #[inline]
             fn equivalent(&self, other: &PreHashed<$owned>) -> bool {
                 Borrow::<$borrowed>::borrow(&other.inner) == self.inner
             }
@@ -290,6 +293,7 @@ impl<Owned, Borrowed> RefToOwned<Owned> for PreHashed<&Borrowed>
 where
     Borrowed: ToOwned<Owned = Owned> + ?Sized,
 {
+    #[inline]
     fn to_owned(&self) -> PreHashed<Owned> {
         PreHashed {
             inner: self.inner.to_owned(),
