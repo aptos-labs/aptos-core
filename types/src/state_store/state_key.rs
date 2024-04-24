@@ -325,8 +325,24 @@ where
     }
 }
 
-#[derive(Eq, Hash, PartialEq)]
 struct TwoKeys<Key1, Key2>(Key1, Key2);
+
+impl<Key1: Hash, Key2: Hash> Hash for TwoKeys<Key1, Key2> {
+    #[inline]
+    fn hash<H: Hasher>(&self, state: &mut H) {
+        self.0.hash(state);
+        self.1.hash(state);
+    }
+}
+
+impl<Key1: Eq, Key2: Eq> PartialEq for TwoKeys<Key1, Key2> {
+    #[inline]
+    fn eq(&self, other: &Self) -> bool {
+        self.0 == other.0 && self.1 == other.1
+    }
+}
+
+impl<Key1: Eq, Key2: Eq> Eq for TwoKeys<Key1, Key2> {}
 
 /*
 conflicting implementation in crate `hashbrown`:
@@ -350,6 +366,7 @@ where
 macro_rules! impl_two_key_equivalent {
     ($Key1:ty, $Key2:ty, $Ref1:ty, $Ref2:ty) => {
         impl Equivalent<TwoKeys<$Key1, $Key2>> for TwoKeys<&$Ref1, &$Ref2> {
+            #[inline]
             fn equivalent(&self, key: &TwoKeys<$Key1, $Key2>) -> bool {
                 Borrow::<$Ref1>::borrow(&key.0) == self.0
                     && Borrow::<$Ref2>::borrow(&key.1) == self.1
