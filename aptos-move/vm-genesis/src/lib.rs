@@ -65,6 +65,7 @@ const JWK_CONSENSUS_CONFIG_MODULE_NAME: &str = "jwk_consensus_config";
 const JWKS_MODULE_NAME: &str = "jwks";
 const CONFIG_BUFFER_MODULE_NAME: &str = "config_buffer";
 const DKG_MODULE_NAME: &str = "dkg";
+const RANDOMNESS_CONFIG_SEQNUM_MODULE_NAME: &str = "randomness_config_seqnum";
 const RANDOMNESS_CONFIG_MODULE_NAME: &str = "randomness_config";
 const RANDOMNESS_MODULE_NAME: &str = "randomness";
 const RECONFIGURATION_STATE_MODULE_NAME: &str = "reconfiguration_state";
@@ -285,6 +286,7 @@ pub fn encode_genesis_change_set(
         .randomness_config_override
         .clone()
         .unwrap_or_else(OnChainRandomnessConfig::default_for_genesis);
+    initialize_randomness_config_seqnum(&mut session);
     initialize_randomness_config(&mut session, randomness_config);
     initialize_randomness_resources(&mut session);
     initialize_on_chain_governance(&mut session, genesis_config);
@@ -499,6 +501,16 @@ fn initialize_dkg(session: &mut SessionExt) {
     exec_function(
         session,
         DKG_MODULE_NAME,
+        "initialize",
+        vec![],
+        serialize_values(&vec![MoveValue::Signer(CORE_CODE_ADDRESS)]),
+    );
+}
+
+fn initialize_randomness_config_seqnum(session: &mut SessionExt) {
+    exec_function(
+        session,
+        RANDOMNESS_CONFIG_SEQNUM_MODULE_NAME,
         "initialize",
         vec![],
         serialize_values(&vec![MoveValue::Signer(CORE_CODE_ADDRESS)]),
