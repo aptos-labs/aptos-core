@@ -2058,8 +2058,8 @@ pub fn forking_retrieval_test() {
             nodes[proposal_node]
                 .pending_network_events
                 .push(Event::Message(
-                    peer, 
-                    ConsensusMsg::VersionedProposalMsg(msg)
+                    peer,
+                    ConsensusMsg::VersionedProposalMsg(msg),
                 ))
         },
         _ => panic!("unexpected network message {:?}", next_message),
