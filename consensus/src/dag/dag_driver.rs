@@ -594,3 +594,9 @@ impl PeersByLatency {
             .flatten()
     }
 }
+
+impl Drop for DagDriver {
+    fn drop(&mut self) {
+        debug!("[Bolt] dropping Dag Driver {}", self.dag_id);
+    }
+}
