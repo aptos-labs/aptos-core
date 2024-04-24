@@ -370,23 +370,23 @@ impl StateStore {
             truncate_ledger_db(ledger_db, overall_commit_progress)
                 .expect("Failed to truncate ledger db.");
 
-            if state_kv_commit_progress != overall_commit_progress {
-                info!(
-                    state_kv_commit_progress = state_kv_commit_progress,
-                    "Start state KV truncation..."
-                );
-                let difference = state_kv_commit_progress - overall_commit_progress;
-                if crash_if_difference_is_too_large {
-                    assert_le!(difference, MAX_COMMIT_PROGRESS_DIFFERENCE);
-                }
-                truncate_state_kv_db(
-                    &state_kv_db,
-                    state_kv_commit_progress,
-                    overall_commit_progress,
-                    difference as usize,
-                )
-                .expect("Failed to truncate state K/V db.");
+            // State K/V commit progress isn't (can't be) written atomically with the data,
+            // because there are shards, so we have to attempt truncation anyway.
+            info!(
+                state_kv_commit_progress = state_kv_commit_progress,
+                "Start state KV truncation..."
+            );
+            let difference = state_kv_commit_progress - overall_commit_progress;
+            if crash_if_difference_is_too_large {
+                assert_le!(difference, MAX_COMMIT_PROGRESS_DIFFERENCE);
             }
+            truncate_state_kv_db(
+                &state_kv_db,
+                state_kv_commit_progress,
+                overall_commit_progress,
+                difference as usize,
+            )
+            .expect("Failed to truncate state K/V db.");
         } else {
             info!("No overall commit progress was found!");
         }
