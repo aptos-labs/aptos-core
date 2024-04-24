@@ -32,6 +32,9 @@ pub const FLAVOR: &str = "flavor";
 
 pub const BYTECODE_VERSION: &str = "bytecode-version";
 
+/// Color flag interpreted locally in diagnostics/mod.rs.
+/// (Is translated to codespan_reporting::term::termcolor::ColorChoice).
+/// Choices here are `NONE`, `ANSI`, `ALWAYS`, with default to Auto.
 pub const COLOR_MODE_ENV_VAR: &str = "COLOR_MODE";
 
 pub const MOVE_COMPILED_INTERFACES_DIR: &str = "mv_interfaces";
