@@ -7,6 +7,7 @@ use move_core_types::{
     identifier::Identifier,
     language_storage::{StructTag, TypeTag},
 };
+use once_cell::sync::Lazy;
 use serde::Deserialize;
 use std::str::FromStr;
 
@@ -17,6 +18,19 @@ struct FungibleStore {
     allow_ungated_balance_transfer: bool,
 }
 
+pub static FUNGIBLE_STORE_TAG: Lazy<StructTag> = Lazy::new(|| StructTag {
+    address: AccountAddress::from_hex_literal("0x1").unwrap(),
+    module: Identifier::new("fungible_asset").unwrap(),
+    name: Identifier::new("FungibleStore").unwrap(),
+    type_params: vec![],
+});
+
+pub static OBJ_GROUP_TAG: Lazy<StructTag> = Lazy::new(|| StructTag {
+    address: AccountAddress::from_hex_literal("0x1").unwrap(),
+    module: Identifier::new("object").unwrap(),
+    name: Identifier::new("ObjectGroup").unwrap(),
+    type_params: vec![],
+});
 #[test]
 fn test_basic_fungible_token() {
     let mut h = MoveHarness::new();
@@ -118,33 +132,20 @@ fn test_basic_fungible_token() {
     let bob_primary_store_addr =
         account_address::create_derived_object_address(*bob.address(), token_addr);
 
-    let fungible_store_tag = StructTag {
-        address: AccountAddress::from_hex_literal("0x1").unwrap(),
-        module: Identifier::new("fungible_asset").unwrap(),
-        name: Identifier::new("FungibleStore").unwrap(),
-        type_params: vec![],
-    };
-    let obj_group_tag = StructTag {
-        address: AccountAddress::from_hex_literal("0x1").unwrap(),
-        module: Identifier::new("object").unwrap(),
-        name: Identifier::new("ObjectGroup").unwrap(),
-        type_params: vec![],
-    };
-
     // Ensure that the group data can be read
     let mut alice_store: FungibleStore = h
         .read_resource_from_resource_group(
             &alice_primary_store_addr,
-            obj_group_tag.clone(),
-            fungible_store_tag.clone(),
+            OBJ_GROUP_TAG.clone(),
+            FUNGIBLE_STORE_TAG.clone(),
         )
         .unwrap();
 
     let bob_store: FungibleStore = h
         .read_resource_from_resource_group(
             &bob_primary_store_addr,
-            obj_group_tag,
-            fungible_store_tag,
+            OBJ_GROUP_TAG.clone(),
+            FUNGIBLE_STORE_TAG.clone(),
         )
         .unwrap();
 
@@ -161,6 +162,16 @@ fn test_coin_to_fungible_asset_migration() {
     let mut h = MoveHarness::new();
 
     let alice = h.new_account_at(AccountAddress::from_hex_literal("0xcafe").unwrap());
+    let alice_primary_store_addr =
+        account_address::create_derived_object_address(*alice.address(), AccountAddress::TEN);
+
+    assert!(h
+        .read_resource_from_resource_group::<FungibleStore>(
+            &alice_primary_store_addr,
+            OBJ_GROUP_TAG.clone(),
+            FUNGIBLE_STORE_TAG.clone()
+        )
+        .is_none());
 
     let result = h.run_entry_function(
         &alice,
@@ -169,4 +180,12 @@ fn test_coin_to_fungible_asset_migration() {
         vec![],
     );
     assert_success!(result);
+
+    assert!(h
+        .read_resource_from_resource_group::<FungibleStore>(
+            &alice_primary_store_addr,
+            OBJ_GROUP_TAG.clone(),
+            FUNGIBLE_STORE_TAG.clone()
+        )
+        .is_some());
 }

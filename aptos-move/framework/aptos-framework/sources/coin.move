@@ -838,8 +838,11 @@ module aptos_framework::coin {
             );
             merge(&mut coin_store.coin, coin);
         } else {
-            if (features::coin_to_fungible_asset_migration_feature_enabled(
-            ) && migrated_primary_fungible_store_exists(account_addr, ensure_paired_metadata<CoinType>())) {
+            let metadata = paired_metadata<CoinType>();
+            if (option::is_some(&metadata) && migrated_primary_fungible_store_exists(
+                account_addr,
+                option::destroy_some(metadata)
+            )) {
                 primary_fungible_store::deposit(account_addr, coin_to_fungible_asset(coin));
             } else {
                 abort error::not_found(ECOIN_STORE_NOT_PUBLISHED)

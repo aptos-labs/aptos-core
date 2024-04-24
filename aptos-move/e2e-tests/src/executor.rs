@@ -372,15 +372,18 @@ impl FakeExecutor {
     /// Adds an account to this executor's data store.
     pub fn add_account_data(&mut self, account_data: &AccountData) {
         self.data_store.add_account_data(account_data);
-        let new_supply = account_data.balance();
-        if new_supply != 0 {
+        let new_added_supply = account_data.balance();
+        // When a new account data with balance is initialized. The total_supply should be updated
+        // correspondingly to be consistent with the global state.
+        // if new_added_supply = 0, it is a noop.
+        if new_added_supply != 0 {
             let coin_info_resource = self
                 .read_coin_info_resource()
                 .expect("coin info must exist in data store");
             let old_supply = self.read_coin_supply().unwrap();
             self.data_store.add_write_set(
                 &coin_info_resource
-                    .to_writeset(old_supply + (new_supply as u128))
+                    .to_writeset(old_supply + (new_added_supply as u128))
                     .unwrap(),
             )
         }
