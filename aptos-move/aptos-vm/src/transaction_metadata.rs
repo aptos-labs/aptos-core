@@ -26,6 +26,7 @@ pub struct TransactionMetadata {
     pub script_hash: Vec<u8>,
     pub script_size: NumBytes,
     pub required_deposit: Option<u64>,
+    pub is_keyless: bool,
 }
 
 impl TransactionMetadata {
@@ -65,6 +66,9 @@ impl TransactionMetadata {
                 _ => NumBytes::zero(),
             },
             required_deposit: None,
+            is_keyless: aptos_types::keyless::get_authenticators(txn)
+                .map(|res| !res.is_empty())
+                .unwrap_or(false),
         }
     }
 
@@ -124,5 +128,9 @@ impl TransactionMetadata {
 
     pub fn set_required_deposit(&mut self, required_deposit: Option<u64>) {
         self.required_deposit = required_deposit;
+    }
+
+    pub fn is_keyless(&self) -> bool {
+        self.is_keyless
     }
 }
