@@ -305,6 +305,7 @@ impl TransactionsApi {
         accept_type: AcceptType,
         data: SubmitTransactionPost,
     ) -> SubmitTransactionResult<PendingTransaction> {
+        println!("submit_transaction");
         data.verify()
             .context("Submitted transaction invalid'")
             .map_err(|err| {
