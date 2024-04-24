@@ -212,22 +212,6 @@ module aptos_framework::fungible_asset {
         object::object_from_constructor_ref<Metadata>(constructor_ref)
     }
 
-    public entry fun update_uris(
-        metadata_owner: &signer,
-        metadata_addr: address,
-        new_icon_uri: String,
-        new_project_uri: String
-    ) acquires Metadata {
-        let metadata_obj = object::address_to_object<Metadata>(metadata_addr);
-        assert!(
-            object::owns(metadata_obj, signer::address_of(metadata_owner)),
-            error::permission_denied(ENOT_METADATA_OWNER)
-        );
-        let metadata = borrow_global_mut<Metadata>(metadata_addr);
-        metadata.icon_uri = new_icon_uri;
-        metadata.project_uri = new_project_uri;
-    }
-
     /// Creates a mint ref that can be used to mint fungible assets from the given fungible object's constructor ref.
     /// This can only be called at object creation time as constructor_ref is only available then.
     public fun generate_mint_ref(constructor_ref: &ConstructorRef): MintRef {

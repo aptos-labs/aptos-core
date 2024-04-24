@@ -24,7 +24,6 @@ metadata object can be any object that equipped with <code><a href="fungible_ass
 -  [Struct `FrozenEvent`](#0x1_fungible_asset_FrozenEvent)
 -  [Constants](#@Constants_0)
 -  [Function `add_fungibility`](#0x1_fungible_asset_add_fungibility)
--  [Function `update_uris`](#0x1_fungible_asset_update_uris)
 -  [Function `generate_mint_ref`](#0x1_fungible_asset_generate_mint_ref)
 -  [Function `generate_burn_ref`](#0x1_fungible_asset_generate_burn_ref)
 -  [Function `generate_transfer_ref`](#0x1_fungible_asset_generate_transfer_ref)
@@ -945,42 +944,6 @@ if option::some(MAX_U128) is used, it is treated as unlimited supply.
     };
 
     <a href="object.md#0x1_object_object_from_constructor_ref">object::object_from_constructor_ref</a>&lt;<a href="fungible_asset.md#0x1_fungible_asset_Metadata">Metadata</a>&gt;(constructor_ref)
-}
-</code></pre>
-
-
-
-</details>
-
-<a id="0x1_fungible_asset_update_uris"></a>
-
-## Function `update_uris`
-
-
-
-<pre><code><b>public</b> entry <b>fun</b> <a href="fungible_asset.md#0x1_fungible_asset_update_uris">update_uris</a>(metadata_owner: &<a href="../../aptos-stdlib/../move-stdlib/doc/signer.md#0x1_signer">signer</a>, metadata_addr: <b>address</b>, new_icon_uri: <a href="../../aptos-stdlib/../move-stdlib/doc/string.md#0x1_string_String">string::String</a>, new_project_uri: <a href="../../aptos-stdlib/../move-stdlib/doc/string.md#0x1_string_String">string::String</a>)
-</code></pre>
-
-
-
-<details>
-<summary>Implementation</summary>
-
-
-<pre><code><b>public</b> entry <b>fun</b> <a href="fungible_asset.md#0x1_fungible_asset_update_uris">update_uris</a>(
-    metadata_owner: &<a href="../../aptos-stdlib/../move-stdlib/doc/signer.md#0x1_signer">signer</a>,
-    metadata_addr: <b>address</b>,
-    new_icon_uri: String,
-    new_project_uri: String
-) <b>acquires</b> <a href="fungible_asset.md#0x1_fungible_asset_Metadata">Metadata</a> {
-    <b>let</b> metadata_obj = <a href="object.md#0x1_object_address_to_object">object::address_to_object</a>&lt;<a href="fungible_asset.md#0x1_fungible_asset_Metadata">Metadata</a>&gt;(metadata_addr);
-    <b>assert</b>!(
-        <a href="object.md#0x1_object_owns">object::owns</a>(metadata_obj, <a href="../../aptos-stdlib/../move-stdlib/doc/signer.md#0x1_signer_address_of">signer::address_of</a>(metadata_owner)),
-        <a href="../../aptos-stdlib/../move-stdlib/doc/error.md#0x1_error_permission_denied">error::permission_denied</a>(<a href="fungible_asset.md#0x1_fungible_asset_ENOT_METADATA_OWNER">ENOT_METADATA_OWNER</a>)
-    );
-    <b>let</b> metadata = <b>borrow_global_mut</b>&lt;<a href="fungible_asset.md#0x1_fungible_asset_Metadata">Metadata</a>&gt;(metadata_addr);
-    metadata.icon_uri = new_icon_uri;
-    metadata.project_uri = new_project_uri;
 }
 </code></pre>
 

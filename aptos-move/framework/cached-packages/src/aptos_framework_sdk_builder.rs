@@ -417,12 +417,6 @@ pub enum EntryFunctionCall {
         amount: u64,
     },
 
-    FungibleAssetUpdateUris {
-        metadata_addr: AccountAddress,
-        new_icon_uri: Vec<u8>,
-        new_project_uri: Vec<u8>,
-    },
-
     /// Withdraw an `amount` of coin `CoinType` from `account` and burn it.
     ManagedCoinBurn {
         coin_type: TypeTag,
@@ -1231,11 +1225,6 @@ impl EntryFunctionCall {
                 pool_address,
                 amount,
             } => delegation_pool_withdraw(pool_address, amount),
-            FungibleAssetUpdateUris {
-                metadata_addr,
-                new_icon_uri,
-                new_project_uri,
-            } => fungible_asset_update_uris(metadata_addr, new_icon_uri, new_project_uri),
             ManagedCoinBurn { coin_type, amount } => managed_coin_burn(coin_type, amount),
             ManagedCoinInitialize {
                 coin_type,
@@ -2705,29 +2694,6 @@ pub fn delegation_pool_withdraw(pool_address: AccountAddress, amount: u64) -> Tr
         vec![
             bcs::to_bytes(&pool_address).unwrap(),
             bcs::to_bytes(&amount).unwrap(),
-        ],
-    ))
-}
-
-pub fn fungible_asset_update_uris(
-    metadata_addr: AccountAddress,
-    new_icon_uri: Vec<u8>,
-    new_project_uri: Vec<u8>,
-) -> TransactionPayload {
-    TransactionPayload::EntryFunction(EntryFunction::new(
-        ModuleId::new(
-            AccountAddress::new([
-                0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
-                0, 0, 0, 1,
-            ]),
-            ident_str!("fungible_asset").to_owned(),
-        ),
-        ident_str!("update_uris").to_owned(),
-        vec![],
-        vec![
-            bcs::to_bytes(&metadata_addr).unwrap(),
-            bcs::to_bytes(&new_icon_uri).unwrap(),
-            bcs::to_bytes(&new_project_uri).unwrap(),
         ],
     ))
 }
@@ -5181,18 +5147,6 @@ mod decoder {
         }
     }
 
-    pub fn fungible_asset_update_uris(payload: &TransactionPayload) -> Option<EntryFunctionCall> {
-        if let TransactionPayload::EntryFunction(script) = payload {
-            Some(EntryFunctionCall::FungibleAssetUpdateUris {
-                metadata_addr: bcs::from_bytes(script.args().get(0)?).ok()?,
-                new_icon_uri: bcs::from_bytes(script.args().get(1)?).ok()?,
-                new_project_uri: bcs::from_bytes(script.args().get(2)?).ok()?,
-            })
-        } else {
-            None
-        }
-    }
-
     pub fn managed_coin_burn(payload: &TransactionPayload) -> Option<EntryFunctionCall> {
         if let TransactionPayload::EntryFunction(script) = payload {
             Some(EntryFunctionCall::ManagedCoinBurn {
@@ -6476,10 +6430,6 @@ static SCRIPT_FUNCTION_DECODER_MAP: once_cell::sync::Lazy<EntryFunctionDecoderMa
         map.insert(
             "delegation_pool_withdraw".to_string(),
             Box::new(decoder::delegation_pool_withdraw),
-        );
-        map.insert(
-            "fungible_asset_update_uris".to_string(),
-            Box::new(decoder::fungible_asset_update_uris),
         );
         map.insert(
             "managed_coin_burn".to_string(),
