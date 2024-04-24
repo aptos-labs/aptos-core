@@ -601,9 +601,12 @@ impl BroadcastStatus<DAGMessage, DAGRpcResult> for Arc<SignatureBuilder> {
     fn add(&self, peer: Author, ack: Self::Response) -> anyhow::Result<Option<Self::Aggregated>> {
         ensure!(self.metadata == ack.metadata, "Digest mismatch");
         ack.verify(peer, &self.epoch_state.verifier)?;
-        debug!(LogSchema::new(LogEvent::ReceiveVote)
-            .remote_peer(peer)
-            .round(self.metadata.round()));
+        debug!(
+            dag_id = self.dag_id,
+            LogSchema::new(LogEvent::ReceiveVote)
+                .remote_peer(peer)
+                .round(self.metadata.round())
+        );
         let mut guard = self.inner.lock();
         let (partial_signatures, tx) = guard.deref_mut();
         partial_signatures.add_signature(peer, ack.signature);

@@ -328,9 +328,12 @@ impl RpcHandler for NodeBroadcastHandler {
         });
 
         observe_node(self.dag_id, node.timestamp(), NodeStage::NodeReceived);
-        debug!(LogSchema::new(LogEvent::ReceiveNode)
-            .remote_peer(*node.author())
-            .round(node.round()));
+        debug!(
+            dag_id = self.dag_id,
+            LogSchema::new(LogEvent::ReceiveNode)
+                .remote_peer(*node.author())
+                .round(node.round())
+        );
 
         let signature = node.sign_vote(&self.signer)?;
 
@@ -342,9 +345,12 @@ impl RpcHandler for NodeBroadcastHandler {
             .expect("must exist")
             .insert(*node.author(), vote.clone());
 
-        debug!(LogSchema::new(LogEvent::Vote)
-            .remote_peer(*node.author())
-            .round(node.round()));
+        debug!(
+            dag_id = self.dag_id,
+            LogSchema::new(LogEvent::Vote)
+                .remote_peer(*node.author())
+                .round(node.round())
+        );
 
         Ok(vote)
     }

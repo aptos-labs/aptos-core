@@ -228,7 +228,11 @@ impl DagDriver {
     pub fn check_new_round(&self) {
         let (highest_strong_link_round, strong_links) = self.get_highest_strong_links_round();
 
-        debug!(round = highest_strong_link_round, "check new round");
+        debug!(
+            dag_id = self.dag_id,
+            round = highest_strong_link_round,
+            "check new round"
+        );
 
         let minimum_delay = self
             .health_backoff
@@ -493,9 +497,15 @@ impl DagDriver {
         let core_task = join(node_broadcast, certified_broadcast);
         let author = self.author;
         let task = async move {
-            debug!("{} Start reliable broadcast for round {}", author, round);
+            debug!(
+                dag_id = dag_id,
+                "{} Start reliable broadcast for round {}", author, round
+            );
             core_task.await;
-            debug!("Finish reliable broadcast for round {}", round);
+            debug!(
+                dag_id = dag_id,
+                "Finish reliable broadcast for round {}", round
+            );
         };
         tokio::spawn(Abortable::new(task, abort_registration));
 

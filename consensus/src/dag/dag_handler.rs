@@ -282,6 +282,7 @@ impl VerifiedMessageProcessor {
             match dag_message_result {
                 Ok(dag_message) => {
                     debug!(
+                        dag_id = self.dag_id,
                         epoch = epoch,
                         author = author,
                         message = dag_message,
@@ -357,6 +358,7 @@ impl VerifiedMessageProcessor {
         };
 
         debug!(
+            dag_id = self.dag_id,
             epoch = epoch,
             sender = author,
             response = response.as_ref().map(|r| r.name()),
