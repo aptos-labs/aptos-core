@@ -213,7 +213,7 @@ fn test_reject_transaction() {
     pool.reject_transaction(
         &TestTransaction::get_address(0),
         0,
-        &txns[1].clone().committed_hash(), // hash of other txn
+        &txns[1].committed_hash(), // hash of other txn
         &DiscardedVMStatus::MALFORMED,
     );
     assert!(pool
@@ -223,7 +223,7 @@ fn test_reject_transaction() {
     pool.reject_transaction(
         &TestTransaction::get_address(0),
         1,
-        &txns[0].clone().committed_hash(), // hash of other txn
+        &txns[0].committed_hash(), // hash of other txn
         &DiscardedVMStatus::MALFORMED,
     );
     assert!(pool
@@ -236,7 +236,7 @@ fn test_reject_transaction() {
     pool.reject_transaction(
         &TestTransaction::get_address(0),
         0,
-        &txns[0].clone().committed_hash(),
+        &txns[0].committed_hash(),
         &DiscardedVMStatus::SEQUENCE_NUMBER_TOO_NEW,
     );
     assert!(pool
@@ -246,7 +246,7 @@ fn test_reject_transaction() {
     pool.reject_transaction(
         &TestTransaction::get_address(0),
         1,
-        &txns[1].clone().committed_hash(),
+        &txns[1].committed_hash(),
         &DiscardedVMStatus::SEQUENCE_NUMBER_TOO_NEW,
     );
     assert!(pool
@@ -258,7 +258,7 @@ fn test_reject_transaction() {
     pool.reject_transaction(
         &TestTransaction::get_address(0),
         0,
-        &txns[0].clone().committed_hash(),
+        &txns[0].committed_hash(),
         &DiscardedVMStatus::MALFORMED,
     );
     assert!(pool
@@ -268,7 +268,7 @@ fn test_reject_transaction() {
     pool.reject_transaction(
         &TestTransaction::get_address(0),
         1,
-        &txns[1].clone().committed_hash(),
+        &txns[1].committed_hash(),
         &DiscardedVMStatus::MALFORMED,
     );
     assert!(pool
@@ -720,7 +720,7 @@ fn test_get_transaction_by_hash() {
         TimelineState::NotReady,
         false,
     );
-    let hash = txn.clone().committed_hash();
+    let hash = txn.committed_hash();
     let ret = pool.get_by_hash(hash);
     assert_eq!(ret, Some(txn));
 
@@ -751,7 +751,7 @@ fn test_get_transaction_by_hash_after_the_txn_is_updated() {
         TimelineState::NotReady,
         false,
     );
-    let new_txn_hash = new_txn.clone().committed_hash();
+    let new_txn_hash = new_txn.committed_hash();
 
     let txn_by_old_hash = pool.get_by_hash(hash);
     assert!(txn_by_old_hash.is_none());
@@ -800,7 +800,7 @@ fn test_transaction_store_remove_account_if_empty() {
     assert_eq!(pool.get_transaction_store().get_transactions().len(), 0);
 
     let txn = TestTransaction::new(2, 2, 1).make_signed_transaction();
-    let hash = txn.clone().committed_hash();
+    let hash = txn.committed_hash();
     add_signed_txn(&mut pool, txn).unwrap();
     assert_eq!(pool.get_transaction_store().get_transactions().len(), 1);
 

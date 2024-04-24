@@ -16,10 +16,12 @@ use aptos_consensus_types::{
     common::{TransactionInProgress, TransactionSummary},
     proof_of_store::{BatchId, BatchInfo},
 };
+use aptos_experimental_runtimes::thread_manager::optimal_min_len;
 use aptos_logger::prelude::*;
 use aptos_mempool::QuorumStoreRequest;
 use aptos_types::{transaction::SignedTransaction, PeerId};
 use futures_channel::mpsc::Sender;
+use rayon::prelude::*;
 use std::{
     collections::{btree_map::Entry, BTreeMap, HashMap},
     sync::Arc,
@@ -116,7 +118,8 @@ impl BatchGenerator {
             .expect("Could not save to db");
 
         let txns_in_progress: Vec<_> = txns
-            .iter()
+            .par_iter()
+            .with_min_len(optimal_min_len(txns.len(), 32))
             .map(|txn| {
                 (
                     TransactionSummary::new(

@@ -361,7 +361,7 @@ async fn test_bcs() {
             aptos_crypto::HashValue::from(expected_transaction.transaction_info().unwrap().hash);
 
         let bcs_hash = if let Transaction::UserTransaction(ref txn) = bcs_txn.transaction {
-            txn.clone().committed_hash()
+            txn.committed_hash()
         } else {
             panic!("BCS transaction is not a user transaction! {:?}", bcs_txn);
         };
