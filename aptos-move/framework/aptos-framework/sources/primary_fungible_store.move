@@ -15,6 +15,7 @@ module aptos_framework::primary_fungible_store {
     use aptos_framework::fungible_asset::{Self, FungibleAsset, FungibleStore, Metadata, MintRef, TransferRef, BurnRef};
     use aptos_framework::object::{Self, Object, ConstructorRef, DeriveRef};
 
+    use std::features;
     use std::option::Option;
     use std::signer;
     use std::string::String;
@@ -74,8 +75,12 @@ module aptos_framework::primary_fungible_store {
         let metadata_addr = object::object_address(&metadata);
         object::address_to_object<Metadata>(metadata_addr);
         let derive_ref = &borrow_global<DeriveRefPod>(metadata_addr).metadata_derive_ref;
-        let constructor_ref = &object::create_user_derived_object(owner_addr, derive_ref);
-
+        let constructor_ref = if (metadata_addr == @aptos_fungible_asset && features::primary_apt_fungible_store_at_user_address_enabled(
+        )) {
+            &object::create_sticky_object_at_address(owner_addr, owner_addr)
+        } else {
+            &object::create_user_derived_object(owner_addr, derive_ref)
+        };
         // Disable ungated transfer as deterministic stores shouldn't be transferrable.
         let transfer_ref = &object::generate_transfer_ref(constructor_ref);
         object::disable_ungated_transfer(transfer_ref);
@@ -87,7 +92,12 @@ module aptos_framework::primary_fungible_store {
     /// Get the address of the primary store for the given account.
     public fun primary_store_address<T: key>(owner: address, metadata: Object<T>): address {
         let metadata_addr = object::object_address(&metadata);
-        object::create_user_derived_object_address(owner, metadata_addr)
+        if (metadata_addr == @aptos_fungible_asset && features::primary_apt_fungible_store_at_user_address_enabled(
+        )) {
+            owner
+        } else {
+            object::create_user_derived_object_address(owner, metadata_addr)
+        }
     }
 
     #[view]
@@ -114,6 +124,15 @@ module aptos_framework::primary_fungible_store {
     }
 
     #[view]
+    public fun is_balance_at_least<T: key>(account: address, metadata: Object<T>, amount: u64): bool {
+        if (primary_store_exists(account, metadata)) {
+            fungible_asset::is_balance_at_least(primary_store(account, metadata), amount)
+        } else {
+            amount == 0
+        }
+    }
+
+    #[view]
     /// Return whether the given account's primary store is frozen.
     public fun is_frozen<T: key>(account: address, metadata: Object<T>): bool {
         if (primary_store_exists(account, metadata)) {
@@ -124,8 +143,8 @@ module aptos_framework::primary_fungible_store {
     }
 
     /// Withdraw `amount` of fungible asset from the given account's primary store.
-    public fun withdraw<T: key>(owner: &signer, metadata: Object<T>, amount: u64): FungibleAsset {
-        let store = primary_store(signer::address_of(owner), metadata);
+    public fun withdraw<T: key>(owner: &signer, metadata: Object<T>, amount: u64): FungibleAsset acquires DeriveRefPod {
+        let store = ensure_primary_store_exists(signer::address_of(owner), metadata);
         // Check if the store object has been burnt or not. If so, unburn it first.
         may_be_unburn(owner, store);
         fungible_asset::withdraw(owner, store, amount)
@@ -136,6 +155,13 @@ module aptos_framework::primary_fungible_store {
         let metadata = fungible_asset::asset_metadata(&fa);
         let store = ensure_primary_store_exists(owner, metadata);
         fungible_asset::deposit(store, fa);
+    }
+
+    /// Deposit fungible asset `fa` to the given account's primary store.
+    public(friend) fun force_deposit(owner: address, fa: FungibleAsset) acquires DeriveRefPod {
+        let metadata = fungible_asset::asset_metadata(&fa);
+        let store = ensure_primary_store_exists(owner, metadata);
+        fungible_asset::deposit_internal(store, fa);
     }
 
     /// Transfer `amount` of fungible asset from sender's primary store to receiver's primary store.
@@ -204,7 +230,12 @@ module aptos_framework::primary_fungible_store {
     }
 
     #[test_only]
-    use aptos_framework::fungible_asset::{create_test_token, generate_mint_ref, generate_burn_ref, generate_transfer_ref};
+    use aptos_framework::fungible_asset::{
+        create_test_token,
+        generate_mint_ref,
+        generate_burn_ref,
+        generate_transfer_ref
+    };
     #[test_only]
     use std::string;
     #[test_only]

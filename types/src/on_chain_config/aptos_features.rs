@@ -71,6 +71,8 @@ pub enum FeatureFlag {
     MODULE_EVENT_MIGRATION = 57,
     REJECT_UNSTABLE_BYTECODE = 58,
     TRANSACTION_CONTEXT_EXTENSION = 59,
+    COIN_TO_FUNGIBLE_ASSET_MIGRATION = 60,
+    PRIMARY_APT_FUNGIBLE_STORE_AT_USER_ADDRESS = 61,
 }
 
 impl FeatureFlag {
@@ -128,6 +130,7 @@ impl FeatureFlag {
             FeatureFlag::MODULE_EVENT_MIGRATION,
             FeatureFlag::REJECT_UNSTABLE_BYTECODE,
             FeatureFlag::TRANSACTION_CONTEXT_EXTENSION,
+            FeatureFlag::COIN_TO_FUNGIBLE_ASSET_MIGRATION,
         ]
     }
 }

@@ -15,7 +15,10 @@ use aptos_language_e2e_tests::{
 use aptos_types::{
     access_path::AccessPath,
     account_address::AccountAddress,
-    account_config::{AccountResource, CoinStoreResource, CORE_CODE_ADDRESS},
+    account_config::{
+        fungible_store::FungibleStoreResource, object::ObjectGroupResource, AccountResource,
+        CoinStoreResource, CORE_CODE_ADDRESS,
+    },
     chain_id::ChainId,
     contract_event::ContractEvent,
     move_utils::MemberId,
@@ -161,10 +164,14 @@ impl MoveHarness {
     /// Creates an account for the given static address. This address needs to be static so
     /// we can load regular Move code to there without need to rewrite code addresses.
     pub fn new_account_at(&mut self, addr: AccountAddress) -> Account {
+        self.new_account_with_balance_at(addr, 1_000_000_000_000_000)
+    }
+
+    pub fn new_account_with_balance_at(&mut self, addr: AccountAddress, balance: u64) -> Account {
         // The below will use the genesis keypair but that should be fine.
         let acc = Account::new_genesis_account(addr);
         // Mint the account 10M Aptos coins (with 8 decimals).
-        self.store_and_fund_account(&acc, 1_000_000_000_000_000, 10)
+        self.store_and_fund_account(&acc, balance, 10)
     }
 
     // Creates an account with a randomly generated address and key pair
@@ -501,7 +508,7 @@ impl MoveHarness {
         options: Option<BuildOptions>,
         patch_metadata: impl FnMut(&mut PackageMetadata),
     ) -> SignedTransaction {
-        let package = build_package(path.to_owned(), options.unwrap_or_default())
+        let package = BuiltPackage::build(path.to_owned(), options.unwrap_or_default())
             .expect("building package must succeed");
         self.create_publish_built_package(account, &package, patch_metadata)
     }
@@ -740,6 +747,17 @@ impl MoveHarness {
         .map(StateValue::into_metadata)
     }
 
+    pub fn read_resource_group_metadata(
+        &self,
+        addr: &AccountAddress,
+        struct_tag: StructTag,
+    ) -> Option<StateValueMetadata> {
+        self.read_state_value(&StateKey::access_path(
+            AccessPath::resource_group_access_path(*addr, struct_tag),
+        ))
+        .map(StateValue::into_metadata)
+    }
+
     pub fn read_resource_group(
         &self,
         addr: &AccountAddress,
@@ -771,8 +789,16 @@ impl MoveHarness {
 
     pub fn read_aptos_balance(&self, addr: &AccountAddress) -> u64 {
         self.read_resource::<CoinStoreResource>(addr, CoinStoreResource::struct_tag())
-            .unwrap()
-            .coin()
+            .map(|c| c.coin())
+            .unwrap_or(0)
+            + self
+                .read_resource_from_resource_group::<FungibleStoreResource>(
+                    &aptos_types::account_config::fungible_store::primary_store(addr),
+                    ObjectGroupResource::struct_tag(),
+                    FungibleStoreResource::struct_tag(),
+                )
+                .map(|c| c.balance())
+                .unwrap_or(0)
     }
 
     /// Write the resource data `T`.
@@ -919,7 +945,7 @@ impl MoveHarness {
         arguments: Vec<Vec<u8>>,
     ) -> ViewFunctionOutput {
         self.executor
-            .execute_view_function(fun.module_id, fun.member_id, type_args, arguments)
+            .execute_view_function(fun, type_args, arguments)
     }
 
     /// Splits transactions into blocks based on passed `block_split``, and

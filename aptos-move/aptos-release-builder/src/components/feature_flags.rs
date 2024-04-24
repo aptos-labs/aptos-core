@@ -110,6 +110,8 @@ pub enum FeatureFlag {
     ModuleEventMigration,
     RejectUnstableBytecode,
     TransactionContextExtension,
+    CoinToFungibleAssetMigration,
+    PrimaryAPTFungibleStoreAtUserAddress,
 }
 
 fn generate_features_blob(writer: &CodeWriter, data: &[u64]) {
@@ -278,6 +280,12 @@ impl From<FeatureFlag> for AptosFeatureFlag {
             FeatureFlag::TransactionContextExtension => {
                 AptosFeatureFlag::TRANSACTION_CONTEXT_EXTENSION
             },
+            FeatureFlag::CoinToFungibleAssetMigration => {
+                AptosFeatureFlag::COIN_TO_FUNGIBLE_ASSET_MIGRATION
+            },
+            FeatureFlag::PrimaryAPTFungibleStoreAtUserAddress => {
+                AptosFeatureFlag::PRIMARY_APT_FUNGIBLE_STORE_AT_USER_ADDRESS
+            },
         }
     }
 }
@@ -374,6 +382,12 @@ impl From<AptosFeatureFlag> for FeatureFlag {
             AptosFeatureFlag::REJECT_UNSTABLE_BYTECODE => FeatureFlag::RejectUnstableBytecode,
             AptosFeatureFlag::TRANSACTION_CONTEXT_EXTENSION => {
                 FeatureFlag::TransactionContextExtension
+            },
+            AptosFeatureFlag::COIN_TO_FUNGIBLE_ASSET_MIGRATION => {
+                FeatureFlag::CoinToFungibleAssetMigration
+            },
+            AptosFeatureFlag::PRIMARY_APT_FUNGIBLE_STORE_AT_USER_ADDRESS => {
+                FeatureFlag::PrimaryAPTFungibleStoreAtUserAddress
             },
         }
     }
