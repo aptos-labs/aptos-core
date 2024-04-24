@@ -212,9 +212,17 @@ module aptos_framework::fungible_asset {
         object::object_from_constructor_ref<Metadata>(constructor_ref)
     }
 
-    public entry fun update_uris(metadata_owner: &signer, metadata_addr: address, new_icon_uri: String, new_project_uri: String) acquires Metadata {
+    public entry fun update_uris(
+        metadata_owner: &signer,
+        metadata_addr: address,
+        new_icon_uri: String,
+        new_project_uri: String
+    ) acquires Metadata {
         let metadata_obj = object::address_to_object<Metadata>(metadata_addr);
-        assert!(object::owns(metadata_obj, signer::address_of(metadata_owner)), error::permission_denied(ENOT_METADATA_OWNER));
+        assert!(
+            object::owns(metadata_obj, signer::address_of(metadata_owner)),
+            error::permission_denied(ENOT_METADATA_OWNER)
+        );
         let metadata = borrow_global_mut<Metadata>(metadata_addr);
         metadata.icon_uri = new_icon_uri;
         metadata.project_uri = new_project_uri;
@@ -633,7 +641,7 @@ module aptos_framework::fungible_asset {
             };
             supply.current = supply.current + (amount as u128);
         } else {
-            assert!(false, error::not_found(ESUPPLY_NOT_FOUND));
+            abort error::not_found(ESUPPLY_NOT_FOUND)
         }
     }
 
@@ -689,7 +697,10 @@ module aptos_framework::fungible_asset {
     ) acquires Supply {
         let metadata_object_address = object::address_from_extend_ref(ref);
         let metadata_object_signer = object::generate_signer_for_extending(ref);
-        assert!(features::concurrent_fungible_assets_enabled(), error::invalid_argument(ECONCURRENT_SUPPLY_NOT_ENABLED));
+        assert!(
+            features::concurrent_fungible_assets_enabled(),
+            error::invalid_argument(ECONCURRENT_SUPPLY_NOT_ENABLED)
+        );
         assert!(exists<Supply>(metadata_object_address), error::not_found(ESUPPLY_NOT_FOUND));
         let Supply {
             current,

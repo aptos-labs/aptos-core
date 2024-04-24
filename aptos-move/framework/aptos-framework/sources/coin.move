@@ -287,7 +287,7 @@ module aptos_framework::coin {
                 };
             primary_fungible_store::create_primary_store_enabled_fungible_asset(
                 &metadata_object_cref,
-                option::map<u128, u128>(coin_supply<CoinType>(), |_| MAX_U128),
+                option::map(coin_supply<CoinType>(), |_| MAX_U128),
                 name<CoinType>(),
                 symbol<CoinType>(),
                 decimals<CoinType>(),
@@ -315,7 +315,6 @@ module aptos_framework::coin {
                     burn_ref_opt: option::some(burn_ref),
                 }
             );
-
         };
         *table::borrow(&map.coin_to_fungible_asset_map, type)
     }
@@ -390,13 +389,12 @@ module aptos_framework::coin {
             error::invalid_argument(EMINT_REF_RECEIPT_MISMATCH)
         );
         let metadata_addr = object_address(&metadata);
-        assert!(exists<PairedFungibleAssetRefs>(metadata_addr), error::internal(EPAIRED_FUNGIBLE_ASSET_REFS_NOT_FOUND));
         let mint_ref_opt = &mut borrow_global_mut<PairedFungibleAssetRefs>(metadata_addr).mint_ref_opt;
         option::fill(mint_ref_opt, mint_ref);
     }
 
     #[view]
-    /// Check whether `TransferRef` has not been taken.
+    /// Check whether `TransferRef` still exists.
     public fun paired_transfer_ref_exists<CoinType>(): bool acquires CoinConversionMap, PairedFungibleAssetRefs {
         let metadata = assert_paired_metadata_exists<CoinType>();
         let metadata_addr = object_address(&metadata);
@@ -427,13 +425,12 @@ module aptos_framework::coin {
             error::invalid_argument(ETRANSFER_REF_RECEIPT_MISMATCH)
         );
         let metadata_addr = object_address(&metadata);
-        assert!(exists<PairedFungibleAssetRefs>(metadata_addr), error::internal(EPAIRED_FUNGIBLE_ASSET_REFS_NOT_FOUND));
         let transfer_ref_opt = &mut borrow_global_mut<PairedFungibleAssetRefs>(metadata_addr).transfer_ref_opt;
         option::fill(transfer_ref_opt, transfer_ref);
     }
 
     #[view]
-    /// Check whether `TransferRef` has not been taken.
+    /// Check whether `BurnRef` has not been taken.
     public fun paired_burn_ref_exists<CoinType>(): bool acquires CoinConversionMap, PairedFungibleAssetRefs {
         let metadata = assert_paired_metadata_exists<CoinType>();
         let metadata_addr = object_address(&metadata);
@@ -464,7 +461,6 @@ module aptos_framework::coin {
             error::invalid_argument(EBURN_REF_RECEIPT_MISMATCH)
         );
         let metadata_addr = object_address(&metadata);
-        assert!(exists<PairedFungibleAssetRefs>(metadata_addr), error::internal(EPAIRED_FUNGIBLE_ASSET_REFS_NOT_FOUND));
         let burn_ref_opt = &mut borrow_global_mut<PairedFungibleAssetRefs>(metadata_addr).burn_ref_opt;
         option::fill(burn_ref_opt, burn_ref);
     }
@@ -598,7 +594,7 @@ module aptos_framework::coin {
                 account_addr,
                 option::destroy_some(metadata)
             ))
-                (amount, 0)
+                abort error::invalid_argument(EINSUFFICIENT_BALANCE)
             else
                 (coin_balance, amount - coin_balance)
         }
@@ -626,7 +622,11 @@ module aptos_framework::coin {
             );
             event::destroy_handle(deposit_events);
             event::destroy_handle(withdraw_events);
-            fungible_asset::deposit(store, coin_to_fungible_asset(coin));
+            if (coin.value == 0) {
+                destroy_zero(coin);
+            } else {
+                fungible_asset::deposit(store, coin_to_fungible_asset(coin));
+            };
             // Note:
             // It is possible the primary fungible store may already exist before this function call.
             // In this case, if the account owns a frozen CoinStore and an unfrozen primary fungible store, this
