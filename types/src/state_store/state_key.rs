@@ -20,7 +20,7 @@ use aptos_crypto::{
 use aptos_crypto_derive::CryptoHasher;
 use aptos_infallible::RwLock;
 use bytes::{BufMut, Bytes, BytesMut};
-use hashbrown::{hash_map, HashMap};
+use hashbrown::{hash_map, Equivalent, HashMap};
 // use aptos_metrics_core::{IntCounterHelper, TimerHelper};
 use move_core_types::{
     account_address::AccountAddress,
@@ -234,7 +234,7 @@ struct TwoLevelRegistry<Key1, Key2> {
     // FIXME(aldenhu): remove
     #[allow(dead_code)]
     key_type: &'static str,
-    inner: RwLock<HashMap<Key1, HashMap<Key2, Weak<Entry>>>>,
+    inner: RwLock<HashMap<TwoKeys<Key1, Key2>, Weak<Entry>>>,
 }
 
 impl<Key1, Key2> TwoLevelRegistry<Key1, Key2>
@@ -249,12 +249,11 @@ where
         }
     }
 
-    fn try_get<Q1, Q2>(&self, key1: &Q1, key2: &Q2) -> Option<Arc<Entry>>
+    fn try_get<'a, Q1, Q2>(&self, key1: &'a Q1, key2: &'a Q2) -> Option<Arc<Entry>>
     where
-        Key1: Borrow<Q1>,
-        Key2: Borrow<Q2>,
-        Q1: Eq + Hash + ?Sized,
-        Q2: Eq + Hash + ?Sized,
+        TwoKeys<&'a Q1, &'a Q2>: Equivalent<TwoKeys<Key1, Key2>>,
+        Q1: Hash + Eq + ?Sized,
+        Q2: Hash + Eq + ?Sized,
     {
         let locked = match self.inner.inner().try_read() {
             Ok(locked) => locked,
@@ -267,15 +266,18 @@ where
         };
 
         locked
-            .get(key1)
-            .and_then(|m| m.get(key2))
+            .get(&TwoKeys(key1, key2))
             .and_then(|weak| weak.upgrade())
     }
 
-    fn lock_and_get_or_add<Q1, Q2>(&self, key1: &Q1, key2: &Q2, maybe_add: EntryInner) -> Arc<Entry>
+    fn lock_and_get_or_add<'a, Q1, Q2>(
+        &self,
+        key1: &'a Q1,
+        key2: &'a Q2,
+        maybe_add: EntryInner,
+    ) -> Arc<Entry>
     where
-        Key1: Borrow<Q1>,
-        Key2: Borrow<Q2>,
+        TwoKeys<&'a Q1, &'a Q2>: Equivalent<TwoKeys<Key1, Key2>>,
         Q1: Eq + Hash + ToOwned<Owned = Key1> + ?Sized,
         Q2: Eq + Hash + ToOwned<Owned = Key2> + ?Sized,
     {
@@ -287,9 +289,7 @@ where
             match self
                 .inner
                 .write()
-                .entry(key1.to_owned())
-                .or_default()
-                .entry(key2.to_owned())
+                .entry(TwoKeys(key1.to_owned(), key2.to_owned()))
             {
                 hash_map::Entry::Occupied(occupied) => {
                     if let Some(entry) = occupied.get().upgrade() {
@@ -315,28 +315,53 @@ where
         unreachable!("Looks like deadlock");
     }
 
-    fn lock_and_remove(&self, key1: &Key1, key2: &Key2) {
-        match self.inner.write().entry(key1.to_owned()) {
-            hash_map::Entry::Occupied(mut occupied) => {
-                match occupied.get_mut().remove(key2) {
-                    Some(..) => {
-                        // STATE_KEY_COUNTERS.inc_with(&[self.key_type, "entry_remove"]);
-                    },
-                    None => {
-                        unreachable!("Entry missing in registry when dropping.")
-                    },
-                }
-                if occupied.get().is_empty() {
-                    occupied.remove();
-                }
-            },
-            hash_map::Entry::Vacant(_) => {
-                // This should not happen
-                unreachable!("level 1 map must exist when an entry is supposed to be in it.");
-            },
-        }
+    fn lock_and_remove<'a, Q1, Q2>(&self, key1: &'a Q1, key2: &'a Q2)
+    where
+        TwoKeys<&'a Q1, &'a Q2>: Equivalent<TwoKeys<Key1, Key2>>,
+        Q1: Hash + Eq + ?Sized,
+        Q2: Hash + Eq + ?Sized,
+    {
+        assert!(self.inner.write().remove(&TwoKeys(key1, key2)).is_some())
     }
 }
+
+#[derive(Eq, Hash, PartialEq)]
+struct TwoKeys<Key1, Key2>(Key1, Key2);
+
+/*
+conflicting implementation in crate `hashbrown`:
+            - impl<Q, K> hashbrown::Equivalent<K> for Q
+              where Q: std::cmp::Eq, K: std::borrow::Borrow<Q>, Q: ?Sized, K: ?Sized;
+
+
+impl<Key1, Key2, Ref1, Ref2> Equivalent<TwoKeys<Key1, Key2>> for TwoKeys<&Ref1, &Ref2>
+where
+    Key1: Borrow<Ref1>,
+    Key2: Borrow<Ref2>,
+    Ref1: Eq + ?Sized,
+    Ref2: Eq + ?Sized,
+{
+    fn equivalent(&self, key: &TwoKeys<Key1, Key2>) -> bool {
+        key.0.borrow() == self.0 && key.1.borrow() == self.1
+    }
+}
+ */
+
+macro_rules! impl_two_key_equivalent {
+    ($Key1:ty, $Key2:ty, $Ref1:ty, $Ref2:ty) => {
+        impl Equivalent<TwoKeys<$Key1, $Key2>> for TwoKeys<&$Ref1, &$Ref2> {
+            fn equivalent(&self, key: &TwoKeys<$Key1, $Key2>) -> bool {
+                Borrow::<$Ref1>::borrow(&key.0) == self.0
+                    && Borrow::<$Ref2>::borrow(&key.1) == self.1
+            }
+        }
+    };
+}
+
+impl_two_key_equivalent!(StructTag, AccountAddress, StructTag, AccountAddress);
+impl_two_key_equivalent!(AccountAddress, Identifier, AccountAddress, IdentStr);
+impl_two_key_equivalent!(TableHandle, Vec<u8>, TableHandle, [u8]);
+impl_two_key_equivalent!(Vec<u8>, (), [u8], ());
 
 static GLOBAL_REGISTRY: Lazy<StateKeyRegistry> = Lazy::new(StateKeyRegistry::new_empty);
 
