@@ -46,11 +46,28 @@ static SAMPLE_NONCE: Lazy<String> = Lazy::new(|| {
 
 pub(crate) const SAMPLE_TEST_ISS_VALUE: &str = "test.oidc.provider";
 
-/// TODO(keyless): Use a multiline format here, for diff-friendliness
 pub(crate) static SAMPLE_JWT_PAYLOAD_JSON: Lazy<String> = Lazy::new(|| {
     format!(
-        r#"{{"iss":"{}","azp":"407408718192.apps.googleusercontent.com","aud":"407408718192.apps.googleusercontent.com","sub":"113990307082899718775","hd":"aptoslabs.com","email":"michael@aptoslabs.com","email_verified":true,"at_hash":"bxIESuI59IoZb5alCASqBg","name":"Michael Straka","picture":"https://lh3.googleusercontent.com/a/ACg8ocJvY4kVUBRtLxe1IqKWL5i7tBDJzFp9YuWVXMzwPpbs=s96-c","given_name":"Michael","family_name":"Straka","locale":"en","iat":1700255944,"exp":2700259544,"nonce":"{}"}}"#,
+        r#"{{
+            "iss":"{}",
+            "azp":"407408718192.apps.googleusercontent.com",
+            "aud":"407408718192.apps.googleusercontent.com",
+            "sub":"113990307082899718775",
+            "hd":"aptoslabs.com",
+            "email":"michael@aptoslabs.com",
+            "email_verified":true,
+            "at_hash":"bxIESuI59IoZb5alCASqBg",
+            "name":"Michael Straka",
+            "picture":"https://lh3.googleusercontent.com/a/ACg8ocJvY4kVUBRtLxe1IqKWL5i7tBDJzFp9YuWVXMzwPpbs=s96-c",
+            "given_name":"Michael",
+            {}
+            "locale":"en",
+            "iat":1700255944,
+            "exp":2700259544,
+            "nonce":"{}"
+         }}"#,
         SAMPLE_TEST_ISS_VALUE,
+        SAMPLE_JWT_EXTRA_FIELD.as_str(),
         SAMPLE_NONCE.as_str()
     )
 });
@@ -59,7 +76,7 @@ pub(crate) static SAMPLE_JWT_PAYLOAD_JSON: Lazy<String> = Lazy::new(|| {
 pub(crate) const SAMPLE_JWT_EXTRA_FIELD_KEY: &str = "family_name";
 
 /// Consistent with what is in `SAMPLE_JWT_PAYLOAD_JSON`
-pub(crate) const SAMPLE_JWT_EXTRA_FIELD: Lazy<String> =
+pub(crate) static SAMPLE_JWT_EXTRA_FIELD: Lazy<String> =
     Lazy::new(|| format!(r#""{}":"Straka","#, SAMPLE_JWT_EXTRA_FIELD_KEY));
 
 /// The JWT parsed as a struct

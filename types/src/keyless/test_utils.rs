@@ -355,7 +355,7 @@ mod test {
             );
             println!("{}", code);
             println!("----------------------------------------------------------------------------------");
-            return prover_response;
+            prover_response
         } else {
             // Print an error message if the request failed
             println!("Request failed with status code: {}", response.status());
