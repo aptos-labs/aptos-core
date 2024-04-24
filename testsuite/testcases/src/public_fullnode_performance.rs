@@ -180,7 +180,12 @@ fn create_and_add_pfns(ctx: &mut NetworkContext, num_pfns: u64) -> Result<Vec<Pe
         .map(|i| {
             // Create a config for the PFN. Note: this needs to be done here
             // because the config will generate a unique peer ID for the PFN.
-            let pfn_config = swarm.get_default_pfn_node_config();
+            let mut pfn_config = swarm.get_default_pfn_node_config();
+            // TODO: make this configurable at a higher level
+            pfn_config.mempool.default_failovers = 20;
+            for network in &mut pfn_config.full_node_networks {
+                network.max_outbound_connections = 20;
+            }
             let pfn_override_config = OverrideNodeConfig::new_with_default_base(pfn_config);
 
             // Add the PFN to the swarm
