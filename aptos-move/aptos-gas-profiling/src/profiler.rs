@@ -34,6 +34,7 @@ pub struct GasProfiler<G> {
     base: G,
 
     intrinsic_cost: Option<InternalGas>,
+    keyless_cost: Option<InternalGas>,
     dependencies: Vec<Dependency>,
     frames: Vec<CallFrame>,
     transaction_transient: Option<InternalGas>,
@@ -90,6 +91,7 @@ impl<G> GasProfiler<G> {
             base,
 
             intrinsic_cost: None,
+            keyless_cost: None,
             dependencies: vec![],
             frames: vec![CallFrame::new_script()],
             transaction_transient: None,
@@ -109,6 +111,7 @@ impl<G> GasProfiler<G> {
             base,
 
             intrinsic_cost: None,
+            keyless_cost: None,
             dependencies: vec![],
             frames: vec![CallFrame::new_function(module_id, func_name, ty_args)],
             transaction_transient: None,
@@ -642,16 +645,19 @@ where
         Ok(total_refund)
     }
 
-    fn charge_intrinsic_gas_for_transaction(
-        &mut self,
-        txn_size: NumBytes,
-        multiplier: NumBytes,
-    ) -> VMResult<()> {
-        let (cost, res) = self.delegate_charge(|base| {
-            base.charge_intrinsic_gas_for_transaction(txn_size, multiplier)
-        });
+    fn charge_intrinsic_gas_for_transaction(&mut self, txn_size: NumBytes) -> VMResult<()> {
+        let (cost, res) =
+            self.delegate_charge(|base| base.charge_intrinsic_gas_for_transaction(txn_size));
 
         self.intrinsic_cost = Some(cost);
+
+        res
+    }
+
+    fn charge_keyless(&mut self) -> VMResult<()> {
+        let (_cost, res) = self.delegate_charge(|base| base.charge_keyless());
+
+        // TODO: add keyless
 
         res
     }
@@ -672,6 +678,7 @@ where
             gas_scaling_factor: self.base.gas_unit_scaling_factor(),
             total: self.algebra().execution_gas_used() + self.algebra().io_gas_used(),
             intrinsic_cost: self.intrinsic_cost.unwrap_or_else(|| 0.into()),
+            keyless_cost: self.keyless_cost.unwrap_or_else(|| 0.into()),
             dependencies: self.dependencies,
             call_graph: self.frames.pop().expect("frame must exist"),
             transaction_transient: self.transaction_transient,

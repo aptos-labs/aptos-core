@@ -11,7 +11,7 @@ use aptos_crypto::{
     ed25519::{Ed25519PrivateKey, Ed25519PublicKey},
     test_utils::KeyPair,
 };
-use aptos_gas_algebra::{FeePerGasUnit, Gas, GasExpression, NumBytes};
+use aptos_gas_algebra::{FeePerGasUnit, Gas, GasExpression};
 use aptos_gas_schedule::{AptosGasParameters, InitialGasSchedule, LATEST_GAS_FEATURE_VERSION};
 use aptos_proptest_helpers::Index;
 use aptos_types::{
@@ -92,7 +92,7 @@ impl AUTransactionGen for InsufficientBalanceGen {
         let txn_gas_params = &gas_params.vm.txn;
         let raw_bytes_len = txn.raw_txn_bytes_len() as u64;
         let min_cost: Gas = txn_gas_params
-            .calculate_intrinsic_gas(raw_bytes_len.into(), NumBytes::one())
+            .calculate_intrinsic_gas(raw_bytes_len.into())
             .evaluate(LATEST_GAS_FEATURE_VERSION, &gas_params.vm)
             .to_unit_round_up_with_params(txn_gas_params);
 

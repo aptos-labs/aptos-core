@@ -816,13 +816,10 @@ impl AptosVM {
             })
         });
 
-        let multiplier = if txn_data.is_keyless() {
-            let gas_params = get_or_vm_startup_failure(&self.gas_params, log_context)?;
-            gas_params.vm.txn.keyless_multiplier
-        } else {
-            NumBytes::one()
-        };
-        gas_meter.charge_intrinsic_gas_for_transaction(txn_data.transaction_size(), multiplier)?;
+        gas_meter.charge_intrinsic_gas_for_transaction(txn_data.transaction_size())?;
+        if txn_data.is_keyless() {
+            gas_meter.charge_keyless()?;
+        }
 
         match payload {
             TransactionPayload::Script(script) => {
@@ -1006,13 +1003,10 @@ impl AptosVM {
             ))
         });
 
-        let multiplier = if txn_data.is_keyless() {
-            let gas_params = get_or_vm_startup_failure(&self.gas_params, log_context)?;
-            gas_params.vm.txn.keyless_multiplier
-        } else {
-            NumBytes::one()
-        };
-        gas_meter.charge_intrinsic_gas_for_transaction(txn_data.transaction_size(), multiplier)?;
+        gas_meter.charge_intrinsic_gas_for_transaction(txn_data.transaction_size())?;
+        if txn_data.is_keyless() {
+            gas_meter.charge_keyless()?;
+        }
 
         // Step 1: Obtain the payload. If any errors happen here, the entire transaction should fail
         let invariant_violation_error = || {
@@ -1580,6 +1574,7 @@ impl AptosVM {
             keyless_validation::validate_authenticators(
                 &authenticators,
                 self.features(),
+                self.gas_feature_version,
                 resolver,
             )?;
         }

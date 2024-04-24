@@ -4,7 +4,7 @@
 
 use aptos_cached_packages::aptos_stdlib;
 use aptos_crypto::{ed25519::Ed25519PrivateKey, PrivateKey, Uniform};
-use aptos_gas_algebra::{Gas, NumBytes};
+use aptos_gas_algebra::Gas;
 use aptos_gas_schedule::{InitialGasSchedule, TransactionGasParameters};
 use aptos_language_e2e_tests::{
     assert_prologue_disparity, assert_prologue_parity, common_transactions::EMPTY_SCRIPT,
@@ -304,8 +304,8 @@ fn verify_simple_payment() {
 
     // Test for a max_gas_amount that is insufficient to pay the minimum fee.
     // Find the minimum transaction gas units and subtract 1.
-    let mut gas_limit: Gas = (txn_gas_params.min_transaction_gas_units * NumBytes::one())
-        .to_unit_round_up_with_params(&txn_gas_params);
+    let mut gas_limit: Gas =
+        (txn_gas_params.min_transaction_gas_units).to_unit_round_up_with_params(&txn_gas_params);
 
     if gas_limit > 0.into() {
         gas_limit = gas_limit.checked_sub(1.into()).unwrap();

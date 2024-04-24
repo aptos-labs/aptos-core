@@ -2,9 +2,10 @@
 // SPDX-License-Identifier: Apache-2.0
 
 use crate::{move_vm_ext::AptosMoveResolver, transaction_metadata::TransactionMetadata};
-use aptos_gas_algebra::GasExpression;
+use aptos_gas_algebra::{Gas, GasExpression, InternalGas};
 use aptos_gas_schedule::{
-    AptosGasParameters, FromOnChainGasSchedule, MiscGasParameters, NativeGasParameters,
+    gas_params::txn::KEYLESS_BASE_COST, AptosGasParameters, FromOnChainGasSchedule,
+    MiscGasParameters, NativeGasParameters,
 };
 use aptos_logger::{enabled, Level};
 use aptos_types::on_chain_config::{
@@ -15,7 +16,7 @@ use aptos_vm_types::storage::{
     io_pricing::IoPricing, space_pricing::DiskSpacePricing, StorageGasParameters,
 };
 use move_core_types::{
-    gas_algebra::{NumArgs, NumBytes},
+    gas_algebra::NumArgs,
     language_storage::CORE_CODE_ADDRESS,
     vm_status::{StatusCode, VMStatus},
 };
@@ -186,22 +187,22 @@ pub(crate) fn check_gas(
     // The submitted transactions max gas units needs to be at least enough to cover the
     // intrinsic cost of the transaction as calculated against the size of the
     // underlying `RawTransaction`.
-    let multiplier = if txn_metadata.is_keyless() {
-        txn_gas_params.keyless_multiplier
+    let keyless = if txn_metadata.is_keyless() {
+        KEYLESS_BASE_COST.evaluate(gas_feature_version, &gas_params.vm)
     } else {
-        NumBytes::one()
+        InternalGas::zero()
     };
     let intrinsic_gas = txn_gas_params
-        .calculate_intrinsic_gas(raw_bytes_len, multiplier)
-        .evaluate(gas_feature_version, &gas_params.vm)
-        .to_unit_round_up_with_params(txn_gas_params);
+        .calculate_intrinsic_gas(raw_bytes_len)
+        .evaluate(gas_feature_version, &gas_params.vm);
+    let total_rounded: Gas = (intrinsic_gas + keyless).to_unit_round_up_with_params(txn_gas_params);
 
-    if txn_metadata.max_gas_amount() < intrinsic_gas {
+    if txn_metadata.max_gas_amount() < total_rounded {
         speculative_warn!(
             log_context,
             format!(
                 "[VM] Gas unit error; min {}, submitted {}",
-                intrinsic_gas,
+                total_rounded,
                 txn_metadata.max_gas_amount()
             ),
         );

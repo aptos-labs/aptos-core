@@ -488,6 +488,8 @@ where
             gas_unit_price: FeePerGasUnit,
         ) -> PartialVMResult<()>;
 
-        fn charge_intrinsic_gas_for_transaction(&mut self, txn_size: NumBytes, multiplier: NumBytes) -> VMResult<()>;
+        fn charge_intrinsic_gas_for_transaction(&mut self, txn_size: NumBytes) -> VMResult<()>;
+
+        fn charge_keyless(&mut self) -> VMResult<()>;
     }
 }

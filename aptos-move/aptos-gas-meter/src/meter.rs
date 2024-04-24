@@ -545,19 +545,19 @@ where
             .map_err(|e| e.finish(Location::Undefined))
     }
 
-    fn charge_intrinsic_gas_for_transaction(
-        &mut self,
-        txn_size: NumBytes,
-        multiplier: NumBytes,
-    ) -> VMResult<()> {
+    fn charge_intrinsic_gas_for_transaction(&mut self, txn_size: NumBytes) -> VMResult<()> {
         let excess = txn_size
             .checked_sub(self.vm_gas_params().txn.large_transaction_cutoff)
             .unwrap_or_else(|| 0.into());
 
         self.algebra
-            .charge_execution(
-                MIN_TRANSACTION_GAS_UNITS * multiplier + INTRINSIC_GAS_PER_BYTE * excess,
-            )
+            .charge_execution(MIN_TRANSACTION_GAS_UNITS + INTRINSIC_GAS_PER_BYTE * excess)
+            .map_err(|e| e.finish(Location::Undefined))
+    }
+
+    fn charge_keyless(&mut self) -> VMResult<()> {
+        self.algebra
+            .charge_execution(KEYLESS_BASE_COST)
             .map_err(|e| e.finish(Location::Undefined))
     }
 }
