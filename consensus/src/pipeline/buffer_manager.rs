@@ -11,7 +11,7 @@ use crate::{
         buffer::{Buffer, Cursor},
         buffer_item::BufferItem,
         commit_reliable_broadcast::{AckState, CommitMessage},
-        execution_schedule_phase::{ExecutionRequest, ExecutionType},
+        execution_schedule_phase::ExecutionRequest,
         execution_wait_phase::{ExecutionResponse, ExecutionWaitRequest},
         persisting_phase::PersistingRequest,
         pipeline_phase::CountedRequest,
@@ -49,6 +49,8 @@ use std::sync::{
 };
 use tokio::time::{Duration, Instant};
 use tokio_retry::strategy::ExponentialBackoff;
+
+use super::pre_execution_phase::PreExecutionRequest;
 
 pub const COMMIT_VOTE_BROADCAST_INTERVAL_MS: u64 = 1500;
 pub const COMMIT_VOTE_REBROADCAST_INTERVAL_MS: u64 = 30000;
@@ -92,6 +94,7 @@ pub struct BufferManager {
     // the roots point to the first *unprocessed* item.
     // None means no items ready to be processed (either all processed or no item finishes previous stage)
     execution_root: BufferItemRootType,
+
     execution_schedule_phase_tx: Sender<CountedRequest<ExecutionRequest>>,
     execution_schedule_phase_rx: Receiver<ExecutionWaitRequest>,
     execution_wait_phase_tx: Sender<CountedRequest<ExecutionWaitRequest>>,
@@ -113,6 +116,7 @@ pub struct BufferManager {
     persisting_phase_tx: Sender<CountedRequest<PersistingRequest>>,
 
     pre_execute_block_rx: UnboundedReceiver<PipelinedBlock>,
+    pre_execution_phase_tx: Option<Sender<CountedRequest<PreExecutionRequest>>>,
 
     block_rx: UnboundedReceiver<OrderedBlocks>,
     reset_rx: UnboundedReceiver<ResetRequest>,
@@ -151,6 +155,7 @@ impl BufferManager {
         >,
         persisting_phase_tx: Sender<CountedRequest<PersistingRequest>>,
         pre_execute_block_rx: UnboundedReceiver<PipelinedBlock>,
+        pre_execution_phase_tx: Option<Sender<CountedRequest<PreExecutionRequest>>>,
         block_rx: UnboundedReceiver<OrderedBlocks>,
         reset_rx: UnboundedReceiver<ResetRequest>,
         epoch_state: Arc<EpochState>,
@@ -193,6 +198,7 @@ impl BufferManager {
             persisting_phase_tx,
 
             pre_execute_block_rx,
+            pre_execution_phase_tx,
 
             block_rx,
             reset_rx,
@@ -241,15 +247,15 @@ impl BufferManager {
     }
 
     async fn process_pre_execute_block(&mut self, block: PipelinedBlock) {
-        let request = self.create_new_request(ExecutionRequest {
-            ordered_blocks: vec![block.clone()],
-            lifetime_guard: self.create_new_request(()),
-            execution_type: ExecutionType::PreExecution,
+        let request = self.create_new_request(PreExecutionRequest {
+            block,
         });
-        self.execution_schedule_phase_tx
-            .send(request)
-            .await
-            .expect("Failed to send execution schedule request");
+        if let Some(pre_execution_phase_tx) = self.pre_execution_phase_tx.as_mut() {
+            pre_execution_phase_tx
+                .send(request)
+                .await
+                .expect("[PreExecution] Failed to send pre-execution request");
+        }
     }
 
     /// process incoming ordered blocks
@@ -270,7 +276,6 @@ impl BufferManager {
         let request = self.create_new_request(ExecutionRequest {
             ordered_blocks: ordered_blocks.clone(),
             lifetime_guard: self.create_new_request(()),
-            execution_type: ExecutionType::Execution,
         });
         self.execution_schedule_phase_tx
             .send(request)
@@ -303,7 +308,6 @@ impl BufferManager {
             let request = self.create_new_request(ExecutionRequest {
                 ordered_blocks,
                 lifetime_guard: self.create_new_request(()),
-                execution_type: ExecutionType::Execution,
             });
             let sender = self.execution_schedule_phase_tx.clone();
             Self::spawn_retry_request(sender, request, Duration::from_millis(100));
@@ -752,8 +756,9 @@ impl BufferManager {
             // advancing the root will trigger sending requests to the pipeline
             ::futures::select! {
                 block = self.pre_execute_block_rx.select_next_some() => {
-                    self.process_pre_execute_block(block).await;
-                }
+                    monitor!("buffer_manager_process_pre_execute_block",
+                    self.process_pre_execute_block(block).await);
+                },
                 blocks = self.block_rx.select_next_some() => {
                     monitor!("buffer_manager_process_ordered", {
                     self.process_ordered_blocks(blocks).await;

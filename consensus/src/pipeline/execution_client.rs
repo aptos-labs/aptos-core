@@ -72,7 +72,7 @@ pub trait TExecutionClient: Send + Sync {
     /// This is needed for some DAG tests. Clean this up as a TODO.
     fn get_execution_channel(&self) -> Option<UnboundedSender<OrderedBlocks>>;
 
-    async fn pre_execute(&self, block: PipelinedBlock) -> ExecutorResult<()>;
+    async fn pre_execute(&self, block: PipelinedBlock);
 
     /// Send ordered blocks to the real execution phase through the channel.
     async fn finalize_order(
@@ -256,6 +256,7 @@ impl ExecutionProxyClient {
         );
 
         let (
+            pre_execution_phase,
             execution_schedule_phase,
             execution_wait_phase,
             signing_phase,
@@ -275,6 +276,7 @@ impl ExecutionProxyClient {
             self.bounded_executor.clone(),
         );
 
+        tokio::spawn(pre_execution_phase.start());
         tokio::spawn(execution_schedule_phase.start());
         tokio::spawn(execution_wait_phase.start());
         tokio::spawn(signing_phase.start());
@@ -334,12 +336,12 @@ impl TExecutionClient for ExecutionProxyClient {
     async fn pre_execute(
         &self,
         block: PipelinedBlock,
-    ) -> ExecutorResult<()> {
+    ) {
         let pre_execute_tx = self.handle.read().pre_execute_tx.clone();
 
         if pre_execute_tx.is_none() {
             debug!("Failed to send to buffer manager, maybe epoch ends");
-            return Ok(());
+            return;
         }
 
         if pre_execute_tx
@@ -350,8 +352,6 @@ impl TExecutionClient for ExecutionProxyClient {
         {
             debug!("Failed to send to buffer manager, maybe epoch ends");
         }
-
-        Ok(())
     }
 
     async fn finalize_order(
@@ -508,9 +508,7 @@ impl TExecutionClient for DummyExecutionClient {
         None
     }
 
-    async fn pre_execute(&self, _block: PipelinedBlock) -> ExecutorResult<()> {
-        Ok(())
-    }
+    async fn pre_execute(&self, _block: PipelinedBlock) {}
 
     async fn finalize_order(
         &self,

@@ -17,7 +17,7 @@ use anyhow::{bail, ensure, Context};
 use aptos_channels::aptos_channel;
 use aptos_config::config::ConsensusConfig;
 use aptos_consensus_types::{
-    block::Block, block_data::BlockType, common::{Author, Round}, delayed_qc_msg::DelayedQcMsg, pipelined_block::{self, PipelinedBlock}, proof_of_store::{ProofCache, ProofOfStoreMsg, SignedBatchInfoMsg}, proposal_msg::ProposalMsg, quorum_cert::QuorumCert, sync_info::SyncInfo, timeout_2chain::TwoChainTimeoutCertificate, vote::Vote, vote_msg::VoteMsg
+    block::Block, block_data::BlockType, common::{Author, Round}, delayed_qc_msg::DelayedQcMsg, pipelined_block::PipelinedBlock, proof_of_store::{ProofCache, ProofOfStoreMsg, SignedBatchInfoMsg}, proposal_msg::ProposalMsg, quorum_cert::QuorumCert, sync_info::SyncInfo, timeout_2chain::TwoChainTimeoutCertificate, vote::Vote, vote_msg::VoteMsg
 };
 use aptos_infallible::{checked, Mutex};
 use aptos_logger::prelude::*;
@@ -815,12 +815,11 @@ impl RoundManager {
     }
 
     pub async fn process_verified_proposal(&mut self, proposal: Block) -> anyhow::Result<()> {
-        // // daniel experimental: pre-execute the proposal
-        // let pipelined_block = PipelinedBlock::new_ordered(proposal.clone());
-        // self.execution_client
-        //     .pre_execute(pipelined_block)
-        //     .await
-        //     .context("[PreExecution] Failed to pre-execute the block")?;
+        // daniel experimental: pre-execute the proposal
+        let pipelined_block = PipelinedBlock::new_ordered(proposal.clone());
+        self.execution_client
+            .pre_execute(pipelined_block)
+            .await;
 
         let proposal_round = proposal.round();
         let vote = self

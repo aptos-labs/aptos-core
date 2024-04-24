@@ -10,14 +10,7 @@ use crate::{
         buffer_manager::{
             create_channel, BufferManager, OrderedBlocks, Receiver, ResetAck, ResetRequest,
             ResetSignal, Sender,
-        },
-        decoupled_execution_utils::prepare_phases_and_buffer_manager,
-        execution_schedule_phase::ExecutionSchedulePhase,
-        execution_wait_phase::ExecutionWaitPhase,
-        persisting_phase::PersistingPhase,
-        pipeline_phase::PipelinePhase,
-        signing_phase::SigningPhase,
-        tests::test_utils::prepare_executed_blocks_with_ledger_info,
+        }, decoupled_execution_utils::prepare_phases_and_buffer_manager, execution_schedule_phase::ExecutionSchedulePhase, execution_wait_phase::ExecutionWaitPhase, persisting_phase::PersistingPhase, pipeline_phase::PipelinePhase, pre_execution_phase, signing_phase::SigningPhase, tests::test_utils::prepare_executed_blocks_with_ledger_info
     },
     test_utils::{
         consensus_runtime, timed_block_on, EmptyStateComputer, MockStorage,
@@ -136,7 +129,10 @@ pub fn prepare_buffer_manager(
     let mocked_execution_proxy = Arc::new(RandomComputeResultStateComputer::new());
     let hash_val = mocked_execution_proxy.get_root_hash();
 
+    let (_, pre_execution_rx) = create_channel::<PipelinedBlock>();
+
     let (
+        pre_execution_phase_pipeline,
         execution_schedule_phase_pipeline,
         execution_wait_phase_pipeline,
         signing_phase_pipeline,
@@ -149,6 +145,7 @@ pub fn prepare_buffer_manager(
         network,
         msg_rx,
         state_computer,
+        pre_execution_rx,
         block_rx,
         buffer_reset_rx,
         Arc::new(EpochState {

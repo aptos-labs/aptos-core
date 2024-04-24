@@ -18,11 +18,14 @@ use aptos_bounded_executor::BoundedExecutor;
 use aptos_channels::aptos_channel::Receiver;
 use aptos_consensus_types::{common::Author, pipelined_block::PipelinedBlock};
 use aptos_types::{account_address::AccountAddress, epoch_state::EpochState};
+use dashmap::DashMap;
 use futures::channel::mpsc::UnboundedReceiver;
 use std::sync::{
     atomic::{AtomicBool, AtomicU64},
     Arc,
 };
+
+use super::pre_execution_phase::{PreExecutionPhase, PreExecutionRequest};
 
 /// build channels and return phases and buffer manager
 pub fn prepare_phases_and_buffer_manager(
@@ -38,6 +41,7 @@ pub fn prepare_phases_and_buffer_manager(
     epoch_state: Arc<EpochState>,
     bounded_executor: BoundedExecutor,
 ) -> (
+    PipelinePhase<PreExecutionPhase>,
     PipelinePhase<ExecutionSchedulePhase>,
     PipelinePhase<ExecutionWaitPhase>,
     PipelinePhase<SigningPhase>,
@@ -47,12 +51,24 @@ pub fn prepare_phases_and_buffer_manager(
     let reset_flag = Arc::new(AtomicBool::new(false));
     let ongoing_tasks = Arc::new(AtomicU64::new(0));
 
+    // PreExecution Phase
+    let pre_execution_results = Arc::new(DashMap::new());
+    let (pre_execution_phase_request_tx, pre_execution_phase_request_rx) =
+        create_channel::<CountedRequest<PreExecutionRequest>>();
+    let pre_execution_phase_processor = PreExecutionPhase::new(execution_proxy.clone(), pre_execution_results.clone());
+    let pre_execution_phase = PipelinePhase::new(
+        pre_execution_phase_request_rx,
+        None,
+        Box::new(pre_execution_phase_processor),
+        reset_flag.clone(),
+    );
+
     // Execution Phase
     let (execution_schedule_phase_request_tx, execution_schedule_phase_request_rx) =
         create_channel::<CountedRequest<ExecutionRequest>>();
     let (execution_schedule_phase_response_tx, execution_schedule_phase_response_rx) =
         create_channel::<ExecutionWaitRequest>();
-    let execution_schedule_phase_processor = ExecutionSchedulePhase::new(execution_proxy);
+    let execution_schedule_phase_processor = ExecutionSchedulePhase::new(execution_proxy, Some(pre_execution_results));
     let execution_schedule_phase = PipelinePhase::new(
         execution_schedule_phase_request_rx,
         Some(execution_schedule_phase_response_tx),
@@ -99,6 +115,7 @@ pub fn prepare_phases_and_buffer_manager(
     );
 
     (
+        pre_execution_phase,
         execution_schedule_phase,
         execution_wait_phase,
         signing_phase,
@@ -115,6 +132,7 @@ pub fn prepare_phases_and_buffer_manager(
             commit_msg_rx,
             persisting_phase_request_tx,
             pre_execute_block_rx,
+            Some(pre_execution_phase_request_tx),
             block_rx,
             sync_rx,
             epoch_state,

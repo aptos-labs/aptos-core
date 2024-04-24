@@ -37,7 +37,7 @@ pub struct ExecutionPhaseForTest {
 
 impl ExecutionPhaseForTest {
     pub fn new(execution_proxy: Arc<dyn StateComputer>) -> Self {
-        let schedule_phase = ExecutionSchedulePhase::new(execution_proxy);
+        let schedule_phase = ExecutionSchedulePhase::new(execution_proxy, None);
         let wait_phase = ExecutionWaitPhase;
         Self {
             schedule_phase,

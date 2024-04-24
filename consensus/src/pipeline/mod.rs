@@ -33,6 +33,7 @@ pub mod execution_wait_phase;
 pub mod hashable;
 pub mod persisting_phase;
 pub mod pipeline_phase;
+pub mod pre_execution_phase;
 pub mod signing_phase;
 
 pub mod execution_client;
