@@ -82,11 +82,9 @@ validator:
     limits:
       cpu: 14
       memory: 56Gi
-      ephemeral-storage: 20Gi
     requests:
       cpu: 14
       memory: 56Gi
-      ephemeral-storage: 20Gi
   storage:
     # -- Kubernetes storage class to use for validator persistent storage
     class:
