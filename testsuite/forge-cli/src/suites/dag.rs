@@ -286,7 +286,7 @@ fn dag_realistic_network_tuned_for_throughput_test() -> ForgeConfig {
         .with_genesis_helm_config_fn(Arc::new(move |helm_values| {
             let onchain_consensus_config = OnChainConsensusConfig::V3 {
                 alg: ConsensusAlgorithmConfig::DAG(DagConsensusConfigV1::default()),
-                vtxn: ValidatorTxnConfig::default_for_genesis(),
+                vtxn: ValidatorTxnConfig::default_disabled(),
             };
 
             helm_values["chain"]["on_chain_consensus_config"] =
