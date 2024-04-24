@@ -25,7 +25,7 @@ aptos-keygen = { workspace = true }
 aptos-language-e2e-tests = { workspace = true }
 aptos-logger = { workspace = true }
 aptos-package-builder = { workspace = true }
-aptos-types = { workspace = true }
+aptos-types = { workspace = true, features = ["testing"] }
 aptos-vm = { workspace = true, features = ["testing"] }
 aptos-vm-genesis = { workspace = true }
 bcs = { workspace = true }

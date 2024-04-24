@@ -23,8 +23,6 @@ Aptos makes use of several cryptographic algorithms:
 - **Boneh-Shacham-Lynn (BLS) multisignatures and aggregate signatures**
   + Based on the [blst](https://docs.rs/blst/) crate
   + Implemented on top of Barreto-Lynn-Scott BLS12-381 elliptic curves
-- The **[Noise Protocol Framework](http://www.noiseprotocol.org/)**
-  - Used to create authenticated and encrypted communications channels between validators
 - **X25519** key exchange
   + Based on the [x25519-dalek](https://docs.rs/x25519-dalek) crate
   + Used in our implementation of the [Noise Protocol Framework](http://www.noiseprotocol.org/)
@@ -43,7 +41,6 @@ Before implementing a cryptographic primitive, be sure to read [`traits.rs`](src
     ├── hash.rs             # Hash function (SHA-3)
     ├── hkdf.rs             # HKDF implementation
     ├── multi_ed25519.rs    # MultiEd25519 implementation of the signing/verification API in traits.rs
-    ├── noise.rs            # Noise Protocol Framework implementation
     ├── test_utils.rs
     ├── traits.rs           # Traits for safer implementations of signature schemes
     ├── validatable.rs      # Traits for deferring validation of group elements (e.g., public keys, signatures)

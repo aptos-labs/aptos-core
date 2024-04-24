@@ -42,7 +42,6 @@ proptest = { workspace = true, optional = true }
 proptest-derive = { workspace = true, optional = true }
 rand = { workspace = true }
 rand_core = { workspace = true }
-ring = { workspace = true }
 serde = { workspace = true }
 serde-name = { workspace = true }
 serde_bytes = { workspace = true }
@@ -99,10 +98,6 @@ harness = false
 
 [[bench]]
 name = "hash"
-harness = false
-
-[[bench]]
-name = "noise"
 harness = false
 
 [[bench]]
