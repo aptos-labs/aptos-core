@@ -323,11 +323,7 @@ impl Display for SyncInfoV2 {
     fn fmt(&self, f: &mut Formatter) -> std::fmt::Result {
         write!(
             f,
-            "SyncInfo[highest_quorum_cert: {:?}, highest_ordered_decision: {:?}, highest_commit_decision: {:?}, highest_2chain_timeout_cert: {:?}, certified_round: {}, ordered_round: {}, timeout round: {}, commit_info: {}]",
-            self.highest_quorum_cert,
-            self.highest_ordered_decision,
-            self.highest_commit_decision.commit_info(),
-            self.highest_2chain_timeout_cert,
+            "SyncInfoV2[certified_round: {}, ordered_round: {}, timeout round: {}, commit_info: {}]",
             self.highest_certified_round(),
             self.highest_ordered_round(),
             self.highest_timeout_round(),
