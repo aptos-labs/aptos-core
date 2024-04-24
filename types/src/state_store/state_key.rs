@@ -363,7 +363,8 @@ where
     {
         // let _timer = STATE_KEY_TIMER.timer_with(&[self.key_type, "lock_and_get_or_add"]);
 
-        const MAX_TRIES: usize = 100;
+        const MAX_TRIES: usize = 1024;
+        let maybe_add = EntryInner::from_deserialized(gen_inner(key1.inner, key2.inner));
 
         for _ in 0..MAX_TRIES {
             let mut locked = self.inner.write();
@@ -371,18 +372,14 @@ where
             match locked.get_mut(key1) {
                 None => {
                     let mut map2 = locked.entry(key1.to_owned()).insert(HashMap::new());
-                    let entry = Arc::new(Entry(EntryInner::from_deserialized(gen_inner(
-                        key1.inner, key2.inner,
-                    ))));
+                    let entry = Arc::new(Entry(maybe_add));
                     map2.get_mut()
                         .insert(key2.to_owned(), Arc::downgrade(&entry));
                     return entry;
                 },
                 Some(map2) => match map2.get_mut(key2) {
                     None => {
-                        let entry = Arc::new(Entry(EntryInner::from_deserialized(gen_inner(
-                            key1.inner, key2.inner,
-                        ))));
+                        let entry = Arc::new(Entry(maybe_add));
                         map2.insert(key2.to_owned(), Arc::downgrade(&entry));
                         return entry;
                     },
