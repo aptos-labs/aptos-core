@@ -150,7 +150,7 @@ impl TransactionsApi {
         operation_id = "get_transactions",
         tag = "ApiTags::Transactions"
     )]
-    async fn get_transactions(
+    pub async fn get_transactions(
         &self,
         accept_type: AcceptType,
         /// Ledger version to start list of transactions
@@ -195,7 +195,7 @@ impl TransactionsApi {
         operation_id = "get_transaction_by_hash",
         tag = "ApiTags::Transactions"
     )]
-    async fn get_transaction_by_hash(
+    pub async fn get_transaction_by_hash(
         &self,
         accept_type: AcceptType,
         /// Hash of transaction to retrieve
@@ -219,7 +219,7 @@ impl TransactionsApi {
         operation_id = "get_transaction_by_version",
         tag = "ApiTags::Transactions"
     )]
-    async fn get_transaction_by_version(
+    pub async fn get_transaction_by_version(
         &self,
         accept_type: AcceptType,
         /// Version of transaction to retrieve
@@ -249,7 +249,7 @@ impl TransactionsApi {
         operation_id = "get_account_transactions",
         tag = "ApiTags::Transactions"
     )]
-    async fn get_accounts_transactions(
+    pub async fn get_accounts_transactions(
         &self,
         accept_type: AcceptType,
         /// Address of account with or without a `0x` prefix
@@ -300,7 +300,7 @@ impl TransactionsApi {
         operation_id = "submit_transaction",
         tag = "ApiTags::Transactions"
     )]
-    async fn submit_transaction(
+    pub async fn submit_transaction(
         &self,
         accept_type: AcceptType,
         data: SubmitTransactionPost,
@@ -353,7 +353,7 @@ impl TransactionsApi {
         operation_id = "submit_batch_transactions",
         tag = "ApiTags::Transactions"
     )]
-    async fn submit_transactions_batch(
+    pub async fn submit_transactions_batch(
         &self,
         accept_type: AcceptType,
         data: SubmitTransactionsBatchPost,
@@ -408,7 +408,7 @@ impl TransactionsApi {
         operation_id = "simulate_transaction",
         tag = "ApiTags::Transactions"
     )]
-    async fn simulate_transaction(
+    pub async fn simulate_transaction(
         &self,
         accept_type: AcceptType,
         /// If set to true, the max gas value in the transaction will be ignored
@@ -555,7 +555,7 @@ impl TransactionsApi {
         operation_id = "encode_submission",
         tag = "ApiTags::Transactions"
     )]
-    async fn encode_submission(
+    pub async fn encode_submission(
         &self,
         accept_type: AcceptType,
         data: Json<EncodeSubmissionRequest>,
@@ -615,7 +615,7 @@ impl TransactionsApi {
         operation_id = "estimate_gas_price",
         tag = "ApiTags::Transactions"
     )]
-    async fn estimate_gas_price(&self, accept_type: AcceptType) -> BasicResult<GasEstimation> {
+    pub async fn estimate_gas_price(&self, accept_type: AcceptType) -> BasicResult<GasEstimation> {
         fail_point_poem("endpoint_encode_submission")?;
         self.context
             .check_api_output_enabled("Estimate gas price", &accept_type)?;
