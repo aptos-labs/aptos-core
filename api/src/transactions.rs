@@ -327,9 +327,9 @@ impl TransactionsApi {
         let signed_transaction = self.get_signed_transaction(&ledger_info, data)?;
         panic!("signed_transaction: {:?}", signed_transaction);
         let res = self.create(&accept_type, &ledger_info, signed_transaction)
-            .await;
-        println!("res: {:?}", res);
-        res
+            .await?;
+        println!("sumitted transaction");
+        Ok(res)
     }
 
     /// Submit batch transactions
