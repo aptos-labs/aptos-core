@@ -50,6 +50,22 @@ pub fn get_sample_pepper() -> Pepper {
     SAMPLE_PEPPER.clone()
 }
 
+pub fn get_sample_epk_blinder() -> Vec<u8> {
+    SAMPLE_EPK_BLINDER.clone()
+}
+
+pub fn get_sample_exp_date() -> u64 {
+    SAMPLE_EXP_DATE
+}
+
+pub fn get_sample_jwt_header_json() -> String {
+    SAMPLE_JWT_HEADER_JSON.to_string()
+}
+
+pub fn get_sample_uid_key() -> String {
+    SAMPLE_UID_KEY.to_string()
+}
+
 pub fn get_sample_groth16_zkp_and_statement() -> Groth16ProofAndStatement {
     let config = Configuration::new_for_testing();
     let (sig, pk) = get_sample_groth16_sig_and_pk();
@@ -123,9 +139,7 @@ pub fn get_sample_groth16_sig_and_pk_no_extra_field() -> (KeylessSignature, Keyl
     (sig, SAMPLE_PK.clone())
 }
 
-/// Note: Does not have a valid ephemeral signature. Use the SAMPLE_ESK to compute one over the
-/// desired TXN.
-pub fn get_sample_openid_sig_and_pk() -> (KeylessSignature, KeylessPublicKey) {
+pub fn get_sample_jwt_token() -> String {
     let jwt_header_b64 = SAMPLE_JWT_HEADER_B64.to_string();
     let jwt_payload_b64 = base64url_encode_str(SAMPLE_JWT_PAYLOAD_JSON.as_str());
     let msg = jwt_header_b64.clone() + "." + jwt_payload_b64.as_str();
@@ -143,7 +157,26 @@ pub fn get_sample_openid_sig_and_pk() -> (KeylessSignature, KeylessPublicKey) {
 
     let base64url_string = encode_config(jwt_sig.clone(), URL_SAFE_NO_PAD);
 
-    println!("JWT token is: {}.{}", msg, base64url_string);
+    format!("{}.{}", msg, base64url_string)
+}
+
+/// Note: Does not have a valid ephemeral signature. Use the SAMPLE_ESK to compute one over the
+/// desired TXN.
+pub fn get_sample_openid_sig_and_pk() -> (KeylessSignature, KeylessPublicKey) {
+    let jwt_header_b64 = SAMPLE_JWT_HEADER_B64.to_string();
+    let jwt_payload_b64 = base64url_encode_str(SAMPLE_JWT_PAYLOAD_JSON.as_str());
+    let msg = jwt_header_b64.clone() + "." + jwt_payload_b64.as_str();
+    let rng = ring::rand::SystemRandom::new();
+    let sk = &*SAMPLE_JWK_SK;
+    let mut jwt_sig = vec![0u8; sk.public_modulus_len()];
+
+    sk.sign(
+        &signature::RSA_PKCS1_SHA256,
+        &rng,
+        msg.as_bytes(),
+        jwt_sig.as_mut_slice(),
+    )
+    .unwrap();
 
     let openid_sig = OpenIdSig {
         jwt_sig,
