@@ -99,7 +99,7 @@ impl AptosVM {
 
         // All check passed, invoke VM to publish DKG result on chain.
         let mut gas_meter = UnmeteredGasMeter;
-        let mut session = self.new_session(resolver, session_id);
+        let mut session = self.new_session(resolver, session_id, None);
         let args = vec![
             MoveValue::Signer(AccountAddress::ONE),
             dkg_node.transcript_bytes.as_move_value(),

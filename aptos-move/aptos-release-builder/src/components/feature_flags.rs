@@ -109,6 +109,7 @@ pub enum FeatureFlag {
     DelegationPoolAllowlisting,
     ModuleEventMigration,
     RejectUnstableBytecode,
+    TransactionContextExtension,
 }
 
 fn generate_features_blob(writer: &CodeWriter, data: &[u64]) {
@@ -274,6 +275,9 @@ impl From<FeatureFlag> for AptosFeatureFlag {
             },
             FeatureFlag::ModuleEventMigration => AptosFeatureFlag::MODULE_EVENT_MIGRATION,
             FeatureFlag::RejectUnstableBytecode => AptosFeatureFlag::REJECT_UNSTABLE_BYTECODE,
+            FeatureFlag::TransactionContextExtension => {
+                AptosFeatureFlag::TRANSACTION_CONTEXT_EXTENSION
+            },
         }
     }
 }
@@ -368,6 +372,9 @@ impl From<AptosFeatureFlag> for FeatureFlag {
             },
             AptosFeatureFlag::MODULE_EVENT_MIGRATION => FeatureFlag::ModuleEventMigration,
             AptosFeatureFlag::REJECT_UNSTABLE_BYTECODE => FeatureFlag::RejectUnstableBytecode,
+            AptosFeatureFlag::TRANSACTION_CONTEXT_EXTENSION => {
+                FeatureFlag::TransactionContextExtension
+            },
         }
     }
 }

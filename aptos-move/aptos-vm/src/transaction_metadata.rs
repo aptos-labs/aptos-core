@@ -7,7 +7,10 @@ use aptos_gas_algebra::{FeePerGasUnit, Gas, NumBytes};
 use aptos_types::{
     account_address::AccountAddress,
     chain_id::ChainId,
-    transaction::{SignedTransaction, TransactionPayload},
+    transaction::{
+        user_transaction_context::UserTransactionContext, EntryFunction, Multisig,
+        SignedTransaction, TransactionPayload,
+    },
 };
 
 pub struct TransactionMetadata {
@@ -27,6 +30,8 @@ pub struct TransactionMetadata {
     pub script_size: NumBytes,
     pub required_deposit: Option<u64>,
     pub is_keyless: bool,
+    pub entry_function_payload: Option<EntryFunction>,
+    pub multisig_payload: Option<Multisig>,
 }
 
 impl TransactionMetadata {
@@ -69,6 +74,14 @@ impl TransactionMetadata {
             is_keyless: aptos_types::keyless::get_authenticators(txn)
                 .map(|res| !res.is_empty())
                 .unwrap_or(false),
+            entry_function_payload: match txn.payload() {
+                TransactionPayload::EntryFunction(e) => Some(e.clone()),
+                _ => None,
+            },
+            multisig_payload: match txn.payload() {
+                TransactionPayload::Multisig(m) => Some(m.clone()),
+                _ => None,
+            },
         }
     }
 
@@ -132,5 +145,28 @@ impl TransactionMetadata {
 
     pub fn is_keyless(&self) -> bool {
         self.is_keyless
+    }
+
+    pub fn entry_function_payload(&self) -> Option<EntryFunction> {
+        self.entry_function_payload.clone()
+    }
+
+    pub fn multisig_payload(&self) -> Option<Multisig> {
+        self.multisig_payload.clone()
+    }
+
+    pub fn as_user_transaction_context(&self) -> UserTransactionContext {
+        UserTransactionContext::new(
+            self.sender,
+            self.secondary_signers.clone(),
+            self.fee_payer.unwrap_or(self.sender),
+            self.max_gas_amount.into(),
+            self.gas_unit_price.into(),
+            self.chain_id.id(),
+            self.entry_function_payload()
+                .map(|entry_func| entry_func.as_entry_function_payload()),
+            self.multisig_payload()
+                .map(|multisig| multisig.as_multisig_payload()),
+        )
     }
 }

@@ -18,6 +18,7 @@ use aptos_table_natives::NativeTableContext;
 use aptos_types::{
     chain_id::ChainId,
     on_chain_config::{FeatureFlag, Features, TimedFeatureFlag, TimedFeatures},
+    transaction::user_transaction_context::UserTransactionContext,
 };
 use move_binary_format::{
     deserializer::DeserializerConfig,
@@ -193,6 +194,7 @@ impl MoveVmExt {
         &self,
         resolver: &'r S,
         session_id: SessionId,
+        user_transaction_context_opt: Option<UserTransactionContext>,
     ) -> SessionExt<'r, '_> {
         let mut extensions = NativeContextExtensions::default();
         let txn_hash: [u8; 32] = session_id
@@ -210,6 +212,7 @@ impl MoveVmExt {
             txn_hash.to_vec(),
             session_id.into_script_hash(),
             self.chain_id,
+            user_transaction_context_opt,
         ));
         extensions.add(NativeCodeContext::default());
         extensions.add(NativeStateStorageContext::new(resolver));
