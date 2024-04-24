@@ -210,7 +210,9 @@ impl Context {
             .send(MempoolClientRequest::SubmitTransaction(txn, req_sender))
             .await?;
         println!("Sent to mp_sender");
-        callback.await?
+        let res = callback.await?;
+        println!("Received from mp_sender");
+        res
     }
 
     // For use from external crates where they don't want to handle
