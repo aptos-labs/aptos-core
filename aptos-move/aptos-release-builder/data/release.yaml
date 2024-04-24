@@ -33,3 +33,15 @@ proposals:
       - FeatureFlag:
           enabled:
             - reject_unstable_bytecode
+  - name: step_4_enable_randomness
+    metadata:
+      title: "Enable randomness with fast path optimization."
+      description: "Enable randomness with fast path optimization."
+      discussion_url: "https://github.com/aptos-labs/aptos-core/pull/TBD"
+    execution_mode: MultiStep
+    update_sequence:
+      - Randomness:
+          V2:
+            secrecy_threshold_in_percentage: 50
+            reconstruct_threshold_in_percentage: 66
+            fast_path_secrecy_threshold_in_percentage: 67

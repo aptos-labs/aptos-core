@@ -114,6 +114,27 @@ impl OnChainRandomnessConfig {
         })
     }
 
+    pub fn new_v2(
+        secrecy_threshold_in_percentage: u64,
+        reconstruct_threshold_in_percentage: u64,
+        fast_path_secrecy_threshold_in_percentage: u64,
+    ) -> Self {
+        let secrecy_threshold = FixedPoint64MoveStruct::from_u64f64(
+            U64F64::from_num(secrecy_threshold_in_percentage) / U64F64::from_num(100),
+        );
+        let reconstruction_threshold = FixedPoint64MoveStruct::from_u64f64(
+            U64F64::from_num(reconstruct_threshold_in_percentage) / U64F64::from_num(100),
+        );
+        let fast_path_secrecy_threshold = FixedPoint64MoveStruct::from_u64f64(
+            U64F64::from_num(fast_path_secrecy_threshold_in_percentage) / U64F64::from_num(100),
+        );
+        Self::V2(ConfigV2 {
+            secrecy_threshold,
+            reconstruction_threshold,
+            fast_path_secrecy_threshold,
+        })
+    }
+
     /// Used by DKG and Consensus on a new epoch to determine the actual `OnChainRandomnessConfig` to be used.
     pub fn from_configs(
         local_seqnum: u64,
