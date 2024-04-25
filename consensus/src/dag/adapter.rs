@@ -440,6 +440,7 @@ impl DAGStorage for StorageAdapter {
         let resource = self.get_commit_history_resource(version)?;
         let handle = resource.table_handle();
         let mut commit_events = vec![];
+        return Ok(commit_events);
         for i in 1..=std::cmp::min(k, resource.length()) {
             let idx = (resource.next_idx() + resource.max_capacity() - i as u32)
                 % resource.max_capacity();
