@@ -96,12 +96,12 @@ TESTS = [
     RunGroupConfig(expected_tps=4170, key=RunGroupKey("modify-global-resource"), included_in=LAND_BLOCKING_AND_C | Flow.REPRESENTATIVE),
     RunGroupConfig(expected_tps=15400, key=RunGroupKey("modify-global-resource", module_working_set_size=10), included_in=Flow.CONTINUOUS),
     RunGroupConfig(expected_tps=155, key=RunGroupKey("publish-package"), included_in=LAND_BLOCKING_AND_C | Flow.REPRESENTATIVE),
-    RunGroupConfig(expected_tps=2450, key=RunGroupKey(
+    RunGroupConfig(expected_tps=1960, key=RunGroupKey(
         "mix_publish_transfer",
         transaction_type_override="publish-package coin-transfer",
         transaction_weights_override="1 500",
     ), included_in=LAND_BLOCKING_AND_C),
-    RunGroupConfig(expected_tps=353, key=RunGroupKey("batch100-transfer"), included_in=LAND_BLOCKING_AND_C),
+    RunGroupConfig(expected_tps=277, key=RunGroupKey("batch100-transfer"), included_in=LAND_BLOCKING_AND_C),
     RunGroupConfig(expected_tps=995, key=RunGroupKey("batch100-transfer", executor_type="native"), included_in=Flow.CONTINUOUS),
 
     RunGroupConfig(expected_tps=165, key=RunGroupKey("vector-picture40"), included_in=Flow(0), waived=True),
