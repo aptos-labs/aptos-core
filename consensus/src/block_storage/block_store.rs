@@ -20,6 +20,7 @@ use anyhow::{bail, ensure, format_err, Context};
 use aptos_consensus_types::{
     block::Block, common::Round, pipelined_block::PipelinedBlock, quorum_cert::QuorumCert,
     sync_info::SyncInfo, timeout_2chain::TwoChainTimeoutCertificate,
+    wrapped_ledger_info::WrappedLedgerInfo,
 };
 use aptos_crypto::{hash::ACCUMULATOR_PLACEHOLDER_HASH, HashValue};
 use aptos_executor_types::StateComputeResult;
@@ -558,11 +559,11 @@ impl BlockReader for BlockStore {
         self.inner.read().highest_quorum_cert()
     }
 
-    fn highest_ordered_cert(&self) -> Arc<QuorumCert> {
+    fn highest_ordered_cert(&self) -> Arc<WrappedLedgerInfo> {
         self.inner.read().highest_ordered_cert()
     }
 
-    fn highest_commit_cert(&self) -> Arc<QuorumCert> {
+    fn highest_commit_cert(&self) -> Arc<WrappedLedgerInfo> {
         self.inner.read().highest_commit_cert()
     }
 

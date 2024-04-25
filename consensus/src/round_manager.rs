@@ -34,6 +34,7 @@ use aptos_consensus_types::{
     block_data::BlockType,
     common::{Author, Round},
     delayed_qc_msg::DelayedQcMsg,
+    order_vote::OrderVote,
     proof_of_store::{ProofCache, ProofOfStoreMsg, SignedBatchInfoMsg},
     proposal_msg::ProposalMsg,
     quorum_cert::QuorumCert,
@@ -71,6 +72,7 @@ use tokio::{
 pub enum UnverifiedEvent {
     ProposalMsg(Box<ProposalMsg>),
     VoteMsg(Box<VoteMsg>),
+    OrderVoteMsg(Box<OrderVote>),
     SyncInfo(Box<SyncInfo>),
     BatchMsg(Box<BatchMsg>),
     SignedBatchInfo(Box<SignedBatchInfoMsg>),
@@ -110,6 +112,15 @@ impl UnverifiedEvent {
                         .observe(start_time.elapsed().as_secs_f64());
                 }
                 VerifiedEvent::VoteMsg(v)
+            },
+            UnverifiedEvent::OrderVoteMsg(v) => {
+                if !self_message {
+                    v.verify(validator)?;
+                    counters::VERIFY_MSG
+                        .with_label_values(&["order_vote"])
+                        .observe(start_time.elapsed().as_secs_f64());
+                }
+                VerifiedEvent::OrderVoteMsg(v)
             },
             // sync info verification is on-demand (verified when it's used)
             UnverifiedEvent::SyncInfo(s) => VerifiedEvent::UnverifiedSyncInfo(s),
@@ -152,6 +163,7 @@ impl UnverifiedEvent {
         match self {
             UnverifiedEvent::ProposalMsg(p) => Ok(p.epoch()),
             UnverifiedEvent::VoteMsg(v) => Ok(v.epoch()),
+            UnverifiedEvent::OrderVoteMsg(v) => Ok(v.epoch()),
             UnverifiedEvent::SyncInfo(s) => Ok(s.epoch()),
             UnverifiedEvent::BatchMsg(b) => b.epoch(),
             UnverifiedEvent::SignedBatchInfo(sd) => sd.epoch(),
@@ -165,6 +177,7 @@ impl From<ConsensusMsg> for UnverifiedEvent {
         match value {
             ConsensusMsg::ProposalMsg(m) => UnverifiedEvent::ProposalMsg(m),
             ConsensusMsg::VoteMsg(m) => UnverifiedEvent::VoteMsg(m),
+            ConsensusMsg::OrderVoteMsg(m) => UnverifiedEvent::OrderVoteMsg(m),
             ConsensusMsg::SyncInfo(m) => UnverifiedEvent::SyncInfo(m),
             ConsensusMsg::BatchMsg(m) => UnverifiedEvent::BatchMsg(m),
             ConsensusMsg::SignedBatchInfo(m) => UnverifiedEvent::SignedBatchInfo(m),
@@ -180,6 +193,7 @@ pub enum VerifiedEvent {
     ProposalMsg(Box<ProposalMsg>),
     VerifiedProposalMsg(Box<Block>),
     VoteMsg(Box<VoteMsg>),
+    OrderVoteMsg(Box<OrderVote>),
     UnverifiedSyncInfo(Box<SyncInfo>),
     BatchMsg(Box<BatchMsg>),
     SignedBatchInfo(Box<SignedBatchInfoMsg>),
@@ -920,6 +934,10 @@ impl RoundManager {
         Ok(vote)
     }
 
+    async fn process_order_vote_msg(&mut self, _order_vote_msg: OrderVote) -> anyhow::Result<()> {
+        Ok(())
+    }
+
     /// Upon new vote:
     /// 1. Ensures we're processing the vote from the same round as local round
     /// 2. Filter out votes for rounds that should not be processed by this validator (to avoid
@@ -1171,6 +1189,9 @@ impl RoundManager {
                     let result = match event {
                         VerifiedEvent::VoteMsg(vote_msg) => {
                             monitor!("process_vote", self.process_vote_msg(*vote_msg).await)
+                        }
+                        VerifiedEvent::OrderVoteMsg(order_vote_msg) => {
+                            monitor!("process_order_vote", self.process_order_vote_msg(*order_vote_msg).await)
                         }
                         VerifiedEvent::UnverifiedSyncInfo(sync_info) => {
                             monitor!(

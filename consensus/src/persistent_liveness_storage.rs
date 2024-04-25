@@ -7,6 +7,7 @@ use anyhow::{format_err, Context, Result};
 use aptos_config::config::NodeConfig;
 use aptos_consensus_types::{
     block::Block, quorum_cert::QuorumCert, timeout_2chain::TwoChainTimeoutCertificate, vote::Vote,
+    wrapped_ledger_info::WrappedLedgerInfo,
 };
 use aptos_crypto::HashValue;
 use aptos_logger::prelude::*;
@@ -60,8 +61,8 @@ pub trait PersistentLivenessStorage: Send + Sync {
 pub struct RootInfo(
     pub Box<Block>,
     pub QuorumCert,
-    pub QuorumCert,
-    pub QuorumCert,
+    pub WrappedLedgerInfo,
+    pub WrappedLedgerInfo,
 );
 
 /// LedgerRecoveryData is a subset of RecoveryData that we can get solely from ledger info.
@@ -138,12 +139,11 @@ impl LedgerRecoveryData {
         let root_commit_cert = root_ordered_cert
             .create_merged_with_executed_state(latest_ledger_info_sig)
             .expect("Inconsistent commit proof and evaluation decision, cannot commit block");
-
         Ok(RootInfo(
             Box::new(root_block),
             root_quorum_cert,
-            root_ordered_cert,
-            root_commit_cert,
+            root_ordered_cert.into(),
+            root_commit_cert.into(),
         ))
     }
 }

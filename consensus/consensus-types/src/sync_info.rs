@@ -2,7 +2,10 @@
 // Parts of the project are originally copyright © Meta Platforms, Inc.
 // SPDX-License-Identifier: Apache-2.0
 
-use crate::{common::Round, quorum_cert::QuorumCert, timeout_2chain::TwoChainTimeoutCertificate};
+use crate::{
+    common::Round, quorum_cert::QuorumCert, timeout_2chain::TwoChainTimeoutCertificate,
+    wrapped_ledger_info::WrappedLedgerInfo,
+};
 use anyhow::{ensure, Context};
 use aptos_types::{block_info::BlockInfo, validator_verifier::ValidatorVerifier};
 use serde::{Deserialize, Serialize};
@@ -14,9 +17,9 @@ pub struct SyncInfo {
     /// Highest quorum certificate known to the peer.
     highest_quorum_cert: QuorumCert,
     /// Highest ordered cert known to the peer.
-    highest_ordered_cert: Option<QuorumCert>,
+    highest_ordered_cert: Option<WrappedLedgerInfo>,
     /// Highest commit cert (ordered cert with execution result) known to the peer.
-    highest_commit_cert: QuorumCert,
+    highest_commit_cert: WrappedLedgerInfo,
     /// Optional highest timeout certificate if available.
     highest_2chain_timeout_cert: Option<TwoChainTimeoutCertificate>,
 }
@@ -44,20 +47,17 @@ impl Display for SyncInfo {
 impl SyncInfo {
     pub fn new_decoupled(
         highest_quorum_cert: QuorumCert,
-        highest_ordered_cert: QuorumCert,
-        highest_commit_cert: QuorumCert,
+        highest_ordered_cert: WrappedLedgerInfo,
+        highest_commit_cert: WrappedLedgerInfo,
         highest_2chain_timeout_cert: Option<TwoChainTimeoutCertificate>,
     ) -> Self {
         // No need to include HTC if it's lower than HQC
         let highest_2chain_timeout_cert = highest_2chain_timeout_cert
             .filter(|tc| tc.round() > highest_quorum_cert.certified_block().round());
 
-        let highest_ordered_cert =
-            Some(highest_ordered_cert).filter(|hoc| hoc != &highest_quorum_cert);
-
         Self {
             highest_quorum_cert,
-            highest_ordered_cert,
+            highest_ordered_cert: Some(highest_ordered_cert),
             highest_commit_cert,
             highest_2chain_timeout_cert,
         }
@@ -65,7 +65,7 @@ impl SyncInfo {
 
     pub fn new(
         highest_quorum_cert: QuorumCert,
-        highest_ordered_cert: QuorumCert,
+        highest_ordered_cert: WrappedLedgerInfo,
         highest_2chain_timeout_cert: Option<TwoChainTimeoutCertificate>,
     ) -> Self {
         let highest_commit_cert = highest_ordered_cert.clone();
@@ -83,14 +83,12 @@ impl SyncInfo {
     }
 
     /// Highest ordered certificate
-    pub fn highest_ordered_cert(&self) -> &QuorumCert {
-        self.highest_ordered_cert
-            .as_ref()
-            .unwrap_or(&self.highest_quorum_cert)
+    pub fn highest_ordered_cert(&self) -> &WrappedLedgerInfo {
+        self.highest_ordered_cert.as_ref().unwrap()
     }
 
     /// Highest ledger info
-    pub fn highest_commit_cert(&self) -> &QuorumCert {
+    pub fn highest_commit_cert(&self) -> &WrappedLedgerInfo {
         &self.highest_commit_cert
     }
 

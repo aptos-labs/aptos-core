@@ -905,7 +905,7 @@ fn no_vote_on_mismatch_round() {
     timed_block_on(&runtime, async {
         let bad_proposal = ProposalMsg::new(
             block_skip_round,
-            SyncInfo::new(genesis_qc.clone(), genesis_qc.clone(), None),
+            SyncInfo::new(genesis_qc.clone(), genesis_qc.clone().into(), None),
         );
         assert!(node
             .round_manager
@@ -914,7 +914,7 @@ fn no_vote_on_mismatch_round() {
             .is_err());
         let good_proposal = ProposalMsg::new(
             correct_block.clone(),
-            SyncInfo::new(genesis_qc.clone(), genesis_qc.clone(), None),
+            SyncInfo::new(genesis_qc.clone(), genesis_qc.clone().into(), None),
         );
         node.round_manager
             .process_proposal_msg(good_proposal)
@@ -970,7 +970,7 @@ fn sync_info_carried_on_timeout_vote() {
             .round_state
             .process_certificates(SyncInfo::new(
                 block_0_quorum_cert.clone(),
-                block_0_quorum_cert.clone(),
+                block_0_quorum_cert.clone().into(),
                 None,
             ));
         node.round_manager
@@ -1027,7 +1027,7 @@ fn no_vote_on_invalid_proposer() {
     timed_block_on(&runtime, async {
         let bad_proposal = ProposalMsg::new(
             block_incorrect_proposer,
-            SyncInfo::new(genesis_qc.clone(), genesis_qc.clone(), None),
+            SyncInfo::new(genesis_qc.clone(), genesis_qc.clone().into(), None),
         );
         assert!(node
             .round_manager
@@ -1036,7 +1036,7 @@ fn no_vote_on_invalid_proposer() {
             .is_err());
         let good_proposal = ProposalMsg::new(
             correct_block.clone(),
-            SyncInfo::new(genesis_qc.clone(), genesis_qc.clone(), None),
+            SyncInfo::new(genesis_qc.clone(), genesis_qc.clone().into(), None),
         );
 
         node.round_manager
@@ -1096,7 +1096,7 @@ fn new_round_on_timeout_certificate() {
     timed_block_on(&runtime, async {
         let skip_round_proposal = ProposalMsg::new(
             block_skip_round,
-            SyncInfo::new(genesis_qc.clone(), genesis_qc.clone(), Some(tc)),
+            SyncInfo::new(genesis_qc.clone(), genesis_qc.clone().into(), Some(tc)),
         );
         node.round_manager
             .process_proposal_msg(skip_round_proposal)
@@ -1104,7 +1104,7 @@ fn new_round_on_timeout_certificate() {
             .unwrap();
         let old_good_proposal = ProposalMsg::new(
             correct_block.clone(),
-            SyncInfo::new(genesis_qc.clone(), genesis_qc.clone(), None),
+            SyncInfo::new(genesis_qc.clone(), genesis_qc.clone().into(), None),
         );
         assert!(node
             .round_manager
@@ -1160,7 +1160,7 @@ fn reject_invalid_failed_authors() {
             block,
             SyncInfo::new(
                 genesis_qc.clone(),
-                genesis_qc.clone(),
+                genesis_qc.clone().into(),
                 if round > 1 {
                     Some(create_timeout(round - 1))
                 } else {
@@ -1241,7 +1241,10 @@ fn response_on_block_retrieval() {
     )
     .unwrap();
     let block_id = block.id();
-    let proposal = ProposalMsg::new(block, SyncInfo::new(genesis_qc.clone(), genesis_qc, None));
+    let proposal = ProposalMsg::new(
+        block,
+        SyncInfo::new(genesis_qc.clone(), genesis_qc.into(), None),
+    );
 
     timed_block_on(&runtime, async {
         node.round_manager
@@ -1379,7 +1382,7 @@ fn recover_on_restart() {
                 proposal.clone(),
                 SyncInfo::new(
                     proposal.quorum_cert().clone(),
-                    genesis_qc.clone(),
+                    genesis_qc.clone().into(),
                     Some(tc.clone()),
                 ),
             );
@@ -1534,7 +1537,7 @@ fn sync_on_partial_newer_sync_info() {
             None,
         );
         // Create a sync info with newer quorum cert but older commit cert
-        let sync_info = SyncInfo::new(block_4_qc.clone(), certificate_for_genesis(), None);
+        let sync_info = SyncInfo::new(block_4_qc.clone(), certificate_for_genesis().into(), None);
         node.round_manager
             .ensure_round_and_sync_up(
                 sync_info.highest_round() + 1,
