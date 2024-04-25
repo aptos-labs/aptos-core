@@ -4,7 +4,7 @@
 mod function_generator;
 mod module_generator;
 
-use crate::{file_format_generator::module_generator::ModuleContext, options::Options};
+use crate::{file_format_generator::module_generator::ModuleContext, options::Options, Experiment};
 use module_generator::ModuleGenerator;
 use move_binary_format::{file_format as FF, internals::ModuleIndex};
 use move_command_line_common::{address::NumericalAddress, parser::NumberFormat};
@@ -91,13 +91,16 @@ pub fn generate_file_format(
                     type_parameters,
                     parameters,
                 };
-                let module_name = ModuleName::pseudo_script_name(env.symbol_pool(), script_index);
-                script_index += 1;
-                let module = move_model::script_into_module(
-                    script.clone(),
-                    &module_name.name().display(env.symbol_pool()).to_string(),
-                );
-                script_module_data.insert(module_env.get_id(), (module, source_map.clone()));
+                if options.experiment_on(Experiment::ATTACH_COMPILED_MODULE) {
+                    let module_name =
+                        ModuleName::pseudo_script_name(env.symbol_pool(), script_index);
+                    script_index += 1;
+                    let module = move_model::script_into_module(
+                        script.clone(),
+                        &module_name.name().display(env.symbol_pool()).to_string(),
+                    );
+                    script_module_data.insert(module_env.get_id(), (module, source_map.clone()));
+                }
                 result.push(CU::CompiledUnitEnum::Script(CU::NamedCompiledScript {
                     package_name: None,
                     name,
@@ -108,7 +111,9 @@ pub fn generate_file_format(
                 ctx.internal_error(module_env.get_loc(), "inconsistent script module");
             }
         } else {
-            module_data.insert(module_env.get_id(), (ff_module.clone(), source_map.clone()));
+            if options.experiment_on(Experiment::ATTACH_COMPILED_MODULE) {
+                module_data.insert(module_env.get_id(), (ff_module.clone(), source_map.clone()));
+            }
             result.push(CU::CompiledUnitEnum::Module(CU::NamedCompiledModule {
                 package_name: None,
                 address: NumericalAddress::new(
@@ -121,11 +126,13 @@ pub fn generate_file_format(
             }));
         }
     }
-    for (id, (m, map)) in module_data {
-        env.attach_compiled_module(id, m, map)
-    }
-    for (id, (m, map)) in script_module_data {
-        env.attach_compiled_module(id, m, map)
+    if options.experiment_on(Experiment::ATTACH_COMPILED_MODULE) {
+        for (id, (m, map)) in module_data {
+            env.attach_compiled_module(id, m, map)
+        }
+        for (id, (m, map)) in script_module_data {
+            env.attach_compiled_module(id, m, map)
+        }
     }
     result
 }

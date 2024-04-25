@@ -31,6 +31,7 @@ use move_compiler::{
     shared::{Flags, NamedAddressMap, NumericalAddress, PackagePaths},
     Compiler,
 };
+use move_compiler_v2::Experiment;
 use move_docgen::{Docgen, DocgenOptions};
 use move_model::{
     model::GlobalEnv, options::ModelBuilderOptions,
@@ -671,8 +672,7 @@ impl CompiledPackage {
                         }
                     }
                 }
-
-                let options = move_compiler_v2::Options {
+                let mut options = move_compiler_v2::Options {
                     sources: paths.iter().flat_map(|x| to_str_vec(&x.paths)).collect(),
                     dependencies: bytecode_deps
                         .iter()
@@ -688,6 +688,7 @@ impl CompiledPackage {
                     compile_test_code: flags.keep_testing_functions(),
                     ..Default::default()
                 };
+                options = options.set_experiment(Experiment::ATTACH_COMPILED_MODULE, true);
                 compiler_driver_v2(options)?
             },
         };
