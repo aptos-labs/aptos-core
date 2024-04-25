@@ -344,46 +344,50 @@ ConsensusMsg:
         NEWTYPE:
           TYPENAME: VoteMsg
     7:
+      OrderVoteMsg:
+        NEWTYPE:
+          TYPENAME: OrderVote
+    8:
       CommitVoteMsg:
         NEWTYPE:
           TYPENAME: CommitVote
-    8:
+    9:
       CommitDecisionMsg:
         NEWTYPE:
           TYPENAME: CommitDecision
-    9:
+    10:
       BatchMsg:
         NEWTYPE:
           TYPENAME: BatchMsg
-    10:
+    11:
       BatchRequestMsg:
         NEWTYPE:
           TYPENAME: BatchRequest
-    11:
+    12:
       BatchResponse:
         NEWTYPE:
           TYPENAME: Batch
-    12:
+    13:
       SignedBatchInfo:
         NEWTYPE:
           TYPENAME: SignedBatchInfoMsg
-    13:
+    14:
       ProofOfStoreMsg:
         NEWTYPE:
           TYPENAME: ProofOfStoreMsg
-    14:
+    15:
       DAGMessage:
         NEWTYPE:
           TYPENAME: DAGNetworkMessage
-    15:
+    16:
       CommitMessage:
         NEWTYPE:
           TYPENAME: CommitMessage
-    16:
+    17:
       RandGenMessage:
         NEWTYPE:
           TYPENAME: RandGenMessage
-    17:
+    18:
       BatchResponseV2:
         NEWTYPE:
           TYPENAME: BatchResponse
@@ -699,6 +703,12 @@ ProviderJWKs:
           TYPENAME: JWKMoveStruct
 PublicKey:
   NEWTYPESTRUCT: BYTES
+WrappedLedgerInfo:
+  STRUCT:
+    - vote_data:
+        TYPENAME: VoteData
+    - signed_ledger_info:
+        TYPENAME: LedgerInfoWithSignatures
 QuorumCert:
   STRUCT:
     - vote_data:
@@ -829,9 +839,9 @@ SyncInfo:
         TYPENAME: QuorumCert
     - highest_ordered_cert:
         OPTION:
-          TYPENAME: QuorumCert
+          TYPENAME: WrappedLedgerInfo
     - highest_commit_cert:
-        TYPENAME: QuorumCert
+        TYPENAME: WrappedLedgerInfo
     - highest_2chain_timeout_cert:
         OPTION:
           TYPENAME: TwoChainTimeoutCertificate
@@ -1024,6 +1034,14 @@ ValidatorVerifier:
     - validator_infos:
         SEQ:
           TYPENAME: ValidatorConsensusInfo
+OrderVote:
+  STRUCT:
+    - author:
+        TYPENAME: AccountAddress
+    - ledger_info:
+        TYPENAME: LedgerInfo
+    - signature:
+        TYPENAME: Signature
 Vote:
   STRUCT:
     - vote_data:

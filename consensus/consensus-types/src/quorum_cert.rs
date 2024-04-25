@@ -33,6 +33,8 @@ impl Display for QuorumCert {
     }
 }
 
+
+
 impl QuorumCert {
     pub fn new(vote_data: VoteData, signed_ledger_info: LedgerInfoWithSignatures) -> Self {
         QuorumCert {
