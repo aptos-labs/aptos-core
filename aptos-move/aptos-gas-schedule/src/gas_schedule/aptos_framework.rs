@@ -301,6 +301,9 @@ crate::gas_schedule::macros::define_gas_parameters!(
         [aggregator_v2_string_concat_per_byte: InternalGasPerByte, { 12.. =>"aggregator_v2.string_concat.per_byte" }, 3],
 
         [object_exists_at_base: InternalGas, { 7.. => "object.exists_at.base" }, 919],
+        // Based on SHA3-256's cost
+        [object_user_derived_address_base: InternalGas, { 16.. => "object.user_derived_address.base" }, 14704],
+
         // These are dummy value, they copied from storage gas in aptos-core/aptos-vm/src/aptos_vm_impl.rs
         [object_exists_at_per_byte_loaded: InternalGasPerByte, { 7.. => "object.exists_at.per_byte_loaded" }, 183],
         [object_exists_at_per_item_loaded: InternalGas, { 7.. => "object.exists_at.per_item_loaded" }, 1470],

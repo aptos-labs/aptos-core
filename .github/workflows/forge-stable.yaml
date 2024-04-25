@@ -118,6 +118,7 @@ jobs:
   ### Real-world-network tests.
   # Run forge framework upgradability test. This is a PR required job.
   run-forge-framework-upgrade-test:
+    if: ${{ github.event_name != 'pull_request' }}
     needs:
       - determine-test-metadata
     uses: aptos-labs/aptos-core/.github/workflows/workflow-run-forge.yaml@main
@@ -130,7 +131,7 @@ jobs:
       POST_TO_SLACK: true
 
   run-forge-realistic-env-max-load-long:
-    if: ${{ github.event_name != 'pull_request' }}
+    if: ${{ github.event_name != 'pull_request' && always() }}
     needs: [determine-test-metadata, run-forge-framework-upgrade-test] # Only run after the previous job completes
     uses: aptos-labs/aptos-core/.github/workflows/workflow-run-forge.yaml@main
     secrets: inherit

@@ -150,6 +150,13 @@ module aptos_framework::aptos_coin {
     }
 
     #[test_only]
+    use aptos_framework::account;
+    #[test_only]
+    use aptos_framework::aggregator_factory;
+    #[test_only]
+    use aptos_framework::fungible_asset::FungibleAsset;
+
+    #[test_only]
     public fun mint_apt_fa_for_test(amount: u64): FungibleAsset acquires MintCapStore {
         ensure_initialized_with_apt_fa_metadata_for_test();
         coin::coin_to_fungible_asset(
@@ -158,19 +165,6 @@ module aptos_framework::aptos_coin {
                 &borrow_global<MintCapStore>(@aptos_framework).mint_cap
             )
         )
-    }
-
-    #[test_only]
-    public fun mint_apt_fa_to_for_test<T: key>(store: Object<T>, amount: u64) acquires MintCapStore {
-        fungible_asset::deposit(store, mint_apt_fa_for_test(amount));
-    }
-
-    #[test_only]
-    public fun mint_apt_fa_to_primary_fungible_store_for_test(
-        owner: address,
-        amount: u64,
-    ) acquires MintCapStore {
-        primary_fungible_store::deposit(owner, mint_apt_fa_for_test(amount));
     }
 
     #[test_only]
@@ -206,46 +200,5 @@ module aptos_framework::aptos_coin {
         coin::create_coin_conversion_map(aptos_framework);
         coin::create_pairing<AptosCoin>(aptos_framework);
         (burn_cap, mint_cap)
-    }
-
-    #[test_only]
-    use aptos_framework::aggregator_factory;
-    #[test_only]
-    use aptos_framework::account;
-    #[test_only]
-    use aptos_framework::fungible_asset::{Self, FungibleAsset, FungibleStore, Metadata};
-    #[test_only]
-    use aptos_framework::primary_fungible_store;
-    #[test_only]
-    use aptos_framework::object::{Self, Object};
-
-    #[test(aptos_framework = @aptos_framework)]
-    fun test_apt_setup_and_mint(aptos_framework: &signer) {
-        let (burn_cap, mint_cap) = initialize_for_test(aptos_framework);
-        let coin = coin::mint(100, &mint_cap);
-        let fa = coin::coin_to_fungible_asset(coin);
-        primary_fungible_store::deposit(@aptos_framework, fa);
-        assert!(
-            primary_fungible_store::balance(
-                @aptos_framework,
-                object::address_to_object<Metadata>(@aptos_fungible_asset)
-            ) == 100,
-            0
-        );
-        coin::destroy_mint_cap(mint_cap);
-        coin::destroy_burn_cap(burn_cap);
-    }
-
-    #[test]
-    fun test_fa_helpers_for_test() acquires MintCapStore {
-        assert!(!object::object_exists<Metadata>(@aptos_fungible_asset), 0);
-        ensure_initialized_with_apt_fa_metadata_for_test();
-        assert!(object::object_exists<Metadata>(@aptos_fungible_asset), 0);
-        mint_apt_fa_to_primary_fungible_store_for_test(@aptos_framework, 100);
-        let metadata = object::address_to_object<Metadata>(@aptos_fungible_asset);
-        assert!(primary_fungible_store::balance(@aptos_framework, metadata) == 100, 0);
-        let store_addr = primary_fungible_store::primary_store_address(@aptos_framework, metadata);
-        mint_apt_fa_to_for_test(object::address_to_object<FungibleStore>(store_addr), 100);
-        assert!(primary_fungible_store::balance(@aptos_framework, metadata) == 200, 0);
     }
 }

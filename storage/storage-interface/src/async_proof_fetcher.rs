@@ -168,13 +168,13 @@ mod tests {
         let fetcher = AsyncProofFetcher::new(Arc::new(MockDbReaderWriter));
         let mut expected_key_hashes = vec![];
         for i in 0..10 {
-            let state_key: StateKey = StateKey::raw(format!("test_key_{}", i).into_bytes());
+            let state_key: StateKey = StateKey::raw(format!("test_key_{}", i).as_bytes());
             expected_key_hashes.push(state_key.hash());
             let result = fetcher
                 .fetch_state_value_with_version_and_schedule_proof_read(&state_key, 0, None)
                 .expect("Should not fail.");
-            let expected_value = StateValue::from(match state_key.into_inner() {
-                StateKeyInner::Raw(key) => key,
+            let expected_value = StateValue::from(match state_key.inner() {
+                StateKeyInner::Raw(key) => key.to_owned(),
                 _ => unreachable!(),
             });
             assert_eq!(result, Some((0, expected_value)));

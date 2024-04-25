@@ -14,7 +14,10 @@ use aptos_crypto::{
 use aptos_crypto_derive::CryptoHasher;
 use derivative::Derivative;
 use move_core_types::{
-    account_address::AccountAddress, language_storage::StructTag, move_resource::MoveResource,
+    account_address::AccountAddress,
+    identifier::IdentStr,
+    language_storage::{ModuleId, StructTag},
+    move_resource::MoveResource,
 };
 use num_derive::{FromPrimitive, ToPrimitive};
 use num_traits::FromPrimitive;
@@ -121,10 +124,9 @@ impl StateKey {
                         .try_into()
                         .expect("Bytes too short."),
                 )?;
-                let key = val[1 + HANDLE_SIZE..].to_vec();
-                Ok(StateKey::table_item(handle, key))
+                Ok(StateKey::table_item(&handle, &val[1 + HANDLE_SIZE..]))
             },
-            StateKeyTag::Raw => Ok(StateKey::raw(val[1..].to_vec())),
+            StateKeyTag::Raw => Ok(StateKey::raw(&val[1..])),
         }
     }
 
@@ -136,38 +138,56 @@ impl StateKey {
         }
     }
 
-    pub fn access_path(access_path: AccessPath) -> Self {
+    fn access_path(access_path: AccessPath) -> Self {
         Self::new(StateKeyInner::AccessPath(access_path))
     }
 
-    pub fn resource(address: &AccountAddress, struct_tag: &StructTag) -> Self {
-        Self::access_path(
-            AccessPath::resource_access_path(*address, struct_tag.to_owned()).unwrap(),
-        )
+    pub fn resource(address: &AccountAddress, struct_tag: &StructTag) -> Result<Self> {
+        Ok(Self::access_path(AccessPath::resource_access_path(
+            *address,
+            struct_tag.to_owned(),
+        )?))
     }
 
-    pub fn resource_typed<T: MoveResource>(address: &AccountAddress) -> Self {
+    pub fn resource_typed<T: MoveResource>(address: &AccountAddress) -> Result<Self> {
         Self::resource(address, &T::struct_tag())
     }
 
-    pub fn on_chain_config<T: OnChainConfig>() -> Self {
+    pub fn resource_group(address: &AccountAddress, struct_tag: &StructTag) -> Self {
+        Self::access_path(AccessPath::resource_group_access_path(
+            *address,
+            struct_tag.to_owned(),
+        ))
+    }
+
+    pub fn module(address: &AccountAddress, name: &IdentStr) -> Self {
+        Self::access_path(AccessPath::code_access_path(ModuleId::new(
+            *address,
+            name.to_owned(),
+        )))
+    }
+
+    pub fn module_id(module_id: &ModuleId) -> Self {
+        Self::module(module_id.address(), module_id.name())
+    }
+
+    pub fn on_chain_config<T: OnChainConfig>() -> Result<Self> {
         Self::resource(T::address(), &T::struct_tag())
     }
 
-    pub fn table_item(handle: TableHandle, key: Vec<u8>) -> Self {
-        Self::new(StateKeyInner::TableItem { handle, key })
+    pub fn table_item(handle: &TableHandle, key: &[u8]) -> Self {
+        Self::new(StateKeyInner::TableItem {
+            handle: *handle,
+            key: key.to_vec(),
+        })
     }
 
-    pub fn raw(raw_key: Vec<u8>) -> Self {
-        Self::new(StateKeyInner::Raw(raw_key))
+    pub fn raw(raw_key: &[u8]) -> Self {
+        Self::new(StateKeyInner::Raw(raw_key.to_vec()))
     }
 
     pub fn inner(&self) -> &StateKeyInner {
         &self.inner
-    }
-
-    pub fn into_inner(self) -> StateKeyInner {
-        self.inner
     }
 
     pub fn get_shard_id(&self) -> u8 {
@@ -189,7 +209,7 @@ impl StateKey {
 
 impl StateKeyInner {
     /// Serializes to bytes for physical storage.
-    pub fn encode(&self) -> anyhow::Result<Vec<u8>> {
+    pub fn encode(&self) -> Result<Vec<u8>> {
         let mut out = vec![];
 
         let (prefix, raw_key) = match self {
@@ -302,7 +322,7 @@ mod tests {
 
     #[test]
     fn test_table_item_hash() {
-        let key = StateKey::table_item("0x1002".parse().unwrap(), vec![7, 2, 3]);
+        let key = StateKey::table_item(&"0x1002".parse().unwrap(), &[7, 2, 3]);
         let expected_hash = "6f5550015f7a6036f88b2458f98a7e4800aba09e83f8f294dbf70bff77f224e6"
             .parse()
             .unwrap();
@@ -311,7 +331,7 @@ mod tests {
 
     #[test]
     fn test_raw_hash() {
-        let key = StateKey::raw(vec![1, 2, 3]);
+        let key = StateKey::raw(&[1, 2, 3]);
         let expected_hash = "655ab5766bc87318e18d9287f32d318e15535d3db9d21a6e5a2b41a51b535aff"
             .parse()
             .unwrap();
@@ -344,14 +364,14 @@ mod tests {
         );
 
         // table item
-        let key = StateKey::table_item("0x123".parse().unwrap(), vec![1]);
+        let key = StateKey::table_item(&"0x123".parse().unwrap(), &[1]);
         assert_eq!(
             &format!("{:?}", key),
             "StateKey { inner: TableItem { handle: 0000000000000000000000000000000000000000000000000000000000000123, key: 01 }, hash: OnceCell(Uninit) }"
         );
 
         // raw
-        let key = StateKey::raw(vec![1, 2, 3]);
+        let key = StateKey::raw(&[1, 2, 3]);
         assert_eq!(
             &format!("{:?}", key),
             "StateKey { inner: Raw(010203), hash: OnceCell(Uninit) }"
