@@ -4,9 +4,12 @@
 
 use crate::{sandbox::utils::module, DEFAULT_BUILD_DIR, DEFAULT_STORAGE_DIR};
 use move_command_line_common::{
-    env::read_bool_env_var,
+    env::{read_bool_env_var, NO_COLOR_MODE_ENV_VAR},
     files::{find_filenames, path_to_string},
-    testing::{add_update_baseline_fix, format_diff, read_env_update_baseline, EXP_EXT},
+    testing::{
+        add_update_baseline_fix, format_diff, read_env_update_baseline, EXP_EXT, EXP_EXT_V2,
+        MOVE_COMPILER_V2,
+    },
 };
 use move_compiler::command_line::COLOR_MODE_ENV_VAR;
 use move_coverage::coverage_map::{CoverageMap, ExecCoverageMapWithModules};
@@ -225,6 +228,8 @@ pub fn run_one(
 
     // Disable colors in error reporting from the Move compiler
     env::set_var(COLOR_MODE_ENV_VAR, "NONE");
+    // Disable colors in error reporting from other tools.
+    env::set_var(NO_COLOR_MODE_ENV_VAR, "true");
     for args_line in args_file {
         let args_line = args_line?;
 
@@ -336,7 +341,12 @@ pub fn run_one(
 
     // compare output and exp_file
     let update_baseline = read_env_update_baseline();
-    let exp_path = args_path.with_extension(EXP_EXT);
+    let exp_ext = if read_bool_env_var(MOVE_COMPILER_V2) {
+        EXP_EXT_V2
+    } else {
+        EXP_EXT
+    };
+    let exp_path = args_path.with_extension(exp_ext);
     if update_baseline {
         fs::write(exp_path, &output)?;
         return Ok(cov_info);

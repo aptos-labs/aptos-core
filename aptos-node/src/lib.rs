@@ -737,6 +737,7 @@ pub fn setup_environment_and_start_node(
                 dkg_start_events,
                 vtxn_pool.clone(),
                 rb_config,
+                node_config.randomness_override_seq_num,
             );
             Some(dkg_runtime)
         },

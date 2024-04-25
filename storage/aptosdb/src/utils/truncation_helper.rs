@@ -35,7 +35,7 @@ use aptos_schemadb::{
 };
 use aptos_storage_interface::Result;
 use aptos_types::{proof::position::Position, transaction::Version};
-use claims::{assert_ge, assert_lt};
+use claims::assert_ge;
 use rayon::prelude::*;
 use status_line::StatusLine;
 use std::{
@@ -82,12 +82,14 @@ pub(crate) fn truncate_state_kv_db(
     while current_version > target_version {
         let target_version_for_this_batch =
             std::cmp::max(current_version - batch_size as u64, target_version);
+        // By writing the progress first, we still maintain that it is less than or equal to the
+        // actual progress per shard, even if it dies in the middle of truncation.
         state_kv_db.write_progress(target_version_for_this_batch)?;
-        truncate_state_kv_db_shards(
-            state_kv_db,
-            target_version_for_this_batch,
-            Some(current_version),
-        )?;
+        // the first batch can actually delete more versions than the target batch size because
+        // we calculate the start version of this batch assuming the latest data is at
+        // `current_version`. Otherwise, we need to seek all shards to determine the
+        // actual latest version of data.
+        truncate_state_kv_db_shards(state_kv_db, target_version_for_this_batch)?;
         current_version = target_version_for_this_batch;
         status.set_current_version(current_version);
     }
@@ -98,17 +100,11 @@ pub(crate) fn truncate_state_kv_db(
 pub(crate) fn truncate_state_kv_db_shards(
     state_kv_db: &StateKvDb,
     target_version: Version,
-    expected_current_version: Option<Version>,
 ) -> Result<()> {
     (0..NUM_STATE_SHARDS)
         .into_par_iter()
         .try_for_each(|shard_id| {
-            truncate_state_kv_db_single_shard(
-                state_kv_db,
-                shard_id as u8,
-                target_version,
-                expected_current_version,
-            )
+            truncate_state_kv_db_single_shard(state_kv_db, shard_id as u8, target_version)
         })
 }
 
@@ -116,15 +112,9 @@ pub(crate) fn truncate_state_kv_db_single_shard(
     state_kv_db: &StateKvDb,
     shard_id: u8,
     target_version: Version,
-    expected_current_version: Option<Version>,
 ) -> Result<()> {
     let batch = SchemaBatch::new();
-    delete_state_value_and_index(
-        state_kv_db.db_shard(shard_id),
-        target_version + 1,
-        expected_current_version,
-        &batch,
-    )?;
+    delete_state_value_and_index(state_kv_db.db_shard(shard_id), target_version + 1, &batch)?;
     state_kv_db.commit_single_shard(target_version, shard_id, batch)
 }
 
@@ -413,7 +403,6 @@ fn delete_event_data(
 fn delete_state_value_and_index(
     state_kv_db_shard: &DB,
     start_version: Version,
-    expected_current_version: Option<Version>,
     batch: &SchemaBatch,
 ) -> Result<()> {
     let mut iter = state_kv_db_shard.iter::<StaleStateValueIndexSchema>(ReadOptions::default())?;
@@ -421,9 +410,6 @@ fn delete_state_value_and_index(
 
     for item in iter {
         let (index, _) = item?;
-        if let Some(expected_current_version) = expected_current_version {
-            assert_lt!(index.stale_since_version, expected_current_version);
-        }
         batch.delete::<StaleStateValueIndexSchema>(&index)?;
         batch.delete::<StateValueSchema>(&(index.state_key, index.stale_since_version))?;
     }

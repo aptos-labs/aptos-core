@@ -29,6 +29,7 @@ module aptos_framework::object {
     use aptos_framework::event;
     use aptos_framework::guid;
 
+    friend aptos_framework::coin;
     friend aptos_framework::primary_fungible_store;
 
     /// An object already exists at this address
@@ -201,12 +202,18 @@ module aptos_framework::object {
         from_bcs::to_address(hash::sha3_256(bytes))
     }
 
+    native fun create_user_derived_object_address_impl(source: address, derive_from: address): address;
+
     /// Derives an object address from the source address and an object: sha3_256([source | object addr | 0xFC]).
     public fun create_user_derived_object_address(source: address, derive_from: address): address {
-        let bytes = bcs::to_bytes(&source);
-        vector::append(&mut bytes, bcs::to_bytes(&derive_from));
-        vector::push_back(&mut bytes, OBJECT_DERIVED_SCHEME);
-        from_bcs::to_address(hash::sha3_256(bytes))
+        if (std::features::object_native_derived_address_enabled()) {
+            create_user_derived_object_address_impl(source, derive_from)
+        } else {
+            let bytes = bcs::to_bytes(&source);
+            vector::append(&mut bytes, bcs::to_bytes(&derive_from));
+            vector::push_back(&mut bytes, OBJECT_DERIVED_SCHEME);
+            from_bcs::to_address(hash::sha3_256(bytes))
+        }
     }
 
     /// Derives an object from an Account GUID.
@@ -257,6 +264,14 @@ module aptos_framework::object {
     public fun create_sticky_object(owner_address: address): ConstructorRef {
         let unique_address = transaction_context::generate_auid_address();
         create_object_internal(owner_address, unique_address, false)
+    }
+
+    /// Create a sticky object at a specific address. Only used by aptos_framework::coin.
+    public(friend) fun create_sticky_object_at_address(
+        owner_address: address,
+        object_address: address,
+    ): ConstructorRef {
+        create_object_internal(owner_address, object_address, false)
     }
 
     #[deprecated]
@@ -773,6 +788,31 @@ module aptos_framework::object {
         std::vector::push_back(&mut bytes, DERIVE_AUID_ADDRESS_SCHEME);
         let auid2 = aptos_framework::from_bcs::to_address(std::hash::sha3_256(bytes));
         assert!(auid1 == auid2, 0);
+    }
+
+    #[test(fx = @std)]
+    fun test_correct_derived_object_address(fx: signer) {
+        use std::features;
+        use aptos_framework::object;
+        let feature = features::get_object_native_derived_address_feature();
+
+        let source = @0x12345;
+        let derive_from = @0x7890;
+
+        features::change_feature_flags_for_testing(&fx, vector[], vector[feature]);
+        let in_move = object::create_user_derived_object_address(source, derive_from);
+
+        features::change_feature_flags_for_testing(&fx, vector[feature], vector[]);
+        let in_native = object::create_user_derived_object_address(source, derive_from);
+
+        assert!(in_move == in_native, 0);
+
+        let bytes = bcs::to_bytes(&source);
+        vector::append(&mut bytes, bcs::to_bytes(&derive_from));
+        vector::push_back(&mut bytes, OBJECT_DERIVED_SCHEME);
+        let directly = from_bcs::to_address(hash::sha3_256(bytes));
+
+        assert!(directly == in_native, 0);
     }
 
     #[test(creator = @0x123)]

@@ -69,6 +69,8 @@ static IGNORED_UNIT_PATHS: Lazy<BTreeSet<String>> = Lazy::new(|| {
 static UNIT_PATH_REMAP: Lazy<Vec<(&'static str, &'static str)>> = Lazy::new(|| {
     vec![
         ("reference-safety/v1-tests", "borrows"),
+        ("reference-safety/v1-borrow-tests", "borrow_tests"),
+        ("reference-safety/v1-locals", "locals"),
         ("friends/v1-tests", "naming"),
         ("uninit-use-checker/v1-commands", "commands"),
         ("uninit-use-checker/v1-locals", "locals"),
@@ -87,6 +89,7 @@ static UNIT_PATH_REMAP: Lazy<Vec<(&'static str, &'static str)>> = Lazy::new(|| {
             "cyclic-instantiation-checker/v1-tests",
             "instantiation_loops",
         ),
+        ("cyclic-instantiation-checker/v1-typing", "typing"),
         ("abilities/v1", "typing"),
         ("acquires-checker/v1-tests", "typing"),
         ("attributes", "parser"),
@@ -95,6 +98,8 @@ static UNIT_PATH_REMAP: Lazy<Vec<(&'static str, &'static str)>> = Lazy::new(|| {
         //   to file v1../unit_test/foo.unit_test.move.
         ("unit_test/test", "unit_test.unit_test"),
         ("checking-lang-v1/v1-typing", "typing"),
+        ("ability-check/v1-typing", "typing"),
+        ("ability-check/v1-signer", "signer"),
     ]
 });
 
