@@ -44,20 +44,19 @@ pub fn generate_bytecode(env: &GlobalEnv, fid: QualifiedId<FunId>) -> FunctionDa
         results: vec![],
         code: vec![],
         local_names: BTreeMap::new(),
-        local_locations: BTreeMap::new(),
         target_locations: BTreeMap::new(),
         src_locations: BTreeMap::new(),
     };
     let mut scope = BTreeMap::new();
-    for Parameter(name, ty, loc) in gen.func_env.get_parameters() {
-        let temp = gen.new_temp(ty, Some(loc));
+    for Parameter(name, ty, _loc) in gen.func_env.get_parameters() {
+        let temp = gen.new_temp(ty);
         scope.insert(name, temp);
         gen.local_names.insert(temp, name);
     }
     let tys = gen.func_env.get_result_type().flatten();
     let multiple = tys.len() > 1;
     for (p, ty) in tys.into_iter().enumerate() {
-        let temp = gen.new_temp(ty, None);
+        let temp = gen.new_temp(ty);
         gen.results.push(temp);
         let pool = gen.func_env.module_env.symbol_pool();
         let name = if multiple {
@@ -91,7 +90,6 @@ pub fn generate_bytecode(env: &GlobalEnv, fid: QualifiedId<FunId>) -> FunctionDa
         results: _,
         code,
         local_names,
-        local_locations,
         target_locations,
         src_locations,
     } = gen;
@@ -112,7 +110,6 @@ pub fn generate_bytecode(env: &GlobalEnv, fid: QualifiedId<FunId>) -> FunctionDa
         loop_unrolling,
         loop_invariants,
         local_names,
-        local_locations,
         target_locations,
         src_locations,
     )
@@ -151,9 +148,9 @@ struct Generator<'env> {
     code: Vec<Bytecode>,
     /// Local names, as far as they have names
     local_names: BTreeMap<TempIndex, Symbol>,
-    /// A map from temporaries to their locations
-    local_locations: BTreeMap<TempIndex, Loc>,
+    /// Maps the attribute id of a bytecode to the ids of the source temporaries.
     src_locations: BTreeMap<AttrId, Vec<AttrId>>,
+    /// Maps the attribute id of a bytecode to the ids of the target temporaries.
     target_locations: BTreeMap<AttrId, Vec<AttrId>>,
 }
 
@@ -246,13 +243,10 @@ impl<'env> Generator<'env> {
         self.context.new_loc_attr(loc)
     }
 
-    /// Create a new temporary of type and location if available.
-    fn new_temp(&mut self, ty: Type, loc: Option<Loc>) -> TempIndex {
+    /// Create a new temporary of type if available.
+    fn new_temp(&mut self, ty: Type) -> TempIndex {
         let next_idx = self.temps.len();
         self.temps.insert(next_idx, ty);
-        if let Some(loc) = loc {
-            self.local_locations.insert(next_idx, loc);
-        }
         next_idx
     }
 
@@ -368,12 +362,11 @@ impl<'env> Generator<'env> {
                 for step in exps.iter().take(exps.len() - 1) {
                     // Result is thrown away, but for typing reasons, we need to introduce
                     // temps to construct the step target.
-                    let step_loc = self.env().get_node_loc(step.node_id());
                     let step_targets = self
                         .get_node_type(step.node_id())
                         .flatten()
                         .into_iter()
-                        .map(|ty| self.new_temp(ty, Some(step_loc.clone())))
+                        .map(|ty| self.new_temp(ty))
                         .collect::<Vec<_>>();
                     let target_ids = vec![step.node_id(); step_targets.len()];
                     self.gen(step_targets.clone(), target_ids, step);
@@ -390,8 +383,7 @@ impl<'env> Generator<'env> {
                 let mut scope = BTreeMap::new();
                 for (id, sym) in pat.vars() {
                     let ty = self.get_node_type(id);
-                    let loc = self.env().get_node_loc(id);
-                    let temp = self.new_temp(ty, Some(loc));
+                    let temp = self.new_temp(ty);
                     scope.insert(sym, temp);
                     self.local_names.insert(temp, sym);
                 }
@@ -1006,8 +998,7 @@ impl<'env> Generator<'env> {
                 // field.
                 let ty =
                     Type::Reference(self.reference_mode_kind, Box::new(self.get_node_type(*id)));
-                let loc = self.env().get_node_loc(*id);
-                let temp = self.new_temp(ty, Some(loc));
+                let temp = self.new_temp(ty);
                 self.gen(vec![temp], vec![*id], exp);
                 temp
             },
@@ -1020,8 +1011,7 @@ impl<'env> Generator<'env> {
                 } else {
                     self.get_node_type(id)
                 };
-                let loc = self.env().get_node_loc(id);
-                let temp = self.new_temp(ty, Some(loc));
+                let temp = self.new_temp(ty);
                 self.gen(vec![temp], vec![id], exp);
                 temp
             },
@@ -1042,11 +1032,9 @@ impl<'env> Generator<'env> {
         if ty.is_reference() {
             temp
         } else {
-            let loc = self.env().get_node_loc(exp.node_id());
             // Need to introduce a reference for the temp.
             let temp_ref = self.new_temp(
-                Type::Reference(self.reference_mode_kind, Box::new(ty.to_owned())),
-                Some(loc),
+                Type::Reference(self.reference_mode_kind, Box::new(ty.to_owned()))
             );
             self.emit_call(
                 exp.node_id(),
@@ -1198,8 +1186,7 @@ impl<'env> Generator<'env> {
         let need_read_ref = !(target_type.is_reference() || self.reference_mode());
         let borrow_dest = if need_read_ref {
             let ref_ty = Type::Reference(ReferenceKind::Immutable, Box::new(target_type));
-            let loc = self.local_locations.get(&target);
-            self.new_temp(ref_ty, loc.cloned())
+            self.new_temp(ref_ty)
         } else {
             target
         };
@@ -1339,8 +1326,7 @@ impl<'env> Generator<'env> {
         match pat {
             Pattern::Wildcard(wildcard_id) => {
                 let ty = self.temp_type(arg).to_owned();
-                let loc = self.env().get_node_loc(*wildcard_id);
-                let temp = self.new_temp(ty, Some(loc));
+                let temp = self.new_temp(ty);
                 // Assign to a temporary to allow stackless bytecode checkers to report any errors
                 // due to the assignment.
                 self.emit_with(id, vec![*wildcard_id], vec![arg_id], |attr| {
@@ -1397,8 +1383,7 @@ impl<'env> Generator<'env> {
             Pattern::Wildcard(id) => {
                 // Wildcard pattern: we need to create a temporary to receive the value, even
                 // if its dropped afterwards.
-                let loc = self.env().get_node_loc(*id);
-                let temp = self.new_temp(self.get_node_type(*id), Some(loc));
+                let temp = self.new_temp(self.get_node_type(*id));
                 (temp, None)
             },
             Pattern::Var(id, sym) => {
@@ -1411,8 +1396,7 @@ impl<'env> Generator<'env> {
                 // temporary to the pattern.
                 let id = pat.node_id();
                 let ty = self.get_node_type(id);
-                let loc = self.env().get_node_loc(id);
-                let temp = self.new_temp(ty, Some(loc));
+                let temp = self.new_temp(ty);
                 (temp, Some((id, pat.clone(), temp)))
             },
         }

@@ -174,7 +174,6 @@ impl<'a> StacklessBytecodeGenerator<'a> {
             BTreeMap::new(),
             BTreeMap::new(),
             BTreeMap::new(),
-            BTreeMap::new(),
         )
     }
 
