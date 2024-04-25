@@ -26,7 +26,7 @@ fn additional_packages() -> Vec<(&'static str, &'static str)> {
         "../../aptos-move/move-examples/token_objects/ambassador",
     ),(
         "on_chain_dice",
-        "../../aptos-move/move-examples/on_chain_dice"
+        "../../aptos-move/move-examples/on_chain_dice",
     )]
 }
 
