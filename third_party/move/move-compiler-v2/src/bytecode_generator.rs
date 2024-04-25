@@ -357,6 +357,7 @@ impl<'env> Generator<'env> {
 
 impl<'env> Generator<'env> {
     fn gen(&mut self, targets: Vec<TempIndex>, target_node_ids: Vec<NodeId>, exp: &Exp) {
+        debug_assert!(targets.len() == target_node_ids.len());
         match exp.as_ref() {
             ExpData::Invalid(id) => self.internal_error(*id, "invalid expression"),
             ExpData::Temporary(id, temp) => self.gen_temporary(targets, target_node_ids, *id, *temp),
