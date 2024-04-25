@@ -678,7 +678,7 @@ fn run_test(path: &Path, config: TestConfig) -> datatest_stable::Result<()> {
                 },
             );
             if *ok.borrow() && config.stop_after == StopAfter::FileFormat {
-                let units = run_file_format_gen(&env, &targets);
+                let units = run_file_format_gen(&mut env, &targets);
                 let out = &mut test_output.borrow_mut();
                 update_diags(ok.borrow_mut(), out, &env);
                 if *ok.borrow() {
