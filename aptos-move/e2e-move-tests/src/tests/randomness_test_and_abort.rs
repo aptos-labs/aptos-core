@@ -130,12 +130,12 @@ fn test_undergas_attack_prevention() {
     set_randomness_seed(&mut h);
 
     // Modify gas parameters so the required deposit for randomness txns is 234_000_000 when gas price is 1.
-    h.modify_gas_schedule(|gas_params| {
-        gas_params.vm.txn.max_execution_gas = 200_000_000.into();
-        gas_params.vm.txn.max_io_gas = 30_000_000.into();
-        gas_params.vm.txn.max_storage_fee = 4_000_000.into();
-        gas_params.vm.txn.maximum_number_of_gas_units = 234_000_001.into();
-    });
+    // h.modify_gas_schedule(|gas_params| {
+    //     gas_params.vm.txn.max_execution_gas = 200_000_000.into();
+    //     gas_params.vm.txn.max_io_gas = 30_000_000.into();
+    //     gas_params.vm.txn.max_storage_fee = 4_000_000.into();
+    //     gas_params.vm.txn.maximum_number_of_gas_units = 234_000_001.into();
+    // });
 
     h.set_default_gas_unit_price(1);
 
@@ -144,23 +144,23 @@ fn test_undergas_attack_prevention() {
     let recipient_0 = h.new_account_with_balance_and_sequence_number(0, 11);
     let recipient_1 = h.new_account_with_balance_and_sequence_number(0, 12);
 
-    // A txn should be discarded if the sender balance is not enough to pay required deposit.
-    let sender = h.new_account_with_balance_and_sequence_number(999, 123);
+    // A txn should be discarded if the sender balance is not enough to pay required deposit: 0.01 APT or 1_000_000 octa.
+    let sender = h.new_account_with_balance_and_sequence_number(999_999, 123);
     let args = vec![
-        1_000_000_000_u64.as_move_value(),
+        1000_u64.as_move_value(),
         MoveValue::Address(*recipient_0.address()),
         MoveValue::Address(*recipient_1.address()),
     ];
     let status = h.run_entry_function(&sender, func.clone(), vec![], serialize_values(&args));
     assert!(status.is_discarded());
-    assert_eq!(999, h.read_aptos_balance(sender.address()));
+    assert_eq!(999_999_u64, h.read_aptos_balance(sender.address()));
     assert_eq!(0, h.read_aptos_balance(recipient_0.address()));
     assert_eq!(0, h.read_aptos_balance(recipient_1.address()));
 
     // A txn should abort but be kept if the sender doesn't have enough balance to complete the transfer.
-    let sender = h.new_account_with_balance_and_sequence_number(234_999_999, 456);
+    let sender = h.new_account_with_balance_and_sequence_number(1_001_000_000, 456);
     let args = vec![
-        1_000_000_000_u64.as_move_value(),
+        1_000_000_999_u64.as_move_value(), // 999 more than what sender has after prologue.
         MoveValue::Address(*recipient_0.address()),
         MoveValue::Address(*recipient_1.address()),
     ];
@@ -168,15 +168,15 @@ fn test_undergas_attack_prevention() {
     let status = assert_ok!(status.as_kept_status());
     assert!(matches!(status, ExecutionStatus::MoveAbort { .. }));
     let sender_balance = h.read_aptos_balance(sender.address());
-    assert_gt!(sender_balance, 234_000_000);
-    assert_lt!(sender_balance, 234_999_999);
+    assert_gt!(sender_balance, 1_000_000); // At least the locked amount will be returned.
+    assert_lt!(sender_balance, 1_001_000_000); // Sender lost gas fee.
     assert_eq!(0, h.read_aptos_balance(recipient_0.address()));
     assert_eq!(0, h.read_aptos_balance(recipient_1.address()));
 
     // Otherwise, the txn should finish normally.
-    let sender = h.new_account_with_balance_and_sequence_number(1_234_999_999, 789);
+    let sender = h.new_account_with_balance_and_sequence_number(1_001_000_000, 789);
     let args = vec![
-        1_000_000_000_u64.as_move_value(),
+        500_000_000_u64.as_move_value(), // half of what sender has after prologue.
         MoveValue::Address(*recipient_0.address()),
         MoveValue::Address(*recipient_1.address()),
     ];
@@ -184,10 +184,10 @@ fn test_undergas_attack_prevention() {
     let status = assert_ok!(status.as_kept_status());
     assert!(matches!(status, ExecutionStatus::Success));
     let sender_balance = h.read_aptos_balance(sender.address());
-    assert_gt!(sender_balance, 234_000_000);
-    assert_lt!(sender_balance, 234_999_999);
+    assert_gt!(sender_balance, 1_000_000); // At least the locked amount will be returned.
+    assert_lt!(sender_balance, 501_000_000); // Sender lost 500_000_000 + gas fee.
     assert_eq!(
-        1_000_000_000,
+        500_000_000,
         h.read_aptos_balance(recipient_0.address()) + h.read_aptos_balance(recipient_1.address())
     );
 }

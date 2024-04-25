@@ -530,6 +530,17 @@ module std::features {
         is_enabled(DISPATCHABLE_FUNGIBLE_ASSET)
     }
 
+    /// If this feature is enabled, a private entry function annotated with `#[randomness]` is allowed to use `randomness.move` APIs.
+    /// Also 0.01 APT from gas payer's balance will be locked during transaction execution
+    /// to mitigate [undergasing attack](https://github.com/aptos-foundation/AIPs/blob/main/aips/aip-41.md#undergasing-attacks).
+    const RANDOMNESS_API_V0: u64 = 64;
+    public fun get_randomness_api_v0_feature(): u64 { RANDOMNESS_API_V0 }
+
+    public fun randomness_api_v0_enabled(): bool acquires Features {
+        is_enabled(RANDOMNESS_API_V0)
+    }
+
+
     // ============================================================================================
     // Feature Flag Implementation
 

@@ -75,6 +75,7 @@ pub enum FeatureFlag {
     PRIMARY_APT_FUNGIBLE_STORE_AT_USER_ADDRESS = 61,
     OBJECT_NATIVE_DERIVED_ADDRESS = 62,
     DISPATCHABLE_FUNGIBLE_ASSET = 63,
+    RANDOMNESS_API_V0 = 64,
 }
 
 impl FeatureFlag {
@@ -135,6 +136,7 @@ impl FeatureFlag {
             FeatureFlag::COIN_TO_FUNGIBLE_ASSET_MIGRATION,
             FeatureFlag::OBJECT_NATIVE_DERIVED_ADDRESS,
             FeatureFlag::DISPATCHABLE_FUNGIBLE_ASSET,
+            FeatureFlag::RANDOMNESS_API_V0,
         ]
     }
 }
