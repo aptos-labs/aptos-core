@@ -1229,7 +1229,7 @@ mod test {
             with_metadata_reads
         );
 
-        // Test incorrect with with incompatible types.
+        // Test incorrect with incompatible types.
         assert!(!captured_reads.incorrect_use);
 
         for i in 0..3 {
