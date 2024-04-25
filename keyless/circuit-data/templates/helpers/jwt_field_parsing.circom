@@ -123,7 +123,6 @@ template ParseJWTFieldWithUnquotedValue(maxKVPairLen, maxNameLen, maxValueLen) {
     signal value_selector[maxKVPairLen] <== ArraySelector(maxKVPairLen)(value_index, value_index+value_len);
 
     for (var i = 0; i < maxKVPairLen; i++) {
-        log(i, field[i], value_selector[i]);
         var is_comma = IsEqual()([field[i], 44]);
         var is_end_brace = IsEqual()([field[i], 125]);
         var is_quote = IsEqual()([field[i], 34]);

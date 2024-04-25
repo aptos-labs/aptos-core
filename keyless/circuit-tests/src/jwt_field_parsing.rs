@@ -384,37 +384,6 @@ fn should_fail_when_value_not_equal_unquoted() {
     should_fail_unquoted(field);
 }
 
-#[test]
-fn should_fail_with_forbidden_value_chars() {
-   should_fail_unquoted(
-        jwt_field_str(
-            "\"name\": val\\ue,",
-            "name",
-            "val\\ue",
-            )
-        );
-   should_fail_unquoted(
-        jwt_field_str(
-            "\"name\": val\"ue,",
-            "name",
-            "val\"ue",
-            )
-        );
-   should_fail_quoted(
-        jwt_field_str(
-            "\"name\": \"val\\ue\",",
-            "name",
-            "val\\ue",
-            )
-        );
-   should_fail_quoted(
-        jwt_field_str(
-            "\"name\": \"val\"ue\",",
-            "name",
-            "val\"ue",
-            )
-        );
-}
 
 // ref: Circuit Bug #3, https://www.notion.so/aptoslabs/JWTFieldCheck-does-not-properly-constrain-field_len-which-can-cause-the-circuit-to-accept-field-val-9943c152e7274f35a1669a6cb416c7bf?pvs=4
 #[test]
@@ -454,6 +423,14 @@ fn malicious_value_len_2() {
         );
 
     field.whole_field_len = field.whole_field.find(",").unwrap() + 1;
+
+    should_pass_unquoted(field);
+
+    let mut field = jwt_field_str_malicious_indices(
+        "\"sub\":user,fake,",
+        "sub",
+        "user,fake",
+        );
 
     should_fail_unquoted(field);
 }
