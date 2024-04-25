@@ -7,4 +7,3 @@ pub mod witness_gen;
 pub mod bits;
 pub mod sha;
 pub mod encoding;
-pub mod field_parser;
