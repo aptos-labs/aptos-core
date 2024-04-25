@@ -254,7 +254,7 @@ fn test_revert_last_commit() {
     let mut in_memory_state = db.buffered_state().lock().current_state().clone();
     let _ancestor = in_memory_state.base.clone();
     let mut val_generator = ValueGenerator::new();
-    let (blocks, _) = val_generator.generate(arb_blocks_to_commit_with_block_nums(1, 3));
+    let (blocks, _) = val_generator.generate(arb_blocks_to_commit_with_block_nums(3, 3));
     for (txns_to_commit, ledger_info_with_sigs) in &blocks {
         update_in_memory_state(&mut in_memory_state, txns_to_commit.as_slice());
         db.save_transactions_for_test(
@@ -267,30 +267,33 @@ fn test_revert_last_commit() {
         )
         .unwrap();
         cur_ver += txns_to_commit.len() as u64;
+
+        println!("next version: {}", cur_ver);
     }
 
     // Get the latest ledger info before revert
     let latest_ledger_info_before_revert = db.get_latest_ledger_info().unwrap();
-    let last_committed_version = latest_ledger_info_before_revert.ledger_info().version();
-    let root_hash = latest_ledger_info_before_revert
+    let root_hash = db
+        .get_latest_ledger_info()
+        .unwrap()
+        .ledger_info()
         .commit_info()
         .executed_state_id();
 
+    let expected_version = cur_ver - 1;
+    assert_eq!(db.get_latest_version().unwrap(), expected_version);
+
     // Revert the last commit
     db.revert_commit(
-        last_committed_version,
-        last_committed_version.clone(), // In this case the last commit and version to commit are same
-        root_hash,                      // the hash will also be the same as lastest
+        db.get_latest_version().unwrap(),
+        db.get_latest_version().unwrap(), // In this case the last commit and version to commit are same
+        root_hash,                        // the hash will also be the same as lastest
         latest_ledger_info_before_revert,
     )
     .unwrap();
 
-    // Check that the latest ledger info is updated correctly after the revert
-    let latest_ledger_info_after_revert = db.get_latest_ledger_info().unwrap();
-    assert_eq!(
-        latest_ledger_info_after_revert.ledger_info().version(),
-        last_committed_version,
-    );
+    let exepcted_version = cur_ver - 2;
+    assert_eq!(db.get_latest_version().unwrap(), exepcted_version);
 }
 
 #[test]
@@ -303,7 +306,8 @@ fn test_revert_nth_commit() {
     let mut in_memory_state = db.buffered_state().lock().current_state().clone();
     let _ancestor = in_memory_state.base.clone();
     let mut val_generator = ValueGenerator::new();
-    let (blocks, _) = val_generator.generate(arb_blocks_to_commit_with_block_nums(3, 10));
+    // set range of min and max blocks to 5 to always gen 5 blocks
+    let (blocks, _) = val_generator.generate(arb_blocks_to_commit_with_block_nums(5, 5));
 
     struct CommitValue {
         hash: HashValue,
@@ -327,6 +331,7 @@ fn test_revert_nth_commit() {
             info: ledger_info_with_sigs.clone(),
         });
         cur_ver += txns_to_commit.len() as u64;
+        println!("Commit at version: {}", cur_ver);
     }
 
     // Check the latest version is expected before the revert
@@ -337,6 +342,7 @@ fn test_revert_nth_commit() {
     // Get the version and root hash for the commit we want to revert (commit 3)
     let revert_version = *commits.keys().nth(2).unwrap();
     let v = commits.get(&revert_version).unwrap();
+    println!("Reverting commit at version: {}", revert_version);
 
     // Revert commit 3
     db.revert_commit(

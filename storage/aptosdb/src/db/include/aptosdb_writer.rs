@@ -640,7 +640,7 @@ impl AptosDB {
         version_to_revert: Version,
         latest_version: Version,
         new_root_hash: HashValue,
-        mut ledger_info_with_sigs: LedgerInfoWithSignatures,
+        ledger_info_with_sigs: LedgerInfoWithSignatures,
     ) -> Result<()> {
         // The state and version after commit will always be one less than the version to revert
         let _timer = OTHER_TIMERS_SECONDS
@@ -715,11 +715,11 @@ impl AptosDB {
         let _ledger_info = ledger_info_with_sigs
             .ledger_info()
             .to_owned()
-            .set_version(version_to_revert);
+            .set_version(version_to_revert - 1);
 
         // Update the latest ledger info if provided
         self.commit_ledger_info(
-            version_to_revert,
+            version_to_revert - 1,
             new_root_hash,
             Some(&ledger_info_with_sigs),
         )?;
