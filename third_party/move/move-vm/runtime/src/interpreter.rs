@@ -140,7 +140,7 @@ impl Interpreter {
         }
 
         let mut current_frame = self
-            .make_new_frame(gas_meter, loader, module_store, function, ty_args, locals)
+            .make_new_frame(gas_meter, function, ty_args, locals)
             .map_err(|err| self.set_location(err))?;
         // Access control for the new frame.
         self.access_control
@@ -223,7 +223,7 @@ impl Interpreter {
                         continue;
                     }
                     let frame = self
-                        .make_call_frame(gas_meter, loader, module_store, func, vec![])
+                        .make_call_frame(gas_meter, loader, func, vec![])
                         .map_err(|err| {
                             self.attach_state_if_invariant_violation(
                                 self.set_location(err),
@@ -284,7 +284,7 @@ impl Interpreter {
                         continue;
                     }
                     let frame = self
-                        .make_call_frame(gas_meter, loader, module_store, func, ty_args)
+                        .make_call_frame(gas_meter, loader, func, ty_args)
                         .map_err(|err| {
                             self.attach_state_if_invariant_violation(
                                 self.set_location(err),
@@ -317,7 +317,6 @@ impl Interpreter {
         &mut self,
         gas_meter: &mut impl GasMeter,
         loader: &Loader,
-        module_store: &ModuleStorageAdapter,
         func: Arc<Function>,
         ty_args: Vec<Type>,
     ) -> PartialVMResult<Frame> {
@@ -336,18 +335,15 @@ impl Interpreter {
 
             if self.paranoid_type_checks {
                 let ty = self.operand_stack.pop_ty()?;
-                let resolver = func.get_resolver(loader, module_store);
                 if is_generic {
-                    ty.check_eq(
-                        &resolver.subst(&func.local_types()[arg_count - i - 1], &ty_args)?,
-                    )?;
+                    ty.check_eq(&func.local_types()[arg_count - i - 1].subst(&ty_args)?)?;
                 } else {
                     // Directly check against the expected type to save a clone here.
                     ty.check_eq(&func.local_types()[arg_count - i - 1])?;
                 }
             }
         }
-        self.make_new_frame(gas_meter, loader, module_store, func, ty_args, locals)
+        self.make_new_frame(gas_meter, func, ty_args, locals)
     }
 
     /// Create a new `Frame` given a `Function` and the function `Locals`.
@@ -356,8 +352,6 @@ impl Interpreter {
     fn make_new_frame(
         &self,
         gas_meter: &mut impl GasMeter,
-        loader: &Loader,
-        module_store: &ModuleStorageAdapter,
         function: Arc<Function>,
         ty_args: Vec<Type>,
         locals: Locals,
@@ -371,11 +365,10 @@ impl Interpreter {
             if ty_args.is_empty() {
                 function.local_types().to_vec()
             } else {
-                let resolver = function.get_resolver(loader, module_store);
                 function
                     .local_types()
                     .iter()
-                    .map(|ty| resolver.subst(ty, &ty_args))
+                    .map(|ty| ty.subst(&ty_args))
                     .collect::<PartialVMResult<Vec<_>>>()?
             }
         } else {
@@ -447,7 +440,7 @@ impl Interpreter {
         if self.paranoid_type_checks {
             for i in 0..expected_args {
                 let expected_ty =
-                    resolver.subst(&function.parameter_types()[expected_args - i - 1], &ty_args)?;
+                    function.parameter_types()[expected_args - i - 1].subst(&ty_args)?;
                 let ty = self.operand_stack.pop_ty()?;
                 ty.check_eq(&expected_ty)?;
             }
@@ -517,7 +510,7 @@ impl Interpreter {
 
         if self.paranoid_type_checks {
             for ty in function.return_types() {
-                self.operand_stack.push_ty(resolver.subst(ty, &ty_args)?)?;
+                self.operand_stack.push_ty(ty.subst(&ty_args)?)?;
             }
         }
         Ok(())

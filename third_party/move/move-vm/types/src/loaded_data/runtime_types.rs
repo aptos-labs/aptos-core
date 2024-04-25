@@ -12,10 +12,7 @@ use move_binary_format::{
         AbilitySet, SignatureToken, StructHandle, StructTypeParameter, TypeParameterIndex,
     },
 };
-use move_core_types::{
-    gas_algebra::AbstractMemorySize, identifier::Identifier, language_storage::ModuleId,
-    vm_status::StatusCode,
-};
+use move_core_types::{identifier::Identifier, language_storage::ModuleId, vm_status::StatusCode};
 use smallbitvec::SmallBitVec;
 use smallvec::{smallvec, SmallVec};
 use std::{
@@ -28,6 +25,10 @@ use std::{
 use triomphe::Arc as TriompheArc;
 
 pub const TYPE_DEPTH_MAX: usize = 256;
+
+/// Maximal nodes which are all allowed when instantiating a generic type. This does not include
+/// field types of structs.
+const MAX_TYPE_INSTANTIATION_NODES: usize = 128;
 
 #[derive(PartialEq, Eq, PartialOrd, Ord, Hash, Clone, Debug)]
 /// A formula describing the value depth of a type, using (the depths of) the type parameters as inputs.
@@ -283,22 +284,28 @@ impl AbilityInfo {
 }
 
 impl Type {
-    #[allow(deprecated)]
-    const LEGACY_BASE_MEMORY_SIZE: AbstractMemorySize = AbstractMemorySize::new(1);
-
-    fn clone_impl(&self, depth: usize) -> PartialVMResult<Type> {
-        self.apply_subst(|idx, _| Ok(Type::TyParam(idx)), depth)
+    fn clone_impl(&self, count: &mut usize, depth: usize) -> PartialVMResult<Type> {
+        self.apply_subst(|idx, _, _| Ok(Type::TyParam(idx)), count, depth)
     }
 
-    fn apply_subst<F>(&self, subst: F, depth: usize) -> PartialVMResult<Type>
+    fn apply_subst<F>(&self, subst: F, count: &mut usize, depth: usize) -> PartialVMResult<Type>
     where
-        F: Fn(u16, usize) -> PartialVMResult<Type> + Copy,
+        F: Fn(u16, &mut usize, usize) -> PartialVMResult<Type> + Copy,
     {
+        if *count > MAX_TYPE_INSTANTIATION_NODES {
+            return Err(PartialVMError::new(StatusCode::TOO_MANY_TYPE_NODES));
+        }
         if depth > TYPE_DEPTH_MAX {
             return Err(PartialVMError::new(StatusCode::VM_MAX_TYPE_DEPTH_REACHED));
         }
+
+        *count += 1;
         let res = match self {
-            Type::TyParam(idx) => subst(*idx, depth)?,
+            Type::TyParam(idx) => {
+                // To avoid double-counting, revert counting the type parameter.
+                *count -= 1;
+                subst(*idx, count, depth)?
+            },
             Type::Bool => Type::Bool,
             Type::U8 => Type::U8,
             Type::U16 => Type::U16,
@@ -308,10 +315,14 @@ impl Type {
             Type::U256 => Type::U256,
             Type::Address => Type::Address,
             Type::Signer => Type::Signer,
-            Type::Vector(ty) => Type::Vector(TriompheArc::new(ty.apply_subst(subst, depth + 1)?)),
-            Type::Reference(ty) => Type::Reference(Box::new(ty.apply_subst(subst, depth + 1)?)),
+            Type::Vector(ty) => {
+                Type::Vector(TriompheArc::new(ty.apply_subst(subst, count, depth + 1)?))
+            },
+            Type::Reference(ty) => {
+                Type::Reference(Box::new(ty.apply_subst(subst, count, depth + 1)?))
+            },
             Type::MutableReference(ty) => {
-                Type::MutableReference(Box::new(ty.apply_subst(subst, depth + 1)?))
+                Type::MutableReference(Box::new(ty.apply_subst(subst, count, depth + 1)?))
             },
             Type::Struct { idx, ability } => Type::Struct {
                 idx: *idx,
@@ -324,7 +335,7 @@ impl Type {
             } => {
                 let mut inst = vec![];
                 for ty in instantiation.iter() {
-                    inst.push(ty.apply_subst(subst, depth + 1)?)
+                    inst.push(ty.apply_subst(subst, count, depth + 1)?)
                 }
                 Type::StructInstantiation {
                     idx: *idx,
@@ -337,9 +348,14 @@ impl Type {
     }
 
     pub fn subst(&self, ty_args: &[Type]) -> PartialVMResult<Type> {
-        self.apply_subst(
-            |idx, depth| match ty_args.get(idx as usize) {
-                Some(ty) => ty.clone_impl(depth),
+        Ok(self.subst_impl(ty_args)?.0)
+    }
+
+    fn subst_impl(&self, ty_args: &[Type]) -> PartialVMResult<(Type, usize)> {
+        let mut count = 0;
+        let ty = self.apply_subst(
+            |idx, cnt, depth| match ty_args.get(idx as usize) {
+                Some(ty) => ty.clone_impl(cnt, depth),
                 None => Err(
                     PartialVMError::new(StatusCode::UNKNOWN_INVARIANT_VIOLATION_ERROR)
                         .with_message(format!(
@@ -349,28 +365,10 @@ impl Type {
                         )),
                 ),
             },
+            &mut count,
             1,
-        )
-    }
-
-    /// Returns the abstract memory size the data structure occupies.
-    ///
-    /// This kept only for legacy reasons.
-    /// New applications should not use this.
-    pub fn size(&self) -> AbstractMemorySize {
-        use Type::*;
-
-        match self {
-            TyParam(_) | Bool | U8 | U16 | U32 | U64 | U128 | U256 | Address | Signer => {
-                Self::LEGACY_BASE_MEMORY_SIZE
-            },
-            Reference(ty) | MutableReference(ty) => Self::LEGACY_BASE_MEMORY_SIZE + ty.size(),
-            Vector(ty) => Self::LEGACY_BASE_MEMORY_SIZE + ty.size(),
-            Struct { .. } => Self::LEGACY_BASE_MEMORY_SIZE,
-            StructInstantiation { ty_args: tys, .. } => tys
-                .iter()
-                .fold(Self::LEGACY_BASE_MEMORY_SIZE, |acc, ty| acc + ty.size()),
-        }
+        )?;
+        Ok((ty, count))
     }
 
     pub fn from_const_signature(constant_signature: &SignatureToken) -> PartialVMResult<Self> {
@@ -690,6 +688,8 @@ mod unit_tests {
         ];
 
         for (ty, ty_args, expected) in cases {
+            let num_nodes = ty.subst_impl(&ty_args).unwrap().1;
+            assert_eq!(num_nodes, expected);
             assert_eq!(ty.num_nodes_in_subst(&ty_args).unwrap(), expected);
         }
     }

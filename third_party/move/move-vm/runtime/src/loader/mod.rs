@@ -321,21 +321,6 @@ impl Loader {
             type_arguments.push(self.load_type(ty, data_store, module_store)?);
         }
 
-        if self.vm_config.type_size_limit
-            && type_arguments
-                .iter()
-                .map(|loaded_ty| self.count_type_nodes(loaded_ty))
-                .sum::<u64>()
-                > MAX_TYPE_INSTANTIATION_NODES
-        {
-            return Err(PartialVMError::new(StatusCode::TOO_MANY_TYPE_NODES)
-                .with_message(format!(
-                    "Too many type nodes when instantiating a type for script {}",
-                    &main.name
-                ))
-                .finish(Location::Script));
-        };
-
         self.verify_ty_args(main.type_parameters(), &type_arguments)
             .map_err(|e| {
                 e.with_message(format!(
@@ -1232,49 +1217,6 @@ impl Loader {
         Ok(())
     }
 
-    // Return an instantiated type given a generic and an instantiation.
-    // Stopgap to avoid a recursion that is either taking too long or using too
-    // much memory
-    fn subst(&self, ty: &Type, ty_args: &[Type]) -> PartialVMResult<Type> {
-        // Before instantiating the type, count the # of nodes of all type arguments plus
-        // existing type instantiation.
-        // If that number is larger than MAX_TYPE_INSTANTIATION_NODES, refuse to construct this type.
-        // This prevents constructing larger and lager types via struct instantiation.
-        match ty {
-            Type::MutableReference(_) | Type::Reference(_) | Type::Vector(_) => {
-                if self.vm_config.type_size_limit
-                    && self.count_type_nodes(ty) > MAX_TYPE_INSTANTIATION_NODES
-                {
-                    return Err(PartialVMError::new(StatusCode::TOO_MANY_TYPE_NODES));
-                }
-            },
-            Type::StructInstantiation {
-                ty_args: struct_inst,
-                ..
-            } => {
-                let mut sum_nodes = 1u64;
-                for ty in ty_args.iter().chain(struct_inst.iter()) {
-                    sum_nodes = sum_nodes.saturating_add(self.count_type_nodes(ty));
-                    if sum_nodes > MAX_TYPE_INSTANTIATION_NODES {
-                        return Err(PartialVMError::new(StatusCode::TOO_MANY_TYPE_NODES));
-                    }
-                }
-            },
-            Type::Address
-            | Type::Bool
-            | Type::Signer
-            | Type::Struct { .. }
-            | Type::TyParam(_)
-            | Type::U8
-            | Type::U16
-            | Type::U32
-            | Type::U64
-            | Type::U128
-            | Type::U256 => (),
-        };
-        ty.subst(ty_args)
-    }
-
     // Verify the kind (constraints) of an instantiation.
     // Both function and script invocation use this function to verify correctness
     // of type arguments provided
@@ -1415,27 +1357,9 @@ impl<'a> Resolver<'a> {
 
         let mut instantiation = vec![];
         for ty in &func_inst.instantiation {
-            instantiation.push(self.subst(ty, ty_args)?);
-        }
-        // Check if the function instantiation over all generics is larger
-        // than MAX_TYPE_INSTANTIATION_NODES.
-        let mut sum_nodes = 1u64;
-        for ty in ty_args.iter().chain(instantiation.iter()) {
-            sum_nodes = sum_nodes.saturating_add(self.loader.count_type_nodes(ty));
-            if sum_nodes > MAX_TYPE_INSTANTIATION_NODES {
-                return Err(PartialVMError::new(StatusCode::TOO_MANY_TYPE_NODES));
-            }
+            instantiation.push(ty.subst(ty_args)?);
         }
         Ok(instantiation)
-    }
-
-    #[allow(unused)]
-    pub(crate) fn type_params_count(&self, idx: FunctionInstantiationIndex) -> usize {
-        let func_inst = match &self.binary {
-            BinaryType::Module(module) => module.function_instantiation_at(idx.0),
-            BinaryType::Script(script) => script.function_instantiation_at(idx.0),
-        };
-        func_inst.instantiation.len()
     }
 
     //
@@ -1463,23 +1387,6 @@ impl<'a> Resolver<'a> {
             BinaryType::Script(_) => unreachable!("Scripts cannot have type instructions"),
         };
 
-        // Before instantiating the type, count the # of nodes of all type arguments plus
-        // existing type instantiation.
-        // If that number is larger than MAX_TYPE_INSTANTIATION_NODES, refuse to construct this type.
-        // This prevents constructing larger and larger types via struct instantiation.
-        let mut sum_nodes = 1u64;
-        for ty in ty_args.iter().chain(struct_inst.instantiation.iter()) {
-            sum_nodes = sum_nodes.saturating_add(self.loader.count_type_nodes(ty));
-            if sum_nodes > MAX_TYPE_INSTANTIATION_NODES {
-                return Err(
-                    PartialVMError::new(StatusCode::TOO_MANY_TYPE_NODES).with_message(format!(
-                        "Number of type instantiation nodes exceeded the maximum of {}",
-                        MAX_TYPE_INSTANTIATION_NODES
-                    )),
-                );
-            }
-        }
-
         let struct_ = &struct_inst.definition_struct_type;
         Ok(Type::StructInstantiation {
             idx: struct_.idx,
@@ -1487,7 +1394,7 @@ impl<'a> Resolver<'a> {
                 struct_inst
                     .instantiation
                     .iter()
-                    .map(|ty| self.subst(ty, ty_args))
+                    .map(|ty| ty.subst(ty_args))
                     .collect::<PartialVMResult<_>>()?,
             ),
             ability: AbilityInfo::generic_struct(
@@ -1524,7 +1431,6 @@ impl<'a> Resolver<'a> {
             .map(|inst_ty| inst_ty.subst(ty_args))
             .collect::<PartialVMResult<Vec<_>>>()?;
 
-        // TODO: Is this type substitution unbounded?
         field_instantiation.definition_struct_type.fields[field_instantiation.offset]
             .subst(&instantiation_types)
     }
@@ -1578,14 +1484,10 @@ impl<'a> Resolver<'a> {
         let ty = self.single_type_at(idx);
 
         if !ty_args.is_empty() {
-            self.subst(ty, ty_args)
+            ty.subst(ty_args)
         } else {
             Ok(ty.clone())
         }
-    }
-
-    pub(crate) fn subst(&self, ty: &Type, ty_args: &[Type]) -> PartialVMResult<Type> {
-        self.loader.subst(ty, ty_args)
     }
 
     //
@@ -1745,10 +1647,6 @@ pub const VALUE_DEPTH_MAX: u64 = 128;
 /// fields for struct types.
 const MAX_TYPE_TO_LAYOUT_NODES: u64 = 256;
 
-/// Maximal nodes which are all allowed when instantiating a generic type. This does not include
-/// field types of structs.
-const MAX_TYPE_INSTANTIATION_NODES: u64 = 128;
-
 struct PseudoGasContext {
     max_cost: u64,
     cost: u64,
@@ -1851,31 +1749,6 @@ impl Loader {
         })
     }
 
-    fn count_type_nodes(&self, ty: &Type) -> u64 {
-        let mut todo = vec![ty];
-        let mut result = 0;
-        while let Some(ty) = todo.pop() {
-            match ty {
-                Type::Vector(ty) => {
-                    result += 1;
-                    todo.push(ty);
-                },
-                Type::Reference(ty) | Type::MutableReference(ty) => {
-                    result += 1;
-                    todo.push(ty);
-                },
-                Type::StructInstantiation { ty_args, .. } => {
-                    result += 1;
-                    todo.extend(ty_args.iter())
-                },
-                _ => {
-                    result += 1;
-                },
-            }
-        }
-        result
-    }
-
     fn struct_name_to_type_layout(
         &self,
         struct_idx: StructNameIndex,
@@ -1907,7 +1780,7 @@ impl Loader {
         let field_tys = struct_type
             .fields
             .iter()
-            .map(|ty| self.subst(ty, ty_args))
+            .map(|ty| ty.subst(ty_args))
             .collect::<PartialVMResult<Vec<_>>>()?;
         let (mut field_layouts, field_has_identifier_mappings): (Vec<MoveTypeLayout>, Vec<bool>) =
             field_tys
@@ -2119,7 +1992,7 @@ impl Loader {
             .iter()
             .zip(&struct_type.fields)
             .map(|(n, ty)| {
-                let ty = self.subst(ty, ty_args)?;
+                let ty = ty.subst(ty_args)?;
                 let l =
                     self.type_to_fully_annotated_layout_impl(&ty, module_store, count, depth)?;
                 Ok(MoveFieldLayout::new(n.clone(), l))
