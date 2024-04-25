@@ -509,6 +509,25 @@ As of some one gently rapping, rapping at my chamber door.
 }
 
 #[test]
+fn check_substr_inclusion_poly_small_test() {
+    let circuit_handle = TestCircuitHandle::new("check_substr_inclusion_poly_test.circom").unwrap();
+
+    let max_str_len = 100;
+    let max_substr_len = 20;
+    let config = CircuitPaddingConfig::new().max_length("str", max_str_len).max_length("substr", max_substr_len);
+    let string = "a";
+    let string_hash = poseidon_bn254::pad_and_hash_string("dummy string", 30).unwrap(); // Hash is not checked in the substring inclusion protocol and so can be arbitrary here
+    let substring = "a";
+    let substring_len = substring.len();
+    let start_index = 0;
+
+    let circuit_input_signals = CircuitInputSignals::new().str_input("str", string).str_input("substr", substring).u64_input("substr_len", substring_len as u64).u64_input("start_index", start_index).fr_input("str_hash", string_hash).pad(&config).unwrap();
+
+    let result = circuit_handle.gen_witness(circuit_input_signals);
+    assert!(result.is_ok());
+}
+
+#[test]
 fn check_substr_inclusion_poly_boolean_test() {
     let circuit_handle = TestCircuitHandle::new("check_substr_inclusion_poly_boolean_test.circom").unwrap();
 
@@ -587,6 +606,25 @@ As of some one gently rapping, rapping at my chamber door.
     let substring = &string[45..70];
     let substring_len = substring.len();
     let start_index = 45;
+
+    let circuit_input_signals = CircuitInputSignals::new().str_input("str", string).str_input("substr", substring).u64_input("substr_len", substring_len as u64).u64_input("start_index", start_index).fr_input("str_hash", string_hash).u64_input("expected_output", 1).pad(&config).unwrap();
+
+    let result = circuit_handle.gen_witness(circuit_input_signals);
+    assert!(result.is_ok());
+}
+
+#[test]
+fn check_substr_inclusion_poly_small_boolean_test() {
+    let circuit_handle = TestCircuitHandle::new("check_substr_inclusion_poly_boolean_test.circom").unwrap();
+
+    let max_str_len = 100;
+    let max_substr_len = 20;
+    let config = CircuitPaddingConfig::new().max_length("str", max_str_len).max_length("substr", max_substr_len);
+    let string = "a";
+    let string_hash = poseidon_bn254::pad_and_hash_string("dummy string", 30).unwrap(); // Hash is not checked in the substring inclusion protocol and so can be arbitrary here
+    let substring = "a";
+    let substring_len = substring.len();
+    let start_index = 0;
 
     let circuit_input_signals = CircuitInputSignals::new().str_input("str", string).str_input("substr", substring).u64_input("substr_len", substring_len as u64).u64_input("start_index", start_index).fr_input("str_hash", string_hash).u64_input("expected_output", 1).pad(&config).unwrap();
 
