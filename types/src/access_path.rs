@@ -40,7 +40,7 @@
 
 use crate::{
     account_address::AccountAddress,
-    state_store::state_key::{StateKey, StateKeyInner},
+    state_store::state_key::{inner::StateKeyInner, StateKey},
 };
 use anyhow::{Error, Result};
 use aptos_crypto::hash::HashValue;
