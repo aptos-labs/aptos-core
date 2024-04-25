@@ -142,8 +142,8 @@ fn main() {
         (257, EntryPoints::TokenV1MintAndTransferFT),
         (412, EntryPoints::TokenV1MintAndTransferNFTSequential),
         (368, EntryPoints::TokenV2AmbassadorMint { numbered: true }),
-        (520, EntryPoints::LiquidityPoolSwap { is_stable: true }),
-        (500, EntryPoints::LiquidityPoolSwap { is_stable: false }),
+        (390, EntryPoints::LiquidityPoolSwap { is_stable: true }),
+        (350, EntryPoints::LiquidityPoolSwap { is_stable: false }),
     ];
 
     let mut failures = Vec::new();
