@@ -306,7 +306,10 @@ impl BlockStore {
             );
             let mut additional_blocks = retriever
                 .retrieve_block_for_qc(
-                    &QuorumCert::new(highest_commit_cert.vote_data().clone(), highest_commit_cert.ledger_info().clone()),
+                    &QuorumCert::new(
+                        highest_commit_cert.vote_data().clone(),
+                        highest_commit_cert.ledger_info().clone(),
+                    ),
                     1,
                     highest_commit_cert.certified_block().id(),
                 )
@@ -323,7 +326,10 @@ impl BlockStore {
             );
 
             blocks.push(block);
-            quorum_certs.push(QuorumCert::new(highest_commit_cert.vote_data().clone(), highest_commit_cert.ledger_info().clone()));
+            quorum_certs.push(QuorumCert::new(
+                highest_commit_cert.vote_data().clone(),
+                highest_commit_cert.ledger_info().clone(),
+            ));
         }
 
         assert_eq!(blocks.len(), quorum_certs.len());
