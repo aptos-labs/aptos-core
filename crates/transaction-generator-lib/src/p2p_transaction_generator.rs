@@ -61,7 +61,7 @@ impl<T: Clone + Send + Sync> Sampler<T> for BasicSampler {
 }
 
 /// A samplers that samples from a pool but do not replace items until the pool is depleted.
-/// The pool is divided into sub-pools. Replacement is done with with each sub-pool shuffled internally.
+/// The pool is divided into sub-pools. Replacement is done with each sub-pool shuffled internally.
 ///
 /// Here is an example. Say the initial pool is `[I, J, K, X, Y, Z]`.
 /// A `BurnAndRecycleSampler` is created with `replace_batch_size=3` to sample from the pool.
