@@ -13,9 +13,10 @@ use crate::{
 };
 use move_binary_format::{
     access::ModuleAccess,
+    binary_views::BinaryIndexedView,
     compatibility::Compatibility,
     errors::{verification_error, Location, PartialVMError, PartialVMResult, VMResult},
-    file_format::LocalIndex,
+    file_format::{LocalIndex, SignatureIndex},
     normalized, CompiledModule, IndexKind,
 };
 use move_bytecode_verifier::script_signature;
@@ -303,13 +304,7 @@ impl VMRuntime {
 
         let (layout, has_identifier_mappings) = self
             .loader
-            .type_to_type_layout_with_identifier_mappings(ty, module_store)
-            .map_err(|_err| {
-                // TODO: Should we use `err` instead of mapping?
-                PartialVMError::new(StatusCode::VERIFICATION_ERROR).with_message(
-                    "entry point functions cannot have non-serializable return types".to_string(),
-                )
-            })?;
+            .type_to_type_layout_with_identifier_mappings(ty, module_store)?;
 
         let serialization_error = || -> PartialVMError {
             PartialVMError::new(StatusCode::UNKNOWN_INVARIANT_VIOLATION_ERROR)
@@ -466,14 +461,12 @@ impl VMRuntime {
         extensions: &mut NativeContextExtensions,
         bypass_declared_entry_check: bool,
     ) -> VMResult<SerializedReturnValues> {
-        // load the function
         let LoadedFunctionInstantiation {
-            type_arguments,
-            parameters,
-            return_,
+            ty_args,
+            arg_tys,
+            return_tys,
         } = function_instantiation;
 
-        use move_binary_format::{binary_views::BinaryIndexedView, file_format::SignatureIndex};
         fn check_is_entry(
             _resolver: &BinaryIndexedView,
             is_entry: bool,
@@ -498,16 +491,15 @@ impl VMRuntime {
 
         script_signature::verify_module_function_signature_by_name(
             module.module(),
-            IdentStr::new(function.as_ref().name()).expect(""),
+            IdentStr::new(function.as_ref().name()).unwrap(),
             additional_signature_checks,
         )?;
 
-        // execute the function
         self.execute_function_impl(
             function,
-            type_arguments,
-            parameters,
-            return_,
+            ty_args,
+            arg_tys,
+            return_tys,
             serialized_args,
             data_store,
             module_store,
@@ -531,9 +523,9 @@ impl VMRuntime {
         let (
             func,
             LoadedFunctionInstantiation {
-                type_arguments,
-                parameters,
-                return_,
+                ty_args,
+                arg_tys,
+                return_tys,
             },
         ) = self
             .loader
@@ -541,9 +533,9 @@ impl VMRuntime {
         // execute the function
         self.execute_function_impl(
             func,
-            type_arguments,
-            parameters,
-            return_,
+            ty_args,
+            arg_tys,
+            return_tys,
             serialized_args,
             data_store,
             module_store,

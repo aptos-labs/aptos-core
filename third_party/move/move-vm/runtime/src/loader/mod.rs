@@ -336,7 +336,7 @@ impl Loader {
                 .finish(Location::Script));
         };
 
-        self.verify_ty_args(main.type_parameters(), &type_arguments)
+        self.verify_ty_arg_abilities(main.ty_arg_abilities(), &type_arguments)
             .map_err(|e| {
                 e.with_message(format!(
                     "Failed to verify type arguments for script {}",
@@ -345,9 +345,9 @@ impl Loader {
                 .finish(Location::Script)
             })?;
         let instantiation = LoadedFunctionInstantiation {
-            type_arguments,
-            parameters,
-            return_,
+            ty_args: type_arguments,
+            arg_tys: parameters,
+            return_tys: return_,
         };
         Ok((main, instantiation))
     }
@@ -543,7 +543,7 @@ impl Loader {
 
         // Construct the type arguments from the match
         let mut type_arguments = vec![];
-        let type_param_len = func.type_parameters().len();
+        let type_param_len = func.ty_arg_abilities().len();
         for i in 0..type_param_len {
             if let Option::Some(t) = map.get(&(i as u16)) {
                 type_arguments.push((*t).clone());
@@ -557,14 +557,13 @@ impl Loader {
             }
         }
 
-        // verify type arguments for capability constraints
-        self.verify_ty_args(func.type_parameters(), &type_arguments)
+        self.verify_ty_arg_abilities(func.ty_arg_abilities(), &type_arguments)
             .map_err(|e| e.finish(Location::Module(module_id.clone())))?;
 
         let loaded = LoadedFunctionInstantiation {
-            type_arguments,
-            parameters,
-            return_: return_vec,
+            ty_args: type_arguments,
+            arg_tys: parameters,
+            return_tys: return_vec,
         };
         Ok((
             LoadedFunction {
@@ -598,21 +597,20 @@ impl Loader {
             .map(|ty| self.load_type(ty, data_store, module_store))
             .collect::<VMResult<Vec<_>>>()
             .map_err(|mut err| {
-                // User provided type arguement failed to load. Set extra sub status to distinguish from internal type loading error.
+                // User provided type argument failed to load. Set extra sub status to distinguish from internal type loading error.
                 if StatusCode::TYPE_RESOLUTION_FAILURE == err.major_status() {
                     err.set_sub_status(move_core_types::vm_status::sub_status::type_resolution_failure::EUSER_TYPE_LOADING_FAILURE);
                 }
                 err
             })?;
 
-        // verify type arguments
-        self.verify_ty_args(func.type_parameters(), &type_arguments)
+        self.verify_ty_arg_abilities(func.ty_arg_abilities(), &type_arguments)
             .map_err(|e| e.finish(Location::Module(module_id.clone())))?;
 
         let loaded = LoadedFunctionInstantiation {
-            type_arguments,
-            parameters,
-            return_,
+            ty_args: type_arguments,
+            arg_tys: parameters,
+            return_tys: return_,
         };
         Ok((module, func, loaded))
     }
@@ -796,8 +794,8 @@ impl Loader {
             TypeTag::U256 => Type::U256,
             TypeTag::Address => Type::Address,
             TypeTag::Signer => Type::Signer,
-            TypeTag::Vector(tt) => Type::Vector(triomphe::Arc::new(self.load_type(
-                tt,
+            TypeTag::Vector(elem_tag) => Type::Vector(triomphe::Arc::new(self.load_type(
+                elem_tag,
                 data_store,
                 module_store,
             )?)),
@@ -805,7 +803,6 @@ impl Loader {
                 let module_id = ModuleId::new(struct_tag.address, struct_tag.module.clone());
                 self.load_module(&module_id, data_store, module_store)?;
                 let struct_type = module_store
-                    // GOOD module was loaded above
                     .get_struct_type_by_identifier(&struct_tag.name, &module_id)
                     .map_err(|e| e.finish(Location::Undefined))?;
                 if struct_type.type_parameters.is_empty() && struct_tag.type_params.is_empty() {
@@ -814,15 +811,15 @@ impl Loader {
                         ability: AbilityInfo::struct_(struct_type.abilities),
                     }
                 } else {
-                    let mut type_params = vec![];
-                    for ty_param in &struct_tag.type_params {
-                        type_params.push(self.load_type(ty_param, data_store, module_store)?);
+                    let mut ty_args = vec![];
+                    for ty_arg_tag in &struct_tag.type_params {
+                        ty_args.push(self.load_type(ty_arg_tag, data_store, module_store)?);
                     }
-                    self.verify_ty_args(struct_type.type_param_constraints(), &type_params)
+                    self.verify_ty_arg_abilities(struct_type.type_param_constraints(), &ty_args)
                         .map_err(|e| e.finish(Location::Undefined))?;
                     Type::StructInstantiation {
                         idx: struct_type.idx,
-                        ty_args: triomphe::Arc::new(type_params),
+                        ty_args: triomphe::Arc::new(ty_args),
                         ability: AbilityInfo::generic_struct(
                             struct_type.abilities,
                             struct_type.phantom_ty_args_mask.clone(),
@@ -1278,19 +1275,23 @@ impl Loader {
     // Verify the kind (constraints) of an instantiation.
     // Both function and script invocation use this function to verify correctness
     // of type arguments provided
-    fn verify_ty_args<'a, I>(&self, constraints: I, ty_args: &[Type]) -> PartialVMResult<()>
+    fn verify_ty_arg_abilities<'a, I>(
+        &self,
+        expected_ty_arg_abilities: I,
+        ty_args: &[Type],
+    ) -> PartialVMResult<()>
     where
         I: IntoIterator<Item = &'a AbilitySet>,
         I::IntoIter: ExactSizeIterator,
     {
-        let constraints = constraints.into_iter();
-        if constraints.len() != ty_args.len() {
+        let expected_ty_arg_abilities = expected_ty_arg_abilities.into_iter();
+        if expected_ty_arg_abilities.len() != ty_args.len() {
             return Err(PartialVMError::new(
                 StatusCode::NUMBER_OF_TYPE_ARGUMENTS_MISMATCH,
             ));
         }
-        for (ty, expected_k) in ty_args.iter().zip(constraints) {
-            if !expected_k.is_subset(ty.abilities()?) {
+        for (ty, expected_ability) in ty_args.iter().zip(expected_ty_arg_abilities) {
+            if !expected_ability.is_subset(ty.abilities()?) {
                 return Err(PartialVMError::new(StatusCode::CONSTRAINT_NOT_SATISFIED));
             }
         }

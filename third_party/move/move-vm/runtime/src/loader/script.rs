@@ -139,7 +139,7 @@ impl Script {
             file_format_version: script.version(),
             index: FunctionDefinitionIndex(0),
             code,
-            type_parameters,
+            ty_arg_abilities: type_parameters,
             native,
             def_is_native,
             def_is_friend_or_private: false,

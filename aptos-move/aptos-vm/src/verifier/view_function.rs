@@ -46,7 +46,7 @@ pub(crate) fn validate_view_function(
     }
 
     // Must return values
-    if fun_inst.return_.is_empty() {
+    if fun_inst.return_tys.is_empty() {
         return Err(
             PartialVMError::new(StatusCode::INVALID_MAIN_FUNCTION_SIGNATURE)
                 .with_message("view function must return values".to_string()),
@@ -56,9 +56,9 @@ pub(crate) fn validate_view_function(
     let allowed_structs = get_allowed_structs(struct_constructors_feature);
     let args = transaction_arg_validation::construct_args(
         session,
-        &fun_inst.parameters,
+        &fun_inst.arg_tys,
         args,
-        &fun_inst.type_arguments,
+        &fun_inst.ty_args,
         allowed_structs,
         true,
     )

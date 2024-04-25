@@ -37,7 +37,7 @@ pub(crate) struct Function {
     pub(crate) file_format_version: u32,
     pub(crate) index: FunctionDefinitionIndex,
     pub(crate) code: Vec<Bytecode>,
-    pub(crate) type_parameters: Vec<AbilitySet>,
+    pub(crate) ty_arg_abilities: Vec<AbilitySet>,
     // TODO: Make `native` and `def_is_native` become an enum.
     pub(crate) native: Option<NativeFunction>,
     pub(crate) def_is_native: bool,
@@ -100,7 +100,7 @@ impl Function {
             Some(code) => code.code.clone(),
             None => vec![],
         };
-        let type_parameters = handle.type_parameters.clone();
+        let ty_arg_abilities = handle.type_parameters.clone();
         let return_types = signature_table[handle.return_.0 as usize].clone();
         let local_types = if let Some(code) = &def.code {
             let mut locals = signature_table[handle.parameters.0 as usize].clone();
@@ -123,7 +123,7 @@ impl Function {
             file_format_version: module.version(),
             index,
             code,
-            type_parameters,
+            ty_arg_abilities,
             native,
             def_is_native,
             def_is_friend_or_private,
@@ -191,8 +191,8 @@ impl Function {
         &self.code
     }
 
-    pub(crate) fn type_parameters(&self) -> &[AbilitySet] {
-        &self.type_parameters
+    pub(crate) fn ty_arg_abilities(&self) -> &[AbilitySet] {
+        &self.ty_arg_abilities
     }
 
     pub(crate) fn local_types(&self) -> &[Type] {

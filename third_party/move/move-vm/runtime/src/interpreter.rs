@@ -437,7 +437,7 @@ impl Interpreter {
         function: Arc<Function>,
         ty_args: Vec<Type>,
     ) -> PartialVMResult<()> {
-        let return_type_count = function.return_type_count();
+        let is_generic = !ty_args.is_empty();
         let mut args = VecDeque::new();
         let expected_args = function.arg_count();
         for _ in 0..expected_args {
@@ -446,10 +446,14 @@ impl Interpreter {
 
         if self.paranoid_type_checks {
             for i in 0..expected_args {
-                let expected_ty =
-                    resolver.subst(&function.parameter_types()[expected_args - i - 1], &ty_args)?;
                 let ty = self.operand_stack.pop_ty()?;
-                ty.check_eq(&expected_ty)?;
+                if is_generic {
+                    let expected_ty = resolver
+                        .subst(&function.parameter_types()[expected_args - i - 1], &ty_args)?;
+                    ty.check_eq(&expected_ty)?;
+                } else {
+                    ty.check_eq(&function.parameter_types()[expected_args - i - 1])?;
+                }
             }
         }
 
@@ -500,7 +504,7 @@ impl Interpreter {
 
         // Paranoid check to protect us against incorrect native function implementations. A native function that
         // returns a different number of values than its declared types will trigger this check
-        if return_values.len() != return_type_count {
+        if return_values.len() != function.return_type_count() {
             return Err(
                 PartialVMError::new(StatusCode::UNKNOWN_INVARIANT_VIOLATION_ERROR).with_message(
                     "Arity mismatch: return value count does not match return type count"
@@ -537,14 +541,14 @@ impl Interpreter {
                     } else {
                         Err(self.set_location(PartialVMError::new(StatusCode::UNKNOWN_INVARIANT_VIOLATION_ERROR)
                                 .with_message(
-                                    format!("Private/Friend function invokation error, caller: {:?}::{:?}, callee: {:?}::{:?}", caller_id, caller.name(), callee_id, callee.name()),
+                                    format!("Private/Friend function invocation error, caller: {:?}::{:?}, callee: {:?}::{:?}", caller_id, caller.name(), callee_id, callee.name()),
                                 )))
                     }
                 },
                 _ => Err(self.set_location(
                     PartialVMError::new(StatusCode::UNKNOWN_INVARIANT_VIOLATION_ERROR)
                         .with_message(format!(
-                            "Private/Friend function invokation error caller: {:?}, callee {:?}",
+                            "Private/Friend function invocation error caller: {:?}, callee {:?}",
                             caller.name(),
                             callee.name()
                         )),
@@ -1043,7 +1047,7 @@ impl Stack {
         Ok(self.value[(self.value.len() - n)..].iter())
     }
 
-    /// Push a `Value` on the stack if the max stack size has not been reached. Abort execution
+    /// Push a type on the stack if the max stack size has not been reached. Abort execution
     /// otherwise.
     fn push_ty(&mut self, ty: Type) -> PartialVMResult<()> {
         if self.types.len() < OPERAND_STACK_SIZE_LIMIT {
@@ -1054,14 +1058,14 @@ impl Stack {
         }
     }
 
-    /// Pop a `Value` off the stack or abort execution if the stack is empty.
+    /// Pop a type off the stack or abort execution if the stack is empty.
     fn pop_ty(&mut self) -> PartialVMResult<Type> {
         self.types
             .pop()
             .ok_or_else(|| PartialVMError::new(StatusCode::EMPTY_VALUE_STACK))
     }
 
-    /// Pop n values off the stack.
+    /// Pop n types off the stack.
     fn popn_tys(&mut self, n: u16) -> PartialVMResult<Vec<Type>> {
         let remaining_stack_size = self
             .types
@@ -1095,7 +1099,7 @@ impl CallStack {
     }
 
     /// Push a `Frame` on the call stack.
-    fn push(&mut self, frame: Frame) -> ::std::result::Result<(), Frame> {
+    fn push(&mut self, frame: Frame) -> Result<(), Frame> {
         if self.0.len() < CALL_STACK_SIZE_LIMIT {
             self.0.push(frame);
             Ok(())
@@ -2536,7 +2540,6 @@ impl Frame {
                             .read_ref()?
                             .value_as::<AccountAddress>()?;
                         let ty = resolver.get_struct_type(*sd_idx)?;
-                        // REVIEW: Can we simplify Interpreter::move_to?
                         interpreter.move_to(
                             false,
                             resolver.loader(),
