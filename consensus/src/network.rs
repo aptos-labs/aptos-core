@@ -370,7 +370,7 @@ impl NetworkSender {
             if let Err(e) = network_sender.send_to(peer, msg.clone()) {
                 warn!(
                     remote_peer = peer,
-                    error = ?e, "Failed to send a msg to peer",
+                    error = ?e, "Failed to send a msg {:?} to peer", msg
                 );
             }
         }
