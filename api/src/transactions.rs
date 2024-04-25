@@ -698,6 +698,7 @@ impl TransactionsApi {
         let accept_type = accept_type.clone();
 
         let ledger_info = api_spawn_blocking(move || context.get_latest_ledger_info()).await?;
+        println!("ledger_info: {:?}", ledger_info);
 
         let txn_data = self
             .get_by_hash(hash.into(), &ledger_info)
@@ -712,7 +713,7 @@ impl TransactionsApi {
             })?
             .context(format!("Failed to find transaction with hash: {}", hash))
             .map_err(|_| transaction_not_found_by_hash(hash, &ledger_info))?;
-
+        println!("txn_data: {:?}", txn_data);
         let api = self.clone();
         api_spawn_blocking(move || api.get_transaction_inner(&accept_type, txn_data, &ledger_info))
             .await
