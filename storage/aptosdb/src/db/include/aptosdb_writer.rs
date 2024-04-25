@@ -633,8 +633,7 @@ impl AptosDB {
         Ok(())
     }
 
-    /// Revert a commit. The latest version will always be one less than the
-    /// `target_version`.
+    /// Revert a commit.
     pub fn revert_commit(
         &self,
         version_to_revert: Version,
