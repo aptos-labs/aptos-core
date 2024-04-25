@@ -204,8 +204,6 @@ pub enum Operation {
     Neq,
     CastU256,
 
-    VecPack,
-
     // ==============================================================
     // Extended Bytecodes (part of the verification IL)
 
@@ -309,7 +307,6 @@ impl Operation {
             Operation::EmitEvent => false,
             Operation::EventStoreDiverge => false,
             Operation::TraceGlobalMem(..) => false,
-            _ => unimplemented!("can_abort not implemented for {:?}", self),
         }
     }
 }
@@ -1268,7 +1265,6 @@ impl<'env> fmt::Display for OperationDisplay<'env> {
             EmitEvent => write!(f, "emit_event")?,
             EventStoreDiverge => write!(f, "event_store_diverge")?,
             TraceGlobalMem(_) => write!(f, "trace_global_mem")?,
-            _ => unimplemented!(),
         }
         Ok(())
     }
