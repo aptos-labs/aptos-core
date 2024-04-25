@@ -120,6 +120,56 @@ template EmailVerifiedCheck(maxEVNameLen, maxEVValueLen, maxUIDNameLen) {
     }
 }
 
+
+template StringBodies(len) {
+  signal input in[len];
+  signal output out[len];
+
+
+  signal quotes[len];
+
+  quotes[0] <== IsEqual()([in[0], 34]); 
+
+  for (var i = 1; i < len; i++) {
+    var is_quote = IsEqual()([in[i], 34]); 
+    var prev_is_backslash = IsEqual()([in[i-1], 92]); 
+    quotes[i] <== is_quote * (1 - prev_is_backslash);
+  }
+
+  for (var i = 0; i < len; i++) {
+    log(i, quotes[i]);
+  }
+
+  out[0] <== 0;
+  out[1] <== IsEqual()([in[0], 34]);
+
+  signal should_end_body[len];
+  signal should_start_body[len];
+  signal term_1[len];
+  signal term_2[len];
+  for (var i = 2; i < len; i++) {
+    var minustwo_is_quote_body = out[i-2];
+    var prev_is_quote = quotes[i-1];
+    var prev_is_quote_body = out[i-1];
+    var curr_is_quote = quotes[i];
+
+
+    should_end_body[i] <== prev_is_quote_body * curr_is_quote;
+    should_start_body[i] <== (1 - minustwo_is_quote_body) * prev_is_quote;
+    // all other: set i+1 to i
+
+    term_1[i] <== (1 - should_end_body[i])*out[i-1];
+    term_2[i] <== should_start_body[i] * ( 1 - out[i-1] );
+
+    out[i] <== term_1[i] + term_2[i]; 
+  }
+
+  for (var i = 0; i < len; i++) {
+    log(i, out[i]);
+  }
+}
+
+
 // Given a base64-encoded array `in`, max length `maxN`, and actual unpadded length `n`, returns
 // the actual length of the decoded string
 template Base64DecodedLength(maxN) {
