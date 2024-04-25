@@ -8,6 +8,12 @@ use once_cell::sync::Lazy;
 /// file formats at a given version. Only version v5 and greater are supported.
 const BYTECODE_VERSION_ENV_VAR: &str = "MOVE_BYTECODE_VERSION";
 
+/// An environment variable interpreted by codespan-reporting package, which is not
+/// used here, but is used in many dependent packages, to decide whether to use
+/// color for diagnostics when AutoColor has been selected.  This can be set
+/// to disable color diagnostics, such as in testing (for simpler diffs).
+pub const NO_COLOR_MODE_ENV_VAR: &str = "NO_COLOR";
+
 /// Get the bytecode version from the environment variable.
 // TODO: This should be configurable via toml and command line flags. See also #129.
 pub fn get_bytecode_version_from_env(from_input: Option<u32>) -> Option<u32> {

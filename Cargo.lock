@@ -92,9 +92,9 @@ dependencies = [
 
 [[package]]
 name = "ahash"
-version = "0.8.8"
+version = "0.8.11"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "42cd52102d3df161c77a887b608d7a4897d7cc112886a9537b738a887a03aaff"
+checksum = "e89da841a80418a9b391ebaea17f5c112ffaaa96f621d2c285b5174da76b9011"
 dependencies = [
  "cfg-if",
  "getrandom 0.2.11",
@@ -264,6 +264,8 @@ dependencies = [
  "aptos-types",
  "aptos-vm",
  "aptos-vm-genesis",
+ "aptos-vm-logging",
+ "aptos-vm-types",
  "async-trait",
  "base64 0.13.1",
  "bcs 0.1.4",
@@ -313,6 +315,7 @@ dependencies = [
  "tonic 0.11.0",
  "tracing",
  "tracing-subscriber 0.3.18",
+ "url",
  "version-compare",
 ]
 
@@ -349,19 +352,13 @@ dependencies = [
  "aptos-crypto",
  "aptos-infallible",
  "aptos-logger",
- "aptos-profiler",
  "aptos-runtimes",
  "aptos-storage-interface",
+ "aptos-system-utils",
  "aptos-types",
- "async-mutex",
  "bcs 0.1.4",
  "http",
  "hyper",
- "lazy_static",
- "mime",
- "pprof",
- "regex",
- "rstack-self",
  "sha256",
  "tokio",
  "url",
@@ -713,6 +710,7 @@ name = "aptos-cargo-cli"
 version = "0.1.0"
 dependencies = [
  "anyhow",
+ "camino",
  "clap 4.4.14",
  "clap-verbosity-flag",
  "determinator",
@@ -965,6 +963,7 @@ dependencies = [
  "ark-bn254",
  "ark-ec",
  "ark-ff",
+ "ark-groth16",
  "ark-serialize",
  "ark-std",
  "base64 0.13.1",
@@ -1479,6 +1478,19 @@ dependencies = [
 ]
 
 [[package]]
+name = "aptos-experimental-layered-map"
+version = "0.1.0"
+dependencies = [
+ "aptos-crypto",
+ "aptos-drop-helper",
+ "aptos-infallible",
+ "aptos-metrics-core",
+ "bitvec 1.0.1",
+ "once_cell",
+ "proptest",
+]
+
+[[package]]
 name = "aptos-experimental-ptx-executor"
 version = "0.1.0"
 dependencies = [
@@ -1951,37 +1963,12 @@ dependencies = [
 ]
 
 [[package]]
-name = "aptos-indexer-grpc-data-access"
-version = "1.0.0"
-dependencies = [
- "anyhow",
- "aptos-protos 1.3.0",
- "async-trait",
- "base64 0.13.1",
- "dashmap",
- "enum_dispatch",
- "google-cloud-storage",
- "prost 0.12.3",
- "redis",
- "redis-test",
- "serde",
- "serde_json",
- "tempfile",
- "thiserror",
- "tokio",
- "tokio-util 0.7.10",
- "tracing",
-]
-
-[[package]]
 name = "aptos-indexer-grpc-data-service"
 version = "1.0.0"
 dependencies = [
  "anyhow",
- "aptos-indexer-grpc-data-access",
  "aptos-indexer-grpc-server-framework",
  "aptos-indexer-grpc-utils",
- "aptos-logger",
  "aptos-metrics-core",
  "aptos-moving-average 0.1.0 (git+https://github.com/aptos-labs/aptos-indexer-processors.git?rev=4801acae7aea30d7e96bbfbe5ec5b04056dfa4cf)",
  "aptos-protos 1.3.0",
@@ -2080,7 +2067,7 @@ dependencies = [
 
 [[package]]
 name = "aptos-indexer-grpc-in-memory-cache-benchmark"
-version = "0.0.0"
+version = "0.1.0"
 dependencies = [
  "anyhow",
  "aptos-indexer-grpc-utils",
@@ -2123,8 +2110,8 @@ name = "aptos-indexer-grpc-server-framework"
 version = "1.0.0"
 dependencies = [
  "anyhow",
- "aptos-admin-service",
  "aptos-metrics-core",
+ "aptos-system-utils",
  "async-trait",
  "backtrace",
  "clap 4.4.14",
@@ -2405,6 +2392,7 @@ dependencies = [
  "move-core-types",
  "move-ir-compiler",
  "move-model",
+ "move-vm-runtime",
  "move-vm-types",
  "num_cpus",
  "once_cell",
@@ -2486,6 +2474,7 @@ dependencies = [
  "aptos-consensus-types",
  "aptos-crypto",
  "aptos-event-notifications",
+ "aptos-experimental-runtimes",
  "aptos-id-generator",
  "aptos-infallible",
  "aptos-logger",
@@ -2558,7 +2547,6 @@ dependencies = [
  "aptos-crypto",
  "aptos-gas-meter",
  "aptos-gas-profiling",
- "aptos-gas-schedule",
  "aptos-logger",
  "aptos-memory-usage-tracker",
  "aptos-rest-client",
@@ -2569,7 +2557,6 @@ dependencies = [
  "aptos-vm-types",
  "bcs 0.1.4",
  "clap 4.4.14",
- "move-binary-format",
  "regex",
  "reqwest",
  "tokio",
@@ -2742,6 +2729,7 @@ dependencies = [
  "thiserror",
  "tokio",
  "tokio-retry",
+ "tokio-stream",
  "tokio-util 0.7.10",
 ]
 
@@ -3669,6 +3657,25 @@ dependencies = [
 ]
 
 [[package]]
+name = "aptos-system-utils"
+version = "0.1.0"
+dependencies = [
+ "anyhow",
+ "aptos-profiler",
+ "async-mutex",
+ "http",
+ "hyper",
+ "lazy_static",
+ "mime",
+ "pprof",
+ "regex",
+ "rstack-self",
+ "tokio",
+ "tracing",
+ "url",
+]
+
+[[package]]
 name = "aptos-table-natives"
 version = "0.1.0"
 dependencies = [
@@ -3976,6 +3983,7 @@ dependencies = [
  "rand 0.7.3",
  "rayon",
  "regex",
+ "reqwest",
  "ring 0.16.20",
  "rsa 0.9.6",
  "serde",
@@ -4073,6 +4081,8 @@ dependencies = [
  "aptos-utils",
  "aptos-vm-logging",
  "aptos-vm-types",
+ "ark-bn254",
+ "ark-groth16",
  "bcs 0.1.4",
  "bytes",
  "claims",
@@ -4126,6 +4136,7 @@ dependencies = [
  "bcs 0.1.4",
  "bytes",
  "move-core-types",
+ "move-vm-runtime",
  "move-vm-types",
  "once_cell",
  "proptest",
@@ -4249,6 +4260,7 @@ dependencies = [
  "handlebars",
  "move-compiler",
  "move-core-types",
+ "move-vm-runtime",
  "move-vm-types",
  "serde",
  "tempfile",
@@ -5477,6 +5489,19 @@ name = "c_linked_list"
 version = "1.1.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "4964518bd3b4a8190e832886cdc0da9794f12e8e6c1613a9e90ff331c4c8724b"
+
+[[package]]
+name = "calc-dep-sizes"
+version = "0.1.0"
+dependencies = [
+ "anyhow",
+ "clap 4.4.14",
+ "futures",
+ "move-binary-format",
+ "move-core-types",
+ "rayon",
+ "tokio",
+]
 
 [[package]]
 name = "camino"
@@ -8376,7 +8401,7 @@ version = "0.17.5"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "34e99a7734579b834a076ef11789783c153c6eb5fb3520ed15bc41f483f0f317"
 dependencies = [
- "ahash 0.8.8",
+ "ahash 0.8.11",
  "camino",
  "cargo_metadata 0.18.1",
  "cfg-if",
@@ -8505,7 +8530,7 @@ version = "0.13.2"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "43a3c133739dddd0d2990f9a4bdf8eb4b21ef50e4851ca85ab661199821d510e"
 dependencies = [
- "ahash 0.8.8",
+ "ahash 0.8.11",
 ]
 
 [[package]]
@@ -8514,7 +8539,7 @@ version = "0.14.3"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "290f1a1d9242c78d09ce40a5e87e7554ee637af1351968159f4952f028f75604"
 dependencies = [
- "ahash 0.8.8",
+ "ahash 0.8.11",
  "allocator-api2",
 ]
 
@@ -9110,7 +9135,7 @@ version = "0.11.19"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "321f0f839cd44a4686e9504b0a62b4d69a50b62072144c71c68f5873c167b8d9"
 dependencies = [
- "ahash 0.8.8",
+ "ahash 0.8.11",
  "clap 4.4.14",
  "crossbeam-channel",
  "crossbeam-utils",
@@ -10408,6 +10433,7 @@ version = "0.1.0"
 dependencies = [
  "abstract-domain-derive",
  "anyhow",
+ "bcs 0.1.4",
  "clap 4.4.14",
  "codespan-reporting",
  "datatest-stable",
@@ -11002,6 +11028,7 @@ dependencies = [
  "move-vm-runtime",
  "move-vm-test-utils",
  "move-vm-types",
+ "smallvec",
  "tempfile",
 ]
 
@@ -12688,7 +12715,7 @@ name = "processor"
 version = "1.0.0"
 source = "git+https://github.com/aptos-labs/aptos-indexer-processors.git?rev=a11f0b6532349aa6b9a80c9a1d77524f02d8a013#a11f0b6532349aa6b9a80c9a1d77524f02d8a013"
 dependencies = [
- "ahash 0.8.8",
+ "ahash 0.8.11",
  "anyhow",
  "aptos-moving-average 0.1.0 (git+https://github.com/aptos-labs/aptos-indexer-processors.git?rev=a11f0b6532349aa6b9a80c9a1d77524f02d8a013)",
  "aptos-protos 1.3.0 (git+https://github.com/aptos-labs/aptos-core.git?tag=aptos-node-v1.10.0)",

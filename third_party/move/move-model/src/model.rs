@@ -3085,11 +3085,8 @@ impl<'env> ModuleEnv<'env> {
 
     /// Disassemble the module bytecode, if it is available.
     pub fn disassemble(&self) -> Option<String> {
-        // TODO(#12541): There seems to be a disassembler bug, or the source map we are generating
-        //   is inconsistent, so we are creating a dummy one until this is fixed.
         let view = BinaryIndexedView::Module(self.get_verified_module()?);
-        let smap = SourceMap::dummy_from_view(&view, self.env.to_ir_loc(&self.get_loc()))
-            .expect("source map");
+        let smap = self.data.source_map.as_ref().expect("source map").clone();
         let disas = Disassembler::new(SourceMapping::new(smap, view), DisassemblerOptions {
             only_externally_visible: false,
             print_code: true,

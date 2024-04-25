@@ -57,7 +57,7 @@ bottom-right of your Visual Studio Code screen when opening a Move file, it mean
    does successfully print this output, try closing and re-opening the Visual Studio Code
    application, as it may not have picked up the update to your `PATH`.
 2. If you installed the `move-analyzer` executable to a different location that is outside of your
-   `PATH`, then you may have the extension look at this location by using the the Visual Studio Code
+   `PATH`, then you may have the extension look at this location by using the Visual Studio Code
    settings (`⌘,` on macOS, or use the menu item *Code > Preferences > Settings*). Search for the
    `move-analyzer.server.path` setting, and set it to the location of the `move-analyzer` language
    server you installed.

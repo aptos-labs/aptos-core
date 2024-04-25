@@ -516,7 +516,9 @@ struct ExecutionTimeMeasurement {
 
 impl ExecutionTimeMeasurement {
     pub fn now() -> Self {
-        let output_size = APTOS_PROCESSED_TXNS_OUTPUT_SIZE.get_sample_sum();
+        let output_size = APTOS_PROCESSED_TXNS_OUTPUT_SIZE
+            .with_label_values(&["execution"])
+            .get_sample_sum();
 
         let partitioning_total = BLOCK_PARTITIONING_SECONDS.get_sample_sum();
         let execution_total = APTOS_EXECUTOR_EXECUTE_BLOCK_SECONDS.get_sample_sum();

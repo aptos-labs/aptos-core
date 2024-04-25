@@ -55,7 +55,9 @@ pub use self::{
     jwk_consensus_config::{
         ConfigV1 as JWKConsensusConfigV1, OIDCProvider, OnChainJWKConsensusConfig,
     },
-    randomness_config::{OnChainRandomnessConfig, RandomnessConfigMoveStruct},
+    randomness_config::{
+        OnChainRandomnessConfig, RandomnessConfigMoveStruct, RandomnessConfigSeqNum,
+    },
     timed_features::{TimedFeatureFlag, TimedFeatureOverride, TimedFeatures, TimedFeaturesBuilder},
     timestamp::CurrentTimeMicroseconds,
     transaction_fee::TransactionFeeBurnCap,
@@ -175,11 +177,9 @@ pub trait OnChainConfig: Send + Sync + DeserializeOwned {
     where
         T: ConfigStorage + ?Sized,
     {
-        match storage.fetch_config_bytes(&StateKey::resource(Self::address(), &Self::struct_tag()))
-        {
-            Some(bytes) => Self::deserialize_into_config(&bytes).ok(),
-            None => None,
-        }
+        let state_key = StateKey::on_chain_config::<Self>().ok()?;
+        let bytes = storage.fetch_config_bytes(&state_key)?;
+        Self::deserialize_into_config(&bytes).ok()
     }
 
     fn address() -> &'static AccountAddress {

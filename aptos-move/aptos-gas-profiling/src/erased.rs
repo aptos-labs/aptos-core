@@ -217,6 +217,8 @@ impl ExecutionAndIOCosts {
 
         nodes.push(Node::new("intrinsic", self.intrinsic_cost));
 
+        nodes.push(Node::new("keyless", self.keyless_cost));
+
         if !self.dependencies.is_empty() {
             let deps = Node::new_with_children(
                 "dependencies",

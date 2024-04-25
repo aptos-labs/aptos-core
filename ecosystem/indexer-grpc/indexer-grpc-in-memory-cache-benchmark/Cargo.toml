@@ -1,5 +1,6 @@
 [package]
 name = "aptos-indexer-grpc-in-memory-cache-benchmark"
+version = "0.1.0"
 
 # Workspace inherited keys
 authors = { workspace = true }

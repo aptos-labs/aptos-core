@@ -157,33 +157,33 @@ impl From<Transaction> for AnalyzedTransaction {
 }
 
 pub fn account_resource_location(address: AccountAddress) -> StorageLocation {
-    StorageLocation::Specific(StateKey::resource_typed::<AccountResource>(&address))
+    StorageLocation::Specific(StateKey::resource_typed::<AccountResource>(&address).unwrap())
 }
 
 pub fn coin_store_location(address: AccountAddress) -> StorageLocation {
-    StorageLocation::Specific(StateKey::resource_typed::<CoinStoreResource>(&address))
+    StorageLocation::Specific(StateKey::resource_typed::<CoinStoreResource>(&address).unwrap())
 }
 
 pub fn current_ts_location() -> StorageLocation {
-    StorageLocation::Specific(StateKey::on_chain_config::<CurrentTimeMicroseconds>())
+    StorageLocation::Specific(StateKey::on_chain_config::<CurrentTimeMicroseconds>().unwrap())
 }
 
 pub fn features_location() -> StorageLocation {
-    StorageLocation::Specific(StateKey::on_chain_config::<Features>())
+    StorageLocation::Specific(StateKey::on_chain_config::<Features>().unwrap())
 }
 
 pub fn aptos_coin_info_location() -> StorageLocation {
-    StorageLocation::Specific(StateKey::resource_typed::<CoinInfoResource>(
-        &AccountAddress::ONE,
-    ))
+    StorageLocation::Specific(
+        StateKey::resource_typed::<CoinInfoResource>(&AccountAddress::ONE).unwrap(),
+    )
 }
 
 pub fn chain_id_location() -> StorageLocation {
-    StorageLocation::Specific(StateKey::on_chain_config::<ChainId>())
+    StorageLocation::Specific(StateKey::on_chain_config::<ChainId>().unwrap())
 }
 
 pub fn transaction_fee_burn_cap_location() -> StorageLocation {
-    StorageLocation::Specific(StateKey::on_chain_config::<TransactionFeeBurnCap>())
+    StorageLocation::Specific(StateKey::on_chain_config::<TransactionFeeBurnCap>().unwrap())
 }
 
 pub fn rw_set_for_coin_transfer(

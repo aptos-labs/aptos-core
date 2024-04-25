@@ -137,13 +137,6 @@ impl Processor {
                     break;
                 }
             }
-
-            tracing::info!(
-                batch_start_version = batch_start_version,
-                cache_worker_latest = cache_worker_latest,
-                batches = ?batches,
-                "Filestore processor loop"
-            );
             // we're too close to the head
             if batches.is_empty() {
                 debug!(

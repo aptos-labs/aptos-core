@@ -1,0 +1,23 @@
+
+Diagnostics:
+error: type `signer` is missing required ability `key`
+  ┌─ tests/ability-check/v1-signer/invalid_move_to_sender.move:3:17
+  │
+3 │         move_to<signer>(s1, move s)
+  │                 ^^^^^^
+  │
+  = required by instantiating type parameter `T:key` of function `move_to`
+
+error: type `signer` is missing required ability `store`
+  ┌─ tests/ability-check/v1-signer/invalid_move_to_sender.move:8:27
+  │
+8 │     struct R has key { s: signer }
+  │                           ^^^^^^
+  │
+  = required by declaration of field `s`
+
+error: cannot use `signer` with an operator which expects a value of type `R`
+   ┌─ tests/ability-check/v1-signer/invalid_move_to_sender.move:10:24
+   │
+10 │         move_to<R>(s1, move s);
+   │                        ^^^^^^

@@ -226,6 +226,8 @@ spec:
         runAsGroup: 6180
         fsGroup: 6180
         {{- end }}
+        seccompProfile:
+          type: RuntimeDefault
       {{- end }}
       volumes:
       - name: aptos-config

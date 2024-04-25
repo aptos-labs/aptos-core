@@ -101,6 +101,8 @@ impl ExecutionAndIOCosts {
 
         lines.push("intrinsic", self.intrinsic_cost);
 
+        lines.push("keyless", self.keyless_cost);
+
         let mut path = vec![];
 
         struct Rec<'a> {
