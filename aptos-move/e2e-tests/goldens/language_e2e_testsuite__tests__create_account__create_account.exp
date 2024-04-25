@@ -5,18 +5,9 @@ Ok(
                 WriteSetV0(
                     WriteSetMut {
                         write_set: {
-                            StateKey {
-                                inner: AccessPath { address: 0xa550c18, path: "Resource(0x1::account::Account)" },
-                                hash: OnceCell(Uninit),
-                            }: Modification(201304972f9242cbc3528a1e286323471ab891baa37e0053b85651693a79854a000100000000000000040000000000000001000000000000000000000000000000000000000000000000000000000000000000000000000000000000000a550c1800000000000000000100000000000000000000000000000000000000000000000000000000000000000000000a550c180000, metadata:StateValueMetadata { inner: None }),
-                            StateKey {
-                                inner: AccessPath { address: 0xf5b9d6f01a99e74c790e2f330c092fa05455a8193f1dfc1b113ecc54d067afe1, path: "Resource(0x1::coin::CoinStore<0x1::aptos_coin::AptosCoin>)" },
-                                hash: OnceCell(Uninit),
-                            }: Creation(00000000000000000000000000000000000200000000000000f5b9d6f01a99e74c790e2f330c092fa05455a8193f1dfc1b113ecc54d067afe100000000000000000300000000000000f5b9d6f01a99e74c790e2f330c092fa05455a8193f1dfc1b113ecc54d067afe1, metadata:StateValueMetadata { inner: Some(StateValueMetadataInner { slot_deposit: 0, bytes_deposit: 0, creation_time_usecs: 0 }) }),
-                            StateKey {
-                                inner: AccessPath { address: 0xf5b9d6f01a99e74c790e2f330c092fa05455a8193f1dfc1b113ecc54d067afe1, path: "Resource(0x1::account::Account)" },
-                                hash: OnceCell(Uninit),
-                            }: Creation(20f5b9d6f01a99e74c790e2f330c092fa05455a8193f1dfc1b113ecc54d067afe10000000000000000040000000000000001000000000000000000000000000000f5b9d6f01a99e74c790e2f330c092fa05455a8193f1dfc1b113ecc54d067afe100000000000000000100000000000000f5b9d6f01a99e74c790e2f330c092fa05455a8193f1dfc1b113ecc54d067afe10000, metadata:StateValueMetadata { inner: Some(StateValueMetadataInner { slot_deposit: 0, bytes_deposit: 0, creation_time_usecs: 0 }) }),
+                            StateKey::AccessPath { address: 0xa550c18, path: "Resource(0x1::account::Account)" }: Modification(201304972f9242cbc3528a1e286323471ab891baa37e0053b85651693a79854a000100000000000000040000000000000001000000000000000000000000000000000000000000000000000000000000000000000000000000000000000a550c1800000000000000000100000000000000000000000000000000000000000000000000000000000000000000000a550c180000, metadata:StateValueMetadata { inner: None }),
+                            StateKey::AccessPath { address: 0xf5b9d6f01a99e74c790e2f330c092fa05455a8193f1dfc1b113ecc54d067afe1, path: "Resource(0x1::coin::CoinStore<0x1::aptos_coin::AptosCoin>)" }: Creation(00000000000000000000000000000000000200000000000000f5b9d6f01a99e74c790e2f330c092fa05455a8193f1dfc1b113ecc54d067afe100000000000000000300000000000000f5b9d6f01a99e74c790e2f330c092fa05455a8193f1dfc1b113ecc54d067afe1, metadata:StateValueMetadata { inner: Some(StateValueMetadataInner { slot_deposit: 0, bytes_deposit: 0, creation_time_usecs: 0 }) }),
+                            StateKey::AccessPath { address: 0xf5b9d6f01a99e74c790e2f330c092fa05455a8193f1dfc1b113ecc54d067afe1, path: "Resource(0x1::account::Account)" }: Creation(20f5b9d6f01a99e74c790e2f330c092fa05455a8193f1dfc1b113ecc54d067afe10000000000000000040000000000000001000000000000000000000000000000f5b9d6f01a99e74c790e2f330c092fa05455a8193f1dfc1b113ecc54d067afe100000000000000000100000000000000f5b9d6f01a99e74c790e2f330c092fa05455a8193f1dfc1b113ecc54d067afe10000, metadata:StateValueMetadata { inner: Some(StateValueMetadataInner { slot_deposit: 0, bytes_deposit: 0, creation_time_usecs: 0 }) }),
                         },
                     },
                 ),
