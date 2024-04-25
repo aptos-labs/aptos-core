@@ -21,7 +21,6 @@ pub const TIMELINE_INDEX_LABEL: &str = "timeline";
 pub const PARKING_LOT_INDEX_LABEL: &str = "parking_lot";
 pub const TRANSACTION_HASH_INDEX_LABEL: &str = "transaction_hash";
 pub const SIZE_BYTES_LABEL: &str = "size_bytes";
-pub const GAS_UPGRADED_INDEX_LABEL: &str = "gas_upgraded";
 
 // Core mempool stages labels
 pub const COMMIT_ACCEPTED_LABEL: &str = "commit_accepted";
@@ -173,6 +172,15 @@ pub static CORE_MEMPOOL_IDEMPOTENT_TXNS: Lazy<IntCounter> = Lazy::new(|| {
     register_int_counter!(
         "aptos_core_mempool_idempotent_txns_count",
         "Number of txns received that are idempotent duplicates"
+    )
+    .unwrap()
+});
+
+/// Counter tracking number of txns received that are gas upgraded for the same sequence number
+pub static CORE_MEMPOOL_GAS_UPGRADED_TXNS: Lazy<IntCounter> = Lazy::new(|| {
+    register_int_counter!(
+        "aptos_core_mempool_gas_upgraded_txns_count",
+        "Number of txns received that are gas upgraded for the same sequence number"
     )
     .unwrap()
 });

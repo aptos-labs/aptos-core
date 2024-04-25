@@ -10,7 +10,6 @@ use crate::{
         },
         mempool::Mempool,
         transaction::{InsertionInfo, MempoolTransaction, TimelineState},
-        TxnPointer,
     },
     counters,
     counters::{BROADCAST_BATCHED_LABEL, BROADCAST_READY_LABEL, CONSENSUS_READY_LABEL},
@@ -67,8 +66,6 @@ pub struct TransactionStore {
     hash_index: HashMap<HashValue, (AccountAddress, u64)>,
     // estimated size in bytes
     size_bytes: usize,
-    // keeps track of txns that were resubmitted with higher gas
-    gas_upgraded_index: HashMap<TxnPointer, u64>,
 
     // configuration
     capacity: usize,
@@ -100,7 +97,6 @@ impl TransactionStore {
             hash_index: HashMap::new(),
             // estimated size in bytes
             size_bytes: 0,
-            gas_upgraded_index: HashMap::new(),
 
             // configuration
             capacity: config.capacity,
@@ -192,7 +188,6 @@ impl TransactionStore {
         let address = txn.get_sender();
         let txn_seq_num = txn.sequence_info.transaction_sequence_number;
         let acc_seq_num = txn.sequence_info.account_sequence_number;
-        let mut gas_upgraded = false;
 
         // If the transaction is already in Mempool, we only allow the user to
         // increase the gas unit price to speed up a transaction, but not the max gas.
@@ -222,7 +217,7 @@ impl TransactionStore {
                     if let Some(txn) = txns.remove(&txn_seq_num) {
                         self.index_remove(&txn);
                     };
-                    gas_upgraded = true;
+                    counters::CORE_MEMPOOL_GAS_UPGRADED_TXNS.inc();
                 } else if current_version.get_gas_price() > txn.get_gas_price() {
                     return MempoolStatus::new(MempoolStatusCode::InvalidUpdate).with_message(
                         "Transaction already in mempool with a higher gas price".to_string(),
@@ -267,10 +262,6 @@ impl TransactionStore {
                 .insert(txn.get_committed_hash(), (txn.get_sender(), txn_seq_num));
             self.sequence_numbers.insert(txn.get_sender(), acc_seq_num);
             self.size_bytes += txn.get_estimated_bytes();
-            if gas_upgraded {
-                self.gas_upgraded_index
-                    .insert(TxnPointer::from(&txn), txn.get_gas_price());
-            }
             txns.insert(txn_seq_num, txn);
             self.track_indices();
         }
@@ -305,10 +296,6 @@ impl TransactionStore {
             self.hash_index.len(),
         );
         counters::core_mempool_index_size(counters::SIZE_BYTES_LABEL, self.size_bytes);
-        counters::core_mempool_index_size(
-            counters::GAS_UPGRADED_INDEX_LABEL,
-            self.gas_upgraded_index.len(),
-        );
     }
 
     /// Checks if Mempool is full.
@@ -553,7 +540,6 @@ impl TransactionStore {
         self.parking_lot_index.remove(txn);
         self.hash_index.remove(&txn.get_committed_hash());
         self.size_bytes -= txn.get_estimated_bytes();
-        self.gas_upgraded_index.remove(&TxnPointer::from(txn));
 
         // Remove account datastructures if there are no more transactions for the account.
         let address = &txn.get_sender();

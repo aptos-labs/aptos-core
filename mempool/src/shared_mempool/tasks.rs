@@ -477,7 +477,6 @@ pub(crate) fn process_quorum_store_request<NetworkClient, TransactionValidator>(
             max_txns,
             max_bytes,
             return_non_full,
-            _include_gas_upgraded,
             exclude_transactions,
             callback,
         ) => {
