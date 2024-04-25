@@ -69,7 +69,7 @@ impl<'a, S: 'a + StateView + Sync> ExecutorTask for AptosExecutorTask<'a, S> {
             ExecutionStatus::DelayedFieldsCodeInvariantError("fail points error".into())
         });
 
-        spin_wait(1000);
+        //spin_wait(1000);
 
         let log_context = AdapterLogSchema::new(self.base_view.id(), txn_idx as usize);
         let resolver = self

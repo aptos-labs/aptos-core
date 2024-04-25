@@ -514,10 +514,16 @@ impl<F> Executor for WorkerFunctionExecutor<F> where F : Fn(&ThreadGarageHandle)
 
 pub struct ThreadGarageExecutor {
     garage: Arc<ThreadGarage>,
+    max_spawned: usize,
 }
 
 
 impl ThreadGarageExecutor {    
+    
+
+    pub fn num_total_threads(&self) -> usize {
+        self.max_spawned
+    }
 
     pub fn new(max_active: usize, max_spawned: usize) -> Self {
         assert!(max_spawned >= max_active);
@@ -536,11 +542,12 @@ impl ThreadGarageExecutor {
 
         Self {
             garage: temp_thread_garage,
+            max_spawned,
         }
     }
 
 
-    pub fn spawn_n<F> (&self, worker_function: F) where F : Fn(&ThreadGarageHandle) -> ReturnType + Send + Sync {        
+    pub fn spawn_n<F> (&self, worker_function: F) where F : Fn(&ThreadGarageHandle) -> ReturnType  + Send + Sync {        
         //start threads, first time spawn_n is called
 
         let temp_executor = Arc::new(WorkerFunctionExecutor::new(worker_function));

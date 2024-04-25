@@ -21,6 +21,9 @@ use crate::{
     thread_garage::{ThreadGarageExecutor,Baton,ReturnType},
 };
 
+use rayon::prelude::*;
+
+
 use aptos_aggregator::{
     delayed_change::{ApplyBase, DelayedChange},
     delta_change_set::serialize,
@@ -58,9 +61,10 @@ use std::{
     marker::{PhantomData, Sync},
     sync::{
         atomic::{AtomicBool, AtomicU32, Ordering},
-        Arc,
+        Arc,Mutex
     },
 };
+use rayon::ThreadPoolBuilder;
 
 
 pub struct BlockExecutor<T, E, S, L, X> {
@@ -730,7 +734,7 @@ where
 
     fn worker_loop(
         &self,
-        executor_arguments: &E::Argument,
+        executor: &E,
         block: &[T],
         last_input_output: &TxnLastInputOutput<T, E::Output, E::Error>,
         versioned_cache: &MVHashMap<T::Key, T::Tag, T::Value, X, T::Identifier>,
@@ -744,7 +748,7 @@ where
     ) -> Result<Option<Baton<DependencyStatus>>, PanicOr<ParallelBlockExecutionError>> {
         // Make executor for each task. TODO: fast concurrent executor.
         let init_timer = VM_INIT_SECONDS.start_timer();
-        let executor = E::init(*executor_arguments);
+        //let executor = E::init(*executor_arguments);
         drop(init_timer);
 
         let _timer = WORK_WITH_TASK_SECONDS.start_timer();
@@ -779,7 +783,7 @@ where
                     base_view,
                     start_shared_counter,
                     shared_counter,
-                    &executor,
+                    executor,
                     block,
                 )?;
                 scheduler_handle.get_scheduler().queueing_commits_mark_done();
@@ -815,7 +819,7 @@ where
                         block,
                         last_input_output,
                         versioned_cache,
-                        &executor,
+                        executor,
                         base_view,
                         ParallelState::new(
                             versioned_cache,
@@ -930,11 +934,14 @@ where
             }
         });*/
 
+        let executor_vec: Vec<E> = (0..self.garage.num_total_threads()).map(|_| E::init(executor_initial_arguments)).collect();
+
         self.garage.spawn_n(|garage| -> ReturnType {
             //eprintln!("calling function");
             let scheduler_handle = SchedulerHandle::new(&scheduler, garage);
+
             let res = self.worker_loop(
-                &executor_initial_arguments,
+                &executor_vec[garage.get_thread_id()],
                 signature_verified_block,
                 &last_input_output,
                 &versioned_cache,
