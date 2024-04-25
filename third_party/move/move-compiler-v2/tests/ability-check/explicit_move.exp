@@ -1,10 +1,10 @@
 
 Diagnostics:
 error: local `x` of type `m::R` does not have the `copy` ability
-   ┌─ tests/ability-check/explicit_move.move:12:9
+   ┌─ tests/ability-check/explicit_move.move:12:14
    │
 12 │         some(x);
-   │         ^^^^^^^ copy needed here because value is still in use
+   │              ^ copy needed here because value is still in use
 13 │         some(x);
    │         ------- used here
 

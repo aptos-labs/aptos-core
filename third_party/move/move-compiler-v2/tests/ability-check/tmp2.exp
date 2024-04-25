@@ -1,0 +1,16 @@
+
+Diagnostics:
+error: value of type `test::R` does not have the `drop` ability
+  ┌─ tests/ability-check/tmp2.move:7:7
+  │
+7 │       x;
+  │       ^ implicitly dropped here since it is no longer used
+
+error: local `x` of type `test::R` does not have the `drop` ability
+   ┌─ tests/ability-check/tmp2.move:8:12
+   │
+ 8 │       } else {
+   │ ╭────────────^
+ 9 │ │
+10 │ │     }
+   │ ╰─────^ implicitly dropped here since it is no longer used
