@@ -315,12 +315,11 @@ pub enum StateKeyDecodeErr {
 mod tests {
     use crate::{
         account_config::{AccountResource, ObjectGroupResource},
-        state_store::state_key::{AccessPath, StateKey},
+        state_store::state_key::StateKey,
     };
     use aptos_crypto::hash::CryptoHash;
     use move_core_types::{
-        account_address::AccountAddress, ident_str, language_storage::ModuleId,
-        move_resource::MoveStructType,
+        account_address::AccountAddress, ident_str, move_resource::MoveStructType,
     };
 
     fn assert_crypto_hash(key: &StateKey, expected_hash: &str) {
@@ -371,26 +370,25 @@ mod tests {
     #[test]
     fn test_debug() {
         // code
-        let key = StateKey::access_path(AccessPath::code_access_path(ModuleId::new(
-            "0xcafe".parse().unwrap(),
-            "my_module".parse().unwrap(),
-        )));
+        let key = StateKey::module(&AccountAddress::ONE, ident_str!("account"));
         assert_eq!(
             &format!("{:?}", key),
-            "StateKey::AccessPath { address: 0xcafe, path: \"Code(000000000000000000000000000000000000000000000000000000000000cafe::my_module)\" }",
+            "StateKey::AccessPath { address: 0x1, path: \"Code(0000000000000000000000000000000000000000000000000000000000000001::account)\" }",
         );
 
         // resource
-        let key = StateKey::access_path(
-            AccessPath::resource_access_path(
-                "0xcafe".parse().unwrap(),
-                "0x1::account::Account".parse().unwrap(),
-            )
-            .unwrap(),
-        );
+        let key = StateKey::resource_typed::<AccountResource>(&AccountAddress::FOUR).unwrap();
         assert_eq!(
             &format!("{:?}", key),
-            "StateKey::AccessPath { address: 0xcafe, path: \"Resource(0x1::account::Account)\" }",
+            "StateKey::AccessPath { address: 0x4, path: \"Resource(0x1::account::Account)\" }",
+        );
+
+        // resource group
+        let key =
+            StateKey::resource_group(&AccountAddress::THREE, &ObjectGroupResource::struct_tag());
+        assert_eq!(
+            &format!("{:?}", key),
+            "StateKey::AccessPath { address: 0x3, path: \"ResourceGroup(0x1::object::ObjectGroup)\" }",
         );
 
         // table item
