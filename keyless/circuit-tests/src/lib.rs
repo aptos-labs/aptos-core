@@ -24,6 +24,8 @@ mod arrays;
 #[cfg(test)]
 mod rsa;
 #[cfg(test)]
+mod misc;
+#[cfg(test)]
 mod jwt_field_parsing;
 
 pub struct TestCircuitHandle {
