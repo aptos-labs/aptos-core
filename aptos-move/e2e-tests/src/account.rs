@@ -47,6 +47,13 @@ impl AccountPublicKey {
             AccountPublicKey::Keyless(_) => None,
         }
     }
+
+    pub fn as_keyless(&self) -> Option<KeylessPublicKey> {
+        match self {
+            AccountPublicKey::Keyless(pk) => Some(pk.clone()),
+            AccountPublicKey::Ed25519(_) => None,
+        }
+    }
 }
 
 /// Details about a Aptos account.
