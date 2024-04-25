@@ -183,6 +183,10 @@ impl BlockInfo {
         self.version
     }
 
+    pub fn set_version(&mut self, version: Version) {
+        self.version = version;
+    }
+
     /// This function checks if the current BlockInfo has
     /// exactly the same values in those fields that will not change
     /// after execution, compared to a given BlockInfo

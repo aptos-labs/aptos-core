@@ -633,22 +633,24 @@ impl AptosDB {
         Ok(())
     }
 
-    pub fn revert_last_commit(
+    /// Revert a commit. The latest version will always be one less than the
+    /// `target_version`.
+    pub fn revert_commit(
         &self,
-        last_version: Version,
+        version_to_revert: Version,
+        latest_version: Version,
         new_root_hash: HashValue,
-        ledger_info_with_sigs: &LedgerInfoWithSignatures,
+        mut ledger_info_with_sigs: LedgerInfoWithSignatures,
     ) -> Result<()> {
+        // The state and version after commit will always be one less than the version to revert
         let _timer = OTHER_TIMERS_SECONDS
-            .with_label_values(&["revert_last_commit"])
+            .with_label_values(&["revert_commit"])
             .start_timer();
-
         // Revert the ledger commit progress
         let ledger_batch = SchemaBatch::new();
         ledger_batch.put::<DbMetadataSchema>(
             &DbMetadataKey::LedgerCommitProgress,
-            // Even though this is a revert operation, we still want to increment the version.
-            &DbMetadataValue::Version(last_version + 1),
+            &DbMetadataValue::Version(version_to_revert - 1),
         )?;
         self.ledger_db.metadata_db().write_schemas(ledger_batch)?;
 
@@ -656,17 +658,17 @@ impl AptosDB {
         let ledger_batch = SchemaBatch::new();
         ledger_batch.put::<DbMetadataSchema>(
             &DbMetadataKey::OverallCommitProgress,
-            &DbMetadataValue::Version(last_version + 1),
+            &DbMetadataValue::Version(version_to_revert - 1),
         )?;
         self.ledger_db.metadata_db().write_schemas(ledger_batch)?;
 
-        let temp_position = Position::from_postorder_index(last_version)?;
+        let temp_position = Position::from_postorder_index(latest_version)?;
 
         // Revert the transaction accumulator
         let batch = SchemaBatch::new();
         self.ledger_db
             .transaction_accumulator_db()
-            .revert_transaction_accumulator(last_version, &batch, temp_position)?;
+            .revert_transaction_accumulator(version_to_revert - 1, &batch, temp_position)?;
         self.ledger_db
             .transaction_accumulator_db()
             .write_schemas(batch)?;
@@ -675,8 +677,7 @@ impl AptosDB {
         let batch = SchemaBatch::new();
         self.ledger_db
             .transaction_info_db()
-            .delete_transaction_info(last_version, &batch)?;
-
+            .delete_transaction_info(version_to_revert, &batch)?;
         let batch = SchemaBatch::new();
         self.ledger_db.transaction_info_db().write_schemas(batch)?;
 
@@ -684,13 +685,12 @@ impl AptosDB {
         let batch = SchemaBatch::new();
         self.ledger_db
             .event_db()
-            .delete_events(last_version, &batch)?;
+            .delete_events(version_to_revert, &batch)?;
         self.ledger_db.event_db().write_schemas(batch)?;
 
         // Revert the transaction auxiliary data
         let batch = SchemaBatch::new();
-        TransactionAuxiliaryDataDb::prune(last_version, last_version, &batch)?;
-
+        TransactionAuxiliaryDataDb::prune(version_to_revert - 1, latest_version, &batch)?;
         let batch = SchemaBatch::new();
         self.ledger_db
             .transaction_auxiliary_data_db()
@@ -698,20 +698,31 @@ impl AptosDB {
 
         // Revert the write set
         let batch = SchemaBatch::new();
-        WriteSetDb::prune(last_version - 1, last_version, &batch)?;
+        WriteSetDb::prune(version_to_revert - 1, latest_version, &batch)?;
         self.ledger_db.transaction_db().prune_transactions(
-            last_version -1,
-            last_version,
+            version_to_revert - 1,
+            latest_version,
             &batch,
         )?;
+
         // Revert the state kv and ledger metadata not yet implemented
         self.state_store
             .state_kv_db
-            .revert_state_kv_and_ledger_metadata(last_version)?;
+            .revert_state_kv_and_ledger_metadata(version_to_revert)?;
+
+        // The latest version will be the version_to_revert
+        //Update the version of `ledger_info_with_sigs`
+        let _ledger_info = ledger_info_with_sigs
+            .ledger_info()
+            .to_owned()
+            .set_version(version_to_revert);
 
         // Update the latest ledger info if provided
-        self.commit_ledger_info(last_version + 1, new_root_hash, Some(ledger_info_with_sigs))?;
-
+        self.commit_ledger_info(
+            version_to_revert,
+            new_root_hash,
+            Some(&ledger_info_with_sigs),
+        )?;
         Ok(())
     }
 }
