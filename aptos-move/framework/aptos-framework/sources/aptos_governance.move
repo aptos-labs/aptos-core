@@ -449,6 +449,31 @@ module aptos_framework::aptos_governance {
         proposal_id
     }
 
+    /// Vote on proposal with proposal_id and all voting power from multiple stake_pools.
+    public entry fun batch_vote(
+        voter: &signer,
+        stake_pools: vector<address>,
+        proposal_id: u64,
+        should_pass: bool,
+    ) acquires ApprovedExecutionHashes, VotingRecords, VotingRecordsV2, GovernanceEvents {
+        vector::for_each(stake_pools, |stake_pool| {
+            vote_internal(voter, stake_pool, proposal_id, MAX_U64, should_pass);
+        });
+    }
+
+    /// Batch vote on proposal with proposal_id and specified voting power from multiple stake_pools.
+    public entry fun batch_partial_vote(
+        voter: &signer,
+        stake_pools: vector<address>,
+        proposal_id: u64,
+        voting_power: u64,
+        should_pass: bool,
+    ) acquires ApprovedExecutionHashes, VotingRecords, VotingRecordsV2, GovernanceEvents {
+        vector::for_each(stake_pools, |stake_pool| {
+            partial_vote(voter, stake_pool, proposal_id, voting_power, should_pass);
+        });
+    }
+
     /// Vote on proposal with `proposal_id` and all voting power from `stake_pool`.
     public entry fun vote(
         voter: &signer,
