@@ -103,7 +103,7 @@ pub struct AdapterPublishArgs {
 
 #[derive(Debug, Parser)]
 pub struct AdapterExecuteArgs {
-    #[clap(long)]
+    #[clap(long, default_value = "true")]
     pub check_runtime_types: bool,
     /// print more complete information for VMErrors on run
     #[clap(long)]
@@ -199,7 +199,7 @@ impl<'a> MoveTestAdapter<'a> for SimpleVMTestAdapter<'a> {
                     }
                     Ok(())
                 },
-                VMConfig::production(),
+                default_test_vm_config(),
             )
             .unwrap();
         let mut addr_to_name_mapping = BTreeMap::new();
@@ -250,7 +250,7 @@ impl<'a> MoveTestAdapter<'a> for SimpleVMTestAdapter<'a> {
                     compat,
                 )
             },
-            VMConfig::production(),
+            default_test_vm_config(),
         ) {
             Ok(()) => Ok((None, module)),
             Err(vm_error) => Err(anyhow!(
@@ -557,5 +557,12 @@ impl From<AdapterExecuteArgs> for VMConfig {
             paranoid_type_checks: arg.check_runtime_types,
             ..Self::production()
         }
+    }
+}
+
+fn default_test_vm_config() -> VMConfig {
+    VMConfig {
+        paranoid_type_checks: true,
+        ..VMConfig::production()
     }
 }
