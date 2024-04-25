@@ -364,7 +364,7 @@ mod test {
     }
 
     fn key(s: impl ToString) -> StateKey {
-        StateKey::raw(s.to_string().into_bytes())
+        StateKey::raw(s.to_string().as_bytes())
     }
 
     fn write(v: u128) -> WriteOp {

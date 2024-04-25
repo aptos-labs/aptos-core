@@ -19,7 +19,6 @@ use aptos_api_types::{
     MoveModuleId, MoveResource, MoveStructTag, StateKeyWrapper, U64,
 };
 use aptos_types::{
-    access_path::AccessPath,
     account_config::{AccountResource, ObjectGroupResource},
     event::{EventHandle, EventKey},
     state_store::state_key::StateKey,
@@ -258,16 +257,14 @@ impl Account {
     }
 
     pub fn get_account_resource(&self) -> Result<Vec<u8>, BasicErrorWith404> {
-        let state_key = StateKey::access_path(
-            AccessPath::resource_access_path(self.address.into(), AccountResource::struct_tag())
-                .map_err(|e| {
-                    BasicErrorWith404::internal_with_code(
-                        e,
-                        AptosErrorCode::InternalError,
-                        &self.latest_ledger_info,
-                    )
-                })?,
-        );
+        let state_key =
+            StateKey::resource_typed::<AccountResource>(self.address.inner()).map_err(|e| {
+                BasicErrorWith404::internal_with_code(
+                    e,
+                    AptosErrorCode::InternalError,
+                    &self.latest_ledger_info,
+                )
+            })?;
 
         let state_value = self.context.get_state_value_poem(
             &state_key,
@@ -287,10 +284,8 @@ impl Account {
             return Ok(());
         }
 
-        let state_key = StateKey::access_path(AccessPath::resource_group_access_path(
-            self.address.into(),
-            ObjectGroupResource::struct_tag(),
-        ));
+        let state_key =
+            StateKey::resource_group(&self.address.into(), &ObjectGroupResource::struct_tag());
 
         let state_value = self.context.get_state_value_poem(
             &state_key,

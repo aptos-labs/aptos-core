@@ -1290,7 +1290,7 @@ pub fn test_mainnet_end_to_end() {
 
     let WriteSet::V0(writeset) = changeset.write_set();
 
-    let state_key = StateKey::on_chain_config::<ValidatorSet>();
+    let state_key = StateKey::on_chain_config::<ValidatorSet>().unwrap();
     let bytes = writeset
         .get(&state_key)
         .unwrap()

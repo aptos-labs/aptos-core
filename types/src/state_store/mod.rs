@@ -124,7 +124,7 @@ pub trait MoveResourceExt: MoveResource {
         state_view: &dyn StateView,
         address: &AccountAddress,
     ) -> Result<Option<Self>> {
-        let state_key = StateKey::resource_typed::<Self>(address);
+        let state_key = StateKey::resource_typed::<Self>(address)?;
         Ok(state_view
             .get_state_value_bytes(&state_key)?
             .map(|bytes| bcs::from_bytes(&bytes))
