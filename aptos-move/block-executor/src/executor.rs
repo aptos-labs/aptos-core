@@ -61,7 +61,7 @@ use std::{
     marker::{PhantomData, Sync},
     sync::{
         atomic::{AtomicBool, AtomicU32, Ordering},
-        Arc,Mutex
+        Arc,Once,Mutex
     },
 };
 use rayon::ThreadPoolBuilder;
@@ -734,7 +734,7 @@ where
 
     fn worker_loop(
         &self,
-        executor: &E,
+        executor_arguments: &Option<E>,
         block: &[T],
         last_input_output: &TxnLastInputOutput<T, E::Output, E::Error>,
         versioned_cache: &MVHashMap<T::Key, T::Tag, T::Value, X, T::Identifier>,
@@ -748,7 +748,9 @@ where
     ) -> Result<Option<Baton<DependencyStatus>>, PanicOr<ParallelBlockExecutionError>> {
         // Make executor for each task. TODO: fast concurrent executor.
         let init_timer = VM_INIT_SECONDS.start_timer();
-        //let executor = E::init(*executor_arguments);
+        
+        let executor = executor_arguments.as_ref().unwrap();
+
         drop(init_timer);
 
         let _timer = WORK_WITH_TASK_SECONDS.start_timer();
@@ -934,47 +936,62 @@ where
             }
         });*/
 
-        let executor_vec: Vec<E> = (0..self.garage.num_total_threads()).map(|_| E::init(executor_initial_arguments)).collect();
+        let executor_vec: ExplicitSyncWrapper<Vec<Option<E>>> = ExplicitSyncWrapper::new((0..self.garage.num_total_threads()).map(|_| None).collect());
 
-        self.garage.spawn_n(|garage| -> ReturnType {
-            //eprintln!("calling function");
-            let scheduler_handle = SchedulerHandle::new(&scheduler, garage);
 
-            let res = self.worker_loop(
-                &executor_vec[garage.get_thread_id()],
-                signature_verified_block,
-                &last_input_output,
-                &versioned_cache,
-                &scheduler_handle,
-                base_view,
-                start_shared_counter,
-                &shared_counter,
-                &shared_commit_state,
-                &final_results,
-            );
-            match res {
-                Err(err) => {
-                    // If there are multiple errors, they all get logged:
-                    // ModulePathReadWriteError and FatalVMErrorvariant is logged at construction,
-                    // and below we log CodeInvariantErrors.
-                    if let PanicOr::CodeInvariantError(err_msg) = err {
-                        alert!("[BlockSTM] worker loop: CodeInvariantError({:?})", err_msg);
-                        println!("error error {}",err_msg);
-                    }
-                    
-                    shared_maybe_error.store(true, Ordering::SeqCst);
+        let once_vec: Vec<Arc<Once>> = (0..self.garage.num_total_threads()).map(|_| Arc::new(Once::new())).collect();
 
-                    //eprintln!("halting from here thread= {}", garage.get_thread_id());
-                    // Make sure to halt the scheduler if it hasn't already been halted.
-                    scheduler_handle.halt();
+        {
+            self.garage.spawn_n(|garage| -> ReturnType {
+                //eprintln!("calling function");
 
-                    return ReturnType::new(Option::<Baton<DependencyStatus>>::None);
-                },
-                Ok(baton) => {
-                    return ReturnType::new(baton);
+                let thread_id = garage.get_thread_id();
+
+                let scheduler_handle = SchedulerHandle::new(&scheduler, garage);
+                
+                
+                let temp = executor_vec.dereference_mut();
+                
+                if temp[thread_id].is_none() {
+                    temp[thread_id] = Some(E::init(executor_initial_arguments));
                 }
-            }
-        });
+
+                let res = self.worker_loop(
+                    &temp[thread_id],
+                    signature_verified_block,
+                    &last_input_output,
+                    &versioned_cache,
+                    &scheduler_handle,
+                    base_view,
+                    start_shared_counter,
+                    &shared_counter,
+                    &shared_commit_state,
+                    &final_results,
+                );
+                match res {
+                    Err(err) => {
+                        // If there are multiple errors, they all get logged:
+                        // ModulePathReadWriteError and FatalVMErrorvariant is logged at construction,
+                        // and below we log CodeInvariantErrors.
+                        if let PanicOr::CodeInvariantError(err_msg) = err {
+                            alert!("[BlockSTM] worker loop: CodeInvariantError({:?})", err_msg);
+                            println!("error error {}",err_msg);
+                        }
+                        
+                        shared_maybe_error.store(true, Ordering::SeqCst);
+
+                        //eprintln!("halting from here thread= {}", garage.get_thread_id());
+                        // Make sure to halt the scheduler if it hasn't already been halted.
+                        scheduler_handle.halt();
+
+                        return ReturnType::new(Option::<Baton<DependencyStatus>>::None);
+                    },
+                    Ok(baton) => {
+                        return ReturnType::new(baton);
+                    }
+                }
+            });
+        }
         drop(timer);
 
         counters::update_state_counters(versioned_cache.stats(), true);
