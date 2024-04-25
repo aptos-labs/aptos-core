@@ -23,6 +23,15 @@ template isWhitespace() {
    signal output is_whitespace <== is_tab + is_line_break + is_space;
 }
 
+template isForbiddenChar() {
+   signal input char;  
+                       
+   signal is_quote <== IsEqual()([char, 34]); 
+   signal is_backslash <== IsEqual()([char, 92]); 
+
+   signal output is_forbidden_char <== is_quote + is_backslash;
+}
+
 // https://github.com/TheFrozenFire/snark-jwt-verify/blob/master/circuits/calculate_total.circom
 // This circuit returns the sum of the inputs.
 // n must be greater than 0.
