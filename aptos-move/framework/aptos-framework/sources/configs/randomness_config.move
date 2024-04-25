@@ -133,7 +133,7 @@ module aptos_framework::randomness_config {
 
         // Enabling.
         let config = new_v1(
-            fixed_point64::create_from_rational(1, 2),
+            fixed_point64::create_from_rational(10, 20),
             fixed_point64::create_from_rational(2, 3)
         );
         set_for_next_epoch(&framework, config);
