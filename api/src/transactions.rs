@@ -305,7 +305,6 @@ impl TransactionsApi {
         accept_type: AcceptType,
         data: SubmitTransactionPost,
     ) -> SubmitTransactionResult<PendingTransaction> {
-        println!("submit_transaction");
         data.verify()
             .context("Submitted transaction invalid'")
             .map_err(|err| {
@@ -314,22 +313,16 @@ impl TransactionsApi {
                     AptosErrorCode::InvalidInput,
                 )
             })?;
-        println!("transaction verified");
         fail_point_poem("endpoint_submit_transaction")?;
         if !self.context.node_config.api.transaction_submission_enabled {
             return Err(api_disabled("Submit transaction"));
         }
-        println!("api enabled");
         self.context
             .check_api_output_enabled("Submit transaction", &accept_type)?;
         let ledger_info = self.context.get_latest_ledger_info()?;
-        println!("ledger_info: {:?}", ledger_info);
         let signed_transaction = self.get_signed_transaction(&ledger_info, data)?;
-        println!("signed_transaction: {:?}", signed_transaction);
-        let res = self.create(&accept_type, &ledger_info, signed_transaction)
-            .await?;
-        println!("sumitted transaction");
-        Ok(res)
+        self.create(&accept_type, &ledger_info, signed_transaction)
+            .await
     }
 
     /// Submit batch transactions
@@ -1065,7 +1058,6 @@ impl TransactionsApi {
 
     /// Submits a single transaction, and converts mempool codes to errors
     async fn create_internal(&self, txn: SignedTransaction) -> Result<(), AptosError> {
-        println!("create_internal");
         let (mempool_status, vm_status_opt) = self
             .context
             .submit_transaction(txn)
