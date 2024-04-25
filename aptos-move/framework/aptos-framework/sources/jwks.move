@@ -31,6 +31,7 @@ module aptos_framework::jwks {
     const EUNKNOWN_JWK_VARIANT: u64 = 4;
     const EISSUER_NOT_FOUND: u64 = 5;
     const EJWK_ID_NOT_FOUND: u64 = 6;
+    const EAPI_DISABLED: u64 = 7;
 
     const ENATIVE_MISSING_RESOURCE_VALIDATOR_SET: u64 = 0x0101;
     const ENATIVE_MISSING_RESOURCE_OBSERVED_JWKS: u64 = 0x0102;
@@ -247,9 +248,15 @@ module aptos_framework::jwks {
     }
 
     /// Only used in reconfigurations to apply the pending `SupportedOIDCProviders`, if there is any.
-    public(friend) fun on_new_epoch() acquires SupportedOIDCProviders {
+    public(friend) fun on_new_epoch(framework: &signer) acquires SupportedOIDCProviders {
+        system_addresses::assert_aptos_framework(framework);
         if (config_buffer::does_exist<SupportedOIDCProviders>()) {
-            *borrow_global_mut<SupportedOIDCProviders>(@aptos_framework) = config_buffer::extract();
+            let new_config = config_buffer::extract<SupportedOIDCProviders>();
+            if (exists<SupportedOIDCProviders>(@aptos_framework)) {
+                *borrow_global_mut<SupportedOIDCProviders>(@aptos_framework) = new_config;
+            } else {
+                move_to(framework, new_config);
+            }
         }
     }
 

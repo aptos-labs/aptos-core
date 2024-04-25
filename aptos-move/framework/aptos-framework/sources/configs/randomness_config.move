@@ -11,6 +11,9 @@ module aptos_framework::randomness_config {
 
     const EINVALID_CONFIG_VARIANT: u64 = 1;
 
+    /// API has been disabled.
+    const EAPI_DISABLED: u64 = 2;
+
     /// The configuration of the on-chain randomness feature.
     struct RandomnessConfig has copy, drop, key, store {
         /// A config variant packed as an `Any`.
@@ -56,10 +59,15 @@ module aptos_framework::randomness_config {
     }
 
     /// Only used in reconfigurations to apply the pending `RandomnessConfig`, if there is any.
-    public(friend) fun on_new_epoch() acquires RandomnessConfig {
+    public(friend) fun on_new_epoch(framework: &signer) acquires RandomnessConfig {
+        system_addresses::assert_aptos_framework(framework);
         if (config_buffer::does_exist<RandomnessConfig>()) {
             let new_config = config_buffer::extract<RandomnessConfig>();
-            borrow_global_mut<RandomnessConfig>(@aptos_framework).variant = new_config.variant;
+            if (exists<RandomnessConfig>(@aptos_framework)) {
+                *borrow_global_mut<RandomnessConfig>(@aptos_framework) = new_config;
+            } else {
+                move_to(framework, new_config);
+            }
         }
     }
 
@@ -137,12 +145,12 @@ module aptos_framework::randomness_config {
             fixed_point64::create_from_rational(2, 3)
         );
         set_for_next_epoch(&framework, config);
-        on_new_epoch();
+        on_new_epoch(&framework);
         assert!(enabled(), 1);
 
         // Disabling.
         set_for_next_epoch(&framework, new_off());
-        on_new_epoch();
+        on_new_epoch(&framework);
         assert!(!enabled(), 2);
     }
 }
