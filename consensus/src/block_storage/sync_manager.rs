@@ -296,35 +296,35 @@ impl BlockStore {
 
         // check if highest_commit_cert comes from a fork
         // if so, we need to fetch it's block as well, to have a proof of commit.
-        // if !blocks
-        //     .iter()
-        //     .any(|block| block.id() == highest_commit_cert.certified_block().id())
-        // {
-        //     info!(
-        //         "Found forked QC {}, fetching it as well",
-        //         highest_commit_cert
-        //     );
-        //     let mut additional_blocks = retriever
-        //         .retrieve_block_for_qc(
-        //             highest_commit_cert,
-        //             1,
-        //             highest_commit_cert.certified_block().id(),
-        //         )
-        //         .await?;
+        if !blocks
+            .iter()
+            .any(|block| block.id() == highest_commit_cert.certified_block().id())
+        {
+            info!(
+                "Found forked QC {}, fetching it as well",
+                highest_commit_cert
+            );
+            let mut additional_blocks = retriever
+                .retrieve_block_for_qc(
+                    highest_commit_cert,
+                    1,
+                    highest_commit_cert.certified_block().id(),
+                )
+                .await?;
 
-        //     assert_eq!(additional_blocks.len(), 1);
-        //     let block = additional_blocks.pop().expect("blocks are empty");
-        //     assert_eq!(
-        //         block.id(),
-        //         highest_commit_cert.certified_block().id(),
-        //         "Expecting in the retrieval response, for commit certificate fork, first block should be {}, but got {}",
-        //         highest_commit_cert.certified_block().id(),
-        //         block.id(),
-        //     );
+            assert_eq!(additional_blocks.len(), 1);
+            let block = additional_blocks.pop().expect("blocks are empty");
+            assert_eq!(
+                block.id(),
+                highest_commit_cert.certified_block().id(),
+                "Expecting in the retrieval response, for commit certificate fork, first block should be {}, but got {}",
+                highest_commit_cert.certified_block().id(),
+                block.id(),
+            );
 
-        //     blocks.push(block);
-        //     quorum_certs.push(highest_commit_cert.clone());
-        // }
+            blocks.push(block);
+            quorum_certs.push(highest_commit_cert.clone());
+        }
 
         assert_eq!(blocks.len(), quorum_certs.len());
         for (i, block) in blocks.iter().enumerate() {
