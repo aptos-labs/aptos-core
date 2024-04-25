@@ -129,14 +129,6 @@ fn test_undergas_attack_prevention() {
         .expect("building package must succeed");
     set_randomness_seed(&mut h);
 
-    // Modify gas parameters so the required deposit for randomness txns is 234_000_000 when gas price is 1.
-    // h.modify_gas_schedule(|gas_params| {
-    //     gas_params.vm.txn.max_execution_gas = 200_000_000.into();
-    //     gas_params.vm.txn.max_io_gas = 30_000_000.into();
-    //     gas_params.vm.txn.max_storage_fee = 4_000_000.into();
-    //     gas_params.vm.txn.maximum_number_of_gas_units = 234_000_001.into();
-    // });
-
     h.set_default_gas_unit_price(1);
 
     // A function to send some amount to 2 people where how to split between the 2 is randomized.

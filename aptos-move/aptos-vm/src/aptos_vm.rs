@@ -2425,6 +2425,8 @@ impl AptosVM {
                 if self.features().is_enabled(FeatureFlag::RANDOMNESS_API_V0)
                     && has_randomness_attribute(resolver, session, entry_func).unwrap_or(false)
                 {
+                    // 0.01 APT to mitigate undergasing attack.
+                    // Will have better API soon, so not bothering to set up on-chain config for this.
                     Some(1_000_000)
                 } else {
                     None
