@@ -838,6 +838,7 @@ impl TransactionsApi {
                 .await
                 .context("Failed to join task to read transaction by hash")?
                 .context("Failed to read transaction by hash from DB")?;
+        println!("from_db: {:?}", from_db);
         Ok(match from_db {
             None => self
                 .context
