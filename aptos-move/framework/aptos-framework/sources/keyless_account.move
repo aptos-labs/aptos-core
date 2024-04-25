@@ -10,6 +10,7 @@ module aptos_framework::keyless_account {
     use std::vector;
     use aptos_std::crypto_algebra;
     use aptos_std::ed25519;
+    use aptos_framework::chain_status;
     use aptos_framework::system_addresses;
 
     // The `aptos_framework::reconfiguration_with_dkg` module needs to be able to call `on_new_epoch`.
@@ -123,6 +124,67 @@ module aptos_framework::keyless_account {
         };
     }
 
+    /// Sets the Groth16 verification key, only callable during genesis. To call during governance proposals, use
+    /// `set_groth16_verification_key_for_next_epoch`.
+    ///
+    /// WARNING: See `set_groth16_verification_key_for_next_epoch` for caveats.
+    public fun update_groth16_verification_key(fx: &signer, vk: Groth16VerificationKey) {
+        system_addresses::assert_aptos_framework(fx);
+        chain_status::assert_genesis();
+        // There should not be a previous resource set here.
+        move_to(fx, vk);
+    }
+
+    /// Sets the keyless configuration, only callable during genesis. To call during governance proposals, use
+    /// `set_configuration_for_next_epoch`.
+    ///
+    /// WARNING: See `set_configuration_for_next_epoch` for caveats.
+    public fun update_configuration(fx: &signer, config: Configuration) {
+        system_addresses::assert_aptos_framework(fx);
+        chain_status::assert_genesis();
+        // There should not be a previous resource set here.
+        move_to(fx, config);
+    }
+
+    #[deprecated]
+    public fun update_training_wheels(fx: &signer, pk: Option<vector<u8>>) acquires Configuration {
+        system_addresses::assert_aptos_framework(fx);
+        chain_status::assert_genesis();
+
+        if (option::is_some(&pk)) {
+            assert!(vector::length(option::borrow(&pk)) == 32, E_TRAINING_WHEELS_PK_WRONG_SIZE)
+        };
+
+        let config = borrow_global_mut<Configuration>(signer::address_of(fx));
+        config.training_wheels_pubkey = pk;
+    }
+
+    #[deprecated]
+    public fun update_max_exp_horizon(fx: &signer, max_exp_horizon_secs: u64) acquires Configuration {
+        system_addresses::assert_aptos_framework(fx);
+        chain_status::assert_genesis();
+
+        let config = borrow_global_mut<Configuration>(signer::address_of(fx));
+        config.max_exp_horizon_secs = max_exp_horizon_secs;
+    }
+
+    #[deprecated]
+    public fun remove_all_override_auds(fx: &signer) acquires Configuration {
+        system_addresses::assert_aptos_framework(fx);
+        chain_status::assert_genesis();
+
+        let config = borrow_global_mut<Configuration>(signer::address_of(fx));
+        config.override_aud_vals = vector[];
+    }
+
+    #[deprecated]
+    public fun add_override_aud(fx: &signer, aud: String) acquires Configuration {
+        system_addresses::assert_aptos_framework(fx);
+        chain_status::assert_genesis();
+
+        let config = borrow_global_mut<Configuration>(signer::address_of(fx));
+        vector::push_back(&mut config.override_aud_vals, aud);
+    }
     /// Queues up a change to the Groth16 verification key. The change will only be effective after reconfiguration.
     /// Only callable via governance proposal.
     ///
@@ -130,17 +192,99 @@ module aptos_framework::keyless_account {
     /// so that old ZKPs for the old VK cannot be replayed as potentially-valid ZKPs.
     ///
     /// WARNING: If a malicious key is set, this would lead to stolen funds.
-    public fun update_groth16_verification_key(fx: &signer, vk: Groth16VerificationKey) {
+    public fun set_groth16_verification_key_for_next_epoch(fx: &signer, vk: Groth16VerificationKey) {
         system_addresses::assert_aptos_framework(fx);
         validate_groth16_vk(&vk);
         config_buffer::upsert<Groth16VerificationKey>(vk);
     }
 
+
     /// Queues up a change to the keyless configuration. The change will only be effective after reconfiguration. Only
     /// callable via governance proposal.
-    public fun update_configuration(fx: &signer, config: Configuration) {
+    ///
+    /// WARNING: A malicious `Configuration` could lead to DoS attacks, create liveness issues, or enable a malicious
+    /// recovery service provider to phish users' accounts.
+    public fun set_configuration_for_next_epoch(fx: &signer, config: Configuration) {
         system_addresses::assert_aptos_framework(fx);
         config_buffer::upsert<Configuration>(config);
+    }
+
+    /// Convenience method to queue up a change to the training wheels PK. The change will only be effective after
+    /// reconfiguration. Only callable via governance proposal.
+    ///
+    /// WARNING: If a malicious key is set, this *could* lead to stolen funds.
+    public fun update_training_wheels_for_next_epoch(fx: &signer, pk: Option<vector<u8>>) acquires Configuration {
+        system_addresses::assert_aptos_framework(fx);
+
+        // If a PK is being set, validate it first.
+        if (option::is_some(&pk)) {
+            let bytes = *option::borrow(&pk);
+            let vpk = ed25519::new_validated_public_key_from_bytes(bytes);
+            assert!(option::is_some(&vpk), E_TRAINING_WHEELS_PK_WRONG_SIZE)
+        };
+
+        let config = if (config_buffer::does_exist<Configuration>()) {
+            config_buffer::extract<Configuration>()
+        } else {
+            *borrow_global<Configuration>(signer::address_of(fx))
+        };
+
+        config.training_wheels_pubkey = pk;
+
+        set_configuration_for_next_epoch(fx, config);
+    }
+
+    /// Convenience method to queues up a change to the max expiration horizon. The change will only be effective after
+    /// reconfiguration. Only callable via governance proposal.
+    public fun update_max_exp_horizon_for_next_epoch(fx: &signer, max_exp_horizon_secs: u64) acquires Configuration {
+        system_addresses::assert_aptos_framework(fx);
+
+        let config = if (config_buffer::does_exist<Configuration>()) {
+            config_buffer::extract<Configuration>()
+        } else {
+            *borrow_global<Configuration>(signer::address_of(fx))
+        };
+
+        config.max_exp_horizon_secs = max_exp_horizon_secs;
+
+        set_configuration_for_next_epoch(fx, config);
+    }
+
+    /// Convenience method to queue up clearing the set of override `aud`'s. The change will only be effective after
+    /// reconfiguration. Only callable via governance proposal.
+    ///
+    /// WARNING: When no override `aud` is set, recovery of keyless accounts associated with applications that disappeared
+    /// is no longer possible.
+    public fun remove_all_override_auds_for_next_epoch(fx: &signer) acquires Configuration {
+        system_addresses::assert_aptos_framework(fx);
+
+        let config = if (config_buffer::does_exist<Configuration>()) {
+            config_buffer::extract<Configuration>()
+        } else {
+            *borrow_global<Configuration>(signer::address_of(fx))
+        };
+
+        config.override_aud_vals = vector[];
+
+        set_configuration_for_next_epoch(fx, config);
+    }
+
+    /// Convenience method to queue up an append to to the set of override `aud`'s. The change will only be effective
+    /// after reconfiguration. Only callable via governance proposal.
+    ///
+    /// WARNING: If a malicious override `aud` is set, this *could* lead to stolen funds.
+    public fun add_override_aud_for_next_epoch(fx: &signer, aud: String) acquires Configuration {
+        system_addresses::assert_aptos_framework(fx);
+
+        let config = if (config_buffer::does_exist<Configuration>()) {
+            config_buffer::extract<Configuration>()
+        } else {
+            *borrow_global<Configuration>(signer::address_of(fx))
+        };
+
+        vector::push_back(&mut config.override_aud_vals, aud);
+
+        set_configuration_for_next_epoch(fx, config);
     }
 
     /// Only used in reconfigurations to apply the queued up configuration changes, if there are any.
@@ -164,83 +308,5 @@ module aptos_framework::keyless_account {
                 move_to(fx, config);
             }
         };
-    }
-
-    /// Convenience method to queue up a change to the training wheels PK. The change will only be effective after
-    /// reconfiguration. Only callable via governance proposal.
-    ///
-    /// WARNING: If a malicious key is set, this *could* lead to stolen funds.
-    public fun update_training_wheels(fx: &signer, pk: Option<vector<u8>>) acquires Configuration {
-        system_addresses::assert_aptos_framework(fx);
-
-        // If a PK is being set, validate it first.
-        if (option::is_some(&pk)) {
-            let bytes = *option::borrow(&pk);
-            let vpk = ed25519::new_validated_public_key_from_bytes(bytes);
-            assert!(option::is_some(&vpk), E_TRAINING_WHEELS_PK_WRONG_SIZE)
-        };
-
-        let config = if (config_buffer::does_exist<Configuration>()) {
-            config_buffer::extract<Configuration>()
-        } else {
-            *borrow_global<Configuration>(signer::address_of(fx))
-        };
-
-        config.training_wheels_pubkey = pk;
-
-        update_configuration(fx, config);
-    }
-
-    /// Convenience method to queues up a change to the max expiration horizon. The change will only be effective after
-    /// reconfiguration. Only callable via governance proposal.
-    public fun update_max_exp_horizon(fx: &signer, max_exp_horizon_secs: u64) acquires Configuration {
-        system_addresses::assert_aptos_framework(fx);
-
-        let config = if (config_buffer::does_exist<Configuration>()) {
-            config_buffer::extract<Configuration>()
-        } else {
-            *borrow_global<Configuration>(signer::address_of(fx))
-        };
-
-        config.max_exp_horizon_secs = max_exp_horizon_secs;
-
-        update_configuration(fx, config);
-    }
-
-    /// Convenience method to queue up clearing the set of override `aud`'s. The change will only be effective after
-    /// reconfiguration. Only callable via governance proposal.
-    ///
-    /// WARNING: When no override `aud` is set, recovery of keyless accounts associated with applications that disappeared
-    /// is no longer possible.
-    public fun remove_all_override_auds(fx: &signer) acquires Configuration {
-        system_addresses::assert_aptos_framework(fx);
-
-        let config = if (config_buffer::does_exist<Configuration>()) {
-            config_buffer::extract<Configuration>()
-        } else {
-            *borrow_global<Configuration>(signer::address_of(fx))
-        };
-
-        config.override_aud_vals = vector[];
-
-        update_configuration(fx, config);
-    }
-
-    /// Convenience method to queue up an append to to the set of override `aud`'s. The change will only be effective
-    /// after reconfiguration. Only callable via governance proposal.
-    ///
-    /// WARNING: If a malicious override `aud` is set, this *could* lead to stolen funds.
-    public fun add_override_aud(fx: &signer, aud: String) acquires Configuration {
-        system_addresses::assert_aptos_framework(fx);
-
-        let config = if (config_buffer::does_exist<Configuration>()) {
-            config_buffer::extract<Configuration>()
-        } else {
-            *borrow_global<Configuration>(signer::address_of(fx))
-        };
-
-        vector::push_back(&mut config.override_aud_vals, aud);
-
-        update_configuration(fx, config);
     }
 }

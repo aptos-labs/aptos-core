@@ -488,7 +488,7 @@ use aptos_framework::aptos_governance;
 use std::option;
 fun main(core_resources: &signer) {{
     let framework_signer = aptos_governance::get_signer_testnet_only(core_resources, @0x1);
-    {}::update_training_wheels(&framework_signer, option::none());
+    {}::update_training_wheels_for_next_epoch(&framework_signer, option::none());
     aptos_governance::force_end_epoch(&framework_signer);
 }}
 }}
@@ -578,8 +578,8 @@ fun main(core_resources: &signer) {{
     ];
     jwks::set_patches(&framework_signer, patches);
 
-    {}::update_max_exp_horizon(&framework_signer, {});
-    {}::update_training_wheels(&framework_signer, option::some(x"{}"));
+    {}::update_max_exp_horizon_for_next_epoch(&framework_signer, {});
+    {}::update_training_wheels_for_next_epoch(&framework_signer, option::some(x"{}"));
     aptos_governance::force_end_epoch(&framework_signer);
 }}
 }}
@@ -654,9 +654,8 @@ script {{
     fun main(core_resources: &signer) {{
         let framework_signer = aptos_governance::get_signer_testnet_only(core_resources, @0x1);
         let vk = {}::new_groth16_verification_key(x"{}", x"{}", x"{}", x"{}", vector[x"{}", x"{}"]);
-        {}::update_groth16_verification_key(&framework_signer, vk);
+        {}::set_groth16_verification_key_for_next_epoch(&framework_signer, vk);
         aptos_governance::force_end_epoch(&framework_signer);
-        //aptos_governance::reconfigure(&framework_signer);
     }}
 }}
 "#,
