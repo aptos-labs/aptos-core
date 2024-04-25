@@ -69,13 +69,11 @@ impl<'a, S: 'a + StateView + Sync> ExecutorTask for AptosExecutorTask<'a, S> {
             ExecutionStatus::DelayedFieldsCodeInvariantError("fail points error".into())
         });
 
-        //spin_wait(1000);
-
         let log_context = AdapterLogSchema::new(self.base_view.id(), txn_idx as usize);
         let resolver = self
             .vm
             .as_move_resolver_with_group_view(executor_with_group_view);
-        match self
+        let res = match self
             .vm
             .execute_single_transaction(txn, &resolver, &log_context)
         {
@@ -127,7 +125,9 @@ impl<'a, S: 'a + StateView + Sync> ExecutorTask for AptosExecutorTask<'a, S> {
                     ExecutionStatus::Abort(err)
                 }
             },
-        }
+        };
+        spin_wait(1000);
+        res
     }
 
     fn is_transaction_dynamic_change_set_capable(txn: &Self::Txn) -> bool {

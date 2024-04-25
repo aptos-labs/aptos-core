@@ -317,6 +317,8 @@ impl ThreadGarage {
                 lock.num_active -= 1;
                 lock.num_sleeping += 1;
 
+                println!("now sleeping={}", lock.num_sleeping);
+
                 //notify one of the threads that since current thread is suspended, it can proceed with running main function
 
                 self.global_cv.notify_one();
