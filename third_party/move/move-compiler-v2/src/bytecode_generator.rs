@@ -13,7 +13,7 @@ use move_model::{
         QualifiedInstId, StructId,
     },
     symbol::Symbol,
-    ty::{PrimitiveType, ReferenceKind, Type}, well_known,
+    ty::{PrimitiveType, ReferenceKind, Type},
 };
 use move_stackless_bytecode::{
     function_target::FunctionData,
@@ -927,18 +927,19 @@ impl<'env> Generator<'env> {
             self.internal_error(id, "inconsistent type arity");
             return;
         }
-        let args_ = args
+        let args = args
             .iter()
             .zip(param_types)
             .map(|(e, t)| self.maybe_convert(e, &t))
             .collect::<Vec<_>>();
-        let args = self.gen_arg_list(&args);
-        self.emit_with(id, |attr| {
+        let args_node_ids = args.iter().map(|e| e.node_id()).collect_vec();
+        let args = self.gen_arg_list(&args, true);
+        self.emit_with(id, targets_node_ids, args_node_ids, |attr| {
             Bytecode::Call(
                 attr,
                 targets,
                 BytecodeOperation::Function(fun.module_id, fun.id, type_args),
-                args_,
+                args,
                 None,
             )
         })
