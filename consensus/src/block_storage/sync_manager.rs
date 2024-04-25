@@ -262,7 +262,7 @@ impl BlockStore {
         // although unlikely, we might wrap num_blocks around on a 32-bit machine
         assert!(num_blocks < std::usize::MAX as u64);
 
-        let blocks = retriever
+        let mut blocks = retriever
             .retrieve_block_for_qc(
                 highest_quorum_cert,
                 num_blocks,
@@ -306,7 +306,7 @@ impl BlockStore {
             );
             let mut additional_blocks = retriever
                 .retrieve_block_for_qc(
-                    highest_commit_cert,
+                    &QuorumCert::new(highest_commit_cert.vote_data().clone(), highest_commit_cert.ledger_info().clone()),
                     1,
                     highest_commit_cert.certified_block().id(),
                 )
@@ -323,7 +323,7 @@ impl BlockStore {
             );
 
             blocks.push(block);
-            quorum_certs.push(highest_commit_cert.clone());
+            quorum_certs.push(QuorumCert::new(highest_commit_cert.vote_data().clone(), highest_commit_cert.ledger_info().clone()));
         }
 
         assert_eq!(blocks.len(), quorum_certs.len());
