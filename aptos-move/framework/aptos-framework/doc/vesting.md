@@ -4076,7 +4076,8 @@ This address should be deterministic for the same admin and vesting contract cre
 
 
 
-<pre><code><b>include</b> <a href="vesting.md#0x1_vesting_VerifyAdminAbortsIf">VerifyAdminAbortsIf</a>;
+<pre><code><b>pragma</b> verify_duration_estimate = 300;
+<b>include</b> <a href="vesting.md#0x1_vesting_VerifyAdminAbortsIf">VerifyAdminAbortsIf</a>;
 <b>let</b> vesting_contract = <b>global</b>&lt;<a href="vesting.md#0x1_vesting_VestingContract">VestingContract</a>&gt;(contract_address);
 <b>let</b> operator = vesting_contract.staking.operator;
 <b>let</b> staker = vesting_contract.signer_cap.<a href="account.md#0x1_account">account</a>;
