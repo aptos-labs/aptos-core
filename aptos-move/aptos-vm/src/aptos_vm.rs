@@ -53,8 +53,9 @@ use aptos_types::{
     invalid_signature,
     move_utils::as_move_value::AsMoveValue,
     on_chain_config::{
-        new_epoch_event_key, ConfigurationResource, FeatureFlag, Features, OnChainConfig,
-        TimedFeatureOverride, TimedFeatures, TimedFeaturesBuilder,
+        new_epoch_event_key, randomness_api_v0_config::RequiredDeposit, ConfigurationResource,
+        FeatureFlag, Features, OnChainConfig, TimedFeatureOverride, TimedFeatures,
+        TimedFeaturesBuilder,
     },
     randomness::Randomness,
     state_store::{StateView, TStateView},
@@ -205,6 +206,7 @@ pub struct AptosVM {
     timed_features: TimedFeatures,
     /// For a new chain, or even mainnet, the VK might not necessarily be set.
     pvk: Option<PreparedVerifyingKey<Bn254>>,
+    randomness_api_v0_required_deposit: RequiredDeposit,
 }
 
 impl AptosVM {
@@ -213,7 +215,8 @@ impl AptosVM {
         override_is_delayed_field_optimization_capable: Option<bool>,
     ) -> Self {
         let _timer = TIMER.timer_with(&["AptosVM::new"]);
-
+        let randomness_api_v0_required_deposit = RequiredDeposit::fetch_config(resolver)
+            .unwrap_or_else(RequiredDeposit::default_if_missing);
         let features = Features::fetch_config(resolver).unwrap_or_default();
         let (
             gas_params,
@@ -273,6 +276,7 @@ impl AptosVM {
             storage_gas_params,
             timed_features,
             pvk,
+            randomness_api_v0_required_deposit,
         }
     }
 
@@ -2412,6 +2416,7 @@ impl AptosVM {
         })
     }
 
+    #[allow(clippy::manual_filter)]
     pub fn get_required_deposit(
         &self,
         session: &mut SessionExt,
@@ -2422,12 +2427,12 @@ impl AptosVM {
     ) -> Option<u64> {
         match payload {
             TransactionPayload::EntryFunction(entry_func) => {
-                if self.features().is_enabled(FeatureFlag::RANDOMNESS_API_V0)
-                    && has_randomness_attribute(resolver, session, entry_func).unwrap_or(false)
-                {
-                    // 0.01 APT to mitigate undergasing attack.
-                    // Will have better API soon, so not bothering to set up on-chain config for this.
-                    Some(1_000_000)
+                if let Some(amount) = self.randomness_api_v0_required_deposit.amount {
+                    if has_randomness_attribute(resolver, session, entry_func).unwrap_or(false) {
+                        Some(amount)
+                    } else {
+                        None
+                    }
                 } else {
                     None
                 }
