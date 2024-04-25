@@ -64,14 +64,6 @@ template ParseJWTFieldWithQuotedValue(maxKVPairLen, maxNameLen, maxValueLen) {
         (whitespace_selector_one[i] + whitespace_selector_two[i] + whitespace_selector_three[i]) * (1 - is_whitespace[i]) === 0;
     }
 
-    // Verify value does not contain backslash or quote
-    signal value_selector[maxKVPairLen] <== ArraySelector(maxKVPairLen)(value_index, value_index+value_len);
-
-    signal is_forbidden_char[maxKVPairLen];
-    for (var i = 0; i < maxKVPairLen; i++) {
-        is_forbidden_char[i] <== isForbiddenChar()(field[i]);
-        value_selector[i] * is_forbidden_char[i] === 0;
-    }
 }
 
 template ParseJWTFieldWithUnquotedValue(maxKVPairLen, maxNameLen, maxValueLen) {
@@ -127,12 +119,12 @@ template ParseJWTFieldWithUnquotedValue(maxKVPairLen, maxNameLen, maxValueLen) {
         (whitespace_selector_one[i] + whitespace_selector_two[i] + whitespace_selector_three[i]) * (1 - is_whitespace[i]) === 0;
     }
 
-    // Verify value does not contain backslash or quote
+    // Verify value does not contain comma or end brace
     signal value_selector[maxKVPairLen] <== ArraySelector(maxKVPairLen)(value_index, value_index+value_len);
 
-    signal is_forbidden_char[maxKVPairLen];
+    signal is_allowed_char[maxKVPairLen];
     for (var i = 0; i < maxKVPairLen; i++) {
-        is_forbidden_char[i] <== isForbiddenChar()(field[i]);
-        value_selector[i] * is_forbidden_char[i] === 0;
+        is_allowed_char[i] <== (field[i] - 44) * (field[i] - 125);
+        value_selector[i] * (1 - is_allowed_char[i]) === 0;
     }
 }

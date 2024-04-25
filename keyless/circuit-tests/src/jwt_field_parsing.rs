@@ -145,9 +145,9 @@ fn jwt_field_str_malicious_indices
 
 fn prepare_jwt_field_check_test_str<T: JWTFieldIndices + JWTFieldStr>(field: T) -> CircuitInputSignals<Padded> {
     let config = CircuitPaddingConfig::new()
-        .max_length("field", 40)
-        .max_length("name", 20)
-        .max_length("value", 20);
+        .max_length("field", 60)
+        .max_length("name", 30)
+        .max_length("value", 30);
 
     CircuitInputSignals::new()
         .str_input("field", &field.whole_field())
@@ -253,6 +253,28 @@ fn no_whitespace_unquoted() {
             "\"name\":value,",
             "name",
             "value",
+            )
+        );
+}
+
+#[test]
+fn malicious_value_1() {
+    let mut field = jwt_field_str_malicious_indices(
+            "\"sub\": \"a\\\",b\",",
+            "sub",
+            "a\\",
+            );
+    field.whole_field_len = field.whole_field.find(',').unwrap()+1;
+   should_pass_quoted(field);
+}
+
+#[test]
+fn malicious_value_2() {
+   should_pass_quoted(
+        jwt_field_str(
+            "\"name1\":\"value1\",\"name2\":\"value2\",",
+            "name1",
+            "value1\",\"name2\":\"value2",
             )
         );
 }
@@ -411,7 +433,7 @@ fn malicious_field_len() {
 
 // ref: Circuit Bug #4, https://www.notion.so/aptoslabs/JWTFieldCheck-allows-for-maliciously-truncating-field-values-at-any-character-f8695dcd397a4bc2b66d52349388499f?pvs=4
 #[test]
-fn malicious_value_len() {
+fn malicious_value_len_1() {
     let mut field = jwt_field_str_malicious_indices(
         "\"sub\":\"user,fake\",",
         "sub",
@@ -421,4 +443,17 @@ fn malicious_value_len() {
     field.whole_field_len = field.whole_field.find(",").unwrap() + 1;
 
     should_fail_quoted(field);
+}
+
+#[test]
+fn malicious_value_len_2() {
+    let mut field = jwt_field_str_malicious_indices(
+        "\"sub\":user,fake,",
+        "sub",
+        "user",
+        );
+
+    field.whole_field_len = field.whole_field.find(",").unwrap() + 1;
+
+    should_fail_unquoted(field);
 }
