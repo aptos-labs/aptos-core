@@ -110,11 +110,6 @@ impl JWTFieldStr for JWTFieldMaliciousIndices<String> {
     }
 }
 
-
-
-
-
-
 fn jwt_field_str
 (
     whole_field: &str,
@@ -142,7 +137,7 @@ fn jwt_field_str_malicious_indices
         value: String::from(value),
         whole_field_len: whole_field.len(),
         name_len: name.len(),
-        value_index: whole_field.find(value).unwrap(),
+        value_index: whole_field.find(value).unwrap_or(0),
         value_len: value.len(),
         colon_index: whole_field.find(':').unwrap()
     }
@@ -167,8 +162,8 @@ fn prepare_jwt_field_check_test_str<T: JWTFieldIndices + JWTFieldStr>(field: T) 
         .unwrap()
 }
 
-fn should_pass<T: JWTFieldIndices + JWTFieldStr>(field: T) {
-    let circuit_handle = TestCircuitHandle::new("misc/jwt_field_check_test.circom").unwrap();
+fn should_pass<T: JWTFieldIndices + JWTFieldStr>(field: T, test_circom_file: &str) {
+    let circuit_handle = TestCircuitHandle::new(test_circom_file).unwrap();
 
     let circuit_input_signals = prepare_jwt_field_check_test_str(
         field
@@ -179,8 +174,8 @@ fn should_pass<T: JWTFieldIndices + JWTFieldStr>(field: T) {
     assert!(result.is_ok());
 }
 
-fn should_fail<T: JWTFieldIndices + JWTFieldStr> (field: T) {
-    let circuit_handle = TestCircuitHandle::new("misc/jwt_field_check_test.circom").unwrap();
+fn should_fail<T: JWTFieldIndices + JWTFieldStr> (field: T, test_circom_file: &str) {
+    let circuit_handle = TestCircuitHandle::new(test_circom_file).unwrap();
 
     let circuit_input_signals = prepare_jwt_field_check_test_str(
         field
@@ -191,6 +186,24 @@ fn should_fail<T: JWTFieldIndices + JWTFieldStr> (field: T) {
     assert!(result.is_err());
 }
 
+fn should_pass_quoted<T: JWTFieldIndices + JWTFieldStr>(field: T) {
+    should_pass(field, "jwt_field_parsing/parse_quoted_test.circom");
+}
+
+fn should_pass_unquoted<T: JWTFieldIndices + JWTFieldStr>(field: T) {
+    should_pass(field, "jwt_field_parsing/parse_unquoted_test.circom");
+}
+
+
+fn should_fail_quoted<T: JWTFieldIndices + JWTFieldStr>(field: T) {
+    should_fail(field, "jwt_field_parsing/parse_quoted_test.circom");
+}
+
+fn should_fail_unquoted<T: JWTFieldIndices + JWTFieldStr>(field: T) {
+    should_fail(field, "jwt_field_parsing/parse_unquoted_test.circom");
+}
+
+
 
 
 
@@ -198,8 +211,8 @@ fn should_fail<T: JWTFieldIndices + JWTFieldStr> (field: T) {
 // The tests
 
 #[test]
-fn simple() {
-   should_pass(
+fn simple_quoted() {
+   should_pass_quoted(
         jwt_field_str(
             "\"name\": \"value\",",
             "name",
@@ -209,36 +222,10 @@ fn simple() {
 }
 
 
-#[test]
-fn malicious_field_len() {
-    let mut field = jwt_field_str_malicious_indices(
-        "\"name\":\",value\"",
-        "name",
-        ",value",
-        );
-    field.whole_field_len = field.whole_field.find(",").unwrap() + 1;
-    field.value_index = field.whole_field.find(",").unwrap();
-    assert_ne!(field.whole_field_len, field.whole_field.len());
-
-    should_fail(field);
-}
 
 #[test]
-fn malicious_value_len() {
-    let mut field = jwt_field_str_malicious_indices(
-        "\"sub\":\"user,fake\",",
-        "sub",
-        "user",
-        );
-
-    field.whole_field_len = field.whole_field.find(",").unwrap() + 1;
-
-    should_pass(field);
-}
-
-#[test]
-fn unquoted_value() {
-   should_pass(
+fn simple_unquoted() {
+   should_pass_unquoted(
         jwt_field_str(
             "\"name\": value,",
             "name",
@@ -248,8 +235,32 @@ fn unquoted_value() {
 }
 
 #[test]
+fn no_whitespace_quoted() {
+   should_pass_quoted(
+        jwt_field_str(
+            "\"name\":\"value\",",
+            "name",
+            "value",
+            )
+        );
+}
+
+
+#[test]
+fn no_whitespace_unquoted() {
+   should_pass_unquoted(
+        jwt_field_str(
+            "\"name\":value,",
+            "name",
+            "value",
+            )
+        );
+}
+
+
+#[test]
 fn end_with_curly_bracket() {
-   should_pass(
+   should_pass_quoted(
         jwt_field_str(
             "\"name\": \"value\"}",
             "name",
@@ -259,8 +270,8 @@ fn end_with_curly_bracket() {
 }
 
 #[test]
-fn unquoted_value_end_with_curly_bracket() {
-   should_pass(
+fn end_with_curly_bracket_unquoted() {
+   should_pass_unquoted(
         jwt_field_str(
             "\"name\": value}",
             "name",
@@ -272,7 +283,7 @@ fn unquoted_value_end_with_curly_bracket() {
 
 #[test]
 fn should_fail_when_name_has_no_first_quote() {
-       should_fail(
+       should_fail_quoted(
         jwt_field_str(
             "name\": \"value\",",
             "name",
@@ -283,7 +294,7 @@ fn should_fail_when_name_has_no_first_quote() {
 
 #[test]
 fn should_fail_when_name_has_no_second_quote() {
-    should_fail(
+    should_fail_quoted(
         jwt_field_str(
             "\"name: \"value\",",
             "name",
@@ -294,7 +305,7 @@ fn should_fail_when_name_has_no_second_quote() {
 
 #[test]
 fn should_fail_when_name_has_no_quotes() {
-    should_fail(
+    should_fail_quoted(
         jwt_field_str(
             "name: \"value\",",
             "name",
@@ -304,8 +315,8 @@ fn should_fail_when_name_has_no_quotes() {
 }
 
 #[test]
-fn should_fail_when_name_not_equal() {
-   should_fail(
+fn should_fail_when_name_not_equal_quoted() {
+   should_fail_quoted(
         jwt_field_str(
             "\"name\": \"value\",",
             "fake",
@@ -315,12 +326,99 @@ fn should_fail_when_name_not_equal() {
 }
 
 #[test]
-fn should_fail_when_value_not_equal() {
-   should_fail(
+fn should_fail_when_name_not_equal_unquoted() {
+   should_fail_unquoted(
         jwt_field_str(
-            "\"name\": \"value\",",
+            "\"name\": value,",
             "fake",
             "value",
             )
         );
+}
+
+#[test]
+fn should_fail_when_value_not_equal_quoted() {
+    let mut field = 
+        jwt_field_str_malicious_indices(
+            "\"name\": \"value\",",
+            "name",
+            "fake",
+            );
+    field.whole_field_len = field.whole_field.len();
+    field.value_index = field.whole_field.find("value").unwrap();
+    should_fail_quoted(field);
+}
+
+#[test]
+fn should_fail_when_value_not_equal_unquoted() {
+    let mut field = 
+        jwt_field_str_malicious_indices(
+            "\"name\": value,",
+            "name",
+            "fake",
+            );
+    field.whole_field_len = field.whole_field.len();
+    field.value_index = field.whole_field.find("value").unwrap();
+    should_fail_unquoted(field);
+}
+
+#[test]
+fn should_fail_with_forbidden_value_chars() {
+   should_fail_unquoted(
+        jwt_field_str(
+            "\"name\": val\\ue,",
+            "name",
+            "val\\ue",
+            )
+        );
+   should_fail_unquoted(
+        jwt_field_str(
+            "\"name\": val\"ue,",
+            "name",
+            "val\"ue",
+            )
+        );
+   should_fail_quoted(
+        jwt_field_str(
+            "\"name\": \"val\\ue\",",
+            "name",
+            "val\\ue",
+            )
+        );
+   should_fail_quoted(
+        jwt_field_str(
+            "\"name\": \"val\"ue\",",
+            "name",
+            "val\"ue",
+            )
+        );
+}
+
+// ref: Circuit Bug #3, https://www.notion.so/aptoslabs/JWTFieldCheck-does-not-properly-constrain-field_len-which-can-cause-the-circuit-to-accept-field-val-9943c152e7274f35a1669a6cb416c7bf?pvs=4
+#[test]
+fn malicious_field_len() {
+    let mut field = jwt_field_str_malicious_indices(
+        "\"name\":\",value\"",
+        "name",
+        ",value",
+        );
+    field.whole_field_len = field.whole_field.find(",").unwrap() + 1;
+    field.value_index = field.whole_field.find(",").unwrap();
+    assert_ne!(field.whole_field_len, field.whole_field.len());
+
+    should_fail_quoted(field);
+}
+
+// ref: Circuit Bug #4, https://www.notion.so/aptoslabs/JWTFieldCheck-allows-for-maliciously-truncating-field-values-at-any-character-f8695dcd397a4bc2b66d52349388499f?pvs=4
+#[test]
+fn malicious_value_len() {
+    let mut field = jwt_field_str_malicious_indices(
+        "\"sub\":\"user,fake\",",
+        "sub",
+        "user",
+        );
+
+    field.whole_field_len = field.whole_field.find(",").unwrap() + 1;
+
+    should_fail_quoted(field);
 }
