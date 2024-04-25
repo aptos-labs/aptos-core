@@ -8,10 +8,14 @@
 /// 1. Once the bug is fixed and the binary + framework have been patched,
 ///    a governance proposal is needed to set `RandomnessConfigSeqNum` to be `X+2`.
 module aptos_framework::randomness_config_seqnum {
+    use std::error;
     use aptos_framework::config_buffer;
     use aptos_framework::system_addresses;
 
     friend aptos_framework::reconfiguration_with_dkg;
+
+    /// API has been disabled.
+    const EAPI_DISABLED: u64 = 1;
 
     /// If this seqnum is smaller than a validator local override, the on-chain `RandomnessConfig` will be ignored.
     /// Useful in a chain recovery from randomness stall.
@@ -34,11 +38,21 @@ module aptos_framework::randomness_config_seqnum {
         }
     }
 
+    /// Deprecated by `on_new_epoch_v2()`.
+    public(friend) fun on_new_epoch() {
+        abort(error::invalid_state(EAPI_DISABLED))
+    }
+
     /// Only used in reconfigurations to apply the pending `RandomnessConfig`, if there is any.
-    public(friend) fun on_new_epoch() acquires RandomnessConfigSeqNum {
+    public(friend) fun on_new_epoch_v2(framework: &signer) acquires RandomnessConfigSeqNum {
+        system_addresses::assert_aptos_framework(framework);
         if (config_buffer::does_exist<RandomnessConfigSeqNum>()) {
             let new_config = config_buffer::extract<RandomnessConfigSeqNum>();
-            borrow_global_mut<RandomnessConfigSeqNum>(@aptos_framework).seq_num = new_config.seq_num;
+            if (exists<RandomnessConfigSeqNum>(@aptos_framework)) {
+                *borrow_global_mut<RandomnessConfigSeqNum>(@aptos_framework) = new_config;
+            } else {
+                move_to(framework, new_config);
+            }
         }
     }
 }

@@ -19,6 +19,9 @@ module aptos_framework::consensus_config {
     /// The provided on chain config bytes are empty or invalid
     const EINVALID_CONFIG: u64 = 1;
 
+    /// API has been disabled.
+    const EAPI_DISABLED: u64 = 2;
+
     /// Publishes the ConsensusConfig config.
     public(friend) fun initialize(aptos_framework: &signer, config: vector<u8>) {
         system_addresses::assert_aptos_framework(aptos_framework);
@@ -55,10 +58,21 @@ module aptos_framework::consensus_config {
         std::config_buffer::upsert<ConsensusConfig>(ConsensusConfig {config});
     }
 
+    /// Deprecated by `on_new_epoch_v2()`.
+    public(friend) fun on_new_epoch() {
+        abort(error::invalid_state(EAPI_DISABLED))
+    }
+
     /// Only used in reconfigurations to apply the pending `ConsensusConfig`, if there is any.
-    public(friend) fun on_new_epoch() acquires ConsensusConfig {
+    public(friend) fun on_new_epoch_v2(framework: &signer) acquires ConsensusConfig {
+        system_addresses::assert_aptos_framework(framework);
         if (config_buffer::does_exist<ConsensusConfig>()) {
-            *borrow_global_mut<ConsensusConfig>(@aptos_framework) = config_buffer::extract();
+            let new_config = config_buffer::extract<ConsensusConfig>();
+            if (exists<ConsensusConfig>(@aptos_framework)) {
+                *borrow_global_mut<ConsensusConfig>(@aptos_framework) = new_config;
+            } else {
+                move_to(framework, new_config);
+            };
         }
     }
 

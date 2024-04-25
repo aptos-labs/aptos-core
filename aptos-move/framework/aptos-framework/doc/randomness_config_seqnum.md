@@ -15,12 +15,18 @@ a governance proposal is needed to set <code><a href="randomness_config_seqnum.m
 
 
 -  [Resource `RandomnessConfigSeqNum`](#0x1_randomness_config_seqnum_RandomnessConfigSeqNum)
+-  [Constants](#@Constants_0)
 -  [Function `set_for_next_epoch`](#0x1_randomness_config_seqnum_set_for_next_epoch)
 -  [Function `initialize`](#0x1_randomness_config_seqnum_initialize)
 -  [Function `on_new_epoch`](#0x1_randomness_config_seqnum_on_new_epoch)
+-  [Function `on_new_epoch_v2`](#0x1_randomness_config_seqnum_on_new_epoch_v2)
+-  [Specification](#@Specification_1)
+    -  [Function `on_new_epoch`](#@Specification_1_on_new_epoch)
+    -  [Function `on_new_epoch_v2`](#@Specification_1_on_new_epoch_v2)
 
 
 <pre><code><b>use</b> <a href="config_buffer.md#0x1_config_buffer">0x1::config_buffer</a>;
+<b>use</b> <a href="../../aptos-stdlib/../move-stdlib/doc/error.md#0x1_error">0x1::error</a>;
 <b>use</b> <a href="system_addresses.md#0x1_system_addresses">0x1::system_addresses</a>;
 </code></pre>
 
@@ -54,6 +60,21 @@ Useful in a chain recovery from randomness stall.
 
 
 </details>
+
+<a id="@Constants_0"></a>
+
+## Constants
+
+
+<a id="0x1_randomness_config_seqnum_EAPI_DISABLED"></a>
+
+API has been disabled.
+
+
+<pre><code><b>const</b> <a href="randomness_config_seqnum.md#0x1_randomness_config_seqnum_EAPI_DISABLED">EAPI_DISABLED</a>: u64 = 1;
+</code></pre>
+
+
 
 <a id="0x1_randomness_config_seqnum_set_for_next_epoch"></a>
 
@@ -114,7 +135,7 @@ Initialize the configuration. Used in genesis or governance.
 
 ## Function `on_new_epoch`
 
-Only used in reconfigurations to apply the pending <code>RandomnessConfig</code>, if there is any.
+Deprecated by <code><a href="randomness_config_seqnum.md#0x1_randomness_config_seqnum_on_new_epoch_v2">on_new_epoch_v2</a>()</code>.
 
 
 <pre><code><b>public</b>(<b>friend</b>) <b>fun</b> <a href="randomness_config_seqnum.md#0x1_randomness_config_seqnum_on_new_epoch">on_new_epoch</a>()
@@ -126,10 +147,40 @@ Only used in reconfigurations to apply the pending <code>RandomnessConfig</code>
 <summary>Implementation</summary>
 
 
-<pre><code><b>public</b>(<b>friend</b>) <b>fun</b> <a href="randomness_config_seqnum.md#0x1_randomness_config_seqnum_on_new_epoch">on_new_epoch</a>() <b>acquires</b> <a href="randomness_config_seqnum.md#0x1_randomness_config_seqnum_RandomnessConfigSeqNum">RandomnessConfigSeqNum</a> {
+<pre><code><b>public</b>(<b>friend</b>) <b>fun</b> <a href="randomness_config_seqnum.md#0x1_randomness_config_seqnum_on_new_epoch">on_new_epoch</a>() {
+    <b>abort</b>(<a href="../../aptos-stdlib/../move-stdlib/doc/error.md#0x1_error_invalid_state">error::invalid_state</a>(<a href="randomness_config_seqnum.md#0x1_randomness_config_seqnum_EAPI_DISABLED">EAPI_DISABLED</a>))
+}
+</code></pre>
+
+
+
+</details>
+
+<a id="0x1_randomness_config_seqnum_on_new_epoch_v2"></a>
+
+## Function `on_new_epoch_v2`
+
+Only used in reconfigurations to apply the pending <code>RandomnessConfig</code>, if there is any.
+
+
+<pre><code><b>public</b>(<b>friend</b>) <b>fun</b> <a href="randomness_config_seqnum.md#0x1_randomness_config_seqnum_on_new_epoch_v2">on_new_epoch_v2</a>(framework: &<a href="../../aptos-stdlib/../move-stdlib/doc/signer.md#0x1_signer">signer</a>)
+</code></pre>
+
+
+
+<details>
+<summary>Implementation</summary>
+
+
+<pre><code><b>public</b>(<b>friend</b>) <b>fun</b> <a href="randomness_config_seqnum.md#0x1_randomness_config_seqnum_on_new_epoch_v2">on_new_epoch_v2</a>(framework: &<a href="../../aptos-stdlib/../move-stdlib/doc/signer.md#0x1_signer">signer</a>) <b>acquires</b> <a href="randomness_config_seqnum.md#0x1_randomness_config_seqnum_RandomnessConfigSeqNum">RandomnessConfigSeqNum</a> {
+    <a href="system_addresses.md#0x1_system_addresses_assert_aptos_framework">system_addresses::assert_aptos_framework</a>(framework);
     <b>if</b> (<a href="config_buffer.md#0x1_config_buffer_does_exist">config_buffer::does_exist</a>&lt;<a href="randomness_config_seqnum.md#0x1_randomness_config_seqnum_RandomnessConfigSeqNum">RandomnessConfigSeqNum</a>&gt;()) {
         <b>let</b> new_config = <a href="config_buffer.md#0x1_config_buffer_extract">config_buffer::extract</a>&lt;<a href="randomness_config_seqnum.md#0x1_randomness_config_seqnum_RandomnessConfigSeqNum">RandomnessConfigSeqNum</a>&gt;();
-        <b>borrow_global_mut</b>&lt;<a href="randomness_config_seqnum.md#0x1_randomness_config_seqnum_RandomnessConfigSeqNum">RandomnessConfigSeqNum</a>&gt;(@aptos_framework).seq_num = new_config.seq_num;
+        <b>if</b> (<b>exists</b>&lt;<a href="randomness_config_seqnum.md#0x1_randomness_config_seqnum_RandomnessConfigSeqNum">RandomnessConfigSeqNum</a>&gt;(@aptos_framework)) {
+            *<b>borrow_global_mut</b>&lt;<a href="randomness_config_seqnum.md#0x1_randomness_config_seqnum_RandomnessConfigSeqNum">RandomnessConfigSeqNum</a>&gt;(@aptos_framework) = new_config;
+        } <b>else</b> {
+            <b>move_to</b>(framework, new_config);
+        }
     }
 }
 </code></pre>
@@ -137,6 +188,43 @@ Only used in reconfigurations to apply the pending <code>RandomnessConfig</code>
 
 
 </details>
+
+<a id="@Specification_1"></a>
+
+## Specification
+
+
+<a id="@Specification_1_on_new_epoch"></a>
+
+### Function `on_new_epoch`
+
+
+<pre><code><b>public</b>(<b>friend</b>) <b>fun</b> <a href="randomness_config_seqnum.md#0x1_randomness_config_seqnum_on_new_epoch">on_new_epoch</a>()
+</code></pre>
+
+
+
+
+<pre><code><b>pragma</b> verify = <b>false</b>;
+</code></pre>
+
+
+
+<a id="@Specification_1_on_new_epoch_v2"></a>
+
+### Function `on_new_epoch_v2`
+
+
+<pre><code><b>public</b>(<b>friend</b>) <b>fun</b> <a href="randomness_config_seqnum.md#0x1_randomness_config_seqnum_on_new_epoch_v2">on_new_epoch_v2</a>(framework: &<a href="../../aptos-stdlib/../move-stdlib/doc/signer.md#0x1_signer">signer</a>)
+</code></pre>
+
+
+
+
+<pre><code><b>requires</b> @aptos_framework == std::signer::address_of(framework);
+<b>include</b> <a href="config_buffer.md#0x1_config_buffer_OnNewEpochRequirement">config_buffer::OnNewEpochRequirement</a>&lt;<a href="randomness_config_seqnum.md#0x1_randomness_config_seqnum_RandomnessConfigSeqNum">RandomnessConfigSeqNum</a>&gt;;
+<b>aborts_if</b> <b>false</b>;
+</code></pre>
 
 
 [move-book]: https://aptos.dev/move/book/SUMMARY

@@ -37,6 +37,12 @@ spec aptos_framework::execution_config {
     }
 
     spec on_new_epoch() {
-        include config_buffer::OnNewEpochAbortsIf<ExecutionConfig>;
+        pragma verify = false;
+    }
+
+    spec on_new_epoch_v2(framework: &signer) {
+        requires @aptos_framework == std::signer::address_of(framework);
+        include config_buffer::OnNewEpochRequirement<ExecutionConfig>;
+        aborts_if false;
     }
 }

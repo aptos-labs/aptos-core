@@ -13,6 +13,7 @@ Maintains the version number for the blockchain.
 -  [Function `set_version`](#0x1_version_set_version)
 -  [Function `set_for_next_epoch`](#0x1_version_set_for_next_epoch)
 -  [Function `on_new_epoch`](#0x1_version_on_new_epoch)
+-  [Function `on_new_epoch_v2`](#0x1_version_on_new_epoch_v2)
 -  [Function `initialize_for_test`](#0x1_version_initialize_for_test)
 -  [Specification](#@Specification_1)
     -  [High-level Requirements](#high-level-req)
@@ -21,6 +22,7 @@ Maintains the version number for the blockchain.
     -  [Function `set_version`](#@Specification_1_set_version)
     -  [Function `set_for_next_epoch`](#@Specification_1_set_for_next_epoch)
     -  [Function `on_new_epoch`](#@Specification_1_on_new_epoch)
+    -  [Function `on_new_epoch_v2`](#@Specification_1_on_new_epoch_v2)
     -  [Function `initialize_for_test`](#@Specification_1_initialize_for_test)
 
 
@@ -91,6 +93,16 @@ Maintains the version number for the blockchain.
 <a id="@Constants_0"></a>
 
 ## Constants
+
+
+<a id="0x1_version_EAPI_DISABLED"></a>
+
+API has been disabled.
+
+
+<pre><code><b>const</b> <a href="version.md#0x1_version_EAPI_DISABLED">EAPI_DISABLED</a>: u64 = 1;
+</code></pre>
+
 
 
 <a id="0x1_version_EINVALID_MAJOR_VERSION_NUMBER"></a>
@@ -218,7 +230,7 @@ Example usage:
 
 ## Function `on_new_epoch`
 
-Only used in reconfigurations to apply the pending <code><a href="version.md#0x1_version_Version">Version</a></code>, if there is any.
+Deprecated by <code><a href="version.md#0x1_version_on_new_epoch_v2">on_new_epoch_v2</a>()</code>.
 
 
 <pre><code><b>public</b>(<b>friend</b>) <b>fun</b> <a href="version.md#0x1_version_on_new_epoch">on_new_epoch</a>()
@@ -230,9 +242,40 @@ Only used in reconfigurations to apply the pending <code><a href="version.md#0x1
 <summary>Implementation</summary>
 
 
-<pre><code><b>public</b>(<b>friend</b>) <b>fun</b> <a href="version.md#0x1_version_on_new_epoch">on_new_epoch</a>() <b>acquires</b> <a href="version.md#0x1_version_Version">Version</a> {
+<pre><code><b>public</b>(<b>friend</b>) <b>fun</b> <a href="version.md#0x1_version_on_new_epoch">on_new_epoch</a>() {
+    <b>abort</b>(<a href="../../aptos-stdlib/../move-stdlib/doc/error.md#0x1_error_invalid_state">error::invalid_state</a>(<a href="version.md#0x1_version_EAPI_DISABLED">EAPI_DISABLED</a>))
+}
+</code></pre>
+
+
+
+</details>
+
+<a id="0x1_version_on_new_epoch_v2"></a>
+
+## Function `on_new_epoch_v2`
+
+Only used in reconfigurations to apply the pending <code><a href="version.md#0x1_version_Version">Version</a></code>, if there is any.
+
+
+<pre><code><b>public</b>(<b>friend</b>) <b>fun</b> <a href="version.md#0x1_version_on_new_epoch_v2">on_new_epoch_v2</a>(framework: &<a href="../../aptos-stdlib/../move-stdlib/doc/signer.md#0x1_signer">signer</a>)
+</code></pre>
+
+
+
+<details>
+<summary>Implementation</summary>
+
+
+<pre><code><b>public</b>(<b>friend</b>) <b>fun</b> <a href="version.md#0x1_version_on_new_epoch_v2">on_new_epoch_v2</a>(framework: &<a href="../../aptos-stdlib/../move-stdlib/doc/signer.md#0x1_signer">signer</a>) <b>acquires</b> <a href="version.md#0x1_version_Version">Version</a> {
+    <a href="system_addresses.md#0x1_system_addresses_assert_aptos_framework">system_addresses::assert_aptos_framework</a>(framework);
     <b>if</b> (<a href="config_buffer.md#0x1_config_buffer_does_exist">config_buffer::does_exist</a>&lt;<a href="version.md#0x1_version_Version">Version</a>&gt;()) {
-        *<b>borrow_global_mut</b>&lt;<a href="version.md#0x1_version_Version">Version</a>&gt;(@aptos_framework) = <a href="config_buffer.md#0x1_config_buffer_extract">config_buffer::extract</a>&lt;<a href="version.md#0x1_version_Version">Version</a>&gt;();
+        <b>let</b> new_value = <a href="config_buffer.md#0x1_config_buffer_extract">config_buffer::extract</a>&lt;<a href="version.md#0x1_version_Version">Version</a>&gt;();
+        <b>if</b> (<b>exists</b>&lt;<a href="version.md#0x1_version_Version">Version</a>&gt;(@aptos_framework)) {
+            *<b>borrow_global_mut</b>&lt;<a href="version.md#0x1_version_Version">Version</a>&gt;(@aptos_framework) = new_value;
+        } <b>else</b> {
+            <b>move_to</b>(framework, new_value);
+        }
     }
 }
 </code></pre>
@@ -398,7 +441,25 @@ Abort if resource already exists in <code>@aptos_framwork</code> when initializi
 
 
 
-<pre><code><b>include</b> <a href="config_buffer.md#0x1_config_buffer_OnNewEpochAbortsIf">config_buffer::OnNewEpochAbortsIf</a>&lt;<a href="version.md#0x1_version_Version">Version</a>&gt;;
+<pre><code><b>pragma</b> verify = <b>false</b>;
+</code></pre>
+
+
+
+<a id="@Specification_1_on_new_epoch_v2"></a>
+
+### Function `on_new_epoch_v2`
+
+
+<pre><code><b>public</b>(<b>friend</b>) <b>fun</b> <a href="version.md#0x1_version_on_new_epoch_v2">on_new_epoch_v2</a>(framework: &<a href="../../aptos-stdlib/../move-stdlib/doc/signer.md#0x1_signer">signer</a>)
+</code></pre>
+
+
+
+
+<pre><code><b>requires</b> @aptos_framework == std::signer::address_of(framework);
+<b>include</b> <a href="config_buffer.md#0x1_config_buffer_OnNewEpochRequirement">config_buffer::OnNewEpochRequirement</a>&lt;<a href="version.md#0x1_version_Version">Version</a>&gt;;
+<b>aborts_if</b> <b>false</b>;
 </code></pre>
 
 

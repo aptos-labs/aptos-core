@@ -28,6 +28,7 @@ This module is responsible for configuring keyless blockchain accounts which wer
 -  [Function `add_override_aud_for_next_epoch`](#0x1_keyless_account_add_override_aud_for_next_epoch)
 -  [Function `on_new_epoch`](#0x1_keyless_account_on_new_epoch)
 -  [Specification](#@Specification_1)
+    -  [Function `on_new_epoch`](#@Specification_1_on_new_epoch)
 
 
 <pre><code><b>use</b> <a href="../../aptos-stdlib/doc/bn254_algebra.md#0x1_bn254_algebra">0x1::bn254_algebra</a>;
@@ -793,8 +794,21 @@ Only used in reconfigurations to apply the queued up configuration changes, if t
 ## Specification
 
 
+<a id="@Specification_1_on_new_epoch"></a>
 
-<pre><code><b>pragma</b> verify=<b>false</b>;
+### Function `on_new_epoch`
+
+
+<pre><code><b>public</b>(<b>friend</b>) <b>fun</b> <a href="keyless_account.md#0x1_keyless_account_on_new_epoch">on_new_epoch</a>(fx: &<a href="../../aptos-stdlib/../move-stdlib/doc/signer.md#0x1_signer">signer</a>)
+</code></pre>
+
+
+
+
+<pre><code><b>requires</b> @aptos_framework == std::signer::address_of(fx);
+<b>include</b> <a href="config_buffer.md#0x1_config_buffer_OnNewEpochRequirement">config_buffer::OnNewEpochRequirement</a>&lt;<a href="keyless_account.md#0x1_keyless_account_Configuration">Configuration</a>&gt;;
+<b>include</b> <a href="config_buffer.md#0x1_config_buffer_OnNewEpochRequirement">config_buffer::OnNewEpochRequirement</a>&lt;<a href="keyless_account.md#0x1_keyless_account_Groth16VerificationKey">Groth16VerificationKey</a>&gt;;
+<b>aborts_if</b> <b>false</b>;
 </code></pre>
 
 

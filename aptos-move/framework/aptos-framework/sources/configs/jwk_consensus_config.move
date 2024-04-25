@@ -19,6 +19,9 @@ module aptos_framework::jwk_consensus_config {
     /// `ConfigV1` creation failed with duplicated providers given.
     const EDUPLICATE_PROVIDERS: u64 = 1;
 
+    /// API has been disabled.
+    const EAPI_DISABLED: u64 = 2;
+
     /// The configuration of the JWK consensus feature.
     struct JWKConsensusConfig has drop, key, store {
         /// A config variant packed as an `Any`.
@@ -64,11 +67,21 @@ module aptos_framework::jwk_consensus_config {
         config_buffer::upsert(config);
     }
 
+    /// Deprecated by `on_new_epoch_v2()`.
+    public(friend) fun on_new_epoch() {
+        abort(error::invalid_state(EAPI_DISABLED))
+    }
+
     /// Only used in reconfigurations to apply the pending `JWKConsensusConfig`, if there is any.
-    public(friend) fun on_new_epoch() acquires JWKConsensusConfig {
+    public(friend) fun on_new_epoch_v2(framework: &signer) acquires JWKConsensusConfig {
+        system_addresses::assert_aptos_framework(framework);
         if (config_buffer::does_exist<JWKConsensusConfig>()) {
             let new_config = config_buffer::extract<JWKConsensusConfig>();
-            borrow_global_mut<JWKConsensusConfig>(@aptos_framework).variant = new_config.variant;
+            if (exists<JWKConsensusConfig>(@aptos_framework)) {
+                *borrow_global_mut<JWKConsensusConfig>(@aptos_framework) = new_config;
+            } else {
+                move_to(framework, new_config);
+            };
         }
     }
 
@@ -122,11 +135,11 @@ module aptos_framework::jwk_consensus_config {
             new_oidc_provider(utf8(b"Alice"), utf8(b"https://alice.io")),
         ]);
         set_for_next_epoch(&framework, config);
-        on_new_epoch();
+        on_new_epoch_v2(&framework);
         assert!(enabled(), 1);
 
         set_for_next_epoch(&framework, new_off());
-        on_new_epoch();
+        on_new_epoch_v2(&framework);
         assert!(!enabled(), 2)
     }
 

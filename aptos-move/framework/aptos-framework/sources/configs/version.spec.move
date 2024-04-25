@@ -74,7 +74,13 @@ spec aptos_framework::version {
     }
 
     spec on_new_epoch() {
-        include config_buffer::OnNewEpochAbortsIf<Version>;
+        pragma verify = false;
+    }
+
+    spec on_new_epoch_v2(framework: &signer) {
+        requires @aptos_framework == std::signer::address_of(framework);
+        include config_buffer::OnNewEpochRequirement<Version>;
+        aborts_if false;
     }
 
     /// This module turns on `aborts_if_is_strict`, so need to add spec for test function `initialize_for_test`.
