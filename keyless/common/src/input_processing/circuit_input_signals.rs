@@ -188,6 +188,10 @@ fn pad_if_needed(
 fn pad_bytes(unpadded_bytes: &[u8], max_size: usize) -> Result<Vec<u8>, anyhow::Error> {
     let mut bytes = Vec::from(unpadded_bytes);
 
+    println!("size: {}", bytes.len());
+    println!("max size: {}", max_size);
+    println!("{:?}", String::from_utf8_lossy(&bytes));
+
     if max_size < bytes.len() {
         Err(anyhow!("max_size exceeded"))
     } else {
