@@ -307,35 +307,59 @@ pub enum StateKeyDecodeErr {
 
 #[cfg(test)]
 mod tests {
-    use crate::state_store::state_key::{AccessPath, StateKey};
+    use crate::{
+        account_config::{AccountResource, ObjectGroupResource},
+        state_store::state_key::{AccessPath, StateKey},
+    };
     use aptos_crypto::hash::CryptoHash;
-    use move_core_types::language_storage::ModuleId;
+    use move_core_types::{
+        account_address::AccountAddress, ident_str, language_storage::ModuleId,
+        move_resource::MoveStructType,
+    };
+
+    fn assert_crypto_hash(key: &StateKey, expected_hash: &str) {
+        let expected_hash = expected_hash.parse().unwrap();
+        assert_eq!(CryptoHash::hash(key), expected_hash);
+    }
 
     #[test]
-    fn test_access_path_hash() {
-        let key = StateKey::access_path(AccessPath::new("0x1002".parse().unwrap(), vec![7, 2, 3]));
-        let expected_hash = "0e0960bcabe04c40e8814ecc0e6de415163573243fb5059e9951f5890e9481ef"
-            .parse()
-            .unwrap();
-        assert_eq!(CryptoHash::hash(&key), expected_hash);
+    fn test_resource_hash() {
+        assert_crypto_hash(
+            &StateKey::resource_typed::<AccountResource>(&AccountAddress::TWO).unwrap(),
+            "8f9ab5d5e3c9f5b885fcceea388fecd16bdb490da08aac9d4f026ddc66733def",
+        );
+    }
+
+    #[test]
+    fn test_resource_group_hash() {
+        assert_crypto_hash(
+            &StateKey::resource_group(&AccountAddress::TWO, &ObjectGroupResource::struct_tag()),
+            "87973d52189ac6a25ea543214305c4c8fb3bc2ceea8c34600361b03527578133",
+        );
+    }
+
+    #[test]
+    fn test_module_hash() {
+        assert_crypto_hash(
+            &StateKey::module(&AccountAddress::TWO, ident_str!("mymodule")),
+            "83d33b345c5e4b25d8f4dfe2b98b492024313b3b6e4febea6bfa844dbd850200",
+        );
     }
 
     #[test]
     fn test_table_item_hash() {
-        let key = StateKey::table_item(&"0x1002".parse().unwrap(), &[7, 2, 3]);
-        let expected_hash = "6f5550015f7a6036f88b2458f98a7e4800aba09e83f8f294dbf70bff77f224e6"
-            .parse()
-            .unwrap();
-        assert_eq!(CryptoHash::hash(&key), expected_hash);
+        assert_crypto_hash(
+            &StateKey::table_item(&"0x1002".parse().unwrap(), &[7, 2, 3]),
+            "6f5550015f7a6036f88b2458f98a7e4800aba09e83f8f294dbf70bff77f224e6",
+        );
     }
 
     #[test]
     fn test_raw_hash() {
-        let key = StateKey::raw(&[1, 2, 3]);
-        let expected_hash = "655ab5766bc87318e18d9287f32d318e15535d3db9d21a6e5a2b41a51b535aff"
-            .parse()
-            .unwrap();
-        assert_eq!(CryptoHash::hash(&key), expected_hash);
+        assert_crypto_hash(
+            &StateKey::raw(&[1, 2, 3]),
+            "655ab5766bc87318e18d9287f32d318e15535d3db9d21a6e5a2b41a51b535aff",
+        )
     }
 
     #[test]
