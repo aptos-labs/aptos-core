@@ -74,7 +74,7 @@ pub fn generate_bytecode(env: &GlobalEnv, fid: QualifiedId<FunId>) -> FunctionDa
         let results = gen.results.clone();
         // Need to clone expression if present because of sharing issues with `gen`. However, because
         // of interning, clone is cheap.
-        gen.gen(results.clone(), Vec::new(), &def);
+        gen.gen(results.clone(), vec![result_node_id; results.len()], &def);
         let target_nodes = Vec::new();
         let src_nodes = vec![result_node_id; results.len()];
         gen.emit_with(def.result_node_id(), target_nodes, src_nodes, |attr| Bytecode::Ret(attr, results))
@@ -357,7 +357,7 @@ impl<'env> Generator<'env> {
 
 impl<'env> Generator<'env> {
     fn gen(&mut self, targets: Vec<TempIndex>, target_node_ids: Vec<NodeId>, exp: &Exp) {
-        debug_assert!(targets.len() == target_node_ids.len());
+        debug_assert!(targets.len() == target_node_ids.len(), "{:?} {:?} {:?}", targets, target_node_ids, exp);
         match exp.as_ref() {
             ExpData::Invalid(id) => self.internal_error(*id, "invalid expression"),
             ExpData::Temporary(id, temp) => self.gen_temporary(targets, target_node_ids, *id, *temp),
@@ -597,6 +597,10 @@ impl<'env> Generator<'env> {
         let target = self.require_unary_target(id, targets);
         let attr = self.new_loc_attr(id);
         let temp = self.find_local(id, name);
+
+        self.target_locations.insert(attr, vec![attr]);
+        self.src_locations.insert(attr, vec![attr]); // TODO: This is not correct, but we don't have a source location for locals
+
         self.emit(Bytecode::Assign(attr, target, temp, AssignKind::Inferred));
     }
 
