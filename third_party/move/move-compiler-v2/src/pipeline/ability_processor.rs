@@ -193,7 +193,17 @@ impl<'a> TransferFunctions for CopyDropAnalysis<'a> {
                 // If this is an equality we need to check drop for the operands, even though we do not need
                 // to emit a drop.
                 if matches!(op, Operation::Eq | Operation::Neq) {
-                    state.check_drop.extend(srcs.iter().cloned().zip(self.target.data.src_locations.get(id).unwrap().iter().cloned()));
+                    state.check_drop.extend(
+                        srcs.iter().cloned().zip(
+                            self.target
+                                .data
+                                .src_locations
+                                .get(id)
+                                .unwrap()
+                                .iter()
+                                .cloned(),
+                        ),
+                    );
                 }
                 // For arguments, we also need to check the case that a src, even if not used after this program
                 // point, is again used in the argument list. Also, in difference to assign inference, we only need
@@ -279,14 +289,15 @@ impl<'a> Transformer<'a> {
                 AssignKind::Inferred => {
                     let copy_drop_at = self.copy_drop.get(&code_offset).expect("copy_drop");
                     if copy_drop_at.needs_copy.contains(&src) {
-                        self.check_implicit_copy(code_offset, id, src);
+                        let src_id = self.src_id(id, 0);
+                        self.check_implicit_copy(code_offset, id, src, src_id);
                         self.builder.emit(Assign(id, dst, src, AssignKind::Copy))
                     } else {
                         self.builder.emit(Assign(id, dst, src, AssignKind::Move))
                     }
                 },
                 AssignKind::Copy | AssignKind::Store => {
-                    self.check_explicit_copy(id, src);
+                    self.check_explicit_copy(id, src, self.src_id(id, 0));
                     self.builder.emit(Assign(id, dst, src, AssignKind::Copy))
                 },
                 AssignKind::Move => {
@@ -298,6 +309,8 @@ impl<'a> Transformer<'a> {
                 use Operation::*;
                 match &op {
                     Function(..) => {
+                        let srcs_ids = self.builder.data.src_locations.get(&id).expect("src ids");
+                        let srcs = srcs.into_iter().zip(srcs_ids.iter().cloned()).collect();
                         let new_srcs = self.copy_args_if_needed(code_offset, id, srcs);
                         self.check_and_emit_bytecode(code_offset, Call(id, dests, op, new_srcs, ai))
                     },
@@ -317,23 +330,27 @@ impl<'a> Transformer<'a> {
             Call(id, _, op, srcs, _) => {
                 use Operation::*;
                 match &op {
-                    Drop => self.check_drop(*id, srcs[0], || {
+                    Drop => self.check_drop(*id, srcs[0], self.src_id(*id, 0), || {
                         ("explicitly dropped here".to_string(), vec![])
                     }),
                     ReadRef => {
                         let ty = self.builder.get_local_type(srcs[0]);
+                        let src_id = self.src_id(*id, 0);
                         self.check_copy_for_type(
                             *id,
                             srcs[0],
+                            src_id,
                             ty.get_target_type().expect("reference type"),
                             || ("reference content copied here".to_string(), vec![]),
                         );
                     },
                     WriteRef => {
                         let ty = self.builder.get_local_type(srcs[0]);
+                        let src_id = self.src_id(*id, 0);
                         self.check_drop_for_type(
                             *id,
                             srcs[0],
+                            src_id,
                             ty.get_target_type().expect("reference type"),
                             || ("reference content dropped here".to_string(), vec![]),
                         );
@@ -351,8 +368,14 @@ impl<'a> Transformer<'a> {
 // Copy and Move
 
 impl<'a> Transformer<'a> {
-    fn check_implicit_copy(&self, code_offset: CodeOffset, id: AttrId, src: TempIndex) {
-        self.check_copy(id, src, || {
+    fn check_implicit_copy(
+        &self,
+        code_offset: CodeOffset,
+        id: AttrId,
+        src: TempIndex,
+        src_id: AttrId,
+    ) {
+        self.check_copy(id, src, src_id, || {
             (
                 "copy needed here because value is still in use".to_string(),
                 self.make_hints_from_usage(code_offset, src),
@@ -360,8 +383,10 @@ impl<'a> Transformer<'a> {
         });
     }
 
-    fn check_explicit_copy(&self, id: AttrId, src: TempIndex) {
-        self.check_copy(id, src, || ("explicitly copied here".to_string(), vec![]));
+    fn check_explicit_copy(&self, id: AttrId, src: TempIndex, src_id: AttrId) {
+        self.check_copy(id, src, src_id, || {
+            ("explicitly copied here".to_string(), vec![])
+        });
     }
 
     /// Walks over the argument list and inserts copies if needed.
@@ -369,14 +394,14 @@ impl<'a> Transformer<'a> {
         &mut self,
         code_offset: CodeOffset,
         id: AttrId,
-        srcs: Vec<TempIndex>,
+        srcs: Vec<(TempIndex, AttrId)>,
     ) -> Vec<TempIndex> {
         use Bytecode::*;
         let copy_drop_at = self.copy_drop.get(&code_offset).expect("copy drop");
         let mut new_srcs = vec![];
-        for src in srcs.iter() {
+        for (src, src_id) in srcs.iter() {
             if copy_drop_at.needs_copy.contains(src) {
-                self.check_implicit_copy(code_offset, id, *src);
+                self.check_implicit_copy(code_offset, id, *src, *src_id);
                 let ty = self.builder.get_local_type(*src);
                 let temp = self.builder.new_temp(ty);
                 self.builder.emit(Assign(id, temp, *src, AssignKind::Copy));
@@ -389,8 +414,14 @@ impl<'a> Transformer<'a> {
     }
 
     /// Checks whether the given temp has copy ability, add diagnostics if not
-    fn check_copy(&self, id: AttrId, temp: TempIndex, describe: impl FnOnce() -> Description) {
-        self.check_copy_for_type(id, temp, &self.ty(temp), describe)
+    fn check_copy(
+        &self,
+        id: AttrId,
+        temp: TempIndex,
+        temp_id: AttrId,
+        describe: impl FnOnce() -> Description,
+    ) {
+        self.check_copy_for_type(id, temp, temp_id, &self.ty(temp), describe)
     }
 
     /// Checks whether the given temp wrt type has copy ability, add diagnostics if not
@@ -398,10 +429,11 @@ impl<'a> Transformer<'a> {
         &self,
         id: AttrId,
         temp: TempIndex,
+        temp_id: AttrId,
         ty: &Type,
         describe: impl FnOnce() -> Description,
     ) {
-        self.check_ability_for_type(id, Some(temp), ty, Ability::Copy, describe)
+        self.check_ability_for_type(id, Some(temp), temp_id, ty, Ability::Copy, describe)
     }
 
     /// Checks whether an explicit move is allowed.
@@ -437,12 +469,12 @@ impl<'a> Transformer<'a> {
         if !bytecode.is_always_branching() || before {
             let copy_drop_at = self.copy_drop.get(&code_offset).expect("copy_drop");
             let id = bytecode.get_attr_id();
-            for (temp, _id) in copy_drop_at.check_drop.iter() {
+            for (temp, temp_id) in copy_drop_at.check_drop.iter() {
                 // println!("before {} code {} i {} temp {} {:?} {:?}", before, code_offset, i, temp, bytecode, self.builder.data.src_locations.get(&id).unwrap());
                 // let temp_attr = self.builder.data.src_locations.get(&id).expect("src locations").get(i).expect("src location");
-                self.check_drop(id, *temp, || {
+                self.check_drop(id, *temp, *temp_id, || {
                     (
-                        format!("operator drops value here (consider borrowing the argument) temp {} offset {} bytecode {:?}", temp, code_offset, bytecode),
+                        "operator drops value here (consider borrowing the argument)".to_owned(),
                         vec![],
                     )
                 });
@@ -454,7 +486,8 @@ impl<'a> Transformer<'a> {
                     .get_info_at(code_offset)
                     .after
                     .is_borrowed(*temp);
-                self.check_drop(bytecode.get_attr_id(), *temp, || {
+                let id = bytecode.get_attr_id();
+                self.check_drop(id, *temp, id, || {
                     (
                         if is_borrowed {
                             "still borrowed but will be implicitly \
@@ -483,18 +516,32 @@ impl<'a> Transformer<'a> {
         }
     }
 
-    fn check_drop(&self, id: AttrId, temp: TempIndex, describe: impl FnOnce() -> Description) {
-        self.check_ability_for_type(id, Some(temp), &self.ty(temp), Ability::Drop, describe)
+    fn check_drop(
+        &self,
+        id: AttrId,
+        temp: TempIndex,
+        temp_id: AttrId,
+        describe: impl FnOnce() -> Description,
+    ) {
+        self.check_ability_for_type(
+            id,
+            Some(temp),
+            temp_id,
+            &self.ty(temp),
+            Ability::Drop,
+            describe,
+        )
     }
 
     fn check_drop_for_type(
         &self,
         id: AttrId,
         temp: TempIndex,
+        temp_id: AttrId,
         ty: &Type,
         describe: impl FnOnce() -> Description,
     ) {
-        self.check_ability_for_type(id, Some(temp), ty, Ability::Drop, describe)
+        self.check_ability_for_type(id, Some(temp), temp_id, ty, Ability::Drop, describe)
     }
 }
 
@@ -511,24 +558,16 @@ impl<'a> Transformer<'a> {
     /// the reason and possible a list of hints is provided as well.
     fn check_ability_for_type(
         &self,
-        id: AttrId,
+        _id: AttrId,
         temp: Option<TempIndex>,
+        temp_id: AttrId,
         ty: &Type,
         ability: Ability,
         describe: impl FnOnce() -> Description,
     ) {
         if !self.has_ability(ty, ability) {
             let (message, hints) = describe();
-            let loc = if let Some(temp) = temp {
-                if let Some(loc) = self.builder.data.local_locations.get(&temp) {
-                    // loc.clone()
-                    self.loc(id)
-                } else {
-                    self.loc(id)
-                }
-            } else {
-                self.loc(id)
-            };
+            let loc = self.loc(temp_id);
             self.error_with_hints(
                 loc,
                 format!(
@@ -555,6 +594,20 @@ impl<'a> Transformer<'a> {
     /// Gets the type of a local.
     fn ty(&self, temp: TempIndex) -> Type {
         self.builder.get_local_type(temp)
+    }
+
+    /// Gets the id of the i-th source target of an instruction.
+    fn src_id(&self, bytecode_id: AttrId, i: usize) -> AttrId {
+        // self.env().error(&self.loc(bytecode_id), "src_id");
+        *self
+            .builder
+            .data
+            .src_locations
+            .get(&bytecode_id)
+            .expect("src locations")
+            .get(i)
+            .expect("src location")
+        // bytecode_id
     }
 
     /// Gets the location associated with an attribute id
