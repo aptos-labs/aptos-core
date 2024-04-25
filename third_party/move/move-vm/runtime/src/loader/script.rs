@@ -21,7 +21,7 @@ use std::{collections::BTreeMap, sync::Arc};
 // A Script is very similar to a `CompiledScript` but data is "transformed" to a representation
 // more appropriate to execution.
 // When code executes, indices in instructions are resolved against runtime structures
-// (rather then "compiled") to make available data needed for execution
+// (rather than "compiled") to make available data needed for execution.
 #[derive(Clone, Debug)]
 pub(crate) struct Script {
     // primitive pools
@@ -34,12 +34,6 @@ pub(crate) struct Script {
 
     // entry point
     pub(crate) main: Arc<Function>,
-
-    // parameters of main
-    pub(crate) parameter_tys: Vec<Type>,
-
-    // return values
-    pub(crate) return_tys: Vec<Type>,
 
     // a map of single-token signature indices to type
     pub(crate) single_signature_token_map: BTreeMap<SignatureIndex, Type>,
@@ -104,7 +98,7 @@ impl Script {
         let code: Vec<Bytecode> = script.code.code.clone();
         let parameters = script.signature_at(script.parameters).clone();
 
-        let parameter_tys = parameters
+        let arg_tys = parameters
             .0
             .iter()
             .map(|tok| intern_type(BinaryIndexedView::Script(&script), tok, &struct_names))
@@ -124,14 +118,7 @@ impl Script {
             .map(|tok| intern_type(BinaryIndexedView::Script(&script), tok, &struct_names))
             .collect::<PartialVMResult<Vec<_>>>()
             .map_err(|err| err.finish(Location::Undefined))?;
-        let return_ = Signature(vec![]);
-        let return_tys = return_
-            .0
-            .iter()
-            .map(|tok| intern_type(BinaryIndexedView::Script(&script), tok, &struct_names))
-            .collect::<PartialVMResult<Vec<_>>>()
-            .map_err(|err| err.finish(Location::Undefined))?;
-        let type_parameters = script.type_parameters.clone();
+        let ty_arg_abilities = script.type_parameters.clone();
         // TODO: main does not have a name. Revisit.
         let name = Identifier::new("main").unwrap();
         let (native, def_is_native) = (None, false); // Script entries cannot be native
@@ -139,15 +126,16 @@ impl Script {
             file_format_version: script.version(),
             index: FunctionDefinitionIndex(0),
             code,
-            ty_arg_abilities: type_parameters,
+            ty_arg_abilities,
             native,
             def_is_native,
             def_is_friend_or_private: false,
             scope,
             name,
-            return_types: return_tys.clone(),
-            local_types: local_tys,
-            parameter_types: parameter_tys.clone(),
+            // Script must not return values.
+            return_tys: vec![],
+            local_tys,
+            arg_tys,
             access_specifier: AccessSpecifier::Any,
         });
 
@@ -193,8 +181,6 @@ impl Script {
             function_refs,
             function_instantiations,
             main,
-            parameter_tys,
-            return_tys,
             single_signature_token_map,
         })
     }
@@ -235,8 +221,8 @@ impl ScriptCache {
         self.scripts.get(hash).map(|script| {
             (
                 script.entry_point(),
-                script.parameter_tys.clone(),
-                script.return_tys.clone(),
+                script.entry_point().arg_tys().to_vec(),
+                script.entry_point().return_tys().to_vec(),
             )
         })
     }
@@ -252,8 +238,8 @@ impl ScriptCache {
                 let script = self.scripts.insert(hash, script);
                 (
                     script.entry_point(),
-                    script.parameter_tys.clone(),
-                    script.return_tys.clone(),
+                    script.entry_point().arg_tys().to_vec(),
+                    script.entry_point().return_tys().to_vec(),
                 )
             },
         }

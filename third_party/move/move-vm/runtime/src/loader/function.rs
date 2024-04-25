@@ -44,9 +44,9 @@ pub(crate) struct Function {
     pub(crate) def_is_friend_or_private: bool,
     pub(crate) scope: Scope,
     pub(crate) name: Identifier,
-    pub(crate) return_types: Vec<Type>,
-    pub(crate) local_types: Vec<Type>,
-    pub(crate) parameter_types: Vec<Type>,
+    pub(crate) return_tys: Vec<Type>,
+    pub(crate) local_tys: Vec<Type>,
+    pub(crate) arg_tys: Vec<Type>,
     pub(crate) access_specifier: AccessSpecifier,
 }
 
@@ -101,14 +101,15 @@ impl Function {
             None => vec![],
         };
         let ty_arg_abilities = handle.type_parameters.clone();
-        let return_types = signature_table[handle.return_.0 as usize].clone();
-        let local_types = if let Some(code) = &def.code {
-            let mut locals = signature_table[handle.parameters.0 as usize].clone();
-            locals.append(&mut signature_table[code.locals.0 as usize].clone());
-            locals
+        let return_tys = signature_table[handle.return_.0 as usize].clone();
+        let local_tys = if let Some(code) = &def.code {
+            let mut local_tys = signature_table[handle.parameters.0 as usize].clone();
+            local_tys.append(&mut signature_table[code.locals.0 as usize].clone());
+            local_tys
         } else {
             vec![]
         };
+        let arg_tys = signature_table[handle.parameters.0 as usize].clone();
 
         let access_specifier = load_access_specifier(
             BinaryIndexedView::Module(module),
@@ -116,8 +117,6 @@ impl Function {
             struct_names,
             &handle.access_specifiers,
         )?;
-
-        let parameter_types = signature_table[handle.parameters.0 as usize].clone();
 
         Ok(Self {
             file_format_version: module.version(),
@@ -129,9 +128,9 @@ impl Function {
             def_is_friend_or_private,
             scope,
             name,
-            local_types,
-            return_types,
-            parameter_types,
+            local_tys,
+            return_tys,
+            arg_tys,
             access_specifier,
         })
     }
@@ -172,15 +171,15 @@ impl Function {
     }
 
     pub(crate) fn local_count(&self) -> usize {
-        self.local_types.len()
+        self.local_tys.len()
     }
 
     pub(crate) fn arg_count(&self) -> usize {
-        self.parameter_types.len()
+        self.arg_tys.len()
     }
 
     pub(crate) fn return_type_count(&self) -> usize {
-        self.return_types.len()
+        self.return_tys.len()
     }
 
     pub(crate) fn name(&self) -> &str {
@@ -195,16 +194,16 @@ impl Function {
         &self.ty_arg_abilities
     }
 
-    pub(crate) fn local_types(&self) -> &[Type] {
-        &self.local_types
+    pub(crate) fn local_tys(&self) -> &[Type] {
+        &self.local_tys
     }
 
-    pub(crate) fn return_types(&self) -> &[Type] {
-        &self.return_types
+    pub(crate) fn return_tys(&self) -> &[Type] {
+        &self.return_tys
     }
 
-    pub(crate) fn parameter_types(&self) -> &[Type] {
-        &self.parameter_types
+    pub(crate) fn arg_tys(&self) -> &[Type] {
+        &self.arg_tys
     }
 
     pub(crate) fn pretty_string(&self) -> String {

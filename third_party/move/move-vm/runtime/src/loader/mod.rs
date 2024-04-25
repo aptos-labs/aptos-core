@@ -291,7 +291,7 @@ impl Loader {
     pub(crate) fn load_script(
         &self,
         script_blob: &[u8],
-        ty_args: &[TypeTag],
+        ty_arg_tags: &[TypeTag],
         data_store: &mut TransactionDataCache,
         module_store: &ModuleStorageAdapter,
     ) -> VMResult<(Arc<Function>, LoadedFunctionInstantiation)> {
@@ -301,7 +301,7 @@ impl Loader {
         let hash_value: [u8; 32] = sha3_256.finalize().into();
 
         let mut scripts = self.scripts.write();
-        let (main, parameters, return_) = match scripts.get(&hash_value) {
+        let (main, arg_tys, return_tys) = match scripts.get(&hash_value) {
             Some(cached) => cached,
             None => {
                 let ver_script = self.deserialize_and_verify_script(
@@ -315,14 +315,13 @@ impl Loader {
             },
         };
 
-        // Verify type arguments.
-        let mut type_arguments = vec![];
-        for ty in ty_args {
-            type_arguments.push(self.load_type(ty, data_store, module_store)?);
+        let mut ty_args = vec![];
+        for ty_arg_tag in ty_arg_tags {
+            ty_args.push(self.load_type(ty_arg_tag, data_store, module_store)?);
         }
 
         if self.vm_config.type_size_limit
-            && type_arguments
+            && ty_args
                 .iter()
                 .map(|loaded_ty| self.count_type_nodes(loaded_ty))
                 .sum::<u64>()
@@ -336,7 +335,7 @@ impl Loader {
                 .finish(Location::Script));
         };
 
-        self.verify_ty_arg_abilities(main.ty_arg_abilities(), &type_arguments)
+        self.verify_ty_arg_abilities(main.ty_arg_abilities(), &ty_args)
             .map_err(|e| {
                 e.with_message(format!(
                     "Failed to verify type arguments for script {}",
@@ -345,9 +344,9 @@ impl Loader {
                 .finish(Location::Script)
             })?;
         let instantiation = LoadedFunctionInstantiation {
-            ty_args: type_arguments,
-            arg_tys: parameters,
-            return_tys: return_,
+            ty_args,
+            arg_tys,
+            return_tys,
         };
         Ok((main, instantiation))
     }
@@ -417,9 +416,9 @@ impl Loader {
             .resolve_function_by_name(function_name, module_id)
             .map_err(|err| err.finish(Location::Undefined))?;
 
-        let parameters = func.parameter_types().to_vec();
+        let parameters = func.arg_tys().to_vec();
 
-        let return_ = func.return_types().to_vec();
+        let return_ = func.return_tys().to_vec();
 
         Ok((module, func, parameters, return_))
     }
@@ -519,21 +518,20 @@ impl Loader {
         data_store: &mut TransactionDataCache,
         module_store: &ModuleStorageAdapter,
     ) -> VMResult<(LoadedFunction, LoadedFunctionInstantiation)> {
-        let (module, func, parameters, return_vec) = self.load_function_without_type_args(
+        let (module, func, arg_tys, return_tys) = self.load_function_without_type_args(
             module_id,
             function_name,
             data_store,
             module_store,
         )?;
 
-        if return_vec.len() != 1 {
+        if return_tys.len() != 1 {
             // For functions that are marked constructor this should not happen.
             return Err(PartialVMError::new(StatusCode::ABORTED).finish(Location::Undefined));
         }
-        let return_type = &return_vec[0];
 
         let mut map = BTreeMap::new();
-        if !Self::match_return_type(return_type, expected_return_type, &mut map) {
+        if !Self::match_return_type(&return_tys[0], expected_return_type, &mut map) {
             // For functions that are marked constructor this should not happen.
             return Err(
                 PartialVMError::new(StatusCode::INVALID_MAIN_FUNCTION_SIGNATURE)
@@ -542,11 +540,11 @@ impl Loader {
         }
 
         // Construct the type arguments from the match
-        let mut type_arguments = vec![];
-        let type_param_len = func.ty_arg_abilities().len();
-        for i in 0..type_param_len {
-            if let Option::Some(t) = map.get(&(i as u16)) {
-                type_arguments.push((*t).clone());
+        let mut ty_args = vec![];
+        let num_ty_args = func.ty_arg_abilities().len();
+        for i in 0..num_ty_args {
+            if let Some(t) = map.get(&(i as u16)) {
+                ty_args.push((*t).clone());
             } else {
                 // Unknown type argument we are not able to infer the type arguments.
                 // For functions that are marked constructor this should not happen.
@@ -557,13 +555,13 @@ impl Loader {
             }
         }
 
-        self.verify_ty_arg_abilities(func.ty_arg_abilities(), &type_arguments)
+        self.verify_ty_arg_abilities(func.ty_arg_abilities(), &ty_args)
             .map_err(|e| e.finish(Location::Module(module_id.clone())))?;
 
         let loaded = LoadedFunctionInstantiation {
-            ty_args: type_arguments,
-            arg_tys: parameters,
-            return_tys: return_vec,
+            ty_args,
+            arg_tys,
+            return_tys,
         };
         Ok((
             LoadedFunction {
@@ -581,20 +579,20 @@ impl Loader {
         &self,
         module_id: &ModuleId,
         function_name: &IdentStr,
-        ty_args: &[TypeTag],
+        ty_arg_tags: &[TypeTag],
         data_store: &mut TransactionDataCache,
         module_store: &ModuleStorageAdapter,
     ) -> VMResult<(Arc<Module>, Arc<Function>, LoadedFunctionInstantiation)> {
-        let (module, func, parameters, return_) = self.load_function_without_type_args(
+        let (module, func, arg_tys, return_tys) = self.load_function_without_type_args(
             module_id,
             function_name,
             data_store,
             module_store,
         )?;
 
-        let type_arguments = ty_args
+        let ty_args = ty_arg_tags
             .iter()
-            .map(|ty| self.load_type(ty, data_store, module_store))
+            .map(|ty_arg_tag| self.load_type(ty_arg_tag, data_store, module_store))
             .collect::<VMResult<Vec<_>>>()
             .map_err(|mut err| {
                 // User provided type argument failed to load. Set extra sub status to distinguish from internal type loading error.
@@ -604,13 +602,13 @@ impl Loader {
                 err
             })?;
 
-        self.verify_ty_arg_abilities(func.ty_arg_abilities(), &type_arguments)
+        self.verify_ty_arg_abilities(func.ty_arg_abilities(), &ty_args)
             .map_err(|e| e.finish(Location::Module(module_id.clone())))?;
 
         let loaded = LoadedFunctionInstantiation {
-            ty_args: type_arguments,
-            arg_tys: parameters,
-            return_tys: return_,
+            ty_args,
+            arg_tys,
+            return_tys,
         };
         Ok((module, func, loaded))
     }

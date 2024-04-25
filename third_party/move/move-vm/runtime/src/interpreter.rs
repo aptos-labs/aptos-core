@@ -338,12 +338,10 @@ impl Interpreter {
                 let ty = self.operand_stack.pop_ty()?;
                 let resolver = func.get_resolver(loader, module_store);
                 if is_generic {
-                    ty.check_eq(
-                        &resolver.subst(&func.local_types()[arg_count - i - 1], &ty_args)?,
-                    )?;
+                    ty.check_eq(&resolver.subst(&func.local_tys()[arg_count - i - 1], &ty_args)?)?;
                 } else {
                     // Directly check against the expected type to save a clone here.
-                    ty.check_eq(&func.local_types()[arg_count - i - 1])?;
+                    ty.check_eq(&func.local_tys()[arg_count - i - 1])?;
                 }
             }
         }
@@ -362,18 +360,18 @@ impl Interpreter {
         ty_args: Vec<Type>,
         locals: Locals,
     ) -> PartialVMResult<Frame> {
-        for ty in function.local_types() {
+        for ty in function.local_tys() {
             gas_meter
                 .charge_create_ty(NumTypeNodes::new(ty.num_nodes_in_subst(&ty_args)? as u64))?;
         }
 
         let local_tys = if self.paranoid_type_checks {
             if ty_args.is_empty() {
-                function.local_types().to_vec()
+                function.local_tys().to_vec()
             } else {
                 let resolver = function.get_resolver(loader, module_store);
                 function
-                    .local_types()
+                    .local_tys()
                     .iter()
                     .map(|ty| resolver.subst(ty, &ty_args))
                     .collect::<PartialVMResult<Vec<_>>>()?
@@ -448,11 +446,11 @@ impl Interpreter {
             for i in 0..expected_args {
                 let ty = self.operand_stack.pop_ty()?;
                 if is_generic {
-                    let expected_ty = resolver
-                        .subst(&function.parameter_types()[expected_args - i - 1], &ty_args)?;
+                    let expected_ty =
+                        resolver.subst(&function.arg_tys()[expected_args - i - 1], &ty_args)?;
                     ty.check_eq(&expected_ty)?;
                 } else {
-                    ty.check_eq(&function.parameter_types()[expected_args - i - 1])?;
+                    ty.check_eq(&function.arg_tys()[expected_args - i - 1])?;
                 }
             }
         }
@@ -520,7 +518,7 @@ impl Interpreter {
         }
 
         if self.paranoid_type_checks {
-            for ty in function.return_types() {
+            for ty in function.return_tys() {
                 self.operand_stack.push_ty(resolver.subst(ty, &ty_args)?)?;
             }
         }
