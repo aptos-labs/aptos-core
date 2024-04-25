@@ -1,5 +1,4 @@
 module aptos_framework::randomness_api_v0_config {
-    use std::option;
     use std::option::Option;
     use aptos_framework::chain_status;
     use aptos_framework::config_buffer;

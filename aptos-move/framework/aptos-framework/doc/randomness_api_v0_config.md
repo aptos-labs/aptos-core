@@ -9,6 +9,7 @@
 -  [Function `initialize`](#0x1_randomness_api_v0_config_initialize)
 -  [Function `set_for_next_epoch`](#0x1_randomness_api_v0_config_set_for_next_epoch)
 -  [Function `on_new_epoch`](#0x1_randomness_api_v0_config_on_new_epoch)
+-  [Specification](#@Specification_0)
 
 
 <pre><code><b>use</b> <a href="chain_status.md#0x1_chain_status">0x1::chain_status</a>;
@@ -131,6 +132,15 @@ Only used in reconfigurations to apply the pending <code><a href="randomness_api
 
 
 </details>
+
+<a id="@Specification_0"></a>
+
+## Specification
+
+
+
+<pre><code><b>pragma</b> verify = <b>false</b>;
+</code></pre>
 
 
 [move-book]: https://aptos.dev/move/book/SUMMARY
