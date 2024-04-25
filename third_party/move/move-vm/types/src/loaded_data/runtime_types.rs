@@ -24,11 +24,14 @@ use std::{
 };
 use triomphe::Arc as TriompheArc;
 
-pub const TYPE_DEPTH_MAX: usize = 256;
+/// Maximum depth of a fully-instantiated type, excluding field types of structs.
+#[cfg(not(test))]
+const MAX_INSTANTIATED_TYPE_DEPTH: usize = 256;
 
-/// Maximal nodes which are all allowed when instantiating a generic type. This does not include
+/// Maximum number of nodes in a fully-instantiated type. This does not include
 /// field types of structs.
-const MAX_TYPE_INSTANTIATION_NODES: usize = 128;
+#[cfg(not(test))]
+const MAX_INSTANTIATED_TYPE_NODE_COUNT: usize = 128;
 
 #[derive(PartialEq, Eq, PartialOrd, Ord, Hash, Clone, Debug)]
 /// A formula describing the value depth of a type, using (the depths of) the type parameters as inputs.
@@ -292,10 +295,10 @@ impl Type {
     where
         F: Fn(u16, &mut usize, usize) -> PartialVMResult<Type> + Copy,
     {
-        if *count > MAX_TYPE_INSTANTIATION_NODES {
+        if *count >= MAX_INSTANTIATED_TYPE_NODE_COUNT {
             return Err(PartialVMError::new(StatusCode::TOO_MANY_TYPE_NODES));
         }
-        if depth > TYPE_DEPTH_MAX {
+        if depth > MAX_INSTANTIATED_TYPE_DEPTH {
             return Err(PartialVMError::new(StatusCode::VM_MAX_TYPE_DEPTH_REACHED));
         }
 
@@ -622,9 +625,16 @@ impl fmt::Display for Type {
     }
 }
 
+// For tests, use smaller constants and ensure count is larger than depth.
+#[cfg(test)]
+const MAX_INSTANTIATED_TYPE_DEPTH: usize = 5;
+#[cfg(test)]
+const MAX_INSTANTIATED_TYPE_NODE_COUNT: usize = 11;
+
 #[cfg(test)]
 mod unit_tests {
     use super::*;
+    use claims::{assert_err, assert_ok};
 
     fn struct_inst_for_test(ty_args: Vec<Type>) -> Type {
         Type::StructInstantiation {
@@ -692,5 +702,44 @@ mod unit_tests {
             assert_eq!(num_nodes, expected);
             assert_eq!(ty.num_nodes_in_subst(&ty_args).unwrap(), expected);
         }
+    }
+
+    #[test]
+    fn test_substitution_large_depth() {
+        use Type::*;
+
+        let ty = Vector(TriompheArc::new(Vector(TriompheArc::new(TyParam(0)))));
+        let ty_arg = Vector(TriompheArc::new(Vector(TriompheArc::new(Bool))));
+        assert_ok!(ty.subst(&[ty_arg.clone()]));
+
+        let ty_arg = Vector(TriompheArc::new(ty_arg));
+        let err = assert_err!(ty.subst(&[ty_arg]));
+        assert_eq!(err.major_status(), StatusCode::VM_MAX_TYPE_DEPTH_REACHED);
+    }
+
+    #[test]
+    fn test_substitution_large_count() {
+        use Type::*;
+
+        let ty_params: Vec<Type> = (0..5).map(TyParam).collect();
+        let ty = struct_inst_for_test(ty_params);
+
+        // Each type argument contributes 2 nodes, so in total the count is 11.
+        let ty_args: Vec<Type> = (0..5).map(|_| Vector(TriompheArc::new(Bool))).collect();
+        let count = assert_ok!(ty.subst_impl(&ty_args)).1;
+        assert_eq!(count, 11);
+
+        let ty_args: Vec<Type> = (0..5)
+            .map(|i| {
+                if i == 4 {
+                    // 3 nodes, to increase the total count to 12.
+                    struct_inst_for_test(vec![U64, struct_for_test()])
+                } else {
+                    Vector(TriompheArc::new(Bool))
+                }
+            })
+            .collect();
+        let err = assert_err!(ty.subst(&ty_args));
+        assert_eq!(err.major_status(), StatusCode::TOO_MANY_TYPE_NODES);
     }
 }
