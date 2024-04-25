@@ -689,7 +689,7 @@ impl TransactionsApi {
         }
     }
 
-    async fn get_transaction_by_hash_inner(
+    pub async fn get_transaction_by_hash_inner(
         &self,
         accept_type: &AcceptType,
         hash: HashValue,
