@@ -129,11 +129,10 @@ pub fn validate_combine_signer_and_txn_args(
     let allowed_structs = get_allowed_structs(are_struct_constructors_enabled);
     // Need to keep this here to ensure we return the historic correct error code for replay
     for ty in func.parameters[signer_param_cnt..].iter() {
-        let valid = is_valid_txn_arg(
-            session,
-            &ty.subst(&func.type_arguments).unwrap(),
-            allowed_structs,
-        );
+        let ty = ty
+            .subst(&func.type_arguments)
+            .map_err(|e| e.finish(Location::Undefined).into_vm_status())?;
+        let valid = is_valid_txn_arg(session, &ty, allowed_structs);
         if !valid {
             return Err(VMStatus::error(
                 StatusCode::INVALID_MAIN_FUNCTION_SIGNATURE,
@@ -224,14 +223,10 @@ pub(crate) fn construct_args(
         return Err(invalid_signature());
     }
     for (ty, arg) in types.iter().zip(args) {
-        let arg = construct_arg(
-            session,
-            &ty.subst(ty_args).unwrap(),
-            allowed_structs,
-            arg,
-            &mut gas_meter,
-            is_view,
-        )?;
+        let ty = ty
+            .subst(ty_args)
+            .map_err(|e| e.finish(Location::Undefined).into_vm_status())?;
+        let arg = construct_arg(session, &ty, allowed_structs, arg, &mut gas_meter, is_view)?;
         res_args.push(arg);
     }
     Ok(res_args)
