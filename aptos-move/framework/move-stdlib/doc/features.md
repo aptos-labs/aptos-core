@@ -698,7 +698,7 @@ Also 0.01 APT from gas payer's balance will be locked during transaction executi
 to mitigate [undergasing attack](https://github.com/aptos-foundation/AIPs/blob/main/aips/aip-41.md#undergasing-attacks).
 
 
-<pre><code><b>const</b> <a href="features.md#0x1_features_RANDOMNESS_API_V0">RANDOMNESS_API_V0</a>: u64 = 63;
+<pre><code><b>const</b> <a href="features.md#0x1_features_RANDOMNESS_API_V0">RANDOMNESS_API_V0</a>: u64 = 64;
 </code></pre>
 
 
