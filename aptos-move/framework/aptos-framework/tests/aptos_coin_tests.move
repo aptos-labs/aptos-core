@@ -6,12 +6,10 @@ module aptos_framework::aptos_coin_tests {
     use aptos_framework::primary_fungible_store;
     use aptos_framework::object::{Self, Object};
 
-    #[test_only]
     public fun mint_apt_fa_to_for_test<T: key>(store: Object<T>, amount: u64) {
         fungible_asset::deposit(store, aptos_coin::mint_apt_fa_for_test(amount));
     }
 
-    #[test_only]
     public fun mint_apt_fa_to_primary_fungible_store_for_test(
         owner: address,
         amount: u64,
