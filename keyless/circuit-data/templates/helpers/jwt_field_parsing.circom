@@ -119,12 +119,14 @@ template ParseJWTFieldWithUnquotedValue(maxKVPairLen, maxNameLen, maxValueLen) {
         (whitespace_selector_one[i] + whitespace_selector_two[i] + whitespace_selector_three[i]) * (1 - is_whitespace[i]) === 0;
     }
 
-    // Verify value does not contain comma or end brace
+    // Verify value does not contain comma, end brace, or quote
     signal value_selector[maxKVPairLen] <== ArraySelector(maxKVPairLen)(value_index, value_index+value_len);
 
-    signal is_allowed_char[maxKVPairLen];
     for (var i = 0; i < maxKVPairLen; i++) {
-        is_allowed_char[i] <== (field[i] - 44) * (field[i] - 125);
-        value_selector[i] * (1 - is_allowed_char[i]) === 0;
+        log(i, field[i], value_selector[i]);
+        var is_comma = IsEqual()([field[i], 44]);
+        var is_end_brace = IsEqual()([field[i], 125]);
+        var is_quote = IsEqual()([field[i], 34]);
+        value_selector[i] * (is_comma + is_end_brace + is_quote) === 0;
     }
 }
