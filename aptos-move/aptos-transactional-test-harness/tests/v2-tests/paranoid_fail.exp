@@ -1,0 +1,80 @@
+processed 3 tasks
+
+task 1 'publish'. lines 4-41:
+
+
+
+task 2 'run'. lines 43-43:
+mutable inputs after call: local#0: 0
+return values: 0
+
+>>> V2 Compiler {
+== BEGIN Bytecode ==
+// Move bytecode v6
+module f75daa73fc071f93593335eb9033da804777eb94491650dd3f095ce6f778acb6.M {
+
+
+public guess_flips(Arg0: vector<u8>) /* def_idx: 0 */ {
+L1:	loc0: &vector<u8>
+L2:	loc1: u64
+L3:	loc2: u8
+L4:	loc3: &u8
+B0:
+	0: ImmBorrowLoc[0](Arg0: vector<u8>)
+	1: StLoc[1](loc0: &vector<u8>)
+	2: LdU64(0)
+	3: StLoc[2](loc1: u64)
+B1:
+	4: CopyLoc[2](loc1: u64)
+	5: CopyLoc[1](loc0: &vector<u8>)
+	6: VecLen(3)
+	7: Lt
+	8: BrFalse(29)
+B2:
+	9: Branch(10)
+B3:
+	10: CopyLoc[1](loc0: &vector<u8>)
+	11: CopyLoc[2](loc1: u64)
+	12: VecImmBorrow(3)
+	13: StLoc[4](loc3: &u8)
+	14: CopyLoc[4](loc3: &u8)
+	15: ReadRef
+	16: StLoc[3](loc2: u8)
+	17: CopyLoc[3](loc2: u8)
+	18: LdU8(0)
+	19: Neq
+	20: BrFalse(24)
+B4:
+	21: MoveLoc[1](loc0: &vector<u8>)
+	22: Pop
+	23: Branch(29)
+B5:
+	24: MoveLoc[2](loc1: u64)
+	25: LdU64(1)
+	26: Add
+	27: StLoc[2](loc1: u64)
+	28: Branch(4)
+B6:
+	29: CopyLoc[0](Arg0: vector<u8>)
+	30: Pop
+	31: MoveLoc[0](Arg0: vector<u8>)
+	32: Pop
+	33: Ret
+}
+entry public test_guess_with_inline_break() /* def_idx: 1 */ {
+L0:	loc0: vector<u8>
+B0:
+	0: LdU8(4)
+	1: LdU8(0)
+	2: LdU8(0)
+	3: LdU8(0)
+	4: LdU8(0)
+	5: VecPack(3, 5)
+	6: StLoc[0](loc0: vector<u8>)
+	7: MoveLoc[0](loc0: vector<u8>)
+	8: Call guess_flips(vector<u8>)
+	9: Ret
+}
+}
+== END Bytecode ==
+}

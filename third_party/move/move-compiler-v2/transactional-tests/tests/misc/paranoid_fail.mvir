@@ -1,0 +1,37 @@
+//# publish
+module 0x42.M {
+    public guess_flips(Arg0: vector<u8>) {
+        let loc0: &vector<u8>;
+        let loc1: u64;
+        let tmp1: u8;
+    label B0:
+        loc0 = &Arg0;
+        loc1 = 0u64;
+    label B1:
+        jump_if_false(copy(loc1) < vec_len<u8>(copy(loc0))) B6;
+    label B2:
+        jump B3;
+    label B3:
+        tmp1 = *vec_imm_borrow<u8>(copy(loc0), copy(loc1));
+        jump_if_false (copy(tmp1) != 0u8) B5;
+    label B4:
+        _ = move(loc0);
+        jump B6;
+    label B5:        
+        loc1 = move(loc1) + 1u64;
+        jump B1;
+    label B6:
+        _ = copy(Arg0);
+        _ = move(Arg0);
+        return;
+    }
+}
+
+//# run
+import 0x1.M;
+
+main() {
+    label L0:
+        M.guess_flips(vec_pack_5<u8>(4, 0, 0, 0, 0));
+        return;
+}

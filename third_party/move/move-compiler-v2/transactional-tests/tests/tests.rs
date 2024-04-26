@@ -119,7 +119,7 @@ fn main() {
         .flatten()
         .filter_map(|e| {
             let p = e.path().display().to_string();
-            if p.ends_with(".move") {
+            if p.ends_with(".move") || p.ends_with(".mvir") {
                 Some(p)
             } else {
                 None
