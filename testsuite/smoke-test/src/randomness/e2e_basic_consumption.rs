@@ -71,6 +71,7 @@ async fn e2e_basic_consumption() {
         .into_inner();
 
     info!("Roll history: {:?}", dice_roll_history.rolls);
+    assert!(false);
 }
 
 #[derive(Deserialize, Serialize)]
