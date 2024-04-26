@@ -150,8 +150,8 @@ template identity(
     signal input uid_field_string_bodies[maxUIDKVPairLen];
     signal input uid_field_len;
     signal input uid_index;
-    CheckSubstrInclusionPoly(max_ascii_jwt_payload_len, maxUIDKVPairLen)(ascii_jwt_payload, ascii_jwt_payload_hash, uid_field_string_bodies, uid_field_len, uid_index);
     CheckSubstrInclusionPoly(max_ascii_jwt_payload_len, maxUIDKVPairLen)(ascii_jwt_payload, ascii_jwt_payload_hash, uid_field, uid_field_len, uid_index);
+    CheckSubstrInclusionPoly(max_ascii_jwt_payload_len, maxUIDKVPairLen)(string_bodies, ascii_jwt_payload_hash, uid_field_string_bodies, uid_field_len, uid_index);
 
     // Perform necessary checks on user id field. Some fields this might be in practice are "sub" or "email"
     signal input uid_name_len;
@@ -214,7 +214,7 @@ template identity(
     signal input iss_field_len;
     signal input iss_index;
     CheckSubstrInclusionPoly(max_ascii_jwt_payload_len, maxIssKVPairLen)(ascii_jwt_payload, ascii_jwt_payload_hash, iss_field, iss_field_len, iss_index);
-    CheckSubstrInclusionPoly(max_ascii_jwt_payload_len, maxIssKVPairLen)(ascii_jwt_payload, ascii_jwt_payload_hash, iss_field_string_bodies, iss_field_len, iss_index);
+    CheckSubstrInclusionPoly(max_ascii_jwt_payload_len, maxIssKVPairLen)(string_bodies, ascii_jwt_payload_hash, iss_field_string_bodies, iss_field_len, iss_index);
 
     // Perform necessary checks on iss field
     var iss_name_len = 3; // iss
@@ -269,7 +269,7 @@ template identity(
     signal input nonce_field_len;
     signal input nonce_index;
     CheckSubstrInclusionPoly(max_ascii_jwt_payload_len, maxNonceKVPairLen)(ascii_jwt_payload, ascii_jwt_payload_hash, nonce_field, nonce_field_len, nonce_index);
-    CheckSubstrInclusionPoly(max_ascii_jwt_payload_len, maxNonceKVPairLen)(ascii_jwt_payload, ascii_jwt_payload_hash, nonce_field_string_bodies, nonce_field_len, nonce_index);
+    CheckSubstrInclusionPoly(max_ascii_jwt_payload_len, maxNonceKVPairLen)(string_bodies, ascii_jwt_payload_hash, nonce_field_string_bodies, nonce_field_len, nonce_index);
 
     // Perform necessary checks on nonce field
     var nonce_name_len = 5; // nonce
