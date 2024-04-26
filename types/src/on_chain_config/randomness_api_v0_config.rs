@@ -6,29 +6,29 @@ use move_core_types::value::{MoveStruct, MoveValue};
 use serde::{Deserialize, Serialize};
 
 #[derive(Deserialize, Serialize)]
-pub struct RequiredDeposit {
-    pub amount: Option<u64>,
+pub struct RequiredGasDeposit {
+    pub gas_amount: Option<u64>,
 }
 
-impl RequiredDeposit {
+impl RequiredGasDeposit {
     pub fn default_for_genesis() -> Self {
         Self {
-            amount: Some(1_000_000), // in octa, which is 0.01 APT
+            gas_amount: Some(1_000_000),
         }
     }
 
     pub fn default_if_missing() -> Self {
-        Self { amount: None }
+        Self { gas_amount: None }
     }
 }
 
-impl OnChainConfig for RequiredDeposit {
+impl OnChainConfig for RequiredGasDeposit {
     const MODULE_IDENTIFIER: &'static str = "randomness_api_v0_config";
-    const TYPE_IDENTIFIER: &'static str = "RequiredDeposit";
+    const TYPE_IDENTIFIER: &'static str = "RequiredGasDeposit";
 }
 
-impl AsMoveValue for RequiredDeposit {
+impl AsMoveValue for RequiredGasDeposit {
     fn as_move_value(&self) -> MoveValue {
-        MoveValue::Struct(MoveStruct::Runtime(vec![self.amount.as_move_value()]))
+        MoveValue::Struct(MoveStruct::Runtime(vec![self.gas_amount.as_move_value()]))
     }
 }

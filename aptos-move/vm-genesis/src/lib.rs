@@ -31,7 +31,7 @@ use aptos_types::{
     },
     move_utils::as_move_value::AsMoveValue,
     on_chain_config::{
-        randomness_api_v0_config::RequiredDeposit, FeatureFlag, Features, GasScheduleV2,
+        randomness_api_v0_config::RequiredGasDeposit, FeatureFlag, Features, GasScheduleV2,
         OnChainConsensusConfig, OnChainExecutionConfig, OnChainJWKConsensusConfig,
         OnChainRandomnessConfig, RandomnessConfigMoveStruct, TimedFeaturesBuilder,
         APTOS_MAX_KNOWN_VERSION,
@@ -531,7 +531,7 @@ fn initialize_randomness_api_v0_config(session: &mut SessionExt) {
         vec![],
         serialize_values(&vec![
             MoveValue::Signer(CORE_CODE_ADDRESS),
-            RequiredDeposit::default_for_genesis().as_move_value(),
+            RequiredGasDeposit::default_for_genesis().as_move_value(),
         ]),
     );
 }

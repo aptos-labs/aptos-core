@@ -53,7 +53,7 @@ use aptos_types::{
     invalid_signature,
     move_utils::as_move_value::AsMoveValue,
     on_chain_config::{
-        new_epoch_event_key, randomness_api_v0_config::RequiredDeposit, ConfigurationResource,
+        new_epoch_event_key, randomness_api_v0_config::RequiredGasDeposit, ConfigurationResource,
         FeatureFlag, Features, OnChainConfig, TimedFeatureOverride, TimedFeatures,
         TimedFeaturesBuilder,
     },
@@ -206,7 +206,7 @@ pub struct AptosVM {
     timed_features: TimedFeatures,
     /// For a new chain, or even mainnet, the VK might not necessarily be set.
     pvk: Option<PreparedVerifyingKey<Bn254>>,
-    randomness_api_v0_required_deposit: RequiredDeposit,
+    randomness_api_v0_required_deposit: RequiredGasDeposit,
 }
 
 impl AptosVM {
@@ -215,8 +215,8 @@ impl AptosVM {
         override_is_delayed_field_optimization_capable: Option<bool>,
     ) -> Self {
         let _timer = TIMER.timer_with(&["AptosVM::new"]);
-        let randomness_api_v0_required_deposit = RequiredDeposit::fetch_config(resolver)
-            .unwrap_or_else(RequiredDeposit::default_if_missing);
+        let randomness_api_v0_required_deposit = RequiredGasDeposit::fetch_config(resolver)
+            .unwrap_or_else(RequiredGasDeposit::default_if_missing);
         let features = Features::fetch_config(resolver).unwrap_or_default();
         let (
             gas_params,
@@ -1709,7 +1709,7 @@ impl AptosVM {
                 &gas_meter.vm_gas_params().txn,
                 &txn_data,
                 txn.payload(),
-            );
+            )?;
             txn_data.set_required_deposit(required_deposit);
             self.validate_signed_transaction(
                 session,
@@ -2422,24 +2422,32 @@ impl AptosVM {
         session: &mut SessionExt,
         resolver: &impl AptosMoveResolver,
         _txn_gas_params: &TransactionGasParameters,
-        _txn_metadata: &TransactionMetadata,
+        txn_metadata: &TransactionMetadata,
         payload: &TransactionPayload,
-    ) -> Option<u64> {
+    ) -> Result<Option<u64>, VMStatus> {
         match payload {
             TransactionPayload::EntryFunction(entry_func) => {
-                if let Some(amount) = self.randomness_api_v0_required_deposit.amount {
+                if let Some(gas_amount) = self.randomness_api_v0_required_deposit.gas_amount {
                     if has_randomness_attribute(resolver, session, entry_func).unwrap_or(false) {
-                        Some(amount)
+                        if gas_amount != u64::from(txn_metadata.max_gas_amount) {
+                            return Err(VMStatus::error(
+                                StatusCode::REQUIRED_DEPOSIT_INCONSISTENT_WITH_TXN_MAX_GAS,
+                                None,
+                            ));
+                        }
+                        let octa_amount =
+                            u64::from(txn_metadata.max_gas_amount * txn_metadata.gas_unit_price);
+                        Ok(Some(octa_amount))
                     } else {
-                        None
+                        Ok(None)
                     }
                 } else {
-                    None
+                    Ok(None)
                 }
             },
             TransactionPayload::Script(_)
             | TransactionPayload::ModuleBundle(_)
-            | TransactionPayload::Multisig(_) => None,
+            | TransactionPayload::Multisig(_) => Ok(None),
         }
     }
 }
@@ -2582,13 +2590,19 @@ impl VMValidator for AptosVM {
             Some(txn_data.as_user_transaction_context()),
         );
         let required_deposit = if let Ok(gas_params) = &self.gas_params {
-            self.get_required_deposit(
+            let maybe_required_deposit = self.get_required_deposit(
                 &mut session,
                 &resolver,
                 &gas_params.vm.txn,
                 &txn_data,
                 txn.payload(),
-            )
+            );
+            match maybe_required_deposit {
+                Ok(required_deposit) => required_deposit,
+                Err(vm_status) => {
+                    return VMValidatorResult::error(vm_status.status_code());
+                },
+            }
         } else {
             return VMValidatorResult::error(StatusCode::GAS_PARAMS_MISSING);
         };
