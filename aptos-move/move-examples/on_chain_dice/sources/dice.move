@@ -7,8 +7,12 @@ module module_owner::dice {
     }
 
     #[randomness]
-    entry fun roll(account: signer) {
-        let _addr = address_of(&account);
-        let _roll = randomness::u64_range(0, 6);
+    entry fun roll(account: signer) acquires DiceRollResult {
+        let addr = address_of(&account);
+        let roll = randomness::u64_range(0, 6);
+        if (exists<DiceRollResult>(addr)) {
+            move_from<DiceRollResult>(addr);
+        };
+        move_to(&account, DiceRollResult { roll });
     }
 }
