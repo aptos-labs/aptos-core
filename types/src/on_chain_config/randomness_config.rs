@@ -199,7 +199,7 @@ impl OnChainRandomnessConfig {
     }
 
     pub fn default_for_genesis() -> Self {
-        OnChainRandomnessConfig::V2(ConfigV2::default())
+        OnChainRandomnessConfig::Off
     }
 
     pub fn randomness_enabled(&self) -> bool {
