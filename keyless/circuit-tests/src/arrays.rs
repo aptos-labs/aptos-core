@@ -23,7 +23,7 @@ fn build_array_selector_output(len: u32, start: u32, end: u32) -> Vec<u8> {
      
 #[test]
 fn array_selector_test() {
-    let circuit_handle = TestCircuitHandle::new("array_selector_test.circom").unwrap();
+    let circuit_handle = TestCircuitHandle::new("arrays/array_selector_test.circom").unwrap();
     let out_len = 8;
     for start in 0..out_len {
         for end in start+1..=out_len {
@@ -38,7 +38,7 @@ fn array_selector_test() {
 
 #[test]
 fn array_selector_test_large() {
-    let circuit_handle = TestCircuitHandle::new("array_selector_test_large.circom").unwrap();
+    let circuit_handle = TestCircuitHandle::new("arrays/array_selector_test_large.circom").unwrap();
     let out_len = 2000;
     let start = 146;
     let end = 1437;
@@ -52,7 +52,7 @@ fn array_selector_test_large() {
 
 #[test]
 fn array_selector_test_small() {
-    let circuit_handle = TestCircuitHandle::new("array_selector_test_small.circom").unwrap();
+    let circuit_handle = TestCircuitHandle::new("arrays/array_selector_test_small.circom").unwrap();
     let out_len = 2;
     let start = 0;
     let end = 1;
@@ -67,7 +67,7 @@ fn array_selector_test_small() {
 #[test]
 #[should_panic]
 fn array_selector_test_wrong_start() {
-    let circuit_handle = TestCircuitHandle::new("array_selector_test.circom").unwrap();
+    let circuit_handle = TestCircuitHandle::new("arrays/array_selector_test.circom").unwrap();
     let out_len = 8;
     let start = 3;
     let end = 3;
@@ -81,7 +81,7 @@ fn array_selector_test_wrong_start() {
 
 #[test]
 fn array_selector_test_complex() {
-    let circuit_handle = TestCircuitHandle::new("array_selector_complex_test.circom").unwrap();
+    let circuit_handle = TestCircuitHandle::new("arrays/array_selector_complex_test.circom").unwrap();
     let out_len = 8;
     // Fails when start = 0 by design
     for start in 1..out_len {
@@ -97,7 +97,7 @@ fn array_selector_test_complex() {
 
 #[test]
 fn array_selector_test_complex_large() {
-    let circuit_handle = TestCircuitHandle::new("array_selector_complex_large_test.circom").unwrap();
+    let circuit_handle = TestCircuitHandle::new("arrays/array_selector_complex_large_test.circom").unwrap();
     let out_len = 2000;
     let start = 157;
     let end = 1143;
@@ -111,7 +111,7 @@ fn array_selector_test_complex_large() {
 
 #[test]
 fn array_selector_test_complex_small() {
-    let circuit_handle = TestCircuitHandle::new("array_selector_complex_small_test.circom").unwrap();
+    let circuit_handle = TestCircuitHandle::new("arrays/array_selector_complex_small_test.circom").unwrap();
     let out_len = 3;
     let start = 1;
     let end = 2;
@@ -126,7 +126,7 @@ fn array_selector_test_complex_small() {
 #[test]
 #[should_panic]
 fn array_selector_test_complex_wrong_start() {
-    let circuit_handle = TestCircuitHandle::new("array_selector_test.circom").unwrap();
+    let circuit_handle = TestCircuitHandle::new("arrays/array_selector_test.circom").unwrap();
     let out_len = 8;
     let start = 3;
     let end = 3;
@@ -151,7 +151,7 @@ fn build_left_array_selector_output(len: u32, index: u32) -> Vec<u8> {
 
 #[test]
 fn left_array_selector_test() {
-    let circuit_handle = TestCircuitHandle::new("left_array_selector_test.circom").unwrap();
+    let circuit_handle = TestCircuitHandle::new("arrays/left_array_selector_test.circom").unwrap();
     let out_len = 8;
     for index in 0..=out_len {
         let output = build_left_array_selector_output(out_len, index);
@@ -164,7 +164,7 @@ fn left_array_selector_test() {
 
 #[test]
 fn left_array_selector_test_large() {
-    let circuit_handle = TestCircuitHandle::new("left_array_selector_large_test.circom").unwrap();
+    let circuit_handle = TestCircuitHandle::new("arrays/left_array_selector_large_test.circom").unwrap();
     let out_len = 2000;
     let index = 1143;
     let output = build_left_array_selector_output(out_len, index);
@@ -177,7 +177,7 @@ fn left_array_selector_test_large() {
 
 #[test]
 fn left_array_selector_test_small() {
-    let circuit_handle = TestCircuitHandle::new("left_array_selector_small_test.circom").unwrap();
+    let circuit_handle = TestCircuitHandle::new("arrays/left_array_selector_small_test.circom").unwrap();
     let out_len = 1;
     let index = 0;
     let output = build_left_array_selector_output(out_len, index);
@@ -204,7 +204,7 @@ fn build_right_array_selector_output(len: usize, index: usize) -> Vec<u8> {
 
 #[test]
 fn right_array_selector_test() {
-    let circuit_handle = TestCircuitHandle::new("right_array_selector_test.circom").unwrap();
+    let circuit_handle = TestCircuitHandle::new("arrays/right_array_selector_test.circom").unwrap();
     let out_len = 8;
     for index in 0..=out_len {
         let output = build_right_array_selector_output(out_len, index);
@@ -218,7 +218,7 @@ fn right_array_selector_test() {
 
 #[test]
 fn right_array_selector_test_large() {
-    let circuit_handle = TestCircuitHandle::new("right_array_selector_large_test.circom").unwrap();
+    let circuit_handle = TestCircuitHandle::new("arrays/right_array_selector_large_test.circom").unwrap();
     let out_len = 2000;
     let index = 1143;
     let output = build_right_array_selector_output(out_len, index);
@@ -231,7 +231,7 @@ fn right_array_selector_test_large() {
 
 #[test]
 fn right_array_selector_test_small() {
-    let circuit_handle = TestCircuitHandle::new("right_array_selector_small_test.circom").unwrap();
+    let circuit_handle = TestCircuitHandle::new("arrays/right_array_selector_small_test.circom").unwrap();
     let out_len = 1;
     let index = 0;
     let output = build_left_array_selector_output(out_len, index);
@@ -261,7 +261,7 @@ fn build_single_one_array_output(len: usize, index: usize) -> Vec<u8> {
 
 #[test]
 fn single_one_array_test() {
-    let circuit_handle = TestCircuitHandle::new("single_one_array_test.circom").unwrap();
+    let circuit_handle = TestCircuitHandle::new("arrays/single_one_array_test.circom").unwrap();
     let out_len = 8;
     for index in 0..=out_len {
         let output = build_single_one_array_output(out_len, index);
@@ -280,7 +280,7 @@ fn single_one_array_test() {
 
 #[test]
 fn single_one_array_large_test() {
-    let circuit_handle = TestCircuitHandle::new("single_one_array_large_test.circom").unwrap();
+    let circuit_handle = TestCircuitHandle::new("arrays/single_one_array_large_test.circom").unwrap();
     let out_len = 2000;
     let index = 1143;
     let output = build_single_one_array_output(out_len, index);
@@ -293,7 +293,7 @@ fn single_one_array_large_test() {
 
 #[test]
 fn single_one_array_small_test() {
-    let circuit_handle = TestCircuitHandle::new("single_one_array_small_test.circom").unwrap();
+    let circuit_handle = TestCircuitHandle::new("arrays/single_one_array_small_test.circom").unwrap();
     let out_len = 1;
     let index = 0;
     let output = build_single_one_array_output(out_len, index);
@@ -306,7 +306,7 @@ fn single_one_array_small_test() {
 
 #[test]
 fn select_array_value_test() {
-    let circuit_handle = TestCircuitHandle::new("select_array_value_test.circom").unwrap();
+    let circuit_handle = TestCircuitHandle::new("arrays/select_array_value_test.circom").unwrap();
     let array = [4,6,1,8,9,4,2,3];
     let in_len = array.len();
     for index in 0..in_len {
@@ -321,7 +321,7 @@ fn select_array_value_test() {
 
 #[test]
 fn select_array_value_large_test() {
-    let circuit_handle = TestCircuitHandle::new("select_array_value_large_test.circom").unwrap();
+    let circuit_handle = TestCircuitHandle::new("arrays/select_array_value_large_test.circom").unwrap();
     let mut input = Vec::new();
     let mut i: u64 = 0;
     for _ in 0..2000 {
@@ -340,7 +340,7 @@ fn select_array_value_large_test() {
 
 #[test]
 fn select_array_value_small_test() {
-    let circuit_handle = TestCircuitHandle::new("select_array_value_small_test.circom").unwrap();
+    let circuit_handle = TestCircuitHandle::new("arrays/select_array_value_small_test.circom").unwrap();
     let array = [42];
     let index = 0;
     let in_len = array.len();
@@ -356,7 +356,7 @@ fn select_array_value_small_test() {
 #[test]
 #[should_panic]
 fn select_array_value_test_wrong_index() {
-    let circuit_handle = TestCircuitHandle::new("select_array_value_test.circom").unwrap();
+    let circuit_handle = TestCircuitHandle::new("arrays/select_array_value_test.circom").unwrap();
     let out_len = 8;
     let index = 8;
     let output = [4,6,1,8,9,4,2,3];
@@ -384,7 +384,7 @@ fn build_single_neg_one_array_output(len: usize, index: usize) -> Vec<Fr> {
 
 #[test]
 fn single_neg_one_array_test() {
-    let circuit_handle = TestCircuitHandle::new("single_neg_one_array_test.circom").unwrap();
+    let circuit_handle = TestCircuitHandle::new("arrays/single_neg_one_array_test.circom").unwrap();
     let out_len = 8;
     for index in 0..=out_len {
         let output = build_single_neg_one_array_output(out_len, index);
@@ -398,7 +398,7 @@ fn single_neg_one_array_test() {
 
 #[test]
 fn single_neg_one_array_large_test() {
-    let circuit_handle = TestCircuitHandle::new("single_neg_one_array_large_test.circom").unwrap();
+    let circuit_handle = TestCircuitHandle::new("arrays/single_neg_one_array_large_test.circom").unwrap();
     let out_len = 2000;
     let index = 1143;
     let output = build_single_neg_one_array_output(out_len, index);
@@ -411,7 +411,7 @@ fn single_neg_one_array_large_test() {
 
 #[test]
 fn single_neg_one_array_small_test() {
-    let circuit_handle = TestCircuitHandle::new("single_neg_one_array_small_test.circom").unwrap();
+    let circuit_handle = TestCircuitHandle::new("arrays/single_neg_one_array_small_test.circom").unwrap();
     let out_len = 1;
     let index = 0;
     let output = build_single_neg_one_array_output(out_len, index);
@@ -424,7 +424,7 @@ fn single_neg_one_array_small_test() {
 
 #[test]
 fn check_substr_inclusion_poly_test() {
-    let circuit_handle = TestCircuitHandle::new("check_substr_inclusion_poly_test.circom").unwrap();
+    let circuit_handle = TestCircuitHandle::new("arrays/check_substr_inclusion_poly_test.circom").unwrap();
 
     let max_str_len = 100;
     let max_substr_len = 20;
@@ -445,7 +445,7 @@ fn check_substr_inclusion_poly_test() {
 
 #[test]
 fn check_substr_inclusion_poly_no_padding_test() {
-    let circuit_handle = TestCircuitHandle::new("check_substr_inclusion_poly_no_padding_test.circom").unwrap();
+    let circuit_handle = TestCircuitHandle::new("arrays/check_substr_inclusion_poly_no_padding_test.circom").unwrap();
 
     let string = "Hello World!";
     let max_str_len = string.len();
@@ -468,7 +468,7 @@ fn check_substr_inclusion_poly_no_padding_test() {
 
 #[test]
 fn check_substr_inclusion_poly_same_test() {
-    let circuit_handle = TestCircuitHandle::new("check_substr_inclusion_poly_test.circom").unwrap();
+    let circuit_handle = TestCircuitHandle::new("arrays/check_substr_inclusion_poly_test.circom").unwrap();
 
     let string = "Hello World!";
     let max_str_len = 100;
@@ -487,7 +487,7 @@ fn check_substr_inclusion_poly_same_test() {
 
 #[test]
 fn check_substr_inclusion_poly_large_test() {
-    let circuit_handle = TestCircuitHandle::new("check_substr_inclusion_poly_large_test.circom").unwrap();
+    let circuit_handle = TestCircuitHandle::new("arrays/check_substr_inclusion_poly_large_test.circom").unwrap();
 
     let max_str_len = 2000;
     let max_substr_len = 1000;
@@ -510,7 +510,7 @@ As of some one gently rapping, rapping at my chamber door.
 
 #[test]
 fn check_substr_inclusion_poly_small_test() {
-    let circuit_handle = TestCircuitHandle::new("check_substr_inclusion_poly_test.circom").unwrap();
+    let circuit_handle = TestCircuitHandle::new("arrays/check_substr_inclusion_poly_test.circom").unwrap();
 
     let max_str_len = 100;
     let max_substr_len = 20;
@@ -529,7 +529,7 @@ fn check_substr_inclusion_poly_small_test() {
 
 #[test]
 fn check_substr_inclusion_poly_boolean_test() {
-    let circuit_handle = TestCircuitHandle::new("check_substr_inclusion_poly_boolean_test.circom").unwrap();
+    let circuit_handle = TestCircuitHandle::new("arrays/check_substr_inclusion_poly_boolean_test.circom").unwrap();
 
     let max_str_len = 100;
     let max_substr_len = 20;
@@ -550,7 +550,7 @@ fn check_substr_inclusion_poly_boolean_test() {
 
 #[test]
 fn check_substr_inclusion_poly_no_padding_boolean_test() {
-    let circuit_handle = TestCircuitHandle::new("check_substr_inclusion_poly_boolean_no_padding_test.circom").unwrap();
+    let circuit_handle = TestCircuitHandle::new("arrays/check_substr_inclusion_poly_boolean_no_padding_test.circom").unwrap();
 
     let string = "Hello World!";
     let max_str_len = string.len();
@@ -573,7 +573,7 @@ fn check_substr_inclusion_poly_no_padding_boolean_test() {
 
 #[test]
 fn check_substr_inclusion_poly_same_boolean_test() {
-    let circuit_handle = TestCircuitHandle::new("check_substr_inclusion_poly_boolean_test.circom").unwrap();
+    let circuit_handle = TestCircuitHandle::new("arrays/check_substr_inclusion_poly_boolean_test.circom").unwrap();
 
     let string = "Hello World!";
     let max_str_len = 100;
@@ -592,7 +592,7 @@ fn check_substr_inclusion_poly_same_boolean_test() {
 
 #[test]
 fn check_substr_inclusion_poly_large_boolean_test() {
-    let circuit_handle = TestCircuitHandle::new("check_substr_inclusion_poly_boolean_large_test.circom").unwrap();
+    let circuit_handle = TestCircuitHandle::new("arrays/check_substr_inclusion_poly_boolean_large_test.circom").unwrap();
 
     let max_str_len = 2000;
     let max_substr_len = 1000;
@@ -615,7 +615,7 @@ As of some one gently rapping, rapping at my chamber door.
 
 #[test]
 fn check_substr_inclusion_poly_small_boolean_test() {
-    let circuit_handle = TestCircuitHandle::new("check_substr_inclusion_poly_boolean_test.circom").unwrap();
+    let circuit_handle = TestCircuitHandle::new("arrays/check_substr_inclusion_poly_boolean_test.circom").unwrap();
 
     let max_str_len = 100;
     let max_substr_len = 20;
@@ -634,7 +634,7 @@ fn check_substr_inclusion_poly_small_boolean_test() {
 
 #[test]
 fn concatenation_check_test() {
-    let circuit_handle = TestCircuitHandle::new("concatenation_check_test.circom").unwrap();
+    let circuit_handle = TestCircuitHandle::new("arrays/concatenation_check_test.circom").unwrap();
 
     let max_full_str_len = 100;
     let max_left_str_len = 70;
@@ -658,7 +658,7 @@ fn concatenation_check_test() {
 #[test]
 #[should_panic]
 fn concatenation_check_left_len_wrong_test() {
-    let circuit_handle = TestCircuitHandle::new("concatenation_check_test.circom").unwrap();
+    let circuit_handle = TestCircuitHandle::new("arrays/concatenation_check_test.circom").unwrap();
 
     let max_full_str_len = 100;
     let max_left_str_len = 70;
@@ -680,7 +680,7 @@ fn concatenation_check_left_len_wrong_test() {
 #[test]
 #[should_panic]
 fn concatenation_check_left_string_wrong_test() {
-    let circuit_handle = TestCircuitHandle::new("concatenation_check_test.circom").unwrap();
+    let circuit_handle = TestCircuitHandle::new("arrays/concatenation_check_test.circom").unwrap();
 
     let max_full_str_len = 100;
     let max_left_str_len = 70;
@@ -702,7 +702,7 @@ fn concatenation_check_left_string_wrong_test() {
 #[test]
 #[should_panic]
 fn concatenation_check_right_string_wrong_test() {
-    let circuit_handle = TestCircuitHandle::new("concatenation_check_test.circom").unwrap();
+    let circuit_handle = TestCircuitHandle::new("arrays/concatenation_check_test.circom").unwrap();
 
     let max_full_str_len = 100;
     let max_left_str_len = 70;
@@ -724,7 +724,7 @@ fn concatenation_check_right_string_wrong_test() {
 
 #[test]
 fn concatenation_check_small_test() {
-    let circuit_handle = TestCircuitHandle::new("concatenation_check_small_test.circom").unwrap();
+    let circuit_handle = TestCircuitHandle::new("arrays/concatenation_check_small_test.circom").unwrap();
 
     let max_full_str_len = 2;
     let max_left_str_len = 1;
@@ -745,7 +745,7 @@ fn concatenation_check_small_test() {
 
 #[test]
 fn concatenation_check_large_test() {
-    let circuit_handle = TestCircuitHandle::new("concatenation_check_large_test.circom").unwrap();
+    let circuit_handle = TestCircuitHandle::new("arrays/concatenation_check_large_test.circom").unwrap();
 
     let max_full_str_len = 1600;
     let max_left_str_len = 1000;
@@ -770,7 +770,7 @@ fn concatenation_check_large_test() {
 
 #[test]
 fn check_are_ascii_digits_test() {
-    let circuit_handle = TestCircuitHandle::new("check_are_ascii_digits_test.circom").unwrap();
+    let circuit_handle = TestCircuitHandle::new("arrays/check_are_ascii_digits_test.circom").unwrap();
     let max_input_len = 20;
     let input_arr = [48,49,50,52,55,3,0,200];
     let len = 5;
@@ -783,7 +783,7 @@ fn check_are_ascii_digits_test() {
 
 #[test]
 fn check_are_ascii_digits_max_len_test() {
-    let circuit_handle = TestCircuitHandle::new("check_are_ascii_digits_max_len_test.circom").unwrap();
+    let circuit_handle = TestCircuitHandle::new("arrays/check_are_ascii_digits_max_len_test.circom").unwrap();
     let max_input_len = 8;
     let input_arr = [48,49,50,52,55,48,50,54];
     let len = input_arr.len();
@@ -796,7 +796,7 @@ fn check_are_ascii_digits_max_len_test() {
 
 #[test]
 fn check_are_ascii_digits_small_test() {
-    let circuit_handle = TestCircuitHandle::new("check_are_ascii_digits_test.circom").unwrap();
+    let circuit_handle = TestCircuitHandle::new("arrays/check_are_ascii_digits_test.circom").unwrap();
     let max_input_len = 20;
     let input_arr = [51];
     let len = 1;
@@ -809,7 +809,7 @@ fn check_are_ascii_digits_small_test() {
 
 #[test]
 fn check_are_ascii_digits_large_test() {
-    let circuit_handle = TestCircuitHandle::new("check_are_ascii_digits_large_test.circom").unwrap();
+    let circuit_handle = TestCircuitHandle::new("arrays/check_are_ascii_digits_large_test.circom").unwrap();
     let max_input_len = 2000;
     let input_arr = [48,49,50,52,55,48,49,50,52,55,48,49,50,52,55,48,49,50,52,55,48,49,50,52,55,48,49,50,52,55,48,49,50,51,52,53,54,55,56,57,48,49,50,52,55,48,49,50,52,55,48,49,50,52,55,48,49,50,52,55,48,49,50,52,55,48,49,50,52,55,48,49,50,51,52,53,54,55,56,57,48,49,50,52,55,48,49,50,52,55,48,49,50,52,55,48,49,50,52,55,48,49,50,52,55,48,49,50,52,55,48,49,50,51,52,53,54,55,56,57,48,49,50,52,55,48,49,50,52,55,48,49,50,52,55,48,49,50,52,55,48,49,50,52,55,48,49,50,52,55,48,49,50,51,52,53,54,55,56,57,48,49,50,52,55,48,49,50,52,55,48,49,50,52,55,48,49,50,52,55,48,49,50,52,55,48,49,50,52,55,48,49,50,51,52,53,54,55,56,57];
     let len = input_arr.len();
@@ -830,7 +830,7 @@ fn digits_to_ascii_digits(digits: Vec<u8>) -> Vec<u8> {
 
 #[test]
 fn ascii_digits_to_field_test() {
-    let circuit_handle = TestCircuitHandle::new("ascii_digits_to_field_test.circom").unwrap();
+    let circuit_handle = TestCircuitHandle::new("arrays/ascii_digits_to_field_test.circom").unwrap();
     let max_input_len = 20;
     let digits = [2,1,2,4,7];
     let ascii_digits = digits_to_ascii_digits(digits.to_vec());
@@ -845,7 +845,7 @@ fn ascii_digits_to_field_test() {
 
 #[test]
 fn ascii_digits_to_field_small_test() {
-    let circuit_handle = TestCircuitHandle::new("ascii_digits_to_field_small_test.circom").unwrap();
+    let circuit_handle = TestCircuitHandle::new("arrays/ascii_digits_to_field_small_test.circom").unwrap();
     let max_input_len = 2;
     let digits = [7, 89];
     let ascii_digits = digits_to_ascii_digits(digits.to_vec());
@@ -860,7 +860,7 @@ fn ascii_digits_to_field_small_test() {
 
 #[test]
 fn ascii_digits_to_field_large_test() {
-    let circuit_handle = TestCircuitHandle::new("ascii_digits_to_field_large_test.circom").unwrap();
+    let circuit_handle = TestCircuitHandle::new("arrays/ascii_digits_to_field_large_test.circom").unwrap();
     let max_input_len = 2000;
     let digits = [2,1,2,4,7,4,8,0,1,9,2,1,8,3,6,7,4,1,5,14,41,180,1,31,47,2,3,6,7,31,35];
     let ascii_digits = digits_to_ascii_digits(digits.to_vec());
@@ -877,7 +877,7 @@ fn ascii_digits_to_field_large_test() {
 #[test]
 #[should_panic]
 fn ascii_digits_to_field_not_ascii_digits_test() {
-    let circuit_handle = TestCircuitHandle::new("ascii_digits_to_field_test.circom").unwrap();
+    let circuit_handle = TestCircuitHandle::new("arrays/ascii_digits_to_field_test.circom").unwrap();
     let max_input_len = 20;
     let digits = [2,1,24,4,7];
     let ascii_digits = digits_to_ascii_digits(digits.to_vec());
