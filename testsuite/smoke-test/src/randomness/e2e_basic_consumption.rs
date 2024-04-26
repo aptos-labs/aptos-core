@@ -9,7 +9,7 @@ use aptos_types::on_chain_config::OnChainRandomnessConfig;
 use serde::{Deserialize, Serialize};
 use std::{collections::BTreeMap, str::FromStr, sync::Arc, time::Duration};
 use rand::thread_rng;
-use aptos_crypto::ed25519::Ed25519PrivateKey;
+use aptos_crypto::ed25519::{Ed25519PrivateKey, Ed25519PublicKey};
 use aptos_crypto::Uniform;
 
 /// Publish the `on-chain-dice` example module,
@@ -42,9 +42,12 @@ async fn e2e_basic_consumption() {
 
     let mut rng = thread_rng();
     let new_sk = Ed25519PrivateKey::generate(&mut rng);
+    let new_pk = Ed25519PublicKey::from(&new_sk);
     let user_idx = cli.add_account_to_cli(new_sk);
     let user_addr = cli.account_id(user_idx);
-    swarm.aptos_public_info().mint(user_addr, 999999999).await.unwrap();
+    let mut info = swarm.aptos_public_info();
+    info.create_user_account(&new_pk).await.unwrap();
+    info.mint(user_addr, 999999999).await.unwrap();
 
     info!("Publishing OnChainDice module.");
     publish_on_chain_dice_module(&mut cli, user_idx).await;
