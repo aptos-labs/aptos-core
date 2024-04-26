@@ -507,6 +507,7 @@ impl<'a> AptosTestAdapter<'a> {
             // TODO fetch values from state?
             block_gas_limit_type: BlockGasLimitType::Limit(30000),
         };
+        AptosVM::set_paranoid_type_checks(true);
         let mut outputs =
             AptosVM::execute_block(&sig_verified_block, &self.storage.clone(), onchain_config)?
                 .into_inner();
