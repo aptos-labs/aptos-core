@@ -18,6 +18,7 @@ pub const BUILD_RUST_VERSION: &str = "build_rust_version";
 pub const BUILD_IS_RELEASE_BUILD: &str = "build_is_release_build";
 pub const BUILD_PROFILE_NAME: &str = "build_profile_name";
 pub const BUILD_USING_TOKIO_UNSTABLE: &str = "build_using_tokio_unstable";
+pub const BUILD_VERSION: &str = "build_version";
 
 /// This macro returns the build information as visible during build-time.
 /// Use of this macro is recommended over the `get_build_information`
@@ -28,9 +29,18 @@ macro_rules! build_information {
     () => {{
         let mut build_information = aptos_build_info::get_build_information();
 
+        let cargo_pkg_version = env!("CARGO_PKG_VERSION");
+
         build_information.insert(
             aptos_build_info::BUILD_PKG_VERSION.into(),
-            env!("CARGO_PKG_VERSION").into(),
+            cargo_pkg_version.into(),
+        );
+
+        build_information.insert(
+            aptos_build_info::BUILD_VERSION.into(),
+            std::option_env!("APTOS_BUILD_VERSION")
+                .unwrap_or(cargo_pkg_version)
+                .to_string(),
         );
 
         build_information
@@ -85,20 +95,20 @@ pub fn get_build_information() -> BTreeMap<String, String> {
     // Get Git metadata from environment variables set during build-time.
     // This is applicable for docker based builds  where the cargo cannot
     // access the .git directory, or to override shadow_rs provided info.
-    if let Ok(git_sha) = std::env::var("GIT_SHA") {
-        build_information.insert(BUILD_COMMIT_HASH.into(), git_sha);
+    if let Some(git_sha) = std::option_env!("GIT_SHA") {
+        build_information.insert(BUILD_COMMIT_HASH.into(), git_sha.into());
     }
 
-    if let Ok(git_branch) = std::env::var("GIT_BRANCH") {
-        build_information.insert(BUILD_BRANCH.into(), git_branch);
+    if let Some(git_branch) = std::option_env!("GIT_BRANCH") {
+        build_information.insert(BUILD_BRANCH.into(), git_branch.into());
     }
 
-    if let Ok(git_tag) = std::env::var("GIT_TAG") {
-        build_information.insert(BUILD_TAG.into(), git_tag);
+    if let Some(git_tag) = std::option_env!("GIT_TAG") {
+        build_information.insert(BUILD_TAG.into(), git_tag.into());
     }
 
-    if let Ok(build_date) = std::env::var("BUILD_DATE") {
-        build_information.insert(BUILD_TIME.into(), build_date);
+    if let Some(build_date) = std::option_env!("BUILD_DATE") {
+        build_information.insert(BUILD_TIME.into(), build_date.into());
     }
 
     build_information
@@ -107,8 +117,8 @@ pub fn get_build_information() -> BTreeMap<String, String> {
 pub fn get_git_hash() -> String {
     // Docker builds don't have the git directory so it has to be provided by this variable
     // Otherwise, shadow will have the right commit hash
-    if let Ok(git_sha) = std::env::var("GIT_SHA") {
-        git_sha
+    if let Some(git_sha) = std::option_env!("GIT_SHA") {
+        git_sha.into()
     } else {
         shadow!(build);
         build::COMMIT_HASH.into()

@@ -51,14 +51,14 @@ const EPOCH_LENGTH_SECS: u64 = 60;
 
 /// Runs an Aptos validator or fullnode
 #[derive(Clone, Debug, Parser)]
-#[clap(name = "Aptos Node", author, version)]
+#[clap(name = "Aptos Node", author, version = None)]
 pub struct AptosNodeArgs {
     /// Path to node configuration file (or template for local test mode).
     #[clap(
         short = 'f',
         long,
         value_parser,
-        required_unless_present_any = ["test", "info"],
+        required_unless_present_any = ["test", "info", "version"],
     )]
     #[cfg_attr(target_os = "linux", clap(required_unless_present_any = ["stacktrace"]))]
     config: Option<PathBuf>,
@@ -104,6 +104,10 @@ pub struct AptosNodeArgs {
     #[clap(long)]
     info: bool,
 
+    /// Display version information
+    #[clap(long)]
+    version: bool,
+
     #[cfg(target_os = "linux")]
     /// Start as a child process to collect thread dump.
     /// See rstack-self crate for more details.
@@ -124,13 +128,19 @@ impl AptosNodeArgs {
             return;
         }
 
+        let build_information = build_information!();
+
         if self.info {
-            let build_information = build_information!();
             println!(
                 "{}",
                 serde_json::to_string_pretty(&build_information)
                     .expect("Failed to print build information")
             );
+            return;
+        }
+
+        if self.version {
+            println!("{}", build_information[aptos_build_info::BUILD_VERSION]);
             return;
         }
 
