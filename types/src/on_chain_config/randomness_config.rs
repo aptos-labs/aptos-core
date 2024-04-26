@@ -199,6 +199,7 @@ impl OnChainRandomnessConfig {
     }
 
     pub fn default_for_genesis() -> Self {
+        println!("foooo");
         OnChainRandomnessConfig::Off
     }
 
