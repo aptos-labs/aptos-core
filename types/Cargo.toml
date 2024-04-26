@@ -27,6 +27,7 @@ arr_macro = { workspace = true }
 base64 = { workspace = true }
 bcs = { workspace = true }
 bytes = { workspace = true }
+criterion = { workspace = true }
 derivative = { workspace = true }
 fixed = { workspace = true }
 hex = { workspace = true }
@@ -78,3 +79,7 @@ url = { workspace = true }
 [features]
 default = []
 fuzzing = ["proptest", "proptest-derive", "aptos-crypto/fuzzing", "move-core-types/fuzzing"]
+
+[[bench]]
+name = "keyless"
+harness = false

@@ -11,7 +11,9 @@ use crate::{
     },
 };
 use anyhow::bail;
-use aptos_crypto::{poseidon_bn254, CryptoMaterialError, ValidCryptoMaterial};
+use aptos_crypto::{
+    poseidon_bn254, CryptoMaterialError, ValidCryptoMaterial,
+};
 use aptos_crypto_derive::{BCSCryptoHash, CryptoHasher};
 use ark_bn254::Bn254;
 use ark_groth16::PreparedVerifyingKey;
@@ -155,18 +157,18 @@ impl KeylessSignature {
 }
 
 /// The pepper is used to create a _hiding_ identity commitment (IDC) when deriving a keyless address.
-/// We fix its size at `poseidon_bn254::BYTES_PACKED_PER_SCALAR` to avoid extra hashing work when
+/// We fix its size at `poseidon_bn254::keyless::BYTES_PACKED_PER_SCALAR` to avoid extra hashing work when
 /// computing the public inputs hash.
 ///
 /// This value should **NOT* be changed since on-chain addresses are based on it (e.g.,
 /// hashing with a larger pepper would lead to a different address).
 #[derive(Clone, Debug, Eq, PartialEq, Hash)]
-pub struct Pepper(pub(crate) [u8; poseidon_bn254::BYTES_PACKED_PER_SCALAR]);
+pub struct Pepper(pub(crate) [u8; poseidon_bn254::keyless::BYTES_PACKED_PER_SCALAR]);
 
 impl Pepper {
     // TODO(keyless) Account address uses Self::LENGTH instead of Self::NUM_BYTES. Consider
     // renaming to be consistent?
-    pub const NUM_BYTES: usize = poseidon_bn254::BYTES_PACKED_PER_SCALAR;
+    pub const NUM_BYTES: usize = poseidon_bn254::keyless::BYTES_PACKED_PER_SCALAR;
 
     pub fn new(bytes: [u8; Self::NUM_BYTES]) -> Self {
         Self(bytes)
@@ -252,13 +254,16 @@ impl IdCommitment {
         uid_key: &str,
         uid_val: &str,
     ) -> anyhow::Result<Self> {
-        let aud_val_hash = poseidon_bn254::pad_and_hash_string(aud, Self::MAX_AUD_VAL_BYTES)?;
+        let aud_val_hash =
+            poseidon_bn254::keyless::pad_and_hash_string(aud, Self::MAX_AUD_VAL_BYTES)?;
         // println!("aud_val_hash: {}", aud_val_hash);
-        let uid_key_hash = poseidon_bn254::pad_and_hash_string(uid_key, Self::MAX_UID_KEY_BYTES)?;
+        let uid_key_hash =
+            poseidon_bn254::keyless::pad_and_hash_string(uid_key, Self::MAX_UID_KEY_BYTES)?;
         // println!("uid_key_hash: {}", uid_key_hash);
-        let uid_val_hash = poseidon_bn254::pad_and_hash_string(uid_val, Self::MAX_UID_VAL_BYTES)?;
+        let uid_val_hash =
+            poseidon_bn254::keyless::pad_and_hash_string(uid_val, Self::MAX_UID_VAL_BYTES)?;
         // println!("uid_val_hash: {}", uid_val_hash);
-        let pepper_scalar = poseidon_bn254::pack_bytes_to_one_scalar(pepper.0.as_slice())?;
+        let pepper_scalar = poseidon_bn254::keyless::pack_bytes_to_one_scalar(pepper.0.as_slice())?;
         // println!("Pepper Fr: {}", pepper_scalar);
 
         let fr = poseidon_bn254::hash_scalars(vec![

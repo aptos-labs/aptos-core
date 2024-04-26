@@ -26,8 +26,9 @@ pub const G1_PROJECTIVE_COMPRESSED_NUM_BYTES: usize = 32;
 pub const G2_PROJECTIVE_COMPRESSED_NUM_BYTES: usize = 64;
 
 // When the extra_field is none, use this hash value which is equal to the hash of a single space string.
-static EMPTY_EXTRA_FIELD_HASH: Lazy<Fr> =
-    Lazy::new(|| poseidon_bn254::pad_and_hash_string(" ", MAX_EXTRA_FIELD_BYTES as usize).unwrap());
+static EMPTY_EXTRA_FIELD_HASH: Lazy<Fr> = Lazy::new(|| {
+    poseidon_bn254::keyless::pad_and_hash_string(" ", MAX_EXTRA_FIELD_BYTES as usize).unwrap()
+});
 
 /// This will do the proper subgroup membership checks.
 pub fn g1_projective_str_to_affine(x: &str, y: &str) -> anyhow::Result<G1Affine> {
@@ -250,7 +251,7 @@ pub fn get_public_inputs_hash(
             None => (Fr::zero(), *Lazy::force(&EMPTY_EXTRA_FIELD_HASH)),
             Some(extra_field) => (
                 Fr::one(),
-                poseidon_bn254::pad_and_hash_string(
+                poseidon_bn254::keyless::pad_and_hash_string(
                     extra_field,
                     config.max_extra_field_bytes as usize,
                 )?,
@@ -259,14 +260,14 @@ pub fn get_public_inputs_hash(
 
         let (override_aud_val_hash, use_override_aud) = match &proof.override_aud_val {
             Some(override_aud_val) => (
-                poseidon_bn254::pad_and_hash_string(
+                poseidon_bn254::keyless::pad_and_hash_string(
                     override_aud_val,
                     IdCommitment::MAX_AUD_VAL_BYTES,
                 )?,
                 ark_bn254::Fr::from(1),
             ),
             None => (
-                poseidon_bn254::pad_and_hash_string("", IdCommitment::MAX_AUD_VAL_BYTES)?,
+                poseidon_bn254::keyless::pad_and_hash_string("", IdCommitment::MAX_AUD_VAL_BYTES)?,
                 ark_bn254::Fr::from(0),
             ),
         };
@@ -274,7 +275,7 @@ pub fn get_public_inputs_hash(
         // Add the hash of the jwt_header with the "." separator appended
         let jwt_header_b64_with_separator =
             format!("{}.", base64url_encode_str(sig.jwt_header_json.as_str()));
-        let jwt_header_hash = poseidon_bn254::pad_and_hash_string(
+        let jwt_header_hash = poseidon_bn254::keyless::pad_and_hash_string(
             &jwt_header_b64_with_separator,
             config.max_jwt_header_b64_bytes as usize,
         )?;
@@ -282,7 +283,7 @@ pub fn get_public_inputs_hash(
         let jwk_hash = jwk.to_poseidon_scalar()?;
 
         // Add the hash of the value of the `iss` field
-        let iss_field_hash = poseidon_bn254::pad_and_hash_string(
+        let iss_field_hash = poseidon_bn254::keyless::pad_and_hash_string(
             pk.iss_val.as_str(),
             config.max_iss_val_bytes as usize,
         )?;
@@ -297,7 +298,7 @@ pub fn get_public_inputs_hash(
         let exp_horizon_secs = Fr::from(proof.exp_horizon_secs);
 
         // Add the epk as padded and packed scalars
-        let mut epk_frs = poseidon_bn254::pad_and_pack_bytes_to_scalars_with_len(
+        let mut epk_frs = poseidon_bn254::keyless::pad_and_pack_bytes_to_scalars_with_len(
             sig.ephemeral_pubkey.to_bytes().as_slice(),
             config.max_commited_epk_bytes as usize,
         )?;

@@ -552,7 +552,7 @@ event-listener = "2.5.3"
 evm = { version = "0.33.1", features = ["tracing"] }
 evm-runtime = { version = "0.33.0", features = ["tracing"] }
 fail = "0.5.0"
-ff = "0.13"
+ff = { version = "0.13", features = ["derive"] }
 field_count = "0.1.1"
 file_diff = "1.0.0"
 fixed = "1.25.1"
@@ -616,6 +616,7 @@ mockall = "0.11.4"
 more-asserts = "0.3.0"
 named-lock = "0.2.0"
 native-tls = "0.2.10"
+neptune = { version = "13.0.0", default_features = false }
 ntest = "0.9.0"
 num = "0.4.0"
 num-bigint = { version = "0.3.2", features = ["rand"] }
@@ -762,6 +763,7 @@ tonic-reflection = "0.11.0"
 triomphe = "0.1.9"
 tui = "0.19.0"
 typed-arena = "2.0.2"
+typenum = "1.17.0"
 uint = "0.9.4"
 ureq = { version = "1.5.4", features = [
     "json",
