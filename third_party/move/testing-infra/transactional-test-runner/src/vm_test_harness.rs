@@ -100,7 +100,7 @@ pub struct AdapterPublishArgs {
 
 #[derive(Debug, Parser)]
 pub struct AdapterExecuteArgs {
-    #[clap(long)]
+    #[clap(long, default_value_t = true)]
     pub check_runtime_types: bool,
     /// print more complete information for VMErrors on run
     #[clap(long)]
