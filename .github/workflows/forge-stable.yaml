@@ -118,16 +118,31 @@ jobs:
   ### Real-world-network tests.
   # Run forge framework upgradability test. This is a PR required job.
   run-forge-framework-upgrade-test:
-    if: ${{ github.event_name != 'pull_request' }}
+    # if: ${{ github.event_name != 'pull_request' }}
     needs:
       - determine-test-metadata
     uses: aptos-labs/aptos-core/.github/workflows/workflow-run-forge.yaml@main
     secrets: inherit
     with:
-      IMAGE_TAG: aptos-node-v1.10.1 # This workflow will test the upgradability from the current tip of the release branch to the current main branch.
+      IMAGE_TAG: 01b24e7e3548382dd25440b39a0438a993387f12 # This workflow will test the upgradability from the current tip of the release branch to the current main branch.
       FORGE_NAMESPACE: forge-framework-upgrade-${{ needs.determine-test-metadata.outputs.BRANCH_HASH }}
       FORGE_RUNNER_DURATION_SECS: 7200 # Run for 2 hours
       FORGE_TEST_SUITE: framework_upgrade
+      POST_TO_SLACK: true
+
+  forge-compat-test:
+    needs:
+      - determine-test-metadata
+      - run-forge-framework-upgrade-test
+    # if: ${{ github.event_name != 'pull_request' && always() }}
+    if: always()
+    uses: aptos-labs/aptos-core/.github/workflows/workflow-run-forge.yaml@main
+    secrets: inherit
+    with:
+      IMAGE_TAG: 01b24e7e3548382dd25440b39a0438a993387f12 # test against a previous testnet release
+      FORGE_NAMESPACE: forge-compat-${{ needs.determine-test-metadata.outputs.BRANCH_HASH }}
+      FORGE_RUNNER_DURATION_SECS: 300
+      FORGE_TEST_SUITE: compat
       POST_TO_SLACK: true
 
   run-forge-realistic-env-max-load-long:
