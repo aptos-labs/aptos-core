@@ -379,6 +379,7 @@ module aptos_framework::transaction_validation {
             coin::is_balance_at_least<AptosCoin>(gas_payer, transaction_fee_amount),
             error::out_of_range(PROLOGUE_ECANT_PAY_GAS_DEPOSIT),
         );
+        debug::print(&utf8(b"0425 - 3"));
 
         let amount_to_burn = if (features::collect_and_distribute_gas_fees()) {
             // TODO(gas): We might want to distinguish the refundable part of the charge and burn it or track
@@ -394,14 +395,17 @@ module aptos_framework::transaction_validation {
             // is tested and is fully proven to work well.
             transaction_fee_amount
         };
-
+        debug::print(&utf8(b"0425 - 4"));
         if (amount_to_burn > storage_fee_refunded) {
+            debug::print(&utf8(b"0425 - 5"));
             let burn_amount = amount_to_burn - storage_fee_refunded;
             transaction_fee::burn_fee(gas_payer, burn_amount);
         } else if (amount_to_burn < storage_fee_refunded) {
+            debug::print(&utf8(b"0425 - 6"));
             let mint_amount = storage_fee_refunded - amount_to_burn;
             transaction_fee::mint_and_refund(gas_payer, mint_amount)
         };
+        debug::print(&utf8(b"0425 - 7"));
 
         // Increment sequence number
         let addr = signer::address_of(&account);
@@ -420,7 +424,9 @@ module aptos_framework::transaction_validation {
         gas_units_remaining: u64,
         required_deposit: Option<u64>,
     ) {
+        debug::print(&utf8(b"0425 - -2"));
         return_deposit(gas_payer, required_deposit);
+        debug::print(&utf8(b"0425 - -1"));
         epilogue_gas_payer(
             account,
             gas_payer,
