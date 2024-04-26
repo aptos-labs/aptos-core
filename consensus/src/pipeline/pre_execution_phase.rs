@@ -21,14 +21,14 @@ pub struct PreExecutionRequest {
 
 pub struct PreExecutionPhase {
     execution_proxy: Arc<dyn StateComputer>,
-    pre_execution_futures: Arc<DashMap<HashValue, SyncStateComputeResultFut>>,
+    execution_futures: Arc<DashMap<HashValue, SyncStateComputeResultFut>>,
 }
 
 impl PreExecutionPhase {
-    pub fn new(execution_proxy: Arc<dyn StateComputer>, pre_execution_futures: Arc<DashMap<HashValue, SyncStateComputeResultFut>>) -> Self {
+    pub fn new(execution_proxy: Arc<dyn StateComputer>, execution_futures: Arc<DashMap<HashValue, SyncStateComputeResultFut>>) -> Self {
         Self { 
             execution_proxy,
-            pre_execution_futures,
+            execution_futures,
         }
     }
 }
@@ -45,8 +45,8 @@ impl StatelessPipeline for PreExecutionPhase {
             block,
         } = req;
 
-        match self.pre_execution_futures.entry(block.id()) {
-            dashmap::mapref::entry::Entry::Occupied(entry) => {}
+        match self.execution_futures.entry(block.id()) {
+            dashmap::mapref::entry::Entry::Occupied(_) => {}
             dashmap::mapref::entry::Entry::Vacant(entry) => {
                 info!("[PreExecution] pre-execute block of epoch {} round {} id {}", block.epoch(), block.round(), block.id());
                 let fut = self

@@ -72,4 +72,11 @@ impl TSafetyRules for LocalClient {
             .write()
             .sign_commit_vote(ledger_info, new_ledger_info)
     }
+
+    fn sign_pre_commit_vote(
+        &mut self,
+        ledger_info: LedgerInfo,
+    ) -> Result<bls12381::Signature, Error> {
+        self.internal.write().sign_pre_commit_vote(ledger_info)
+    }
 }

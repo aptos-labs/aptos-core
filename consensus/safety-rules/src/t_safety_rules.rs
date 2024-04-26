@@ -52,4 +52,9 @@ pub trait TSafetyRules {
         ledger_info: LedgerInfoWithSignatures,
         new_ledger_info: LedgerInfo,
     ) -> Result<bls12381::Signature, Error>;
+
+    fn sign_pre_commit_vote(
+        &mut self,
+        ledger_info: LedgerInfo,
+    ) -> Result<bls12381::Signature, Error>;
 }

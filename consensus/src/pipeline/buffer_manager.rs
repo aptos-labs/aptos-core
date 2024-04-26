@@ -34,6 +34,7 @@ use aptos_types::{
     ledger_info::LedgerInfoWithSignatures,
 };
 use bytes::Bytes;
+use dashmap::DashMap;
 use futures::{
     channel::{
         mpsc::{unbounded, UnboundedReceiver, UnboundedSender},
@@ -43,10 +44,10 @@ use futures::{
     FutureExt, SinkExt, StreamExt,
 };
 use once_cell::sync::OnceCell;
-use std::sync::{
+use std::{collections::HashMap, sync::{
     atomic::{AtomicBool, AtomicU64, Ordering},
     Arc,
-};
+}};
 use tokio::time::{Duration, Instant};
 use tokio_retry::strategy::ExponentialBackoff;
 
@@ -136,6 +137,8 @@ pub struct BufferManager {
     previous_commit_time: Instant,
     reset_flag: Arc<AtomicBool>,
     bounded_executor: BoundedExecutor,
+
+    buffered_commit_votes: Arc<DashMap<HashValue, HashMap<Author, IncomingCommitRequest>>>,
 }
 
 impl BufferManager {
@@ -210,6 +213,8 @@ impl BufferManager {
             previous_commit_time: Instant::now(),
             reset_flag,
             bounded_executor: executor,
+
+            buffered_commit_votes: Arc::new(DashMap::new()),
         }
     }
 
@@ -282,8 +287,24 @@ impl BufferManager {
             .await
             .expect("Failed to send execution schedule request");
 
+        let block_ids = ordered_blocks.iter().map(|b| b.id()).collect::<Vec<_>>();
+
         let item = BufferItem::new_ordered(ordered_blocks, ordered_proof, callback);
         self.buffer.push_back(item);
+
+        for block_id in block_ids {
+            self.process_buffered_commit_votes(block_id).await;
+        }
+    }
+
+    async fn process_buffered_commit_votes(&mut self, block_id: HashValue) {
+        let mut commit_votes = self.buffered_commit_votes.remove(&block_id);
+        if let Some((_, commit_votes)) = commit_votes.take() {
+            info!("[PreExecution] process {} buffered commit votes for block id {}", commit_votes.len(), block_id);
+            for (_, commit_msg) in commit_votes {
+                self.process_commit_message(commit_msg);
+            }
+        }
     }
 
     /// Set the execution root to the first not executed item (Ordered) and send execution request
@@ -572,6 +593,7 @@ impl BufferManager {
                 // find the corresponding item
                 let author = vote.author();
                 let commit_info = vote.commit_info().clone();
+                info!("[PreExecution] receive commit vote for block of epoch {} round {} id {}", commit_info.epoch(), commit_info.round(), commit_info.id());
                 info!("Receive commit vote {} from {}", commit_info, author);
                 let target_block_id = vote.commit_info().id();
                 let current_cursor = self
@@ -606,7 +628,16 @@ impl BufferManager {
                         return None;
                     }
                 } else {
-                    reply_nack(protocol, response_sender); // TODO: send_commit_vote() doesn't care about the response and this should be direct send not RPC
+                    let author = vote.author();
+                    let commit_msg = IncomingCommitRequest {
+                        req: CommitMessage::Vote(vote),
+                        protocol,
+                        response_sender: response_sender,
+                    };
+                    let mut commit_votes = self.buffered_commit_votes.entry(target_block_id).or_default();
+                    commit_votes.insert(author, commit_msg);
+                    
+                    // reply_nack(protocol, response_sender); // TODO: send_commit_vote() doesn't care about the response and this should be direct send not RPC
                 }
             },
             CommitMessage::Decision(commit_proof) => {

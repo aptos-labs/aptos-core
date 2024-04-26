@@ -54,6 +54,7 @@ pub enum LogEntry {
     State,
     Waypoint,
     SignCommitVote,
+    SignPreCommitVote
 }
 
 impl LogEntry {
@@ -72,6 +73,7 @@ impl LogEntry {
             LogEntry::State => "state",
             LogEntry::Waypoint => "waypoint",
             LogEntry::SignCommitVote => "sign_commit_vote",
+            LogEntry::SignPreCommitVote => "sign_pre_commit_vote"
         }
     }
 }

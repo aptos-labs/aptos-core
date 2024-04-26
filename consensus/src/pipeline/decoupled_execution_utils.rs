@@ -3,20 +3,19 @@
 // SPDX-License-Identifier: Apache-2.0
 
 use crate::{
-    network::{IncomingCommitRequest, NetworkSender},
-    pipeline::{
+    network::{IncomingCommitRequest, NetworkSender}, pipeline::{
         buffer_manager::{create_channel, BufferManager, OrderedBlocks, ResetRequest},
         execution_schedule_phase::{ExecutionRequest, ExecutionSchedulePhase},
         execution_wait_phase::{ExecutionResponse, ExecutionWaitPhase, ExecutionWaitRequest},
         persisting_phase::{PersistingPhase, PersistingRequest},
         pipeline_phase::{CountedRequest, PipelinePhase},
         signing_phase::{CommitSignerProvider, SigningPhase, SigningRequest, SigningResponse},
-    },
-    state_replication::StateComputer,
+    }, state_computer::SyncStateComputeResultFut, state_replication::StateComputer
 };
 use aptos_bounded_executor::BoundedExecutor;
 use aptos_channels::aptos_channel::Receiver;
 use aptos_consensus_types::{common::Author, pipelined_block::PipelinedBlock};
+use aptos_crypto::HashValue;
 use aptos_types::{account_address::AccountAddress, epoch_state::EpochState};
 use dashmap::DashMap;
 use futures::channel::mpsc::UnboundedReceiver;
@@ -40,6 +39,7 @@ pub fn prepare_phases_and_buffer_manager(
     sync_rx: UnboundedReceiver<ResetRequest>,
     epoch_state: Arc<EpochState>,
     bounded_executor: BoundedExecutor,
+    execution_futures: Arc<DashMap<HashValue, SyncStateComputeResultFut>>,
 ) -> (
     PipelinePhase<PreExecutionPhase>,
     PipelinePhase<ExecutionSchedulePhase>,
@@ -52,10 +52,9 @@ pub fn prepare_phases_and_buffer_manager(
     let ongoing_tasks = Arc::new(AtomicU64::new(0));
 
     // PreExecution Phase
-    let pre_execution_futures = Arc::new(DashMap::new());
     let (pre_execution_phase_request_tx, pre_execution_phase_request_rx) =
         create_channel::<CountedRequest<PreExecutionRequest>>();
-    let pre_execution_phase_processor = PreExecutionPhase::new(execution_proxy.clone(), pre_execution_futures.clone());
+    let pre_execution_phase_processor = PreExecutionPhase::new(execution_proxy.clone(), execution_futures.clone());
     let pre_execution_phase = PipelinePhase::new(
         pre_execution_phase_request_rx,
         None,
@@ -68,7 +67,7 @@ pub fn prepare_phases_and_buffer_manager(
         create_channel::<CountedRequest<ExecutionRequest>>();
     let (execution_schedule_phase_response_tx, execution_schedule_phase_response_rx) =
         create_channel::<ExecutionWaitRequest>();
-    let execution_schedule_phase_processor = ExecutionSchedulePhase::new(execution_proxy, pre_execution_futures);
+    let execution_schedule_phase_processor = ExecutionSchedulePhase::new(execution_proxy, execution_futures);
     let execution_schedule_phase = PipelinePhase::new(
         execution_schedule_phase_request_rx,
         Some(execution_schedule_phase_response_tx),

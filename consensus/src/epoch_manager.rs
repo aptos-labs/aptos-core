@@ -93,6 +93,7 @@ use aptos_types::{
     validator_signer::ValidatorSigner,
 };
 use aptos_validator_transaction_pool::VTxnPoolState;
+use dashmap::DashMap;
 use fail::fail_point;
 use futures::{
     channel::{
@@ -787,6 +788,8 @@ impl<P: OnChainConfigProvider> EpochManager<P> {
 
         let safety_rules_container = Arc::new(Mutex::new(safety_rules));
 
+        let execution_futures = Arc::new(DashMap::new());
+
         self.execution_client
             .start_epoch(
                 epoch_state.clone(),
@@ -799,6 +802,7 @@ impl<P: OnChainConfigProvider> EpochManager<P> {
                 fast_rand_config.clone(),
                 rand_msg_rx,
                 recovery_data.root_block().round(),
+                execution_futures.clone(),
             )
             .await;
 
@@ -869,6 +873,7 @@ impl<P: OnChainConfigProvider> EpochManager<P> {
             onchain_randomness_config,
             onchain_jwk_consensus_config,
             fast_rand_config,
+            execution_futures,
         );
 
         round_manager.init(last_vote).await;
@@ -1291,6 +1296,7 @@ impl<P: OnChainConfigProvider> EpochManager<P> {
                 fast_rand_config,
                 rand_msg_rx,
                 highest_committed_round,
+                Arc::new(DashMap::new()),
             )
             .await;
 

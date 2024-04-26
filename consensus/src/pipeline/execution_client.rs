@@ -19,7 +19,7 @@ use crate::{
         storage::interface::RandStorage,
         types::{AugmentedData, RandConfig, Share},
     },
-    state_computer::ExecutionProxy,
+    state_computer::{ExecutionProxy, SyncStateComputeResultFut},
     state_replication::{StateComputer, StateComputerCommitCallBackType},
     transaction_deduper::create_transaction_deduper,
     transaction_shuffler::create_transaction_shuffler,
@@ -32,6 +32,7 @@ use aptos_consensus_types::{
     common::{Author, Round},
     pipelined_block::PipelinedBlock,
 };
+use aptos_crypto::HashValue;
 use aptos_executor_types::ExecutorResult;
 use aptos_infallible::RwLock;
 use aptos_logger::prelude::*;
@@ -43,6 +44,7 @@ use aptos_types::{
     on_chain_config::{OnChainConsensusConfig, OnChainExecutionConfig, OnChainRandomnessConfig},
     validator_signer::ValidatorSigner,
 };
+use dashmap::DashMap;
 use fail::fail_point;
 use futures::{
     channel::{mpsc::UnboundedSender, oneshot},
@@ -67,6 +69,7 @@ pub trait TExecutionClient: Send + Sync {
         fast_rand_config: Option<RandConfig>,
         rand_msg_rx: aptos_channel::Receiver<AccountAddress, IncomingRandGenRequest>,
         highest_ordered_round: Round,
+        execution_futures: Arc<DashMap<HashValue, SyncStateComputeResultFut>>,
     );
 
     /// This is needed for some DAG tests. Clean this up as a TODO.
@@ -154,6 +157,7 @@ pub struct ExecutionProxyClient {
     // channels to buffer manager
     handle: Arc<RwLock<BufferManagerHandle>>,
     rand_storage: Arc<dyn RandStorage<AugmentedData>>,
+    execution_futures: Arc<DashMap<HashValue, SyncStateComputeResultFut>>,
 }
 
 impl ExecutionProxyClient {
@@ -175,6 +179,7 @@ impl ExecutionProxyClient {
             bounded_executor,
             handle: Arc::new(RwLock::new(BufferManagerHandle::new())),
             rand_storage,
+            execution_futures: Arc::new(DashMap::new()),
         }
     }
 
@@ -186,6 +191,7 @@ impl ExecutionProxyClient {
         fast_rand_config: Option<RandConfig>,
         rand_msg_rx: aptos_channel::Receiver<AccountAddress, IncomingRandGenRequest>,
         highest_ordered_round: Round,
+        execution_futures: Arc<DashMap<HashValue, SyncStateComputeResultFut>>,
     ) {
         let network_sender = NetworkSender::new(
             self.author,
@@ -274,6 +280,7 @@ impl ExecutionProxyClient {
             reset_buffer_manager_rx,
             epoch_state,
             self.bounded_executor.clone(),
+            execution_futures,
         );
 
         tokio::spawn(pre_execution_phase.start());
@@ -299,6 +306,7 @@ impl TExecutionClient for ExecutionProxyClient {
         fast_rand_config: Option<RandConfig>,
         rand_msg_rx: aptos_channel::Receiver<AccountAddress, IncomingRandGenRequest>,
         highest_ordered_round: Round,
+        execution_futures: Arc<DashMap<HashValue, SyncStateComputeResultFut>>,
     ) {
         let maybe_rand_msg_tx = self.spawn_decoupled_execution(
             commit_signer_provider,
@@ -307,6 +315,7 @@ impl TExecutionClient for ExecutionProxyClient {
             fast_rand_config,
             rand_msg_rx,
             highest_ordered_round,
+            execution_futures,
         );
 
         let transaction_shuffler =
@@ -501,6 +510,7 @@ impl TExecutionClient for DummyExecutionClient {
         _fast_rand_config: Option<RandConfig>,
         _rand_msg_rx: aptos_channel::Receiver<AccountAddress, IncomingRandGenRequest>,
         _highest_ordered_round: Round,
+        _execution_futures: Arc<DashMap<HashValue, SyncStateComputeResultFut>>,
     ) {
     }
 

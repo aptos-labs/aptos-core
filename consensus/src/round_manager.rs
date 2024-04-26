@@ -11,34 +11,32 @@ use crate::{
         proposer_election::ProposerElection,
         round_state::{NewRoundEvent, NewRoundReason, RoundState, RoundStateLogSchema},
         unequivocal_proposer_election::UnequivocalProposerElection,
-    }, logging::{LogEvent, LogSchema}, metrics_safety_rules::MetricsSafetyRules, monitor, network::NetworkSender, network_interface::ConsensusMsg, pending_votes::VoteReceptionResult, persistent_liveness_storage::PersistentLivenessStorage, pipeline::execution_client::TExecutionClient, quorum_store::types::BatchMsg, rand::rand_gen::types::{FastShare, RandConfig, Share, TShare}, util::is_vtxn_expected
+    }, logging::{LogEvent, LogSchema}, metrics_safety_rules::MetricsSafetyRules, monitor, network::NetworkSender, network_interface::ConsensusMsg, pending_votes::VoteReceptionResult, persistent_liveness_storage::PersistentLivenessStorage, pipeline::execution_client::TExecutionClient, quorum_store::types::BatchMsg, rand::rand_gen::types::{FastShare, RandConfig, Share, TShare}, state_computer::{PipelineExecutionResult, SyncStateComputeResultFut}, util::is_vtxn_expected
 };
 use anyhow::{bail, ensure, Context};
 use aptos_channels::aptos_channel;
 use aptos_config::config::ConsensusConfig;
 use aptos_consensus_types::{
-    block::Block, block_data::BlockType, common::{Author, Round}, delayed_qc_msg::DelayedQcMsg, pipelined_block::PipelinedBlock, proof_of_store::{ProofCache, ProofOfStoreMsg, SignedBatchInfoMsg}, proposal_msg::ProposalMsg, quorum_cert::QuorumCert, sync_info::SyncInfo, timeout_2chain::TwoChainTimeoutCertificate, vote::Vote, vote_msg::VoteMsg
+    block::Block, block_data::BlockType, common::{Author, Round}, delayed_qc_msg::DelayedQcMsg, pipeline::commit_vote::CommitVote, pipelined_block::PipelinedBlock, proof_of_store::{ProofCache, ProofOfStoreMsg, SignedBatchInfoMsg}, proposal_msg::ProposalMsg, quorum_cert::QuorumCert, sync_info::SyncInfo, timeout_2chain::TwoChainTimeoutCertificate, vote::Vote, vote_msg::VoteMsg
 };
+use aptos_crypto::HashValue;
 use aptos_infallible::{checked, Mutex};
 use aptos_logger::prelude::*;
 #[cfg(test)]
 use aptos_safety_rules::ConsensusState;
 use aptos_safety_rules::TSafetyRules;
 use aptos_types::{
-    epoch_state::EpochState,
-    on_chain_config::{
+    block_info::BlockInfo, epoch_state::EpochState, ledger_info::LedgerInfo, on_chain_config::{
         OnChainConsensusConfig, OnChainJWKConsensusConfig, OnChainRandomnessConfig,
         ValidatorTxnConfig,
-    },
-    randomness::RandMetadata,
-    validator_verifier::ValidatorVerifier,
-    PeerId,
+    }, randomness::RandMetadata, validator_verifier::ValidatorVerifier, PeerId
 };
+use dashmap::DashMap;
 use fail::fail_point;
 use futures::{channel::oneshot, FutureExt, StreamExt};
 use futures_channel::mpsc::UnboundedReceiver;
 use serde::Serialize;
-use std::{mem::Discriminant, sync::Arc, time::Duration};
+use std::{mem::Discriminant, pin::{self, pin, Pin}, sync::Arc, time::Duration};
 use tokio::{
     sync::oneshot as TokioOneshot,
     time::{sleep, Instant},
@@ -196,6 +194,7 @@ pub struct RoundManager {
     randomness_config: OnChainRandomnessConfig,
     jwk_consensus_config: OnChainJWKConsensusConfig,
     fast_rand_config: Option<RandConfig>,
+    execution_futures: Arc<DashMap<HashValue, SyncStateComputeResultFut>>,
 }
 
 impl RoundManager {
@@ -215,6 +214,7 @@ impl RoundManager {
         randomness_config: OnChainRandomnessConfig,
         jwk_consensus_config: OnChainJWKConsensusConfig,
         fast_rand_config: Option<RandConfig>,
+        execution_futures: Arc<DashMap<HashValue, SyncStateComputeResultFut>>,
     ) -> Self {
         // when decoupled execution is false,
         // the counter is still static.
@@ -242,6 +242,7 @@ impl RoundManager {
             randomness_config,
             jwk_consensus_config,
             fast_rand_config,
+            execution_futures,
         }
     }
 
@@ -850,6 +851,52 @@ impl RoundManager {
             );
             self.network.send_vote(vote_msg, vec![recipient]).await;
         }
+
+        // safe to send commit vote here if execution is finished
+        let ledger_info = vote.ledger_info().clone();
+        let block_id = vote.ledger_info().consensus_block_id();
+        let author = self.proposal_generator.author();
+        let execution_futures = self.execution_futures.clone();
+        let safety_rules = self.safety_rules.clone();
+        let network = self.network.clone();
+        let task = async move {
+            if let Some((_, fut)) = execution_futures.remove(&block_id) {
+                match fut.await {
+                    Ok(execution_result) => {
+                        let commit_info = BlockInfo::new(
+                            ledger_info.epoch(),
+                            ledger_info.round(),
+                            ledger_info.consensus_block_id(),
+                            execution_result.result.root_hash(),
+                            execution_result.result.version(),
+                            ledger_info.timestamp_usecs(),
+                            execution_result.result.epoch_state().clone(),
+                        );
+                        let execution_future = Box::pin(async move { Ok(execution_result) });
+                        execution_futures.insert(block_id, execution_future);
+    
+                        info!("[PreExecution] broadcast commit vote for block of epoch {} round {} id {}", ledger_info.epoch(), ledger_info.round(), ledger_info.consensus_block_id());
+    
+                        let commit_ledger_info = LedgerInfo::new(commit_info, ledger_info.consensus_data_hash());
+                        let signature = safety_rules.lock().sign_pre_commit_vote(commit_ledger_info.clone());
+                        match signature{
+                            Ok(signature) => {
+                                let commit_vote = CommitVote::new_with_signature(author, commit_ledger_info, signature);
+                                network.broadcast_commit_vote(commit_vote).await;
+                            },
+                            Err(e) => {
+                                warn!("[PreExecution] Failed to sign commit vote: {:?}", e);
+                            }
+                        }
+                    },
+                    Err(e) => {
+                        warn!("[PreExecution] Failed to execute block: {:?}", e);
+                    }
+                }
+            };
+        };
+        tokio::spawn(task);
+
         Ok(())
     }
 

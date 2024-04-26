@@ -45,14 +45,14 @@ impl Display for ExecutionRequest {
 
 pub struct ExecutionSchedulePhase {
     execution_proxy: Arc<dyn StateComputer>,
-    pre_execution_futures: Arc<DashMap<HashValue, SyncStateComputeResultFut>>,
+    execution_futures: Arc<DashMap<HashValue, SyncStateComputeResultFut>>,
 }
 
 impl ExecutionSchedulePhase {
-    pub fn new(execution_proxy: Arc<dyn StateComputer>, pre_execution_futures: Arc<DashMap<HashValue, SyncStateComputeResultFut>>) -> Self {
+    pub fn new(execution_proxy: Arc<dyn StateComputer>, execution_futures: Arc<DashMap<HashValue, SyncStateComputeResultFut>>) -> Self {
         Self { 
             execution_proxy,
-            pre_execution_futures,
+            execution_futures,
         }
     }
 }
@@ -82,8 +82,8 @@ impl StatelessPipeline for ExecutionSchedulePhase {
         // Call schedule_compute() for each block here (not in the fut being returned) to
         // make sure they are scheduled in order.
         for block in &ordered_blocks {
-            match self.pre_execution_futures.entry(block.id()) {
-                dashmap::mapref::entry::Entry::Occupied(entry) => {
+            match self.execution_futures.entry(block.id()) {
+                dashmap::mapref::entry::Entry::Occupied(_) => {
                     info!("[PreExecution] block was pre-executed, epoch {} round {} id {}", block.epoch(), block.round(), block.id());
                 }
                 dashmap::mapref::entry::Entry::Vacant(entry) => {
@@ -97,7 +97,7 @@ impl StatelessPipeline for ExecutionSchedulePhase {
             }
         }
 
-        let execution_futures = self.pre_execution_futures.clone();
+        let execution_futures = self.execution_futures.clone();
 
         // In the future being returned, wait for the compute results in order.
         // n.b. Must `spawn()` here to make sure lifetime_guard will be released even if

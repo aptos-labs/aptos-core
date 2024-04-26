@@ -360,6 +360,17 @@ impl SafetyRules {
 
         Ok(signature)
     }
+
+    fn guarded_sign_pre_commit_vote(
+        &mut self,
+        ledger_info: LedgerInfo,
+    ) -> Result<bls12381::Signature, Error> {
+        self.signer()?;
+
+        let signature = self.sign(&ledger_info)?;
+
+        Ok(signature)
+    }
 }
 
 impl TSafetyRules for SafetyRules {
@@ -413,6 +424,14 @@ impl TSafetyRules for SafetyRules {
     ) -> Result<bls12381::Signature, Error> {
         let cb = || self.guarded_sign_commit_vote(ledger_info, new_ledger_info);
         run_and_log(cb, |log| log, LogEntry::SignCommitVote)
+    }
+
+    fn sign_pre_commit_vote(
+        &mut self,
+        ledger_info: LedgerInfo,
+    ) -> Result<bls12381::Signature, Error> {
+        let cb = || self.guarded_sign_pre_commit_vote(ledger_info);
+        run_and_log(cb, |log| log, LogEntry::SignPreCommitVote)
     }
 }
 

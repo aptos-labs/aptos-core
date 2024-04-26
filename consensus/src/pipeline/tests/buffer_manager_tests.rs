@@ -153,6 +153,7 @@ pub fn prepare_buffer_manager(
             verifier: validators.clone(),
         }),
         bounded_executor,
+        Arc::new(DashMap::new()),
     );
 
     (
