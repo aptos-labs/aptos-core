@@ -7,6 +7,7 @@ include "helpers/packing.circom";
 include "helpers/hashtofield.circom";
 include "helpers/sha.circom";
 include "helpers/rsa/rsa_verify.circom";
+include "helpers/jwt_field_parsing.circom";
 include "helpers/rsa/bigint.circom";
 include "../node_modules/circomlib/circuits/poseidon.circom";
 include "../node_modules/circomlib/circuits/bitify.circom";
@@ -130,7 +131,8 @@ template identity(
     signal aud_value_len;
     aud_value_len <== (override_aud_value_len-private_aud_value_len) * s + private_aud_value_len;
 
-    JWTFieldCheck(maxAudKVPairLen, maxAudNameLen, maxAudValueLen)(aud_field, aud_field_len, aud_index, aud_name_len, aud_value_index, aud_value_len, aud_colon_index, aud_name, aud_value);
+    log("aud");
+    ParseJWTFieldWithQuotedValue(maxAudKVPairLen, maxAudNameLen, maxAudValueLen)(aud_field, aud_name, aud_value, aud_field_len, aud_name_len, aud_value_index, aud_value_len, aud_colon_index);
 
     // Check aud name is correct
     var required_aud_name[aud_name_len] = [97, 117, 100]; // aud
@@ -152,7 +154,8 @@ template identity(
     signal input uid_name[maxUIDNameLen];
     signal input uid_value[maxUIDValueLen];
 
-    JWTFieldCheck(maxUIDKVPairLen, maxUIDNameLen, maxUIDValueLen)(uid_field, uid_field_len, uid_index, uid_name_len, uid_value_index, uid_value_len, uid_colon_index, uid_name, uid_value);
+    log("uid");
+    ParseJWTFieldWithQuotedValue(maxUIDKVPairLen, maxUIDNameLen, maxUIDValueLen)(uid_field, uid_name, uid_value, uid_field_len, uid_name_len, uid_value_index, uid_value_len, uid_colon_index);
 
     // Check extra field is in the JWT
     signal input extra_field[maxEFKVPairLen];
@@ -194,7 +197,7 @@ template identity(
     signal ev_fail <== AND()(uid_is_email, not_ev_in_jwt);
     ev_fail === 0;
 
-    JWTFieldCheck(maxEVKVPairLen, maxEVNameLen, maxEVValueLen)(ev_field, ev_field_len, ev_index, ev_name_len, ev_value_index, ev_value_len, ev_colon_index, ev_name, ev_value);
+    ParseJWTFieldWithUnquotedValue(maxEVKVPairLen, maxEVNameLen, maxEVValueLen)(ev_field, ev_name, ev_value, ev_field_len, ev_name_len, ev_value_index, ev_value_len, ev_colon_index);
 
     // Check iss field is in the JWT
     // Note that because `iss_field` is a public input, we assume the verifier will perform correctness checks on it outside of the circuit. 
@@ -211,7 +214,7 @@ template identity(
     signal input iss_name[maxIssNameLen];
     signal input iss_value[maxIssValueLen];
 
-    JWTFieldCheck(maxIssKVPairLen, maxIssNameLen, maxIssValueLen)(iss_field, iss_field_len, iss_index, iss_name_len, iss_value_index, iss_value_len, iss_colon_index, iss_name, iss_value);
+    ParseJWTFieldWithQuotedValue(maxIssKVPairLen, maxIssNameLen, maxIssValueLen)(iss_field, iss_name, iss_value, iss_field_len, iss_name_len, iss_value_index, iss_value_len, iss_colon_index);
 
     // Check name of the iss field is correct
     var required_iss_name[iss_name_len] = [105, 115, 115]; // iss
@@ -233,7 +236,7 @@ template identity(
     signal input iat_name[maxIatNameLen];
     signal input iat_value[maxIatValueLen];
 
-    JWTFieldCheck(maxIatKVPairLen, maxIatNameLen, maxIatValueLen)(iat_field, iat_field_len, iat_index, iat_name_len, iat_value_index, iat_value_len, iat_colon_index, iat_name, iat_value);
+    ParseJWTFieldWithUnquotedValue(maxIatKVPairLen, maxIatNameLen, maxIatValueLen)(iat_field, iat_name, iat_value, iat_field_len, iat_name_len, iat_value_index, iat_value_len, iat_colon_index);
 
     // Check name of the iat field is correct
     var required_iat_name[iat_name_len] = [105, 97, 116]; // iat
@@ -262,7 +265,7 @@ template identity(
     signal input nonce_name[maxNonceNameLen];
     signal input nonce_value[maxNonceValueLen];
 
-    JWTFieldCheck(maxNonceKVPairLen, maxNonceNameLen, maxNonceValueLen)(nonce_field, nonce_field_len, nonce_index, nonce_name_len, nonce_value_index, nonce_value_len, nonce_colon_index, nonce_name, nonce_value);
+    ParseJWTFieldWithQuotedValue(maxNonceKVPairLen, maxNonceNameLen, maxNonceValueLen)(nonce_field, nonce_name, nonce_value, nonce_field_len, nonce_name_len, nonce_value_index, nonce_value_len, nonce_colon_index);
 
     // Check name of the nonce field is correct
     var required_nonce_name[nonce_name_len] = [110, 111, 110, 99, 101]; // nonce

@@ -23,6 +23,8 @@ mod sha;
 mod arrays;
 #[cfg(test)]
 mod rsa;
+#[cfg(test)]
+mod jwt_field_parsing;
 
 pub struct TestCircuitHandle {
     dir: TempDir,
