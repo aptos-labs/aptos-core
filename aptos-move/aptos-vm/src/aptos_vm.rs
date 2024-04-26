@@ -2429,7 +2429,7 @@ impl AptosVM {
             TransactionPayload::EntryFunction(entry_func) => {
                 if let Some(gas_amount) = self.randomness_api_v0_required_deposit.gas_amount {
                     if has_randomness_attribute(resolver, session, entry_func).unwrap_or(false) {
-                        if gas_amount < u64::from(txn_metadata.max_gas_amount) {
+                        if gas_amount > u64::from(txn_metadata.max_gas_amount) {
                             return Err(VMStatus::error(
                                 StatusCode::REQUIRED_DEPOSIT_INCONSISTENT_WITH_TXN_MAX_GAS,
                                 None,
