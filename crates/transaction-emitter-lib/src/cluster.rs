@@ -1,7 +1,7 @@
 // Copyright © Aptos Foundation
 // SPDX-License-Identifier: Apache-2.0
 
-use crate::{emitter::query_sequence_number, instance::Instance, ClusterArgs};
+use crate::{emitter::load_specific_account, instance::Instance, ClusterArgs};
 use anyhow::{anyhow, bail, format_err, Result};
 use aptos_crypto::{
     ed25519::{Ed25519PrivateKey, Ed25519PublicKey},
@@ -9,9 +9,7 @@ use aptos_crypto::{
 };
 use aptos_logger::{info, warn};
 use aptos_rest_client::{Client as RestClient, State};
-use aptos_sdk::types::{
-    account_config::aptos_test_root_address, chain_id::ChainId, AccountKey, LocalAccount,
-};
+use aptos_sdk::types::{chain_id::ChainId, AccountKey, LocalAccount};
 use futures::{stream::FuturesUnordered, StreamExt};
 use rand::seq::SliceRandom;
 use std::{convert::TryFrom, time::Instant};
@@ -200,22 +198,7 @@ impl Cluster {
     }
 
     pub async fn load_coin_source_account(&self, client: &RestClient) -> Result<LocalAccount> {
-        let account_key = self.account_key();
-        let address = if self.coin_source_is_root {
-            aptos_test_root_address()
-        } else {
-            account_key.authentication_key().account_address()
-        };
-
-        let sequence_number = query_sequence_number(client, address).await.map_err(|e| {
-            format_err!(
-                "query_sequence_number on {:?} for account {} failed: {:?}",
-                client,
-                address,
-                e
-            )
-        })?;
-        Ok(LocalAccount::new(address, account_key, sequence_number))
+        load_specific_account(self.account_key(), self.coin_source_is_root, client).await
     }
 
     pub fn random_instance(&self) -> Instance {
