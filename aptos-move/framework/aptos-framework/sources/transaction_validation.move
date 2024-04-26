@@ -342,8 +342,10 @@ module aptos_framework::transaction_validation {
         gas_units_remaining: u64,
         required_deposit: Option<u64>,
     ) {
+        debug::print(&utf8(b"0425 - -2"));
         let gas_payer = signer::address_of(&account);
         return_deposit(gas_payer, required_deposit);
+        debug::print(&utf8(b"0425 - -1"));
         epilogue(
             account,
             storage_fee_refunded,
@@ -364,6 +366,9 @@ module aptos_framework::transaction_validation {
         gas_units_remaining: u64
     ) {
         debug::print(&utf8(b"0425 - 0"));
+        debug::print(&txn_max_gas_units);
+        debug::print(&gas_units_remaining);
+        debug::print(&txn_gas_price);
         assert!(txn_max_gas_units >= gas_units_remaining, error::invalid_argument(EOUT_OF_GAS));
         let gas_used = txn_max_gas_units - gas_units_remaining;
         debug::print(&utf8(b"0425 - 1"));
@@ -424,9 +429,7 @@ module aptos_framework::transaction_validation {
         gas_units_remaining: u64,
         required_deposit: Option<u64>,
     ) {
-        debug::print(&utf8(b"0425 - -2"));
         return_deposit(gas_payer, required_deposit);
-        debug::print(&utf8(b"0425 - -1"));
         epilogue_gas_payer(
             account,
             gas_payer,
