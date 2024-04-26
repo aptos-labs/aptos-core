@@ -207,6 +207,7 @@ impl AccountPicker {
     fn pick_pair(&mut self, indexes: &[Index; 2],  w: usize) -> [usize; 2] {
         match self {
             AccountPicker::Unlimited(num_accounts) => {  
+<<<<<<< HEAD
                 let temp = w % (*num_accounts/2);
                 [2*temp, 2*temp+1]
 
@@ -221,6 +222,19 @@ impl AccountPicker {
                 } else {
                     Self::pick_pair_impl(*num_accounts, indexes)
                 }*/
+=======
+                if w < 2 {
+                    let half_accounts = (*num_accounts) / 2;
+                    let temp = Self::pick_pair_impl(half_accounts, indexes);
+                    if w == 0 {
+                        temp
+                    } else {
+                        [temp[0]+half_accounts,temp[1]+half_accounts]
+                    }
+                } else {
+                    Self::pick_pair_impl(*num_accounts, indexes)
+                }
+>>>>>>> 17660504f6 (mixed workload?)
             },
             AccountPicker::Limited(remaining) => {
                 let [remaining_idx_1, remaining_idx_2] =

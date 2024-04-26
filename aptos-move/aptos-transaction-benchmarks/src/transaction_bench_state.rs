@@ -140,7 +140,11 @@ where
         let mut transactions: Vec<Transaction> = transaction_gens
             .into_iter().enumerate()
             .map(|(i, txn_gen)| {
+<<<<<<< HEAD
                 Transaction::UserTransaction(txn_gen.apply(&mut self.account_universe, i).0)
+=======
+                Transaction::UserTransaction(txn_gen.apply(&mut self.account_universe, i % 2).0)
+>>>>>>> 17660504f6 (mixed workload?)
             })
             .collect();
 
