@@ -79,9 +79,13 @@ pub(crate) fn truncate_state_kv_db(
     let status = StatusLine::new(Progress::new(target_version));
 
     let mut current_version = current_version;
-    while current_version > target_version {
-        let target_version_for_this_batch =
-            std::cmp::max(current_version - batch_size as u64, target_version);
+    // current_version can be the same with target_version while there is data written to the db before
+    // the progress is recorded -- we need to run the truncate for at least one batch
+    loop {
+        let target_version_for_this_batch = std::cmp::max(
+            current_version.wrapping_sub(batch_size as Version),
+            target_version,
+        );
         // By writing the progress first, we still maintain that it is less than or equal to the
         // actual progress per shard, even if it dies in the middle of truncation.
         state_kv_db.write_progress(target_version_for_this_batch)?;
@@ -92,6 +96,10 @@ pub(crate) fn truncate_state_kv_db(
         truncate_state_kv_db_shards(state_kv_db, target_version_for_this_batch)?;
         current_version = target_version_for_this_batch;
         status.set_current_version(current_version);
+
+        if current_version <= target_version {
+            break;
+        }
     }
     assert_eq!(current_version, target_version);
     Ok(())
