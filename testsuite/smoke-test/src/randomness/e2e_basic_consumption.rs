@@ -8,6 +8,9 @@ use aptos_logger::info;
 use aptos_types::on_chain_config::OnChainRandomnessConfig;
 use serde::{Deserialize, Serialize};
 use std::{collections::BTreeMap, str::FromStr, sync::Arc, time::Duration};
+use rand::thread_rng;
+use aptos_crypto::ed25519::Ed25519PrivateKey;
+use aptos_crypto::Uniform;
 
 /// Publish the `on-chain-dice` example module,
 /// run its function that consume on-chain randomness, and
@@ -16,7 +19,7 @@ use std::{collections::BTreeMap, str::FromStr, sync::Arc, time::Duration};
 async fn e2e_basic_consumption() {
     let epoch_duration_secs = 20;
 
-    let (mut swarm, mut cli, _faucet) = SwarmBuilder::new_local(4)
+    let (mut swarm, mut cli, faucet) = SwarmBuilder::new_local(4)
         .with_num_fullnodes(1)
         .with_aptos()
         .with_init_genesis_config(Arc::new(move |conf| {
@@ -37,16 +40,17 @@ async fn e2e_basic_consumption() {
         .await
         .expect("Epoch 2 taking too long to arrive!");
 
-    let root_address = swarm.chain_info().root_account().address();
-    info!("Root account: {}", root_address);
-    let _root_idx = cli.add_account_with_address_to_cli(swarm.root_key(), root_address);
+    let rng = thread_rng();
+    let new_sk = Ed25519PrivateKey::generate(&mut rng);
+    let user_idx = cli.add_account_to_cli(new_sk);
+    let user_addr = cli.account_id(user_idx);
+    swarm.aptos_public_info().mint(user_addr, 999999999).await.unwrap();
 
     info!("Publishing OnChainDice module.");
-    publish_on_chain_dice_module(&mut cli, 0).await;
+    publish_on_chain_dice_module(&mut cli, user_idx).await;
 
     info!("Rolling the dice.");
-    let account = cli.account_id(0).to_hex_literal();
-    let roll_func_id = MemberId::from_str(&format!("{}::dice::roll", account)).unwrap();
+    let roll_func_id = MemberId::from_str(&format!("{}::dice::roll", user_addr)).unwrap();
     let mut dice_roll_history = vec![];
     for _ in 0..10 {
         let gas_options = GasOptions {
@@ -55,15 +59,15 @@ async fn e2e_basic_consumption() {
             expiration_secs: 60,
         };
         let txn_summary = cli
-            .run_function(0, Some(gas_options), roll_func_id.clone(), vec![], vec![])
+            .run_function(user_idx, Some(gas_options), roll_func_id.clone(), vec![], vec![])
             .await
             .unwrap();
         info!("Roll txn summary: {:?}", txn_summary);
 
         let dice_roll_result = rest_client
             .get_account_resource_bcs::<DiceRollResult>(
-                root_address,
-                format!("{}::dice::DiceRollResult", account).as_str(),
+                user_addr,
+                format!("{}::dice::DiceRollResult", user_addr).as_str(),
             )
             .await
             .unwrap()
