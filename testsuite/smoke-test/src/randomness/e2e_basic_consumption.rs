@@ -5,12 +5,13 @@ use crate::smoke_test_environment::SwarmBuilder;
 use aptos::{common::types::GasOptions, move_tool::MemberId, test::CliTestFramework};
 use aptos_forge::{NodeExt, Swarm, SwarmExt};
 use aptos_logger::info;
-use aptos_types::on_chain_config::OnChainRandomnessConfig;
+use aptos_types::on_chain_config::{OnChainRandomnessConfig, StorageGasSchedule};
 use serde::{Deserialize, Serialize};
 use std::{collections::BTreeMap, str::FromStr, sync::Arc, time::Duration};
 use rand::thread_rng;
 use aptos_crypto::ed25519::{Ed25519PrivateKey, Ed25519PublicKey};
 use aptos_crypto::Uniform;
+use crate::randomness::get_on_chain_resource;
 
 /// Publish the `on-chain-dice` example module,
 /// run its function that consume on-chain randomness, and
@@ -51,6 +52,9 @@ async fn e2e_basic_consumption() {
 
     info!("Publishing OnChainDice module.");
     publish_on_chain_dice_module(&mut cli, user_idx).await;
+
+    let storage_gas = get_on_chain_resource::<StorageGasSchedule>(&rest_client).await;
+    println!("storage_gas={:?}", storage_gas);
 
     info!("Rolling the dice.");
     let roll_func_id = MemberId::from_str(&format!("{}::dice::roll", user_addr)).unwrap();
