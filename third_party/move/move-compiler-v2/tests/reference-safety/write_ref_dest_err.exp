@@ -6,10 +6,7 @@ error: cannot assign to borrowed local `_y`
 17 │         let z = &_y;
    │                 --- previous local borrow
 18 │         (_y, _) = foo(&_y);
-   │                   ^^^^^^^^
-   │                   │   │
-   │                   │   previous local borrow
-   │                   attempted to assign here
+   │                   ^^^^^^^^ attempted to assign here
 19 │         *z;
    │         -- conflicting reference `z` used here
 

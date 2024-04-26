@@ -685,16 +685,6 @@ impl LifetimeState {
         map
     }
 
-    fn leaves_for_labels(&self, lbl: &BTreeSet<LifetimeLabel>) -> BTreeSet<TempIndex> {
-        let mut set: BTreeSet<TempIndex> = BTreeSet::new();
-        for (temp, label) in &self.temp_to_label_map {
-            if lbl.contains(label) {
-                set.insert(*temp);
-            }
-        }
-        set
-    }
-
     /// Releases graph resources for a reference in temporary.
     fn release_ref(&mut self, temp: TempIndex) {
         if let Some(label) = self.temp_to_label_map.remove(&temp) {
@@ -1015,32 +1005,42 @@ impl<'env, 'state> LifetimeAnalysisStep<'env, 'state> {
         }
     }
 
-    /// Check whether a local can be written. This is only allowed if it is not borrowed by any
-    /// temps that are alive after the statement
+    /// Release all references that are not alive after this program point
+    /// from temp_to_label_map if `dests` do not contain any references
+    /// This function should be called before `check_write_local`
+    fn release_before_write_local(&mut self, dests: &[TempIndex]) {
+        let alive_temps = self.alive.after_set();
+        if !dests.iter().any(|temp| self.is_ref(*temp)) {
+            for temp in self
+                .state
+                .temp_to_label_map
+                .keys()
+                .cloned()
+                .collect::<Vec<_>>()
+            {
+                if !alive_temps.contains(&temp) && self.is_ref(temp) {
+                    self.state.release_ref(temp)
+                }
+            }
+        }
+    }
+
+    /// Check whether a local can be written. This is only allowed if no borrowed references exist.
     fn check_write_local(&self, local: TempIndex) {
         if self.is_ref(local) {
             // Always valid
             return;
         }
         if let Some(label) = self.state.label_for_temp_with_children(local) {
-            let children = self.state.transitive_children(label);
-            // cannot be assigned if the destination is currently borrowed by temps that are alive
-            // after the statement
-            if self
-                .state
-                .leaves_for_labels(&children)
-                .iter()
-                .any(|temp| self.alive.after.contains_key(temp) && *temp != local)
-            {
-                self.error_with_hints(
-                    self.cur_loc(),
-                    format!("cannot assign to borrowed {}", self.display(local)),
-                    "attempted to assign here",
-                    self.borrow_info(label, |_| true)
-                        .into_iter()
-                        .chain(self.usage_info(label, |t| t != &local)),
-                )
-            }
+            // The destination is currently borrowed and cannot be assigned
+            self.error_with_hints(
+                self.cur_loc(),
+                format!("cannot assign to borrowed {}", self.display(local)),
+                "attempted to assign here",
+                self.borrow_info(label, |_| true)
+                    .into_iter()
+                    .chain(self.usage_info(label, |t| t != &local)),
+            )
         }
     }
 
@@ -1453,6 +1453,7 @@ impl<'env, 'state> LifetimeAnalysisStep<'env, 'state> {
             }
         } else {
             self.check_read_local(src, mode);
+            self.release_before_write_local(&[dest]);
             self.check_write_local(dest);
         }
     }
@@ -1518,6 +1519,7 @@ impl<'env, 'state> LifetimeAnalysisStep<'env, 'state> {
             self.check_read_local(*src, ReadMode::Argument);
         }
         // Next check whether we can assign to the destinations.
+        self.release_before_write_local(dests);
         for dest in dests {
             self.check_write_local(*dest)
         }
@@ -1708,6 +1710,7 @@ impl<'env, 'state> LifetimeAnalysisStep<'env, 'state> {
     /// Process a MoveFrom instruction.
     fn move_from(&mut self, dest: TempIndex, resource: &QualifiedInstId<StructId>, src: TempIndex) {
         self.check_read_local(src, ReadMode::Argument);
+        self.release_before_write_local(&[dest]);
         self.check_write_local(dest);
         if let Some(label) = self.state.label_for_global_with_children(resource) {
             self.error_with_hints(
@@ -1766,6 +1769,7 @@ impl<'env, 'state> LifetimeAnalysisStep<'env, 'state> {
     /// Process a ReadRef instruction.
     fn read_ref(&mut self, dest: TempIndex, src: TempIndex) {
         debug_assert!(self.is_ref(src));
+        self.release_before_write_local(&[dest]);
         self.check_write_local(dest);
         self.check_read_local(src, ReadMode::Argument);
     }
