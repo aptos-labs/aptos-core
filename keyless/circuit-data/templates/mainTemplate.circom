@@ -283,7 +283,7 @@ template identity(
     // Check nonce is correct
     signal nonce_field_elem <== ASCIIDigitsToField(maxNonceValueLen)(nonce_value, nonce_value_len);
     
-    //nonce_field_elem === computed_nonce;
+    nonce_field_elem === computed_nonce;
 
     // Compute the address seed
     signal input pepper;
