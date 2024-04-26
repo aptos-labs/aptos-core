@@ -703,13 +703,13 @@ impl AptosDB {
             latest_version,
             &batch,
         )?;
+        println!("Reverted write set");
 
-        // Revert the state kv and ledger metadata not yet implemented
+        // Revert the state kv and ledger metadata
         self.state_store
             .state_kv_db
             .revert_state_kv_and_ledger_metadata(version_to_revert)?;
 
-        // The latest version will be the version_to_revert
         //Update the version of `ledger_info_with_sigs`
         let _ledger_info = ledger_info_with_sigs
             .ledger_info()

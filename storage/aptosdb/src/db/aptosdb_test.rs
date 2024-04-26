@@ -313,8 +313,6 @@ fn test_revert_nth_commit() {
         hash: HashValue,
         info: LedgerInfoWithSignatures,
         first_version: Version,
-        last_version: Version,
-        txs: usize,
     }
 
     let mut committed_blocks = HashMap::new();
@@ -324,7 +322,6 @@ fn test_revert_nth_commit() {
     for (txns_to_commit, ledger_info_with_sigs) in &blocks {
         let first_version = cur_ver;
         update_in_memory_state(&mut in_memory_state, txns_to_commit.as_slice());
-
         db.save_transactions_for_test(
             txns_to_commit,
             cur_ver, /* first_version */
@@ -334,16 +331,11 @@ fn test_revert_nth_commit() {
             in_memory_state.clone(),
         )
         .unwrap();
-
-        let last_version = cur_ver + txns_to_commit.len() as u64 - 1;
         committed_blocks.insert(blockheight, Commit {
             hash: ledger_info_with_sigs.commit_info().executed_state_id(),
             info: ledger_info_with_sigs.clone(),
             first_version,
-            last_version,
-            txs: txns_to_commit.len(),
         });
-
         commit_versions.push(cur_ver);
         cur_ver += txns_to_commit.len() as u64;
         blockheight += 1;
@@ -357,13 +349,12 @@ fn test_revert_nth_commit() {
     let revert_block_num = blockheight - 3;
     let revert = committed_blocks.get(&revert_block_num).unwrap();
 
-    println!("Reverting block: {:?}", revert);
-
-    let version_to_revert = revert.first_version;
+    // Get the version to revert to
+    let version_to_revert = revert.first_version - 1;
 
     db.revert_commit(
         version_to_revert,
-        revert.last_version,
+        db.get_latest_version().unwrap(),
         revert.hash.clone(),
         revert.info.clone(),
     )

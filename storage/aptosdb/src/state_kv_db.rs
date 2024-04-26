@@ -211,7 +211,7 @@ impl StateKvDb {
 
     pub(crate) fn revert_state_kv_and_ledger_metadata(&self, version: Version) -> Result<()> {
         // Revert the state KV metadata DB to the given version
-        let mut metadata_batch = SchemaBatch::new();
+        let metadata_batch = SchemaBatch::new();
         metadata_batch.put::<DbMetadataSchema>(
             &DbMetadataKey::StateKvCommitProgress,
             &DbMetadataValue::Version(version),
@@ -224,17 +224,12 @@ impl StateKvDb {
 
         // Revert each state KV DB shard to the corresponding version
         for shard_id in 0..NUM_STATE_SHARDS {
-            let mut shard_batch = SchemaBatch::new();
+            let shard_batch = SchemaBatch::new();
             shard_batch.put::<DbMetadataSchema>(
                 &DbMetadataKey::StateKvShardCommitProgress(shard_id as usize),
                 &DbMetadataValue::Version(version),
             )?;
             self.state_kv_db_shards[shard_id as usize].write_schemas(shard_batch)?;
-        }
-
-        // Truncate the state KV DB shards if necessary
-        if let Some(overall_kv_commit_progress) = get_state_kv_commit_progress(self)? {
-            truncate_state_kv_db_shards(self, overall_kv_commit_progress, Some(version))?;
         }
 
         Ok(())
