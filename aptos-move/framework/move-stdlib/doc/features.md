@@ -118,8 +118,6 @@ return true.
 -  [Function `object_native_derived_address_enabled`](#0x1_features_object_native_derived_address_enabled)
 -  [Function `get_dispatchable_fungible_asset_feature`](#0x1_features_get_dispatchable_fungible_asset_feature)
 -  [Function `dispatchable_fungible_asset_enabled`](#0x1_features_dispatchable_fungible_asset_enabled)
--  [Function `get_randomness_api_v0_feature`](#0x1_features_get_randomness_api_v0_feature)
--  [Function `randomness_api_v0_enabled`](#0x1_features_randomness_api_v0_enabled)
 -  [Function `change_feature_flags`](#0x1_features_change_feature_flags)
 -  [Function `change_feature_flags_internal`](#0x1_features_change_feature_flags_internal)
 -  [Function `change_feature_flags_for_next_epoch`](#0x1_features_change_feature_flags_for_next_epoch)
@@ -687,18 +685,6 @@ Lifetime: transient
 
 
 <pre><code><b>const</b> <a href="features.md#0x1_features_PRIMARY_APT_FUNGIBLE_STORE_AT_USER_ADDRESS">PRIMARY_APT_FUNGIBLE_STORE_AT_USER_ADDRESS</a>: u64 = 61;
-</code></pre>
-
-
-
-<a id="0x1_features_RANDOMNESS_API_V0"></a>
-
-If this feature is enabled, a private entry function annotated with <code>#[randomness]</code> is allowed to use <code>randomness.<b>move</b></code> APIs.
-Also 0.01 APT from gas payer's balance will be locked during transaction execution
-to mitigate [undergasing attack](https://github.com/aptos-foundation/AIPs/blob/main/aips/aip-41.md#undergasing-attacks).
-
-
-<pre><code><b>const</b> <a href="features.md#0x1_features_RANDOMNESS_API_V0">RANDOMNESS_API_V0</a>: u64 = 64;
 </code></pre>
 
 
@@ -2848,52 +2834,6 @@ Lifetime: transient
 
 <pre><code><b>public</b> <b>fun</b> <a href="features.md#0x1_features_dispatchable_fungible_asset_enabled">dispatchable_fungible_asset_enabled</a>(): bool <b>acquires</b> <a href="features.md#0x1_features_Features">Features</a> {
     <a href="features.md#0x1_features_is_enabled">is_enabled</a>(<a href="features.md#0x1_features_DISPATCHABLE_FUNGIBLE_ASSET">DISPATCHABLE_FUNGIBLE_ASSET</a>)
-}
-</code></pre>
-
-
-
-</details>
-
-<a id="0x1_features_get_randomness_api_v0_feature"></a>
-
-## Function `get_randomness_api_v0_feature`
-
-
-
-<pre><code><b>public</b> <b>fun</b> <a href="features.md#0x1_features_get_randomness_api_v0_feature">get_randomness_api_v0_feature</a>(): u64
-</code></pre>
-
-
-
-<details>
-<summary>Implementation</summary>
-
-
-<pre><code><b>public</b> <b>fun</b> <a href="features.md#0x1_features_get_randomness_api_v0_feature">get_randomness_api_v0_feature</a>(): u64 { <a href="features.md#0x1_features_RANDOMNESS_API_V0">RANDOMNESS_API_V0</a> }
-</code></pre>
-
-
-
-</details>
-
-<a id="0x1_features_randomness_api_v0_enabled"></a>
-
-## Function `randomness_api_v0_enabled`
-
-
-
-<pre><code><b>public</b> <b>fun</b> <a href="features.md#0x1_features_randomness_api_v0_enabled">randomness_api_v0_enabled</a>(): bool
-</code></pre>
-
-
-
-<details>
-<summary>Implementation</summary>
-
-
-<pre><code><b>public</b> <b>fun</b> <a href="features.md#0x1_features_randomness_api_v0_enabled">randomness_api_v0_enabled</a>(): bool <b>acquires</b> <a href="features.md#0x1_features_Features">Features</a> {
-    <a href="features.md#0x1_features_is_enabled">is_enabled</a>(<a href="features.md#0x1_features_RANDOMNESS_API_V0">RANDOMNESS_API_V0</a>)
 }
 </code></pre>
 
