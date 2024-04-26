@@ -820,15 +820,71 @@ fn check_are_ascii_digits_large_test() {
     assert!(result.is_ok());
 }
 
+fn digits_to_ascii_digits(digits: Vec<u8>) -> Vec<u8> {
+    let mut result = digits.clone();
+    for i in 0..result.len() {
+        result[i] = result[i] + 48;
+    }
+    result
+}
+
 #[test]
 fn ascii_digits_to_field_test() {
     let circuit_handle = TestCircuitHandle::new("ascii_digits_to_field_test.circom").unwrap();
     let max_input_len = 20;
-    let digits = [50,49,50,52,55,3,0,200]; // 21247
+    let digits = [2,1,2,4,7];
+    let ascii_digits = digits_to_ascii_digits(digits.to_vec());
     let len = 5;
     let expected_output = 21247;
     let config = CircuitPaddingConfig::new().max_length("digits", max_input_len);
-    let circuit_input_signals = CircuitInputSignals::new().u64_input("len", len).bytes_input("digits", &digits).u64_input("expected_output", expected_output).pad(&config).unwrap();
+    let circuit_input_signals = CircuitInputSignals::new().u64_input("len", len).bytes_input("digits", &ascii_digits).u64_input("expected_output", expected_output).pad(&config).unwrap();
+     
+    let result = circuit_handle.gen_witness(circuit_input_signals);
+    assert!(result.is_ok());
+}
+
+#[test]
+fn ascii_digits_to_field_small_test() {
+    let circuit_handle = TestCircuitHandle::new("ascii_digits_to_field_small_test.circom").unwrap();
+    let max_input_len = 2;
+    let digits = [7, 89];
+    let ascii_digits = digits_to_ascii_digits(digits.to_vec());
+    let len = 1;
+    let expected_output = 7;
+    let config = CircuitPaddingConfig::new().max_length("digits", max_input_len);
+    let circuit_input_signals = CircuitInputSignals::new().u64_input("len", len).bytes_input("digits", &ascii_digits).u64_input("expected_output", expected_output).pad(&config).unwrap();
+     
+    let result = circuit_handle.gen_witness(circuit_input_signals);
+    assert!(result.is_ok());
+}
+
+#[test]
+fn ascii_digits_to_field_large_test() {
+    let circuit_handle = TestCircuitHandle::new("ascii_digits_to_field_large_test.circom").unwrap();
+    let max_input_len = 2000;
+    let digits = [2,1,2,4,7,4,8,0,1,9,2,1,8,3,6,7,4,1,5,14,41,180,1,31,47,2,3,6,7,31,35];
+    let ascii_digits = digits_to_ascii_digits(digits.to_vec());
+    let len = 19;
+    let expected_output = 2124748019218367415;
+    let config = CircuitPaddingConfig::new().max_length("digits", max_input_len);
+    let circuit_input_signals = CircuitInputSignals::new().u64_input("len", len).bytes_input("digits", &ascii_digits).u64_input("expected_output", expected_output).pad(&config).unwrap();
+     
+    let result = circuit_handle.gen_witness(circuit_input_signals);
+    println!("{:?}", result);
+    assert!(result.is_ok());
+}
+
+#[test]
+#[should_panic]
+fn ascii_digits_to_field_not_ascii_digits_test() {
+    let circuit_handle = TestCircuitHandle::new("ascii_digits_to_field_test.circom").unwrap();
+    let max_input_len = 20;
+    let digits = [2,1,24,4,7];
+    let ascii_digits = digits_to_ascii_digits(digits.to_vec());
+    let len = 5;
+    let expected_output = 21247;
+    let config = CircuitPaddingConfig::new().max_length("digits", max_input_len);
+    let circuit_input_signals = CircuitInputSignals::new().u64_input("len", len).bytes_input("digits", &ascii_digits).u64_input("expected_output", expected_output).pad(&config).unwrap();
      
     let result = circuit_handle.gen_witness(circuit_input_signals);
     assert!(result.is_ok());

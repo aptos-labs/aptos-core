@@ -281,6 +281,7 @@ template CheckAreASCIIDigits(maxNumDigits) {
 
 // Given a string of digits in ASCII format, returns the digits represented as a single field element
 // Assumes the number represented by the ASCII digits is smaller than the scalar field used by the circuit
+// Does not work when maxLen = 1
 template ASCIIDigitsToField(maxLen) {
     signal input digits[maxLen]; 
     signal input len; 
@@ -315,6 +316,8 @@ template ASCIIDigitsToField(maxLen) {
 
     index_eq_sum ==> success;
     // Guarantee at most one element of index_eq is equal to 1
+    log("about to print success");
+    log(success);
     success === 1;
 
     out <== accumulators[maxLen - 1];
