@@ -4,7 +4,10 @@
 //! This module defines all the gas parameters for transactions, along with their initial values
 //! in the genesis and a mapping between the Rust representation and the on-chain gas schedule.
 
-use crate::gas_schedule::VMGasParameters;
+use crate::{
+    gas_schedule::VMGasParameters,
+    ver::gas_feature_versions::{RELEASE_V1_11, RELEASE_V1_12},
+};
 use aptos_gas_algebra::{
     AbstractValueSize, Fee, FeePerByte, FeePerGasUnit, FeePerSlot, Gas, GasExpression,
     GasScalingFactor, GasUnit, NumModules, NumSlots,
@@ -120,12 +123,12 @@ crate::gas_schedule::macros::define_gas_parameters!(
         ],
         [
             storage_io_per_event_byte_write: InternalGasPerByte,
-            { 16.. => "storage_io_per_event_byte_write" },
+            { RELEASE_V1_11.. => "storage_io_per_event_byte_write" },
             89,
         ],
         [
             storage_io_per_transaction_byte_write: InternalGasPerByte,
-            { 16.. => "storage_io_per_transaction_byte_write" },
+            { RELEASE_V1_11.. => "storage_io_per_transaction_byte_write" },
             89,
         ],
         [memory_quota: AbstractValueSize, { 1.. => "memory_quota" }, 10_000_000],
@@ -233,7 +236,7 @@ crate::gas_schedule::macros::define_gas_parameters!(
         ],
         [
             keyless_base_cost: InternalGas,
-            { 17.. => "keyless.base" },
+            { RELEASE_V1_12.. => "keyless.base" },
             414_000_000,
         ]
     ]
