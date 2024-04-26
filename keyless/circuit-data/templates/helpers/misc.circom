@@ -149,10 +149,6 @@ template StringBodies(len) {
   for (var i = 1; i < len; i++) {
     out[i] <== AND()(quote_parity[i-1], quote_parity[i]);
   }
-
-  for (var i = 0; i < len; i++) {
-    log(i, out[i]);
-  }
 }
 
 
