@@ -316,8 +316,6 @@ template ASCIIDigitsToField(maxLen) {
 
     index_eq_sum ==> success;
     // Guarantee at most one element of index_eq is equal to 1
-    log("about to print success");
-    log(success);
     success === 1;
 
     out <== accumulators[maxLen - 1];
