@@ -44,6 +44,7 @@ once_cell = { workspace = true }
 passkey-types = { workspace = true }
 proptest = { workspace = true, optional = true }
 proptest-derive = { workspace = true, optional = true }
+quick_cache = { workspace = true }
 rand = { workspace = true }
 rayon = { workspace = true }
 ring = { workspace = true }

@@ -11,9 +11,7 @@ use crate::{
     },
 };
 use anyhow::bail;
-use aptos_crypto::{
-    poseidon_bn254, CryptoMaterialError, ValidCryptoMaterial,
-};
+use aptos_crypto::{poseidon_bn254, CryptoMaterialError, ValidCryptoMaterial};
 use aptos_crypto_derive::{BCSCryptoHash, CryptoHasher};
 use ark_bn254::Bn254;
 use ark_groth16::PreparedVerifyingKey;
@@ -166,8 +164,6 @@ impl KeylessSignature {
 pub struct Pepper(pub(crate) [u8; poseidon_bn254::keyless::BYTES_PACKED_PER_SCALAR]);
 
 impl Pepper {
-    // TODO(keyless) Account address uses Self::LENGTH instead of Self::NUM_BYTES. Consider
-    // renaming to be consistent?
     pub const NUM_BYTES: usize = poseidon_bn254::keyless::BYTES_PACKED_PER_SCALAR;
 
     pub fn new(bytes: [u8; Self::NUM_BYTES]) -> Self {

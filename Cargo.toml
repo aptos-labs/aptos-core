@@ -664,6 +664,7 @@ proptest-derive = "0.4.0"
 prost = { version = "0.12.3", features = ["no-recursion-limit"] }
 prost-types = "0.12.3"
 quanta = "0.10.1"
+quick_cache = "0.5.1"
 quote = "1.0.18"
 rand = "0.7.3"
 rand_core = "0.5.1"

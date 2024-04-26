@@ -4,7 +4,10 @@
 use crate::keyless::{
     bn254_circom::get_public_inputs_hash,
     circuit_testcases::*,
-    test_utils::{get_sample_groth16_sig_and_pk, get_sample_openid_sig_and_pk},
+    test_utils::{
+        get_sample_groth16_sig_and_pk, get_sample_groth16_sig_and_pk_no_extra_field,
+        get_sample_openid_sig_and_pk,
+    },
     Configuration, EphemeralCertificate, KeylessPublicKey, KeylessSignature,
     DEVNET_VERIFICATION_KEY,
 };
@@ -20,7 +23,10 @@ use std::ops::{AddAssign, Deref};
 #[ignore]
 fn test_keyless_groth16_sizes() {
     let (sig, pk) = get_sample_groth16_sig_and_pk();
-    print_keyless_sizes("Groth16 sizes", sig, pk)
+    print_keyless_sizes("Groth16 sizes", sig, pk, " (with family_name revealed)");
+
+    let (sig, pk) = get_sample_groth16_sig_and_pk_no_extra_field();
+    print_keyless_sizes("Groth16 sizes", sig, pk, " (without extra_field)");
 }
 
 /// Outputs:
@@ -31,18 +37,20 @@ fn test_keyless_groth16_sizes() {
 fn test_keyless_openid_sizes() {
     let (sig, pk) = get_sample_openid_sig_and_pk();
 
-    print_keyless_sizes("OpenID sizes", sig, pk)
+    print_keyless_sizes("OpenID sizes", sig, pk, "")
 }
 
-fn print_keyless_sizes(ty: &str, sig: KeylessSignature, pk: KeylessPublicKey) {
+fn print_keyless_sizes(ty: &str, sig: KeylessSignature, pk: KeylessPublicKey, details: &str) {
     println!("{}", ty);
     println!("--------------");
     println!(
-        "KeylessSignature BCS size: {} bytes",
+        "KeylessSignature BCS size{}: {} bytes",
+        details,
         bcs::to_bytes(&sig).unwrap().len()
     );
     println!(
-        "KeylessPublicKey BCS size: {} bytes",
+        "KeylessPublicKey BCS size{}: {} bytes",
+        details,
         bcs::to_bytes(&pk).unwrap().len()
     );
 }

@@ -69,10 +69,8 @@ pub fn hash_scalars(inputs: Vec<ark_bn254::Fr>) -> anyhow::Result<ark_bn254::Fr>
     Ok(result.into())
 }
 
-/// Given an string and `max_bytes`, it pads the byte array of the string with zeros up to size `max_bytes`,
+/// Given a string and `max_bytes`, it pads the byte array of the string with zeros up to size `max_bytes`,
 /// packs it to scalars, and returns the hash of the scalars.
-///
-/// This function calls `pad_and_pack_bytes_to_scalars_no_len` safely as strings will not contain the zero byte except to terminate.
 pub fn pad_and_hash_string(str: &str, max_bytes: usize) -> anyhow::Result<ark_bn254::Fr> {
     pad_and_hash_bytes_with_len(str.as_bytes(), max_bytes)
 }
@@ -83,7 +81,7 @@ pub fn pad_and_hash_string(str: &str, max_bytes: usize) -> anyhow::Result<ark_bn
 /// Note: The byte packing encodes the length of the bytes properly so as to avoid collisions when
 /// hashing, say, 0x00 versus 0x0000.
 ///
-/// WARNING: We do not expose this function to avoid unnecessary bugs, since for SNARK circuits we
+/// Note: We do not expose this function to avoid unnecessary bugs, since for SNARK circuits we
 /// always have to hash padded byte arrays. If necessary, an expert developer can indirectly call
 /// this via `pad_and_hash_bytes(bytes, bytes.len())`.
 #[allow(unused)]
@@ -96,9 +94,9 @@ fn hash_bytes(bytes: &[u8]) -> anyhow::Result<ark_bn254::Fr> {
 /// Then it packs padded `bytes` and returns the hash of the scalars via `hash_scalars`.
 ///
 /// This is used when we know that `bytes` will not terminate in 0's and may skip encoding the length, for
-/// example ASCII strings. Otherwise unexpected collisions can occur.
+/// example ASCII strings. Otherwise, unexpected collisions can occur.
 ///
-/// Due to risk of collisions due to improper use by the caller, it is not exposed.
+/// We do not expose this to minimize the risk of collisions due to improper use by the caller.
 #[allow(unused)]
 fn pad_and_hash_bytes_no_len(bytes: &[u8], max_bytes: usize) -> anyhow::Result<ark_bn254::Fr> {
     let scalars = pad_and_pack_bytes_to_scalars_no_len(bytes, max_bytes)?;
