@@ -138,9 +138,9 @@ where
             .expect("creating a new value should succeed")
             .current();
         let mut transactions: Vec<Transaction> = transaction_gens
-            .into_iter()
-            .map(|txn_gen| {
-                Transaction::UserTransaction(txn_gen.apply(&mut self.account_universe).0)
+            .into_iter().enumerate()
+            .map(|(i, txn_gen)| {
+                Transaction::UserTransaction(txn_gen.apply(&mut self.account_universe, i % 2).0)
             })
             .collect();
 

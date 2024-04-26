@@ -36,6 +36,7 @@ impl AUTransactionGen for SequenceNumberMismatchGen {
     fn apply(
         &self,
         universe: &mut AccountUniverse,
+        _w: usize,
     ) -> (SignedTransaction, (TransactionStatus, u64)) {
         let sender = universe.pick(self.sender).1;
 
@@ -75,6 +76,7 @@ impl AUTransactionGen for InsufficientBalanceGen {
     fn apply(
         &self,
         universe: &mut AccountUniverse,
+        _w: usize,
     ) -> (SignedTransaction, (TransactionStatus, u64)) {
         let sender = universe.pick(self.sender).1;
 
@@ -140,6 +142,7 @@ impl AUTransactionGen for InvalidAuthkeyGen {
     fn apply(
         &self,
         universe: &mut AccountUniverse,
+        _w: usize,
     ) -> (SignedTransaction, (TransactionStatus, u64)) {
         let sender = universe.pick(self.sender).1;
 

@@ -93,6 +93,7 @@ pub trait AUTransactionGen: fmt::Debug {
     fn apply(
         &self,
         universe: &mut AccountUniverse,
+        w: usize,
     ) -> (SignedTransaction, (TransactionStatus, u64));
 
     /// Creates an arced version of this transaction, suitable for dynamic dispatch.
@@ -108,8 +109,9 @@ impl AUTransactionGen for Arc<dyn AUTransactionGen> {
     fn apply(
         &self,
         universe: &mut AccountUniverse,
+        w: usize,
     ) -> (SignedTransaction, (TransactionStatus, u64)) {
-        (**self).apply(universe)
+        (**self).apply(universe, w)
     }
 }
 
@@ -342,7 +344,7 @@ pub fn run_and_assert_gas_cost_stability(
     let mut universe = universe.setup_gas_cost_stability(&mut executor);
     let (transactions, expected_values): (Vec<_>, Vec<_>) = transaction_gens
         .iter()
-        .map(|transaction_gen| transaction_gen.clone().apply(&mut universe))
+        .map(|transaction_gen| transaction_gen.clone().apply(&mut universe, 2))
         .unzip();
     let outputs = executor.execute_block(transactions).unwrap();
 
@@ -371,7 +373,7 @@ pub fn run_and_assert_universe(
     let mut universe = universe.setup(&mut executor);
     let (transactions, expected_values): (Vec<_>, Vec<_>) = transaction_gens
         .iter()
-        .map(|transaction_gen| transaction_gen.clone().apply(&mut universe))
+        .map(|transaction_gen| transaction_gen.clone().apply(&mut universe, 2))
         .unzip();
     let outputs = executor.execute_block(transactions).unwrap();
 

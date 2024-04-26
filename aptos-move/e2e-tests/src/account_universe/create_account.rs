@@ -37,6 +37,7 @@ impl AUTransactionGen for CreateAccountGen {
     fn apply(
         &self,
         universe: &mut AccountUniverse,
+        _w: usize,
     ) -> (SignedTransaction, (TransactionStatus, u64)) {
         let sender = universe.pick(self.sender).1;
 
@@ -82,12 +83,13 @@ impl AUTransactionGen for CreateExistingAccountGen {
     fn apply(
         &self,
         universe: &mut AccountUniverse,
+        w: usize,
     ) -> (SignedTransaction, (TransactionStatus, u64)) {
         let AccountPair {
             account_1: sender,
             account_2: receiver,
             ..
-        } = self.sender_receiver.pick(universe);
+        } = self.sender_receiver.pick(universe, w);
 
         let txn = create_account_txn(sender.account(), receiver.account(), sender.sequence_number);
 

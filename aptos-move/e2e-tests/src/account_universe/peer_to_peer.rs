@@ -34,12 +34,13 @@ impl AUTransactionGen for P2PTransferGen {
     fn apply(
         &self,
         universe: &mut AccountUniverse,
+        w: usize,
     ) -> (SignedTransaction, (TransactionStatus, u64)) {
         let AccountPair {
             account_1: sender,
             account_2: receiver,
             ..
-        } = self.sender_receiver.pick(universe);
+        } = self.sender_receiver.pick(universe, w);
 
         let txn = peer_to_peer_txn(
             sender.account(),

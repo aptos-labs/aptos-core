@@ -31,7 +31,7 @@ proptest! {
 
         for pair in pairs {
             let (idx_1, idx_2, account_1, account_2) = {
-                let pick = pair.pick(&mut universe);
+                let pick = pair.pick(&mut universe, 2);
                 (
                     pick.idx_1,
                     pick.idx_2,

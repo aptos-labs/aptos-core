@@ -204,9 +204,21 @@ impl AccountPicker {
         }
     }
 
-    fn pick_pair(&mut self, indexes: &[Index; 2]) -> [usize; 2] {
+    fn pick_pair(&mut self, indexes: &[Index; 2],  w: usize) -> [usize; 2] {
         match self {
-            AccountPicker::Unlimited(num_accounts) => Self::pick_pair_impl(*num_accounts, indexes),
+            AccountPicker::Unlimited(num_accounts) => {  
+                if w < 2 {
+                    let half_accounts = (*num_accounts) / 2;
+                    let temp = Self::pick_pair_impl(half_accounts, indexes);
+                    if w == 0 {
+                        temp
+                    } else {
+                        [temp[0]+half_accounts,temp[1]+half_accounts]
+                    }
+                } else {
+                    Self::pick_pair_impl(*num_accounts, indexes)
+                }
+            },
             AccountPicker::Limited(remaining) => {
                 let [remaining_idx_1, remaining_idx_2] =
                     Self::pick_pair_impl(remaining.len(), indexes);
@@ -249,8 +261,8 @@ impl AccountPicker {
 impl AccountPairGen {
     /// Picks two accounts uniformly randomly from this universe and returns mutable references to
     /// them.
-    pub fn pick<'a>(&self, universe: &'a mut AccountUniverse) -> AccountPair<'a> {
-        let [low_idx, high_idx] = universe.picker.pick_pair(&self.pair);
+    pub fn pick<'a>(&self, universe: &'a mut AccountUniverse,  w: usize) -> AccountPair<'a> {
+        let [low_idx, high_idx] = universe.picker.pick_pair(&self.pair, w);
         // Need to use `split_at_mut` because you can't have multiple mutable references to items
         // from a single slice at any given time.
         let (head, tail) = universe.accounts.split_at_mut(low_idx + 1);
