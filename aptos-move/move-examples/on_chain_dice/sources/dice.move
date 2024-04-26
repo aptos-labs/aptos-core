@@ -2,7 +2,7 @@ module module_owner::dice {
     use std::signer::address_of;
     use aptos_framework::randomness;
 
-    struct DiceRollResult has key {
+    struct DiceRollResult has drop, key {
         roll: u64,
     }
 
