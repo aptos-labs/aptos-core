@@ -126,7 +126,7 @@ impl<'a, S: 'a + StateView + Sync> ExecutorTask for AptosExecutorTask<'a, S> {
                 }
             },
         };
-        spin_wait(1000);
+        //spin_wait(10000);
         res
     }
 
@@ -134,7 +134,7 @@ impl<'a, S: 'a + StateView + Sync> ExecutorTask for AptosExecutorTask<'a, S> {
         if txn.is_valid() {
             if let Transaction::GenesisTransaction(WriteSetPayload::Direct(_)) = txn.expect_valid()
             {
-                // WriteSetPayload::Direct cannot be handled in mode where delayed_field_optimization or
+                // WriteSetPayload::Direct  cannot be handled in mode where delayed_field_optimization or
                 // resource_groups_split_in_change_set is enabled.
                 return false;
             }
