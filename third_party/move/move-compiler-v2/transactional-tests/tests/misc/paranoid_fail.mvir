@@ -1,9 +1,10 @@
-//# publish
+//# publish --print-bytecode
 module 0x42.M {
     public guess_flips(Arg0: vector<u8>) {
         let loc0: &vector<u8>;
         let loc1: u64;
         let tmp1: u8;
+        let tmp2: &u8;
     label B0:
         loc0 = &Arg0;
         loc1 = 0u64;
@@ -12,12 +13,13 @@ module 0x42.M {
     label B2:
         jump B3;
     label B3:
-        tmp1 = *vec_imm_borrow<u8>(copy(loc0), copy(loc1));
+        tmp2 = vec_imm_borrow<u8>(copy(loc0), copy(loc1));
+        tmp1 = *copy(tmp2);
         jump_if_false (copy(tmp1) != 0u8) B5;
     label B4:
         _ = move(loc0);
         jump B6;
-    label B5:        
+    label B5:
         loc1 = move(loc1) + 1u64;
         jump B1;
     label B6:
@@ -25,13 +27,14 @@ module 0x42.M {
         _ = move(Arg0);
         return;
     }
-}
 
-//# run
-import 0x1.M;
-
-main() {
+    public test_guess_with_inline_break() {
+        let loc0: vector<u8>;
     label L0:
-        M.guess_flips(vec_pack_5<u8>(4, 0, 0, 0, 0));
+        loc0 = vec_pack_5<u8>(4u8, 0u8, 0u8, 0u8, 0u8);
+        Self.guess_flips(move(loc0));
         return;
+    }
 }
+
+//# run 0x42::M::test_guess_with_inline_break
