@@ -703,7 +703,6 @@ impl AptosDB {
             latest_version,
             &batch,
         )?;
-        println!("Reverted write set");
 
         // Revert the state kv and ledger metadata
         self.state_store

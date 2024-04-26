@@ -331,6 +331,7 @@ fn test_revert_nth_commit() {
             in_memory_state.clone(),
         )
         .unwrap();
+
         committed_blocks.insert(blockheight, Commit {
             hash: ledger_info_with_sigs.commit_info().executed_state_id(),
             info: ledger_info_with_sigs.clone(),
