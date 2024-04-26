@@ -47,6 +47,7 @@ async fn e2e_basic_consumption() {
     info!("Rolling the dice.");
     let account = cli.account_id(0).to_hex_literal();
     let roll_func_id = MemberId::from_str(&format!("{}::dice::roll", account)).unwrap();
+    let mut dice_roll_history = vec![];
     for _ in 0..10 {
         let gas_options = GasOptions {
             gas_unit_price: Some(1),
@@ -58,25 +59,26 @@ async fn e2e_basic_consumption() {
             .await
             .unwrap();
         info!("Roll txn summary: {:?}", txn_summary);
+
+        let dice_roll_result = rest_client
+            .get_account_resource_bcs::<DiceRollResult>(
+                root_address,
+                format!("{}::dice::DiceRollResult", account).as_str(),
+            )
+            .await
+            .unwrap()
+            .into_inner();
+        dice_roll_history.push(dice_roll_result.roll);
     }
 
-    info!("Collecting roll history.");
-    let dice_roll_history = rest_client
-        .get_account_resource_bcs::<DiceRollHistory>(
-            root_address,
-            format!("{}::dice::DiceRollHistory", account).as_str(),
-        )
-        .await
-        .unwrap()
-        .into_inner();
 
-    info!("Roll history: {:?}", dice_roll_history.rolls);
+    info!("Roll history: {:?}", dice_roll_history);
     assert!(false);
 }
 
 #[derive(Deserialize, Serialize)]
-struct DiceRollHistory {
-    rolls: Vec<u64>,
+struct DiceRollResult {
+    roll: u64,
 }
 
 async fn publish_on_chain_dice_module(cli: &mut CliTestFramework, publisher_account_idx: usize) {
