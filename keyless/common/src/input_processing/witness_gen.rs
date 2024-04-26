@@ -4,8 +4,7 @@
 // Copyright © Aptos Foundation
 
 use anyhow::{anyhow, bail, Result};
-use std::fs;
-use std::process::{Command, Output};
+use std::{fs, process::Command};
 use tempfile::NamedTempFile;
 use tracing::info_span;
 
@@ -29,8 +28,12 @@ pub fn witness_gen(
     let input_file = NamedTempFile::new()?;
     let witness_file = NamedTempFile::new()?;
     fs::write(input_file.path(), body.as_bytes())?;
-    let mut cmd =
-        get_witness_command(witness_gen_js_path, witness_gen_wasm_path, input_file.path_str()?, witness_file.path_str()?);
+    let mut cmd = get_witness_command(
+        witness_gen_js_path,
+        witness_gen_wasm_path,
+        input_file.path_str()?,
+        witness_file.path_str()?,
+    );
     let output = cmd.output()?;
     // Check if the command executed successfully
     if output.status.success() {
@@ -45,7 +48,7 @@ pub fn witness_gen(
         // Print the error message if the command failed
         let stderr = String::from_utf8_lossy(&output.stderr);
         let stdout = String::from_utf8_lossy(&output.stdout);
-        bail!("Command failed:\n{}\n{}", stdout, stderr);
+        bail!("Command failed:\n{}\n{}", stdout, stderr)
     }
 }
 

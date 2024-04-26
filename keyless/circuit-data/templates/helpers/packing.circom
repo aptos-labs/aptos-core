@@ -1,5 +1,7 @@
 pragma circom 2.1.3;
 
+include "helpers/arrays.circom";
+
 // Based on `Num2Bits` in circomlib
 template Num2BitsBE(n) {
     signal input in;
@@ -67,6 +69,7 @@ template ASCIIDecimalsToFieldElem(inputLen) {
 }
 
 // Converts bit array 'in' into an array of field elements of size `bitsPerFieldElem` each
+// Example: with inputLen=11, bitsPerFieldElem=4, [0,0,0,0, 0,0,0,1, 0,1,1,] ==> [0, 1, 6]
 template BitsToFieldElems(inputLen, bitsPerFieldElem) {
     signal input in[inputLen];
     var num_elems = inputLen%bitsPerFieldElem == 0 ? inputLen \ bitsPerFieldElem : (inputLen\bitsPerFieldElem) + 1; // '\' is the quotient operation - we add 1 if there are extra bits past the full bytes

@@ -14,9 +14,15 @@ rust-version = { workspace = true }
 
 [dependencies]
 anyhow = { workspace = true }
-base64 = { workspace = true }
+aptos-types.workspace = true
 ark-bn254 = { workspace = true }
+ark-ff.workspace = true
+base64 = { workspace = true }
+hex.workspace = true
+num-bigint.workspace = true
+num-modular = "0.6.1"
 serde = { workspace = true }
 serde_json = { workspace = true }
-tracing = { workspace = true }
 tempfile = { workspace = true }
+thiserror.workspace = true
+tracing = { workspace = true }

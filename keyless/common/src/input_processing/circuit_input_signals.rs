@@ -19,8 +19,11 @@ pub enum CircuitInputSignal {
 }
 
 pub struct Unpadded;
+
+#[derive(Debug)]
 pub struct Padded;
 
+#[derive(Debug)]
 pub struct CircuitInputSignals<T> {
     signals: BTreeMap<String, CircuitInputSignal>,
     t: PhantomData<T>,
@@ -54,6 +57,11 @@ impl CircuitInputSignals<Unpadded> {
             CircuitInputSignal::U64(signal_value as u64),
         );
         self
+    }
+
+    pub fn bits_input(self, signal_name: &str, signal_value: &[bool]) -> Self {
+        let bytes: Vec<u8> = signal_value.iter().map(|&val| val as u8).collect();
+        self.bytes_input(signal_name, bytes.as_slice())
     }
 
     pub fn str_input(mut self, signal_name: &str, signal_value: &str) -> Self {
@@ -100,6 +108,14 @@ impl CircuitInputSignals<Unpadded> {
         self.signals.insert(
             String::from(signal_name),
             CircuitInputSignal::Fr(signal_value),
+        );
+        self
+    }
+
+    pub fn bools_input(mut self, signal_name: &str, signal_value: &[bool]) -> Self {
+        self.signals.insert(
+            String::from(signal_name),
+            CircuitInputSignal::Bytes(signal_value.iter().map(|b| *b as u8).collect::<Vec<u8>>()),
         );
         self
     }
@@ -157,19 +173,24 @@ fn pad_if_needed(
         CircuitInputSignal::U64(x) => CircuitInputSignal::U64(x),
         CircuitInputSignal::Fr(x) => CircuitInputSignal::Fr(x),
         CircuitInputSignal::Frs(x) => CircuitInputSignal::Frs(x),
-        CircuitInputSignal::Limbs(x) => CircuitInputSignal::Limbs(x),
+        CircuitInputSignal::Limbs(mut x) => {
+            let zeros_needed = global_input_max_lengths.get(k).copied().unwrap_or(x.len()) - x.len();
+            x.extend(vec![0; zeros_needed]);
+            CircuitInputSignal::Limbs(x)
+        },
 
         CircuitInputSignal::Bytes(b) => {
             CircuitInputSignal::Bytes(pad_bytes(&b, global_input_max_lengths[k])?)
-        }
+        },
     })
 }
 
 fn pad_bytes(unpadded_bytes: &[u8], max_size: usize) -> Result<Vec<u8>, anyhow::Error> {
     let mut bytes = Vec::from(unpadded_bytes);
 
-    println!("{:?}", bytes);
-    println!("{:?}", max_size);
+    println!("size: {}", bytes.len());
+    println!("max size: {}", max_size);
+    println!("{:?}", String::from_utf8_lossy(&bytes));
 
     if max_size < bytes.len() {
         Err(anyhow!("max_size exceeded"))

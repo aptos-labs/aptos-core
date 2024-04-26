@@ -14,11 +14,26 @@ rust-version = { workspace = true }
 
 [dependencies]
 anyhow = { workspace = true }
-aptos-crypto.workspace = true
+aptos-crypto = { workspace = true }
 aptos-keyless-common = { workspace = true }
-ark-bn254.workspace = true
-ark-ff.workspace = true
+aptos-types = { workspace = true }
+ark-bn254 = { workspace = true }
+ark-ff = { workspace = true }
 base64 = { workspace = true }
-itertools.workspace = true
+futures = { workspace = true }
+itertools = { workspace = true }
+num-traits = { workspace = true }
+rand = { workspace = true }
 serde_json = { workspace = true }
+sha2 = { workspace = true }
 tempfile = { workspace = true }
+aptos-logger = { workspace = true }
+
+
+[dev-dependencies]
+num-bigint = { workspace = true }
+rsa = { version = "0.9.6", features = ["sha2"] }
+num-modular = { version = "0.6.1", features = ["num-bigint", "num-integer", "num-traits", "std"] }
+rand_chacha = "0.3.1"
+tokio = { workspace = true }
+hex = { workspace = true }
