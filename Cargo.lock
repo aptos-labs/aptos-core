@@ -1561,6 +1561,30 @@ dependencies = [
 ]
 
 [[package]]
+name = "aptos-experimental-airdrop"
+version = "0.0.0"
+dependencies = [
+ "anyhow",
+ "aptos-config",
+ "aptos-crypto",
+ "aptos-global-constants",
+ "aptos-logger",
+ "aptos-sdk",
+ "aptos-transaction-emitter-lib",
+ "aptos-transaction-generator-lib",
+ "bcs 0.1.4",
+ "chrono",
+ "clap 4.4.14",
+ "futures",
+ "itertools 0.12.1",
+ "rand 0.7.3",
+ "reqwest",
+ "serde",
+ "serde_json",
+ "tokio",
+]
+
+[[package]]
 name = "aptos-experimental-ptx-executor"
 version = "0.1.0"
 dependencies = [
