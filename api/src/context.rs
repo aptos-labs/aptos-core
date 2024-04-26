@@ -37,8 +37,7 @@ use aptos_types::{
     ledger_info::LedgerInfoWithSignatures,
     on_chain_config::{GasSchedule, GasScheduleV2, OnChainConfig, OnChainExecutionConfig},
     state_store::{
-        state_key::{StateKey, StateKeyInner},
-        state_key_prefix::StateKeyPrefix,
+        state_key::{inner::StateKeyInner, prefix::StateKeyPrefix, StateKey},
         state_value::StateValue,
         TStateView,
     },

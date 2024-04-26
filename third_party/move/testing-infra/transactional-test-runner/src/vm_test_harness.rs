@@ -37,6 +37,7 @@ use move_stdlib::move_stdlib_named_addresses;
 use move_symbol_pool::Symbol;
 use move_vm_runtime::{
     config::VMConfig,
+    module_traversal::*,
     move_vm::MoveVM,
     session::{SerializedReturnValues, Session},
 };
@@ -277,9 +278,18 @@ impl<'a> MoveTestAdapter<'a> for SimpleVMTestAdapter<'a> {
             .chain(args)
             .collect();
         let verbose = extra_args.verbose;
+        let traversal_storage = TraversalStorage::new();
         self.perform_session_action(
             gas_budget,
-            |session, gas_status| session.execute_script(script_bytes, type_args, args, gas_status),
+            |session, gas_status| {
+                session.execute_script(
+                    script_bytes,
+                    type_args,
+                    args,
+                    gas_status,
+                    &mut TraversalContext::new(&traversal_storage),
+                )
+            },
             VMConfig::from(extra_args),
         )
         .map_err(|vm_error| {
@@ -320,12 +330,19 @@ impl<'a> MoveTestAdapter<'a> for SimpleVMTestAdapter<'a> {
             .chain(args)
             .collect();
         let verbose = extra_args.verbose;
+        let traversal_storage = TraversalStorage::new();
+
         let serialized_return_values = self
             .perform_session_action(
                 gas_budget,
                 |session, gas_status| {
                     session.execute_function_bypass_visibility(
-                        module, function, type_args, args, gas_status,
+                        module,
+                        function,
+                        type_args,
+                        args,
+                        gas_status,
+                        &mut TraversalContext::new(&traversal_storage),
                     )
                 },
                 VMConfig::from(extra_args),

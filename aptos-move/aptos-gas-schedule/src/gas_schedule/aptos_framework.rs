@@ -241,6 +241,13 @@ crate::gas_schedule::macros::define_gas_parameters!(
         [type_info_type_name_per_byte_in_str: InternalGasPerByte, "type_info.type_name.per_abstract_memory_unit", 18],
         [type_info_chain_id_base: InternalGas, { 4.. => "type_info.chain_id.base" }, 551],
 
+        // TODO(Gas): Fix my cost
+        [function_info_check_is_identifier_base: InternalGas, { 17.. => "function_info.is_identifier.base" }, 551],
+        [function_info_check_is_identifier_per_byte: InternalGasPerByte, { 17.. => "function_info.is_identifier.per_byte" }, 3],
+        [function_info_check_dispatch_type_compatibility_impl_base: InternalGas, { 17.. => "function_info.check_dispatch_type_compatibility_impl.base" }, 1002],
+        [function_info_load_function_base: InternalGas, { 17.. => "function_info.load_function.base" }, 551],
+        [dispatchable_fungible_asset_dispatch_base: InternalGas, { 17.. => "dispatchable_fungible_asset.dispatch.base" }, 551],
+
         // Reusing SHA2-512's cost from Ristretto
         [hash_sha2_512_base: InternalGas, { 4.. => "hash.sha2_512.base" }, 11910],  // 3_240 * 20
         [hash_sha2_512_per_byte: InternalGasPerByte, { 4.. => "hash.sha2_512.per_byte" }, 220], // 60 * 20

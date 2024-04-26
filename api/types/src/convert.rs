@@ -24,7 +24,7 @@ use aptos_types::{
     chain_id::ChainId,
     contract_event::{ContractEvent, EventWithVersion},
     state_store::{
-        state_key::{StateKey, StateKeyInner},
+        state_key::{inner::StateKeyInner, StateKey},
         table::{TableHandle, TableInfo},
     },
     transaction::{

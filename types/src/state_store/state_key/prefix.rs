@@ -1,7 +1,7 @@
 // Copyright © Aptos Foundation
 // SPDX-License-Identifier: Apache-2.0
 
-use crate::state_store::state_key::{StateKey, StateKeyTag};
+use crate::state_store::state_key::{inner::StateKeyTag, StateKey};
 use move_core_types::account_address::AccountAddress;
 
 // Struct for defining prefix of a state key, which can be used for finding all the values with a
@@ -46,10 +46,7 @@ impl From<AccountAddress> for StateKeyPrefix {
 mod tests {
     use crate::{
         account_config::{AccountResource, CoinStoreResource},
-        state_store::{
-            state_key::{StateKey, StateKeyTag},
-            state_key_prefix::StateKeyPrefix,
-        },
+        state_store::state_key::{inner::StateKeyTag, prefix::StateKeyPrefix, StateKey},
     };
     use move_core_types::account_address::AccountAddress;
 
