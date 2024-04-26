@@ -183,6 +183,7 @@ impl OnChainRandomnessConfig {
     }
 
     pub fn fast_path_secrecy_threshold(&self) -> Option<U64F64> {
+        println!("hi");
         match self {
             OnChainRandomnessConfig::Off => None,
             OnChainRandomnessConfig::V1(_) => None,
