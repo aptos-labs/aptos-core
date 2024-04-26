@@ -50,7 +50,7 @@ async fn e2e_basic_consumption() {
     for _ in 0..10 {
         let gas_options = GasOptions {
             gas_unit_price: Some(1),
-            max_gas: Some(10_000), // should match the default required gas deposit.
+            max_gas: Some(1_000_000),
             expiration_secs: 60,
         };
         let txn_summary = cli
