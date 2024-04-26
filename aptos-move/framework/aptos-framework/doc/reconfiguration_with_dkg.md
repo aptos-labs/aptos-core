@@ -22,8 +22,10 @@ Reconfiguration with DKG helper functions.
 <b>use</b> <a href="gas_schedule.md#0x1_gas_schedule">0x1::gas_schedule</a>;
 <b>use</b> <a href="jwk_consensus_config.md#0x1_jwk_consensus_config">0x1::jwk_consensus_config</a>;
 <b>use</b> <a href="jwks.md#0x1_jwks">0x1::jwks</a>;
+<b>use</b> <a href="keyless_account.md#0x1_keyless_account">0x1::keyless_account</a>;
 <b>use</b> <a href="../../aptos-stdlib/../move-stdlib/doc/option.md#0x1_option">0x1::option</a>;
 <b>use</b> <a href="randomness_config.md#0x1_randomness_config">0x1::randomness_config</a>;
+<b>use</b> <a href="randomness_config_seqnum.md#0x1_randomness_config_seqnum">0x1::randomness_config_seqnum</a>;
 <b>use</b> <a href="reconfiguration.md#0x1_reconfiguration">0x1::reconfiguration</a>;
 <b>use</b> <a href="reconfiguration_state.md#0x1_reconfiguration_state">0x1::reconfiguration_state</a>;
 <b>use</b> <a href="stake.md#0x1_stake">0x1::stake</a>;
@@ -100,7 +102,9 @@ Run the default reconfiguration to enter the new epoch.
     std::version::on_new_epoch();
     <a href="jwk_consensus_config.md#0x1_jwk_consensus_config_on_new_epoch">jwk_consensus_config::on_new_epoch</a>();
     <a href="jwks.md#0x1_jwks_on_new_epoch">jwks::on_new_epoch</a>();
+    <a href="randomness_config_seqnum.md#0x1_randomness_config_seqnum_on_new_epoch">randomness_config_seqnum::on_new_epoch</a>();
     <a href="randomness_config.md#0x1_randomness_config_on_new_epoch">randomness_config::on_new_epoch</a>();
+    <a href="keyless_account.md#0x1_keyless_account_on_new_epoch">keyless_account::on_new_epoch</a>(<a href="account.md#0x1_account">account</a>);
     <a href="../../aptos-stdlib/../move-stdlib/doc/features.md#0x1_features_on_new_epoch">features::on_new_epoch</a>(<a href="account.md#0x1_account">account</a>);
     <a href="reconfiguration.md#0x1_reconfiguration_reconfigure">reconfiguration::reconfigure</a>();
 }
