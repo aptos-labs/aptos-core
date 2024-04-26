@@ -250,6 +250,7 @@ impl OnChainConfig for RandomnessConfigMoveStruct {
 
 impl AsMoveValue for RandomnessConfigMoveStruct {
     fn as_move_value(&self) -> MoveValue {
+        println!("hi");
         MoveValue::Struct(MoveStruct::Runtime(vec![self.variant.as_move_value()]))
     }
 }
