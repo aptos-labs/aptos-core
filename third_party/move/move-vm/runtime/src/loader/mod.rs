@@ -2234,10 +2234,19 @@ impl Loader {
             .write()
             .depth_formula
             .insert(name.clone(), formula.clone());
-        if prev.is_some() {
+        // TODO: remove this error or ensure we lock correctly.
+        if let Some(f) = prev {
+            // Should not be an error! Can we alert?
             return Err(
-                PartialVMError::new(StatusCode::UNKNOWN_INVARIANT_VIOLATION_ERROR)
-                    .with_message("Recursive type?".to_owned()),
+                PartialVMError::new(StatusCode::UNKNOWN_INVARIANT_VIOLATION_ERROR).with_message(
+                    format!(
+                        "Depth formula for struct '{}' and formula {:?} (struct type: {:?}) is already cached: {:?}",
+                        name,
+                        formula,
+                        struct_type.as_ref(),
+                        f
+                    ),
+                ),
             );
         }
         Ok(formula)
