@@ -19,7 +19,6 @@ use aptos_types::{
     state_proof::StateProof,
     state_store::{
         state_key::StateKey,
-        state_key_prefix::StateKeyPrefix,
         state_storage_usage::StateStorageUsage,
         state_value::{StateValue, StateValueChunkWithProof},
         table::{TableHandle, TableInfo},
@@ -50,6 +49,7 @@ pub mod state_view;
 use crate::state_delta::StateDelta;
 use aptos_scratchpad::SparseMerkleTree;
 pub use aptos_types::block_info::BlockHeight;
+use aptos_types::state_store::state_key::prefix::StateKeyPrefix;
 pub use errors::AptosDbError;
 pub use executed_trees::ExecutedTrees;
 

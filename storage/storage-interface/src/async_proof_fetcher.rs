@@ -160,7 +160,7 @@ impl AsyncProofFetcher {
 mod tests {
     use super::*;
     use crate::mock::MockDbReaderWriter;
-    use aptos_types::state_store::state_key::StateKeyInner;
+    use aptos_types::state_store::state_key::inner::StateKeyInner;
     use assert_unordered::assert_eq_unordered;
 
     #[test]
