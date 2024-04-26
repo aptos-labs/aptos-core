@@ -9,12 +9,11 @@ include "../node_modules/circomlib/circuits/bitify.circom";
 
 // Checks the given jwt key value pair has a colon in between the name and value, a comma or endbrace at the end, and only whitespace in between the name and colon, colon and value, and value and end character. Returns the name and value fields 
 // We did this instead of a polynomial concatenation check to avoid having to implement a multi-variable concatenation check
-template ParseJWTFieldWithQuotedValue(maxKVPairLen, maxNameLen, maxValueLen, maxJWTPayloadLen) {
+template ParseJWTFieldWithQuotedValue(maxKVPairLen, maxNameLen, maxValueLen) {
     signal input field[maxKVPairLen]; // ASCII
     signal input name[maxNameLen];
     signal input value[maxValueLen];
-    signal input field_index;
-    signal input string_bodies[maxJWTPayloadLen];
+    signal input field_string_bodies[maxKVPairLen];
     signal input field_len; // ASCII
     signal input name_len;
     signal input value_index; // index of value within `field`
@@ -66,8 +65,10 @@ template ParseJWTFieldWithQuotedValue(maxKVPairLen, maxNameLen, maxValueLen, max
 
     for (var i = 0; i < maxKVPairLen; i++) {
         (whitespace_selector_one[i] + whitespace_selector_two[i] + whitespace_selector_three[i]) * (1 - is_whitespace[i]) === 0;
-        (name_selector[i] + value_selector[i]) * (1 - string_bodies[i]) === 0;
-        (1 - (name_selector[i] + value_selector[i])) * string_bodies[i] === 0;
+        
+        // Check that only the name and value parts of the field are inside string bodies, and nothing else is
+        (name_selector[i] + value_selector[i]) * (1 - field_string_bodies[i]) === 0;
+        (1 - (name_selector[i] + value_selector[i])) * field_string_bodies[i] === 0;
     }
 
 
