@@ -1,3 +1,5 @@
+/// Configurations for randomness V0 API.
+/// The default
 module aptos_framework::randomness_api_v0_config {
     use std::option::Option;
     use aptos_framework::chain_status;

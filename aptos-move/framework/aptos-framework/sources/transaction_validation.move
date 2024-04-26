@@ -5,7 +5,9 @@ module aptos_framework::transaction_validation {
     use std::option;
     use std::option::Option;
     use std::signer;
+    use std::string::utf8;
     use std::vector;
+    use aptos_std::debug;
 
     use aptos_framework::account;
     use aptos_framework::aptos_coin::AptosCoin;
@@ -361,13 +363,15 @@ module aptos_framework::transaction_validation {
         txn_max_gas_units: u64,
         gas_units_remaining: u64
     ) {
+        debug::print(&utf8(b"0425 - 0"));
         assert!(txn_max_gas_units >= gas_units_remaining, error::invalid_argument(EOUT_OF_GAS));
         let gas_used = txn_max_gas_units - gas_units_remaining;
-
+        debug::print(&utf8(b"0425 - 1"));
         assert!(
             (txn_gas_price as u128) * (gas_used as u128) <= MAX_U64,
             error::out_of_range(EOUT_OF_GAS)
         );
+        debug::print(&utf8(b"0425 - 2"));
         let transaction_fee_amount = txn_gas_price * gas_used;
         // it's important to maintain the error code consistent with vm
         // to do failed transaction cleanup.
