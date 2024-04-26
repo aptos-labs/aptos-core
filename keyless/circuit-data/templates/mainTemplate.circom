@@ -249,7 +249,7 @@ template identity(
 
     ParseJWTFieldWithUnquotedValue(maxIatKVPairLen, maxIatNameLen, maxIatValueLen)(iat_field, iat_name, iat_value, iat_field_len, iat_name_len, iat_value_index, iat_value_len, iat_colon_index);
 
-    // Check that ef is not inside a string body
+    // Check that iat is not inside a string body
     signal iat_start_char <== SelectArrayValue(max_ascii_jwt_payload_len)(string_bodies, iat_index);
     iat_start_char === 0;
 
@@ -300,7 +300,7 @@ template identity(
     // Check nonce is correct
     signal nonce_field_elem <== ASCIIDigitsToField(maxNonceValueLen)(nonce_value, nonce_value_len);
     
-    //nonce_field_elem === computed_nonce;
+    nonce_field_elem === computed_nonce;
 
     // Compute the address seed
     signal input pepper;
