@@ -2235,10 +2235,7 @@ impl Loader {
             .depth_formula
             .insert(name.clone(), formula.clone());
         if prev.is_some() {
-            return Err(
-                PartialVMError::new(StatusCode::UNKNOWN_INVARIANT_VIOLATION_ERROR)
-                    .with_message("Recursive type?".to_owned()),
-            );
+            panic!("Type for struct {:?} was already in cache", name.clone())
         }
         Ok(formula)
     }
