@@ -2,6 +2,7 @@
 // SPDX-License-Identifier: Apache-2.0
 
 use crate::TestCircuitHandle;
+use crate::misc::calc_string_bodies;
 use aptos_keyless_common::input_processing::{
     circuit_input_signals::{CircuitInputSignals, Padded}, config::CircuitPaddingConfig,
 };
@@ -154,6 +155,8 @@ fn prepare_jwt_field_check_test_str<T: JWTFieldIndices + JWTFieldStr>(field: T) 
         .str_input("name", &field.name())
         .str_input("value", &field.value())
         .usize_input("field_len", field.whole_field_len())
+        .usize_input("field_index", 0)
+        .bools_input("string_bodies", &calc_string_bodies(field.whole_field()))
         .usize_input("name_len", field.name_len())
         .usize_input("value_index", field.value_index())
         .usize_input("value_len", field.value_len())
