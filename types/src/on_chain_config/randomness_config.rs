@@ -153,6 +153,7 @@ impl OnChainRandomnessConfig {
     pub fn randomness_enabled(&self) -> bool {
         println!("hiii");
         println!("hiii");
+        println!("hiii");
         match self {
             OnChainRandomnessConfig::Off => false,
             OnChainRandomnessConfig::V1(_) => true,
