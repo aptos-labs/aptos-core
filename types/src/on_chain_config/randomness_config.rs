@@ -159,6 +159,7 @@ impl OnChainRandomnessConfig {
     }
 
     pub fn fast_randomness_enabled(&self) -> bool {
+        println!("foo");
         match self {
             OnChainRandomnessConfig::Off => false,
             OnChainRandomnessConfig::V1(_) => false,
