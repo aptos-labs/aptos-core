@@ -136,7 +136,6 @@ template identity(
     signal aud_value_len;
     aud_value_len <== (override_aud_value_len-private_aud_value_len) * s + private_aud_value_len;
 
-    log("aud");
     ParseJWTFieldWithQuotedValue(maxAudKVPairLen, maxAudNameLen, maxAudValueLen)(aud_field, aud_name, aud_value, aud_field_string_bodies, aud_field_len, aud_name_len, aud_value_index, aud_value_len, aud_colon_index);
 
     // Check aud name is correct
@@ -161,7 +160,6 @@ template identity(
     signal input uid_name[maxUIDNameLen];
     signal input uid_value[maxUIDValueLen];
 
-    log("uid");
     ParseJWTFieldWithQuotedValue(maxUIDKVPairLen, maxUIDNameLen, maxUIDValueLen)(uid_field, uid_name, uid_value, uid_field_string_bodies, uid_field_len, uid_name_len, uid_value_index, uid_value_len, uid_colon_index);
 
     // Check extra field is in the JWT
