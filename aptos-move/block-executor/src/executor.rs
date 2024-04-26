@@ -60,11 +60,9 @@ use std::{
     collections::{BTreeMap, HashMap, HashSet},
     marker::{PhantomData, Sync},
     sync::{
-        atomic::{AtomicBool, AtomicU32, Ordering},
-        Arc,Once,Mutex
+        atomic::{AtomicBool, AtomicU32, AtomicUsize, Ordering}, Arc, Mutex, Once
     },
 };
-use rayon::ThreadPoolBuilder;
 
 
 pub struct BlockExecutor<T, E, S, L, X> {
@@ -939,9 +937,26 @@ where
         let executor_vec: ExplicitSyncWrapper<Vec<Option<E>>> = ExplicitSyncWrapper::new((0..self.garage.num_total_threads()).map(|_| None).collect());
 
 
-        let once_vec: Vec<Arc<Once>> = (0..self.garage.num_total_threads()).map(|_| Arc::new(Once::new())).collect();
+        let num_spawned = self.garage.num_total_threads();
+
+        let cur_index = AtomicUsize::new(0);
+
+        self.garage.spawn_n(|_| -> ReturnType {
+            loop {
+               let index = cur_index.fetch_add(1, Ordering::Relaxed);
+               if index >= num_spawned {
+                   break ReturnType::new(Option::<Baton<()>>::None);
+               } 
+               let temp = executor_vec.dereference_mut();
+                
+               if temp[index].is_none() {
+                   temp[index] = Some(E::init(executor_initial_arguments));
+               }
+            }
+        });
 
         {
+            let executor_vec = executor_vec.into_inner();
             self.garage.spawn_n(|garage| -> ReturnType {
                 //eprintln!("calling function");
 
@@ -949,15 +964,8 @@ where
 
                 let scheduler_handle = SchedulerHandle::new(&scheduler, garage);
                 
-                
-                let temp = executor_vec.dereference_mut();
-                
-                if temp[thread_id].is_none() {
-                    temp[thread_id] = Some(E::init(executor_initial_arguments));
-                }
-
                 let res = self.worker_loop(
-                    &temp[thread_id],
+                    &executor_vec[thread_id],
                     signature_verified_block,
                     &last_input_output,
                     &versioned_cache,
