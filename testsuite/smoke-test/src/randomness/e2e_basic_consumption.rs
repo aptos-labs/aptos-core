@@ -40,7 +40,7 @@ async fn e2e_basic_consumption() {
         .await
         .expect("Epoch 2 taking too long to arrive!");
 
-    let rng = thread_rng();
+    let mut rng = thread_rng();
     let new_sk = Ed25519PrivateKey::generate(&mut rng);
     let user_idx = cli.add_account_to_cli(new_sk);
     let user_addr = cli.account_id(user_idx);
