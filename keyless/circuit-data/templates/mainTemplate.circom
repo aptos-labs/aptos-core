@@ -178,6 +178,10 @@ template identity(
     signal ef_fail <== AND()(use_extra_field, not_ef_passes);
     ef_fail === 0;
 
+    // Check that ef is not inside a string body
+    signal ef_start_char <== SelectArrayValue(max_ascii_jwt_payload_len)(string_bodies, extra_index);
+    ef_start_char === 0;
+
     // Check email verified field
     signal input ev_field[maxEVKVPairLen];
     signal input ev_field_len;
@@ -223,7 +227,6 @@ template identity(
     signal input iss_name[maxIssNameLen];
     signal input iss_value[maxIssValueLen];
 
-    log("iss");
     ParseJWTFieldWithQuotedValue(maxIssKVPairLen, maxIssNameLen, maxIssValueLen)(iss_field, iss_name, iss_value, iss_field_string_bodies, iss_field_len, iss_name_len, iss_value_index, iss_value_len, iss_colon_index);
 
     // Check name of the iss field is correct
@@ -247,6 +250,10 @@ template identity(
     signal input iat_value[maxIatValueLen];
 
     ParseJWTFieldWithUnquotedValue(maxIatKVPairLen, maxIatNameLen, maxIatValueLen)(iat_field, iat_name, iat_value, iat_field_len, iat_name_len, iat_value_index, iat_value_len, iat_colon_index);
+
+    // Check that ef is not inside a string body
+    signal iat_start_char <== SelectArrayValue(max_ascii_jwt_payload_len)(string_bodies, iat_index);
+    iat_start_char === 0;
 
     // Check name of the iat field is correct
     var required_iat_name[iat_name_len] = [105, 97, 116]; // iat
@@ -277,7 +284,6 @@ template identity(
     signal input nonce_name[maxNonceNameLen];
     signal input nonce_value[maxNonceValueLen];
 
-    log("nonce");
     ParseJWTFieldWithQuotedValue(maxNonceKVPairLen, maxNonceNameLen, maxNonceValueLen)(nonce_field, nonce_name, nonce_value, nonce_field_string_bodies, nonce_field_len, nonce_name_len, nonce_value_index, nonce_value_len, nonce_colon_index);
 
     // Check name of the nonce field is correct
