@@ -780,12 +780,13 @@ impl AptosVM {
 
     fn validate_and_execute_entry_function(
         &self,
+        resolver: &impl AptosMoveResolver,
         session: &mut SessionExt,
         gas_meter: &mut impl AptosGasMeter,
         traversal_context: &mut TraversalContext,
         senders: Vec<AccountAddress>,
         entry_fn: &EntryFunction,
-        txn_data: &TransactionMetadata,
+        _txn_data: &TransactionMetadata,
     ) -> Result<(), VMStatus> {
         // Note: Feature gating is needed here because the traversal of the dependencies could
         //       result in shallow-loading of the modules and therefore subtle changes in
@@ -806,7 +807,7 @@ impl AptosVM {
             entry_fn.ty_args(),
         )?;
 
-        if is_friend_or_private && txn_data.required_deposit.is_some() {
+        if is_friend_or_private && has_randomness_attribute(resolver, session, entry_fn)? {
             let txn_context = session
                 .get_native_extensions()
                 .get_mut::<RandomnessContext>();
@@ -873,6 +874,7 @@ impl AptosVM {
             TransactionPayload::EntryFunction(entry_fn) => {
                 session.execute(|session| {
                     self.validate_and_execute_entry_function(
+                        resolver,
                         session,
                         gas_meter,
                         traversal_context,
@@ -980,6 +982,7 @@ impl AptosVM {
                         aptos_try!({
                             return_on_failure!(session.execute(|session| self
                                 .execute_multisig_entry_function(
+                                    resolver,
                                     session,
                                     gas_meter,
                                     traversal_context,
@@ -1107,6 +1110,7 @@ impl AptosVM {
             MultisigTransactionPayload::EntryFunction(entry_function) => {
                 session.execute(|session| {
                     self.execute_multisig_entry_function(
+                        resolver,
                         session,
                         gas_meter,
                         traversal_context,
@@ -1211,6 +1215,7 @@ impl AptosVM {
 
     fn execute_multisig_entry_function(
         &self,
+        resolver: &impl AptosMoveResolver,
         session: &mut SessionExt,
         gas_meter: &mut impl AptosGasMeter,
         traversal_context: &mut TraversalContext,
@@ -1222,6 +1227,7 @@ impl AptosVM {
         // If txn args are not valid, we'd still consider the transaction as executed but
         // failed. This is primarily because it's unrecoverable at this point.
         self.validate_and_execute_entry_function(
+            resolver,
             session,
             gas_meter,
             traversal_context,
