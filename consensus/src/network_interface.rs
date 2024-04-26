@@ -132,7 +132,6 @@ pub const RPC: &[ProtocolId] = &[
 
 /// Supported protocols in preferred order (from highest priority to lowest).
 pub const DIRECT_SEND: &[ProtocolId] = &[
-    ProtocolId::ConsensusDirectSendCompressed,
     ProtocolId::ConsensusDirectSendBcs,
     ProtocolId::ConsensusDirectSendJson,
 ];
