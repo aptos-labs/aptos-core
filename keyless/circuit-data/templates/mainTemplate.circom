@@ -204,7 +204,6 @@ template identity(
     signal ev_fail <== AND()(uid_is_email, not_ev_in_jwt);
     ev_fail === 0;
 
-    log("email_verified");
     ParseJWTFieldWithUnquotedValue(maxEVKVPairLen, maxEVNameLen, maxEVValueLen)(ev_field, ev_name, ev_value, ev_field_len, ev_name_len, ev_value_index, ev_value_len, ev_colon_index);
 
     // Check iss field is in the JWT
@@ -247,7 +246,6 @@ template identity(
     signal input iat_name[maxIatNameLen];
     signal input iat_value[maxIatValueLen];
 
-    log("iat");
     ParseJWTFieldWithUnquotedValue(maxIatKVPairLen, maxIatNameLen, maxIatValueLen)(iat_field, iat_name, iat_value, iat_field_len, iat_name_len, iat_value_index, iat_value_len, iat_colon_index);
 
     // Check name of the iat field is correct
