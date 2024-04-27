@@ -69,6 +69,7 @@ impl PeerMonitoringServiceNetworkEvents {
                 PeerMonitoringServiceMessage::Request(peer_monitoring_service_request),
                 protocol_id,
                 response_tx,
+                _,
             ) => {
                 let response_sender = ResponseSender::new(response_tx);
                 let peer_network_id = PeerNetworkId::new(network_id, peer_id);

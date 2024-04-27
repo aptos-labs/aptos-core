@@ -394,8 +394,10 @@ impl NodeSetup {
     pub async fn next_network_message(&mut self) -> ConsensusMsg {
         match self.next_network_event().await {
             Event::Message(_, msg) => msg,
-            Event::RpcRequest(_, msg, _, _) if matches!(msg, ConsensusMsg::CommitMessage(_)) => msg,
-            Event::RpcRequest(_, msg, _, _) => {
+            Event::RpcRequest(_, msg, _, _, _) if matches!(msg, ConsensusMsg::CommitMessage(_)) => {
+                msg
+            },
+            Event::RpcRequest(_, msg, _, _, _) => {
                 panic!(
                     "Unexpected event, got RpcRequest, expected Message: {:?} on node {}",
                     msg,
@@ -408,7 +410,7 @@ impl NodeSetup {
 
     pub fn no_next_msg(&mut self) {
         match self.poll_next_network_event() {
-            Some(Event::RpcRequest(_, msg, _, _)) | Some(Event::Message(_, msg)) => panic!(
+            Some(Event::RpcRequest(_, msg, _, _, _)) | Some(Event::Message(_, msg)) => panic!(
                 "Unexpected Consensus Message: {:?} on node {}",
                 msg,
                 self.identity_desc()
@@ -459,7 +461,7 @@ impl NodeSetup {
 
     pub async fn poll_block_retreival(&mut self) -> Option<IncomingBlockRetrievalRequest> {
         match self.poll_next_network_event() {
-            Some(Event::RpcRequest(_, msg, protocol, response_sender)) => match msg {
+            Some(Event::RpcRequest(_, msg, protocol, response_sender, _)) => match msg {
                 ConsensusMsg::BlockRetrievalRequest(v) => Some(IncomingBlockRetrievalRequest {
                     req: *v,
                     protocol,

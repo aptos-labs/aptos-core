@@ -1136,7 +1136,7 @@ async fn wait_for_network_event(
                 assert_eq!(peer_id, expected_peer_id);
                 assert_eq!(dummy_message, expected_dummy_message);
             },
-            Event::RpcRequest(peer_id, dummy_message, protocol_id, _) => {
+            Event::RpcRequest(peer_id, dummy_message, protocol_id, _, _) => {
                 assert!(is_rpc_request);
                 assert_eq!(peer_id, expected_peer_id);
                 assert_eq!(dummy_message, expected_dummy_message);

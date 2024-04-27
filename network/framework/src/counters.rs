@@ -40,7 +40,8 @@ pub const SERIALIZATION_LABEL: &str = "serialization";
 pub const DESERIALIZATION_LABEL: &str = "deserialization";
 
 const LATENCY_BUCKETS: [f64; 21] = [
-    0.001, 0.002, 0.005, 0.01, 0.02, 0.03, 0.05, 0.1, 0.2, 0.3, 0.4, 0.5, 0.7, 0.9, 1.0, 2.0, 3.0, 5.0, 7.0, 9.0, 10.0,
+    0.001, 0.002, 0.005, 0.01, 0.02, 0.03, 0.05, 0.1, 0.2, 0.3, 0.4, 0.5, 0.7, 0.9, 1.0, 2.0, 3.0,
+    5.0, 7.0, 9.0, 10.0,
 ];
 
 pub static APTOS_CONNECTIONS: Lazy<IntGaugeVec> = Lazy::new(|| {
@@ -641,6 +642,15 @@ pub static NETWORK_PEER_WRITE_DURATION: Lazy<HistogramVec> = Lazy::new(|| {
         "aptos_network_peer_write_duration",
         "Counters related to peer ping times (before and after dialing)",
         &["network_id", "peer_id", "label"],
+    )
+    .unwrap()
+});
+
+pub static INCOMING_RPC_STEP_DURATION: Lazy<HistogramVec> = Lazy::new(|| {
+    register_histogram_vec!(
+        "aptos_consensus_incoming_rpc_step_duration",
+        "rpc step message processing",
+        &["step"],
     )
     .unwrap()
 });

@@ -28,7 +28,7 @@ use futures_util::{
 };
 #[cfg(test)]
 use std::sync::Arc;
-use std::time::Duration;
+use std::time::{Duration, Instant};
 use tokio::time::timeout;
 
 pub struct IncomingRpcRequest {
@@ -67,7 +67,7 @@ impl RBNetworkSender<JWKConsensusMsg> for NetworkSender {
     ) -> anyhow::Result<JWKConsensusMsg> {
         if receiver == self.author {
             let (tx, rx) = oneshot::channel();
-            let self_msg = Event::RpcRequest(receiver, msg, RPC[0], tx);
+            let self_msg = Event::RpcRequest(receiver, msg, RPC[0], tx, Instant::now());
             self.self_sender.clone().send(self_msg).await?;
             if let Ok(Ok(Ok(bytes))) = timeout(time_limit, rx).await {
                 Ok(RPC[0].from_bytes(&bytes)?)
@@ -162,7 +162,7 @@ impl NetworkTask {
     pub async fn start(mut self) {
         while let Some(message) = self.all_events.next().await {
             match message {
-                Event::RpcRequest(peer_id, msg, protocol, response_sender) => {
+                Event::RpcRequest(peer_id, msg, protocol, response_sender, _) => {
                     let req = IncomingRpcRequest {
                         msg,
                         sender: peer_id,

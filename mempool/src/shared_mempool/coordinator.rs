@@ -342,7 +342,7 @@ async fn handle_network_event<NetworkClient, TransactionValidator>(
                 },
             }
         },
-        Event::RpcRequest(peer_id, _msg, _, _res_tx) => {
+        Event::RpcRequest(peer_id, _msg, _, _res_tx, _) => {
             counters::unexpected_msg_count_inc(&network_id);
             sample!(
                 SampleRate::Duration(Duration::from_secs(60)),

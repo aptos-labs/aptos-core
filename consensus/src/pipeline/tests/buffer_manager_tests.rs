@@ -230,7 +230,7 @@ async fn loopback_commit_vote(
     verifier: &ValidatorVerifier,
 ) {
     match msg {
-        Event::RpcRequest(author, msg, protocol, callback) => {
+        Event::RpcRequest(author, msg, protocol, callback, _) => {
             if let ConsensusMsg::CommitMessage(msg) = msg {
                 msg.verify(verifier).unwrap();
                 let request = IncomingCommitRequest {

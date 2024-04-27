@@ -164,7 +164,7 @@ impl<NetworkClient: NetworkClientInterface<HealthCheckerMsg> + Unpin> HealthChec
                                 &metadata.remote_peer_id
                             );
                         }
-                        Event::RpcRequest(peer_id, msg, protocol, res_tx) => {
+                        Event::RpcRequest(peer_id, msg, protocol, res_tx, _) => {
                             match msg {
                                 HealthCheckerMsg::Ping(ping) => self.handle_ping_request(peer_id, ping, protocol, res_tx),
                                 _ => {

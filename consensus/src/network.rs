@@ -10,7 +10,7 @@ use crate::{
         TDAGNetworkSender,
     },
     logging::{LogEvent, LogSchema},
-    monitor,
+    monitor, network,
     network_interface::{ConsensusMsg, ConsensusNetworkClient, RPC},
     pipeline::commit_reliable_broadcast::CommitMessage,
     quorum_store::types::{Batch, BatchMsg, BatchRequest, BatchResponse},
@@ -34,6 +34,7 @@ use aptos_consensus_types::{
 use aptos_logger::prelude::*;
 use aptos_network::{
     application::interface::{NetworkClient, NetworkServiceEvents},
+    counters::INCOMING_RPC_STEP_DURATION,
     protocols::{network::Event, rpc::error::RpcError},
     ProtocolId,
 };
@@ -308,7 +309,7 @@ impl NetworkSender {
         if receiver == self.author() {
             let (tx, rx) = oneshot::channel();
             let protocol = RPC[0];
-            let self_msg = Event::RpcRequest(receiver, msg.clone(), RPC[0], tx);
+            let self_msg = Event::RpcRequest(receiver, msg.clone(), RPC[0], tx, Instant::now());
             self.self_sender.clone().send(self_msg).await?;
             if let Ok(Ok(Ok(bytes))) = timeout(timeout_duration, rx).await {
                 Ok(protocol.from_bytes(&bytes)?)
@@ -808,10 +809,13 @@ impl NetworkTask {
                         },
                     }
                 },
-                Event::RpcRequest(peer_id, msg, protocol, callback) => {
+                Event::RpcRequest(peer_id, msg, protocol, callback, instant) => {
                     counters::CONSENSUS_RECEIVED_MSGS
                         .with_label_values(&[msg.name()])
                         .inc();
+                    INCOMING_RPC_STEP_DURATION
+                        .with_label_values(&["consensus"])
+                        .observe(instant.elapsed().as_secs_f64());
                     let req = match msg {
                         ConsensusMsg::BlockRetrievalRequest(request) => {
                             debug!(

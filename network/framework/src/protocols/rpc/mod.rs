@@ -110,6 +110,7 @@ pub struct InboundRpcRequest {
     /// when trying to send their response, as the rpc call might have timed out
     /// while handling the request.
     pub res_tx: oneshot::Sender<Result<Bytes, RpcError>>,
+    pub instant: Instant,
 }
 
 impl SerializedRequest for InboundRpcRequest {
@@ -253,6 +254,7 @@ impl InboundRpcs {
             protocol_id,
             data: Bytes::from(request.raw_request),
             res_tx: response_tx,
+            instant: Instant::now(),
         });
         if let Err(err) = peer_notifs_tx.push(protocol_id, notif) {
             counters::rpc_messages(network_context, REQUEST_LABEL, INBOUND_LABEL, FAILED_LABEL)

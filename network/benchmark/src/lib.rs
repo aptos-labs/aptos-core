@@ -208,7 +208,7 @@ async fn handler_task(
                 )
                 .await;
             },
-            Event::RpcRequest(peer_id, msg_wrapper, protocol_id, sender) => {
+            Event::RpcRequest(peer_id, msg_wrapper, protocol_id, sender, _) => {
                 handle_rpc(
                     peer_id,
                     msg_wrapper,

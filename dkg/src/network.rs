@@ -24,7 +24,10 @@ use futures::{
 };
 use futures_channel::oneshot;
 use move_core_types::account_address::AccountAddress;
-use std::{sync::Arc, time::Duration};
+use std::{
+    sync::Arc,
+    time::{Duration, Instant},
+};
 use tokio::time::timeout;
 
 pub struct IncomingRpcRequest {
@@ -69,7 +72,7 @@ impl NetworkSender {
         if receiver == self.author() {
             let (tx, rx) = oneshot::channel();
             let protocol = RPC[0];
-            let self_msg = Event::RpcRequest(receiver, msg.clone(), RPC[0], tx);
+            let self_msg = Event::RpcRequest(receiver, msg.clone(), RPC[0], tx, Instant::now());
             self.self_sender.clone().send(self_msg).await?;
             if let Ok(Ok(Ok(bytes))) = timeout(timeout_duration, rx).await {
                 Ok(protocol.from_bytes(&bytes)?)
@@ -134,7 +137,7 @@ impl NetworkTask {
     pub async fn start(mut self) {
         while let Some(message) = self.all_events.next().await {
             match message {
-                Event::RpcRequest(peer_id, msg, protocol, response_sender) => {
+                Event::RpcRequest(peer_id, msg, protocol, response_sender, _) => {
                     let req = IncomingRpcRequest {
                         msg,
                         sender: peer_id,
