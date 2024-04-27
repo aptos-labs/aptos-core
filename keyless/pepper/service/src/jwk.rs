@@ -6,7 +6,7 @@ use anyhow::{anyhow, Result};
 use aptos_logger::warn;
 use dashmap::DashMap;
 use jsonwebtoken::{
-    jwk::{Jwk, JwkSet},
+    jwk::JwkSet,
     DecodingKey,
 };
 use once_cell::sync::Lazy;
