@@ -35,6 +35,7 @@ use claims::assert_some;
 use dashmap::DashSet;
 use futures::executor::block_on;
 use mini_moka::sync::Cache;
+use rayon::iter::{IndexedParallelIterator, IntoParallelRefIterator, ParallelIterator};
 use std::{collections::BTreeMap, mem, sync::Arc, time::Instant};
 use tokio::{sync::mpsc::UnboundedSender, task::JoinHandle};
 
@@ -199,31 +200,32 @@ impl NodeBroadcastHandler {
         let should_fetch = !missing_parents.is_empty();
         let verifier = self.epoch_state.verifier.clone();
         let quorum_store_enabled = self.quorum_store_enabled;
-        let node = tokio::task::spawn_blocking(move || {
-            if !missing_parents.is_empty() {
-                // For each missing parent, verify their signatures and voting power.
-                // Otherwise, a malicious node can send bad nodes with fake parents
-                // and cause this peer to issue unnecessary fetch requests.
-                ensure!(
-                    missing_parents
-                        .iter()
-                        .all(|parent| { parent.verify(&verifier).is_ok() }),
-                    NodeBroadcastHandleError::InvalidParent
-                );
-            }
+        // let node = tokio::task::spawn_blocking(move || {
+        //     if !missing_parents.is_empty() {
+        //         // For each missing parent, verify their signatures and voting power.
+        //         // Otherwise, a malicious node can send bad nodes with fake parents
+        //         // and cause this peer to issue unnecessary fetch requests.
+        //         ensure!(
+        //             missing_parents
+        //                 .par_iter()
+        //                 .with_min_len(2)
+        //                 .all(|parent| { parent.verify(&verifier).is_ok() }),
+        //             NodeBroadcastHandleError::InvalidParent
+        //         );
+        //     }
 
-            let cache = Cache::builder().build();
-            ensure!(
-                node.payload()
-                    .verify(&verifier, &cache, quorum_store_enabled)
-                    .is_ok(),
-                "invalid payload"
-            );
+        //     let cache = Cache::builder().build();
+        //     ensure!(
+        //         node.payload()
+        //             .verify(&verifier, &cache, quorum_store_enabled)
+        //             .is_ok(),
+        //         "invalid payload"
+        //     );
 
-            Ok(node)
-        })
-        .await
-        .expect("task must finish")?;
+        //     Ok(node)
+        // })
+        // .await
+        // .expect("task must finish")?;
 
         if should_fetch {
             // Don't issue fetch requests for parents of the lowest round in the DAG
