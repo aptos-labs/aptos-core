@@ -129,14 +129,12 @@ module coin_listing {
         price: u64,
     ) acquires FixedPriceListing {
         let listing_addr = object::object_address(&object);
-
         assert!(exists<FixedPriceListing<CoinType>>(listing_addr), error::not_found(ENO_LISTING));
 
-        let fixedPriceListing = borrow_global_mut<FixedPriceListing<CoinType>>(listing_addr);
+        let fixed_price_listing = borrow_global_mut<FixedPriceListing<CoinType>>(listing_addr);
+        assert!(fixed_price_listing.price != price, error::invalid_argument(ESAME_PRICE));
 
-        assert!(fixedPriceListing.price != price, error::invalid_argument(ESAME_PRICE))
-        
-        fixedPriceListing.price = price;
+        fixed_price_listing.price = price;
 
         events::emit_listing_placed(
             listing::fee_schedule(object),
@@ -664,6 +662,7 @@ module listing_tests {
     use marketplace::listing::{Self, Listing};
     use marketplace::test_utils;
 
+    #[test_only]
     struct DummyToken has key {}
 
     fun test_fixed_price(
@@ -733,7 +732,6 @@ module listing_tests {
             test_utils::setup(aptos_framework, marketplace, seller, purchaser);
 
         let (token, _fee_schedule, listing) = fixed_price_listing(marketplace, seller);
-
         coin_listing::update_fixed_price<AptosCoin>(seller, listing, 500);
     }
 
@@ -749,7 +747,6 @@ module listing_tests {
             test_utils::setup(aptos_framework, marketplace, seller, purchaser);
 
         let (token, _fee_schedule, listing) = fixed_price_listing(marketplace, seller);
-
         coin_listing::update_fixed_price<DummyToken>(seller, listing, 1000);
     }
 
@@ -764,11 +761,9 @@ module listing_tests {
             test_utils::setup(aptos_framework, marketplace, seller, purchaser);
 
         let (token, _fee_schedule, listing) = fixed_price_listing(marketplace, seller);
-
         assert!(coin_listing::price<AptosCoin>(listing) == option::some(500), 0);
 
         coin_listing::update_fixed_price<AptosCoin>(seller, listing, 1000);
-
         assert!(coin_listing::price<AptosCoin>(listing) == option::some(1000), 0);
     }
 
