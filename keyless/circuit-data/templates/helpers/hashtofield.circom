@@ -26,6 +26,8 @@ template CheckAre64BitLimbs(numLimbs) {
 // Hashes multiple bytes to one field element using a Poseidon hash
 // We hash the length of the input as well to prevent collisions
 // Currently does not work with greater than 64*31=1984 bytes
+//
+// Warning: `numBytes` cannot be 0.
 template HashBytesToFieldWithLen(numBytes) {
     signal input in[numBytes];
     signal input len;
@@ -49,6 +51,8 @@ template HashBytesToFieldWithLen(numBytes) {
 // Hashes multiple bytes to one field element using a Poseidon hash
 // We hash the length of the input as well to prevent collisions
 // Currently does not work with greater than 64*31=1984 bytes
+//
+// Warning: `numBytes` cannot be 0.
 template HashBytesToField(numBytes) {
     signal input in[numBytes];
     signal output hash;
@@ -128,6 +132,8 @@ template HashElemsToField(numElems) {
 
 // Hashes multiple 64 bit limbs to one field element using a Poseidon hash
 // We hash the length of the input as well to avoid collisions
+//
+// Warning: `numLimbs` cannot be 0.
 template Hash64BitLimbsToFieldWithLen(numLimbs) {
     signal input in[numLimbs];
     signal input len;
@@ -164,6 +170,7 @@ template ChunksToFieldElem(numChunks, bitsPerChunk) {
 }
 
 // Packs chunks into multiple field elements
+// `inputLen` cannot be 0.
 template ChunksToFieldElems(inputLen, chunksPerFieldElem, bitsPerChunk) {
     signal input in[inputLen];
     var num_elems = inputLen%chunksPerFieldElem == 0 ? inputLen \ chunksPerFieldElem : (inputLen\chunksPerFieldElem) + 1; // '\' is the quotient operation - we add 1 if there are extra bits past the full chunks

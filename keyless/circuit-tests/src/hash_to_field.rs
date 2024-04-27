@@ -39,7 +39,7 @@ fn hash_bytes_to_field_with_len() {
     for i in 0..num_iterations {
         println!();
         println!("Iteration {} starts.", i);
-        let num_bytes_circuit_capacity: usize = rng.gen_range(0, max_supported_byte_len);
+        let num_bytes_circuit_capacity: usize = rng.gen_range(1, max_supported_byte_len);
         println!("num_bytes_circuit_capacity={}", num_bytes_circuit_capacity);
         let circuit_src = CIRCUIT_SRC_TEMPLATE.replace("__MAX_LEN__", num_bytes_circuit_capacity.to_string().as_str());
         let circuit = TestCircuitHandle::new_from_str(circuit_src.as_str()).unwrap();
