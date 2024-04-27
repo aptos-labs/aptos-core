@@ -178,7 +178,7 @@ impl ShoalppBootstrapper {
         let mut dag_shutdown_tx_vec = Vec::new();
 
         self.dags.into_iter().for_each(|dag_bootstrapper| {
-            let (dag_rpc_tx, dag_rpc_rx) = aptos_channel::new(QueueStyle::FIFO, 10, None);
+            let (dag_rpc_tx, dag_rpc_rx) = aptos_channel::new(QueueStyle::FIFO, 50, None);
             dag_rpc_tx_vec.push(dag_rpc_tx);
             let (dag_shutdown_tx, dag_shutdown_rx) = oneshot::channel();
             dag_shutdown_tx_vec.push(dag_shutdown_tx);

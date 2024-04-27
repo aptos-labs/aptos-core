@@ -1323,7 +1323,11 @@ impl<P: OnChainConfigProvider> EpochManager<P> {
             self.peers_and_metadata.clone(),
         );
 
-        let (shoalpp_rpc_tx, shoalpp_rpc_rx) = aptos_channel::new(QueueStyle::FIFO, 10, None);
+        let (shoalpp_rpc_tx, shoalpp_rpc_rx) = aptos_channel::new(
+            QueueStyle::FIFO,
+            self.dag_config.incoming_rpc_channel_per_key_size,
+            None,
+        );
         self.shoalpp_rpc_tx = Some(shoalpp_rpc_tx);
         let (shoalpp_shutdown_tx, shoalpp_shutdown_rx) = oneshot::channel();
         self.dag_shutdown_tx = Some(shoalpp_shutdown_tx);

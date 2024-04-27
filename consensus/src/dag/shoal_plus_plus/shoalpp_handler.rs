@@ -1,7 +1,10 @@
 // Copyright © Aptos Foundation
 // SPDX-License-Identifier: Apache-2.0
 
-use crate::network::{IncomingDAGRequest, IncomingShoalppRequest};
+use crate::{
+    dag::observability::counters::RPC_PROCESS_DURATION,
+    network::{IncomingDAGRequest, IncomingShoalppRequest},
+};
 use aptos_channels::aptos_channel;
 use aptos_consensus_types::common::Author;
 use aptos_logger::debug;
@@ -34,8 +37,15 @@ impl BoltHandler {
             tokio::select! {
 
                 (peer_id, msg) = shoalpp_rpc_rx.select_next_some() => {
+                    let start = msg.start;
+                    RPC_PROCESS_DURATION
+                        .with_label_values(&["shoalpp_handler"])
+                        .observe(start.elapsed().as_secs_f64());
                     match self.convert(msg) {
                         Ok(dag_req) => {
+                            RPC_PROCESS_DURATION
+                                .with_label_values(&["shoalpp_convert"])
+                                .observe(start.elapsed().as_secs_f64());
                             let dag_id = dag_req.dag_id();
                             if let Err(e) = dag_rpc_tx_vec[dag_id as usize].push(peer_id, dag_req){
                                 debug!("failed to push req to dag {}: {}", dag_id, e);
