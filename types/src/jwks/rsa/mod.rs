@@ -7,7 +7,11 @@ use aptos_crypto::poseidon_bn254;
 use base64::URL_SAFE_NO_PAD;
 use jsonwebtoken::{Algorithm, DecodingKey, TokenData, Validation};
 use move_core_types::value::{MoveStruct, MoveValue};
+use once_cell::sync::Lazy;
+use ring::signature::RsaKeyPair;
+use rsa::{pkcs1::EncodeRsaPrivateKey, pkcs8::DecodePrivateKey};
 use serde::{Deserialize, Serialize};
+use std::{fs::File, io::prelude::*};
 
 /// Move type `0x1::jwks::RSA_JWK` in rust.
 /// See its doc in Move for more details.
@@ -20,6 +24,45 @@ pub struct RSA_JWK {
     pub e: String,
     pub n: String,
 }
+
+#[derive(Debug, Deserialize, Serialize)]
+struct RsaJwkSet {
+    keys: Vec<RSA_JWK>,
+}
+
+pub fn get_jwk_from_file(file_path: &str) -> RSA_JWK {
+    let mut file = File::open(file_path).expect(&format!(
+        "Unable to open test jwk json file, path - {}",
+        file_path
+    ));
+    let mut jwk_set_json = String::new();
+    file.read_to_string(&mut jwk_set_json)
+        .expect("Unable to read file");
+    let RsaJwkSet { keys } = serde_json::from_str(&jwk_set_json).expect("Unable to parse JSON");
+    keys[0].clone()
+}
+
+pub static SECURE_TEST_RSA_JWK: Lazy<RSA_JWK> =
+    Lazy::new(|| get_jwk_from_file("src/jwks/rsa/secure_test_jwk.json"));
+
+pub static INSECURE_TEST_RSA_JWK: Lazy<RSA_JWK> =
+    Lazy::new(|| get_jwk_from_file("src/jwks/rsa/insecure_test_jwk.json"));
+
+pub static INSECURE_TEST_RSA_KEY_PAIR: Lazy<RsaKeyPair> = Lazy::new(|| {
+    let file_path = "src/jwks/rsa/insecure_test_jwk_private_key.pem";
+    let mut file = File::open(file_path).expect(&format!(
+        "Unable to open rsa private key file, path - {}",
+        file_path
+    ));
+    let mut sk = String::new();
+    file.read_to_string(&mut sk).expect("Unable to read file");
+    // TODO(keyless): Hacking around the difficulty of parsing PKCS#8-encoded PEM files with the `pem` crate
+    let der = rsa::RsaPrivateKey::from_pkcs8_pem(&sk)
+        .unwrap()
+        .to_pkcs1_der()
+        .unwrap();
+    RsaKeyPair::from_der(der.as_bytes()).unwrap()
+});
 
 impl RSA_JWK {
     /// The circuit-supported RSA modulus size.

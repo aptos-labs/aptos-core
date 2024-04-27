@@ -23,7 +23,7 @@ use aptos_types::{
     contract_event::{ContractEvent, ContractEventV1},
     jwks::{
         patch::{PatchJWKMoveStruct, PatchUpsertJWK},
-        rsa::RSA_JWK,
+        secure_test_rsa_jwk,
     },
     keyless::{
         self, test_utils::get_sample_iss, Groth16VerificationKey, DEVNET_VERIFICATION_KEY,
@@ -652,7 +652,7 @@ fn initialize_keyless_accounts(session: &mut SessionExt, chain_id: ChainId) {
 
         let patch: PatchJWKMoveStruct = PatchUpsertJWK {
             issuer: get_sample_iss(),
-            jwk: RSA_JWK::secure_test_jwk().into(),
+            jwk: secure_test_rsa_jwk().into(),
         }
         .into();
         exec_function(
