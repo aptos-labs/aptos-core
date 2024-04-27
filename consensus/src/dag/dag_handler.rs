@@ -105,33 +105,6 @@ impl NetworkHandler {
         tokio_metrics_collector::default_task_collector()
             .add("dag_handler", monitor.clone())
             .ok();
-        // TODO: feed in the executor based on verification Runtime
-        let mut verified_msg_stream =
-            dag_rpc_rx.concurrent_map_blocking(move |rpc_request: IncomingDAGRequest| {
-                RPC_PROCESS_DURATION
-                    .with_label_values(&["dag_handler"])
-                    .observe(rpc_request.start.elapsed().as_secs_f64());
-                let timer = INCOMING_MSG_PROCESSING.start_timer();
-                defer!(drop(timer));
-                let epoch = rpc_request.req.epoch();
-                let result = rpc_request
-                    .req
-                    .try_into()
-                    .and_then(|dag_message: DAGMessage| {
-                        monitor!(
-                            "dag_message_verify",
-                            dag_message.verify(rpc_request.sender, &epoch_state.verifier)
-                        )?;
-                        Ok(dag_message)
-                    });
-                (
-                    result,
-                    epoch,
-                    rpc_request.sender,
-                    rpc_request.responder,
-                    rpc_request.start,
-                )
-            });
 
         let dag_driver_clone = dag_driver.clone();
         let node_receiver_clone = node_receiver.clone();
@@ -184,9 +157,40 @@ impl NetworkHandler {
         // not blocking each other.
         // TODO: make this configurable
         let executor = BoundedExecutor::new(200, Handle::current());
+        let (verified_msg_stream_tx, mut verified_msg_stream) =
+            tokio::sync::mpsc::unbounded_channel();
         loop {
             select! {
-                Some((msg, epoch, author, responder, start)) = verified_msg_stream.next() => {
+                rpc_request = dag_rpc_rx.select_next_some() => {
+                    RPC_PROCESS_DURATION
+                        .with_label_values(&["dag_handler"])
+                        .observe(rpc_request.start.elapsed().as_secs_f64());
+                    let tx = verified_msg_stream_tx.clone();
+                    let epoch_state = epoch_state.clone();
+                    tokio::task::spawn_blocking(move || {
+                        let timer = INCOMING_MSG_PROCESSING.start_timer();
+                        defer!(drop(timer));
+                        let epoch = rpc_request.req.epoch();
+                        let result = rpc_request
+                            .req
+                            .try_into()
+                            .and_then(|dag_message: DAGMessage| {
+                                monitor!(
+                                    "dag_message_verify",
+                                    dag_message.verify(rpc_request.sender, &epoch_state.verifier)
+                                )?;
+                                Ok(dag_message)
+                            });
+                        tx.send((
+                            result,
+                            epoch,
+                            rpc_request.sender,
+                            rpc_request.responder,
+                            rpc_request.start,
+                        ))
+                    });
+                },
+                Some((msg, epoch, author, responder, start)) = verified_msg_stream.recv() => {
                     RPC_PROCESS_DURATION
                         .with_label_values(&["post_verify_recv"])
                         .observe(start.elapsed().as_secs_f64());

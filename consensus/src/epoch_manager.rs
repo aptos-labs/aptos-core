@@ -9,6 +9,7 @@ use crate::{
     },
     counters,
     dag::{
+        observability::counters::RPC_PROCESS_DURATION,
         shoal_plus_plus::shoalpp_bootstrap::ShoalppBootstrapper, DagCommitSigner, StorageAdapter,
     },
     error::{error_kind, DbError},
@@ -1601,6 +1602,9 @@ impl<P: OnChainConfigProvider> EpochManager<P> {
                 }
             },
             IncomingRpcRequest::ShoalppRequest(request) => {
+                RPC_PROCESS_DURATION
+                    .with_label_values(&["epoch_manager"])
+                    .observe(request.start.elapsed().as_secs_f64());
                 if let Some(tx) = &self.shoalpp_rpc_tx {
                     tx.push(peer_id, (peer_id, request))
                 } else {
