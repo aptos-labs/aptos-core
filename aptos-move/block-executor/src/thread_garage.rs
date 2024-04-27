@@ -156,9 +156,6 @@ impl<'a> ThreadGarageHandle<'a>{
 pub struct CurrentThreadData {
     num_active: usize, //number of threads currently running worker function
     num_completed: usize, //number of threads which finished running worker function
-    num_sleeping: usize,
-    halting_cleanup_idx: usize,
-    asleep: Vec<bool> //asleep[i] is true if thread i is asleep, waiting for dependencies to be satisfied
 }
 
 impl CurrentThreadData {
@@ -166,9 +163,6 @@ impl CurrentThreadData {
         Self {
             num_active: 0,
             num_completed: 0,
-            num_sleeping: 0,
-            halting_cleanup_idx: 0,
-            asleep: vec![false; capacity],
         }
     }
 }
@@ -209,7 +203,10 @@ pub struct ThreadGarage {
     max_spawned: usize, // >= max_active
 
     // number of currently spawned threads
-    num_spawned: AtomicUsize,
+    num_spawned: CachePadded<AtomicUsize>,
+    num_sleeping: CachePadded<AtomicUsize>,
+
+    halting_cleanup_idx: CachePadded<AtomicUsize>,
 
     //mutex to the vector containing worker functions
     //main thread pushes to it, worker threads remove from it
@@ -227,6 +224,8 @@ pub struct ThreadGarage {
 
     //vector of condvars used to waking up threads which are asleep due to unsatisfied dependencies
     baton_cv: Vec<Condvar>,
+
+    asleep_mutex: Vec<CachePadded<Mutex<bool>>>,
     
     halted: CachePadded<AtomicBool>,
 }
@@ -236,12 +235,15 @@ impl ThreadGarage {
         Self {
             max_active,
             max_spawned,
-            num_spawned: AtomicUsize::new(0),
+            num_spawned: CachePadded::new(AtomicUsize::new(0)),
+            num_sleeping: CachePadded::new(AtomicUsize::new(0)),
+            halting_cleanup_idx: CachePadded::new(AtomicUsize::new(0)),
             worker_function_vec: ExplicitSyncWrapper::new((0..max_spawned).map(|_| None).collect()),
             global_barrier: ThreadGarageBarrier::new(max_spawned),
             global_mutex: CachePadded::new(Mutex::new(CurrentThreadData::new(max_spawned))),
             global_cv: Condvar::new(),
             baton_cv: (0..max_spawned).map(|_| Condvar::new()).collect(),
+            asleep_mutex: (0..max_spawned).map(|_| CachePadded::new(Mutex::new(false))).collect(),
             halted: CachePadded::new(AtomicBool::new(false)),
         }
     }
@@ -254,13 +256,13 @@ impl ThreadGarage {
         //create new baton for current_thread, using default_value
         let baton: Baton<T>;
         {
-            let mut lock = self.global_mutex.lock().unwrap();
+            let mut lock = self.asleep_mutex[thread_id].lock().unwrap();
             
             if self.is_halted() {
                 return Ok(SuspendResult::FailedRegisteringHook);
             }
 
-            lock.asleep[thread_id] = true;
+            *lock = true;
             baton = Baton::new(thread_id, default_value);
         }
         
@@ -274,13 +276,14 @@ impl ThreadGarage {
                 eprintln!("dependency already resolved thread={}", thread_id);
                 //depencency already satisfied, no need to suspend
                 {
-                    let mut lock = self.global_mutex.lock().unwrap();
-                    if !lock.asleep[thread_id] {
-                        lock.num_active -= 1;
+                    let mut global_lock = self.global_mutex.lock().unwrap();
+                    let mut local_lock = self.asleep_mutex[thread_id].lock().unwrap();
+                    if !*local_lock {
+                        global_lock.num_active -= 1;
                         self.global_cv.notify_one();
                     }
                     else {
-                        lock.asleep[thread_id] = false;
+                        *local_lock = false;
                     }
                 }
                 if self.is_halted() {
@@ -301,38 +304,29 @@ impl ThreadGarage {
             None => {
                 //eprintln!("actually going to sleep thread={}", thread_id);
                 //suspend logic
-                let mut lock = self.global_mutex.lock().unwrap();
+                {
+                    let mut global_lock = self.global_mutex.lock().unwrap();
 
-                /*if lock.num_sleeping + 1 == self.max_spawned {
-                    if !lock.asleep[thread_id] {
-                        lock.num_active -= 1;
-                        //self.global_cv.notify_one();
-                    }
-                    else {
-                        lock.asleep[thread_id] = false;
-                    }
-                    return Err(SuspendError::ErrorNoAvailableThreads);
-                }*/
+                    global_lock.num_active -= 1;
+                    let cnt_sleeping = self.num_sleeping.fetch_add(1, Ordering::SeqCst)+1;
 
-                lock.num_active -= 1;
-                lock.num_sleeping += 1;
+                    println!("now sleeping={}", cnt_sleeping);
 
-                println!("now sleeping={}", lock.num_sleeping);
+                    //notify one of the threads that since current thread is suspended, it can proceed with running main function
 
-                //notify one of the threads that since current thread is suspended, it can proceed with running main function
+                    self.global_cv.notify_one();
 
-                self.global_cv.notify_one();
-
+                }
                 //eprintln!("num sleeping prior {}", lock.num_sleeping);
 
-                while lock.asleep[thread_id] {
-                    lock = self.baton_cv[thread_id].wait(lock).unwrap();
+                let mut local_lock = self.asleep_mutex[thread_id].lock().unwrap();
+
+                while *local_lock {
+                    local_lock = self.baton_cv[thread_id].wait(local_lock).unwrap();
                 }
-
+                
+                self.num_sleeping.fetch_sub(1, Ordering::SeqCst);
                 //eprintln!("woke up thread={}", thread_id);
-                lock.num_sleeping -= 1;
-
-                //eprintln!("num sleeping after {}", lock.num_sleeping);
 
                 if self.is_halted() {
                     //println!("Thread: {} woke up in halted state", thread_id);
@@ -392,34 +386,40 @@ impl ThreadGarage {
         self.halted.load(Ordering::SeqCst)
     }
 
-    pub fn halting_cleanup_pass(self: &Arc<Self>, lock: &mut MutexGuard<CurrentThreadData>, thread_id: usize) -> bool {
+    pub fn halting_cleanup_pass(self: &Arc<Self>, _thread_id: usize) -> bool {
         if self.is_halted() {
-            while lock.halting_cleanup_idx < self.max_spawned {
-                let halting_cleanup_idx = lock.halting_cleanup_idx;
+            loop {
+                let halting_cleanup_idx = self.halting_cleanup_idx.fetch_add(1, Ordering::Relaxed);
+                if halting_cleanup_idx >= self.max_spawned {
+                    break false;
+                }
                 //println!("IDx: << {} <<  cleanup_idx: {}", thread_id, halting_cleanup_idx);
                 //println!(" num_active: {} num_completed: {}", lock.num_active, lock.num_completed);
-                if lock.asleep[lock.halting_cleanup_idx] {
+                let mut local_lock = self.asleep_mutex[halting_cleanup_idx].lock().unwrap();
+
+                if *local_lock {
                     //println!("WILL WAKEUP THREAD: {}", lock.halting_cleanup_idx);
-                    lock.asleep[halting_cleanup_idx] = false;
+                    *local_lock = false;
                     self.baton_cv[halting_cleanup_idx].notify_one();
-                    lock.halting_cleanup_idx += 1;
-                    return true;
+                    break true;
                 }
-                lock.halting_cleanup_idx += 1;
             }
         }
+        else {
         //println!("Clean exit from thread: {}",  thread_id); 
-        false
+            false
+        }
     }
 
     pub fn can_complete(self: &Arc<Self>, thread_id: usize) -> bool {    
-        let mut lock = self.global_mutex.lock().unwrap();
 
-        if !self.halting_cleanup_pass(&mut lock, thread_id) {
-            lock.num_active -= 1;
-            lock.num_completed += 1;
+        if !self.halting_cleanup_pass(thread_id) {
+            let mut global_lock = self.global_mutex.lock().unwrap();
 
-            if lock.num_completed == self.max_active {
+            global_lock.num_active -= 1;
+            global_lock.num_completed += 1;
+
+            if global_lock.num_completed == self.max_active {
                 self.global_cv.notify_all();
             }
             return true;
@@ -456,26 +456,26 @@ impl<F> Executor for WorkerFunctionExecutor<F> where F : Fn(&ThreadGarageHandle)
             // 2. wait for someone to call suspend
             // 3. return (we're done)
             {
-                let mut lock = garage.global_mutex.lock().unwrap();
+                let mut global_lock = garage.global_mutex.lock().unwrap();
 
-                assert!(lock.num_active + lock.num_completed <= garage.max_active);
+                assert!(global_lock.num_active + global_lock.num_completed <= garage.max_active);
 
-                while lock.num_active + lock.num_completed == garage.max_active { 
+                while global_lock.num_active + global_lock.num_completed == garage.max_active { 
 
                     // Need to check before waiting; in case of equality, we have completed worker function max number of times
-                    if lock.num_completed == garage.max_active {
+                    if global_lock.num_completed == garage.max_active {
                         return;
                     }
                     
                      // Notified from:
                     // 1. the last completed worker
                     // 2. a suspended worker
-                    lock = garage.global_cv.wait(lock).unwrap();
+                    global_lock = garage.global_cv.wait(global_lock).unwrap();
 
-                    assert!(lock.num_active + lock.num_completed <= garage.max_active);
+                    assert!(global_lock.num_active + global_lock.num_completed <= garage.max_active);
                 }
                 // we know we'll be running the worker function
-                lock.num_active += 1;
+                global_lock.num_active += 1;
             }
             
             if garage.is_halted() {
@@ -492,15 +492,17 @@ impl<F> Executor for WorkerFunctionExecutor<F> where F : Fn(&ThreadGarageHandle)
 
             match baton_thread_id {
                 Some(baton_thread_id) if !garage.is_halted() => {
-                    let mut lock = garage.global_mutex.lock().unwrap();
+                    let mut local_lock = garage.asleep_mutex[baton_thread_id].lock().unwrap();
                     
-                    if lock.asleep[baton_thread_id] {
-                        lock.asleep[baton_thread_id] = false;
+                    if *local_lock {
+                        *local_lock = false;
                         //println!("thread: {}, waking up thread: {}", thread_id, baton_thread_id);
                         garage.baton_cv[baton_thread_id].notify_one();
                     }
                     else {
-                        lock.num_active -= 1;
+                        drop(local_lock);
+                        let mut global_lock = garage.global_mutex.lock().unwrap();
+                        global_lock.num_active -= 1;
                     }
                 },
                 _ => {
@@ -557,8 +559,8 @@ impl ThreadGarageExecutor {
 
             let mut lock = self.garage.global_mutex.lock().unwrap();
             lock.num_completed = 0;
-            lock.halting_cleanup_idx = 0;
         }
+        self.garage.halting_cleanup_idx.store(0, Ordering::Release);
         self.garage.halted.store(false, Ordering::Release);
         
         //worker threads are waiting on barrier, hence it is safe to modify worker function vector 
