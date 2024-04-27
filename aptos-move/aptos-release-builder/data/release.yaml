@@ -12,7 +12,7 @@ proposals:
           feature_version: 16
           overrides:
             - name: "txn.max_execution_gas"
-              value: 3676000000
+              value: 9999000000
   - name: step_2_upgrade_framework
     metadata:
       title: "Multi-step proposal to upgrade mainnet framework to v1.12"
