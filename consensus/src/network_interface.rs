@@ -50,9 +50,6 @@ pub enum ConsensusMsg {
     /// VoteMsg is the struct that is ultimately sent by the voter in response for receiving a
     /// proposal.
     VoteMsg(Box<VoteMsg>),
-    /// OrderVoteMsg is the struct that is broadcasted by a validator on receiving quorum certificate
-    /// on a block.
-    OrderVoteMsg(Box<OrderVote>),
     /// CommitProposal is the struct that is sent by the validator after execution to propose
     /// on the committed state hash root.
     CommitVoteMsg(Box<CommitVote>),
@@ -79,6 +76,9 @@ pub enum ConsensusMsg {
     RandGenMessage(RandGenMessage),
     /// Quorum Store: Response to the batch request.
     BatchResponseV2(Box<BatchResponse>),
+    /// OrderVoteMsg is the struct that is broadcasted by a validator on receiving quorum certificate
+    /// on a block.
+    OrderVoteMsg(Box<OrderVote>),
 }
 
 /// Network type for consensus

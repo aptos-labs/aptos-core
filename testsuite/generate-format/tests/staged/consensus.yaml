@@ -344,53 +344,53 @@ ConsensusMsg:
         NEWTYPE:
           TYPENAME: VoteMsg
     7:
-      OrderVoteMsg:
-        NEWTYPE:
-          TYPENAME: OrderVote
-    8:
       CommitVoteMsg:
         NEWTYPE:
           TYPENAME: CommitVote
-    9:
+    8:
       CommitDecisionMsg:
         NEWTYPE:
           TYPENAME: CommitDecision
-    10:
+    9:
       BatchMsg:
         NEWTYPE:
           TYPENAME: BatchMsg
-    11:
+    10:
       BatchRequestMsg:
         NEWTYPE:
           TYPENAME: BatchRequest
-    12:
+    11:
       BatchResponse:
         NEWTYPE:
           TYPENAME: Batch
-    13:
+    12:
       SignedBatchInfo:
         NEWTYPE:
           TYPENAME: SignedBatchInfoMsg
-    14:
+    13:
       ProofOfStoreMsg:
         NEWTYPE:
           TYPENAME: ProofOfStoreMsg
-    15:
+    14:
       DAGMessage:
         NEWTYPE:
           TYPENAME: DAGNetworkMessage
-    16:
+    15:
       CommitMessage:
         NEWTYPE:
           TYPENAME: CommitMessage
-    17:
+    16:
       RandGenMessage:
         NEWTYPE:
           TYPENAME: RandGenMessage
-    18:
+    17:
       BatchResponseV2:
         NEWTYPE:
           TYPENAME: BatchResponse
+    18:
+      OrderVoteMsg:
+        NEWTYPE:
+          TYPENAME: OrderVote
 ContractEvent:
   ENUM:
     0:
