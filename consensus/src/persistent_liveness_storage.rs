@@ -142,8 +142,8 @@ impl LedgerRecoveryData {
         Ok(RootInfo(
             Box::new(root_block),
             root_quorum_cert,
-            root_ordered_cert.into(),
-            root_commit_cert.into(),
+            root_ordered_cert.into_wrapped_ledger_info(),
+            root_commit_cert.into_wrapped_ledger_info(),
         ))
     }
 }

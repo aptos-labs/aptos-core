@@ -2,7 +2,7 @@
 // Parts of the project are originally copyright © Meta Platforms, Inc.
 // SPDX-License-Identifier: Apache-2.0
 
-use crate::{quorum_cert::QuorumCert, vote_data::VoteData};
+use crate::vote_data::VoteData;
 use anyhow::{ensure, Context};
 use aptos_bitvec::BitVec;
 use aptos_crypto::{hash::CryptoHash, HashValue};
@@ -152,14 +152,5 @@ impl WrappedLedgerInfo {
             executed_commit_info
         );
         Ok(Self::new(self.vote_data.clone(), executed_ledger_info))
-    }
-}
-
-impl From<QuorumCert> for WrappedLedgerInfo {
-    fn from(quorum_cert: QuorumCert) -> Self {
-        Self {
-            vote_data: quorum_cert.vote_data().clone(),
-            signed_ledger_info: quorum_cert.ledger_info().clone(),
-        }
     }
 }

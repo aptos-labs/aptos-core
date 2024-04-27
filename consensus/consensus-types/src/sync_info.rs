@@ -83,8 +83,12 @@ impl SyncInfo {
     }
 
     /// Highest ordered certificate
-    pub fn highest_ordered_cert(&self) -> &WrappedLedgerInfo {
-        self.highest_ordered_cert.as_ref().unwrap()
+    pub fn highest_ordered_cert(&self) -> WrappedLedgerInfo {
+        if let Some(cert) = &self.highest_ordered_cert {
+            cert.clone()
+        } else {
+            self.highest_quorum_cert.into_wrapped_ledger_info()
+        }
     }
 
     /// Highest ledger info

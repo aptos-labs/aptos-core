@@ -285,7 +285,7 @@ impl BlockTree {
             .or_insert_with(|| Arc::clone(&qc));
 
         if self.highest_ordered_cert.commit_info().round() < qc.commit_info().round() {
-            self.highest_ordered_cert = Arc::new(qc.as_ref().clone().into());
+            self.highest_ordered_cert = Arc::new(qc.into_wrapped_ledger_info());
         }
 
         Ok(())
@@ -443,7 +443,7 @@ impl BlockTree {
             warn!(error = ?e, "fail to delete block");
         }
         self.process_pruned_blocks(id_to_remove);
-        self.update_highest_commit_cert(commit_proof.into());
+        self.update_highest_commit_cert(commit_proof.into_wrapped_ledger_info());
     }
 }
 
