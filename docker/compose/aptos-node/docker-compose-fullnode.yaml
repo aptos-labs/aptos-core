@@ -29,6 +29,11 @@ services:
       # Only expose these internally
       - "127.0.0.1:9101:9101"
       - "127.0.0.1:9102:9102"
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "10m"
+        max-file: "3"
 
   fullnode:
     image: "${VALIDATOR_IMAGE_REPO:-aptoslabs/validator}:${IMAGE_TAG:-testnet}"
@@ -59,6 +64,11 @@ services:
       - 8080
       # Validator metrics
       - 9101
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "10m"
+        max-file: "3"
 
 networks:
   shared:
@@ -69,4 +79,6 @@ networks:
 
 volumes:
   aptos-fullnode:
+    # For production use, renaming this to aptos-data on both val and VFN
+    # will allow you to hot switch a VFN to a val
     name: aptos-fullnode

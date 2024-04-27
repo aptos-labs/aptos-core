@@ -34,6 +34,11 @@ services:
       - "127.0.0.1:9102:9102"
       # Disable access to rest API port 80 for validator by default
       # - 8180:8180
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "10m"
+        max-file: "3"
 
 
   validator:
@@ -68,6 +73,11 @@ services:
       - 9101
       # Disable access to rest API port 80 for validator by default
       # - 8080
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "10m"
+        max-file: "3"
 
 networks:
   shared:
@@ -78,4 +88,6 @@ networks:
 
 volumes:
   aptos-validator:
+    # For production use, renaming this to aptos-data on both val and VFN
+    # will allow you to hot switch a VFN to a val
     name: aptos-validator
