@@ -23,7 +23,7 @@ use futures::{
 use futures_util::FutureExt;
 use pin_project::pin_project;
 use serde::{de::DeserializeOwned, Serialize};
-use std::{cmp::min, fmt::Debug, marker::PhantomData, pin::Pin, time::Duration};
+use std::{any::type_name, cmp::min, fmt::Debug, marker::PhantomData, pin::Pin, time::Duration};
 
 pub trait Message: DeserializeOwned + Serialize + Debug {}
 impl<T: DeserializeOwned + Serialize + Debug> Message for T {}
@@ -252,6 +252,7 @@ fn request_to_network_event<TMessage: Message, Request: SerializedRequest>(
                 "request_to_network_event: {:?}",
                 request.protocol_id().from_bytes::<TMessage>(request.data())
             );
+            println!("Type of TMessage: {}", type_name::<TMessage>());
             warn!(
                 SecurityEvent::InvalidNetworkEvent,
                 error = ?err,
