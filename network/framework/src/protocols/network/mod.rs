@@ -258,7 +258,7 @@ fn request_to_network_event<TMessage: Message, Request: SerializedRequest>(
                 error = ?err,
                 remote_peer_id = peer_id.short_str(),
                 protocol_id = request.protocol_id(),
-                data_prefix = hex::encode(&data[..min(16, data.len())]),
+                data_prefix = hex::encode(&data),
             );
             None
         },
