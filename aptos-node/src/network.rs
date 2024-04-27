@@ -31,7 +31,7 @@ use aptos_storage_service_types::StorageServiceMessage;
 use aptos_time_service::TimeService;
 use aptos_types::chain_id::ChainId;
 use serde::{Deserialize, Serialize};
-use std::{collections::HashMap, sync::Arc};
+use std::{collections::HashMap, fmt::Debug, sync::Arc};
 use tokio::runtime::Runtime;
 
 /// A simple struct that holds both the network client
@@ -404,7 +404,7 @@ fn create_network_runtime(network_config: &NetworkConfig) -> Runtime {
 
 /// Registers a new application client and service with the network
 fn register_client_and_service_with_network<
-    T: Serialize + for<'de> Deserialize<'de> + Send + 'static,
+    T: Serialize + for<'de> Deserialize<'de> + Send + Debug + 'static,
 >(
     network_builder: &mut NetworkBuilder,
     network_id: NetworkId,
@@ -496,7 +496,7 @@ fn transform_network_handles_into_interfaces(
 /// Creates an application network inteface using the given
 /// handles and config.
 fn create_network_interfaces<
-    T: Serialize + for<'de> Deserialize<'de> + Send + Sync + Clone + 'static,
+    T: Serialize + for<'de> Deserialize<'de> + Send + Sync + Clone + Debug + 'static,
 >(
     network_handles: Vec<ApplicationNetworkHandle<T>>,
     network_application_config: NetworkApplicationConfig,
