@@ -23,10 +23,10 @@ use futures::{
 use futures_util::FutureExt;
 use pin_project::pin_project;
 use serde::{de::DeserializeOwned, Serialize};
-use std::{any::type_name, cmp::min, fmt::Debug, marker::PhantomData, pin::Pin, time::Duration};
+use std::{cmp::min, fmt::Debug, marker::PhantomData, pin::Pin, time::Duration};
 
-pub trait Message: DeserializeOwned + Serialize + Debug {}
-impl<T: DeserializeOwned + Serialize + Debug> Message for T {}
+pub trait Message: DeserializeOwned + Serialize {}
+impl<T: DeserializeOwned + Serialize> Message for T {}
 
 // TODO: do we want to make this configurable?
 const MAX_DESERIALIZATION_QUEUE_SIZE_PER_PEER: usize = 50;
@@ -248,17 +248,12 @@ fn request_to_network_event<TMessage: Message, Request: SerializedRequest>(
         Ok(msg) => Some(msg),
         Err(err) => {
             let data = &request.data();
-            println!(
-                "request_to_network_event: {:?}",
-                request.protocol_id().from_bytes::<TMessage>(request.data())
-            );
-            println!("Type of TMessage: {}", type_name::<TMessage>());
             warn!(
                 SecurityEvent::InvalidNetworkEvent,
                 error = ?err,
                 remote_peer_id = peer_id.short_str(),
                 protocol_id = request.protocol_id(),
-                data_prefix = hex::encode(&data),
+                data_prefix = hex::encode(&data[..min(16, data.len())]),
             );
             None
         },

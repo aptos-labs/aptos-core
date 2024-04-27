@@ -18,7 +18,6 @@ aptos-bitvec = { workspace = true }
 aptos-bounded-executor = { workspace = true }
 aptos-channels = { workspace = true }
 aptos-collections = { workspace = true }
-aptos-compression = { workspace = true }
 aptos-config = { workspace = true }
 aptos-consensus-notifications = { workspace = true }
 aptos-consensus-types = { workspace = true }

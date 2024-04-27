@@ -829,7 +829,6 @@ dependencies = [
  "aptos-cached-packages",
  "aptos-channels",
  "aptos-collections",
- "aptos-compression",
  "aptos-config",
  "aptos-consensus-notifications",
  "aptos-consensus-types",
