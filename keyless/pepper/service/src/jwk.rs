@@ -78,20 +78,6 @@ pub fn start_jwk_refresh_loop(issuer: &str, jwk_url: &str, refresh_interval: Dur
 }
 
 pub fn cached_decoding_key(issuer: &String, kid: &String) -> Result<Arc<DecodingKey>> {
-    let test_jwk = r#"{
-        "kid": "test_jwk",
-        "kty": "RSA",
-        "alg": "RS256",
-        "use": "sig",
-        "n": "6S7asUuzq5Q_3U9rbs-PkDVIdjgmtgWreG5qWPsC9xXZKiMV1AiV9LXyqQsAYpCqEDM3XbfmZqGb48yLhb_XqZaKgSYaC_h2DjM7lgrIQAp9902Rr8fUmLN2ivr5tnLxUUOnMOc2SQtr9dgzTONYW5Zu3PwyvAWk5D6ueIUhLtYzpcB-etoNdL3Ir2746KIy_VUsDwAM7dhrqSK8U2xFCGlau4ikOTtvzDownAMHMrfE7q1B6WZQDAQlBmxRQsyKln5DIsKv6xauNsHRgBAKctUxZG8M4QJIx3S6Aughd3RZC4Ca5Ae9fd8L8mlNYBCrQhOZ7dS0f4at4arlLcajtw",
-        "e": "AQAB"
-    }"#;
-    if kid.eq("test_jwk") {
-        let key = serde_json::from_str::<Jwk>(test_jwk)
-            .map_err(|e| anyhow!("error while parsing json: {}", e))?;
-        let decoding_key = DecodingKey::from_jwk(&key)?;
-        return Ok(Arc::new(decoding_key));
-    }
     let key_set = DECODING_KEY_CACHE
         .get(issuer)
         .ok_or_else(|| anyhow!("unknown issuer: {}", issuer))?;

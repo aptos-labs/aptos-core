@@ -12,6 +12,7 @@ use aptos_keyless_pepper_service::{
     ProcessingFailure,
     ProcessingFailure::{BadRequest, InternalError},
 };
+use aptos_types::keyless::test_utils::get_sample_iss;
 use aptos_logger::info;
 use hyper::{
     header::{
@@ -83,6 +84,12 @@ async fn main() {
         "https://id.twitch.tv/oauth2",
         "https://id.twitch.tv/oauth2/keys",
         Duration::from_secs(10),
+    );
+
+    jwk::start_jwk_refresh_loop(
+        &get_sample_iss(),
+        "https://github.com/aptos-labs/aptos-core/raw/main/types/src/jwks/rsa/secure_test_jwk.json",
+        Duration::from_secs(300),
     );
 
     let addr = SocketAddr::from(([0, 0, 0, 0], 8000));
