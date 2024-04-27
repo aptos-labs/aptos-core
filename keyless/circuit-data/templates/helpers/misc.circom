@@ -122,13 +122,24 @@ template StringBodies(len) {
   signal quote_parity_1[len];
   signal quote_parity_2[len];
 
+  signal backslashes[len];
+  signal adjacent_backslash_parity[len];
+
   quotes[0] <== IsEqual()([in[0], 34]); 
   quote_parity[0] <== IsEqual()([in[0], 34]); 
 
+  backslashes[0] <== IsEqual()([in[0], 92]);
+  adjacent_backslash_parity[0] <== IsEqual()([in[0], 92]);
+
+  for (var i = 1; i < len; i++) {
+    backslashes[i] <== IsEqual()([in[i], 92]);
+    adjacent_backslash_parity[i] <== backslashes[i] * (1 - adjacent_backslash_parity[i-1]);
+  }
+
   for (var i = 1; i < len; i++) {
     var is_quote = IsEqual()([in[i], 34]); 
-    var prev_is_backslash = IsEqual()([in[i-1], 92]); 
-    quotes[i] <== is_quote * (1 - prev_is_backslash);
+    var prev_is_odd_backslash = adjacent_backslash_parity[i-1];
+    quotes[i] <== is_quote * (1 - prev_is_odd_backslash);
     quote_parity_1[i] <== quotes[i] * (1 - quote_parity[i-1]);
     quote_parity_2[i] <== (1 - quotes[i]) * quote_parity[i-1];
     quote_parity[i] <== quote_parity_1[i] + quote_parity_2[i];

@@ -56,7 +56,13 @@ pub fn calc_string_bodies(s: &str) -> Vec<bool> {
     quotes[0] = bytes[0] == b'"';
     quote_parity[0] = bytes[0] == b'"';
     for i in 1..bytes.len() {
-        quotes[i] = bytes[i] == b'"' && bytes[i-1] != b'\\';
+        let mut prev_is_odd_backslash = false;
+        for j in (0..i).rev() {
+            if bytes[j] != b'\\' { break; }
+            println!("{}: {}", j, bytes[j]);
+            prev_is_odd_backslash = !prev_is_odd_backslash;
+        }
+        quotes[i] = bytes[i] == b'"' && !prev_is_odd_backslash;
         quote_parity[i] = if  quotes[i] { !quote_parity[i-1] } else { quote_parity[i-1] };
     }
 
@@ -211,3 +217,25 @@ fn string_bodies_test_prefix_quotes() {
     }
 }
 
+
+#[test]
+fn string_bodies_test_zjma() {
+    let circuit_handle = TestCircuitHandle::new("misc/string_bodies_test.circom").unwrap();
+
+    let s = "\"abc\\\\\"";
+    let quotes = calc_string_bodies(&s);
+
+    let config = CircuitPaddingConfig::new()
+        .max_length("in", 13)
+        .max_length("out", 13);
+
+    let circuit_input_signals = CircuitInputSignals::new()
+        .str_input("in", s)
+        .bools_input("out", &quotes)
+        .pad(&config)
+        .unwrap();
+
+    let result = circuit_handle.gen_witness(circuit_input_signals);
+    println!("{:?}", result);
+    assert!(result.is_ok());
+}
