@@ -10,7 +10,7 @@ use move_core_types::{
     language_storage::{ModuleId, TypeTag},
     value::{MoveTypeLayout, MoveValue},
 };
-use move_vm_runtime::{move_vm::MoveVM, session::SerializedReturnValues};
+use move_vm_runtime::{module_traversal::*, move_vm::MoveVM, session::SerializedReturnValues};
 use move_vm_test_utils::InMemoryStorage;
 use move_vm_types::gas::UnmeteredGasMeter;
 
@@ -59,6 +59,7 @@ fn run(
         .into_iter()
         .map(|val| val.simple_serialize().unwrap())
         .collect();
+    let traversal_storage = TraversalStorage::new();
 
     let SerializedReturnValues {
         return_values,
@@ -69,6 +70,7 @@ fn run(
         ty_args,
         args,
         &mut UnmeteredGasMeter,
+        &mut TraversalContext::new(&traversal_storage),
     )?;
 
     Ok(return_values

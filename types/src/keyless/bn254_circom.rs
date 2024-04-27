@@ -37,7 +37,7 @@ pub fn g1_projective_str_to_affine(x: &str, y: &str) -> anyhow::Result<G1Affine>
 
 /// This will do the proper subgroup membership checks.
 pub fn g2_projective_str_to_affine(x: [&str; 2], y: [&str; 2]) -> anyhow::Result<G2Affine> {
-    let g2_affine = G2Bytes::new_unchecked(x, y)?.as_affine()?;
+    let g2_affine = G2Bytes::new_unchecked(x, y)?.deserialize_into_affine()?;
     Ok(g2_affine)
 }
 
@@ -171,7 +171,7 @@ impl G2Bytes {
         }
     }
 
-    pub fn as_affine(&self) -> Result<G2Affine, CryptoMaterialError> {
+    pub fn deserialize_into_affine(&self) -> Result<G2Affine, CryptoMaterialError> {
         self.try_into()
     }
 }
@@ -309,11 +309,12 @@ pub fn get_public_inputs_hash(
         // println!("IDC:                {}", idc);
         // println!("exp_timestamp_secs: {}", exp_timestamp_secs);
         // println!("exp_horizon_secs:   {}", exp_horizon_secs);
-        // println!("iss field hash:     {}", pk.iss_val);
+        // println!("iss field:          {}", pk.iss_val);
+        // println!("iss field hash:     {}", iss_field_hash);
         // println!("Has extra field:    {}", has_extra_field);
         // println!("Extra field val:    {:?}", proof.extra_field);
         // println!("Extra field hash:   {}", extra_field_hash);
-        // println!("JWT header val:     {}", jwt_header_with_separator);
+        // println!("JWT header val:     {}", jwt_header_b64_with_separator);
         // println!("JWT header hash:    {}", jwt_header_hash);
         // println!("JWK hash:           {}", jwk_hash);
         // println!("Override aud hash:  {}", override_aud_val_hash);

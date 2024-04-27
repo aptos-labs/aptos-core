@@ -1,7 +1,7 @@
 // Copyright © Aptos Foundation
 // SPDX-License-Identifier: Apache-2.0
 
-use crate::state_store::state_key::{StateKey, StateKeyTag};
+use crate::state_store::state_key::{inner::StateKeyTag, StateKey};
 use move_core_types::account_address::AccountAddress;
 
 // Struct for defining prefix of a state key, which can be used for finding all the values with a
@@ -45,11 +45,8 @@ impl From<AccountAddress> for StateKeyPrefix {
 #[cfg(test)]
 mod tests {
     use crate::{
-        access_path::AccessPath,
-        state_store::{
-            state_key::{StateKey, StateKeyTag},
-            state_key_prefix::StateKeyPrefix,
-        },
+        account_config::{AccountResource, CoinStoreResource},
+        state_store::state_key::{inner::StateKeyTag, prefix::StateKeyPrefix, StateKey},
     };
     use move_core_types::account_address::AccountAddress;
 
@@ -57,8 +54,8 @@ mod tests {
     fn test_state_key_prefix() {
         let address1 = AccountAddress::new([12u8; AccountAddress::LENGTH]);
         let address2 = AccountAddress::new([22u8; AccountAddress::LENGTH]);
-        let key1 = StateKey::access_path(AccessPath::new(address1, b"state_key".to_vec()));
-        let key2 = StateKey::access_path(AccessPath::new(address2, b"state_key".to_vec()));
+        let key1 = StateKey::resource_typed::<AccountResource>(&address1).unwrap();
+        let key2 = StateKey::resource_typed::<CoinStoreResource>(&address2).unwrap();
 
         let account1_key_prefx = StateKeyPrefix::new(StateKeyTag::AccessPath, address1.to_vec());
         let account2_key_prefx = StateKeyPrefix::new(StateKeyTag::AccessPath, address2.to_vec());

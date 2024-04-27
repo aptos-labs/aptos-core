@@ -126,7 +126,7 @@ impl OpenIdSig {
             base64url_encode_str(&self.jwt_payload_json),
             base64url_encode_bytes(&self.jwt_sig)
         );
-        rsa_jwk.verify_signature(&jwt_b64)?;
+        rsa_jwk.verify_signature_without_exp_check(&jwt_b64)?;
         Ok(())
     }
 

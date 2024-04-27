@@ -637,11 +637,18 @@ impl AuthenticationKey {
     }
 
     /// Construct a preimage from a transaction-derived AUID as (txn_hash || auid_scheme_id)
-    pub fn auid(txn_hash: Vec<u8>, auid_counter: u64) -> Self {
-        let mut hash_arg = Vec::new();
-        hash_arg.extend(txn_hash);
-        hash_arg.extend(auid_counter.to_le_bytes().to_vec());
-        Self::from_preimage(hash_arg, Scheme::DeriveAuid)
+    pub fn auid(mut txn_hash: Vec<u8>, auid_counter: u64) -> Self {
+        txn_hash.extend(auid_counter.to_le_bytes().to_vec());
+        Self::from_preimage(txn_hash, Scheme::DeriveAuid)
+    }
+
+    pub fn object_address_from_object(
+        source: &AccountAddress,
+        derive_from: &AccountAddress,
+    ) -> AuthenticationKey {
+        let mut bytes = source.to_vec();
+        bytes.append(&mut derive_from.to_vec());
+        Self::from_preimage(bytes, Scheme::DeriveObjectAddressFromObject)
     }
 
     /// Create an authentication key from an Ed25519 public key
