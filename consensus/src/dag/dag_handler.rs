@@ -158,7 +158,89 @@ impl NetworkHandler {
         // TODO: make this configurable
         let executor = BoundedExecutor::new(200, Handle::current());
         let (verified_msg_stream_tx, mut verified_msg_stream) =
-            tokio::sync::mpsc::unbounded_channel();
+            tokio::sync::mpsc::unbounded_channel::<(
+                anyhow::Result<DAGMessage>,
+                u64,
+                Author,
+                RpcResponder,
+                Instant,
+            )>();
+        let (ret_tx, mut ret_rx) = tokio::sync::oneshot::channel();
+
+        let h = tokio::task::spawn(async move {
+            loop {
+                select! {
+                    Some((msg, epoch, author, responder, start)) = verified_msg_stream.recv() => {
+                        RPC_PROCESS_DURATION
+                            .with_label_values(&["post_verify_recv"])
+                            .observe(start.elapsed().as_secs_f64());
+                        let verified_msg_processor = verified_msg_processor.clone();
+                        let f = executor.spawn(monitor.instrument(async move {
+                            monitor!("dag_on_verified_msg", {
+                                match verified_msg_processor.process_verified_message(msg, epoch, author, responder, start).await {
+                                    Ok(sync_status) => {
+                                        if matches!(
+                                            sync_status,
+                                            SyncOutcome::NeedsSync(_) | SyncOutcome::EpochEnds
+                                        ) {
+                                            return Some(sync_status);
+                                        }
+                                    },
+                                    Err(e) => {
+                                        warn!(error = ?e, "error processing rpc");
+                                    },
+                                };
+                                None
+                            })
+                        })).await;
+                        futures.push(f);
+                    },
+                    Some(status) = futures.next() => {
+                        if let Some(status) = status.expect("future must not panic") {
+                            ret_tx.send(status).expect("must send");
+                            return;
+                        }
+                    },
+                    Some(result) = certified_node_fetch_waiter.next() => {
+                        let dag_driver_clone = dag_driver.clone();
+                        executor.spawn(async move {
+                            monitor!("dag_on_cert_node_fetch", match result {
+                                Ok(certified_node) => {
+                                    if let Err(e) = dag_driver_clone.process(certified_node).await {
+                                        warn!(error = ?e, "error processing certified node fetch notification");
+                                    } else {
+                                        tokio::task::spawn_blocking(move || dag_driver_clone.fetch_callback());
+                                    }
+                                },
+                                Err(e) => {
+                                    debug!("sender dropped channel: {}", e);
+                                },
+                            });
+                        }).await;
+                    },
+                    Some(result) = node_fetch_waiter.next() => {
+                        let node_receiver_clone = node_receiver.clone();
+                        let dag_driver_clone = dag_driver.clone();
+                        executor.spawn(async move {
+                            monitor!("dag_on_node_fetch", match result {
+                                Ok(node) => {
+                                    if let Err(e) = node_receiver_clone.process(node).await {
+                                        warn!(error = ?e, "error processing node fetch notification");
+                                    } else {
+                                        tokio::task::spawn_blocking(move || dag_driver_clone.fetch_callback());
+                                    }
+                                },
+                                Err(e) => {
+                                    debug!("sender dropped channel: {}", e);
+                                },
+                            });
+                        }).await;
+                    },
+                }
+            }
+        });
+        defer!(h.abort());
+
         loop {
             select! {
                 rpc_request = dag_rpc_rx.select_next_some() => {
@@ -190,71 +272,9 @@ impl NetworkHandler {
                         ))
                     });
                 },
-                Some((msg, epoch, author, responder, start)) = verified_msg_stream.recv() => {
-                    RPC_PROCESS_DURATION
-                        .with_label_values(&["post_verify_recv"])
-                        .observe(start.elapsed().as_secs_f64());
-                    let verified_msg_processor = verified_msg_processor.clone();
-                    let f = executor.spawn(monitor.instrument(async move {
-                        monitor!("dag_on_verified_msg", {
-                            match verified_msg_processor.process_verified_message(msg, epoch, author, responder, start).await {
-                                Ok(sync_status) => {
-                                    if matches!(
-                                        sync_status,
-                                        SyncOutcome::NeedsSync(_) | SyncOutcome::EpochEnds
-                                    ) {
-                                        return Some(sync_status);
-                                    }
-                                },
-                                Err(e) => {
-                                    warn!(error = ?e, "error processing rpc");
-                                },
-                            };
-                            None
-                        })
-                    })).await;
-                    futures.push(f);
-                },
-                Some(status) = futures.next() => {
-                    if let Some(status) = status.expect("future must not panic") {
-                        return status;
-                    }
-                },
-                Some(result) = certified_node_fetch_waiter.next() => {
-                    let dag_driver_clone = dag_driver.clone();
-                    executor.spawn(async move {
-                        monitor!("dag_on_cert_node_fetch", match result {
-                            Ok(certified_node) => {
-                                if let Err(e) = dag_driver_clone.process(certified_node).await {
-                                    warn!(error = ?e, "error processing certified node fetch notification");
-                                } else {
-                                    tokio::task::spawn_blocking(move || dag_driver_clone.fetch_callback());
-                                }
-                            },
-                            Err(e) => {
-                                debug!("sender dropped channel: {}", e);
-                            },
-                        });
-                    }).await;
-                },
-                Some(result) = node_fetch_waiter.next() => {
-                    let node_receiver_clone = node_receiver.clone();
-                    let dag_driver_clone = dag_driver.clone();
-                    executor.spawn(async move {
-                        monitor!("dag_on_node_fetch", match result {
-                            Ok(node) => {
-                                if let Err(e) = node_receiver_clone.process(node).await {
-                                    warn!(error = ?e, "error processing node fetch notification");
-                                } else {
-                                    tokio::task::spawn_blocking(move || dag_driver_clone.fetch_callback());
-                                }
-                            },
-                            Err(e) => {
-                                debug!("sender dropped channel: {}", e);
-                            },
-                        });
-                    }).await;
-                },
+                Ok(ret) = &mut ret_rx => {
+                    return ret;
+                }
             }
         }
     }
