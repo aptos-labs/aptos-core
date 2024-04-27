@@ -125,7 +125,6 @@ pub struct ConsensusNetworkClient<NetworkClient> {
 
 /// Supported protocols in preferred order (from highest priority to lowest).
 pub const RPC: &[ProtocolId] = &[
-    ProtocolId::ConsensusRpcCompressed,
     ProtocolId::ConsensusRpcBcs,
     ProtocolId::ConsensusRpcJson,
 ];
