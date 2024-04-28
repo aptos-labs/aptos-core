@@ -654,3 +654,7 @@ pub static INCOMING_RPC_STEP_DURATION: Lazy<HistogramVec> = Lazy::new(|| {
     )
     .unwrap()
 });
+
+pub static PEER_LOOP: Lazy<HistogramVec> = Lazy::new(|| {
+    register_histogram_vec!("aptos_network_peer_loop", "network peer loop", &["peer_id"],).unwrap()
+});

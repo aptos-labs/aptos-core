@@ -18,7 +18,7 @@
 use crate::{
     counters::{
         self, network_application_inbound_traffic, network_application_outbound_traffic,
-        FAILED_LABEL, RECEIVED_LABEL, SENT_LABEL,
+        FAILED_LABEL, PEER_LOOP, RECEIVED_LABEL, SENT_LABEL,
     },
     logging::NetworkSchema,
     peer_manager::{PeerManagerError, TransportNotification},
@@ -230,8 +230,10 @@ where
             self.max_message_size,
         );
 
+        let peer_id_str = self.remote_peer_id().to_string();
         // Start main Peer event loop.
         let reason = loop {
+            let _timer = PEER_LOOP.with_label_values(&[&peer_id_str]).start_timer();
             if let State::ShuttingDown(reason) = self.state {
                 break reason;
             }
