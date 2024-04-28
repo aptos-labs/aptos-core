@@ -18,7 +18,7 @@ use aptos_types::{
 use aptos_vm::{data_cache::AsMoveResolver, AptosVM};
 use aptos_vm_logging::log_schema::AdapterLogSchema;
 use fail::fail_point;
-use std::sync::Arc;
+use std::sync::{Arc, Mutex};
 
 #[cfg(test)]
 #[path = "unit_tests/vm_validator_test.rs"]
@@ -119,5 +119,55 @@ pub fn get_account_sequence_number(
     match AccountResource::fetch_move_resource(state_view, &address)? {
         Some(account_resource) => Ok(account_resource.sequence_number()),
         None => Ok(0),
+    }
+}
+
+// A pool of VMValidators that can be used to validate transactions concurrently. This is done because
+// the VM is not thread safe today. This is a temporary solution until the VM is made thread safe.
+#[derive(Clone)]
+pub struct PooledVMValidator {
+    vm_validators: Vec<Arc<Mutex<VMValidator>>>,
+    // Index of the next VM to use for validation
+    next_vm: Arc<Mutex<usize>>,
+}
+
+impl PooledVMValidator {
+    pub fn new(db_reader: Arc<dyn DbReader>, pool_size: usize) -> Self {
+        let mut vm_validators = Vec::new();
+        for _ in 0..pool_size {
+            vm_validators.push(Arc::new(Mutex::new(VMValidator::new(db_reader.clone()))));
+        }
+        PooledVMValidator {
+            vm_validators,
+            next_vm: Arc::new(Mutex::new(0)),
+        }
+    }
+
+    pub fn get_next_vm(&self) -> Arc<Mutex<VMValidator>> {
+        let mut next_vm = self.next_vm.lock().unwrap();
+        let vm = self.vm_validators[*next_vm].clone();
+        *next_vm = (*next_vm + 1) % self.vm_validators.len();
+        vm
+    }
+}
+
+impl TransactionValidation for PooledVMValidator {
+    type ValidationInstance = AptosVM;
+
+    fn validate_transaction(&self, txn: SignedTransaction) -> Result<VMValidatorResult> {
+        self.get_next_vm().lock().unwrap().validate_transaction(txn)
+    }
+
+    fn restart(&mut self) -> Result<()> {
+        for vm_validator in &self.vm_validators {
+            vm_validator.lock().unwrap().restart()?;
+        }
+        Ok(())
+    }
+
+    fn notify_commit(&mut self) {
+        for vm_validator in &self.vm_validators {
+            vm_validator.lock().unwrap().notify_commit();
+        }
     }
 }
