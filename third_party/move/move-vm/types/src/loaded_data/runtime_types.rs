@@ -13,6 +13,7 @@ use move_binary_format::{
     },
 };
 use move_core_types::{identifier::Identifier, language_storage::ModuleId, vm_status::StatusCode};
+use serde::Serialize;
 use smallbitvec::SmallBitVec;
 use smallvec::{smallvec, SmallVec};
 use std::{
@@ -621,6 +622,47 @@ impl fmt::Display for Type {
             Reference(t) => write!(f, "&{}", t),
             MutableReference(t) => write!(f, "&mut {}", t),
             TyParam(no) => write!(f, "_{}", no),
+        }
+    }
+}
+
+#[derive(Clone, Serialize)]
+pub struct TypeConfig {
+    // Maximum number of nodes a fully-instantiated type has.
+    max_ty_size: usize,
+    // Maximum depth (in terms of number of nodes) a fully-instantiated type has.
+    max_ty_depth: usize,
+}
+
+impl TypeConfig {
+    pub fn production() -> Self {
+        // TODO: pick the right parameters.
+        Self::default()
+    }
+}
+
+impl Default for TypeConfig {
+    fn default() -> Self {
+        Self {
+            max_ty_size: 256,
+            max_ty_depth: 256,
+        }
+    }
+}
+
+#[derive(Clone)]
+pub struct TypeBuilder {
+    #[allow(dead_code)]
+    max_ty_size: usize,
+    #[allow(dead_code)]
+    max_ty_depth: usize,
+}
+
+impl TypeBuilder {
+    pub fn new(ty_config: &TypeConfig) -> Self {
+        Self {
+            max_ty_size: ty_config.max_ty_size,
+            max_ty_depth: ty_config.max_ty_depth,
         }
     }
 }

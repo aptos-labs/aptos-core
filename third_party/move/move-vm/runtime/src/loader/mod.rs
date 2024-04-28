@@ -53,6 +53,7 @@ mod type_loader;
 
 pub(crate) use function::{Function, FunctionHandle, FunctionInstantiation, LoadedFunction, Scope};
 pub(crate) use modules::{Module, ModuleCache, ModuleStorage, ModuleStorageAdapter};
+use move_vm_types::loaded_data::runtime_types::TypeBuilder;
 pub(crate) use script::{Script, ScriptCache};
 use type_loader::intern_type;
 
@@ -195,6 +196,7 @@ pub(crate) struct Loader {
     module_cache_hits: RwLock<BTreeSet<ModuleId>>,
 
     vm_config: VMConfig,
+    ty_builder: TypeBuilder,
 }
 
 impl Clone for Loader {
@@ -207,12 +209,14 @@ impl Clone for Loader {
             invalidated: RwLock::new(*self.invalidated.read()),
             module_cache_hits: RwLock::new(self.module_cache_hits.read().clone()),
             vm_config: self.vm_config.clone(),
+            ty_builder: self.ty_builder.clone(),
         }
     }
 }
 
 impl Loader {
     pub(crate) fn new(natives: NativeFunctions, vm_config: VMConfig) -> Self {
+        let ty_builder = TypeBuilder::new(&vm_config.ty_config);
         Self {
             scripts: RwLock::new(ScriptCache::new()),
             type_cache: RwLock::new(TypeCache::new()),
@@ -221,11 +225,17 @@ impl Loader {
             invalidated: RwLock::new(false),
             module_cache_hits: RwLock::new(BTreeSet::new()),
             vm_config,
+            ty_builder,
         }
     }
 
     pub(crate) fn vm_config(&self) -> &VMConfig {
         &self.vm_config
+    }
+
+    #[allow(dead_code)]
+    pub(crate) fn ty_builder(&self) -> &TypeBuilder {
+        &self.ty_builder
     }
 
     /// Flush this cache if it is marked as invalidated.
@@ -370,7 +380,7 @@ impl Loader {
     fn verify_script(&self, script: &CompiledScript) -> VMResult<()> {
         fail::fail_point!("verifier-failpoint-3", |_| { Ok(()) });
 
-        move_bytecode_verifier::verify_script_with_config(&self.vm_config.verifier, script)
+        move_bytecode_verifier::verify_script_with_config(&self.vm_config.verifier_config, script)
     }
 
     fn verify_script_dependencies(
@@ -655,7 +665,7 @@ impl Loader {
         // module will NOT show up in `module_cache`. In the module republishing case, it means
         // that the old module is still in the `module_cache`, unless a new Loader is created,
         // which means that a new MoveVM instance needs to be created.
-        move_bytecode_verifier::verify_module_with_config(&self.vm_config.verifier, module)?;
+        move_bytecode_verifier::verify_module_with_config(&self.vm_config.verifier_config, module)?;
         self.check_natives(module)?;
 
         let mut visited = BTreeSet::new();
@@ -1013,8 +1023,11 @@ impl Loader {
 
         // Verify the module if it hasn't been verified before.
         if VERIFIED_MODULES.lock().get(&hash_value).is_none() {
-            move_bytecode_verifier::verify_module_with_config(&self.vm_config.verifier, &module)
-                .map_err(expect_no_verification_errors)?;
+            move_bytecode_verifier::verify_module_with_config(
+                &self.vm_config.verifier_config,
+                &module,
+            )
+            .map_err(expect_no_verification_errors)?;
 
             VERIFIED_MODULES.lock().put(hash_value, ());
         }

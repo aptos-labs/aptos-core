@@ -29,6 +29,7 @@ use move_bytecode_verifier::VerifierConfig;
 use move_vm_runtime::{
     config::VMConfig, move_vm::MoveVM, native_extensions::NativeContextExtensions,
 };
+use move_vm_types::loaded_data::runtime_types::TypeConfig;
 use std::ops::Deref;
 
 pub struct MoveVmExt {
@@ -118,13 +119,15 @@ impl MoveVmExt {
             inner: WarmVmCache::get_warm_vm(
                 builder,
                 VMConfig {
-                    verifier: verifier_config,
+                    verifier_config,
                     deserializer_config: DeserializerConfig::new(
                         max_binary_format_version,
                         max_identifier_size,
                     ),
                     paranoid_type_checks: crate::AptosVM::get_paranoid_checks(),
                     enable_invariant_violation_check_in_swap_loc,
+                    // TODO: Set correctly.
+                    ty_config: TypeConfig::production(),
                     type_size_limit,
                     max_value_nest_depth: Some(128),
                     type_max_cost,

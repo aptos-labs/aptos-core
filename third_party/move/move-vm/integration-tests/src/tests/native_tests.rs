@@ -62,7 +62,7 @@ fn test_publish_module_with_nested_loops() {
             make_failed_native(),
         )];
         let vm = MoveVM::new_with_config(natives, VMConfig {
-            verifier: VerifierConfig {
+            verifier_config: VerifierConfig {
                 max_loop_depth: Some(2),
                 ..Default::default()
             },
