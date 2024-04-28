@@ -24,12 +24,12 @@ fn get_nested_struct_type(
 ) -> TypeTag {
     let mut ret = TypeTag::Bool;
     for _ in 0..depth {
-        let type_params = std::iter::repeat(ret).take(num_type_args).collect();
+        let type_args = std::iter::repeat(ret).take(num_type_args).collect();
         ret = TypeTag::Struct(Box::new(StructTag {
             address: module_address,
             module: module_identifier.clone(),
             name: struct_identifier.clone(),
-            type_params,
+            type_args,
         }))
     }
     ret

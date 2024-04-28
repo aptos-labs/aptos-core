@@ -301,7 +301,7 @@ impl Loader {
         let hash_value: [u8; 32] = sha3_256.finalize().into();
 
         let mut scripts = self.scripts.write();
-        let (main, arg_tys, return_tys) = match scripts.get(&hash_value) {
+        let (main, param_tys, return_tys) = match scripts.get(&hash_value) {
             Some(cached) => cached,
             None => {
                 let ver_script = self.deserialize_and_verify_script(
@@ -345,7 +345,7 @@ impl Loader {
             })?;
         let instantiation = LoadedFunctionInstantiation {
             ty_args,
-            arg_tys,
+            param_tys,
             return_tys,
         };
         Ok((main, instantiation))
@@ -416,7 +416,7 @@ impl Loader {
             .resolve_function_by_name(function_name, module_id)
             .map_err(|err| err.finish(Location::Undefined))?;
 
-        let parameters = func.arg_tys().to_vec();
+        let parameters = func.param_tys().to_vec();
 
         let return_ = func.return_tys().to_vec();
 
@@ -518,7 +518,7 @@ impl Loader {
         data_store: &mut TransactionDataCache,
         module_store: &ModuleStorageAdapter,
     ) -> VMResult<(LoadedFunction, LoadedFunctionInstantiation)> {
-        let (module, func, arg_tys, return_tys) = self.load_function_without_type_args(
+        let (module, func, param_tys, return_tys) = self.load_function_without_type_args(
             module_id,
             function_name,
             data_store,
@@ -560,7 +560,7 @@ impl Loader {
 
         let loaded = LoadedFunctionInstantiation {
             ty_args,
-            arg_tys,
+            param_tys,
             return_tys,
         };
         Ok((
@@ -583,7 +583,7 @@ impl Loader {
         data_store: &mut TransactionDataCache,
         module_store: &ModuleStorageAdapter,
     ) -> VMResult<(Arc<Module>, Arc<Function>, LoadedFunctionInstantiation)> {
-        let (module, func, arg_tys, return_tys) = self.load_function_without_type_args(
+        let (module, func, param_tys, return_tys) = self.load_function_without_type_args(
             module_id,
             function_name,
             data_store,
@@ -607,7 +607,7 @@ impl Loader {
 
         let loaded = LoadedFunctionInstantiation {
             ty_args,
-            arg_tys,
+            param_tys,
             return_tys,
         };
         Ok((module, func, loaded))
@@ -803,24 +803,24 @@ impl Loader {
                 let struct_type = module_store
                     .get_struct_type_by_identifier(&struct_tag.name, &module_id)
                     .map_err(|e| e.finish(Location::Undefined))?;
-                if struct_type.type_parameters.is_empty() && struct_tag.type_params.is_empty() {
+                if struct_type.ty_params.is_empty() && struct_tag.type_args.is_empty() {
                     Type::Struct {
                         idx: struct_type.idx,
                         ability: AbilityInfo::struct_(struct_type.abilities),
                     }
                 } else {
                     let mut ty_args = vec![];
-                    for ty_arg_tag in &struct_tag.type_params {
+                    for ty_arg_tag in &struct_tag.type_args {
                         ty_args.push(self.load_type(ty_arg_tag, data_store, module_store)?);
                     }
-                    self.verify_ty_arg_abilities(struct_type.type_param_constraints(), &ty_args)
+                    self.verify_ty_arg_abilities(struct_type.ty_param_constraints(), &ty_args)
                         .map_err(|e| e.finish(Location::Undefined))?;
                     Type::StructInstantiation {
                         idx: struct_type.idx,
                         ty_args: triomphe::Arc::new(ty_args),
                         ability: AbilityInfo::generic_struct(
                             struct_type.abilities,
-                            struct_type.phantom_ty_args_mask.clone(),
+                            struct_type.phantom_ty_params_mask.clone(),
                         ),
                     }
                 }
@@ -1491,7 +1491,7 @@ impl<'a> Resolver<'a> {
             ),
             ability: AbilityInfo::generic_struct(
                 struct_.abilities,
-                struct_.phantom_ty_args_mask.clone(),
+                struct_.phantom_ty_params_mask.clone(),
             ),
         })
     }
@@ -1501,7 +1501,7 @@ impl<'a> Resolver<'a> {
             BinaryType::Module(module) => {
                 let handle = &module.field_handles[idx.0 as usize];
 
-                Ok(handle.definition_struct_type.fields[handle.offset].clone())
+                Ok(handle.definition_struct_type.field_tys[handle.offset].clone())
             },
             BinaryType::Script(_) => unreachable!("Scripts cannot have type instructions"),
         }
@@ -1524,11 +1524,11 @@ impl<'a> Resolver<'a> {
             .collect::<PartialVMResult<Vec<_>>>()?;
 
         // TODO: Is this type substitution unbounded?
-        field_instantiation.definition_struct_type.fields[field_instantiation.offset]
+        field_instantiation.definition_struct_type.field_tys[field_instantiation.offset]
             .subst(&instantiation_types)
     }
 
-    pub(crate) fn get_struct_fields(
+    pub(crate) fn get_struct_field_tys(
         &self,
         idx: StructDefinitionIndex,
     ) -> PartialVMResult<Arc<StructType>> {
@@ -1556,7 +1556,7 @@ impl<'a> Resolver<'a> {
             .collect::<PartialVMResult<Vec<_>>>()?;
 
         struct_type
-            .fields
+            .field_tys
             .iter()
             .map(|ty| ty.subst(&instantiation_types))
             .collect::<PartialVMResult<Vec<_>>>()
@@ -1654,7 +1654,7 @@ impl<'a> Resolver<'a> {
                     ),
                     ability: AbilityInfo::generic_struct(
                         struct_.abilities,
-                        struct_.phantom_ty_args_mask.clone(),
+                        struct_.phantom_ty_params_mask.clone(),
                     ),
                 })
             },
@@ -1798,7 +1798,7 @@ impl Loader {
             address: *name.module.address(),
             module: name.module.name().to_owned(),
             name: name.name.clone(),
-            type_params: ty_arg_tags,
+            type_args: ty_arg_tags,
         };
 
         let size =
@@ -1904,7 +1904,7 @@ impl Loader {
         let maybe_mapping = self.get_identifier_mapping_kind(name);
 
         let field_tys = struct_type
-            .fields
+            .field_tys
             .iter()
             .map(|ty| self.subst(ty, ty_args))
             .collect::<PartialVMResult<Vec<_>>>()?;
@@ -2094,7 +2094,7 @@ impl Loader {
         }
 
         let struct_type = module_store.get_struct_type_by_identifier(&name.name, &name.module)?;
-        if struct_type.fields.len() != struct_type.field_names.len() {
+        if struct_type.field_tys.len() != struct_type.field_names.len() {
             return Err(
                 PartialVMError::new(StatusCode::UNKNOWN_INVARIANT_VIOLATION_ERROR).with_message(
                     format!(
@@ -2116,7 +2116,7 @@ impl Loader {
         let field_layouts = struct_type
             .field_names
             .iter()
-            .zip(&struct_type.fields)
+            .zip(&struct_type.field_tys)
             .map(|(n, ty)| {
                 let ty = self.subst(ty, ty_args)?;
                 let l =
@@ -2214,7 +2214,7 @@ impl Loader {
         let struct_type = module_store.get_struct_type_by_identifier(&name.name, &name.module)?;
 
         let formulas = struct_type
-            .fields
+            .field_tys
             .iter()
             .map(|field_type| self.calculate_depth_of_type(field_type, module_store))
             .collect::<PartialVMResult<Vec<_>>>()?;

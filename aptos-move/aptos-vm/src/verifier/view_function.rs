@@ -56,7 +56,7 @@ pub(crate) fn validate_view_function(
     let allowed_structs = get_allowed_structs(struct_constructors_feature);
     let args = transaction_arg_validation::construct_args(
         session,
-        &fun_inst.arg_tys,
+        &fun_inst.param_tys,
         args,
         &fun_inst.ty_args,
         allowed_structs,

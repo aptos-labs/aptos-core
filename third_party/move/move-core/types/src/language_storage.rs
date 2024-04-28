@@ -109,7 +109,7 @@ pub struct StructTag {
     pub name: Identifier,
     // alias for compatibility with old json serialized data.
     #[serde(rename = "type_args", alias = "type_params")]
-    pub type_params: Vec<TypeTag>,
+    pub type_args: Vec<TypeTag>,
 }
 
 impl StructTag {
@@ -157,10 +157,10 @@ impl StructTag {
     /// to change and should not be used inside stable code.
     pub fn to_canonical_string(&self) -> String {
         let mut generics = String::new();
-        if let Some(first_ty) = self.type_params.first() {
+        if let Some(first_ty) = self.type_args.first() {
             generics.push('<');
             generics.push_str(&first_ty.to_canonical_string());
-            for ty in self.type_params.iter().skip(1) {
+            for ty in self.type_args.iter().skip(1) {
                 generics.push_str(&ty.to_canonical_string())
             }
             generics.push('>');
@@ -283,10 +283,10 @@ impl Display for StructTag {
             self.module,
             self.name
         )?;
-        if let Some(first_ty) = self.type_params.first() {
+        if let Some(first_ty) = self.type_args.first() {
             write!(f, "<")?;
             write!(f, "{}", first_ty)?;
-            for ty in self.type_params.iter().skip(1) {
+            for ty in self.type_args.iter().skip(1) {
                 write!(f, ", {}", ty)?;
             }
             write!(f, ">")?;
@@ -348,11 +348,11 @@ mod tests {
             address: AccountAddress::ONE,
             module: Identifier::new("abc").unwrap(),
             name: Identifier::new("abc").unwrap(),
-            type_params: vec![TypeTag::U8],
+            type_args: vec![TypeTag::U8],
         }));
         let b = serde_json::to_string(&a).unwrap();
         let c: TypeTag = serde_json::from_str(&b).unwrap();
-        assert!(a.eq(&c), "Typetag serde error");
+        assert!(a.eq(&c), "Type tag serde error");
         assert_eq!(mem::size_of::<TypeTag>(), 16);
     }
 
@@ -408,12 +408,12 @@ mod tests {
         TypeTag::Vector(Box::new(type_param))
     }
 
-    fn make_type_tag_struct(type_param: TypeTag) -> TypeTag {
+    fn make_type_tag_struct(type_arg: TypeTag) -> TypeTag {
         TypeTag::Struct(Box::new(StructTag {
             address: AccountAddress::ONE,
             module: Identifier::new("a").unwrap(),
             name: Identifier::new("a").unwrap(),
-            type_params: vec![type_param],
+            type_args: vec![type_arg],
         }))
     }
 

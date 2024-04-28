@@ -372,7 +372,7 @@ fn test_roundtrip_to_storage_change_set() {
         address: AccountAddress::ONE,
         module: ident_str!("foo").into(),
         name: ident_str!("Foo").into(),
-        type_params: vec![],
+        type_args: vec![],
     };
     let test_module_id = ModuleId::new(AccountAddress::ONE, ident_str!("bar").into());
 

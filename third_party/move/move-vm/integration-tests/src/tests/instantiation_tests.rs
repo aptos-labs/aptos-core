@@ -118,7 +118,7 @@ fn instantiation_err() {
             address: addr,
             module: Identifier::new("m").unwrap(),
             name: Identifier::new("s").unwrap(),
-            type_params: vec![ty_arg; N],
+            type_args: vec![ty_arg; N],
         }));
     }
 

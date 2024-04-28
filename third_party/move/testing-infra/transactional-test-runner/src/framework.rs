@@ -472,7 +472,7 @@ pub trait MoveTestAdapter<'a>: Sized {
                     address: module_addr,
                     module,
                     name,
-                    type_params: type_arguments,
+                    type_args: type_arguments,
                 } = resource
                     .into_struct_tag(&|s| Some(state.resolve_named_address(s)))
                     .unwrap();

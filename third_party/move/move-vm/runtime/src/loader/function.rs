@@ -30,14 +30,12 @@ pub(crate) enum Scope {
 }
 
 // A runtime function
-// #[derive(Debug)]
-// https://github.com/rust-lang/rust/issues/70263
 pub(crate) struct Function {
     #[allow(unused)]
     pub(crate) file_format_version: u32,
     pub(crate) index: FunctionDefinitionIndex,
     pub(crate) code: Vec<Bytecode>,
-    pub(crate) ty_arg_abilities: Vec<AbilitySet>,
+    pub(crate) ty_param_abilities: Vec<AbilitySet>,
     // TODO: Make `native` and `def_is_native` become an enum.
     pub(crate) native: Option<NativeFunction>,
     pub(crate) def_is_native: bool,
@@ -46,7 +44,7 @@ pub(crate) struct Function {
     pub(crate) name: Identifier,
     pub(crate) return_tys: Vec<Type>,
     pub(crate) local_tys: Vec<Type>,
-    pub(crate) arg_tys: Vec<Type>,
+    pub(crate) param_tys: Vec<Type>,
     pub(crate) access_specifier: AccessSpecifier,
 }
 
@@ -100,7 +98,7 @@ impl Function {
             Some(code) => code.code.clone(),
             None => vec![],
         };
-        let ty_arg_abilities = handle.type_parameters.clone();
+        let ty_param_abilities = handle.type_parameters.clone();
         let return_tys = signature_table[handle.return_.0 as usize].clone();
         let local_tys = if let Some(code) = &def.code {
             let mut local_tys = signature_table[handle.parameters.0 as usize].clone();
@@ -109,7 +107,7 @@ impl Function {
         } else {
             vec![]
         };
-        let arg_tys = signature_table[handle.parameters.0 as usize].clone();
+        let param_tys = signature_table[handle.parameters.0 as usize].clone();
 
         let access_specifier = load_access_specifier(
             BinaryIndexedView::Module(module),
@@ -122,7 +120,7 @@ impl Function {
             file_format_version: module.version(),
             index,
             code,
-            ty_arg_abilities,
+            ty_param_abilities,
             native,
             def_is_native,
             def_is_friend_or_private,
@@ -130,7 +128,7 @@ impl Function {
             name,
             local_tys,
             return_tys,
-            arg_tys,
+            param_tys,
             access_specifier,
         })
     }
@@ -174,12 +172,8 @@ impl Function {
         self.local_tys.len()
     }
 
-    pub(crate) fn arg_count(&self) -> usize {
-        self.arg_tys.len()
-    }
-
-    pub(crate) fn return_type_count(&self) -> usize {
-        self.return_tys.len()
+    pub(crate) fn param_count(&self) -> usize {
+        self.param_tys.len()
     }
 
     pub(crate) fn name(&self) -> &str {
@@ -191,7 +185,7 @@ impl Function {
     }
 
     pub(crate) fn ty_arg_abilities(&self) -> &[AbilitySet] {
-        &self.ty_arg_abilities
+        &self.ty_param_abilities
     }
 
     pub(crate) fn local_tys(&self) -> &[Type] {
@@ -202,8 +196,8 @@ impl Function {
         &self.return_tys
     }
 
-    pub(crate) fn arg_tys(&self) -> &[Type] {
-        &self.arg_tys
+    pub(crate) fn param_tys(&self) -> &[Type] {
+        &self.param_tys
     }
 
     pub(crate) fn pretty_string(&self) -> String {

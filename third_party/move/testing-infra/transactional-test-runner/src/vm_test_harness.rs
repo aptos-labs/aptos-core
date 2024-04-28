@@ -68,7 +68,7 @@ pub fn view_resource_in_move_storage(
         address: *module.address(),
         module: module.name().to_owned(),
         name: resource.to_owned(),
-        type_params: type_args,
+        type_args,
     };
     // TODO
     match storage.get_resource(&address, &tag).unwrap() {

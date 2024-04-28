@@ -129,7 +129,7 @@ impl ElementType {
                 address: AccountAddress::ONE,
                 module: ident_str!("string").to_owned(),
                 name: ident_str!("String").to_owned(),
-                type_params: vec![],
+                type_args: vec![],
             })),
         }
     }

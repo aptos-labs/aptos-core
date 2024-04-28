@@ -204,7 +204,7 @@ impl Interpreter {
                             module_id,
                             func.name(),
                             self.operand_stack
-                                .last_n(func.arg_count())
+                                .last_n(func.param_count())
                                 .map_err(|e| set_err_info!(current_frame, e))?,
                             (func.local_count() as u64).into(),
                         )
@@ -270,7 +270,7 @@ impl Interpreter {
                             func.name(),
                             ty_args.iter().map(|ty| TypeWithLoader { ty, loader }),
                             self.operand_stack
-                                .last_n(func.arg_count())
+                                .last_n(func.param_count())
                                 .map_err(|e| set_err_info!(current_frame, e))?,
                             (func.local_count() as u64).into(),
                         )
@@ -322,12 +322,12 @@ impl Interpreter {
         ty_args: Vec<Type>,
     ) -> PartialVMResult<Frame> {
         let mut locals = Locals::new(func.local_count());
-        let arg_count = func.arg_count();
+        let param_count = func.param_count();
         let is_generic = !ty_args.is_empty();
 
-        for i in 0..arg_count {
+        for i in 0..param_count {
             locals.store_loc(
-                arg_count - i - 1,
+                param_count - i - 1,
                 self.operand_stack.pop()?,
                 loader
                     .vm_config()
@@ -338,10 +338,12 @@ impl Interpreter {
                 let ty = self.operand_stack.pop_ty()?;
                 let resolver = func.get_resolver(loader, module_store);
                 if is_generic {
-                    ty.check_eq(&resolver.subst(&func.local_tys()[arg_count - i - 1], &ty_args)?)?;
+                    ty.check_eq(
+                        &resolver.subst(&func.local_tys()[param_count - i - 1], &ty_args)?,
+                    )?;
                 } else {
                     // Directly check against the expected type to save a clone here.
-                    ty.check_eq(&func.local_tys()[arg_count - i - 1])?;
+                    ty.check_eq(&func.local_tys()[param_count - i - 1])?;
                 }
             }
         }
@@ -437,7 +439,7 @@ impl Interpreter {
     ) -> PartialVMResult<()> {
         let is_generic = !ty_args.is_empty();
         let mut args = VecDeque::new();
-        let expected_args = function.arg_count();
+        let expected_args = function.param_count();
         for _ in 0..expected_args {
             args.push_front(self.operand_stack.pop()?);
         }
@@ -447,10 +449,10 @@ impl Interpreter {
                 let ty = self.operand_stack.pop_ty()?;
                 if is_generic {
                     let expected_ty =
-                        resolver.subst(&function.arg_tys()[expected_args - i - 1], &ty_args)?;
+                        resolver.subst(&function.param_tys()[expected_args - i - 1], &ty_args)?;
                     ty.check_eq(&expected_ty)?;
                 } else {
-                    ty.check_eq(&function.arg_tys()[expected_args - i - 1])?;
+                    ty.check_eq(&function.param_tys()[expected_args - i - 1])?;
                 }
             }
         }
@@ -502,7 +504,7 @@ impl Interpreter {
 
         // Paranoid check to protect us against incorrect native function implementations. A native function that
         // returns a different number of values than its declared types will trigger this check
-        if return_values.len() != function.return_type_count() {
+        if return_values.len() != function.return_tys().len() {
             return Err(
                 PartialVMError::new(StatusCode::UNKNOWN_INVARIANT_VIOLATION_ERROR).with_message(
                     "Arity mismatch: return value count does not match return type count"
@@ -1263,21 +1265,15 @@ impl FrameTypeCache {
         resolver: &Resolver,
         ty_args: &[Type],
     ) -> PartialVMResult<((&Type, NumTypeNodes), (&Type, NumTypeNodes))> {
-        let ((field_ty, field_type_count), (struct_ty, struct_type_count)) =
+        let ((field_ty, field_ty_count), (struct_ty, struct_ty_count)) =
             Self::get_or(&mut self.field_instantiation, idx, |idx| {
                 let struct_type = resolver.field_instantiation_to_struct(idx, ty_args)?;
-                let struct_type_count = NumTypeNodes::new(struct_type.num_nodes() as u64);
-                let field_type = resolver.get_field_type_generic(idx, ty_args)?;
-                let field_type_count = NumTypeNodes::new(field_type.num_nodes() as u64);
-                Ok((
-                    (field_type, field_type_count),
-                    (struct_type, struct_type_count),
-                ))
+                let struct_ty_count = NumTypeNodes::new(struct_type.num_nodes() as u64);
+                let field_ty = resolver.get_field_type_generic(idx, ty_args)?;
+                let field_ty_count = NumTypeNodes::new(field_ty.num_nodes() as u64);
+                Ok(((field_ty, field_ty_count), (struct_type, struct_ty_count)))
             })?;
-        Ok((
-            (field_ty, *field_type_count),
-            (struct_ty, *struct_type_count),
-        ))
+        Ok(((field_ty, *field_ty_count), (struct_ty, *struct_ty_count)))
     }
 
     #[inline(always)]
@@ -1580,7 +1576,7 @@ impl Frame {
             },
             Bytecode::Pack(idx) => {
                 let field_count = resolver.field_count(*idx);
-                let args_ty = resolver.get_struct_fields(*idx)?;
+                let args_ty = resolver.get_struct_field_tys(*idx)?;
                 let output_ty = resolver.get_struct_type(*idx)?;
                 let ability = output_ty.abilities()?;
 
@@ -1593,7 +1589,7 @@ impl Frame {
                     ability
                 };
 
-                if field_count as usize != args_ty.fields.len() {
+                if field_count as usize != args_ty.field_tys.len() {
                     return Err(
                         PartialVMError::new(StatusCode::UNKNOWN_INVARIANT_VIOLATION_ERROR)
                             .with_message("Args count mismatch".to_string()),
@@ -1604,7 +1600,7 @@ impl Frame {
                     .operand_stack
                     .popn_tys(field_count)?
                     .into_iter()
-                    .zip(args_ty.fields.iter())
+                    .zip(args_ty.field_tys.iter())
                 {
                     // Fields ability should be a subset of the struct ability because abilities can be weakened but not the other direction.
                     // For example, it is ok to have a struct that doesn't have a copy capability where its field is a struct that has copy capability but not vice versa.
@@ -1653,8 +1649,8 @@ impl Frame {
             Bytecode::Unpack(idx) => {
                 let struct_ty = interpreter.operand_stack.pop_ty()?;
                 struct_ty.check_eq(&resolver.get_struct_type(*idx)?)?;
-                let struct_decl = resolver.get_struct_fields(*idx)?;
-                for ty in struct_decl.fields.iter() {
+                let struct_decl = resolver.get_struct_field_tys(*idx)?;
+                for ty in struct_decl.field_tys.iter() {
                     interpreter.operand_stack.push_ty(ty.clone())?;
                 }
             },

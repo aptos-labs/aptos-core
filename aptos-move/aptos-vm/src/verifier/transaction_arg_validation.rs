@@ -114,7 +114,7 @@ pub fn validate_combine_signer_and_txn_args(
     }
     let mut signer_param_cnt = 0;
     // find all signer params at the beginning
-    for ty in func.arg_tys.iter() {
+    for ty in func.param_tys.iter() {
         match ty {
             Type::Signer => signer_param_cnt += 1,
             Type::Reference(inner_type) => {
@@ -128,7 +128,7 @@ pub fn validate_combine_signer_and_txn_args(
 
     let allowed_structs = get_allowed_structs(are_struct_constructors_enabled);
     // Need to keep this here to ensure we return the historic correct error code for replay
-    for ty in func.arg_tys[signer_param_cnt..].iter() {
+    for ty in func.param_tys[signer_param_cnt..].iter() {
         let valid = is_valid_txn_arg(session, &ty.subst(&func.ty_args).unwrap(), allowed_structs);
         if !valid {
             return Err(VMStatus::error(
@@ -138,7 +138,7 @@ pub fn validate_combine_signer_and_txn_args(
         }
     }
 
-    if (signer_param_cnt + args.len()) != func.arg_tys.len() {
+    if (signer_param_cnt + args.len()) != func.param_tys.len() {
         return Err(VMStatus::error(
             StatusCode::NUMBER_OF_ARGUMENTS_MISMATCH,
             None,
@@ -161,7 +161,7 @@ pub fn validate_combine_signer_and_txn_args(
     // FAILED_TO_DESERIALIZE_ARGUMENT error.
     let args = construct_args(
         session,
-        &func.arg_tys[signer_param_cnt..],
+        &func.param_tys[signer_param_cnt..],
         args,
         &func.ty_args,
         allowed_structs,
@@ -423,7 +423,7 @@ fn validate_and_construct(
         expected_type,
     )?;
     let mut args = vec![];
-    for param_type in &instantiation.arg_tys {
+    for param_type in &instantiation.param_tys {
         let mut arg = vec![];
         recursively_construct_arg(
             session,

@@ -158,7 +158,7 @@ async fn get_balances(
                     // Only show coins on the base account
                     if account.is_base_account() {
                         let coin_store: CoinStoreResource = bcs::from_bytes(&bytes)?;
-                        if let Some(coin_type) = struct_tag.type_params.first() {
+                        if let Some(coin_type) = struct_tag.type_args.first() {
                             // Only display supported coins
                             if coin_type == &native_coin_tag() {
                                 balances.push(Amount {

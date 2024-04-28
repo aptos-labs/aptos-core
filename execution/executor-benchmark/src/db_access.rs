@@ -61,13 +61,13 @@ impl DbAccessUtil {
         address: AccountAddress,
         module: &str,
         name: &str,
-        type_params: Vec<TypeTag>,
+        type_args: Vec<TypeTag>,
     ) -> StructTag {
         StructTag {
             address,
             module: Identifier::from_str(module).unwrap(),
             name: Identifier::from_str(name).unwrap(),
-            type_params,
+            type_args,
         }
     }
 
@@ -76,7 +76,7 @@ impl DbAccessUtil {
         resource_address: AccountAddress,
         module: &str,
         name: &str,
-        type_params: Vec<TypeTag>,
+        type_args: Vec<TypeTag>,
     ) -> StateKey {
         StateKey::access_path(AccessPath::new(
             address,
@@ -84,7 +84,7 @@ impl DbAccessUtil {
                 resource_address,
                 module,
                 name,
-                type_params,
+                type_args,
             ))
             .expect("access path in test"),
         ))
