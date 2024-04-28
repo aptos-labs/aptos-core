@@ -18,7 +18,7 @@
 use crate::{
     counters::{
         self, network_application_inbound_traffic, network_application_outbound_traffic,
-        FAILED_LABEL, PEER_LOOP, RECEIVED_LABEL, SENT_LABEL,
+        FAILED_LABEL, INCOMING_RPC_STEP_DURATION, PEER_LOOP, RECEIVED_LABEL, SENT_LABEL,
     },
     logging::NetworkSchema,
     peer_manager::{PeerManagerError, TransportNotification},
@@ -271,12 +271,14 @@ where
                 },
                 // Drive the queue of pending inbound rpcs. When one is fulfilled
                 // by an upstream protocol, send the response to the remote peer.
-                maybe_response = self.inbound_rpcs.next_completed_response() => {
+                (maybe_response, instant) = self.inbound_rpcs.next_completed_response() => {
                     // Extract the relevant metadata from the message
                     let message_metadata = match &maybe_response {
                         Ok((response, protocol_id)) => Some((response.request_id, *protocol_id)),
                         _ => None,
                     };
+
+                    INCOMING_RPC_STEP_DURATION.with_label_values(&["full_trip"]).observe(instant.elapsed().as_secs_f64());
 
                     // Send the response to the remote peer
                     if let Err(error) = self.inbound_rpcs.send_outbound_response(&mut write_reqs_tx, maybe_response).await {

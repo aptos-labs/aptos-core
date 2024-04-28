@@ -181,8 +181,9 @@ pub struct InboundRpcs {
     remote_peer_id: PeerId,
     /// The core async queue of pending inbound rpc tasks. The tasks are driven
     /// to completion by the `InboundRpcs::next_completed_response()` method.
-    inbound_rpc_tasks:
-        FuturesUnordered<BoxFuture<'static, Result<(RpcResponse, ProtocolId), RpcError>>>,
+    inbound_rpc_tasks: FuturesUnordered<
+        BoxFuture<'static, (Result<(RpcResponse, ProtocolId), RpcError>, Instant)>,
+    >,
     /// A blanket timeout on all inbound rpc requests. If the application handler
     /// doesn't respond to the request before this timeout, the request will be
     /// dropped.
@@ -250,11 +251,12 @@ impl InboundRpcs {
 
         // Forward request to PeerManager for handling.
         let (response_tx, response_rx) = oneshot::channel();
+        let instant = Instant::now();
         let notif = PeerNotification::RecvRpc(InboundRpcRequest {
             protocol_id,
             data: Bytes::from(request.raw_request),
             res_tx: response_tx,
-            instant: Instant::now(),
+            instant: instant.clone(),
         });
         if let Err(err) = peer_notifs_tx.push(protocol_id, notif) {
             counters::rpc_messages(network_context, REQUEST_LABEL, INBOUND_LABEL, FAILED_LABEL)
@@ -286,7 +288,7 @@ impl InboundRpcs {
                     Ok(_) => timer.stop_and_record(),
                     Err(_) => timer.stop_and_discard(),
                 };
-                maybe_response
+                (maybe_response, instant)
             })
             .boxed();
 
@@ -324,7 +326,8 @@ impl InboundRpcs {
     /// `futures::select!`.
     pub fn next_completed_response(
         &mut self,
-    ) -> impl Future<Output = Result<(RpcResponse, ProtocolId), RpcError>> + FusedFuture + '_ {
+    ) -> impl Future<Output = (Result<(RpcResponse, ProtocolId), RpcError>, Instant)> + FusedFuture + '_
+    {
         self.inbound_rpc_tasks.select_next_some()
     }
 

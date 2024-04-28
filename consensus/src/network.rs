@@ -851,7 +851,7 @@ impl NetworkTask {
                                     protocol,
                                     response_sender: callback,
                                 },
-                                start: Instant::now(),
+                                start: instant,
                             })
                         },
                         ConsensusMsg::CommitMessage(req) => {
