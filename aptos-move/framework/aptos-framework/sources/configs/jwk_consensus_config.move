@@ -67,13 +67,8 @@ module aptos_framework::jwk_consensus_config {
         config_buffer::upsert(config);
     }
 
-    /// Deprecated by `on_new_epoch_v2()`.
-    public(friend) fun on_new_epoch() {
-        abort(error::invalid_state(EAPI_DISABLED))
-    }
-
     /// Only used in reconfigurations to apply the pending `JWKConsensusConfig`, if there is any.
-    public(friend) fun on_new_epoch_v2(framework: &signer) acquires JWKConsensusConfig {
+    public(friend) fun on_new_epoch(framework: &signer) acquires JWKConsensusConfig {
         system_addresses::assert_aptos_framework(framework);
         if (config_buffer::does_exist<JWKConsensusConfig>()) {
             let new_config = config_buffer::extract<JWKConsensusConfig>();
@@ -135,11 +130,11 @@ module aptos_framework::jwk_consensus_config {
             new_oidc_provider(utf8(b"Alice"), utf8(b"https://alice.io")),
         ]);
         set_for_next_epoch(&framework, config);
-        on_new_epoch_v2(&framework);
+        on_new_epoch(&framework);
         assert!(enabled(), 1);
 
         set_for_next_epoch(&framework, new_off());
-        on_new_epoch_v2(&framework);
+        on_new_epoch(&framework);
         assert!(!enabled(), 2)
     }
 

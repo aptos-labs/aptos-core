@@ -54,13 +54,8 @@ module aptos_framework::execution_config {
         config_buffer::upsert(ExecutionConfig { config });
     }
 
-    /// Deprecated by `on_new_epoch_v2()`.
-    public(friend) fun on_new_epoch() {
-        abort(error::invalid_state(EAPI_DISABLED))
-    }
-
     /// Only used in reconfigurations to apply the pending `ExecutionConfig`, if there is any.
-    public(friend) fun on_new_epoch_v2(framework: &signer) acquires ExecutionConfig {
+    public(friend) fun on_new_epoch(framework: &signer) acquires ExecutionConfig {
         system_addresses::assert_aptos_framework(framework);
         if (config_buffer::does_exist<ExecutionConfig>()) {
             let config = config_buffer::extract<ExecutionConfig>();

@@ -1,6 +1,5 @@
 /// Structs and functions for on-chain randomness configurations.
 module aptos_framework::randomness_config {
-    use std::error;
     use std::string;
     use aptos_std::copyable_any;
     use aptos_std::copyable_any::Any;
@@ -59,13 +58,8 @@ module aptos_framework::randomness_config {
         config_buffer::upsert(new_config);
     }
 
-    /// Deprecated by `on_new_epoch_v2()`.
-    public(friend) fun on_new_epoch() {
-        abort(error::invalid_state(EAPI_DISABLED))
-    }
-
     /// Only used in reconfigurations to apply the pending `RandomnessConfig`, if there is any.
-    public(friend) fun on_new_epoch_v2(framework: &signer) acquires RandomnessConfig {
+    public(friend) fun on_new_epoch(framework: &signer) acquires RandomnessConfig {
         system_addresses::assert_aptos_framework(framework);
         if (config_buffer::does_exist<RandomnessConfig>()) {
             let new_config = config_buffer::extract<RandomnessConfig>();
@@ -151,12 +145,12 @@ module aptos_framework::randomness_config {
             fixed_point64::create_from_rational(2, 3)
         );
         set_for_next_epoch(&framework, config);
-        on_new_epoch_v2(&framework);
+        on_new_epoch(&framework);
         assert!(enabled(), 1);
 
         // Disabling.
         set_for_next_epoch(&framework, new_off());
-        on_new_epoch_v2(&framework);
+        on_new_epoch(&framework);
         assert!(!enabled(), 2);
     }
 }

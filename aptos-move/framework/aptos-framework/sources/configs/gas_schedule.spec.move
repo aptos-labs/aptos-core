@@ -107,11 +107,7 @@ spec aptos_framework::gas_schedule {
         aborts_if exists<GasScheduleV2>(@aptos_framework) && new_gas_schedule.feature_version < cur_gas_schedule.feature_version;
     }
 
-    spec on_new_epoch() {
-        pragma verify = false;
-    }
-
-    spec on_new_epoch_v2(framework: &signer) {
+    spec on_new_epoch(framework: &signer) {
         requires @aptos_framework == std::signer::address_of(framework);
         include config_buffer::OnNewEpochRequirement<GasScheduleV2>;
         aborts_if false;

@@ -15,7 +15,6 @@ it costs to execute Move on the network.
 -  [Function `set_gas_schedule`](#0x1_gas_schedule_set_gas_schedule)
 -  [Function `set_for_next_epoch`](#0x1_gas_schedule_set_for_next_epoch)
 -  [Function `on_new_epoch`](#0x1_gas_schedule_on_new_epoch)
--  [Function `on_new_epoch_v2`](#0x1_gas_schedule_on_new_epoch_v2)
 -  [Function `set_storage_gas_config`](#0x1_gas_schedule_set_storage_gas_config)
 -  [Function `set_storage_gas_config_for_next_epoch`](#0x1_gas_schedule_set_storage_gas_config_for_next_epoch)
 -  [Specification](#@Specification_1)
@@ -25,7 +24,6 @@ it costs to execute Move on the network.
     -  [Function `set_gas_schedule`](#@Specification_1_set_gas_schedule)
     -  [Function `set_for_next_epoch`](#@Specification_1_set_for_next_epoch)
     -  [Function `on_new_epoch`](#@Specification_1_on_new_epoch)
-    -  [Function `on_new_epoch_v2`](#@Specification_1_on_new_epoch_v2)
     -  [Function `set_storage_gas_config`](#@Specification_1_set_storage_gas_config)
     -  [Function `set_storage_gas_config_for_next_epoch`](#@Specification_1_set_storage_gas_config_for_next_epoch)
 
@@ -297,34 +295,10 @@ aptos_framework::aptos_governance::reconfigure(&framework_signer);
 
 ## Function `on_new_epoch`
 
-
-
-<pre><code><b>public</b>(<b>friend</b>) <b>fun</b> <a href="gas_schedule.md#0x1_gas_schedule_on_new_epoch">on_new_epoch</a>()
-</code></pre>
-
-
-
-<details>
-<summary>Implementation</summary>
-
-
-<pre><code><b>public</b>(<b>friend</b>) <b>fun</b> <a href="gas_schedule.md#0x1_gas_schedule_on_new_epoch">on_new_epoch</a>() {
-    <b>abort</b>(<a href="../../aptos-stdlib/../move-stdlib/doc/error.md#0x1_error_invalid_state">error::invalid_state</a>(<a href="gas_schedule.md#0x1_gas_schedule_EAPI_DISABLED">EAPI_DISABLED</a>))
-}
-</code></pre>
-
-
-
-</details>
-
-<a id="0x1_gas_schedule_on_new_epoch_v2"></a>
-
-## Function `on_new_epoch_v2`
-
 Only used in reconfigurations to apply the pending <code><a href="gas_schedule.md#0x1_gas_schedule_GasScheduleV2">GasScheduleV2</a></code>, if there is any.
 
 
-<pre><code><b>public</b>(<b>friend</b>) <b>fun</b> <a href="gas_schedule.md#0x1_gas_schedule_on_new_epoch_v2">on_new_epoch_v2</a>(framework: &<a href="../../aptos-stdlib/../move-stdlib/doc/signer.md#0x1_signer">signer</a>)
+<pre><code><b>public</b>(<b>friend</b>) <b>fun</b> <a href="gas_schedule.md#0x1_gas_schedule_on_new_epoch">on_new_epoch</a>(framework: &<a href="../../aptos-stdlib/../move-stdlib/doc/signer.md#0x1_signer">signer</a>)
 </code></pre>
 
 
@@ -333,7 +307,7 @@ Only used in reconfigurations to apply the pending <code><a href="gas_schedule.m
 <summary>Implementation</summary>
 
 
-<pre><code><b>public</b>(<b>friend</b>) <b>fun</b> <a href="gas_schedule.md#0x1_gas_schedule_on_new_epoch_v2">on_new_epoch_v2</a>(framework: &<a href="../../aptos-stdlib/../move-stdlib/doc/signer.md#0x1_signer">signer</a>) <b>acquires</b> <a href="gas_schedule.md#0x1_gas_schedule_GasScheduleV2">GasScheduleV2</a> {
+<pre><code><b>public</b>(<b>friend</b>) <b>fun</b> <a href="gas_schedule.md#0x1_gas_schedule_on_new_epoch">on_new_epoch</a>(framework: &<a href="../../aptos-stdlib/../move-stdlib/doc/signer.md#0x1_signer">signer</a>) <b>acquires</b> <a href="gas_schedule.md#0x1_gas_schedule_GasScheduleV2">GasScheduleV2</a> {
     <a href="system_addresses.md#0x1_system_addresses_assert_aptos_framework">system_addresses::assert_aptos_framework</a>(framework);
     <b>if</b> (<a href="config_buffer.md#0x1_config_buffer_does_exist">config_buffer::does_exist</a>&lt;<a href="gas_schedule.md#0x1_gas_schedule_GasScheduleV2">GasScheduleV2</a>&gt;()) {
         <b>let</b> new_gas_schedule = <a href="config_buffer.md#0x1_config_buffer_extract">config_buffer::extract</a>&lt;<a href="gas_schedule.md#0x1_gas_schedule_GasScheduleV2">GasScheduleV2</a>&gt;();
@@ -546,23 +520,7 @@ Only used in reconfigurations to apply the pending <code><a href="gas_schedule.m
 ### Function `on_new_epoch`
 
 
-<pre><code><b>public</b>(<b>friend</b>) <b>fun</b> <a href="gas_schedule.md#0x1_gas_schedule_on_new_epoch">on_new_epoch</a>()
-</code></pre>
-
-
-
-
-<pre><code><b>pragma</b> verify = <b>false</b>;
-</code></pre>
-
-
-
-<a id="@Specification_1_on_new_epoch_v2"></a>
-
-### Function `on_new_epoch_v2`
-
-
-<pre><code><b>public</b>(<b>friend</b>) <b>fun</b> <a href="gas_schedule.md#0x1_gas_schedule_on_new_epoch_v2">on_new_epoch_v2</a>(framework: &<a href="../../aptos-stdlib/../move-stdlib/doc/signer.md#0x1_signer">signer</a>)
+<pre><code><b>public</b>(<b>friend</b>) <b>fun</b> <a href="gas_schedule.md#0x1_gas_schedule_on_new_epoch">on_new_epoch</a>(framework: &<a href="../../aptos-stdlib/../move-stdlib/doc/signer.md#0x1_signer">signer</a>)
 </code></pre>
 
 

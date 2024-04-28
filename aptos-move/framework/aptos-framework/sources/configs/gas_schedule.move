@@ -102,12 +102,8 @@ module aptos_framework::gas_schedule {
         config_buffer::upsert(new_gas_schedule);
     }
 
-    public(friend) fun on_new_epoch() {
-        abort(error::invalid_state(EAPI_DISABLED))
-    }
-
     /// Only used in reconfigurations to apply the pending `GasScheduleV2`, if there is any.
-    public(friend) fun on_new_epoch_v2(framework: &signer) acquires GasScheduleV2 {
+    public(friend) fun on_new_epoch(framework: &signer) acquires GasScheduleV2 {
         system_addresses::assert_aptos_framework(framework);
         if (config_buffer::does_exist<GasScheduleV2>()) {
             let new_gas_schedule = config_buffer::extract<GasScheduleV2>();

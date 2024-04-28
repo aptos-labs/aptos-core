@@ -247,13 +247,8 @@ module aptos_framework::jwks {
         ret
     }
 
-    /// Deprecated by `on_new_epoch_v2()`.
-    public(friend) fun on_new_epoch() {
-        abort(error::invalid_state(EAPI_DISABLED))
-    }
-
     /// Only used in reconfigurations to apply the pending `SupportedOIDCProviders`, if there is any.
-    public(friend) fun on_new_epoch_v2(framework: &signer) acquires SupportedOIDCProviders {
+    public(friend) fun on_new_epoch(framework: &signer) acquires SupportedOIDCProviders {
         system_addresses::assert_aptos_framework(framework);
         if (config_buffer::does_exist<SupportedOIDCProviders>()) {
             let new_config = config_buffer::extract<SupportedOIDCProviders>();

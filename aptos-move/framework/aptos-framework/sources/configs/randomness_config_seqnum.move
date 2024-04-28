@@ -8,7 +8,6 @@
 /// 1. Once the bug is fixed and the binary + framework have been patched,
 ///    a governance proposal is needed to set `RandomnessConfigSeqNum` to be `X+2`.
 module aptos_framework::randomness_config_seqnum {
-    use std::error;
     use aptos_framework::config_buffer;
     use aptos_framework::system_addresses;
 
@@ -38,13 +37,8 @@ module aptos_framework::randomness_config_seqnum {
         }
     }
 
-    /// Deprecated by `on_new_epoch_v2()`.
-    public(friend) fun on_new_epoch() {
-        abort(error::invalid_state(EAPI_DISABLED))
-    }
-
     /// Only used in reconfigurations to apply the pending `RandomnessConfig`, if there is any.
-    public(friend) fun on_new_epoch_v2(framework: &signer) acquires RandomnessConfigSeqNum {
+    public(friend) fun on_new_epoch(framework: &signer) acquires RandomnessConfigSeqNum {
         system_addresses::assert_aptos_framework(framework);
         if (config_buffer::does_exist<RandomnessConfigSeqNum>()) {
             let new_config = config_buffer::extract<RandomnessConfigSeqNum>();

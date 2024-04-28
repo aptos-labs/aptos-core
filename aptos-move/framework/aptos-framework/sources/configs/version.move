@@ -66,13 +66,8 @@ module aptos_framework::version {
         config_buffer::upsert(Version {major});
     }
 
-    /// Deprecated by `on_new_epoch_v2()`.
-    public(friend) fun on_new_epoch() {
-        abort(error::invalid_state(EAPI_DISABLED))
-    }
-
     /// Only used in reconfigurations to apply the pending `Version`, if there is any.
-    public(friend) fun on_new_epoch_v2(framework: &signer) acquires Version {
+    public(friend) fun on_new_epoch(framework: &signer) acquires Version {
         system_addresses::assert_aptos_framework(framework);
         if (config_buffer::does_exist<Version>()) {
             let new_value = config_buffer::extract<Version>();

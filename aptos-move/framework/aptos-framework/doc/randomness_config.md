@@ -14,7 +14,6 @@ Structs and functions for on-chain randomness configurations.
 -  [Function `initialize`](#0x1_randomness_config_initialize)
 -  [Function `set_for_next_epoch`](#0x1_randomness_config_set_for_next_epoch)
 -  [Function `on_new_epoch`](#0x1_randomness_config_on_new_epoch)
--  [Function `on_new_epoch_v2`](#0x1_randomness_config_on_new_epoch_v2)
 -  [Function `enabled`](#0x1_randomness_config_enabled)
 -  [Function `new_off`](#0x1_randomness_config_new_off)
 -  [Function `new_v1`](#0x1_randomness_config_new_v1)
@@ -22,13 +21,11 @@ Structs and functions for on-chain randomness configurations.
 -  [Function `current`](#0x1_randomness_config_current)
 -  [Specification](#@Specification_1)
     -  [Function `on_new_epoch`](#@Specification_1_on_new_epoch)
-    -  [Function `on_new_epoch_v2`](#@Specification_1_on_new_epoch_v2)
     -  [Function `current`](#@Specification_1_current)
 
 
 <pre><code><b>use</b> <a href="config_buffer.md#0x1_config_buffer">0x1::config_buffer</a>;
 <b>use</b> <a href="../../aptos-stdlib/doc/copyable_any.md#0x1_copyable_any">0x1::copyable_any</a>;
-<b>use</b> <a href="../../aptos-stdlib/../move-stdlib/doc/error.md#0x1_error">0x1::error</a>;
 <b>use</b> <a href="../../aptos-stdlib/doc/fixed_point64.md#0x1_fixed_point64">0x1::fixed_point64</a>;
 <b>use</b> <a href="../../aptos-stdlib/../move-stdlib/doc/string.md#0x1_string">0x1::string</a>;
 <b>use</b> <a href="system_addresses.md#0x1_system_addresses">0x1::system_addresses</a>;
@@ -251,35 +248,10 @@ This can be called by on-chain governance to update on-chain consensus configs f
 
 ## Function `on_new_epoch`
 
-Deprecated by <code><a href="randomness_config.md#0x1_randomness_config_on_new_epoch_v2">on_new_epoch_v2</a>()</code>.
-
-
-<pre><code><b>public</b>(<b>friend</b>) <b>fun</b> <a href="randomness_config.md#0x1_randomness_config_on_new_epoch">on_new_epoch</a>()
-</code></pre>
-
-
-
-<details>
-<summary>Implementation</summary>
-
-
-<pre><code><b>public</b>(<b>friend</b>) <b>fun</b> <a href="randomness_config.md#0x1_randomness_config_on_new_epoch">on_new_epoch</a>() {
-    <b>abort</b>(<a href="../../aptos-stdlib/../move-stdlib/doc/error.md#0x1_error_invalid_state">error::invalid_state</a>(<a href="randomness_config.md#0x1_randomness_config_EAPI_DISABLED">EAPI_DISABLED</a>))
-}
-</code></pre>
-
-
-
-</details>
-
-<a id="0x1_randomness_config_on_new_epoch_v2"></a>
-
-## Function `on_new_epoch_v2`
-
 Only used in reconfigurations to apply the pending <code><a href="randomness_config.md#0x1_randomness_config_RandomnessConfig">RandomnessConfig</a></code>, if there is any.
 
 
-<pre><code><b>public</b>(<b>friend</b>) <b>fun</b> <a href="randomness_config.md#0x1_randomness_config_on_new_epoch_v2">on_new_epoch_v2</a>(framework: &<a href="../../aptos-stdlib/../move-stdlib/doc/signer.md#0x1_signer">signer</a>)
+<pre><code><b>public</b>(<b>friend</b>) <b>fun</b> <a href="randomness_config.md#0x1_randomness_config_on_new_epoch">on_new_epoch</a>(framework: &<a href="../../aptos-stdlib/../move-stdlib/doc/signer.md#0x1_signer">signer</a>)
 </code></pre>
 
 
@@ -288,7 +260,7 @@ Only used in reconfigurations to apply the pending <code><a href="randomness_con
 <summary>Implementation</summary>
 
 
-<pre><code><b>public</b>(<b>friend</b>) <b>fun</b> <a href="randomness_config.md#0x1_randomness_config_on_new_epoch_v2">on_new_epoch_v2</a>(framework: &<a href="../../aptos-stdlib/../move-stdlib/doc/signer.md#0x1_signer">signer</a>) <b>acquires</b> <a href="randomness_config.md#0x1_randomness_config_RandomnessConfig">RandomnessConfig</a> {
+<pre><code><b>public</b>(<b>friend</b>) <b>fun</b> <a href="randomness_config.md#0x1_randomness_config_on_new_epoch">on_new_epoch</a>(framework: &<a href="../../aptos-stdlib/../move-stdlib/doc/signer.md#0x1_signer">signer</a>) <b>acquires</b> <a href="randomness_config.md#0x1_randomness_config_RandomnessConfig">RandomnessConfig</a> {
     <a href="system_addresses.md#0x1_system_addresses_assert_aptos_framework">system_addresses::assert_aptos_framework</a>(framework);
     <b>if</b> (<a href="config_buffer.md#0x1_config_buffer_does_exist">config_buffer::does_exist</a>&lt;<a href="randomness_config.md#0x1_randomness_config_RandomnessConfig">RandomnessConfig</a>&gt;()) {
         <b>let</b> new_config = <a href="config_buffer.md#0x1_config_buffer_extract">config_buffer::extract</a>&lt;<a href="randomness_config.md#0x1_randomness_config_RandomnessConfig">RandomnessConfig</a>&gt;();
@@ -470,23 +442,7 @@ Get the currently effective randomness configuration object.
 ### Function `on_new_epoch`
 
 
-<pre><code><b>public</b>(<b>friend</b>) <b>fun</b> <a href="randomness_config.md#0x1_randomness_config_on_new_epoch">on_new_epoch</a>()
-</code></pre>
-
-
-
-
-<pre><code><b>pragma</b> verify = <b>false</b>;
-</code></pre>
-
-
-
-<a id="@Specification_1_on_new_epoch_v2"></a>
-
-### Function `on_new_epoch_v2`
-
-
-<pre><code><b>public</b>(<b>friend</b>) <b>fun</b> <a href="randomness_config.md#0x1_randomness_config_on_new_epoch_v2">on_new_epoch_v2</a>(framework: &<a href="../../aptos-stdlib/../move-stdlib/doc/signer.md#0x1_signer">signer</a>)
+<pre><code><b>public</b>(<b>friend</b>) <b>fun</b> <a href="randomness_config.md#0x1_randomness_config_on_new_epoch">on_new_epoch</a>(framework: &<a href="../../aptos-stdlib/../move-stdlib/doc/signer.md#0x1_signer">signer</a>)
 </code></pre>
 
 

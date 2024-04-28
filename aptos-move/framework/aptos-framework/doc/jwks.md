@@ -35,7 +35,6 @@ have a simple layout which is easily accessible in Rust.
 -  [Function `remove_oidc_provider`](#0x1_jwks_remove_oidc_provider)
 -  [Function `remove_oidc_provider_for_next_epoch`](#0x1_jwks_remove_oidc_provider_for_next_epoch)
 -  [Function `on_new_epoch`](#0x1_jwks_on_new_epoch)
--  [Function `on_new_epoch_v2`](#0x1_jwks_on_new_epoch_v2)
 -  [Function `set_patches`](#0x1_jwks_set_patches)
 -  [Function `new_patch_remove_all`](#0x1_jwks_new_patch_remove_all)
 -  [Function `new_patch_remove_issuer`](#0x1_jwks_new_patch_remove_issuer)
@@ -58,7 +57,6 @@ have a simple layout which is easily accessible in Rust.
 -  [Function `apply_patch`](#0x1_jwks_apply_patch)
 -  [Specification](#@Specification_1)
     -  [Function `on_new_epoch`](#@Specification_1_on_new_epoch)
-    -  [Function `on_new_epoch_v2`](#@Specification_1_on_new_epoch_v2)
 
 
 <pre><code><b>use</b> <a href="chain_status.md#0x1_chain_status">0x1::chain_status</a>;
@@ -930,35 +928,10 @@ aptos_framework::aptos_governance::reconfigure(&framework_signer);
 
 ## Function `on_new_epoch`
 
-Deprecated by <code><a href="jwks.md#0x1_jwks_on_new_epoch_v2">on_new_epoch_v2</a>()</code>.
-
-
-<pre><code><b>public</b>(<b>friend</b>) <b>fun</b> <a href="jwks.md#0x1_jwks_on_new_epoch">on_new_epoch</a>()
-</code></pre>
-
-
-
-<details>
-<summary>Implementation</summary>
-
-
-<pre><code><b>public</b>(<b>friend</b>) <b>fun</b> <a href="jwks.md#0x1_jwks_on_new_epoch">on_new_epoch</a>() {
-    <b>abort</b>(<a href="../../aptos-stdlib/../move-stdlib/doc/error.md#0x1_error_invalid_state">error::invalid_state</a>(<a href="jwks.md#0x1_jwks_EAPI_DISABLED">EAPI_DISABLED</a>))
-}
-</code></pre>
-
-
-
-</details>
-
-<a id="0x1_jwks_on_new_epoch_v2"></a>
-
-## Function `on_new_epoch_v2`
-
 Only used in reconfigurations to apply the pending <code><a href="jwks.md#0x1_jwks_SupportedOIDCProviders">SupportedOIDCProviders</a></code>, if there is any.
 
 
-<pre><code><b>public</b>(<b>friend</b>) <b>fun</b> <a href="jwks.md#0x1_jwks_on_new_epoch_v2">on_new_epoch_v2</a>(framework: &<a href="../../aptos-stdlib/../move-stdlib/doc/signer.md#0x1_signer">signer</a>)
+<pre><code><b>public</b>(<b>friend</b>) <b>fun</b> <a href="jwks.md#0x1_jwks_on_new_epoch">on_new_epoch</a>(framework: &<a href="../../aptos-stdlib/../move-stdlib/doc/signer.md#0x1_signer">signer</a>)
 </code></pre>
 
 
@@ -967,7 +940,7 @@ Only used in reconfigurations to apply the pending <code><a href="jwks.md#0x1_jw
 <summary>Implementation</summary>
 
 
-<pre><code><b>public</b>(<b>friend</b>) <b>fun</b> <a href="jwks.md#0x1_jwks_on_new_epoch_v2">on_new_epoch_v2</a>(framework: &<a href="../../aptos-stdlib/../move-stdlib/doc/signer.md#0x1_signer">signer</a>) <b>acquires</b> <a href="jwks.md#0x1_jwks_SupportedOIDCProviders">SupportedOIDCProviders</a> {
+<pre><code><b>public</b>(<b>friend</b>) <b>fun</b> <a href="jwks.md#0x1_jwks_on_new_epoch">on_new_epoch</a>(framework: &<a href="../../aptos-stdlib/../move-stdlib/doc/signer.md#0x1_signer">signer</a>) <b>acquires</b> <a href="jwks.md#0x1_jwks_SupportedOIDCProviders">SupportedOIDCProviders</a> {
     <a href="system_addresses.md#0x1_system_addresses_assert_aptos_framework">system_addresses::assert_aptos_framework</a>(framework);
     <b>if</b> (<a href="config_buffer.md#0x1_config_buffer_does_exist">config_buffer::does_exist</a>&lt;<a href="jwks.md#0x1_jwks_SupportedOIDCProviders">SupportedOIDCProviders</a>&gt;()) {
         <b>let</b> new_config = <a href="config_buffer.md#0x1_config_buffer_extract">config_buffer::extract</a>&lt;<a href="jwks.md#0x1_jwks_SupportedOIDCProviders">SupportedOIDCProviders</a>&gt;();
@@ -1696,23 +1669,7 @@ Maintains the sorted-by-issuer invariant in <code><a href="jwks.md#0x1_jwks_AllP
 ### Function `on_new_epoch`
 
 
-<pre><code><b>public</b>(<b>friend</b>) <b>fun</b> <a href="jwks.md#0x1_jwks_on_new_epoch">on_new_epoch</a>()
-</code></pre>
-
-
-
-
-<pre><code><b>pragma</b> verify = <b>false</b>;
-</code></pre>
-
-
-
-<a id="@Specification_1_on_new_epoch_v2"></a>
-
-### Function `on_new_epoch_v2`
-
-
-<pre><code><b>public</b>(<b>friend</b>) <b>fun</b> <a href="jwks.md#0x1_jwks_on_new_epoch_v2">on_new_epoch_v2</a>(framework: &<a href="../../aptos-stdlib/../move-stdlib/doc/signer.md#0x1_signer">signer</a>)
+<pre><code><b>public</b>(<b>friend</b>) <b>fun</b> <a href="jwks.md#0x1_jwks_on_new_epoch">on_new_epoch</a>(framework: &<a href="../../aptos-stdlib/../move-stdlib/doc/signer.md#0x1_signer">signer</a>)
 </code></pre>
 
 

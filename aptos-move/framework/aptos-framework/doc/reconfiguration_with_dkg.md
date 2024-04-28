@@ -98,16 +98,16 @@ Run the default reconfiguration to enter the new epoch.
 <pre><code><b>public</b>(<b>friend</b>) <b>fun</b> <a href="reconfiguration_with_dkg.md#0x1_reconfiguration_with_dkg_finish">finish</a>(framework: &<a href="../../aptos-stdlib/../move-stdlib/doc/signer.md#0x1_signer">signer</a>) {
     <a href="system_addresses.md#0x1_system_addresses_assert_aptos_framework">system_addresses::assert_aptos_framework</a>(framework);
     <a href="dkg.md#0x1_dkg_try_clear_incomplete_session">dkg::try_clear_incomplete_session</a>(framework);
-    <a href="consensus_config.md#0x1_consensus_config_on_new_epoch_v2">consensus_config::on_new_epoch_v2</a>(framework);
-    <a href="execution_config.md#0x1_execution_config_on_new_epoch_v2">execution_config::on_new_epoch_v2</a>(framework);
-    <a href="gas_schedule.md#0x1_gas_schedule_on_new_epoch_v2">gas_schedule::on_new_epoch_v2</a>(framework);
-    std::version::on_new_epoch_v2(framework);
+    <a href="consensus_config.md#0x1_consensus_config_on_new_epoch">consensus_config::on_new_epoch</a>(framework);
+    <a href="execution_config.md#0x1_execution_config_on_new_epoch">execution_config::on_new_epoch</a>(framework);
+    <a href="gas_schedule.md#0x1_gas_schedule_on_new_epoch">gas_schedule::on_new_epoch</a>(framework);
+    std::version::on_new_epoch(framework);
     <a href="../../aptos-stdlib/../move-stdlib/doc/features.md#0x1_features_on_new_epoch">features::on_new_epoch</a>(framework);
-    <a href="jwk_consensus_config.md#0x1_jwk_consensus_config_on_new_epoch_v2">jwk_consensus_config::on_new_epoch_v2</a>(framework);
-    <a href="jwks.md#0x1_jwks_on_new_epoch_v2">jwks::on_new_epoch_v2</a>(framework);
+    <a href="jwk_consensus_config.md#0x1_jwk_consensus_config_on_new_epoch">jwk_consensus_config::on_new_epoch</a>(framework);
+    <a href="jwks.md#0x1_jwks_on_new_epoch">jwks::on_new_epoch</a>(framework);
     <a href="keyless_account.md#0x1_keyless_account_on_new_epoch">keyless_account::on_new_epoch</a>(framework);
-    <a href="randomness_config_seqnum.md#0x1_randomness_config_seqnum_on_new_epoch_v2">randomness_config_seqnum::on_new_epoch_v2</a>(framework);
-    <a href="randomness_config.md#0x1_randomness_config_on_new_epoch_v2">randomness_config::on_new_epoch_v2</a>(framework);
+    <a href="randomness_config_seqnum.md#0x1_randomness_config_seqnum_on_new_epoch">randomness_config_seqnum::on_new_epoch</a>(framework);
+    <a href="randomness_config.md#0x1_randomness_config_on_new_epoch">randomness_config::on_new_epoch</a>(framework);
     <a href="reconfiguration.md#0x1_reconfiguration_reconfigure">reconfiguration::reconfigure</a>();
 }
 </code></pre>

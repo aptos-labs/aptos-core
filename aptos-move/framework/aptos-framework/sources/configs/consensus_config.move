@@ -58,13 +58,8 @@ module aptos_framework::consensus_config {
         std::config_buffer::upsert<ConsensusConfig>(ConsensusConfig {config});
     }
 
-    /// Deprecated by `on_new_epoch_v2()`.
-    public(friend) fun on_new_epoch() {
-        abort(error::invalid_state(EAPI_DISABLED))
-    }
-
     /// Only used in reconfigurations to apply the pending `ConsensusConfig`, if there is any.
-    public(friend) fun on_new_epoch_v2(framework: &signer) acquires ConsensusConfig {
+    public(friend) fun on_new_epoch(framework: &signer) acquires ConsensusConfig {
         system_addresses::assert_aptos_framework(framework);
         if (config_buffer::does_exist<ConsensusConfig>()) {
             let new_config = config_buffer::extract<ConsensusConfig>();
