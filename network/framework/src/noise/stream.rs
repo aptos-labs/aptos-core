@@ -232,9 +232,6 @@ where
         context: &mut Context,
         buf: Option<&[u8]>,
     ) -> Poll<io::Result<Option<usize>>> {
-        let _timer = counters::NETWORK_PEER_WRITE_DURATION
-            .with_label_values(&["unknown", "unknown", "noise"])
-            .start_timer();
         loop {
             trace!(
                 "NoiseStream {} WriteState::{:?}",
