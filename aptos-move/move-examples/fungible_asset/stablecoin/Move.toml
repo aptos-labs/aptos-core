@@ -1,0 +1,12 @@
+[package]
+name = "FiatToken"
+version = "1.0.1"
+
+[addresses]
+aptos_framework = "0x1"
+aptos_token_objects = "0x4"
+circle = "_"
+
+[dependencies]
+AptosFramework = { local = "../../../framework/aptos-framework" }
+AptosTokenObjects = { local = "../../../framework/aptos-token-objects" }
