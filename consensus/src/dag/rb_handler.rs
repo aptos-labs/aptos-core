@@ -142,11 +142,6 @@ impl NodeBroadcastHandler {
     }
 
     async fn validate(&self, node: Node) -> anyhow::Result<Node> {
-        let start = Instant::now();
-        defer!(RB_HANDLER_PROCESS_DURATION
-            .with_label_values(&[&"validate_inner"])
-            .observe(start.elapsed().as_secs_f64()));
-
         ensure!(
             node.epoch() == self.epoch_state.epoch,
             "different epoch {}, current {}",
