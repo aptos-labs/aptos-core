@@ -1505,9 +1505,11 @@ impl Frame {
             },
             Bytecode::LdConst(i) => {
                 let constant = resolver.constant_at(*i);
-                interpreter
-                    .operand_stack
-                    .push_ty(Type::from_const_signature(&constant.type_)?)?;
+                let ty = resolver
+                    .loader()
+                    .ty_builder()
+                    .create_constant_ty(&constant.type_)?;
+                interpreter.operand_stack.push_ty(ty)?;
             },
             Bytecode::CopyLoc(idx) => {
                 let ty = local_tys[*idx as usize].clone();

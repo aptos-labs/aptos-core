@@ -375,37 +375,6 @@ impl Type {
         Ok((ty, count))
     }
 
-    pub fn from_const_signature(constant_signature: &SignatureToken) -> PartialVMResult<Self> {
-        use SignatureToken as S;
-        use Type as L;
-
-        Ok(match constant_signature {
-            S::Bool => L::Bool,
-            S::U8 => L::U8,
-            S::U16 => L::U16,
-            S::U32 => L::U32,
-            S::U64 => L::U64,
-            S::U128 => L::U128,
-            S::U256 => L::U256,
-            S::Address => L::Address,
-            S::Vector(inner) => L::Vector(TriompheArc::new(Self::from_const_signature(inner)?)),
-            // Not yet supported
-            S::Struct(_) | S::StructInstantiation(_, _) => {
-                return Err(
-                    PartialVMError::new(StatusCode::UNKNOWN_INVARIANT_VIOLATION_ERROR)
-                        .with_message("Unable to load const type signature".to_string()),
-                )
-            },
-            // Not allowed/Not meaningful
-            S::TypeParameter(_) | S::Reference(_) | S::MutableReference(_) | S::Signer => {
-                return Err(
-                    PartialVMError::new(StatusCode::UNKNOWN_INVARIANT_VIOLATION_ERROR)
-                        .with_message("Unable to load const type signature".to_string()),
-                )
-            },
-        })
-    }
-
     pub fn check_vec_ref(&self, inner_ty: &Type, is_mut: bool) -> PartialVMResult<Type> {
         match self {
             Type::MutableReference(inner) => match &**inner {
@@ -664,6 +633,60 @@ impl TypeBuilder {
             max_ty_size: ty_config.max_ty_size,
             max_ty_depth: ty_config.max_ty_depth,
         }
+    }
+
+    pub fn create_constant_ty(&self, const_tok: &SignatureToken) -> PartialVMResult<Type> {
+        let mut count = 0;
+        self.create_constant_ty_impl(const_tok, &mut count, 0)
+    }
+
+    fn create_constant_ty_impl(
+        &self,
+        const_tok: &SignatureToken,
+        count: &mut usize,
+        depth: usize,
+    ) -> PartialVMResult<Type> {
+        use SignatureToken as S;
+        use Type as T;
+
+        if *count >= self.max_ty_size {
+            return Err(PartialVMError::new(StatusCode::TOO_MANY_TYPE_NODES));
+        }
+        if depth > self.max_ty_depth {
+            return Err(PartialVMError::new(StatusCode::VM_MAX_TYPE_DEPTH_REACHED));
+        }
+
+        *count += 1;
+        Ok(match const_tok {
+            S::Bool => T::Bool,
+            S::U8 => T::U8,
+            S::U16 => T::U16,
+            S::U32 => T::U32,
+            S::U64 => T::U64,
+            S::U128 => T::U128,
+            S::U256 => T::U256,
+            S::Address => T::Address,
+            S::Vector(elem_tok) => {
+                let elem_ty = self.create_constant_ty_impl(elem_tok, count, depth + 1)?;
+                T::Vector(TriompheArc::new(elem_ty))
+            },
+
+            S::Struct(_) | S::StructInstantiation(_, _) => {
+                return Err(
+                    PartialVMError::new(StatusCode::UNKNOWN_INVARIANT_VIOLATION_ERROR)
+                        .with_message("Struct constants are not supported".to_string()),
+                )
+            },
+
+            S::TypeParameter(_) | S::Reference(_) | S::MutableReference(_) | S::Signer => {
+                return Err(
+                    PartialVMError::new(StatusCode::UNKNOWN_INVARIANT_VIOLATION_ERROR)
+                        .with_message(
+                            "Not allowed or not meaningful type for a constant".to_string(),
+                        ),
+                )
+            },
+        })
     }
 }
 
