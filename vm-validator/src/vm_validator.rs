@@ -18,6 +18,7 @@ use aptos_types::{
 use aptos_vm::{data_cache::AsMoveResolver, AptosVM};
 use aptos_vm_logging::log_schema::AdapterLogSchema;
 use fail::fail_point;
+use rand::{thread_rng, Rng};
 use std::sync::{Arc, Mutex};
 
 #[cfg(test)]
@@ -127,8 +128,6 @@ pub fn get_account_sequence_number(
 #[derive(Clone)]
 pub struct PooledVMValidator {
     vm_validators: Vec<Arc<Mutex<VMValidator>>>,
-    // Index of the next VM to use for validation
-    next_vm: Arc<Mutex<usize>>,
 }
 
 impl PooledVMValidator {
@@ -137,17 +136,13 @@ impl PooledVMValidator {
         for _ in 0..pool_size {
             vm_validators.push(Arc::new(Mutex::new(VMValidator::new(db_reader.clone()))));
         }
-        PooledVMValidator {
-            vm_validators,
-            next_vm: Arc::new(Mutex::new(0)),
-        }
+        PooledVMValidator { vm_validators }
     }
 
     pub fn get_next_vm(&self) -> Arc<Mutex<VMValidator>> {
-        let mut next_vm = self.next_vm.lock().unwrap();
-        let vm = self.vm_validators[*next_vm].clone();
-        *next_vm = (*next_vm + 1) % self.vm_validators.len();
-        vm
+        let mut rng = thread_rng(); // Create a thread-local random number generator
+        let random_index = rng.gen_range(0, self.vm_validators.len()); // Generate random index
+        self.vm_validators[random_index].clone() // Return the VM at the random index
     }
 }
 
