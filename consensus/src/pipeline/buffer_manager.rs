@@ -348,8 +348,6 @@ impl BufferManager {
                 let aggregated_item = item.unwrap_aggregated();
                 let block = aggregated_item.executed_blocks.last().unwrap().block();
                 observe_block(block.timestamp_usecs(), BlockStage::COMMIT_CERTIFIED);
-                // TODO: As all the validators broadcast commit votes directly to all other validators,
-                // the proposer do not have to broadcast commit decision again. Remove this if block.
                 // if we're the proposer for the block, we're responsible to broadcast the commit decision.
                 if block.author() == Some(self.author) {
                     let commit_decision = CommitMessage::Decision(CommitDecision::new(
@@ -523,11 +521,27 @@ impl BufferManager {
                 // we have found the buffer item
                 let mut signed_item = item.advance_to_signed(self.author, signature);
                 let signed_item_mut = signed_item.unwrap_signed_mut();
+                let maybe_proposer = signed_item_mut
+                    .executed_blocks
+                    .last()
+                    .unwrap()
+                    .block()
+                    .author();
                 let commit_vote = signed_item_mut.commit_vote.clone();
-                let commit_vote = CommitMessage::Vote(commit_vote);
-                signed_item_mut
-                    .rb_handle
-                    .replace((Instant::now(), self.do_reliable_broadcast(commit_vote)));
+
+                if let Some(proposer) = maybe_proposer {
+                    let sender = self.commit_msg_tx.clone();
+                    tokio::spawn(async move {
+                        if let Err(e) = sender.send_commit_vote(commit_vote, proposer).await {
+                            warn!("Failed to send commit vote {:?}", e);
+                        }
+                    });
+                } else {
+                    let commit_vote = CommitMessage::Vote(commit_vote);
+                    signed_item_mut
+                        .rb_handle
+                        .replace((Instant::now(), self.do_reliable_broadcast(commit_vote)));
+                }
                 self.buffer.set(&current_cursor, signed_item);
             } else {
                 self.buffer.set(&current_cursor, item);
