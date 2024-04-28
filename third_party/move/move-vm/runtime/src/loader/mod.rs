@@ -959,43 +959,33 @@ impl Loader {
         Ok(())
     }
 
-    // The interface for module loading. Aligned with `load_type` and `load_function`, this function
-    // verifies that the module is OK instead of expect it.
+    // Loads and returns a module. Additionally, loads the transitive closure of its
+    // dependencies. Each dependency is re-verified and checked that it does not form
+    // a cycle.
     pub(crate) fn load_module(
         &self,
         id: &ModuleId,
         data_store: &mut TransactionDataCache,
         module_store: &ModuleStorageAdapter,
     ) -> VMResult<Arc<Module>> {
-        self.load_module_internal(id, data_store, module_store)
-    }
-
-    // Load the transitive closure of the target module first, and then verify that the modules in
-    // the closure do not have cyclic dependencies.
-    fn load_module_internal(
-        &self,
-        id: &ModuleId,
-        data_store: &mut TransactionDataCache,
-        module_store: &ModuleStorageAdapter,
-    ) -> VMResult<Arc<Module>> {
-        // if the module is already in the code cache, load the cached version
         if let Some(cached) = module_store.module_at(id) {
             self.module_cache_hits.write().insert(id.clone());
             return Ok(cached);
         }
 
-        // otherwise, load the transitive closure of the target module
+        // Otherwise, load the transitive closure of the target module.
+        // No module should fail to load.
         let module_ref = self.load_and_verify_module_and_dependencies_and_friends(
             id,
             &BTreeMap::new(),
             &BTreeSet::new(),
             data_store,
             module_store,
-            /* allow_module_loading_failure */ true,
+            /* allow_module_loading_failure */ false,
             /* dependencies_depth */ 0,
         )?;
 
-        // verify that the transitive closure does not have cycles
+        // Verify that the transitive closure does not have cycles.
         self.verify_module_cyclic_relations(
             module_ref.module(),
             &BTreeMap::new(),
