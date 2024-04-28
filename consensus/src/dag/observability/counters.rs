@@ -149,12 +149,3 @@ pub static RPC_PROCESS_DURATION: Lazy<HistogramVec> = Lazy::new(|| {
     )
     .unwrap()
 });
-
-pub static RB_HANDLER_PROCESS_DURATION: Lazy<HistogramVec> = Lazy::new(|| {
-    register_histogram_vec!(
-        "aptos_consensus_dag_rb_handler_process",
-        "RB process breakdown",
-        &["step"]
-    )
-    .unwrap()
-});

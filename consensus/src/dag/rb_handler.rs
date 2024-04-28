@@ -8,7 +8,7 @@ use crate::{
         dag_network::RpcHandler,
         errors::NodeBroadcastHandleError,
         observability::{
-            counters::{FETCH_ENQUEUE_FAILURES, RB_HANDLER_PROCESS_DURATION, RB_HANDLE_ACKS},
+            counters::{FETCH_ENQUEUE_FAILURES, RB_HANDLE_ACKS},
             logging::{LogEvent, LogSchema},
             tracing::{observe_node, NodeStage},
         },
@@ -312,10 +312,6 @@ impl RpcHandler for NodeBroadcastHandler {
             observe_node(self.dag_id, node.timestamp(), NodeStage::NodeFirstReceived);
         }
 
-        RB_HANDLER_PROCESS_DURATION
-            .with_label_values(&[&"lock"])
-            .observe(start.elapsed().as_secs_f64());
-
         if let Some(ack) = self
             .votes_by_round_peer
             .lock()
@@ -327,15 +323,7 @@ impl RpcHandler for NodeBroadcastHandler {
             return Ok(ack.clone());
         }
 
-        RB_HANDLER_PROCESS_DURATION
-            .with_label_values(&[&"vote_check"])
-            .observe(start.elapsed().as_secs_f64());
-
         let node = self.validate(node).await?;
-
-        RB_HANDLER_PROCESS_DURATION
-            .with_label_values(&[&"validate"])
-            .observe(start.elapsed().as_secs_f64());
 
         let dag = self.dag.clone();
         let order_rule = self.order_rule.clone();
@@ -345,10 +333,6 @@ impl RpcHandler for NodeBroadcastHandler {
             dag.write().update_votes(&metadata, parents_metadata, false);
             order_rule.process_new_node(&metadata);
         });
-
-        RB_HANDLER_PROCESS_DURATION
-            .with_label_values(&[&"order_spawn"])
-            .observe(start.elapsed().as_secs_f64());
 
         observe_node(self.dag_id, node.timestamp(), NodeStage::NodeReceived);
         debug!(
@@ -360,10 +344,6 @@ impl RpcHandler for NodeBroadcastHandler {
 
         let signature = node.sign_vote(&self.signer)?;
 
-        RB_HANDLER_PROCESS_DURATION
-            .with_label_values(&[&"sign"])
-            .observe(start.elapsed().as_secs_f64());
-
         let vote = Vote::new(node.metadata().clone(), signature);
         self.storage.save_vote(&node.id(), &vote, self.dag_id)?;
         self.votes_by_round_peer
@@ -371,10 +351,6 @@ impl RpcHandler for NodeBroadcastHandler {
             .get_mut(&node.round())
             .expect("must exist")
             .insert(*node.author(), vote.clone());
-
-        RB_HANDLER_PROCESS_DURATION
-            .with_label_values(&[&"save_mem"])
-            .observe(start.elapsed().as_secs_f64());
 
         debug!(
             dag_id = self.dag_id,
