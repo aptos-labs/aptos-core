@@ -2,6 +2,7 @@
 // SPDX-License-Identifier: Apache-2.0
 
 use crate::TestCircuitHandle;
+use crate::misc::calc_string_bodies;
 use aptos_keyless_common::input_processing::{
     circuit_input_signals::{CircuitInputSignals, Padded}, config::CircuitPaddingConfig,
 };
@@ -143,13 +144,15 @@ fn jwt_field_str_malicious_indices
     }
 }
 
-fn prepare_jwt_field_check_test_str<T: JWTFieldIndices + JWTFieldStr>(field: T) -> CircuitInputSignals<Padded> {
+fn unquoted_test<T: JWTFieldIndices + JWTFieldStr>(field: T, test_circom_file: &str) -> Result<tempfile::NamedTempFile, anyhow::Error> {
+    let circuit_handle = TestCircuitHandle::new(test_circom_file).unwrap();
+
     let config = CircuitPaddingConfig::new()
         .max_length("field", 60)
         .max_length("name", 30)
         .max_length("value", 30);
 
-    CircuitInputSignals::new()
+    let circuit_input_signals = CircuitInputSignals::new()
         .str_input("field", &field.whole_field())
         .str_input("name", &field.name())
         .str_input("value", &field.value())
@@ -159,48 +162,55 @@ fn prepare_jwt_field_check_test_str<T: JWTFieldIndices + JWTFieldStr>(field: T) 
         .usize_input("value_len", field.value_len())
         .usize_input("colon_index", field.colon_index())
         .pad(&config)
-        .unwrap()
-}
-
-fn should_pass<T: JWTFieldIndices + JWTFieldStr>(field: T, test_circom_file: &str) {
-    let circuit_handle = TestCircuitHandle::new(test_circom_file).unwrap();
-
-    let circuit_input_signals = prepare_jwt_field_check_test_str(
-        field
-        );
+        .unwrap();
 
     let result = circuit_handle.gen_witness(circuit_input_signals);
     println!("{:?}", result);
-    assert!(result.is_ok());
+    result
 }
 
-fn should_fail<T: JWTFieldIndices + JWTFieldStr> (field: T, test_circom_file: &str) {
+fn quoted_test<T: JWTFieldIndices + JWTFieldStr> (field: T, test_circom_file: &str) -> Result<tempfile::NamedTempFile, anyhow::Error> {
     let circuit_handle = TestCircuitHandle::new(test_circom_file).unwrap();
 
-    let circuit_input_signals = prepare_jwt_field_check_test_str(
-        field
-        );
+    let config = CircuitPaddingConfig::new()
+        .max_length("field", 60)
+        .max_length("field_string_bodies", 60)
+        .max_length("name", 30)
+        .max_length("value", 30);
+
+    let circuit_input_signals = CircuitInputSignals::new()
+        .str_input("field", &field.whole_field())
+        .str_input("name", &field.name())
+        .str_input("value", &field.value())
+        .usize_input("field_len", field.whole_field_len())
+        .bools_input("field_string_bodies", &calc_string_bodies(field.whole_field()))
+        .usize_input("name_len", field.name_len())
+        .usize_input("value_index", field.value_index())
+        .usize_input("value_len", field.value_len())
+        .usize_input("colon_index", field.colon_index())
+        .pad(&config)
+        .unwrap();
 
     let result = circuit_handle.gen_witness(circuit_input_signals);
     println!("{:?}", result);
-    assert!(result.is_err());
+    result
 }
 
 fn should_pass_quoted<T: JWTFieldIndices + JWTFieldStr>(field: T) {
-    should_pass(field, "jwt_field_parsing/parse_quoted_test.circom");
+    assert!(quoted_test(field, "jwt_field_parsing/parse_quoted_test.circom").is_ok());
 }
 
 fn should_pass_unquoted<T: JWTFieldIndices + JWTFieldStr>(field: T) {
-    should_pass(field, "jwt_field_parsing/parse_unquoted_test.circom");
+    assert!(unquoted_test(field, "jwt_field_parsing/parse_unquoted_test.circom").is_ok());
 }
 
 
 fn should_fail_quoted<T: JWTFieldIndices + JWTFieldStr>(field: T) {
-    should_fail(field, "jwt_field_parsing/parse_quoted_test.circom");
+    assert!(quoted_test(field, "jwt_field_parsing/parse_quoted_test.circom").is_err());
 }
 
 fn should_fail_unquoted<T: JWTFieldIndices + JWTFieldStr>(field: T) {
-    should_fail(field, "jwt_field_parsing/parse_unquoted_test.circom");
+    assert!(unquoted_test(field, "jwt_field_parsing/parse_unquoted_test.circom").is_err());
 }
 
 
@@ -257,6 +267,7 @@ fn no_whitespace_unquoted() {
         );
 }
 
+// fails to parse now with StringBodies logic
 #[test]
 fn malicious_value_1() {
     let mut field = jwt_field_str_malicious_indices(
@@ -265,12 +276,13 @@ fn malicious_value_1() {
             "a\\",
             );
     field.whole_field_len = field.whole_field.find(',').unwrap()+1;
-   should_pass_quoted(field);
+   should_fail_quoted(field);
 }
 
+// fails to parse now with StringBodies logic
 #[test]
 fn malicious_value_2() {
-   should_pass_quoted(
+   should_fail_quoted(
         jwt_field_str(
             "\"name1\":\"value1\",\"name2\":\"value2\",",
             "name1",

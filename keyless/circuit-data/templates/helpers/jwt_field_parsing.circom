@@ -13,6 +13,7 @@ template ParseJWTFieldWithQuotedValue(maxKVPairLen, maxNameLen, maxValueLen) {
     signal input field[maxKVPairLen]; // ASCII
     signal input name[maxNameLen];
     signal input value[maxValueLen];
+    signal input field_string_bodies[maxKVPairLen];
     signal input field_len; // ASCII
     signal input name_len;
     signal input value_index; // index of value within `field`
@@ -59,10 +60,18 @@ template ParseJWTFieldWithQuotedValue(maxKVPairLen, maxNameLen, maxValueLen) {
     signal whitespace_selector_one[maxKVPairLen] <== ArraySelectorComplex(maxKVPairLen)(name_len+2, colon_index); // Skip 2 quotes around name, stop 1 index before the colon
     signal whitespace_selector_two[maxKVPairLen] <== ArraySelectorComplex(maxKVPairLen)(colon_index+1, value_index-1); // Skip 2 quotes around value, stop 1 index before the value
     signal whitespace_selector_three[maxKVPairLen] <== ArraySelectorComplex(maxKVPairLen)(value_index+value_len+1, field_len-1); // Skip 2 quotes in the value, stop just before the comma/end brace
+    signal name_selector[maxKVPairLen] <== ArraySelector(maxKVPairLen)(1, name_len+1);
+    signal value_selector[maxKVPairLen] <== ArraySelector(maxKVPairLen)(value_index, value_index+value_len);
 
     for (var i = 0; i < maxKVPairLen; i++) {
         (whitespace_selector_one[i] + whitespace_selector_two[i] + whitespace_selector_three[i]) * (1 - is_whitespace[i]) === 0;
+        
+        // Check that only the name and value parts of the field are inside string bodies, and nothing else is
+        (name_selector[i] + value_selector[i]) * (1 - field_string_bodies[i]) === 0;
+        (1 - (name_selector[i] + value_selector[i])) * field_string_bodies[i] === 0;
     }
+
+
 
 }
 
@@ -112,8 +121,8 @@ template ParseJWTFieldWithUnquotedValue(maxKVPairLen, maxNameLen, maxValueLen) {
     }
 
     signal whitespace_selector_one[maxKVPairLen] <== ArraySelectorComplex(maxKVPairLen)(name_len+2, colon_index); // Skip 2 quotes around name, stop 1 index before the colon
-    signal whitespace_selector_two[maxKVPairLen] <== ArraySelectorComplex(maxKVPairLen)(colon_index+1, value_index); 
-    signal whitespace_selector_three[maxKVPairLen] <== ArraySelectorComplex(maxKVPairLen)(value_index+value_len, field_len-1); 
+    signal whitespace_selector_two[maxKVPairLen] <== ArraySelectorComplex(maxKVPairLen)(colon_index+1, value_index); // no quote this time, so check whitespace until the value start
+    signal whitespace_selector_three[maxKVPairLen] <== ArraySelectorComplex(maxKVPairLen)(value_index+value_len, field_len-1); // and directly after the value end
 
     for (var i = 0; i < maxKVPairLen; i++) {
         (whitespace_selector_one[i] + whitespace_selector_two[i] + whitespace_selector_three[i]) * (1 - is_whitespace[i]) === 0;
