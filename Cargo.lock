@@ -2495,6 +2495,7 @@ dependencies = [
  "futures",
  "itertools 0.12.1",
  "maplit",
+ "num_cpus",
  "once_cell",
  "proptest",
  "rand 0.7.3",
