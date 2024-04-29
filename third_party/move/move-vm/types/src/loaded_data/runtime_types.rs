@@ -7,12 +7,16 @@
 use derivative::Derivative;
 use itertools::Itertools;
 use move_binary_format::{
-    errors::{PartialVMError, PartialVMResult},
+    errors::{Location, PartialVMError, PartialVMResult, VMResult},
     file_format::{
         AbilitySet, SignatureToken, StructHandle, StructTypeParameter, TypeParameterIndex,
     },
 };
-use move_core_types::{identifier::Identifier, language_storage::ModuleId, vm_status::StatusCode};
+use move_core_types::{
+    identifier::Identifier,
+    language_storage::{ModuleId, StructTag, TypeTag},
+    vm_status::StatusCode,
+};
 use serde::Serialize;
 use smallbitvec::SmallBitVec;
 use smallvec::{smallvec, SmallVec};
@@ -22,6 +26,7 @@ use std::{
     collections::{btree_map, BTreeMap},
     fmt,
     fmt::Debug,
+    sync::Arc,
 };
 use triomphe::Arc as TriompheArc;
 
@@ -279,6 +284,25 @@ impl AbilityInfo {
 }
 
 impl Type {
+    pub fn verify_ty_args<'a, I>(constraints: I, ty_args: &[Type]) -> PartialVMResult<()>
+    where
+        I: IntoIterator<Item = &'a AbilitySet>,
+        I::IntoIter: ExactSizeIterator,
+    {
+        let constraints = constraints.into_iter();
+        if constraints.len() != ty_args.len() {
+            return Err(PartialVMError::new(
+                StatusCode::NUMBER_OF_TYPE_ARGUMENTS_MISMATCH,
+            ));
+        }
+        for (ty, expected_k) in ty_args.iter().zip(constraints) {
+            if !expected_k.is_subset(ty.abilities()?) {
+                return Err(PartialVMError::new(StatusCode::CONSTRAINT_NOT_SATISFIED));
+            }
+        }
+        Ok(())
+    }
+
     pub fn check_vec_ref(&self, inner_ty: &Type, is_mut: bool) -> PartialVMResult<Type> {
         match self {
             Type::MutableReference(inner) => match &**inner {
@@ -525,9 +549,7 @@ impl Default for TypeConfig {
 
 #[derive(Clone)]
 pub struct TypeBuilder {
-    #[allow(dead_code)]
     max_ty_size: usize,
-    #[allow(dead_code)]
     max_ty_depth: usize,
 }
 
@@ -549,7 +571,7 @@ impl TypeBuilder {
 
     pub fn create_constant_ty(&self, const_tok: &SignatureToken) -> PartialVMResult<Type> {
         let mut count = 0;
-        self.create_constant_ty_impl(const_tok, &mut count, 0)
+        self.create_constant_ty_impl(const_tok, &mut count, 1)
     }
 
     fn create_constant_ty_impl(
@@ -599,6 +621,32 @@ impl TypeBuilder {
                 )
             },
         })
+    }
+
+    /// Instantiates all type parameters of the given type.
+    pub fn subst(&self, ty: &Type, ty_args: &[Type]) -> PartialVMResult<Type> {
+        Ok(self.subst_impl(ty, ty_args)?.0)
+    }
+
+    fn subst_impl(&self, ty: &Type, ty_args: &[Type]) -> PartialVMResult<(Type, usize)> {
+        let mut count = 0;
+        let ty = self.apply_subst(
+            ty,
+            |idx, count, depth| match ty_args.get(idx as usize) {
+                Some(ty) => self.clone_impl(ty, count, depth),
+                None => Err(
+                    PartialVMError::new(StatusCode::UNKNOWN_INVARIANT_VIOLATION_ERROR)
+                        .with_message(format!(
+                            "Type substitution failed: there are {} type arguments and index {} is out of bounds",
+                            idx,
+                            ty_args.len()
+                        )),
+                ),
+            },
+            &mut count,
+            1,
+        )?;
+        Ok((ty, count))
     }
 
     fn clone_impl(&self, ty: &Type, count: &mut usize, depth: usize) -> PartialVMResult<Type> {
@@ -678,29 +726,79 @@ impl TypeBuilder {
         Ok(res)
     }
 
-    fn subst_impl(&self, ty: &Type, ty_args: &[Type]) -> PartialVMResult<(Type, usize)> {
+    pub fn create_ty<F>(&self, ty_tag: &TypeTag, mut resolver: F) -> VMResult<Type>
+    where
+        F: FnMut(&StructTag) -> VMResult<Arc<StructType>>,
+    {
         let mut count = 0;
-        let ty = self.apply_subst(
-            ty,
-            |idx, count, depth| match ty_args.get(idx as usize) {
-                Some(ty) => self.clone_impl(ty, count, depth),
-                None => Err(
-                    PartialVMError::new(StatusCode::UNKNOWN_INVARIANT_VIOLATION_ERROR)
-                        .with_message(format!(
-                            "Type substitution failed: there are {} type arguments and index {} is out of bounds",
-                            idx,
-                            ty_args.len()
-                        )),
-                ),
-            },
-            &mut count,
-            1,
-        )?;
-        Ok((ty, count))
+        self.create_ty_impl(ty_tag, &mut resolver, &mut count, 1)
     }
 
-    pub fn subst(&self, ty: &Type, ty_args: &[Type]) -> PartialVMResult<Type> {
-        Ok(self.subst_impl(ty, ty_args)?.0)
+    fn create_ty_impl<F>(
+        &self,
+        ty_tag: &TypeTag,
+        resolver: &mut F,
+        count: &mut usize,
+        depth: usize,
+    ) -> VMResult<Type>
+    where
+        F: FnMut(&StructTag) -> VMResult<Arc<StructType>>,
+    {
+        use Type::*;
+        use TypeTag as T;
+
+        if *count >= self.max_ty_size {
+            return Err(
+                PartialVMError::new(StatusCode::TOO_MANY_TYPE_NODES).finish(Location::Undefined)
+            );
+        }
+        if depth > self.max_ty_depth {
+            return Err(PartialVMError::new(StatusCode::VM_MAX_TYPE_DEPTH_REACHED)
+                .finish(Location::Undefined));
+        }
+
+        *count += 1;
+        Ok(match ty_tag {
+            T::Bool => Bool,
+            T::U8 => U8,
+            T::U16 => U16,
+            T::U32 => U32,
+            T::U64 => U64,
+            T::U128 => U128,
+            T::U256 => U256,
+            T::Address => Address,
+            T::Signer => Signer,
+            T::Vector(elem_ty_tag) => {
+                let elem_ty = self.create_ty_impl(elem_ty_tag, resolver, count, depth + 1)?;
+                Vector(triomphe::Arc::new(elem_ty))
+            },
+            T::Struct(struct_tag) => {
+                let struct_ty = resolver(struct_tag.as_ref())?;
+
+                if struct_ty.type_parameters.is_empty() && struct_tag.type_params.is_empty() {
+                    Struct {
+                        idx: struct_ty.idx,
+                        ability: AbilityInfo::struct_(struct_ty.abilities),
+                    }
+                } else {
+                    let mut ty_args = vec![];
+                    for ty_arg_tag in &struct_tag.type_params {
+                        let ty_arg = self.create_ty_impl(ty_arg_tag, resolver, count, depth + 1)?;
+                        ty_args.push(ty_arg);
+                    }
+                    Type::verify_ty_args(struct_ty.type_param_constraints(), &ty_args)
+                        .map_err(|e| e.finish(Location::Undefined))?;
+                    StructInstantiation {
+                        idx: struct_ty.idx,
+                        ty_args: triomphe::Arc::new(ty_args),
+                        ability: AbilityInfo::generic_struct(
+                            struct_ty.abilities,
+                            struct_ty.phantom_ty_args_mask.clone(),
+                        ),
+                    }
+                }
+            },
+        })
     }
 }
 

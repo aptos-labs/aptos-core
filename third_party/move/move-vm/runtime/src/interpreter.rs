@@ -140,7 +140,7 @@ impl Interpreter {
         }
 
         let mut current_frame = self
-            .make_new_frame(loader, gas_meter, function, ty_args, locals)
+            .make_new_frame(gas_meter, loader, function, ty_args, locals)
             .map_err(|err| self.set_location(err))?;
         // Access control for the new frame.
         self.access_control
@@ -346,7 +346,7 @@ impl Interpreter {
                 }
             }
         }
-        self.make_new_frame(loader, gas_meter, func, ty_args, locals)
+        self.make_new_frame(gas_meter, loader, func, ty_args, locals)
     }
 
     /// Create a new `Frame` given a `Function` and the function `Locals`.
@@ -354,8 +354,8 @@ impl Interpreter {
     /// The locals must be loaded before calling this.
     fn make_new_frame(
         &self,
-        loader: &Loader,
         gas_meter: &mut impl GasMeter,
+        loader: &Loader,
         function: Arc<Function>,
         ty_args: Vec<Type>,
         locals: Locals,
