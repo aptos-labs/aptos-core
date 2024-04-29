@@ -184,16 +184,17 @@ fn check_function(function: &FunctionEnv) {
             let binop_as_str = binop.to_string_if_binop().expect("binop");
             let notes = vec![
                 "To compile this code, either:".to_owned(),
-                "1. upgrade to language version 2.0 or above,".to_owned(),
+                "1. upgrade to language version 2.0 or later (which uses strict left-to-right evaluation order),".to_owned(),
                 "2. rewrite the code to remove sequences from directly within binary operations,"
                     .to_owned(),
                 "   e.g., save intermediate results providing explicit order.".to_owned(),
+                "In either of these cases, please ensure to check the code does what you expect it to, because of changed semantics.".to_owned(),
             ];
             env.diag_with_primary_notes_and_labels(
                 Severity::Error,
                 &binop_loc,
                 &format!(
-                    "Non-empty sequence within the context of the binary operation `{}`",
+                    "A sequence within an operand of binary operation `{}` can obscure program logic and is not allowed by this compiler.",
                     binop_as_str
                 ),
                 &format!("binary operation `{}`", binop_as_str),

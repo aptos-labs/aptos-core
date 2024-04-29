@@ -17,13 +17,12 @@ pub mod options;
 pub mod pipeline;
 pub mod plan_builder;
 pub mod recursive_struct_checker;
-pub mod seqs_in_binop_checker;
 pub mod unused_params_checker;
 
 use crate::{
     env_pipeline::{
         lambda_lifter, lambda_lifter::LambdaLiftingOptions, rewrite_target::RewritingScope,
-        spec_checker, spec_rewriter, EnvProcessorPipeline,
+        seqs_in_binop_checker, spec_checker, spec_rewriter, EnvProcessorPipeline,
     },
     pipeline::{
         ability_processor::AbilityProcessor, avail_copies_analysis::AvailCopiesAnalysisProcessor,
@@ -53,7 +52,9 @@ use move_compiler::{
 };
 use move_disassembler::disassembler::Disassembler;
 use move_ir_types::location;
-use move_model::{add_move_lang_diagnostics, metadata::LanguageVersion, model::GlobalEnv, PackageInfo};
+use move_model::{
+    add_move_lang_diagnostics, metadata::LanguageVersion, model::GlobalEnv, PackageInfo,
+};
 use move_stackless_bytecode::function_target_pipeline::{
     FunctionTargetPipeline, FunctionTargetsHolder, FunctionVariant,
 };
