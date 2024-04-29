@@ -207,7 +207,10 @@ impl AccountPicker {
     fn pick_pair(&mut self, indexes: &[Index; 2],  w: usize) -> [usize; 2] {
         match self {
             AccountPicker::Unlimited(num_accounts) => {  
-                if w < 10 && *num_accounts > 15 {
+                let temp = w % (*num_accounts/2);
+                [2*temp, 2*temp+1]
+
+                /*if w < 10 && *num_accounts > 15 {
                     //let half_accounts = (*num_accounts) / 2;
                     if w == 0 {
                          Self::pick_pair_impl(3, indexes)
@@ -217,7 +220,7 @@ impl AccountPicker {
                     }
                 } else {
                     Self::pick_pair_impl(*num_accounts, indexes)
-                }
+                }*/
             },
             AccountPicker::Limited(remaining) => {
                 let [remaining_idx_1, remaining_idx_2] =

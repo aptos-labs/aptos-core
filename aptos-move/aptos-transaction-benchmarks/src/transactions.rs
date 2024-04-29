@@ -31,7 +31,7 @@ pub static RAYON_EXEC_POOL: Lazy<Arc<rayon::ThreadPool>> = Lazy::new(|| {
 
 pub static THREAD_GARAGE_EXECUTOR: Lazy<Arc<ThreadGarageExecutor>> = Lazy::new(|| {
     Arc::new(
-        ThreadGarageExecutor::new(10, 50)
+        ThreadGarageExecutor::new(10, 10)
     )
 });
 
