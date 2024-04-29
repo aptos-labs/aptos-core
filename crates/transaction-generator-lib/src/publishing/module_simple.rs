@@ -230,6 +230,9 @@ pub enum EntryPoints {
     },
     /// Burn an NFT token, only works with numbered=false tokens.
     TokenV2AmbassadorBurn,
+    TokenV2AmbassadorMintBatch {
+        count: u64,
+    },
 
     LiquidityPoolSwapInit {
         is_stable: bool,
@@ -295,7 +298,9 @@ impl EntryPoints {
             | EntryPoints::ResourceGroupsSenderMultiChange { .. }
             | EntryPoints::CoinInitAndMint
             | EntryPoints::FungibleAssetMint => "framework_usecases",
-            EntryPoints::TokenV2AmbassadorMint { .. } | EntryPoints::TokenV2AmbassadorBurn => {
+            EntryPoints::TokenV2AmbassadorMint { .. }
+            | EntryPoints::TokenV2AmbassadorBurn
+            | EntryPoints::TokenV2AmbassadorMintBatch { .. } => {
                 "ambassador_token"
             },
             EntryPoints::LiquidityPoolSwapInit { .. }
@@ -349,7 +354,9 @@ impl EntryPoints {
             | EntryPoints::ResourceGroupsSenderMultiChange { .. } => "resource_groups_example",
             EntryPoints::CoinInitAndMint => "coin_example",
             EntryPoints::FungibleAssetMint => "fungible_asset_example",
-            EntryPoints::TokenV2AmbassadorMint { .. } | EntryPoints::TokenV2AmbassadorBurn => {
+            EntryPoints::TokenV2AmbassadorMint { .. }
+            | EntryPoints::TokenV2AmbassadorBurn
+            | EntryPoints:: TokenV2AmbassadorMintBatch { .. } => {
                 "ambassador"
             },
             EntryPoints::LiquidityPoolSwapInit { .. } | EntryPoints::LiquidityPoolSwap { .. } => {
@@ -605,6 +612,21 @@ impl EntryPoints {
                 ident_str!("burn_named_by_user").to_owned(),
                 vec![],
             ),
+            EntryPoints::TokenV2AmbassadorMintBatch { count } => {
+                let rng: &mut StdRng = rng.expect("Must provide RNG");
+                get_payload(
+                    module_id,
+                    ident_str!("mint_multiple_numbered_ambassador_token_by_user").to_owned(),
+                    vec![
+                        bcs::to_bytes(&rand_string(rng, 100)).unwrap(), // description
+                        bcs::to_bytes("superstar #").unwrap(),          // name
+                        bcs::to_bytes(&rand_string(rng, 50)).unwrap(),  // uri
+                        bcs::to_bytes(&count).unwrap(),                 // count
+                    ],
+                )
+            },
+
+
 
             EntryPoints::LiquidityPoolSwapInit { is_stable } => get_payload(
                 module_id,
@@ -702,7 +724,9 @@ impl EntryPoints {
             EntryPoints::CoinInitAndMint | EntryPoints::FungibleAssetMint => {
                 MultiSigConfig::Publisher
             },
-            EntryPoints::TokenV2AmbassadorMint { .. } | EntryPoints::TokenV2AmbassadorBurn => {
+            EntryPoints::TokenV2AmbassadorMint { .. }
+            | EntryPoints::TokenV2AmbassadorBurn
+            | EntryPoints:: TokenV2AmbassadorMintBatch { .. } => {
                 MultiSigConfig::Publisher
             },
             EntryPoints::LiquidityPoolSwap { .. } => MultiSigConfig::Publisher,
@@ -753,7 +777,9 @@ impl EntryPoints {
             EntryPoints::CoinInitAndMint | EntryPoints::FungibleAssetMint => {
                 AutomaticArgs::SignerAndMultiSig
             },
-            EntryPoints::TokenV2AmbassadorMint { .. } | EntryPoints::TokenV2AmbassadorBurn => {
+            EntryPoints::TokenV2AmbassadorMint { .. }
+            | EntryPoints::TokenV2AmbassadorBurn
+            | EntryPoints:: TokenV2AmbassadorMintBatch { .. } => {
                 AutomaticArgs::SignerAndMultiSig
             },
             EntryPoints::LiquidityPoolSwapInit { .. } => AutomaticArgs::Signer,

@@ -57,6 +57,7 @@ pub enum TransactionTypeArg {
     FungibleAssetMint,
     TokenV2AmbassadorMint,
     TokenV2AmbassadorMintAndBurn1M,
+    TokenV2AmbassadorMintBatch100,
     LiquidityPoolSwap,
     LiquidityPoolSwapStable,
     VectorPictureCreate30k,
@@ -352,6 +353,11 @@ impl TransactionTypeArg {
                 num_modules: 1,
                 use_account_pool: sender_use_account_pool,
                 progress_type: workflow_progress_type,
+            },
+            TransactionTypeArg::TokenV2AmbassadorMintBatch100 => TransactionType::CallCustomModules {
+                entry_point: EntryPoints::TokenV2AmbassadorMintBatch { count: 100 },
+                num_modules: module_working_set_size,
+                use_account_pool: sender_use_account_pool,
             },
             TransactionTypeArg::LiquidityPoolSwap => TransactionType::CallCustomModules {
                 entry_point: EntryPoints::LiquidityPoolSwap { is_stable: false },
