@@ -31,6 +31,7 @@ use move_compiler::{
     shared::{Flags, NamedAddressMap, NumericalAddress, PackagePaths},
     Compiler,
 };
+use move_compiler_v2::Experiment;
 use move_docgen::{Docgen, DocgenOptions};
 use move_model::{
     model::GlobalEnv, options::ModelBuilderOptions,
@@ -637,7 +638,7 @@ impl CompiledPackage {
         let effective_language_version = config.language_version.unwrap_or_default();
         effective_compiler_version.check_language_support(effective_language_version)?;
 
-        let (file_map, all_compiled_units, _optional_global_env) = match config
+        let (file_map, all_compiled_units, optional_global_env) = match config
             .compiler_version
             .unwrap_or_default()
         {
@@ -671,8 +672,7 @@ impl CompiledPackage {
                         }
                     }
                 }
-
-                let options = move_compiler_v2::Options {
+                let mut options = move_compiler_v2::Options {
                     sources: paths.iter().flat_map(|x| to_str_vec(&x.paths)).collect(),
                     dependencies: bytecode_deps
                         .iter()
@@ -688,6 +688,7 @@ impl CompiledPackage {
                     compile_test_code: flags.keep_testing_functions(),
                     ..Default::default()
                 };
+                options = options.set_experiment(Experiment::ATTACH_COMPILED_MODULE, true);
                 compiler_driver_v2(options)?
             },
         };
@@ -747,13 +748,22 @@ impl CompiledPackage {
             if skip_attribute_checks {
                 flags = flags.set_skip_attribute_checks(true)
             }
-            let model = run_model_builder_with_options_and_compilation_flags(
-                vec![sources_package_paths],
-                deps_package_paths.into_iter().map(|(p, _)| p).collect_vec(),
-                ModelBuilderOptions::default(),
-                flags,
-                &known_attributes,
-            )?;
+
+            let model = match (
+                resolution_graph.build_options.generate_docs,
+                resolution_graph.build_options.generate_abis,
+                optional_global_env,
+            ) {
+                (false, false, Some(env)) => env, // Use V2 generated model if not for docgen or abigen
+                _ => run_model_builder_with_options_and_compilation_flags(
+                    // Otherwise, use V1 generated model
+                    vec![sources_package_paths],
+                    deps_package_paths.into_iter().map(|(p, _)| p).collect_vec(),
+                    ModelBuilderOptions::default(),
+                    flags,
+                    &known_attributes,
+                )?,
+            };
 
             if resolution_graph.build_options.generate_docs {
                 compiled_docs = Some(Self::build_docs(

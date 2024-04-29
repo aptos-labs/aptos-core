@@ -11,7 +11,7 @@ use aptos_types::{
     block_executor::{
         config::BlockExecutorConfigFromOnchain, partitioner::PartitionedTransactions,
     },
-    state_store::state_key::StateKeyInner,
+    state_store::state_key::inner::StateKeyInner,
     transaction::{
         analyzed_transaction::AnalyzedTransaction,
         signature_verified_transaction::SignatureVerifiedTransaction, Transaction,

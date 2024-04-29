@@ -29,6 +29,7 @@ mod consensus_config;
 mod execution_config;
 mod gas_schedule;
 mod jwk_consensus_config;
+pub mod randomness_api_v0_config;
 mod randomness_config;
 mod timed_features;
 mod timestamp;
@@ -177,11 +178,9 @@ pub trait OnChainConfig: Send + Sync + DeserializeOwned {
     where
         T: ConfigStorage + ?Sized,
     {
-        match storage.fetch_config_bytes(&StateKey::resource(Self::address(), &Self::struct_tag()))
-        {
-            Some(bytes) => Self::deserialize_into_config(&bytes).ok(),
-            None => None,
-        }
+        let state_key = StateKey::on_chain_config::<Self>().ok()?;
+        let bytes = storage.fetch_config_bytes(&state_key)?;
+        Self::deserialize_into_config(&bytes).ok()
     }
 
     fn address() -> &'static AccountAddress {

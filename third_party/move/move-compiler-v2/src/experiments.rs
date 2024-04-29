@@ -171,6 +171,11 @@ pub static EXPERIMENTS: Lazy<BTreeMap<String, Experiment>> = Lazy::new(|| {
                 .to_string(),
             default: Given(false),
         },
+        Experiment {
+            name: Experiment::ATTACH_COMPILED_MODULE.to_string(),
+            description: "Whether to attach the compiled module to the global env.".to_string(),
+            default: Given(false),
+        },
     ];
     experiments
         .into_iter()
@@ -185,6 +190,7 @@ impl Experiment {
     pub const ACQUIRES_CHECK: &'static str = "acquires-check";
     pub const AST_SIMPLIFY: &'static str = "ast-simplify";
     pub const AST_SIMPLIFY_FULL: &'static str = "ast-simplify-full";
+    pub const ATTACH_COMPILED_MODULE: &'static str = "attach-compiled-module";
     pub const CHECKS: &'static str = "checks";
     pub const COPY_PROPAGATION: &'static str = "copy-propagation";
     pub const DEAD_CODE_ELIMINATION: &'static str = "dead-code-elimination";

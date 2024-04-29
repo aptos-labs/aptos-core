@@ -31,9 +31,10 @@ use aptos_types::{
     },
     move_utils::as_move_value::AsMoveValue,
     on_chain_config::{
-        FeatureFlag, Features, GasScheduleV2, OnChainConsensusConfig, OnChainExecutionConfig,
-        OnChainJWKConsensusConfig, OnChainRandomnessConfig, RandomnessConfigMoveStruct,
-        TimedFeaturesBuilder, APTOS_MAX_KNOWN_VERSION,
+        randomness_api_v0_config::RequiredGasDeposit, FeatureFlag, Features, GasScheduleV2,
+        OnChainConsensusConfig, OnChainExecutionConfig, OnChainJWKConsensusConfig,
+        OnChainRandomnessConfig, RandomnessConfigMoveStruct, TimedFeaturesBuilder,
+        APTOS_MAX_KNOWN_VERSION,
     },
     transaction::{authenticator::AuthenticationKey, ChangeSet, Transaction, WriteSetPayload},
     write_set::TransactionWrite,
@@ -49,6 +50,7 @@ use move_core_types::{
     language_storage::{ModuleId, TypeTag},
     value::{serialize_values, MoveTypeLayout, MoveValue},
 };
+use move_vm_runtime::module_traversal::{TraversalContext, TraversalStorage};
 use move_vm_types::gas::UnmeteredGasMeter;
 use once_cell::sync::Lazy;
 use rand::prelude::*;
@@ -65,6 +67,7 @@ const JWK_CONSENSUS_CONFIG_MODULE_NAME: &str = "jwk_consensus_config";
 const JWKS_MODULE_NAME: &str = "jwks";
 const CONFIG_BUFFER_MODULE_NAME: &str = "config_buffer";
 const DKG_MODULE_NAME: &str = "dkg";
+const RANDOMNESS_API_V0_CONFIG_MODULE_NAME: &str = "randomness_api_v0_config";
 const RANDOMNESS_CONFIG_SEQNUM_MODULE_NAME: &str = "randomness_config_seqnum";
 const RANDOMNESS_CONFIG_MODULE_NAME: &str = "randomness_config";
 const RANDOMNESS_MODULE_NAME: &str = "randomness";
@@ -286,6 +289,7 @@ pub fn encode_genesis_change_set(
         .randomness_config_override
         .clone()
         .unwrap_or_else(OnChainRandomnessConfig::default_for_genesis);
+    initialize_randomness_api_v0_config(&mut session);
     initialize_randomness_config_seqnum(&mut session);
     initialize_randomness_config(&mut session, randomness_config);
     initialize_randomness_resources(&mut session);
@@ -383,6 +387,7 @@ fn exec_function(
     ty_args: Vec<TypeTag>,
     args: Vec<Vec<u8>>,
 ) {
+    let storage = TraversalStorage::new();
     session
         .execute_function_bypass_visibility(
             &ModuleId::new(
@@ -393,6 +398,7 @@ fn exec_function(
             ty_args,
             args,
             &mut UnmeteredGasMeter,
+            &mut TraversalContext::new(&storage),
         )
         .unwrap_or_else(|e| {
             panic!(
@@ -517,6 +523,19 @@ fn initialize_randomness_config_seqnum(session: &mut SessionExt) {
     );
 }
 
+fn initialize_randomness_api_v0_config(session: &mut SessionExt) {
+    exec_function(
+        session,
+        RANDOMNESS_API_V0_CONFIG_MODULE_NAME,
+        "initialize",
+        vec![],
+        serialize_values(&vec![
+            MoveValue::Signer(CORE_CODE_ADDRESS),
+            RequiredGasDeposit::default_for_genesis().as_move_value(),
+        ]),
+    );
+}
+
 fn initialize_randomness_config(
     session: &mut SessionExt,
     randomness_config: OnChainRandomnessConfig,
@@ -635,7 +654,7 @@ fn initialize_keyless_accounts(session: &mut SessionExt, chain_id: ChainId) {
         ]),
     );
     if !chain_id.is_mainnet() {
-        let vk = Groth16VerificationKey::from(DEVNET_VERIFICATION_KEY.clone());
+        let vk = Groth16VerificationKey::from(&*DEVNET_VERIFICATION_KEY);
         exec_function(
             session,
             KEYLESS_ACCOUNT_MODULE_NAME,
@@ -1290,7 +1309,7 @@ pub fn test_mainnet_end_to_end() {
 
     let WriteSet::V0(writeset) = changeset.write_set();
 
-    let state_key = StateKey::on_chain_config::<ValidatorSet>();
+    let state_key = StateKey::on_chain_config::<ValidatorSet>().unwrap();
     let bytes = writeset
         .get(&state_key)
         .unwrap()

@@ -118,6 +118,13 @@ spec aptos_framework::object {
         ensures [abstract] result == spec_create_object_address(source, seed);
     }
 
+    spec fun spec_create_user_derived_object_address_impl(source: address, derive_from: address): address;
+
+    spec create_user_derived_object_address_impl(source: address, derive_from: address): address {
+        pragma opaque;
+        ensures [abstract] result == spec_create_user_derived_object_address_impl(source, derive_from);
+    }
+
     spec create_user_derived_object_address(source: address, derive_from: address): address {
         pragma opaque;
         pragma aborts_if_is_strict = false;

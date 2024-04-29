@@ -32,6 +32,7 @@ fungible asset to it. This emits an deposit event.
 -  [Function `deposit`](#0x1_primary_fungible_store_deposit)
 -  [Function `force_deposit`](#0x1_primary_fungible_store_force_deposit)
 -  [Function `transfer`](#0x1_primary_fungible_store_transfer)
+-  [Function `transfer_assert_minimum_deposit`](#0x1_primary_fungible_store_transfer_assert_minimum_deposit)
 -  [Function `mint`](#0x1_primary_fungible_store_mint)
 -  [Function `burn`](#0x1_primary_fungible_store_burn)
 -  [Function `set_frozen_flag`](#0x1_primary_fungible_store_set_frozen_flag)
@@ -44,7 +45,8 @@ fungible asset to it. This emits an deposit event.
     -  [Module-level Specification](#module-level-spec)
 
 
-<pre><code><b>use</b> <a href="../../aptos-stdlib/../move-stdlib/doc/features.md#0x1_features">0x1::features</a>;
+<pre><code><b>use</b> <a href="dispatchable_fungible_asset.md#0x1_dispatchable_fungible_asset">0x1::dispatchable_fungible_asset</a>;
+<b>use</b> <a href="../../aptos-stdlib/../move-stdlib/doc/features.md#0x1_features">0x1::features</a>;
 <b>use</b> <a href="fungible_asset.md#0x1_fungible_asset">0x1::fungible_asset</a>;
 <b>use</b> <a href="object.md#0x1_object">0x1::object</a>;
 <b>use</b> <a href="../../aptos-stdlib/../move-stdlib/doc/option.md#0x1_option">0x1::option</a>;
@@ -224,8 +226,7 @@ Get the address of the primary store for the given account.
 
 <pre><code><b>public</b> <b>fun</b> <a href="primary_fungible_store.md#0x1_primary_fungible_store_primary_store_address">primary_store_address</a>&lt;T: key&gt;(owner: <b>address</b>, metadata: Object&lt;T&gt;): <b>address</b> {
     <b>let</b> metadata_addr = <a href="object.md#0x1_object_object_address">object::object_address</a>(&metadata);
-    <b>if</b> (metadata_addr == @aptos_fungible_asset && <a href="../../aptos-stdlib/../move-stdlib/doc/features.md#0x1_features_primary_apt_fungible_store_at_user_address_enabled">features::primary_apt_fungible_store_at_user_address_enabled</a>(
-    )) {
+    <b>if</b> (metadata_addr == @aptos_fungible_asset && <a href="../../aptos-stdlib/../move-stdlib/doc/features.md#0x1_features_primary_apt_fungible_store_at_user_address_enabled">features::primary_apt_fungible_store_at_user_address_enabled</a>()) {
         owner
     } <b>else</b> {
         <a href="object.md#0x1_object_create_user_derived_object_address">object::create_user_derived_object_address</a>(owner, metadata_addr)
@@ -399,7 +400,7 @@ Withdraw <code>amount</code> of fungible asset from the given account's primary 
     <b>let</b> store = <a href="primary_fungible_store.md#0x1_primary_fungible_store_ensure_primary_store_exists">ensure_primary_store_exists</a>(<a href="../../aptos-stdlib/../move-stdlib/doc/signer.md#0x1_signer_address_of">signer::address_of</a>(owner), metadata);
     // Check <b>if</b> the store <a href="object.md#0x1_object">object</a> <b>has</b> been burnt or not. If so, unburn it first.
     <a href="primary_fungible_store.md#0x1_primary_fungible_store_may_be_unburn">may_be_unburn</a>(owner, store);
-    <a href="fungible_asset.md#0x1_fungible_asset_withdraw">fungible_asset::withdraw</a>(owner, store, amount)
+    <a href="dispatchable_fungible_asset.md#0x1_dispatchable_fungible_asset_withdraw">dispatchable_fungible_asset::withdraw</a>(owner, store, amount)
 }
 </code></pre>
 
@@ -426,7 +427,7 @@ Deposit fungible asset <code>fa</code> to the given account's primary store.
 <pre><code><b>public</b> <b>fun</b> <a href="primary_fungible_store.md#0x1_primary_fungible_store_deposit">deposit</a>(owner: <b>address</b>, fa: FungibleAsset) <b>acquires</b> <a href="primary_fungible_store.md#0x1_primary_fungible_store_DeriveRefPod">DeriveRefPod</a> {
     <b>let</b> metadata = <a href="fungible_asset.md#0x1_fungible_asset_asset_metadata">fungible_asset::asset_metadata</a>(&fa);
     <b>let</b> store = <a href="primary_fungible_store.md#0x1_primary_fungible_store_ensure_primary_store_exists">ensure_primary_store_exists</a>(owner, metadata);
-    <a href="fungible_asset.md#0x1_fungible_asset_deposit">fungible_asset::deposit</a>(store, fa);
+    <a href="dispatchable_fungible_asset.md#0x1_dispatchable_fungible_asset_deposit">dispatchable_fungible_asset::deposit</a>(store, fa);
 }
 </code></pre>
 
@@ -487,7 +488,49 @@ Transfer <code>amount</code> of fungible asset from sender's primary store to re
     // Check <b>if</b> the sender store <a href="object.md#0x1_object">object</a> <b>has</b> been burnt or not. If so, unburn it first.
     <a href="primary_fungible_store.md#0x1_primary_fungible_store_may_be_unburn">may_be_unburn</a>(sender, sender_store);
     <b>let</b> recipient_store = <a href="primary_fungible_store.md#0x1_primary_fungible_store_ensure_primary_store_exists">ensure_primary_store_exists</a>(recipient, metadata);
-    <a href="fungible_asset.md#0x1_fungible_asset_transfer">fungible_asset::transfer</a>(sender, sender_store, recipient_store, amount);
+    <a href="dispatchable_fungible_asset.md#0x1_dispatchable_fungible_asset_transfer">dispatchable_fungible_asset::transfer</a>(sender, sender_store, recipient_store, amount);
+}
+</code></pre>
+
+
+
+</details>
+
+<a id="0x1_primary_fungible_store_transfer_assert_minimum_deposit"></a>
+
+## Function `transfer_assert_minimum_deposit`
+
+Transfer <code>amount</code> of fungible asset from sender's primary store to receiver's primary store.
+Use the minimum deposit assertion api to make sure receipient will receive a minimum amount of fund.
+
+
+<pre><code><b>public</b> entry <b>fun</b> <a href="primary_fungible_store.md#0x1_primary_fungible_store_transfer_assert_minimum_deposit">transfer_assert_minimum_deposit</a>&lt;T: key&gt;(sender: &<a href="../../aptos-stdlib/../move-stdlib/doc/signer.md#0x1_signer">signer</a>, metadata: <a href="object.md#0x1_object_Object">object::Object</a>&lt;T&gt;, recipient: <b>address</b>, amount: u64, expected: u64)
+</code></pre>
+
+
+
+<details>
+<summary>Implementation</summary>
+
+
+<pre><code><b>public</b> entry <b>fun</b> <a href="primary_fungible_store.md#0x1_primary_fungible_store_transfer_assert_minimum_deposit">transfer_assert_minimum_deposit</a>&lt;T: key&gt;(
+    sender: &<a href="../../aptos-stdlib/../move-stdlib/doc/signer.md#0x1_signer">signer</a>,
+    metadata: Object&lt;T&gt;,
+    recipient: <b>address</b>,
+    amount: u64,
+    expected: u64,
+) <b>acquires</b> <a href="primary_fungible_store.md#0x1_primary_fungible_store_DeriveRefPod">DeriveRefPod</a> {
+    <b>let</b> sender_store = <a href="primary_fungible_store.md#0x1_primary_fungible_store_ensure_primary_store_exists">ensure_primary_store_exists</a>(<a href="../../aptos-stdlib/../move-stdlib/doc/signer.md#0x1_signer_address_of">signer::address_of</a>(sender), metadata);
+    // Check <b>if</b> the sender store <a href="object.md#0x1_object">object</a> <b>has</b> been burnt or not. If so, unburn it first.
+    <a href="primary_fungible_store.md#0x1_primary_fungible_store_may_be_unburn">may_be_unburn</a>(sender, sender_store);
+    <b>let</b> recipient_store = <a href="primary_fungible_store.md#0x1_primary_fungible_store_ensure_primary_store_exists">ensure_primary_store_exists</a>(recipient, metadata);
+    <a href="dispatchable_fungible_asset.md#0x1_dispatchable_fungible_asset_transfer_assert_minimum_deposit">dispatchable_fungible_asset::transfer_assert_minimum_deposit</a>(
+        sender,
+        sender_store,
+        recipient_store,
+        amount,
+        expected
+    );
 }
 </code></pre>
 
