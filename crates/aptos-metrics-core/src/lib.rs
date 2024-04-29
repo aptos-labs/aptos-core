@@ -35,3 +35,13 @@ impl IntGaugeHelper for IntGaugeVec {
         self.with_label_values(labels).set(val)
     }
 }
+
+pub trait IntCounterHelper {
+    fn inc_with(&self, labels: &[&str]);
+}
+
+impl IntCounterHelper for IntCounterVec {
+    fn inc_with(&self, labels: &[&str]) {
+        self.with_label_values(labels).inc()
+    }
+}

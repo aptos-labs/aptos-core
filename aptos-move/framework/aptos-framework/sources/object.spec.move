@@ -56,6 +56,7 @@ spec aptos_framework::object {
         ensures [abstract] result == spec_exists_at<T>(object);
     }
 
+
     spec address_to_object<T: key>(object: address): Object<T> {
         aborts_if !exists<ObjectCore>(object);
         aborts_if !spec_exists_at<T>(object);
@@ -115,6 +116,13 @@ spec aptos_framework::object {
         pragma aborts_if_is_strict = false;
         aborts_if [abstract] false;
         ensures [abstract] result == spec_create_object_address(source, seed);
+    }
+
+    spec fun spec_create_user_derived_object_address_impl(source: address, derive_from: address): address;
+
+    spec create_user_derived_object_address_impl(source: address, derive_from: address): address {
+        pragma opaque;
+        ensures [abstract] result == spec_create_user_derived_object_address_impl(source, derive_from);
     }
 
     spec create_user_derived_object_address(source: address, derive_from: address): address {
@@ -296,6 +304,11 @@ spec aptos_framework::object {
             }
         };
         ensures result == ConstructorRef { self: obj_addr, can_delete: true };
+    }
+
+    spec create_sticky_object_at_address(owner_address: address, object_address: address): ConstructorRef {
+        // TODO(fa_migration)
+        pragma verify = false;
     }
 
     spec create_object_internal(

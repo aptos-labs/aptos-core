@@ -82,6 +82,7 @@ impl<'r, 'l> Session<'r, 'l> {
         ty_args: Vec<TypeTag>,
         args: Vec<impl Borrow<[u8]>>,
         gas_meter: &mut impl GasMeter,
+        traversal_context: &mut TraversalContext,
     ) -> VMResult<()> {
         let bypass_declared_entry_check = false;
         self.move_vm.runtime.execute_function(
@@ -92,6 +93,7 @@ impl<'r, 'l> Session<'r, 'l> {
             &mut self.data_cache,
             &self.module_store,
             gas_meter,
+            traversal_context,
             &mut self.native_extensions,
             bypass_declared_entry_check,
         )?;
@@ -106,6 +108,7 @@ impl<'r, 'l> Session<'r, 'l> {
         ty_args: Vec<TypeTag>,
         args: Vec<impl Borrow<[u8]>>,
         gas_meter: &mut impl GasMeter,
+        traversal_context: &mut TraversalContext,
     ) -> VMResult<SerializedReturnValues> {
         let bypass_declared_entry_check = true;
         self.move_vm.runtime.execute_function(
@@ -116,6 +119,7 @@ impl<'r, 'l> Session<'r, 'l> {
             &mut self.data_cache,
             &self.module_store,
             gas_meter,
+            traversal_context,
             &mut self.native_extensions,
             bypass_declared_entry_check,
         )
@@ -127,6 +131,7 @@ impl<'r, 'l> Session<'r, 'l> {
         instantiation: LoadedFunctionInstantiation,
         args: Vec<impl Borrow<[u8]>>,
         gas_meter: &mut impl GasMeter,
+        traversal_context: &mut TraversalContext,
     ) -> VMResult<SerializedReturnValues> {
         self.move_vm.runtime.execute_function_instantiation(
             func,
@@ -135,6 +140,7 @@ impl<'r, 'l> Session<'r, 'l> {
             &mut self.data_cache,
             &self.module_store,
             gas_meter,
+            traversal_context,
             &mut self.native_extensions,
             true,
         )
@@ -162,6 +168,7 @@ impl<'r, 'l> Session<'r, 'l> {
         ty_args: Vec<TypeTag>,
         args: Vec<impl Borrow<[u8]>>,
         gas_meter: &mut impl GasMeter,
+        traversal_context: &mut TraversalContext,
     ) -> VMResult<()> {
         self.move_vm.runtime.execute_script(
             script,
@@ -170,6 +177,7 @@ impl<'r, 'l> Session<'r, 'l> {
             &mut self.data_cache,
             &self.module_store,
             gas_meter,
+            traversal_context,
             &mut self.native_extensions,
         )
     }

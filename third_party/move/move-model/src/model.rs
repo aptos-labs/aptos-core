@@ -836,12 +836,11 @@ impl GlobalEnv {
     }
 
     fn add_backtrace(msg: &str, _is_bug: bool) -> String {
-        // For now, we do not use is_bug, but we could have
-        // another env var MOVE_COMPILER_DEBUG_BUG_ENV_VAR to
-        // only backtrace bugs if the env var is set.
-        static DEBUG_COMPILER: Lazy<bool> =
-            Lazy::new(|| read_bool_env_var(cli::MOVE_COMPILER_DEBUG_ENV_VAR));
-        if *DEBUG_COMPILER {
+        // Note that you need both MOVE_COMPILER_BACKTRACE=1 and RUST_BACKTRACE=1 for this to
+        // actually generate a backtrace.
+        static DUMP_BACKTRACE: Lazy<bool> =
+            Lazy::new(|| read_bool_env_var(cli::MOVE_COMPILER_BACKTRACE_ENV_VAR));
+        if *DUMP_BACKTRACE {
             let bt = Backtrace::capture();
             if BacktraceStatus::Captured == bt.status() {
                 format!("{}\nBacktrace: {:#?}", msg, bt)

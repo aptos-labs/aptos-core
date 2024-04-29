@@ -3,6 +3,7 @@
 
 use super::Test;
 use crate::{CoreContext, Result, TestReport};
+use anyhow::anyhow;
 use aptos_cached_packages::aptos_stdlib;
 use aptos_logger::info;
 use aptos_rest_client::{Client as RestClient, PendingTransaction, State, Transaction};
@@ -265,6 +266,27 @@ impl<'t> AptosPublicInfo<'t> {
                     .as_str()
                     .and_then(|s| s.parse::<u64>().ok())
             })
+    }
+
+    pub async fn account_exists(&self, address: AccountAddress) -> Result<()> {
+        self.rest_client
+            .get_account_resources(address)
+            .await
+            .is_ok()
+            .then_some(())
+            .ok_or_else(|| anyhow!("Account does not exist"))
+    }
+
+    pub async fn get_account_sequence_number(&mut self, address: AccountAddress) -> Result<u64> {
+        self.account_exists(address).await?;
+
+        Ok(self
+            .client()
+            .get_account_bcs(address)
+            .await
+            .unwrap()
+            .into_inner()
+            .sequence_number())
     }
 
     pub fn random_account(&mut self) -> LocalAccount {

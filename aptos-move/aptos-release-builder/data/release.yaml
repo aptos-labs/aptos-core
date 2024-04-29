@@ -1,6 +1,6 @@
 ---
 remote_endpoint: ~
-name: "v1.11"
+name: "v1.12"
 proposals:
   - name: step_1_increase_max_txn_gas
     metadata:
@@ -8,40 +8,19 @@ proposals:
       description: "Increase max txn gas temporarily for framework upgrade"
     execution_mode: MultiStep
     update_sequence:
-      - DefaultGasWithOverrideOld:
+      - DefaultGasWithOverride:
+          feature_version: 16
           overrides:
             - name: "txn.max_execution_gas"
               value: 3676000000
   - name: step_2_upgrade_framework
     metadata:
-      title: "Multi-step proposal to upgrade mainnet framework to v1.11"
-      description: "This includes changes in https://github.com/aptos-labs/aptos-core/commits/aptos-release-v1.11"
+      title: "Multi-step proposal to upgrade mainnet framework to v1.12"
+      description: "This includes changes in https://github.com/aptos-labs/aptos-core/commits/aptos-release-v1.12"
     execution_mode: MultiStep
     update_sequence:
       - Framework:
           bytecode_version: 6
           git_hash: ~
-      - RawScript: aptos-move/aptos-release-builder/data/proposals/randomness_framework_initialization.move
-      - DefaultGas
-  - name: step_3_enable_checking_unstable_bytecode
-    metadata:
-      title: "Enable the check to reject unstable bytecode to be published to mainnet"
-      description: "Reject unstable bytecode to be published to mainnet"
-      discussion_url: "https://github.com/aptos-labs/aptos-core/pull/12814"
-    execution_mode: MultiStep
-    update_sequence:
-      - FeatureFlag:
-          enabled:
-            - reject_unstable_bytecode
-  - name: step_4_enable_randomness
-    metadata:
-      title: "Enable randomness with fast path optimization."
-      description: "Enable randomness with fast path optimization."
-      discussion_url: "https://github.com/aptos-labs/aptos-core/pull/TBD"
-    execution_mode: MultiStep
-    update_sequence:
-      - Randomness:
-          V2:
-            secrecy_threshold_in_percentage: 50
-            reconstruct_threshold_in_percentage: 66
-            fast_path_secrecy_threshold_in_percentage: 67
+      - DefaultGasWithOverride:
+          feature_version: 17

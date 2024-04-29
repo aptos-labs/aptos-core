@@ -1292,6 +1292,15 @@ impl<'a> Resolver<'a> {
         self.module_store.function_at(&func_inst.handle)
     }
 
+    pub(crate) fn function_from_name(
+        &self,
+        module_id: &ModuleId,
+        func_name: &IdentStr,
+    ) -> PartialVMResult<Arc<Function>> {
+        self.module_store
+            .resolve_function_by_name(func_name, module_id)
+    }
+
     pub(crate) fn instantiate_generic_function(
         &self,
         gas_meter: Option<&mut impl GasMeter>,

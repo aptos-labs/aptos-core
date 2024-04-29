@@ -117,6 +117,7 @@ pub struct ExecutionAndIOCosts {
     pub total: InternalGas,
 
     pub intrinsic_cost: InternalGas,
+    pub keyless_cost: InternalGas,
     pub dependencies: Vec<Dependency>,
     pub call_graph: CallFrame,
     pub transaction_transient: Option<InternalGas>,
@@ -238,6 +239,7 @@ impl ExecutionAndIOCosts {
         let mut total = InternalGas::zero();
 
         total += self.intrinsic_cost;
+        total += self.keyless_cost;
 
         for dep in &self.dependencies {
             total += dep.cost;

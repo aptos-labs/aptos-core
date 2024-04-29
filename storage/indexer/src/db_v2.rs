@@ -18,7 +18,7 @@ use aptos_types::{
     access_path::Path,
     account_address::AccountAddress,
     state_store::{
-        state_key::{StateKey, StateKeyInner},
+        state_key::{inner::StateKeyInner, StateKey},
         table::{TableHandle, TableInfo},
     },
     transaction::Version,
