@@ -1,0 +1,340 @@
+Command `sandbox publish`:
+Command `test`:
+INCLUDING DEPENDENCY MoveNursery
+INCLUDING DEPENDENCY MoveStdlib
+BUILDING print_values
+Running Move unit tests
+[ PASS    ] 0x1::bcs_tests::bcs_address
+[ PASS    ] 0x1::bcs_tests::bcs_bool
+[ PASS    ] 0x1::bcs_tests::bcs_u128
+[ PASS    ] 0x1::bcs_tests::bcs_u16
+[ PASS    ] 0x1::bcs_tests::bcs_u256
+[ PASS    ] 0x1::bcs_tests::bcs_u32
+[ PASS    ] 0x1::bcs_tests::bcs_u64
+[ PASS    ] 0x1::aclTests::test_add_failure
+[ PASS    ] 0x1::bcs_tests::bcs_u8
+[ PASS    ] 0x1::capability_tests::test_delegate_failure_after_revoke
+[ PASS    ] 0x1::bcs_tests::bcs_vec_u8
+[ PASS    ] 0x1::aclTests::test_remove_failure
+[ PASS    ] 0x1::guid_tests::test_basics
+[ PASS    ] 0x1::capability_tests::test_delegate_success
+[ PASS    ] 0x1::bit_vector_tests::empty_bitvector
+[ PASS    ] 0x1::bit_vector_tests::index_bit_out_of_bounds
+[ PASS    ] 0x1::capability_tests::test_failure
+[ PASS    ] 0x1::errors_tests::errors_state
+[ PASS    ] 0x1::aclTests::test_success
+[ PASS    ] 0x1::bit_vector_tests::longest_sequence_no_set_nonzero_index
+[ PASS    ] 0x1::capability_tests::test_success
+[ PASS    ] 0x1::bit_vector_tests::longest_sequence_no_set_zero_index
+[ PASS    ] 0x1::bcs_tests::encode_128
+[ PASS    ] 0x1::bit_vector_tests::longest_sequence_one_set_zero_index
+[ PASS    ] 0x1::bit_vector_tests::longest_sequence_two_set_nonzero_index
+[ PASS    ] 0x1::guid_tests::test_delegation
+[ PASS    ] 0x1::bcs_tests::encode_129
+[ PASS    ] 0x1::guid_tests::test_id
+[ PASS    ] 0x1::bit_vector_tests::longest_sequence_with_break
+[debug] 42
+[debug] [ 100, 200, 300 ]
+[debug] 0x2::M::Foo {
+  dummy_field: false
+}
+[debug] 0x2::M::Bar {
+  x: 404,
+  y: 0x2::M::Foo {
+    dummy_field: false
+  },
+  z: true
+}
+[debug] 0x2::M::Box<0x2::M::Foo> {
+  x: 0x2::M::Foo {
+    dummy_field: false
+  }
+}
+[debug] "test_print_quoted_string"
+[debug] "Can you say \"Hel\\lo\"?"
+[debug] "test_print_string"
+[debug] 0x48656c6c6f2c2073616e65204d6f766520646562756767696e6721
+[debug] "Hello, sane Move debugging!"
+[debug] "test_print_ascii_string"
+[ PASS    ] 0x1::fixed_point32_tests::ceil_can_round_up_correctly
+[debug] "Hello, sane Move debugging!"
+[ PASS    ] 0x1::ascii_tests::printable_chars_dont_allow_newline
+[debug] "test_print_primitive_types"
+[debug] 255
+[debug] 65535
+[debug] 4294967295
+[debug] 18446744073709551615
+[debug] 340282366920938463463374607431768211455
+[debug] 115792089237316195423570985008687907853269984665640564039457584007913129639935
+[debug] false
+[debug] true
+[debug] @0x1234c0ffee
+[debug] signer(0x0)
+[ PASS    ] 0x1::bit_vector_tests::set_bit_out_of_bounds
+[debug] "test_print_struct"
+[debug] 0x2::M::TestInner {
+  val: 100,
+  vec: [ 200, 400 ],
+  msgs: [
+    0x616263646566,
+    0x313233343536
+  ]
+}
+[debug] 0x2::M::TestInner {
+  val: 10,
+  vec: [],
+  msgs: []
+}
+[debug] "test_print_vectors"
+[debug] 0xffabcdef
+[debug] [ 16, 17, 18, 19 ]
+[debug] [ 32, 33, 34, 35 ]
+[debug] [ 64, 65, 66, 67 ]
+[debug] [ 128, 129, 130, 131 ]
+[ PASS    ] 0x1::hash_tests::sha2_256_expected_hash
+[debug] [ 256, 257, 258, 259 ]
+[debug] [ true, false ]
+[debug] [ @0x1234, @0x5678, @0xabcdef ]
+[debug] [ signer(0x0), signer(0x100000000000000000000000000000000000000000000000000000000000000), signer(0x200000000000000000000000000000000000000000000000000000000000000), signer(0x300000000000000000000000000000000000000000000000000000000000000) ]
+[ PASS    ] 0x1::ascii_tests::printable_chars_dont_allow_tab
+[debug] [
+  0x2::M::TestInner {
+    val: 4,
+    vec: [ 127, 128 ],
+    msgs: [
+      0x00ff,
+      0xabcd
+    ]
+  },
+  0x2::M::TestInner {
+    val: 8,
+    vec: [ 128, 129 ],
+    msgs: [
+      0x0000
+    ]
+  }
+]
+[ PASS    ] 0x1::hash_tests::sha3_256_expected_hash
+[debug] "test_print_vector_of_vectors"
+[debug] [
+  0xffab,
+  0xcdef
+]
+[debug] [
+  [ 16, 17 ],
+  [ 18, 19 ]
+]
+[debug] [
+  [ 32, 33 ],
+  [ 34, 35 ]
+]
+[debug] [
+  [ 64, 65 ],
+  [ 66, 67 ]
+]
+[debug] [
+  [ 128, 129 ],
+  [ 130, 131 ]
+]
+[debug] [
+  [ 256, 257 ],
+  [ 258, 259 ]
+]
+[debug] [
+  [ true, false ],
+  [ false, true ]
+]
+[ PASS    ] 0x1::string_tests::test_append
+[debug] [
+  [ @0x1234, @0x5678 ],
+  [ @0xabcdef, @0x9999 ]
+]
+[debug] [
+  [ signer(0x0), signer(0x100000000000000000000000000000000000000000000000000000000000000) ],
+  [ signer(0x0), signer(0x100000000000000000000000000000000000000000000000000000000000000) ]
+]
+[debug] [
+  [
+    0x2::M::TestInner {
+      val: 4,
+      vec: [ 127, 128 ],
+      msgs: []
+    },
+    0x2::M::TestInner {
+      val: 8,
+      vec: [ 128, 129 ],
+      msgs: []
+    }
+  ],
+  [
+    0x2::M::TestInner {
+      val: 4,
+      vec: [ 127, 128 ],
+      msgs: []
+    },
+    0x2::M::TestInner {
+      val: 8,
+      vec: [ 128, 129 ],
+      msgs: []
+    }
+  ]
+]
+[debug] "test_print_nested_struct"
+[debug] 0x2::M::TestStruct {
+  addr: @0x1,
+  number: 255,
+  bytes: 0xc0ffee,
+  name: "He\"llo",
+  vec: [
+    0x2::M::TestInner {
+      val: 1,
+      vec: [ 130, 131 ],
+      msgs: []
+    },
+    0x2::M::TestInner {
+      val: 2,
+      vec: [ 132, 133 ],
+      msgs: []
+    }
+  ]
+}
+[debug] "test_print_generic_struct"
+[ PASS    ] 0x1::fixed_point32_tests::ceil_will_not_change_if_number_already_integer
+[debug] 0x2::M::GenericStruct<0x2::M::Foo> {
+  val: 60
+}
+[ PASS    ] 0x2::M::test
+[ PASS    ] 0x1::string_tests::test_index_of
+[ PASS    ] 0x1::string_tests::test_index_of_fail
+[ PASS    ] 0x1::fixed_point32_tests::create_div_zero
+[ PASS    ] 0x1::option_tests::borrow_mut_none
+[ PASS    ] 0x1::ascii_tests::test_ascii_chars
+[ PASS    ] 0x1::compareTests::equality_of_simple_types
+[ PASS    ] 0x1::roleTests::test_assign_failure
+[ PASS    ] 0x1::string_tests::test_insert
+[ PASS    ] 0x1::fixed_point32_tests::create_from_rational_max_numerator_denominator
+[ PASS    ] 0x1::fixed_point32_tests::create_from_u64_create_correct_fixed_point_number
+[ PASS    ] 0x1::string_tests::test_invalid_utf8
+[ PASS    ] 0x1::compareTests::greater_than_with_natural_ordering
+[ PASS    ] 0x1::fixed_point32_tests::create_from_u64_throw_error_when_number_too_large
+[ PASS    ] 0x1::roleTests::test_revoke_failure
+[ PASS    ] 0xa::type_name_tests::test_generics
+[ PASS    ] 0x1::string_tests::test_sub_string
+[ PASS    ] 0x1::roleTests::test_success
+[ PASS    ] 0x1::fixed_point32_tests::create_overflow
+[ PASS    ] 0x1::string_tests::test_sub_string_empty
+[ PASS    ] 0x1::ascii_tests::test_ascii_push_char_pop_char
+[ PASS    ] 0x1::fixed_point32_tests::create_underflow
+[ PASS    ] 0xa::type_name_tests::test_ground_types
+[ PASS    ] 0x1::string_tests::test_sub_string_invalid_boundary
+[ PASS    ] 0x1::compareTests::greater_than_without_natural_ordering
+[ PASS    ] 0x1::string_tests::test_sub_string_invalid_index
+[ PASS    ] 0x1::fixed_point32_tests::create_zero
+[ PASS    ] 0x1::ascii_tests::test_ascii_push_chars
+[ PASS    ] 0x1::compareTests::inequality_of_simple_types
+[ PASS    ] 0x1::option_tests::borrow_mut_some
+[ PASS    ] 0xa::type_name_tests::test_structs
+[ PASS    ] 0x1::compareTests::less_than_with_natural_ordering
+[ PASS    ] 0x1::fixed_point32_tests::divide_by_zero
+[ PASS    ] 0x1::compareTests::less_than_without_natural_ordering
+[ PASS    ] 0x1::string_tests::test_valid_utf8
+[ PASS    ] 0x1::option_tests::borrow_with_default
+[ PASS    ] 0x1::fixed_point32_tests::divide_overflow_large_numerator
+[ PASS    ] 0x1::fixed_point32_tests::divide_overflow_small_divisore
+[ PASS    ] 0x1::bit_vector_tests::shift_left_at_size
+[ PASS    ] 0x1::option_tests::destroy_none
+[ PASS    ] 0x1::fixed_point32_tests::exact_divide
+[ PASS    ] 0x1::vector_tests::append_empties_is_empty
+[ PASS    ] 0x1::fixed_point32_tests::exact_multiply
+[ PASS    ] 0x1::fixed_point32_tests::floor_can_return_the_correct_number_one
+[ PASS    ] 0x1::fixed_point32_tests::floor_can_return_the_correct_number_zero
+[ PASS    ] 0x1::vector_tests::append_respects_order_empty_lhs
+[ PASS    ] 0x1::option_tests::destroy_none_some
+[ PASS    ] 0x1::fixed_point32_tests::max_can_return_larger_fixed_point_number
+[ PASS    ] 0x1::fixed_point32_tests::min_can_return_smaller_fixed_point_number
+[ PASS    ] 0x1::option_tests::destroy_some
+[ PASS    ] 0x1::vector_tests::append_respects_order_empty_rhs
+[ PASS    ] 0x1::fixed_point32_tests::multiply_overflow_large_multiplier
+[ PASS    ] 0x1::bit_vector_tests::shift_left_more_than_size
+[ PASS    ] 0x1::fixed_point32_tests::multiply_overflow_small_multiplier
+[ PASS    ] 0x1::bit_vector_tests::single_bit_bitvector
+[ PASS    ] 0x1::option_tests::destroy_some_none
+[ PASS    ] 0x1::fixed_point32_tests::multiply_truncates
+[ PASS    ] 0x1::ascii_tests::test_invalid_ascii_characters
+[ PASS    ] 0x1::vector_tests::append_respects_order_nonempty_rhs_lhs
+[ PASS    ] 0x1::fixed_point32_tests::round_can_round_down_correctly
+[ PASS    ] 0x1::option_tests::destroy_with_default
+[ PASS    ] 0x1::bit_vector_tests::test_set_bit_and_index_basic
+[ PASS    ] 0x1::fixed_point32_tests::round_can_round_up_correctly
+[ PASS    ] 0x1::vector_tests::borrow_out_of_range
+[ PASS    ] 0x1::option_tests::extract_none
+[ PASS    ] 0x1::vector_tests::destroy_empty
+[ PASS    ] 0x1::option_tests::extract_some
+[ PASS    ] 0x1::ascii_tests::test_nonvisible_chars
+[ PASS    ] 0x1::option_tests::fill_none
+[ PASS    ] 0x1::vector_tests::destroy_empty_with_pops
+[ PASS    ] 0x1::option_tests::fill_some
+[ PASS    ] 0x1::vector_tests::destroy_non_empty
+[ PASS    ] 0x1::option_tests::get_with_default
+[ PASS    ] 0x1::vector_tests::get_set_work
+[ PASS    ] 0x1::option_tests::into_vec_none
+[ PASS    ] 0x1::vector_tests::index_of_empty_not_has
+[ PASS    ] 0x1::option_tests::into_vec_some
+[ PASS    ] 0x1::option_tests::option_borrow_none
+[ PASS    ] 0x1::vector_tests::index_of_nonempty_has
+[ PASS    ] 0x1::option_tests::option_borrow_some
+[ PASS    ] 0x1::vector_tests::index_of_nonempty_has_multiple_occurences
+[ PASS    ] 0x1::option_tests::option_contains
+[ PASS    ] 0x1::ascii_tests::test_printable_chars
+[ PASS    ] 0x1::option_tests::option_none_is_none
+[ PASS    ] 0x1::option_tests::option_some_is_some
+[ PASS    ] 0x1::vector_tests::index_of_nonempty_not_has
+[ PASS    ] 0x1::option_tests::swap_none
+[ PASS    ] 0x1::option_tests::swap_or_fill_none
+[ PASS    ] 0x1::option_tests::swap_or_fill_some
+[ PASS    ] 0x1::option_tests::swap_some
+[ PASS    ] 0x1::vector_tests::length
+[ PASS    ] 0x1::option_tests::test_filter
+[ PASS    ] 0x1::vector_tests::pop_out_of_range
+[ PASS    ] 0x1::option_tests::test_fold
+[ PASS    ] 0x1::option_tests::test_for_each
+[ PASS    ] 0x1::vector_tests::pop_push_back
+[ PASS    ] 0x1::option_tests::test_for_each_mut
+[ PASS    ] 0x1::vector_tests::push_back_and_borrow
+[ PASS    ] 0x1::option_tests::test_for_each_ref
+[ PASS    ] 0x1::option_tests::test_map
+[ PASS    ] 0x1::vector_tests::remove_empty_vector
+[ PASS    ] 0x1::vector_tests::remove_nonsingleton_vector
+[ PASS    ] 0x1::vector_tests::remove_nonsingleton_vector_last_elem
+[ PASS    ] 0x1::vector_tests::remove_out_of_bound_index
+[ PASS    ] 0x1::vector_tests::remove_singleton_vector
+[ PASS    ] 0x1::vector_tests::reverse_singleton_vector
+[ PASS    ] 0x1::vector_tests::reverse_vector_empty
+[ PASS    ] 0x1::vector_tests::reverse_vector_nonempty_even_length
+[ PASS    ] 0x1::vector_tests::reverse_vector_nonempty_odd_length_non_singleton
+[ PASS    ] 0x1::vector_tests::swap_different_indices
+[ PASS    ] 0x1::vector_tests::swap_empty
+[ PASS    ] 0x1::vector_tests::swap_out_of_range
+[ PASS    ] 0x1::vector_tests::swap_remove_empty
+[ PASS    ] 0x1::vector_tests::swap_remove_end_of_vector
+[ PASS    ] 0x1::vector_tests::swap_remove_inside_vector
+[ PASS    ] 0x1::vector_tests::swap_remove_out_of_range
+[ PASS    ] 0x1::vector_tests::swap_remove_singleton
+[ PASS    ] 0x1::vector_tests::swap_same_index
+[ PASS    ] 0x1::vector_tests::test_empty_is_empty
+[ PASS    ] 0x1::vector_tests::test_filter
+[ PASS    ] 0x1::vector_tests::test_fold
+[ PASS    ] 0x1::vector_tests::test_for_each
+[ PASS    ] 0x1::vector_tests::test_for_each_mut
+[ PASS    ] 0x1::vector_tests::test_for_each_ref
+[ PASS    ] 0x1::vector_tests::test_map
+[ PASS    ] 0x1::vector_tests::test_natives_with_different_instantiations
+[ PASS    ] 0x1::vector_tests::test_singleton_contains
+[ PASS    ] 0x1::vector_tests::test_singleton_len
+[ PASS    ] 0x1::vector_tests::vector_contains
+[ PASS    ] 0x1::bit_vector_tests::test_set_bit_and_index_odd_size
+[ PASS    ] 0x1::bit_vector_tests::test_shift_left
+[ PASS    ] 0x1::bit_vector_tests::test_shift_left_specific_amount
+[ PASS    ] 0x1::bit_vector_tests::test_shift_left_specific_amount_to_unset_bit
+[ PASS    ] 0x1::bit_vector_tests::unset_bit_out_of_bounds
+Test result: OK. Total tests: 171; passed: 171; failed: 0

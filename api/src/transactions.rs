@@ -1364,7 +1364,7 @@ impl TransactionsApi {
 
         let stats_key = match txn.payload() {
             TransactionPayload::Script(_) => {
-                format!("Script::{}", txn.clone().committed_hash()).to_string()
+                format!("Script::{}", txn.committed_hash()).to_string()
             },
             TransactionPayload::ModuleBundle(_) => "ModuleBundle::unknown".to_string(),
             TransactionPayload::EntryFunction(entry_function) => FunctionStats::function_to_key(

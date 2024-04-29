@@ -27,9 +27,13 @@ const RELEVANT_FILE_PATHS_FOR_COMPILER_V2: [&str; 7] = [
     ".github/workflows/move-test-compiler-v2.yaml",
     ".github/actions/move-tests-compiler-v2",
 ];
+const RELEVANT_FILE_PATHS_FOR_FRAMEWORK_UPGRADE_TESTS: [&str; 2] =
+    ["aptos-move/aptos-release-builder", "aptos-move/framework"];
 
 // Relevant packages to monitor when deciding to run the targeted tests
 const RELEVANT_PACKAGES_FOR_COMPILER_V2: [&str; 2] = ["aptos-framework", "e2e-move-tests"];
+const RELEVANT_PACKAGES_FOR_FRAMEWORK_UPGRADE_TESTS: [&str; 2] =
+    ["aptos-framework", "aptos-release-builder"];
 
 // The targeted unit test packages to ignore (these will be run separately, by other jobs)
 const TARGETED_UNIT_TEST_PACKAGES_TO_IGNORE: [&str; 2] = ["aptos-testcases", "smoke-test"];
@@ -62,6 +66,7 @@ pub enum AptosCargoCommand {
     Nextest(CommonArgs),
     TargetedCLITests(CommonArgs),
     TargetedCompilerV2Tests(CommonArgs),
+    TargetedFrameworkUpgradeTests(CommonArgs),
     TargetedUnitTests(CommonArgs),
     Test(CommonArgs),
 }
@@ -88,6 +93,7 @@ impl AptosCargoCommand {
             AptosCargoCommand::Nextest(args) => args,
             AptosCargoCommand::TargetedCLITests(args) => args,
             AptosCargoCommand::TargetedCompilerV2Tests(args) => args,
+            AptosCargoCommand::TargetedFrameworkUpgradeTests(args) => args,
             AptosCargoCommand::TargetedUnitTests(args) => args,
             AptosCargoCommand::Test(args) => args,
         }
@@ -196,6 +202,31 @@ impl AptosCargoCommand {
 
                 // Otherwise, skip the targeted compiler v2 tests
                 println!("Skipping targeted compiler v2 tests because no relevant files or packages were affected!");
+                Ok(())
+            },
+            AptosCargoCommand::TargetedFrameworkUpgradeTests(_) => {
+                // Determine if the framework upgrade tests should be run.
+                // Start by calculating the changed files and affected packages.
+                let (_, _, changed_files) = package_args.identify_changed_files()?;
+                let (_, _, affected_package_paths) =
+                    self.get_args_and_affected_packages(package_args)?;
+
+                // Determine if any relevant files or packages were changed
+                let relevant_changes_detected = detect_relevant_changes(
+                    RELEVANT_FILE_PATHS_FOR_FRAMEWORK_UPGRADE_TESTS.to_vec(),
+                    RELEVANT_PACKAGES_FOR_FRAMEWORK_UPGRADE_TESTS.to_vec(),
+                    changed_files,
+                    affected_package_paths,
+                );
+
+                // Output if relevant changes were detected that require the framework upgrade
+                // test. This will be consumed by Github Actions and used to run the test.
+                // TODO: is there a cleaner way to output this for Github Actions?
+                println!(
+                    "Framework upgrade test required: {}",
+                    relevant_changes_detected
+                );
+
                 Ok(())
             },
             AptosCargoCommand::TargetedUnitTests(_) => {

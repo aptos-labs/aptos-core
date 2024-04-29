@@ -14,4 +14,4 @@ move-vm-types = { path = "../../../../../move-vm/types" }
 
 diem-crypto = { path = "../crypto" }
 
-smallvec = "1.6.1"
+smallvec = { workspace = true }

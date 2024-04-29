@@ -18,15 +18,9 @@ use aptos_api_types::{
     MoveModuleBytecode, MoveResource, MoveStructTag, MoveValue, RawStateValueRequest,
     RawTableItemRequest, TableItemRequest, VerifyInput, VerifyInputWithRecursion, U64,
 };
-use aptos_types::{
-    access_path::AccessPath,
-    state_store::{state_key::StateKey, table::TableHandle, TStateView},
-};
+use aptos_types::state_store::{state_key::StateKey, table::TableHandle, TStateView};
 use aptos_vm::data_cache::AsMoveResolver;
-use move_core_types::{
-    language_storage::{ModuleId, StructTag},
-    resolver::MoveResolver,
-};
+use move_core_types::{language_storage::StructTag, resolver::MoveResolver};
 use poem_openapi::{
     param::{Path, Query},
     payload::Json,
@@ -350,9 +344,7 @@ impl StateApi {
         name: IdentifierWrapper,
         ledger_version: Option<U64>,
     ) -> BasicResultWith404<MoveModuleBytecode> {
-        let module_id = ModuleId::new(address.into(), name.into());
-        let access_path = AccessPath::code_access_path(module_id.clone());
-        let state_key = StateKey::access_path(access_path);
+        let state_key = StateKey::module(address.inner(), &name);
         let (ledger_info, ledger_version, state_view) = self
             .context
             .state_view(ledger_version.map(|inner| inner.0))?;
@@ -366,9 +358,7 @@ impl StateApi {
                     &ledger_info,
                 )
             })?
-            .ok_or_else(|| {
-                module_not_found(address, module_id.name(), ledger_version, &ledger_info)
-            })?;
+            .ok_or_else(|| module_not_found(address, &name, ledger_version, &ledger_info))?;
 
         match accept_type {
             AcceptType::Json => {
@@ -448,7 +438,7 @@ impl StateApi {
         })?;
 
         // Retrieve value from the state key
-        let state_key = StateKey::table_item(TableHandle(table_handle.into()), raw_key);
+        let state_key = StateKey::table_item(&TableHandle(table_handle.into()), &raw_key);
         let bytes = state_view
             .get_state_value_bytes(&state_key)
             .context(format!(
@@ -502,10 +492,8 @@ impl StateApi {
             .context
             .state_view(ledger_version.map(|inner| inner.0))?;
 
-        let state_key = StateKey::table_item(
-            TableHandle(table_handle.into()),
-            table_item_request.key.0.clone(),
-        );
+        let state_key =
+            StateKey::table_item(&TableHandle(table_handle.into()), &table_item_request.key.0);
         let bytes = state_view
             .get_state_value_bytes(&state_key)
             .context(format!(

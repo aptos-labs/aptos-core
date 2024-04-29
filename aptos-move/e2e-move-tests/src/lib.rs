@@ -12,7 +12,7 @@ pub mod transaction_fee;
 use anyhow::bail;
 use aptos_framework::{BuildOptions, BuiltPackage, UPGRADE_POLICY_CUSTOM_FIELD};
 pub use harness::*;
-use move_command_line_common::{env::read_bool_env_var, testing::MOVE_COMPILER_V2};
+use move_command_line_common::env::get_move_compiler_v2_from_env;
 use move_model::metadata::CompilerVersion;
 use move_package::{package_hooks::PackageHooks, source_package::parsed_manifest::CustomDepInfo};
 use move_symbol_pool::Symbol;
@@ -47,7 +47,7 @@ pub(crate) fn build_package(
     options: BuildOptions,
 ) -> anyhow::Result<BuiltPackage> {
     let mut options = options;
-    if read_bool_env_var(MOVE_COMPILER_V2) {
+    if get_move_compiler_v2_from_env() {
         options.compiler_version = Some(CompilerVersion::V2_0);
     }
     BuiltPackage::build(package_path.to_owned(), options)
