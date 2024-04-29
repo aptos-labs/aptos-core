@@ -5,12 +5,10 @@ authors = []
 
 [addresses]
 bonding_curve_launchpad_addr = "_"
-fa_obj_holder_addr = "_"
 memecoin_creator_addr = "_"
 
 [dev-addresses]
 bonding_curve_launchpad_addr = "0x2832"
-fa_obj_holder_addr = "0x81"
 memecoin_creator_addr = "0x803"
 
 [dependencies.AptosFramework]

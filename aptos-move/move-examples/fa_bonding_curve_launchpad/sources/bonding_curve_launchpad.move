@@ -19,6 +19,7 @@ module bonding_curve_launchpad_addr::bonding_curve_launchpad {
     const ELIQUIDITY_PAIR_DISABLED: u64 = 102;
 
     const INITIAL_NEW_FA_RESERVE: u128 = 803_000_000_000_000_000;
+    const INITIAL_NEW_FA_RESERVE_u64: u64 = 803_000_000_000_000_000;
     const FA_DECIMALS: u8 = 8;
     const INITIAL_VIRTUAL_LIQUIDITY: u128 = 50_000_000_000;
     const APT_LIQUIDITY_THRESHOLD: u128 = 600_000_000_000;
@@ -118,8 +119,9 @@ module bonding_curve_launchpad_addr::bonding_curve_launchpad {
         assert!(!smart_table::contains(&mut fa_smartTable.key_to_fa_data, fa_key), EFA_EXISTS_ALREADY);
 
         let base_unit_max_supply: option::Option<u128> = option::some(fa_description.max_supply * math128::pow(10, (fa_description.decimals as u128)));
+        debug::print(&base_unit_max_supply);
         let fa_obj_constructor_ref = &object::create_sticky_object(@bonding_curve_launchpad_addr); // FA object container. Need to store FA, somewhere, so object is it's home. FA obj is essentially the FA.
-        // Creates FA, the primary store for the FA on the resource account defined by constructor, AND mints the initial supply.
+        // Creates FA, the primary store for the FA on the resource account defined by constructor, AND defines the max supply.
         primary_fungible_store::create_primary_store_enabled_fungible_asset(
             fa_obj_constructor_ref,
             base_unit_max_supply,
@@ -130,19 +132,24 @@ module bonding_curve_launchpad_addr::bonding_curve_launchpad {
             fa_description.project_uri
         );
 
+
+
         // Ref's held by the contract.
         let mint_ref = fungible_asset::generate_mint_ref(fa_obj_constructor_ref);
         let burn_ref = fungible_asset::generate_burn_ref(fa_obj_constructor_ref);
         let transfer_ref = fungible_asset::generate_transfer_ref(fa_obj_constructor_ref);
+
+
+
+        let fa_obj_signer = object::generate_signer(fa_obj_constructor_ref);
+        let fa_obj_address = signer::address_of(&fa_obj_signer);
+        primary_fungible_store::mint(&mint_ref, @bonding_curve_launchpad_addr, INITIAL_NEW_FA_RESERVE_u64);
 
         let fa_controller = FAController {
             mint_ref,
             burn_ref,
             transfer_ref,
         };
-        let fa_obj_signer = object::generate_signer(fa_obj_constructor_ref);
-        let fa_obj_address = signer::address_of(&fa_obj_signer);
-
         let fa_data = FAData {
             controller: fa_controller,
             description: fa_description,
@@ -182,8 +189,8 @@ module bonding_curve_launchpad_addr::bonding_curve_launchpad {
             initial_liquidity_pair
         );
 
-        // if(apt_initialPurchaseAmountIn != 0)
-        //     swap_apt_to_fa(account, fa_metadata, fa_data.controller.transfer_ref, apt_initialPurchaseAmountIn);
+        if(apt_initialPurchaseAmountIn != 0)
+            swap_apt_to_fa(account, fa_smartTable, fa_metadata, fa_key, apt_initialPurchaseAmountIn);
 
         //! Event for liquidity pair created...
     }
@@ -196,11 +203,15 @@ module bonding_curve_launchpad_addr::bonding_curve_launchpad {
 
     }
 
-    public(friend) fun swap_apt_to_fa(account: &signer, fa_metadata: Object<Metadata>, fa_transfer_ref: fungible_asset::TransferRef, amountIn: u64) acquires LiquidityPairSmartTable {
+    public(friend) fun swap_apt_to_fa(account: &signer, fa_smartTable: &mut LaunchPad,  fa_metadata: Object<Metadata>, fa_key: FAKey, amountIn: u64) acquires LiquidityPairSmartTable {
+        debug::print(&utf8(b"Enter"));
         let liquidity_pair_smartTable = borrow_global_mut<LiquidityPairSmartTable>(@bonding_curve_launchpad_addr);
         assert!(smart_table::contains(&mut liquidity_pair_smartTable.liquidity_pairs, fa_metadata), ELIQUIDITY_PAIR_DOES_NOT_EXIST);
         let liquidity_pair = smart_table::borrow_mut(&mut liquidity_pair_smartTable.liquidity_pairs, fa_metadata);
-        assert!(!liquidity_pair.enabled, ELIQUIDITY_PAIR_DISABLED);
+        assert!(liquidity_pair.enabled, ELIQUIDITY_PAIR_DISABLED);
+        debug::print(&utf8(b"1"));
+
+
 
         //* amountIn might end up changing here, so we'll use the value returned.
         let swapper_address = signer::address_of(account);
@@ -210,13 +221,26 @@ module bonding_curve_launchpad_addr::bonding_curve_launchpad {
             false,
             amountIn
         );
+                debug::print(&utf8(b"2"));
+
+        let fa_data = smart_table::borrow_mut(&mut fa_smartTable.key_to_fa_data, fa_key);
+        let does_primary_store_exist_for_swapper = primary_fungible_store::primary_store_exists(swapper_address, fa_metadata);
+        if(!does_primary_store_exist_for_swapper){
+            primary_fungible_store::create_primary_store(swapper_address, fa_metadata);
+        };
+
+
+        debug::print(&utf8(b"3"));
         aptos_account::transfer(account, @bonding_curve_launchpad_addr, apt_given);
-        primary_fungible_store::transfer_with_ref(&fa_transfer_ref, @bonding_curve_launchpad_addr, swapper_address, fa_gained);
+        debug::print(&utf8(b"4"));
+        primary_fungible_store::transfer_with_ref(&fa_data.controller.transfer_ref, @bonding_curve_launchpad_addr, swapper_address, 10);
+        // primary_fungible_store::transfer_with_ref(&fa_data.controller.transfer_ref, @bonding_curve_launchpad_addr, swapper_address, fa_gained);
+        debug::print(&utf8(b"5"));
 
         // Disable transfers from users.
         //? Do I really need to check this every time?
         if(!primary_fungible_store::is_frozen(swapper_address, fa_metadata))
-            primary_fungible_store::set_frozen_flag(&fa_transfer_ref, swapper_address, true);
+            primary_fungible_store::set_frozen_flag(&fa_data.controller.transfer_ref, swapper_address, true);
 
         liquidity_pair.fa_reserves = fa_updated_reserves;
         liquidity_pair.apt_reserves = apt_updated_reserves;
@@ -261,9 +285,10 @@ module bonding_curve_launchpad_addr::bonding_curve_launchpad {
     #[test(account = @bonding_curve_launchpad_addr, sender = @memecoin_creator_addr)]
     fun test_create_fa(account: &signer, sender: &signer) acquires LaunchPad, LiquidityPairSmartTable {
         init_module(account);
+
         create_fa_pair(
             sender,
-            100_000_000,
+            0,
             string::utf8(b"SheepyCoin"),
             string::utf8(b"SHEEP"),
             INITIAL_NEW_FA_RESERVE,
@@ -273,7 +298,7 @@ module bonding_curve_launchpad_addr::bonding_curve_launchpad {
         );
         create_fa_pair(
             sender,
-            100_000_000,
+            0,
             string::utf8(b"PoggieCoin"),
             string::utf8(b"POGGIE"),
             INITIAL_NEW_FA_RESERVE,
@@ -283,6 +308,9 @@ module bonding_curve_launchpad_addr::bonding_curve_launchpad {
         );
         debug::print(&utf8(b"PoggieWoggies"));
     }
+
+
+
 
 
 
