@@ -260,7 +260,7 @@ impl<'env> Generator<'env> {
         self.context.new_loc_attr(loc)
     }
 
-    /// Create a new temporary of type if available.
+    /// Create a new temporary of type.
     fn new_temp(&mut self, ty: Type) -> TempIndex {
         let next_idx = self.temps.len();
         self.temps.insert(next_idx, ty);
