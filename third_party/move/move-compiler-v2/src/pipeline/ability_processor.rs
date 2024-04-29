@@ -606,7 +606,6 @@ impl<'a> Transformer<'a> {
             .expect("src locations")
             .get(i)
             .expect("src location")
-        // bytecode_id
     }
 
     /// Gets the location associated with an attribute id
