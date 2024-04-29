@@ -156,7 +156,7 @@ Most memory leaks result in general product reliability problems. If an attacker
 
 ### Fuzzing
 
-Aptos contains harnesses for fuzzing crash-prone code like deserializers, using [`libFuzzer`](https://llvm.org/docs/LibFuzzer.html) through [`cargo fuzz`](https://rust-fuzz.github.io/book/cargo-fuzz.html). For more examples, see the `testsuite/fuzzer` directory where find detailed README.md.
+Aptos contains harnesses for fuzzing crash-prone code like deserializes, using [`libFuzzer`](https://llvm.org/docs/LibFuzzer.html) through [`cargo fuzz`](https://rust-fuzz.github.io/book/cargo-fuzz.html). For more examples, see the `testsuite/fuzzer` directory where find detailed README.md.
 
 ## Conclusion
 
