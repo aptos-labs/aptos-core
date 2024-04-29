@@ -1704,7 +1704,7 @@ impl Frame {
                     .push_ty(Type::Reference(Box::new(ty)))?;
             },
             Bytecode::ImmBorrowField(fh_idx) => {
-                let expected_ty = resolver.field_handle_to_struct(*fh_idx)?;
+                let expected_ty = resolver.field_handle_to_struct(*fh_idx);
 
                 // TODO: move this to types.
                 let top_ty = interpreter.operand_stack.pop_ty()?;
@@ -1716,7 +1716,7 @@ impl Frame {
                     .push_ty(Type::Reference(Box::new(resolver.get_field_type(*fh_idx)?)))?;
             },
             Bytecode::MutBorrowField(fh_idx) => {
-                let expected_ty = resolver.field_handle_to_struct(*fh_idx)?;
+                let expected_ty = resolver.field_handle_to_struct(*fh_idx);
                 let top_ty = interpreter.operand_stack.pop_ty()?;
 
                 // TODO: move this to types.
@@ -1756,7 +1756,7 @@ impl Frame {
             Bytecode::Pack(idx) => {
                 let field_count = resolver.field_count(*idx);
                 let args_ty = resolver.get_struct_fields(*idx)?;
-                let output_ty = resolver.get_struct_type(*idx)?;
+                let output_ty = resolver.get_struct_type(*idx);
                 let ability = output_ty.abilities()?;
 
                 // If the struct has a key ability, we expects all of its field to have store ability but not key ability.
@@ -1827,7 +1827,7 @@ impl Frame {
             },
             Bytecode::Unpack(idx) => {
                 let struct_ty = interpreter.operand_stack.pop_ty()?;
-                struct_ty.paranoid_check_eq(&resolver.get_struct_type(*idx)?)?;
+                struct_ty.paranoid_check_eq(&resolver.get_struct_type(*idx))?;
                 let struct_decl = resolver.get_struct_fields(*idx)?;
                 for ty in struct_decl.fields.iter() {
                     interpreter.operand_stack.push_ty(ty.clone())?;
@@ -1961,7 +1961,7 @@ impl Frame {
                     .operand_stack
                     .pop_ty()?
                     .paranoid_check_is_address_ty()?;
-                let ty = resolver.get_struct_type(*idx)?;
+                let ty = resolver.get_struct_type(*idx);
                 ty.paranoid_check_has_ability(Ability::Key)?;
 
                 // TODO: gate this construction!
@@ -1974,7 +1974,7 @@ impl Frame {
                     .operand_stack
                     .pop_ty()?
                     .paranoid_check_is_address_ty()?;
-                let ty = resolver.get_struct_type(*idx)?;
+                let ty = resolver.get_struct_type(*idx);
                 ty.paranoid_check_has_ability(Ability::Key)?;
 
                 // TODO: gate this construction!
@@ -2023,7 +2023,7 @@ impl Frame {
                     .operand_stack
                     .pop_ty()?
                     .paranoid_check_is_signer_ref_ty()?;
-                ty.paranoid_check_eq(&resolver.get_struct_type(*idx)?)?;
+                ty.paranoid_check_eq(&resolver.get_struct_type(*idx))?;
                 ty.paranoid_check_has_ability(Ability::Key)?;
             },
             Bytecode::MoveToGeneric(idx) => {
@@ -2040,7 +2040,7 @@ impl Frame {
                     .operand_stack
                     .pop_ty()?
                     .paranoid_check_is_address_ty()?;
-                let ty = resolver.get_struct_type(*idx)?;
+                let ty = resolver.get_struct_type(*idx);
                 ty.paranoid_check_has_ability(Ability::Key)?;
                 interpreter.operand_stack.push_ty(ty)?;
             },
@@ -2390,7 +2390,7 @@ impl Frame {
                     },
                     Bytecode::Pack(sd_idx) => {
                         let field_count = resolver.field_count(*sd_idx);
-                        let struct_type = resolver.get_struct_type(*sd_idx)?;
+                        let struct_type = resolver.get_struct_type(*sd_idx);
                         check_depth_of_type(resolver, &struct_type)?;
                         gas_meter.charge_pack(
                             false,
@@ -2633,7 +2633,7 @@ impl Frame {
                     Bytecode::MutBorrowGlobal(sd_idx) | Bytecode::ImmBorrowGlobal(sd_idx) => {
                         let is_mut = matches!(instruction, Bytecode::MutBorrowGlobal(_));
                         let addr = interpreter.operand_stack.pop_as::<AccountAddress>()?;
-                        let ty = resolver.get_struct_type(*sd_idx)?;
+                        let ty = resolver.get_struct_type(*sd_idx);
                         interpreter.borrow_global(
                             is_mut,
                             false,
@@ -2666,7 +2666,7 @@ impl Frame {
                     },
                     Bytecode::Exists(sd_idx) => {
                         let addr = interpreter.operand_stack.pop_as::<AccountAddress>()?;
-                        let ty = resolver.get_struct_type(*sd_idx)?;
+                        let ty = resolver.get_struct_type(*sd_idx);
                         interpreter.exists(
                             false,
                             resolver.loader(),
@@ -2695,7 +2695,7 @@ impl Frame {
                     },
                     Bytecode::MoveFrom(sd_idx) => {
                         let addr = interpreter.operand_stack.pop_as::<AccountAddress>()?;
-                        let ty = resolver.get_struct_type(*sd_idx)?;
+                        let ty = resolver.get_struct_type(*sd_idx);
                         interpreter.move_from(
                             false,
                             resolver.loader(),
@@ -2730,7 +2730,7 @@ impl Frame {
                             .value_as::<Reference>()?
                             .read_ref()?
                             .value_as::<AccountAddress>()?;
-                        let ty = resolver.get_struct_type(*sd_idx)?;
+                        let ty = resolver.get_struct_type(*sd_idx);
                         // REVIEW: Can we simplify Interpreter::move_to?
                         interpreter.move_to(
                             false,

@@ -1331,15 +1331,14 @@ impl<'a> Resolver<'a> {
     // Type resolution
     //
 
-    pub(crate) fn get_struct_type(&self, idx: StructDefinitionIndex) -> PartialVMResult<Type> {
+    pub(crate) fn get_struct_type(&self, idx: StructDefinitionIndex) -> Type {
         let struct_def = match &self.binary {
             BinaryType::Module(module) => module.struct_at(idx),
             BinaryType::Script(_) => unreachable!("Scripts cannot have type instructions"),
         };
-        Ok(Type::Struct {
-            idx: struct_def.idx,
-            ability: AbilityInfo::struct_(struct_def.abilities),
-        })
+        self.loader()
+            .ty_builder()
+            .create_struct_ty(struct_def.idx, AbilityInfo::struct_(struct_def.abilities))
     }
 
     pub(crate) fn get_struct_type_generic(
@@ -1493,14 +1492,13 @@ impl<'a> Resolver<'a> {
         }
     }
 
-    pub(crate) fn field_handle_to_struct(&self, idx: FieldHandleIndex) -> PartialVMResult<Type> {
+    pub(crate) fn field_handle_to_struct(&self, idx: FieldHandleIndex) -> Type {
         match &self.binary {
             BinaryType::Module(module) => {
-                let struct_ = &module.field_handles[idx.0 as usize].definition_struct_type;
-                Ok(Type::Struct {
-                    idx: struct_.idx,
-                    ability: AbilityInfo::struct_(struct_.abilities),
-                })
+                let struct_ty = &module.field_handles[idx.0 as usize].definition_struct_type;
+                self.loader()
+                    .ty_builder()
+                    .create_struct_ty(struct_ty.idx, AbilityInfo::struct_(struct_ty.abilities))
             },
             BinaryType::Script(_) => unreachable!("Scripts cannot have field instructions"),
         }
@@ -1517,6 +1515,8 @@ impl<'a> Resolver<'a> {
                 let struct_ty = &field_inst.definition_struct_type;
 
                 let ty_builder = self.loader().ty_builder();
+
+                // TODO: gate this construction!
                 Ok(Type::StructInstantiation {
                     idx: struct_ty.idx,
                     ty_args: triomphe::Arc::new(

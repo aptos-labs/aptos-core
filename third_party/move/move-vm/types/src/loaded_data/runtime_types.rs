@@ -723,6 +723,11 @@ impl TypeBuilder {
         Type::U256
     }
 
+    #[inline]
+    pub fn create_struct_ty(&self, idx: StructNameIndex, ability: AbilityInfo) -> Type {
+        Type::Struct { idx, ability }
+    }
+
     pub fn create_constant_ty(&self, const_tok: &SignatureToken) -> PartialVMResult<Type> {
         let mut count = 0;
         self.create_constant_ty_impl(const_tok, &mut count, 1)
