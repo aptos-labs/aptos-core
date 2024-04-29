@@ -532,11 +532,9 @@ impl Signature for MultiEd25519Signature {
             .iter()
             .enumerate()
             .filter(|(bitmap_index, _)| bitmap_get_bit(self.bitmap, *bitmap_index))
-            .map(|(bitmap_index, sig)| {
+            .try_for_each(|(bitmap_index, sig)| {
                 sig.verify_arbitrary_msg(message, &public_key.public_keys[bitmap_index])
             })
-            .reduce(|accumulator, element| accumulator.and(element))
-            .unwrap_or(Ok(()))
     }
 
     fn to_bytes(&self) -> Vec<u8> {
