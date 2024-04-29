@@ -62,7 +62,7 @@ SELECTED_FLOW = Flow[os.environ.get("FLOW", default="LAND_BLOCKING")]
 IS_MAINNET = SELECTED_FLOW in [Flow.MAINNET, Flow.MAINNET_LARGE_DB]
 
 DEFAULT_NUM_INIT_ACCOUNTS = (
-    "100000000" if SELECTED_FLOW == Flow.MAINNET_LARGE_DB else "2000000"
+    "100000000" if SELECTED_FLOW == Flow.MAINNET_LARGE_DB else "100000"
 )
 DEFAULT_MAX_BLOCK_SIZE = "25000" if IS_MAINNET else "10000"
 
@@ -156,6 +156,8 @@ TESTS = [
     RunGroupConfig(expected_tps=970, key=RunGroupKey("liquidity-pool-swap-stable"), included_in=Flow.CONTINUOUS),
     RunGroupConfig(expected_tps=4350, key=RunGroupKey("liquidity-pool-swap-stable", module_working_set_size=20), included_in=Flow.CONTINUOUS),
 
+    RunGroupConfig(expected_tps=27000, key=RunGroupKey("deserialize-u256"), included_in=LAND_BLOCKING_AND_C),
+    
     # fee payer sequentializes transactions today. in these tests module publisher is the fee payer, so larger number of modules tests throughput with multiple fee payers
     RunGroupConfig(expected_tps=3120, key=RunGroupKey("no-op-fee-payer"), included_in=LAND_BLOCKING_AND_C),
     RunGroupConfig(expected_tps=17747, key=RunGroupKey("no-op-fee-payer", module_working_set_size=50), included_in=Flow.CONTINUOUS),
