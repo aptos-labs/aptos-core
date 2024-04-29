@@ -11,6 +11,7 @@ use crate::{
 use anyhow::Result;
 use aptos_consensus_types::{
     block::Block, quorum_cert::QuorumCert, timeout_2chain::TwoChainTimeoutCertificate, vote::Vote,
+    wrapped_ledger_info::WrappedLedgerInfo,
 };
 use aptos_crypto::HashValue;
 use aptos_infallible::Mutex;
@@ -130,6 +131,7 @@ impl MockStorage {
             RootMetadata::new_empty(),
             quorum_certs,
             qc,
+            None,
         )
     }
 
@@ -141,7 +143,7 @@ impl MockStorage {
         let shared_storage = Arc::new(MockSharedStorage::new(validator_set.clone()));
         let genesis_li = LedgerInfo::mock_genesis(Some(validator_set));
         let storage = Self::new_with_ledger_info(shared_storage, genesis_li);
-        let recovery_data = match storage.start() {
+        let recovery_data = match storage.start(None) {
             LivenessStorageData::FullRecoveryData(recovery_data) => recovery_data,
             _ => panic!("Mock storage should never fail constructing recovery data"),
         };
@@ -201,7 +203,7 @@ impl PersistentLivenessStorage for MockStorage {
         self.get_ledger_recovery_data()
     }
 
-    fn start(&self) -> LivenessStorageData {
+    fn start(&self, _highest_ordered_cert: Option<WrappedLedgerInfo>) -> LivenessStorageData {
         match self.try_start() {
             Ok(recovery_data) => LivenessStorageData::FullRecoveryData(recovery_data),
             Err(_) => LivenessStorageData::PartialRecoveryData(self.recover_from_ledger()),
@@ -249,7 +251,7 @@ impl EmptyStorage {
 
     pub fn start_for_testing() -> (RecoveryData, Arc<Self>) {
         let storage = Arc::new(EmptyStorage::new());
-        let recovery_data = match storage.start() {
+        let recovery_data = match storage.start(None) {
             LivenessStorageData::FullRecoveryData(recovery_data) => recovery_data,
             _ => panic!("Mock storage should never fail constructing recovery data"),
         };
@@ -277,7 +279,7 @@ impl PersistentLivenessStorage for EmptyStorage {
         ))
     }
 
-    fn start(&self) -> LivenessStorageData {
+    fn start(&self, highest_ordered_cert: Option<WrappedLedgerInfo>) -> LivenessStorageData {
         match RecoveryData::new(
             None,
             self.recover_from_ledger(),
@@ -285,6 +287,7 @@ impl PersistentLivenessStorage for EmptyStorage {
             RootMetadata::new_empty(),
             vec![],
             None,
+            highest_ordered_cert,
         ) {
             Ok(recovery_data) => LivenessStorageData::FullRecoveryData(recovery_data),
             Err(e) => {

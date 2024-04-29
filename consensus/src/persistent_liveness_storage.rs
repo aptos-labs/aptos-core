@@ -37,7 +37,7 @@ pub trait PersistentLivenessStorage: Send + Sync {
     fn recover_from_ledger(&self) -> LedgerRecoveryData;
 
     /// Construct necessary data to start consensus.
-    fn start(&self) -> LivenessStorageData;
+    fn start(&self, highest_ordered_cert: Option<WrappedLedgerInfo>) -> LivenessStorageData;
 
     /// Persist the highest 2chain timeout certificate for improved liveness - proof for other replicas
     /// to jump to this round
@@ -88,6 +88,7 @@ impl LedgerRecoveryData {
         &self,
         blocks: &mut Vec<Block>,
         quorum_certs: &mut Vec<QuorumCert>,
+        highest_ordered_cert: Option<WrappedLedgerInfo>,
     ) -> Result<RootInfo> {
         info!(
             "The last committed block id as recorded in storage: {}",
@@ -128,9 +129,14 @@ impl LedgerRecoveryData {
             .find(|qc| qc.certified_block().id() == root_block.id())
             .ok_or_else(|| format_err!("No QC found for root: {}", root_id))?
             .clone();
+        // TODO: The earlier assertion could fail when executing blocks based on order votes.
+        // A commit certificate may not have a QC with ledger info that matches with the
+        // commit certificate.
         let root_ordered_cert = quorum_certs
             .iter()
             .find(|qc| qc.commit_info().id() == root_block.id())
+            .map(|qc| qc.into_wrapped_ledger_info())
+            .or_else(|| highest_ordered_cert.filter(|cert| cert.commit_info().id() == root_id))
             .ok_or_else(|| format_err!("No LI found for root: {}", root_id))?
             .clone();
 
@@ -142,8 +148,8 @@ impl LedgerRecoveryData {
         Ok(RootInfo(
             Box::new(root_block),
             root_quorum_cert,
-            root_ordered_cert.into_wrapped_ledger_info(),
-            root_commit_cert.into_wrapped_ledger_info(),
+            root_ordered_cert,
+            root_commit_cert,
         ))
     }
 }
@@ -204,9 +210,10 @@ impl RecoveryData {
         root_metadata: RootMetadata,
         mut quorum_certs: Vec<QuorumCert>,
         highest_2chain_timeout_cert: Option<TwoChainTimeoutCertificate>,
+        highest_ordered_cert: Option<WrappedLedgerInfo>,
     ) -> Result<Self> {
         let root = ledger_recovery_data
-            .find_root(&mut blocks, &mut quorum_certs)
+            .find_root(&mut blocks, &mut quorum_certs, highest_ordered_cert)
             .with_context(|| {
                 // for better readability
                 blocks.sort_by_key(|block| block.round());
@@ -348,7 +355,7 @@ impl PersistentLivenessStorage for StorageWriteProxy {
         LedgerRecoveryData::new(latest_ledger_info)
     }
 
-    fn start(&self) -> LivenessStorageData {
+    fn start(&self, highest_ordered_cert: Option<WrappedLedgerInfo>) -> LivenessStorageData {
         info!("Start consensus recovery.");
         let raw_data = self
             .db
@@ -396,6 +403,7 @@ impl PersistentLivenessStorage for StorageWriteProxy {
             accumulator_summary.into(),
             quorum_certs,
             highest_2chain_timeout_cert,
+            highest_ordered_cert,
         ) {
             Ok(mut initial_data) => {
                 (self as &dyn PersistentLivenessStorage)
