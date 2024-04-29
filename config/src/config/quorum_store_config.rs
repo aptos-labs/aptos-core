@@ -65,7 +65,7 @@ pub struct QuorumStoreConfig {
     pub batch_request_rpc_timeout_ms: usize,
     /// Duration for expiring locally created batches.
     pub batch_expiry_gap_when_init_usecs: u64,
-    /// Duration for expiring remotely created batches.
+    /// Duration for expiring remotely created batches. The txns are filtered to prevent dupliation across validators.
     pub remote_batch_expiry_gap_when_init_usecs: u64,
     pub memory_quota: usize,
     pub db_quota: usize,
