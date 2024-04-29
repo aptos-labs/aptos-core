@@ -132,16 +132,3 @@ template ParseJWTFieldWithUnquotedValue(maxKVPairLen, maxNameLen, maxValueLen) {
     }
 }
 
-template ParseEmailVerifiedField(maxKVPairLen, maxNameLen, maxValueLen) {
-    signal input field[maxKVPairLen]; // ASCII
-    signal input name[maxNameLen];
-    signal input value[maxValueLen];
-    signal input field_len; // ASCII
-    signal input name_len;
-    signal input value_index; // index of value within `field`
-    signal input value_len;
-    signal input colon_index; // index of colon within `field`
-
-
-    ParseJWTFieldSharedLogic(maxKVPairLen, maxNameLen, maxValueLen)(field, name, value, field_len, name_len, value_index, value_len, colon_index);
-}
