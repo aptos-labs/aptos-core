@@ -639,7 +639,7 @@ impl<'a> Transformer<'a> {
     }
 
     /// Create a display string for temps. If the temp is printable, this will be 'local `x`'. Otherwise
-    /// it will be just 'value'.
+    /// it will be just "value".
     fn display_temp(&self, temp: TempIndex) -> String {
         self.builder
             .get_target()
