@@ -136,7 +136,7 @@ pub struct DagRoundStateConfig {
 impl Default for DagRoundStateConfig {
     fn default() -> Self {
         Self {
-            adaptive_responsive_minimum_wait_time_ms: 600,
+            adaptive_responsive_minimum_wait_time_ms: 60000,
             wait_voting_power_pct: 100,
         }
     }

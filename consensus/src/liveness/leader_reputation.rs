@@ -754,7 +754,7 @@ impl ProposerElection for LeaderReputation {
         (
             proposers[chosen_index],
             voting_power_participation_ratio,
-            chosen_proposers,
+            vec![proposers[chosen_index]],
         )
     }
 
