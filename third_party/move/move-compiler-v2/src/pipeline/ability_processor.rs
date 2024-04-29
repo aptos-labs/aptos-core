@@ -200,7 +200,7 @@ impl<'a> TransferFunctions for CopyDropAnalysis<'a> {
                                 .data
                                 .src_attrs
                                 .get(id)
-                                .unwrap()
+                                .expect("src attrs")
                                 .iter()
                                 .cloned(),
                         ),
