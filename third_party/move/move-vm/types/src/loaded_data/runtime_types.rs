@@ -9,13 +9,13 @@ use itertools::Itertools;
 use move_binary_format::{
     errors::{Location, PartialVMError, PartialVMResult, VMResult},
     file_format::{
-        AbilitySet, SignatureToken, StructHandle, StructTypeParameter, TypeParameterIndex,
+        Ability, AbilitySet, SignatureToken, StructHandle, StructTypeParameter, TypeParameterIndex,
     },
 };
 use move_core_types::{
     identifier::Identifier,
     language_storage::{ModuleId, StructTag, TypeTag},
-    vm_status::StatusCode,
+    vm_status::{sub_status::unknown_invariant_violation::EPARANOID_FAILURE, StatusCode},
 };
 use serde::Serialize;
 use smallbitvec::SmallBitVec;
@@ -283,76 +283,195 @@ impl AbilityInfo {
     }
 }
 
+macro_rules! paranoid_failure {
+    ($msg:ident) => {
+        Err(
+            PartialVMError::new(StatusCode::UNKNOWN_INVARIANT_VIOLATION_ERROR)
+                .with_message($msg)
+                .with_sub_status(EPARANOID_FAILURE),
+        )
+    };
+}
+
 impl Type {
-    pub fn verify_ty_args<'a, I>(constraints: I, ty_args: &[Type]) -> PartialVMResult<()>
+    pub fn verify_ty_arg_abilities<'a, I>(
+        ty_param_abilities: I,
+        ty_args: &[Self],
+    ) -> PartialVMResult<()>
     where
         I: IntoIterator<Item = &'a AbilitySet>,
         I::IntoIter: ExactSizeIterator,
     {
-        let constraints = constraints.into_iter();
-        if constraints.len() != ty_args.len() {
+        let ty_param_abilities = ty_param_abilities.into_iter();
+        if ty_param_abilities.len() != ty_args.len() {
             return Err(PartialVMError::new(
                 StatusCode::NUMBER_OF_TYPE_ARGUMENTS_MISMATCH,
             ));
         }
-        for (ty, expected_k) in ty_args.iter().zip(constraints) {
-            if !expected_k.is_subset(ty.abilities()?) {
+        for (ty, expected_ability_set) in ty_args.iter().zip(ty_param_abilities) {
+            if !expected_ability_set.is_subset(ty.abilities()?) {
                 return Err(PartialVMError::new(StatusCode::CONSTRAINT_NOT_SATISFIED));
             }
         }
         Ok(())
     }
 
-    pub fn check_vec_ref(&self, inner_ty: &Type, is_mut: bool) -> PartialVMResult<Type> {
+    pub fn paranoid_check_is_bool_ty(&self) -> PartialVMResult<()> {
+        if !matches!(self, Self::Bool) {
+            let msg = format!("Expected boolean type, got {}", self);
+            return paranoid_failure!(msg);
+        }
+        Ok(())
+    }
+
+    pub fn paranoid_check_is_u64_ty(&self) -> PartialVMResult<()> {
+        if !matches!(self, Self::U64) {
+            let msg = format!("Expected U64 type, got {}", self);
+            return paranoid_failure!(msg);
+        }
+        Ok(())
+    }
+
+    pub fn paranoid_check_is_address_ty(&self) -> PartialVMResult<()> {
+        if !matches!(self, Self::Address) {
+            let msg = format!("Expected address type, got {}", self);
+            return paranoid_failure!(msg);
+        }
+        Ok(())
+    }
+
+    pub fn paranoid_check_is_signer_ref_ty(&self) -> PartialVMResult<()> {
+        if let Self::Reference(inner_ty) = self {
+            if matches!(inner_ty.as_ref(), Self::Signer) {
+                return Ok(());
+            }
+        }
+        let msg = format!("Expected address type, got {}", self);
+        paranoid_failure!(msg)
+    }
+
+    pub fn paranoid_check_has_ability(&self, ability: Ability) -> PartialVMResult<()> {
+        if !self.abilities()?.has_ability(ability) {
+            let msg = format!("Type {} does not have expected ability {}", self, ability);
+            return paranoid_failure!(msg);
+        }
+        Ok(())
+    }
+
+    pub fn paranoid_check_abilities(&self, expected_abilities: AbilitySet) -> PartialVMResult<()> {
+        let abilities = self.abilities()?;
+        if !expected_abilities.is_subset(abilities) {
+            let msg = format!(
+                "Type {} has unexpected ability: expected {}, got {}",
+                self, expected_abilities, abilities
+            );
+            return paranoid_failure!(msg);
+        }
+        Ok(())
+    }
+
+    pub fn paranoid_check_eq(&self, expected_ty: &Self) -> PartialVMResult<()> {
+        if self != expected_ty {
+            let msg = format!("Expected type {}, got {}", expected_ty, self);
+            return paranoid_failure!(msg);
+        }
+        Ok(())
+    }
+
+    pub fn paranoid_check_is_vec_ty(&self, expected_elem_ty: &Self) -> PartialVMResult<()> {
+        if let Self::Vector(elem_ty) = self {
+            return elem_ty.paranoid_check_eq(expected_elem_ty);
+        }
+
+        let msg = format!("Expected vector type, got {}", self);
+        paranoid_failure!(msg)
+    }
+
+    pub fn paranoid_check_is_vec_ref_ty(
+        &self,
+        expected_elem_ty: &Self,
+        is_mut: bool,
+    ) -> PartialVMResult<()> {
+        if let Self::MutableReference(inner_ty) = self {
+            if let Self::Vector(elem_ty) = inner_ty.as_ref() {
+                elem_ty.paranoid_check_eq(expected_elem_ty)?;
+                return Ok(());
+            }
+        }
+
+        if let Self::Reference(inner_ty) = self {
+            if !is_mut {
+                if let Self::Vector(elem_ty) = inner_ty.as_ref() {
+                    elem_ty.paranoid_check_eq(expected_elem_ty)?;
+                    return Ok(());
+                }
+            }
+        }
+
+        let msg = format!(
+            "Expected a (mutable: {}) vector reference, got {}",
+            is_mut, self
+        );
+        paranoid_failure!(msg)
+    }
+
+    /// Returns an error if the type is not a (mutable) vector reference. Otherwise, returns
+    /// a (mutable) reference to its element type.
+    pub fn paranoid_check_and_get_vec_elem_ref_ty(
+        &self,
+        expected_elem_ty: &Self,
+        is_mut: bool,
+    ) -> PartialVMResult<Self> {
+        self.paranoid_check_is_vec_ref_ty(expected_elem_ty, is_mut)?;
+        let elem_ty = Box::new(self.get_vec_ref_elem_ty());
+
+        // SAFETY: This type construction satisfies all constraints on size/depth because the parent
+        //         vector reference type has been safely constructed.
+        Ok(if is_mut {
+            Type::MutableReference(elem_ty)
+        } else {
+            Type::Reference(elem_ty)
+        })
+    }
+
+    /// Returns an error if the type is not a (mutable) vector reference. Otherwise, returns
+    /// its element type.
+    pub fn paranoid_check_and_get_vec_elem_ty(
+        &self,
+        expected_elem_ty: &Self,
+        is_mut: bool,
+    ) -> PartialVMResult<Self> {
+        self.paranoid_check_is_vec_ref_ty(expected_elem_ty, is_mut)?;
+        Ok(self.get_vec_ref_elem_ty())
+    }
+
+    #[inline]
+    fn get_vec_ref_elem_ty(&self) -> Self {
         match self {
-            Type::MutableReference(inner) => match &**inner {
-                Type::Vector(inner) => {
-                    inner.check_eq(inner_ty)?;
-                    Ok(inner.as_ref().clone())
-                },
-                _ => Err(
-                    PartialVMError::new(StatusCode::UNKNOWN_INVARIANT_VIOLATION_ERROR)
-                        .with_message("VecMutBorrow expects a vector reference".to_string())
-                        .with_sub_status(move_core_types::vm_status::sub_status::unknown_invariant_violation::EPARANOID_FAILURE),
-                ),
+            Self::Reference(inner_ty) | Self::MutableReference(inner_ty) => match inner_ty.as_ref()
+            {
+                Self::Vector(elem_ty) => elem_ty.as_ref().clone(),
+                _ => unreachable!("The inner type must be a vector"),
             },
-            Type::Reference(inner) if !is_mut => match &**inner {
-                Type::Vector(inner) => {
-                    inner.check_eq(inner_ty)?;
-                    Ok(inner.as_ref().clone())
-                },
-                _ => Err(
-                    PartialVMError::new(StatusCode::UNKNOWN_INVARIANT_VIOLATION_ERROR)
-                        .with_message("VecMutBorrow expects a vector reference".to_string())
-                        .with_sub_status(move_core_types::vm_status::sub_status::unknown_invariant_violation::EPARANOID_FAILURE),
-                ),
-            },
-            _ => Err(
-                PartialVMError::new(StatusCode::UNKNOWN_INVARIANT_VIOLATION_ERROR)
-                    .with_message("VecMutBorrow expects a vector reference".to_string())
-                    .with_sub_status(move_core_types::vm_status::sub_status::unknown_invariant_violation::EPARANOID_FAILURE),
-            ),
+            _ => unreachable!("The top-level type must be a reference"),
         }
     }
 
-    pub fn check_eq(&self, other: &Self) -> PartialVMResult<()> {
-        if self != other {
-            return Err(
-                PartialVMError::new(StatusCode::UNKNOWN_INVARIANT_VIOLATION_ERROR)
-                    .with_message(format!(
-                        "Type mismatch: expected {:?}, got {:?}",
-                        self, other
-                    ))
-                    .with_sub_status(move_core_types::vm_status::sub_status::unknown_invariant_violation::EPARANOID_FAILURE),
-            );
+    #[inline]
+    pub fn paranoid_freeze_ref_ty(self) -> PartialVMResult<Type> {
+        match self {
+            Type::MutableReference(ty) => Ok(Type::Reference(ty)),
+            _ => {
+                let msg = format!("Expected a mutable reference to freeze, got {}", self);
+                paranoid_failure!(msg)
+            },
         }
-        Ok(())
     }
 
     pub fn check_ref_eq(&self, expected_inner: &Self) -> PartialVMResult<()> {
         match self {
             Type::MutableReference(inner) | Type::Reference(inner) => {
-                inner.check_eq(expected_inner)
+                inner.paranoid_check_eq(expected_inner)
             },
             _ => Err(
                 PartialVMError::new(StatusCode::UNKNOWN_INVARIANT_VIOLATION_ERROR)
@@ -567,6 +686,41 @@ impl TypeBuilder {
             max_ty_size: 11,
             max_ty_depth: 5,
         }
+    }
+
+    #[inline]
+    pub fn create_bool_ty(&self) -> Type {
+        Type::Bool
+    }
+
+    #[inline]
+    pub fn create_u8_ty(&self) -> Type {
+        Type::U8
+    }
+
+    #[inline]
+    pub fn create_u16_ty(&self) -> Type {
+        Type::U16
+    }
+
+    #[inline]
+    pub fn create_u32_ty(&self) -> Type {
+        Type::U32
+    }
+
+    #[inline]
+    pub fn create_u64_ty(&self) -> Type {
+        Type::U64
+    }
+
+    #[inline]
+    pub fn create_u128_ty(&self) -> Type {
+        Type::U128
+    }
+
+    #[inline]
+    pub fn create_u256_ty(&self) -> Type {
+        Type::U256
     }
 
     pub fn create_constant_ty(&self, const_tok: &SignatureToken) -> PartialVMResult<Type> {
@@ -786,7 +940,7 @@ impl TypeBuilder {
                         let ty_arg = self.create_ty_impl(ty_arg_tag, resolver, count, depth + 1)?;
                         ty_args.push(ty_arg);
                     }
-                    Type::verify_ty_args(struct_ty.type_param_constraints(), &ty_args)
+                    Type::verify_ty_arg_abilities(struct_ty.type_param_constraints(), &ty_args)
                         .map_err(|e| e.finish(Location::Undefined))?;
                     StructInstantiation {
                         idx: struct_ty.idx,

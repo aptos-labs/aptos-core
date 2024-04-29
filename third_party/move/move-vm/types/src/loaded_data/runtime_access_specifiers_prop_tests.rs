@@ -5,7 +5,7 @@ use crate::loaded_data::{
     runtime_access_specifier::{
         AccessInstance, AccessSpecifier, AccessSpecifierClause, AddressSpecifier, ResourceSpecifier,
     },
-    runtime_types::{StructIdentifier, Type},
+    runtime_types::{StructIdentifier, Type, TypeBuilder},
 };
 use move_binary_format::file_format::AccessKind;
 use move_core_types::{
@@ -116,10 +116,11 @@ fn address_specifier_strategy() -> impl Strategy<Value = AddressSpecifier> {
 }
 
 fn type_args_strategy() -> impl Strategy<Value = Vec<Type>> {
+    let ty_builder = TypeBuilder::new_for_test();
     prop_oneof![
         Just(vec![]),
-        Just(vec![Type::U8]),
-        Just(vec![Type::U16, Type::U32])
+        Just(vec![ty_builder.create_u8_ty()]),
+        Just(vec![ty_builder.create_u16_ty(), ty_builder.create_u32_ty()])
     ]
 }
 

@@ -331,7 +331,7 @@ impl Loader {
             type_arguments.push(self.load_type(ty, data_store, module_store)?);
         }
 
-        Type::verify_ty_args(main.type_parameters(), &type_arguments).map_err(|e| {
+        Type::verify_ty_arg_abilities(main.type_parameters(), &type_arguments).map_err(|e| {
             e.with_message(format!(
                 "Failed to verify type arguments for script {}",
                 &main.name
@@ -552,7 +552,7 @@ impl Loader {
         }
 
         // verify type arguments for capability constraints
-        Type::verify_ty_args(func.type_parameters(), &type_arguments)
+        Type::verify_ty_arg_abilities(func.type_parameters(), &type_arguments)
             .map_err(|e| e.finish(Location::Module(module_id.clone())))?;
 
         let loaded = LoadedFunctionInstantiation {
@@ -600,7 +600,7 @@ impl Loader {
             })?;
 
         // verify type arguments
-        Type::verify_ty_args(func.type_parameters(), &type_arguments)
+        Type::verify_ty_arg_abilities(func.type_parameters(), &type_arguments)
             .map_err(|e| e.finish(Location::Module(module_id.clone())))?;
 
         let loaded = LoadedFunctionInstantiation {
