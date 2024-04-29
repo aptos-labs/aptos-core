@@ -3,10 +3,13 @@
 
 use crate::{
     access_path::AccessPath,
-    state_store::{state_key::inner::StateKeyInner, table::TableHandle},
+    state_store::{
+        state_key::inner::{StateKeyInner, StateKeyInnerHasher},
+        table::TableHandle,
+    },
 };
 use anyhow::Result;
-use aptos_crypto::HashValue;
+use aptos_crypto::{hash::CryptoHasher, HashValue};
 use aptos_infallible::RwLock;
 use bytes::Bytes;
 use hashbrown::HashMap;
@@ -15,7 +18,7 @@ use move_core_types::{
     identifier::{IdentStr, Identifier},
     language_storage::StructTag,
 };
-use once_cell::sync::{Lazy, OnceCell};
+use once_cell::sync::Lazy;
 use std::{
     borrow::Borrow,
     hash::{Hash, Hasher},
@@ -26,18 +29,8 @@ use std::{
 pub struct Entry {
     pub deserialized: StateKeyInner,
     // pub serialized: Bytes,
-    pub encoded: OnceCell<Bytes>,
-    pub hash_value: OnceCell<HashValue>,
-}
-
-impl Entry {
-    fn new(deserialized: StateKeyInner) -> Self {
-        Self {
-            deserialized,
-            encoded: OnceCell::new(),
-            hash_value: OnceCell::new(),
-        }
-    }
+    pub encoded: Bytes,
+    pub hash_value: HashValue,
 }
 
 impl Drop for Entry {
@@ -104,8 +97,14 @@ where
     {
         const MAX_TRIES: usize = 1024;
 
-        // generate the entry outside the lock
-        let maybe_add = inner_gen()?;
+        // generate the entry content outside the lock
+        let deserialized = inner_gen()?;
+        let encoded = deserialized.encode().expect("Failed to encode StateKey.");
+        let hash_value = {
+            let mut state = StateKeyInnerHasher::default();
+            state.update(&encoded);
+            state.finish()
+        };
 
         for _ in 0..MAX_TRIES {
             let mut locked = self.inner.write();
@@ -113,14 +112,22 @@ where
             match locked.get_mut(key1) {
                 None => {
                     let mut map2 = locked.entry(key1.to_owned()).insert(HashMap::new());
-                    let entry = Arc::new(Entry::new(maybe_add));
+                    let entry = Arc::new(Entry {
+                        deserialized,
+                        encoded,
+                        hash_value,
+                    });
                     map2.get_mut()
                         .insert(key2.to_owned(), Arc::downgrade(&entry));
                     return Ok(entry);
                 },
                 Some(map2) => match map2.get(key2) {
                     None => {
-                        let entry = Arc::new(Entry::new(maybe_add));
+                        let entry = Arc::new(Entry {
+                            deserialized,
+                            encoded,
+                            hash_value,
+                        });
                         map2.insert(key2.to_owned(), Arc::downgrade(&entry));
                         return Ok(entry);
                     },

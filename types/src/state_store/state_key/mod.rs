@@ -9,22 +9,21 @@ pub mod registry;
 #[cfg(test)]
 mod tests;
 
-use crate::state_store::state_key::{
-    inner::{StateKeyDecodeErr, StateKeyInnerHasher, StateKeyTag},
-    registry::{Entry, REGISTRY},
-};
 use crate::{
     access_path,
     access_path::AccessPath,
     on_chain_config::OnChainConfig,
     state_store::{
-        // metrics::{STATE_KEY_COUNTERS, STATE_KEY_TIMER},
+        state_key::{
+            inner::{StateKeyDecodeErr, StateKeyTag},
+            registry::{Entry, REGISTRY},
+        },
         table::TableHandle,
     },
 };
 use anyhow::Result;
 use aptos_crypto::{
-    hash::{CryptoHash, CryptoHasher, DummyHasher},
+    hash::{CryptoHash, DummyHasher},
     HashValue,
 };
 use bytes::Bytes;
@@ -56,11 +55,7 @@ impl Debug for StateKey {
 
 impl StateKey {
     pub fn encoded(&self) -> &Bytes {
-        self.0.encoded.get_or_init(|| {
-            self.inner()
-                .encode()
-                .expect("StateKeyInner::encode() failed.")
-        })
+        &self.0.encoded
     }
 
     /// Recovers from serialized bytes in physical storage.
@@ -104,11 +99,7 @@ impl StateKey {
     }
 
     fn crypto_hash(&self) -> &HashValue {
-        self.0.hash_value.get_or_init(|| {
-            let mut state = StateKeyInnerHasher::default();
-            state.update(self.encoded());
-            state.finish()
-        })
+        &self.0.hash_value
     }
 
     pub fn size(&self) -> usize {
