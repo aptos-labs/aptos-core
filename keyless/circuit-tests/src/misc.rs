@@ -8,6 +8,7 @@ use aptos_keyless_common::input_processing::{
 };
 use std::iter::zip;
 use rand::{distributions::Alphanumeric, Rng}; // 0.8
+use ark_bn254::Fr;
 
 
 
@@ -232,6 +233,33 @@ fn string_bodies_test_zjma() {
     let circuit_input_signals = CircuitInputSignals::new()
         .str_input("in", s)
         .bools_input("out", &quotes)
+        .pad(&config)
+        .unwrap();
+
+    let result = circuit_handle.gen_witness(circuit_input_signals);
+    println!("{:?}", result);
+    assert!(result.is_ok());
+}
+
+#[test]
+fn calculate_total_test() {
+    let circuit_handle = TestCircuitHandle::new("misc/calculate_total_test.circom").unwrap();
+
+    let mut rng = rand::thread_rng();
+
+    let nums : Vec<Fr> = (0..10)
+        .map(|_| Fr::from(rng.gen::<u64>()) )
+        .collect();
+
+    let sum : Fr = nums.iter().sum();
+
+
+    let config = CircuitPaddingConfig::new()
+        .max_length("nums", 10);
+
+    let circuit_input_signals = CircuitInputSignals::new()
+        .frs_input("nums", &nums)
+        .fr_input("sum", sum)
         .pad(&config)
         .unwrap();
 
