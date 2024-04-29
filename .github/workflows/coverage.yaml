@@ -51,7 +51,7 @@ jobs:
     if: |
       contains(github.event.pull_request.labels.*.name, 'CICD:run-coverage') ||
       (github.event_name == 'schedule' && github.ref_name == 'main')
-    timeout-minutes: 240
+    timeout-minutes: 720 # incremented from 240 due to execution time limit hit in cron
     runs-on: high-perf-docker
     steps:
       - uses: actions/checkout@v3
