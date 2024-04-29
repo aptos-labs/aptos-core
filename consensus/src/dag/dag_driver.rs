@@ -418,7 +418,10 @@ impl DagDriver {
             let (tx, rx) = oneshot::channel();
             if let Err(_) = rb
                 .clone()
-                .send((tx, BoltBCParms::Node(node.clone(), signature_builder)))
+                .send((
+                    tx,
+                    BoltBCParms::Node(node.clone(), signature_builder, ordered_peers),
+                ))
                 .await
             {
                 error!("[Bolt] channel closed before sending node");
@@ -467,7 +470,11 @@ impl DagDriver {
             if let Err(_) = rb2
                 .send((
                     tx,
-                    BoltBCParms::CertifiedNode(certified_node_msg, cert_ack_set),
+                    BoltBCParms::CertifiedNode(
+                        certified_node_msg,
+                        cert_ack_set,
+                        ordered_peers_clone,
+                    ),
                 ))
                 .await
             {
