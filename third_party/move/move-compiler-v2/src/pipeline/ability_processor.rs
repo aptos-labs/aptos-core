@@ -471,8 +471,6 @@ impl<'a> Transformer<'a> {
             let copy_drop_at = self.copy_drop.get(&code_offset).expect("copy_drop");
             let id = bytecode.get_attr_id();
             for (temp, temp_id) in copy_drop_at.check_drop.iter() {
-                // println!("before {} code {} i {} temp {} {:?} {:?}", before, code_offset, i, temp, bytecode, self.builder.data.src_locations.get(&id).unwrap());
-                // let temp_attr = self.builder.data.src_locations.get(&id).expect("src locations").get(i).expect("src location");
                 self.check_drop(id, *temp, *temp_id, || {
                     (
                         "operator drops value here (consider borrowing the argument)".to_owned(),
