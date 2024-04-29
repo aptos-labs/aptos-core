@@ -1,11 +1,10 @@
 use aptos_keyless_common::input_processing::circuit_input_signals::CircuitInputSignals;
 use aptos_keyless_common::input_processing::config::CircuitPaddingConfig;
-use aptos_keyless_common::input_processing::witness_gen::witness_gen;
-use crate::{TestCircuitHandle};
-use itertools::*;
+use crate::TestCircuitHandle;
 use aptos_crypto::poseidon_bn254;
 use ark_bn254::Fr;
 use ark_ff::{Zero, One};
+use rand::Rng;
 
 fn build_array_selector_output(len: u32, start: u32, end: u32) -> Vec<u8> {
     let mut output = Vec::new();
@@ -211,7 +210,6 @@ fn right_array_selector_test() {
         let config = CircuitPaddingConfig::new().max_length("expected_output", out_len as usize);
         let circuit_input_signals = CircuitInputSignals::new().u64_input("index", index as u64).bytes_input("expected_output", &output[..]).pad(&config).unwrap();
         let result = circuit_handle.gen_witness(circuit_input_signals);
-        println!("{}: {:?}, {:?}", index, output, result);
         assert!(result.is_ok());
     };
 }
@@ -272,7 +270,6 @@ fn single_one_array_test() {
              .unwrap();
      
         let result = circuit_handle.gen_witness(circuit_input_signals);
-        println!("{}: {:?}, {:?}", index, output, result);
         assert!(result.is_ok());
     }
 }
@@ -306,12 +303,14 @@ fn single_one_array_small_test() {
 #[test]
 fn select_array_value_test() {
     let circuit_handle = TestCircuitHandle::new("arrays/select_array_value_test.circom").unwrap();
-    let array = [4,6,1,8,9,4,2,3];
+    let mut rng = rand::thread_rng();
+    let array: Vec<u8> = (0..8).map(|_| rng.gen_range(0, 250)).collect();
+
     let in_len = array.len();
     for index in 0..in_len {
         let output = array[index];
         let config = CircuitPaddingConfig::new().max_length("array", in_len);
-        let circuit_input_signals = CircuitInputSignals::new().u64_input("index", index as u64).bytes_input("array", &array).u64_input("expected_output", output as u64).pad(&config).unwrap();
+        let circuit_input_signals = CircuitInputSignals::new().u64_input("index", index as u64).bytes_input("array", &array[..]).u64_input("expected_output", output as u64).pad(&config).unwrap();
      
         let result = circuit_handle.gen_witness(circuit_input_signals);
         assert!(result.is_ok());
@@ -321,12 +320,9 @@ fn select_array_value_test() {
 #[test]
 fn select_array_value_large_test() {
     let circuit_handle = TestCircuitHandle::new("arrays/select_array_value_large_test.circom").unwrap();
-    let mut input = Vec::new();
-    let mut i: u64 = 0;
-    for _ in 0..2000 {
-        input.push((i%256) as u8);
-        i += 1;
-    }
+    let mut rng = rand::thread_rng();
+    let input: Vec<u8> = (0..2000).map(|_| rng.gen_range(0, 250)).collect();
+
     let index = 1567;
     let in_len = input.len();
     let output = input[index];
@@ -340,7 +336,8 @@ fn select_array_value_large_test() {
 #[test]
 fn select_array_value_small_test() {
     let circuit_handle = TestCircuitHandle::new("arrays/select_array_value_small_test.circom").unwrap();
-    let array = [42];
+let mut rng = rand::thread_rng();
+    let array: Vec<u8> = (0..1).map(|_| rng.gen_range(0, 250)).collect();
     let index = 0;
     let in_len = array.len();
     let output = array[index];
@@ -357,7 +354,9 @@ fn select_array_value_test_wrong_index() {
     let circuit_handle = TestCircuitHandle::new("arrays/select_array_value_test.circom").unwrap();
     let out_len = 8;
     let index = 8;
-    let output = [4,6,1,8,9,4,2,3];
+    let mut rng = rand::thread_rng();
+    let output: Vec<u8> = (0..8).map(|_| rng.gen_range(0, 250)).collect();
+
     let config = CircuitPaddingConfig::new().max_length("expected_output", out_len as usize);
     let circuit_input_signals = CircuitInputSignals::new().u64_input("index", index as u64).bytes_input("expected_output", &output).pad(&config).unwrap();
      
@@ -458,8 +457,6 @@ fn check_substr_inclusion_poly_no_padding_test() {
         let circuit_input_signals = CircuitInputSignals::new().str_input("str", string).str_input("substr", substring).u64_input("substr_len", substring_len as u64).u64_input("start_index", start_index as u64).fr_input("str_hash", string_hash).pad(&config).unwrap();
 
         let result = circuit_handle.gen_witness(circuit_input_signals);
-        println!("{:?}", result);
-        println!("{}", string.len());
         assert!(result.is_ok());
     }
 }
@@ -551,7 +548,6 @@ fn check_substr_inclusion_poly_edge_case_test() {
 
     let result = circuit_handle.gen_witness(circuit_input_signals);
 
-    println!("result={:?}", result);
     assert!(result.is_ok());
 }
 
@@ -593,8 +589,6 @@ fn check_substr_inclusion_poly_no_padding_boolean_test() {
         let circuit_input_signals = CircuitInputSignals::new().str_input("str", string).str_input("substr", substring).u64_input("substr_len", substring_len as u64).u64_input("start_index", start_index as u64).fr_input("str_hash", string_hash).u64_input("expected_output", 1).pad(&config).unwrap();
 
         let result = circuit_handle.gen_witness(circuit_input_signals);
-        println!("{:?}", result);
-        println!("{}", string.len());
         assert!(result.is_ok());
     }
 }
@@ -800,7 +794,13 @@ fn concatenation_check_large_test() {
 fn check_are_ascii_digits_test() {
     let circuit_handle = TestCircuitHandle::new("arrays/check_are_ascii_digits_test.circom").unwrap();
     let max_input_len = 20;
-    let input_arr = [48,49,50,52,55,3,0,200];
+
+    let mut rng = rand::thread_rng();
+    let digits: Vec<u8> = (0..5).map(|_| rng.gen_range(0,9)).collect();
+    let mut input_arr = digits_to_ascii_digits(digits.to_vec());
+    let mut not_digits: Vec<u8> = (0..8-5).map(|_| rng.gen_range(0, 250)).collect();
+    input_arr.append(&mut not_digits);
+
     let len = 5;
     let config = CircuitPaddingConfig::new().max_length("in", max_input_len);
     let circuit_input_signals = CircuitInputSignals::new().u64_input("len", len).bytes_input("in", &input_arr).pad(&config).unwrap();
@@ -813,7 +813,9 @@ fn check_are_ascii_digits_test() {
 fn check_are_ascii_digits_max_len_test() {
     let circuit_handle = TestCircuitHandle::new("arrays/check_are_ascii_digits_max_len_test.circom").unwrap();
     let max_input_len = 8;
-    let input_arr = [48,49,50,52,55,48,50,54];
+    let mut rng = rand::thread_rng();
+    let digits: Vec<u8> = (0..8).map(|_| rng.gen_range(0,9)).collect();
+    let input_arr = digits_to_ascii_digits(digits.to_vec());
     let len = input_arr.len();
     let config = CircuitPaddingConfig::new().max_length("in", max_input_len);
     let circuit_input_signals = CircuitInputSignals::new().u64_input("len", len as u64).bytes_input("in", &input_arr).pad(&config).unwrap();
@@ -826,7 +828,9 @@ fn check_are_ascii_digits_max_len_test() {
 fn check_are_ascii_digits_small_test() {
     let circuit_handle = TestCircuitHandle::new("arrays/check_are_ascii_digits_test.circom").unwrap();
     let max_input_len = 20;
-    let input_arr = [51];
+    let mut rng = rand::thread_rng();
+    let digits: Vec<u8> = (0..1).map(|_| rng.gen_range(0,9)).collect();
+    let input_arr = digits_to_ascii_digits(digits.to_vec());
     let len = 1;
     let config = CircuitPaddingConfig::new().max_length("in", max_input_len);
     let circuit_input_signals = CircuitInputSignals::new().u64_input("len", len).bytes_input("in", &input_arr).pad(&config).unwrap();
@@ -839,7 +843,10 @@ fn check_are_ascii_digits_small_test() {
 fn check_are_ascii_digits_large_test() {
     let circuit_handle = TestCircuitHandle::new("arrays/check_are_ascii_digits_large_test.circom").unwrap();
     let max_input_len = 2000;
-    let input_arr = [48,49,50,52,55,48,49,50,52,55,48,49,50,52,55,48,49,50,52,55,48,49,50,52,55,48,49,50,52,55,48,49,50,51,52,53,54,55,56,57,48,49,50,52,55,48,49,50,52,55,48,49,50,52,55,48,49,50,52,55,48,49,50,52,55,48,49,50,52,55,48,49,50,51,52,53,54,55,56,57,48,49,50,52,55,48,49,50,52,55,48,49,50,52,55,48,49,50,52,55,48,49,50,52,55,48,49,50,52,55,48,49,50,51,52,53,54,55,56,57,48,49,50,52,55,48,49,50,52,55,48,49,50,52,55,48,49,50,52,55,48,49,50,52,55,48,49,50,52,55,48,49,50,51,52,53,54,55,56,57,48,49,50,52,55,48,49,50,52,55,48,49,50,52,55,48,49,50,52,55,48,49,50,52,55,48,49,50,52,55,48,49,50,51,52,53,54,55,56,57];
+    let mut rng = rand::thread_rng();
+    let digits: Vec<u8> = (0..1523).map(|_| rng.gen_range(0,9)).collect();
+    let input_arr = digits_to_ascii_digits(digits.to_vec());
+
     let len = input_arr.len();
     let config = CircuitPaddingConfig::new().max_length("in", max_input_len);
     let circuit_input_signals = CircuitInputSignals::new().u64_input("len", len as u64).bytes_input("in", &input_arr).pad(&config).unwrap();
@@ -861,6 +868,7 @@ fn ascii_digits_to_field_test() {
     let circuit_handle = TestCircuitHandle::new("arrays/ascii_digits_to_field_test.circom").unwrap();
     let max_input_len = 20;
     let digits = [2,1,2,4,7];
+
     let ascii_digits = digits_to_ascii_digits(digits.to_vec());
     let len = 5;
     let expected_output = 21247;
@@ -890,15 +898,20 @@ fn ascii_digits_to_field_small_test() {
 fn ascii_digits_to_field_large_test() {
     let circuit_handle = TestCircuitHandle::new("arrays/ascii_digits_to_field_large_test.circom").unwrap();
     let max_input_len = 2000;
+    let mut rng = rand::thread_rng();
+    let digits: Vec<u8> = (0..19).map(|_| rng.gen_range(0, 9)).collect();
+
     let digits = [2,1,2,4,7,4,8,0,1,9,2,1,8,3,6,7,4,1,5,14,41,180,1,31,47,2,3,6,7,31,35];
-    let ascii_digits = digits_to_ascii_digits(digits.to_vec());
+    let mut ascii_digits = digits_to_ascii_digits(digits.to_vec());
+    /*let mut not_digits: Vec<u8> = (0..31-19).map(|_| rng.gen_range(0, 250)).collect();
+    ascii_digits.append(&mut not_digits);*/
+
     let len = 19;
     let expected_output = 2124748019218367415;
     let config = CircuitPaddingConfig::new().max_length("digits", max_input_len);
     let circuit_input_signals = CircuitInputSignals::new().u64_input("len", len).bytes_input("digits", &ascii_digits).u64_input("expected_output", expected_output).pad(&config).unwrap();
      
     let result = circuit_handle.gen_witness(circuit_input_signals);
-    println!("{:?}", result);
     assert!(result.is_ok());
 }
 
@@ -917,32 +930,3 @@ fn ascii_digits_to_field_not_ascii_digits_test() {
     let result = circuit_handle.gen_witness(circuit_input_signals);
     assert!(result.is_ok());
 }
-/*=======
-    let circuit_handle = TestCircuitHandle::new("check_substr_inclusion_poly_boolean_test.circom").unwrap();
-
-    let test_str : &'static [u8] = &[4u8, 233, 24, 159, 105, 83, 145, 69, 245, 99, 150, 28, 197, 219, 186, 204, 47, 219, 5, 139, 89, 15, 216, 169, 206, 145, 224, 32, 59, 0, 178, 44, 116, 149, 61, 64, 149, 134, 204, 103, 18, 57, 87, 168, 144, 26, 173, 48, 219, 125, 64, 211, 131, 159, 76, 29, 154, 118, 163, 18, 38, 24, 44, 191, 196, 36, 240, 250, 82, 176, 94, 86, 202, 67, 142, 19, 115, 237, 104, 190, 28, 122, 44, 252, 139, 106, 125, 145, 135, 1, 181, 127, 0, 242, 187, 80, 208, 51, 22, 1, 194, 159, 218, 16, 33, 113, 220, 214, 209, 168, 195, 83, 177, 149, 74, 20, 7, 28, 124, 175, 212, 240, 55, 96, 155, 163, 158, 94, 64, 141, 154, 111, 89, 219, 90, 16, 142, 139, 215, 124, 141, 19, 94, 73, 24, 213, 204, 15, 221, 86, 52, 132, 246, 58, 133, 94, 193, 36, 12, 232, 37, 209, 171, 118, 85, 13, 154, 180, 124, 188, 81, 235, 254, 114, 114, 101, 75, 161, 208, 227, 71, 22, 48, 204, 128, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 5, 192];
-    let str_hash = poseidon_bn254::pad_and_hash_bytes_with_len(test_str, 256).unwrap();
-    let substr : &'static [u8] = &[0u8, 0, 0, 0, 0, 0, 5, 192];
-    let start_index = 248;
-
-
-    let config = CircuitPaddingConfig::new()
-        .max_length("str", 256)
-        .max_length("substr", 8);
-
-    let circuit_input_signals = CircuitInputSignals::new()
-        .bytes_input("str", test_str)
-        .fr_input("str_hash", str_hash)
-        .bytes_input("substr", substr)
-        .usize_input("substr_len", substr.len())
-        .usize_input("start_index", start_index)
-        .bool_input("check_passes", true)
-        .pad(&config)
-        .unwrap();
-
-
-    let result = circuit_handle.gen_witness(circuit_input_signals);
-
-    println!("result={:?}", result);
-    assert!(result.is_ok());
-}*/
