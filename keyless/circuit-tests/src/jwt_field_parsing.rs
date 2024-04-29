@@ -144,6 +144,32 @@ fn jwt_field_str_malicious_indices
     }
 }
 
+fn email_verified_test<T: JWTFieldIndices + JWTFieldStr>(field: T, test_circom_file: &str) -> Result<tempfile::NamedTempFile, anyhow::Error> {
+    let circuit_handle = TestCircuitHandle::new(test_circom_file).unwrap();
+
+    let config = CircuitPaddingConfig::new()
+        .max_length("field", 30)
+        .max_length("name", 20)
+        .max_length("value", 10);
+
+    let circuit_input_signals = CircuitInputSignals::new()
+        .str_input("field", &field.whole_field())
+        .str_input("name", &field.name())
+        .str_input("value", &field.value())
+        .usize_input("field_len", field.whole_field_len())
+        .usize_input("name_len", field.name_len())
+        .usize_input("value_index", field.value_index())
+        .usize_input("value_len", field.value_len())
+        .usize_input("colon_index", field.colon_index())
+        .pad(&config)
+        .unwrap();
+
+    let result = circuit_handle.gen_witness(circuit_input_signals);
+    println!("{:?}", result);
+    result
+}
+
+
 fn unquoted_test<T: JWTFieldIndices + JWTFieldStr>(field: T, test_circom_file: &str) -> Result<tempfile::NamedTempFile, anyhow::Error> {
     let circuit_handle = TestCircuitHandle::new(test_circom_file).unwrap();
 
@@ -204,6 +230,9 @@ fn should_pass_unquoted<T: JWTFieldIndices + JWTFieldStr>(field: T) {
     assert!(unquoted_test(field, "jwt_field_parsing/parse_unquoted_test.circom").is_ok());
 }
 
+fn should_pass_ev<T: JWTFieldIndices + JWTFieldStr>(field: T) {
+    assert!(email_verified_test(field, "jwt_field_parsing/parse_email_verified_field_test.circom").is_ok());
+}
 
 fn should_fail_quoted<T: JWTFieldIndices + JWTFieldStr>(field: T) {
     assert!(quoted_test(field, "jwt_field_parsing/parse_quoted_test.circom").is_err());
@@ -213,7 +242,9 @@ fn should_fail_unquoted<T: JWTFieldIndices + JWTFieldStr>(field: T) {
     assert!(unquoted_test(field, "jwt_field_parsing/parse_unquoted_test.circom").is_err());
 }
 
-
+fn should_fail_ev<T: JWTFieldIndices + JWTFieldStr>(field: T) {
+    assert!(email_verified_test(field, "jwt_field_parsing/parse_email_verified_field_test.circom").is_err());
+}
 
 
 
@@ -446,3 +477,72 @@ fn malicious_value_len_2() {
 
     should_fail_unquoted(field);
 }
+
+
+
+#[test]
+fn ev_unquoted_no_spaces() {
+    should_pass_ev(
+        jwt_field_str(
+            "\"email_verified\":true,",
+            "email_verified",
+            "true",
+            )
+    );
+}
+
+#[test]
+fn ev_unquoted_spaces() {
+    should_pass_ev(
+        jwt_field_str(
+            "\"email_verified\": true ,",
+            "email_verified",
+            "true",
+            )
+    );
+}
+
+#[test]
+fn ev_unquoted_spaces_2() {
+    should_pass_ev(
+        jwt_field_str(
+            "\"email_verified\":  true  ,",
+            "email_verified",
+            "true",
+            )
+    );
+}
+
+#[test]
+fn ev_quoted_no_spaces() {
+    should_pass_ev(
+        jwt_field_str(
+            "\"email_verified\":\"true\",",
+            "email_verified",
+            "true",
+            )
+    );
+}
+
+#[test]
+fn ev_quoted_spaces() {
+    should_pass_ev(
+        jwt_field_str(
+            "\"email_verified\": \"true\" ,",
+            "email_verified",
+            "true",
+            )
+    );
+}
+
+#[test]
+fn ev_quoted_spaces_2() {
+    should_pass_ev(
+        jwt_field_str(
+            "\"email_verified\":  \"true\"  ,",
+            "email_verified",
+            "true",
+            )
+    );
+}
+

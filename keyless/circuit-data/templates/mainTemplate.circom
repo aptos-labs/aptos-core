@@ -206,7 +206,8 @@ template identity(
     signal ev_fail <== AND()(uid_is_email, not_ev_in_jwt);
     ev_fail === 0;
 
-    ParseJWTFieldWithUnquotedValue(maxEVKVPairLen, maxEVNameLen, maxEVValueLen)(ev_field, ev_name, ev_value, ev_field_len, ev_name_len, ev_value_index, ev_value_len, ev_colon_index);
+    // Need custom logic here because some providers apparently do not follow the OIDC spec and put the email_verified value in quotes
+    ParseEmailVerifiedField(maxEVKVPairLen, maxEVNameLen, maxEVValueLen)(ev_field, ev_name, ev_value, ev_field_len, ev_name_len, ev_value_index, ev_value_len, ev_colon_index);
 
     // Check iss field is in the JWT
     // Note that because `iss_field` is a public input, we assume the verifier will perform correctness checks on it outside of the circuit. 
