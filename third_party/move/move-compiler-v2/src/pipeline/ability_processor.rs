@@ -597,7 +597,6 @@ impl<'a> Transformer<'a> {
 
     /// Gets the id of the i-th source target of an instruction.
     fn src_id(&self, bytecode_id: AttrId, i: usize) -> AttrId {
-        // self.env().error(&self.loc(bytecode_id), "src_id");
         *self
             .builder
             .data
