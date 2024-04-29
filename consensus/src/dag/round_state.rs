@@ -208,7 +208,7 @@ impl ResponsiveCheck for AdaptiveResponsive {
         let (wait_time, is_health_backoff) = if self.minimal_wait_time < health_backoff_delay {
             (health_backoff_delay, true)
         } else {
-            if highest_strong_links_round > 300 {
+            if highest_strong_links_round > 350 {
                 (self.minimal_wait_time, false)
             } else {
                 (self.minimal_wait_time * 100, false)
