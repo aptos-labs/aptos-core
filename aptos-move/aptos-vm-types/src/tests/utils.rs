@@ -38,10 +38,10 @@ impl CheckChangeSet for MockChangeSetChecker {
 
 macro_rules! as_state_key {
     ($k:ident) => {
-        StateKey::raw($k.to_string().into_bytes())
+        StateKey::raw($k.to_string().as_bytes())
     };
     ($k:expr) => {
-        StateKey::raw($k.to_string().into_bytes())
+        StateKey::raw($k.to_string().as_bytes())
     };
 }
 pub(crate) use as_state_key;

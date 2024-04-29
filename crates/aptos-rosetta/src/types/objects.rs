@@ -33,7 +33,7 @@ use aptos_types::{
     event::EventKey,
     fee_statement::FeeStatement,
     stake_pool::{SetOperatorEvent, StakePool},
-    state_store::state_key::{StateKey, StateKeyInner},
+    state_store::state_key::{inner::StateKeyInner, StateKey},
     transaction::{EntryFunction, TransactionPayload},
     write_set::{WriteOp, WriteSet},
 };

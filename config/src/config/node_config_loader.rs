@@ -166,7 +166,7 @@ fn get_chain_id(node_config: &NodeConfig) -> Result<ChainId, Error> {
     // Extract the chain ID from the genesis transaction
     match genesis_txn {
         Transaction::GenesisTransaction(WriteSetPayload::Direct(change_set)) => {
-            let chain_id_state_key = StateKey::on_chain_config::<ChainId>();
+            let chain_id_state_key = StateKey::on_chain_config::<ChainId>()?;
 
             // Get the write op from the write set
             let write_set_mut = change_set.clone().write_set().clone().into_mut();

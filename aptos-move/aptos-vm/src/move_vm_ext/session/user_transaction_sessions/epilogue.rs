@@ -28,8 +28,13 @@ impl<'r, 'l> EpilogueSession<'r, 'l> {
         storage_refund: Fee,
     ) -> Result<Self, VMStatus> {
         let session_id = SessionId::epilogue_meta(txn_meta);
-        let session =
-            RespawnedSession::spawn(vm, session_id, resolver, previous_session_change_set)?;
+        let session = RespawnedSession::spawn(
+            vm,
+            session_id,
+            resolver,
+            previous_session_change_set,
+            Some(txn_meta.as_user_transaction_context()),
+        )?;
 
         Ok(Self {
             session,

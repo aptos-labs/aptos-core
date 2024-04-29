@@ -20,7 +20,10 @@ use move_core_types::{
     value::MoveValue,
     vm_status::StatusCode,
 };
-use move_vm_runtime::session::LoadedFunctionInstantiation;
+use move_vm_runtime::{
+    module_traversal::{TraversalContext, TraversalStorage},
+    session::LoadedFunctionInstantiation,
+};
 use move_vm_types::{
     gas::{GasMeter, UnmeteredGasMeter},
     loaded_data::runtime_types::Type,
@@ -437,8 +440,14 @@ fn validate_and_construct(
         )?;
         args.push(arg);
     }
-    let serialized_result =
-        session.execute_instantiated_function(function, instantiation, args, gas_meter)?;
+    let storage = TraversalStorage::new();
+    let serialized_result = session.execute_instantiated_function(
+        function,
+        instantiation,
+        args,
+        gas_meter,
+        &mut TraversalContext::new(&storage),
+    )?;
     let mut ret_vals = serialized_result.return_values;
     // We know ret_vals.len() == 1
     let deserialize_error = VMStatus::error(

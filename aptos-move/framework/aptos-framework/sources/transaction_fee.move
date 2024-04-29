@@ -247,6 +247,8 @@ module aptos_framework::transaction_fee {
 
     #[test_only]
     use aptos_framework::aggregator_factory;
+    #[test_only]
+    use aptos_framework::object;
 
     #[test(aptos_framework = @aptos_framework)]
     fun test_initialize_fee_collection_and_distribution(aptos_framework: signer) acquires CollectedFeesPerBlock {
@@ -324,6 +326,7 @@ module aptos_framework::transaction_fee {
         aptos_account::create_account(alice_addr);
         aptos_account::create_account(bob_addr);
         aptos_account::create_account(carol_addr);
+        assert!(object::object_address(&coin::ensure_paired_metadata<AptosCoin>()) == @aptos_fungible_asset, 0);
         coin::deposit(alice_addr, coin::mint(10000, &mint_cap));
         coin::deposit(bob_addr, coin::mint(10000, &mint_cap));
         coin::deposit(carol_addr, coin::mint(10000, &mint_cap));

@@ -19,7 +19,6 @@ use std::{collections::HashMap, ops::Deref};
 pub mod errors;
 pub mod in_memory_state_view;
 pub mod state_key;
-pub mod state_key_prefix;
 pub mod state_storage_usage;
 pub mod state_value;
 pub mod table;
@@ -124,7 +123,7 @@ pub trait MoveResourceExt: MoveResource {
         state_view: &dyn StateView,
         address: &AccountAddress,
     ) -> Result<Option<Self>> {
-        let state_key = StateKey::resource_typed::<Self>(address);
+        let state_key = StateKey::resource_typed::<Self>(address)?;
         Ok(state_view
             .get_state_value_bytes(&state_key)?
             .map(|bytes| bcs::from_bytes(&bytes))

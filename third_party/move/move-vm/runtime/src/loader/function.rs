@@ -29,22 +29,22 @@ pub(crate) enum Scope {
     Script(ScriptHash),
 }
 
-// A runtime function
-pub(crate) struct Function {
+// A runtime function representation.
+pub struct Function {
     #[allow(unused)]
     pub(crate) file_format_version: u32,
     pub(crate) index: FunctionDefinitionIndex,
     pub(crate) code: Vec<Bytecode>,
-    pub(crate) ty_param_abilities: Vec<AbilitySet>,
+    pub ty_param_abilities: Vec<AbilitySet>,
     // TODO: Make `native` and `def_is_native` become an enum.
     pub(crate) native: Option<NativeFunction>,
     pub(crate) def_is_native: bool,
-    pub(crate) def_is_friend_or_private: bool,
+    pub def_is_friend_or_private: bool,
     pub(crate) scope: Scope,
     pub(crate) name: Identifier,
-    pub(crate) return_tys: Vec<Type>,
+    pub return_tys: Vec<Type>,
     pub(crate) local_tys: Vec<Type>,
-    pub(crate) param_tys: Vec<Type>,
+    pub param_tys: Vec<Type>,
     pub(crate) access_specifier: AccessSpecifier,
 }
 

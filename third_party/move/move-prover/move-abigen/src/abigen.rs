@@ -3,7 +3,7 @@
 // SPDX-License-Identifier: Apache-2.0
 
 use anyhow::{anyhow, bail};
-use heck::SnakeCase;
+use heck::ToSnakeCase;
 #[allow(unused_imports)]
 use log::{debug, info, warn};
 use move_binary_format::{file_format::Ability, CompiledModule};

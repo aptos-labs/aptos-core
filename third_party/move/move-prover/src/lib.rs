@@ -138,8 +138,6 @@ pub fn run_move_prover_with_model_v2<W: WriteColor>(
     options: Options,
     start_time: Instant,
 ) -> anyhow::Result<()> {
-    debug!("global env before prover run:\n{}", env.dump_env_all());
-
     let build_duration = start_time.elapsed();
     check_errors(
         env,

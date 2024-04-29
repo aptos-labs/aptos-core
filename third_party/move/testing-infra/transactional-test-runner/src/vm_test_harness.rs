@@ -3,7 +3,7 @@
 // SPDX-License-Identifier: Apache-2.0
 
 use crate::{
-    framework::{run_test_impl, CompiledState, MoveTestAdapter},
+    framework::{either_or_no_modules, run_test_impl, CompiledState, MoveTestAdapter},
     tasks::{EmptyCommand, InitCommand, SyntaxChoice, TaskInput},
 };
 use anyhow::{anyhow, Result};
@@ -17,7 +17,9 @@ use move_binary_format::{
     CompiledModule,
 };
 use move_command_line_common::{
-    address::ParsedAddress, env::read_bool_env_var, files::verify_and_create_named_address_mapping,
+    address::ParsedAddress,
+    env::{get_move_compiler_block_v1_from_env, get_move_compiler_v2_from_env, read_bool_env_var},
+    files::verify_and_create_named_address_mapping,
 };
 use move_compiler::{
     compiled_unit::AnnotatedCompiledUnit,
@@ -37,6 +39,7 @@ use move_stdlib::move_stdlib_named_addresses;
 use move_symbol_pool::Symbol;
 use move_vm_runtime::{
     config::VMConfig,
+    module_traversal::*,
     move_vm::MoveVM,
     session::{SerializedReturnValues, Session},
 };
@@ -44,6 +47,7 @@ use move_vm_test_utils::{gas_schedule::GasStatus, InMemoryStorage};
 use once_cell::sync::Lazy;
 use std::{
     collections::{BTreeMap, BTreeSet},
+    iter::Iterator,
     path::Path,
 };
 
@@ -138,7 +142,8 @@ impl<'a> MoveTestAdapter<'a> for SimpleVMTestAdapter<'a> {
         default_syntax: SyntaxChoice,
         comparison_mode: bool,
         run_config: TestRunConfig,
-        pre_compiled_deps: Option<&'a FullyCompiledProgram>,
+        pre_compiled_deps_v1: Option<&'a FullyCompiledProgram>,
+        pre_compiled_deps_v2: Option<&'a PrecompiledFilesModules>,
         task_opt: Option<TaskInput<(InitCommand, EmptyCommand)>>,
     ) -> (Self, Option<String>) {
         let additional_mapping = match task_opt.map(|t| t.command) {
@@ -159,7 +164,12 @@ impl<'a> MoveTestAdapter<'a> for SimpleVMTestAdapter<'a> {
             named_address_mapping.insert(name, addr);
         }
         let mut adapter = Self {
-            compiled_state: CompiledState::new(named_address_mapping, pre_compiled_deps, None),
+            compiled_state: CompiledState::new(
+                named_address_mapping,
+                pre_compiled_deps_v1,
+                pre_compiled_deps_v2,
+                None,
+            ),
             default_syntax,
             comparison_mode,
             run_config,
@@ -170,7 +180,10 @@ impl<'a> MoveTestAdapter<'a> for SimpleVMTestAdapter<'a> {
             .perform_session_action(
                 None,
                 |session, gas_status| {
-                    for module in &*MOVE_STDLIB_COMPILED {
+                    for module in either_or_no_modules(pre_compiled_deps_v1, pre_compiled_deps_v2)
+                        .into_iter()
+                        .map(|tmod| &tmod.named_module.module)
+                    {
                         let mut module_bytes = vec![];
                         module
                             .serialize_for_version(
@@ -194,14 +207,16 @@ impl<'a> MoveTestAdapter<'a> for SimpleVMTestAdapter<'a> {
             let prev = addr_to_name_mapping.insert(addr, Symbol::from(name));
             assert!(prev.is_none());
         }
-        for module in MOVE_STDLIB_COMPILED
-            .iter()
-            .filter(|module| !adapter.compiled_state.is_precompiled_dep(&module.self_id()))
-            .collect::<Vec<_>>()
-        {
+        let missing_modules: Vec<_> =
+            either_or_no_modules(pre_compiled_deps_v1, pre_compiled_deps_v2)
+                .into_iter()
+                .map(|tmod| &tmod.named_module.module)
+                .filter(|module| !adapter.compiled_state.is_precompiled_dep(&module.self_id()))
+                .collect();
+        for module in missing_modules {
             adapter
                 .compiled_state
-                .add_and_generate_interface_file(module.clone());
+                .add_and_generate_interface_file(module.clone())
         }
         (adapter, None)
     }
@@ -277,9 +292,18 @@ impl<'a> MoveTestAdapter<'a> for SimpleVMTestAdapter<'a> {
             .chain(args)
             .collect();
         let verbose = extra_args.verbose;
+        let traversal_storage = TraversalStorage::new();
         self.perform_session_action(
             gas_budget,
-            |session, gas_status| session.execute_script(script_bytes, type_args, args, gas_status),
+            |session, gas_status| {
+                session.execute_script(
+                    script_bytes,
+                    type_args,
+                    args,
+                    gas_status,
+                    &mut TraversalContext::new(&traversal_storage),
+                )
+            },
             VMConfig::from(extra_args),
         )
         .map_err(|vm_error| {
@@ -320,12 +344,19 @@ impl<'a> MoveTestAdapter<'a> for SimpleVMTestAdapter<'a> {
             .chain(args)
             .collect();
         let verbose = extra_args.verbose;
+        let traversal_storage = TraversalStorage::new();
+
         let serialized_return_values = self
             .perform_session_action(
                 gas_budget,
                 |session, gas_status| {
                     session.execute_function_bypass_visibility(
-                        module, function, type_args, args, gas_status,
+                        module,
+                        function,
+                        type_args,
+                        args,
+                        gas_status,
+                        &mut TraversalContext::new(&traversal_storage),
                     )
                 },
                 VMConfig::from(extra_args),
@@ -394,7 +425,10 @@ impl<'a> SimpleVMTestAdapter<'a> {
     }
 }
 
-static PRECOMPILED_MOVE_STDLIB: Lazy<FullyCompiledProgram> = Lazy::new(|| {
+static PRECOMPILED_MOVE_STDLIB: Lazy<Option<FullyCompiledProgram>> = Lazy::new(|| {
+    if get_move_compiler_block_v1_from_env() {
+        return None;
+    }
     let program_res = move_compiler::construct_pre_compiled_lib(
         vec![PackagePaths {
             name: None,
@@ -407,7 +441,7 @@ static PRECOMPILED_MOVE_STDLIB: Lazy<FullyCompiledProgram> = Lazy::new(|| {
     )
     .unwrap();
     match program_res {
-        Ok(stdlib) => stdlib,
+        Ok(stdlib) => Some(stdlib),
         Err((files, errors)) => {
             eprintln!("!!!Standard library failed to compile!!!");
             move_compiler::diagnostics::report_diagnostics(&files, errors)
@@ -415,35 +449,35 @@ static PRECOMPILED_MOVE_STDLIB: Lazy<FullyCompiledProgram> = Lazy::new(|| {
     }
 });
 
-static MOVE_STDLIB_COMPILED: Lazy<Vec<CompiledModule>> = Lazy::new(|| {
-    let (files, units_res) = move_compiler::Compiler::from_files(
-        move_stdlib::move_stdlib_files(),
-        vec![],
-        move_stdlib::move_stdlib_named_addresses(),
-        Flags::empty().set_skip_attribute_checks(true), // no point in checking here.
-        KnownAttribute::get_all_attribute_names(),
-    )
-    .build()
-    .unwrap();
-    match units_res {
-        Err(diags) => {
-            eprintln!("!!!Standard library failed to compile!!!");
-            move_compiler::diagnostics::report_diagnostics(&files, diags)
-        },
-        Ok((_, warnings)) if !warnings.is_empty() => {
-            eprintln!("!!!Standard library failed to compile!!!");
-            move_compiler::diagnostics::report_diagnostics(&files, warnings)
-        },
-        Ok((units, _warnings)) => units
-            .into_iter()
-            .filter_map(|m| match m {
-                AnnotatedCompiledUnit::Module(annot_module) => {
-                    Some(annot_module.named_module.module)
-                },
-                AnnotatedCompiledUnit::Script(_) => None,
-            })
-            .collect(),
+pub struct PrecompiledFilesModules(Vec<String>, Vec<AnnotatedCompiledUnit>);
+
+impl PrecompiledFilesModules {
+    pub fn new(files: Vec<String>, modules: Vec<AnnotatedCompiledUnit>) -> Self {
+        PrecompiledFilesModules(files, modules)
     }
+
+    pub fn filenames(&self) -> &Vec<String> {
+        &self.0
+    }
+
+    pub fn units(&self) -> &Vec<AnnotatedCompiledUnit> {
+        &self.1
+    }
+}
+
+static PRECOMPILED_MOVE_STDLIB_V2: Lazy<PrecompiledFilesModules> = Lazy::new(|| {
+    let options = move_compiler_v2::Options {
+        sources: move_stdlib::move_stdlib_files(),
+        dependencies: vec![],
+        named_address_mapping: move_stdlib::move_stdlib_named_addresses_strings(),
+        known_attributes: KnownAttribute::get_all_attribute_names().clone(),
+        language_version: None,
+        ..move_compiler_v2::Options::default()
+    };
+
+    let (_global_env, modules) = move_compiler_v2::run_move_compiler_to_stderr(options)
+        .expect("stdlib compilation succeeds");
+    PrecompiledFilesModules::new(move_stdlib::move_stdlib_files(), modules)
 });
 
 #[derive(Debug, Clone, PartialOrd, Ord, PartialEq, Eq)]
@@ -463,11 +497,39 @@ pub fn run_test(path: &Path) -> Result<(), Box<dyn std::error::Error>> {
     run_test_with_config(TestRunConfig::CompilerV1, path)
 }
 
+fn precompiled_v1_stdlib_if_needed(
+    config: &TestRunConfig,
+) -> Option<&'static FullyCompiledProgram> {
+    match config {
+        TestRunConfig::CompilerV1 { .. } => PRECOMPILED_MOVE_STDLIB.as_ref(),
+        TestRunConfig::ComparisonV1V2 { .. } => PRECOMPILED_MOVE_STDLIB.as_ref(),
+        TestRunConfig::CompilerV2 { .. } => None,
+    }
+}
+
+fn precompiled_v2_stdlib_if_needed(
+    config: &TestRunConfig,
+) -> Option<&'static PrecompiledFilesModules> {
+    match config {
+        TestRunConfig::CompilerV1 { .. } => None,
+        TestRunConfig::ComparisonV1V2 { .. } => Some(&*PRECOMPILED_MOVE_STDLIB_V2),
+        TestRunConfig::CompilerV2 { .. } => Some(&*PRECOMPILED_MOVE_STDLIB_V2),
+    }
+}
+
 pub fn run_test_with_config(
-    config: TestRunConfig,
+    mut config: TestRunConfig,
     path: &Path,
 ) -> Result<(), Box<dyn std::error::Error>> {
-    run_test_impl::<SimpleVMTestAdapter>(config, path, Some(&*PRECOMPILED_MOVE_STDLIB), &None)
+    if get_move_compiler_v2_from_env() && !matches!(config, TestRunConfig::CompilerV2 { .. }) {
+        config = TestRunConfig::CompilerV2 {
+            language_version: LanguageVersion::default(),
+            v2_experiments: vec![],
+        }
+    }
+    let v1_lib = precompiled_v1_stdlib_if_needed(&config);
+    let v2_lib = precompiled_v2_stdlib_if_needed(&config);
+    run_test_impl::<SimpleVMTestAdapter>(config, path, v1_lib, v2_lib, &None)
 }
 
 pub fn run_test_with_config_and_exp_suffix(
@@ -475,7 +537,18 @@ pub fn run_test_with_config_and_exp_suffix(
     path: &Path,
     exp_suffix: &Option<String>,
 ) -> Result<(), Box<dyn std::error::Error>> {
-    run_test_impl::<SimpleVMTestAdapter>(config, path, Some(&*PRECOMPILED_MOVE_STDLIB), exp_suffix)
+    let config =
+        if get_move_compiler_v2_from_env() && !matches!(config, TestRunConfig::CompilerV2 { .. }) {
+            TestRunConfig::CompilerV2 {
+                language_version: LanguageVersion::default(),
+                v2_experiments: vec![],
+            }
+        } else {
+            config
+        };
+    let v1_lib = precompiled_v1_stdlib_if_needed(&config);
+    let v2_lib = precompiled_v2_stdlib_if_needed(&config);
+    run_test_impl::<SimpleVMTestAdapter>(config, path, v1_lib, v2_lib, exp_suffix)
 }
 
 impl From<AdapterExecuteArgs> for VMConfig {

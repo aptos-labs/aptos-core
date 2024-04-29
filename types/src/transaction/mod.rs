@@ -48,6 +48,7 @@ mod module;
 mod multisig;
 mod script;
 pub mod signature_verified_transaction;
+pub mod user_transaction_context;
 pub mod webauthn;
 
 #[cfg(any(test, feature = "fuzzing"))]

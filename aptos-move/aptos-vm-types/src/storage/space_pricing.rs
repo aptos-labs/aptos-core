@@ -263,7 +263,7 @@ mod tests {
         let mut params = TransactionGasParameters::random();
         params.storage_fee_per_state_byte = 5.into();
         params.storage_fee_per_state_slot = 1000.into();
-        let key = StateKey::raw(vec![1, 2, 3]);
+        let key = StateKey::raw(&[1, 2, 3]);
         assert_eq!(key.size(), 3); // to make sure our assumptions on the numbers in the assertions below are correct
         let ts = CurrentTimeMicroseconds { microseconds: 0 };
         let mut meta = StateValueMetadata::new(0, 0, &ts);
