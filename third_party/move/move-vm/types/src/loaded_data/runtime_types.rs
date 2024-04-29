@@ -468,15 +468,47 @@ impl Type {
         }
     }
 
-    pub fn check_ref_eq(&self, expected_inner: &Self) -> PartialVMResult<()> {
+    #[inline]
+    pub fn paranoid_read_ref(self) -> PartialVMResult<Type> {
         match self {
-            Type::MutableReference(inner) | Type::Reference(inner) => {
-                inner.paranoid_check_eq(expected_inner)
+            Type::Reference(inner_ty) | Type::MutableReference(inner_ty) => {
+                inner_ty.paranoid_check_has_ability(Ability::Copy)?;
+                Ok(inner_ty.as_ref().clone())
             },
-            _ => Err(
-                PartialVMError::new(StatusCode::UNKNOWN_INVARIANT_VIOLATION_ERROR)
-                    .with_message("VecMutBorrow expects a vector reference".to_string()),
-            ),
+            _ => {
+                let msg = format!("Expected a reference to read, got {}", self);
+                paranoid_failure!(msg)
+            },
+        }
+    }
+
+    #[inline]
+    pub fn paranoid_write_ref(&self, val_ty: &Type) -> PartialVMResult<()> {
+        if let Type::MutableReference(inner_ty) = self {
+            if inner_ty.as_ref() == val_ty {
+                return inner_ty.paranoid_check_has_ability(Ability::Drop);
+            }
+        }
+
+        let msg = format!("Cannot write type {} to type {}", val_ty, self);
+        paranoid_failure!(msg)
+    }
+
+    pub fn paranoid_check_ref_eq(
+        &self,
+        expected_inner_ty: &Self,
+        is_mut: bool,
+    ) -> PartialVMResult<()> {
+        match self {
+            Type::MutableReference(inner_ty) => inner_ty.paranoid_check_eq(expected_inner_ty),
+            Type::Reference(inner_ty) if !is_mut => inner_ty.paranoid_check_eq(expected_inner_ty),
+            _ => {
+                let msg = format!(
+                    "Expected a (mutable: {}) reference type, got {}",
+                    is_mut, self
+                );
+                paranoid_failure!(msg)
+            },
         }
     }
 
@@ -674,6 +706,11 @@ pub struct TypeBuilder {
 
 impl TypeBuilder {
     pub fn new(ty_config: &TypeConfig) -> Self {
+        // To avoid extra size/depth checks when constructing a struct reference
+        // type, make sure we always have at least 2 nodes.
+        assert!(ty_config.max_ty_size > 2);
+        assert!(ty_config.max_ty_depth > 2);
+
         Self {
             max_ty_size: ty_config.max_ty_size,
             max_ty_depth: ty_config.max_ty_depth,
@@ -726,6 +763,42 @@ impl TypeBuilder {
     #[inline]
     pub fn create_struct_ty(&self, idx: StructNameIndex, ability: AbilityInfo) -> Type {
         Type::Struct { idx, ability }
+    }
+
+    #[inline]
+    pub fn create_struct_instantiation_ty(
+        &self,
+        struct_ty: &StructType,
+        ty_params: Vec<Type>,
+        ty_args: &[Type],
+    ) -> PartialVMResult<Type> {
+        let ty = Type::StructInstantiation {
+            idx: struct_ty.idx,
+            ty_args: triomphe::Arc::new(ty_params),
+            ability: AbilityInfo::generic_struct(
+                struct_ty.abilities,
+                struct_ty.phantom_ty_args_mask.clone(),
+            ),
+        };
+        self.subst(&ty, ty_args)
+    }
+
+    #[inline]
+    pub fn create_ref_ty(&self, inner_ty: &Type, is_mut: bool) -> PartialVMResult<Type> {
+        let mut count = 1;
+        let inner_ty = Box::new(self.clone_impl(inner_ty, &mut count, 2)?);
+        Ok(if is_mut {
+            Type::MutableReference(inner_ty)
+        } else {
+            Type::Reference(inner_ty)
+        })
+    }
+
+    #[inline]
+    pub fn create_vec_ty(&self, elem_ty: &Type) -> PartialVMResult<Type> {
+        let mut count = 1;
+        let elem_ty = self.clone_impl(elem_ty, &mut count, 2)?;
+        Ok(Type::Vector(TriompheArc::new(elem_ty)))
     }
 
     pub fn create_constant_ty(&self, const_tok: &SignatureToken) -> PartialVMResult<Type> {
@@ -788,7 +861,7 @@ impl TypeBuilder {
     }
 
     fn subst_impl(&self, ty: &Type, ty_args: &[Type]) -> PartialVMResult<(Type, usize)> {
-        let mut count = 0;
+        let mut ty_size = 0;
         let ty = self.apply_subst(
             ty,
             |idx, count, depth| match ty_args.get(idx as usize) {
@@ -802,10 +875,10 @@ impl TypeBuilder {
                         )),
                 ),
             },
-            &mut count,
+            &mut ty_size,
             1,
         )?;
-        Ok((ty, count))
+        Ok((ty, ty_size))
     }
 
     fn clone_impl(&self, ty: &Type, count: &mut usize, depth: usize) -> PartialVMResult<Type> {
@@ -832,7 +905,7 @@ impl TypeBuilder {
         }
 
         *count += 1;
-        let res = match ty {
+        Ok(match ty {
             TyParam(idx) => {
                 // To avoid double-counting, revert counting the type parameter.
                 *count -= 1;
@@ -881,10 +954,10 @@ impl TypeBuilder {
                     ability: ability.clone(),
                 }
             },
-        };
-        Ok(res)
+        })
     }
 
+    /// Creates a fully-instantiated type from its storage representation.
     pub fn create_ty<F>(&self, ty_tag: &TypeTag, mut resolver: F) -> VMResult<Type>
     where
         F: FnMut(&StructTag) -> VMResult<Arc<StructType>>,

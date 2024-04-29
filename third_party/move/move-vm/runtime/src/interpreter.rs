@@ -1688,70 +1688,50 @@ impl Frame {
             },
             Bytecode::StLoc(_) => (),
             Bytecode::MutBorrowLoc(idx) => {
-                let ty = local_tys[*idx as usize].clone();
-
-                // TODO: gate this construction!
-                interpreter
-                    .operand_stack
-                    .push_ty(Type::MutableReference(Box::new(ty)))?;
+                let ty = &local_tys[*idx as usize];
+                let mut_ref_ty = ty_builder.create_ref_ty(ty, true)?;
+                interpreter.operand_stack.push_ty(mut_ref_ty)?;
             },
             Bytecode::ImmBorrowLoc(idx) => {
-                let ty = local_tys[*idx as usize].clone();
-
-                // TODO: gate this construction!
-                interpreter
-                    .operand_stack
-                    .push_ty(Type::Reference(Box::new(ty)))?;
+                let ty = &local_tys[*idx as usize];
+                let ref_ty = ty_builder.create_ref_ty(ty, false)?;
+                interpreter.operand_stack.push_ty(ref_ty)?;
             },
             Bytecode::ImmBorrowField(fh_idx) => {
+                let ty = interpreter.operand_stack.pop_ty()?;
                 let expected_ty = resolver.field_handle_to_struct(*fh_idx);
+                ty.paranoid_check_ref_eq(&expected_ty, false)?;
 
-                // TODO: move this to types.
-                let top_ty = interpreter.operand_stack.pop_ty()?;
-                top_ty.check_ref_eq(&expected_ty)?;
-
-                // TODO: gate this construction!
-                interpreter
-                    .operand_stack
-                    .push_ty(Type::Reference(Box::new(resolver.get_field_type(*fh_idx)?)))?;
+                let field_ty = resolver.get_field_type(*fh_idx)?;
+                let field_ref_ty = ty_builder.create_ref_ty(field_ty, false)?;
+                interpreter.operand_stack.push_ty(field_ref_ty)?;
             },
             Bytecode::MutBorrowField(fh_idx) => {
-                let expected_ty = resolver.field_handle_to_struct(*fh_idx);
-                let top_ty = interpreter.operand_stack.pop_ty()?;
+                let ref_ty = interpreter.operand_stack.pop_ty()?;
+                let expected_inner_ty = resolver.field_handle_to_struct(*fh_idx);
+                ref_ty.paranoid_check_ref_eq(&expected_inner_ty, true)?;
 
-                // TODO: move this to types.
-                top_ty.paranoid_check_eq(&Type::MutableReference(Box::new(expected_ty)))?;
-
-                // TODO: gate this construction!
-                interpreter
-                    .operand_stack
-                    .push_ty(Type::MutableReference(Box::new(
-                        resolver.get_field_type(*fh_idx)?,
-                    )))?;
+                let field_ty = resolver.get_field_type(*fh_idx)?;
+                let field_mut_ref_ty = ty_builder.create_ref_ty(field_ty, true)?;
+                interpreter.operand_stack.push_ty(field_mut_ref_ty)?;
             },
             Bytecode::ImmBorrowFieldGeneric(idx) => {
-                let ((expected_field_ty, _), (expected_struct_ty, _)) =
+                let struct_ty = interpreter.operand_stack.pop_ty()?;
+                let ((field_ty, _), (expected_struct_ty, _)) =
                     ty_cache.get_field_type_and_struct_type(*idx, resolver, ty_args)?;
-                let top_ty = interpreter.operand_stack.pop_ty()?;
-                top_ty.check_ref_eq(expected_struct_ty)?;
+                struct_ty.paranoid_check_ref_eq(expected_struct_ty, false)?;
 
-                // TODO: gate this construction!
-                interpreter
-                    .operand_stack
-                    .push_ty(Type::Reference(Box::new(expected_field_ty.clone())))?;
+                let field_ref_ty = ty_builder.create_ref_ty(field_ty, false)?;
+                interpreter.operand_stack.push_ty(field_ref_ty)?;
             },
             Bytecode::MutBorrowFieldGeneric(idx) => {
-                let ((expected_field_ty, _), (expected_struct_ty, _)) =
+                let struct_ty = interpreter.operand_stack.pop_ty()?;
+                let ((field_ty, _), (expected_struct_ty, _)) =
                     ty_cache.get_field_type_and_struct_type(*idx, resolver, ty_args)?;
-                let top_ty = interpreter.operand_stack.pop_ty()?;
-                top_ty.paranoid_check_eq(&Type::MutableReference(Box::new(
-                    expected_struct_ty.clone(),
-                )))?;
+                struct_ty.paranoid_check_ref_eq(expected_struct_ty, true)?;
 
-                // TODO: gate this construction!
-                interpreter
-                    .operand_stack
-                    .push_ty(Type::MutableReference(Box::new(expected_field_ty.clone())))?;
+                let field_mut_ref_ty = ty_builder.create_ref_ty(field_ty, true)?;
+                interpreter.operand_stack.push_ty(field_mut_ref_ty)?;
             },
             Bytecode::Pack(idx) => {
                 let field_count = resolver.field_count(*idx);
@@ -1847,47 +1827,13 @@ impl Frame {
             },
             Bytecode::ReadRef => {
                 let ref_ty = interpreter.operand_stack.pop_ty()?;
-                // TODO: move this to types.
-                match ref_ty {
-                    Type::Reference(inner) | Type::MutableReference(inner) => {
-                        inner.paranoid_check_has_ability(Ability::Copy)?;
-                        interpreter.operand_stack.push_ty(inner.as_ref().clone())?;
-                    },
-                    _ => {
-                        return Err(PartialVMError::new(
-                            StatusCode::UNKNOWN_INVARIANT_VIOLATION_ERROR,
-                        )
-                        .with_message("ReadRef expecting a value of reference type".to_string()))
-                    },
-                }
+                let inner_ty = ref_ty.paranoid_read_ref()?;
+                interpreter.operand_stack.push_ty(inner_ty)?;
             },
             Bytecode::WriteRef => {
-                let ref_ty = interpreter.operand_stack.pop_ty()?;
+                let mut_ref_ty = interpreter.operand_stack.pop_ty()?;
                 let val_ty = interpreter.operand_stack.pop_ty()?;
-
-                // TODO: move these checks to types.
-                match ref_ty {
-                    Type::MutableReference(inner) => {
-                        if *inner == val_ty {
-                            inner.paranoid_check_has_ability(Ability::Drop)?;
-                        } else {
-                            return Err(PartialVMError::new(
-                                StatusCode::UNKNOWN_INVARIANT_VIOLATION_ERROR,
-                            )
-                            .with_message(
-                                "WriteRef tried to write references of different types".to_string(),
-                            ));
-                        }
-                    },
-                    _ => {
-                        return Err(PartialVMError::new(
-                            StatusCode::UNKNOWN_INVARIANT_VIOLATION_ERROR,
-                        )
-                        .with_message(
-                            "WriteRef expecting a value of mutable reference type".to_string(),
-                        ))
-                    },
-                }
+                mut_ref_ty.paranoid_write_ref(&val_ty)?;
             },
             Bytecode::CastU8 => {
                 interpreter.operand_stack.pop_ty()?;
@@ -1961,52 +1907,44 @@ impl Frame {
                     .operand_stack
                     .pop_ty()?
                     .paranoid_check_is_address_ty()?;
-                let ty = resolver.get_struct_type(*idx);
-                ty.paranoid_check_has_ability(Ability::Key)?;
+                let struct_ty = resolver.get_struct_type(*idx);
+                struct_ty.paranoid_check_has_ability(Ability::Key)?;
 
-                // TODO: gate this construction!
-                interpreter
-                    .operand_stack
-                    .push_ty(Type::MutableReference(Box::new(ty)))?;
+                let struct_mut_ref_ty = ty_builder.create_ref_ty(&struct_ty, true)?;
+                interpreter.operand_stack.push_ty(struct_mut_ref_ty)?;
             },
             Bytecode::ImmBorrowGlobal(idx) => {
                 interpreter
                     .operand_stack
                     .pop_ty()?
                     .paranoid_check_is_address_ty()?;
-                let ty = resolver.get_struct_type(*idx);
-                ty.paranoid_check_has_ability(Ability::Key)?;
+                let struct_ty = resolver.get_struct_type(*idx);
+                struct_ty.paranoid_check_has_ability(Ability::Key)?;
 
-                // TODO: gate this construction!
-                interpreter
-                    .operand_stack
-                    .push_ty(Type::Reference(Box::new(ty)))?;
+                let struct_ref_ty = ty_builder.create_ref_ty(&struct_ty, false)?;
+                interpreter.operand_stack.push_ty(struct_ref_ty)?;
             },
             Bytecode::MutBorrowGlobalGeneric(idx) => {
                 interpreter
                     .operand_stack
                     .pop_ty()?
                     .paranoid_check_is_address_ty()?;
-                let ty = ty_cache.get_struct_type(*idx, resolver, ty_args)?.0.clone();
-                ty.paranoid_check_has_ability(Ability::Key)?;
+                let struct_ty = ty_cache.get_struct_type(*idx, resolver, ty_args)?.0;
+                struct_ty.paranoid_check_has_ability(Ability::Key)?;
 
-                // TODO: gate this construction!
-                interpreter
-                    .operand_stack
-                    .push_ty(Type::MutableReference(Box::new(ty)))?;
+                let struct_mut_ref_ty = ty_builder.create_ref_ty(struct_ty, true)?;
+                interpreter.operand_stack.push_ty(struct_mut_ref_ty)?;
             },
             Bytecode::ImmBorrowGlobalGeneric(idx) => {
                 interpreter
                     .operand_stack
                     .pop_ty()?
                     .paranoid_check_is_address_ty()?;
-                let ty = ty_cache.get_struct_type(*idx, resolver, ty_args)?.0.clone();
-                ty.paranoid_check_has_ability(Ability::Key)?;
+                let struct_ty = ty_cache.get_struct_type(*idx, resolver, ty_args)?.0;
+                struct_ty.paranoid_check_has_ability(Ability::Key)?;
 
-                // TODO: gate this construction!
-                interpreter
-                    .operand_stack
-                    .push_ty(Type::Reference(Box::new(ty)))?;
+                let struct_ref_ty = ty_builder.create_ref_ty(struct_ty, false)?;
+                interpreter.operand_stack.push_ty(struct_ref_ty)?;
             },
             Bytecode::Exists(_) | Bytecode::ExistsGeneric(_) => {
                 interpreter
@@ -2074,10 +2012,8 @@ impl Frame {
                     elem_ty.paranoid_check_eq(ty)?;
                 }
 
-                // TODO: This type construction has to be gated!
-                interpreter
-                    .operand_stack
-                    .push_ty(Type::Vector(triomphe::Arc::new(ty.clone())))?;
+                let vec_ty = ty_builder.create_vec_ty(ty)?;
+                interpreter.operand_stack.push_ty(vec_ty)?;
             },
             Bytecode::VecLen(si) => {
                 let (ty, _) = ty_cache.get_signature_index_type(*si, resolver, ty_args)?;

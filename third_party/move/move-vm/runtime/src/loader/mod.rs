@@ -233,7 +233,6 @@ impl Loader {
         &self.vm_config
     }
 
-    #[allow(dead_code)]
     pub(crate) fn ty_builder(&self) -> &TypeBuilder {
         &self.ty_builder
     }
@@ -1351,30 +1350,20 @@ impl<'a> Resolver<'a> {
             BinaryType::Script(_) => unreachable!("Scripts cannot have type instructions"),
         };
 
+        let struct_ty = &struct_inst.definition_struct_type;
         let ty_builder = self.loader().ty_builder();
-        let struct_ = &struct_inst.definition_struct_type;
-        Ok(Type::StructInstantiation {
-            idx: struct_.idx,
-            ty_args: triomphe::Arc::new(
-                struct_inst
-                    .instantiation
-                    .iter()
-                    .map(|ty| ty_builder.subst(ty, ty_args))
-                    .collect::<PartialVMResult<_>>()?,
-            ),
-            ability: AbilityInfo::generic_struct(
-                struct_.abilities,
-                struct_.phantom_ty_args_mask.clone(),
-            ),
-        })
+        ty_builder.create_struct_instantiation_ty(
+            struct_ty,
+            struct_inst.instantiation.clone(),
+            ty_args,
+        )
     }
 
-    pub(crate) fn get_field_type(&self, idx: FieldHandleIndex) -> PartialVMResult<Type> {
+    pub(crate) fn get_field_type(&self, idx: FieldHandleIndex) -> PartialVMResult<&Type> {
         match &self.binary {
             BinaryType::Module(module) => {
                 let handle = &module.field_handles[idx.0 as usize];
-
-                Ok(handle.definition_struct_type.fields[handle.offset].clone())
+                Ok(&handle.definition_struct_type.fields[handle.offset])
             },
             BinaryType::Script(_) => unreachable!("Scripts cannot have type instructions"),
         }
@@ -1515,22 +1504,11 @@ impl<'a> Resolver<'a> {
                 let struct_ty = &field_inst.definition_struct_type;
 
                 let ty_builder = self.loader().ty_builder();
-
-                // TODO: gate this construction!
-                Ok(Type::StructInstantiation {
-                    idx: struct_ty.idx,
-                    ty_args: triomphe::Arc::new(
-                        field_inst
-                            .instantiation
-                            .iter()
-                            .map(|ty| ty_builder.subst(ty, ty_args))
-                            .collect::<PartialVMResult<Vec<_>>>()?,
-                    ),
-                    ability: AbilityInfo::generic_struct(
-                        struct_ty.abilities,
-                        struct_ty.phantom_ty_args_mask.clone(),
-                    ),
-                })
+                ty_builder.create_struct_instantiation_ty(
+                    struct_ty,
+                    field_inst.instantiation.clone(),
+                    ty_args,
+                )
             },
             BinaryType::Script(_) => unreachable!("Scripts cannot have field instructions"),
         }
