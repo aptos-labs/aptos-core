@@ -9,12 +9,15 @@ use aptos_keyless_common::input_processing::{
     witness_gen::witness_gen,
 };
 use std::{env, fs, fs::File, path::PathBuf, process::Command};
+use std::io::Write;
 use tempfile::{tempdir, NamedTempFile, TempDir};
 
 #[cfg(test)]
 mod base64;
 #[cfg(test)]
 mod bigint;
+#[cfg(test)]
+mod hash_to_field;
 #[cfg(test)]
 mod packing;
 #[cfg(test)]
@@ -33,15 +36,22 @@ pub struct TestCircuitHandle {
 }
 
 impl TestCircuitHandle {
+    /// Compile the circuit in the given file using BN254 as the underlying curve.
     pub fn new(file_name: &str) -> anyhow::Result<Self> {
-        let dir = tempdir()?;
         let cargo_manifest_dir = PathBuf::from(env::var("CARGO_MANIFEST_DIR").unwrap());
         let include_root_dir = cargo_manifest_dir.join("../circuit-data/templates");
         let src_circuit_path = include_root_dir.join("tests").join(file_name);
+        let content = fs::read_to_string(src_circuit_path)?;
+        Self::new_from_str(content.as_str())
+    }
+
+    pub fn new_from_str(circuit_src: &str) -> anyhow::Result<Self> {
+        let dir = tempdir()?;
+        let cargo_manifest_dir = PathBuf::from(env::var("CARGO_MANIFEST_DIR").unwrap());
+        let include_root_dir = cargo_manifest_dir.join("../circuit-data/templates");
         let tmp_circuit_path = dir.path().to_owned().join("circuit.circom");
-        // Rex: why is this variable never used?
-        let _tmp_circuit_file = File::create(&tmp_circuit_path)?;
-        fs::copy(src_circuit_path, &tmp_circuit_path)?;
+        let mut tmp_circuit_file = File::create(&tmp_circuit_path)?;
+        tmp_circuit_file.write_all(circuit_src.as_bytes())?;
         let output = Command::new("circom")
             .args([
                 "-l",

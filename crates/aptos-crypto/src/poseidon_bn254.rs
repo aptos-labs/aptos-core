@@ -4,6 +4,7 @@
 //! Implements the Poseidon hash function for BN-254, which hashes $\le$ 16 field elements and
 //! produces a single field element as output.
 use anyhow::bail;
+use ark_bn254::Fr;
 use ark_ff::{BigInteger, PrimeField};
 use once_cell::sync::Lazy;
 // TODO(keyless): Figure out the right library for Poseidon.
@@ -18,6 +19,9 @@ pub const MAX_NUM_INPUT_SCALARS: usize = 16;
 /// us to keep our SNARK circuits simpler.
 pub const BYTES_PACKED_PER_SCALAR: usize = 31;
 
+/// `BYTES_PACKED_PER_SCALAR` but for u64s.
+pub const LIMBS_PACKED_PER_SCALAR: usize = 3;
+
 /// The maximum number of bytes that can be given as input to the byte-oriented variant of the
 /// Poseidon-BN254 hash function exposed in `pad_and_hash_bytes`.
 ///
@@ -28,12 +32,15 @@ pub const BYTES_PACKED_PER_SCALAR: usize = 31;
 /// SNARK circuits would have to implement this more complicated packing).
 pub const MAX_NUM_INPUT_BYTES: usize = MAX_NUM_INPUT_SCALARS * BYTES_PACKED_PER_SCALAR;
 
+/// `MAX_NUM_INPUT_BYTES` but for u64s.
+pub const MAX_NUM_INPUT_LIMBS: usize = MAX_NUM_INPUT_SCALARS * LIMBS_PACKED_PER_SCALAR;
+
 /// Apparently, creating this object is rather slow, so we make it a global.
 static HASHER: Lazy<Poseidon> = Lazy::new(Poseidon::new);
 
 /// Given an array of up to `MAX_NUM_INPUT_SCALARS` field elements (in the BN254 scalar field), hashes
 /// them using Poseidon-BN254 into a single field element.
-pub fn hash_scalars(inputs: Vec<ark_bn254::Fr>) -> anyhow::Result<ark_bn254::Fr> {
+pub fn hash_scalars(inputs: Vec<Fr>) -> anyhow::Result<Fr> {
     if inputs.is_empty() || inputs.len() > MAX_NUM_INPUT_SCALARS {
         bail!(
             "Poseidon-BN254 needs > 0 and <= 16 inputs, but was called with {} inputs",
@@ -48,7 +55,7 @@ pub fn hash_scalars(inputs: Vec<ark_bn254::Fr>) -> anyhow::Result<ark_bn254::Fr>
 /// packs it to scalars, and returns the hash of the scalars.
 ///
 /// This function calls `pad_and_pack_bytes_to_scalars_no_len` safely as strings will not contain the zero byte except to terminate.
-pub fn pad_and_hash_string(str: &str, max_bytes: usize) -> anyhow::Result<ark_bn254::Fr> {
+pub fn pad_and_hash_string(str: &str, max_bytes: usize) -> anyhow::Result<Fr> {
     pad_and_hash_bytes_with_len(str.as_bytes(), max_bytes)
 }
 
@@ -59,7 +66,7 @@ pub fn pad_and_hash_string(str: &str, max_bytes: usize) -> anyhow::Result<ark_bn
 ///
 /// If the last chunk is smaller than 31 bytes, so all remaining bytes in its associated field
 /// element are padded to zero due to the LE encoding.
-fn pack_bytes_to_scalars(bytes: &[u8]) -> anyhow::Result<Vec<ark_bn254::Fr>> {
+fn pack_bytes_to_scalars(bytes: &[u8]) -> anyhow::Result<Vec<Fr>> {
     if bytes.len() > MAX_NUM_INPUT_BYTES {
         bail!(
             "Cannot hash more than {} bytes. Was given {} bytes.",
@@ -72,6 +79,23 @@ fn pack_bytes_to_scalars(bytes: &[u8]) -> anyhow::Result<Vec<ark_bn254::Fr>> {
         .chunks(BYTES_PACKED_PER_SCALAR)
         .map(|chunk| pack_bytes_to_one_scalar(chunk).expect("chunk converts to scalar"))
         .collect::<Vec<ark_bn254::Fr>>();
+
+    Ok(scalars)
+}
+
+fn pack_limbs_to_scalars(limbs: &[u64]) -> anyhow::Result<Vec<Fr>> {
+    if limbs.len() > MAX_NUM_INPUT_LIMBS {
+        bail!(
+            "Cannot hash more than {} limbs. Was given {} limbs.",
+            MAX_NUM_INPUT_LIMBS,
+            limbs.len()
+        );
+    }
+
+    let scalars = limbs
+        .chunks(LIMBS_PACKED_PER_SCALAR)
+        .map(|chunk| pack_limbs_to_one_scalar(chunk).expect("chunk converts to scalar"))
+        .collect::<Vec<Fr>>();
 
     Ok(scalars)
 }
@@ -106,6 +130,35 @@ pub fn pad_and_pack_bytes_to_scalars_with_len(
     Ok(scalars)
 }
 
+/// `pad_and_pack_bytes_to_scalars_with_len` but for u64s.
+pub fn pad_and_pack_limbs_to_scalars_with_len(
+    limbs: &[u64],
+    max_limbs: usize,
+) -> anyhow::Result<Vec<Fr>> {
+    let len = limbs.len();
+    if max_limbs > MAX_NUM_INPUT_LIMBS {
+        bail!(
+            "Cannot hash more than {} limbs. Was given {} limbs.",
+            MAX_NUM_INPUT_LIMBS,
+            len
+        );
+    }
+    if len > max_limbs {
+        bail!(
+            "Limb array length of {} is NOT <= max length of {} limbs.",
+            limbs.len(),
+            max_limbs
+        );
+    }
+
+    let len_scalar = Fr::try_from(len as u64).unwrap();
+    let scalars = pad_and_pack_limbs_to_scalars_no_len(limbs, max_limbs)?
+        .into_iter()
+        .chain([len_scalar])
+        .collect::<Vec<Fr>>();
+    Ok(scalars)
+}
+
 /// Given $n$ bytes, this function left pads bytes with 'max_bytes'- $n$ zeros and returns $k$ field elements that pack those bytes as tightly as
 /// possible, where $k$ is the ceiling of `max_bytes`/`BYTES_PACKED_PER_SCALAR`.
 fn pad_and_pack_bytes_to_scalars_no_len(
@@ -133,6 +186,31 @@ fn pad_and_pack_bytes_to_scalars_no_len(
     Ok(scalars)
 }
 
+fn pad_and_pack_limbs_to_scalars_no_len(
+    limbs: &[u64],
+    max_limbs: usize,
+) -> anyhow::Result<Vec<ark_bn254::Fr>> {
+    let len = limbs.len();
+    if max_limbs > MAX_NUM_INPUT_LIMBS {
+        bail!(
+            "Cannot hash more than {} limbs. Was given {} limbs.",
+            MAX_NUM_INPUT_LIMBS,
+            len
+        );
+    }
+    if limbs.len() > max_limbs {
+        bail!(
+            "Limb array length of {} is NOT <= max length of {} limbs.",
+            limbs.len(),
+            max_limbs
+        );
+    }
+
+    let padded = zero_pad_limbs(limbs, max_limbs)?;
+    let scalars = pack_limbs_to_scalars(padded.as_slice())?;
+    Ok(scalars)
+}
+
 /// Packs the bytes to a vector of scalars (see `pack_bytes_to_scalars`) and hashes the scalars via
 /// `hash_scalars`.
 ///
@@ -155,8 +233,7 @@ fn hash_bytes(bytes: &[u8]) -> anyhow::Result<ark_bn254::Fr> {
 /// example ASCII strings. Otherwise unexpected collisions can occur.
 ///
 /// Due to risk of collisions due to improper use by the caller, it is not exposed.
-#[allow(unused)]
-fn pad_and_hash_bytes_no_len(bytes: &[u8], max_bytes: usize) -> anyhow::Result<ark_bn254::Fr> {
+pub fn pad_and_hash_bytes_no_len(bytes: &[u8], max_bytes: usize) -> anyhow::Result<ark_bn254::Fr> {
     let scalars = pad_and_pack_bytes_to_scalars_no_len(bytes, max_bytes)?;
     hash_scalars(scalars)
 }
@@ -168,8 +245,17 @@ fn pad_and_hash_bytes_no_len(bytes: &[u8], max_bytes: usize) -> anyhow::Result<a
 pub fn pad_and_hash_bytes_with_len(
     bytes: &[u8],
     max_bytes: usize,
-) -> anyhow::Result<ark_bn254::Fr> {
+) -> anyhow::Result<Fr> {
     let scalars = pad_and_pack_bytes_to_scalars_with_len(bytes, max_bytes)?;
+    hash_scalars(scalars)
+}
+
+/// `pad_and_hash_bytes_with_len` but for u64s.
+pub fn pad_and_hash_limbs_with_len(
+    limbs: &[u64],
+    max_limbs: usize,
+) -> anyhow::Result<Fr> {
+    let scalars = pad_and_pack_limbs_to_scalars_with_len(limbs, max_limbs)?;
     hash_scalars(scalars)
 }
 
@@ -194,6 +280,24 @@ fn zero_pad_bytes(bytes: &[u8], size: usize) -> anyhow::Result<Vec<u8>> {
     Ok(padded)
 }
 
+fn zero_pad_limbs(limbs: &[u64], size: usize) -> anyhow::Result<Vec<u64>> {
+    if size > MAX_NUM_INPUT_LIMBS {
+        bail!(
+            "Cannot pad to more than {} limbs. Requested size is {}.",
+            MAX_NUM_INPUT_LIMBS,
+            size
+        );
+    }
+
+    if limbs.len() > size {
+        bail!("Cannot pad {} limb(s) to size {}", limbs.len(), size);
+    }
+
+    let mut padded = limbs.to_vec();
+    padded.resize(size, 0);
+    Ok(padded)
+}
+
 /// Converts the chunk of bytes into a scalar, assuming it is of size less than or equal to `BYTES_PACKED_PER_SCALAR`.
 pub fn pack_bytes_to_one_scalar(chunk: &[u8]) -> anyhow::Result<ark_bn254::Fr> {
     if chunk.len() > BYTES_PACKED_PER_SCALAR {
@@ -204,6 +308,20 @@ pub fn pack_bytes_to_one_scalar(chunk: &[u8]) -> anyhow::Result<ark_bn254::Fr> {
         );
     }
     let fr = ark_bn254::Fr::from_le_bytes_mod_order(chunk);
+    Ok(fr)
+}
+
+/// `pack_bytes_to_one_scalar` but for u64s.
+pub fn pack_limbs_to_one_scalar(chunk: &[u64]) -> anyhow::Result<Fr> {
+    if chunk.len() > LIMBS_PACKED_PER_SCALAR {
+        bail!(
+            "Cannot convert chunk to scalar. Max chunk size is {} limbs. Was given {} limbs.",
+            LIMBS_PACKED_PER_SCALAR,
+            chunk.len(),
+        );
+    }
+    let bytes_chunk: Vec<u8> = chunk.iter().flat_map(|&limb| limb.to_le_bytes().into_iter()).collect();
+    let fr = ark_bn254::Fr::from_le_bytes_mod_order(bytes_chunk.as_slice());
     Ok(fr)
 }
 
