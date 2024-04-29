@@ -93,6 +93,7 @@ impl BlockStore {
         self.sync_to_highest_quorum_cert(
             sync_info.highest_quorum_cert().clone(),
             sync_info.highest_commit_cert().clone(),
+            sync_info.highest_ordered_cert().clone(),
             &mut retriever,
         )
         .await?;
@@ -204,6 +205,7 @@ impl BlockStore {
         &self,
         highest_quorum_cert: QuorumCert,
         highest_commit_cert: WrappedLedgerInfo,
+        highest_ordered_cert: WrappedLedgerInfo,
         retriever: &mut BlockRetriever,
     ) -> anyhow::Result<()> {
         if !self.need_sync_for_ledger_info(highest_commit_cert.ledger_info()) {
@@ -212,6 +214,7 @@ impl BlockStore {
         let (root, root_metadata, blocks, quorum_certs) = Self::fast_forward_sync(
             &highest_quorum_cert,
             &highest_commit_cert,
+            &highest_ordered_cert,
             retriever,
             self.storage.clone(),
             self.execution_client.clone(),
@@ -242,6 +245,7 @@ impl BlockStore {
     pub async fn fast_forward_sync<'a>(
         highest_quorum_cert: &'a QuorumCert,
         highest_commit_cert: &'a WrappedLedgerInfo,
+        highest_ordered_cert: &'a WrappedLedgerInfo,
         retriever: &'a mut BlockRetriever,
         storage: Arc<dyn PersistentLivenessStorage>,
         execution_client: Arc<dyn TExecutionClient>,
@@ -342,7 +346,11 @@ impl BlockStore {
 
         // Check early that recovery will succeed, and return before corrupting our state in case it will not.
         LedgerRecoveryData::new(highest_commit_cert.ledger_info().clone())
-            .find_root(&mut blocks.clone(), &mut quorum_certs.clone())
+            .find_root(
+                &mut blocks.clone(),
+                &mut quorum_certs.clone(),
+                Some(highest_ordered_cert.clone()),
+            )
             .with_context(|| {
                 // for better readability
                 quorum_certs.sort_by_key(|qc| qc.certified_block().round());
@@ -371,7 +379,7 @@ impl BlockStore {
         // we do not need to update block_tree.highest_commit_decision_ledger_info here
         // because the block_tree is going to rebuild itself.
 
-        let recovery_data = match storage.start() {
+        let recovery_data = match storage.start(Some(highest_ordered_cert.clone())) {
             LivenessStorageData::FullRecoveryData(recovery_data) => recovery_data,
             _ => panic!("Failed to construct recovery data after fast forward sync"),
         };
