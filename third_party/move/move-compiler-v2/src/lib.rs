@@ -170,6 +170,8 @@ pub fn run_checker(options: Options) -> anyhow::Result<GlobalEnv> {
         },
         options.language_version.unwrap_or_default(),
         options.compile_test_code,
+        options.source_paths.clone(),
+        options.dep_paths.clone(),
     )?;
     // Store address aliases
     let map = addrs

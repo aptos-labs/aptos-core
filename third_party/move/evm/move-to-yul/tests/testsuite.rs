@@ -67,6 +67,8 @@ fn test_runner(path: &Path) -> datatest_stable::Result<()> {
         ModelBuilderOptions::default(),
         flags,
         &known_attributes,
+        None,
+        None,
     )?;
     for exp in std::iter::once(String::new()).chain(experiments.into_iter()) {
         let mut options = Options {

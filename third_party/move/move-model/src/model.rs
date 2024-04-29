@@ -526,6 +526,8 @@ pub struct GlobalEnv {
     pub(crate) file_idx_to_id: BTreeMap<u16, FileId>,
     /// A set indicating whether a file id is a target or a dependency.
     pub(crate) file_id_is_dep: BTreeSet<FileId>,
+    /// A set indicating whether a file id is a target or a dependency.
+    pub(crate) file_id_is_dep_for_doc: BTreeSet<FileId>,
     /// A special constant location representing an unknown location.
     /// This uses a pseudo entry in `source_files` to be safely represented.
     pub(crate) unknown_loc: Loc,
@@ -617,6 +619,7 @@ impl GlobalEnv {
             file_id_to_idx,
             file_idx_to_id,
             file_id_is_dep: BTreeSet::new(),
+            file_id_is_dep_for_doc: BTreeSet::new(),
             diags: RefCell::new(vec![]),
             symbol_pool: SymbolPool::new(),
             next_free_node_id: Default::default(),
@@ -775,6 +778,7 @@ impl GlobalEnv {
         file_name: &str,
         source: &str,
         is_dep: bool,
+        is_doc_dep: bool,
     ) -> FileId {
         let file_id = self.source_files.add(file_name, source.to_string());
         self.stdlib_address =
@@ -793,6 +797,9 @@ impl GlobalEnv {
         self.file_idx_to_id.insert(file_idx, file_id);
         if is_dep {
             self.file_id_is_dep.insert(file_id);
+        }
+        if is_doc_dep {
+            self.file_id_is_dep_for_doc.insert(file_id);
         }
         file_id
     }
@@ -2606,6 +2613,12 @@ impl<'env> ModuleEnv<'env> {
     pub fn is_target(&self) -> bool {
         let file_id = self.data.loc.file_id;
         *self.env.everything_is_target.borrow() || !self.env.file_id_is_dep.contains(&file_id)
+    }
+
+    pub fn is_target_for_docs(&self) -> bool {
+        let file_id = self.data.loc.file_id;
+        *self.env.everything_is_target.borrow()
+            || !self.env.file_id_is_dep_for_doc.contains(&file_id)
     }
 
     /// Returns the path to source file of this module.

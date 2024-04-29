@@ -85,6 +85,8 @@ pub fn run_move_prover_v2<W: WriteColor>(
         warn_unused: false,
         whole_program: false,
         compile_test_code: false,
+        source_paths: None,
+        dep_paths: None,
     }
     .set_experiment(Experiment::UNUSED_STRUCT_PARAMS_CHECK, false);
 

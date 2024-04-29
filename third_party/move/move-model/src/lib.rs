@@ -45,6 +45,7 @@ use move_symbol_pool::Symbol as MoveSymbol;
 use std::{
     collections::{BTreeMap, BTreeSet, VecDeque},
     rc::Rc,
+    string::String,
 };
 
 pub mod ast;
@@ -86,7 +87,21 @@ pub fn run_model_builder_in_compiler_mode(
     known_attributes: &BTreeSet<String>,
     language_version: LanguageVersion,
     compile_test_code: bool,
+    opt_source_path: Option<PackagePaths>,
+    opt_dep_paths: Option<Vec<PackagePaths>>,
 ) -> anyhow::Result<GlobalEnv> {
+    let to_str_vec = |ps: &[MoveSymbol]| {
+        ps.iter()
+            .map(move |s| s.as_str().to_owned())
+            .collect::<Vec<_>>()
+    };
+    let to_str_map = |ps: &BTreeMap<MoveSymbol, NumericalAddress>| {
+        let mut output_map = BTreeMap::new();
+        for (s, v) in ps {
+            output_map.insert(s.as_str().to_owned(), *v);
+        }
+        output_map
+    };
     let to_package_paths = |PackageInfo {
                                 sources,
                                 address_map,
@@ -95,6 +110,15 @@ pub fn run_model_builder_in_compiler_mode(
         paths: sources,
         named_address_map: address_map,
     };
+    let to_package_paths_str = |path_symbol: &PackagePaths| PackagePaths {
+        name: path_symbol.name,
+        paths: to_str_vec(&path_symbol.paths),
+        named_address_map: to_str_map(&path_symbol.named_address_map),
+    };
+    let sources_docs =
+        opt_source_path.map(|source_paths| vec![to_package_paths_str(&source_paths)]);
+    let deps_docs =
+        opt_dep_paths.map(|dep_paths| dep_paths.iter().map(to_package_paths_str).collect_vec());
     run_model_builder_with_options_and_compilation_flags(
         vec![to_package_paths(source)],
         deps.into_iter().map(to_package_paths).collect(),
@@ -107,6 +131,8 @@ pub fn run_model_builder_in_compiler_mode(
             .set_skip_attribute_checks(skip_attribute_checks)
             .set_keep_testing_functions(compile_test_code),
         known_attributes,
+        sources_docs,
+        deps_docs,
     )
 }
 
@@ -132,6 +158,8 @@ pub fn run_model_builder_with_options<
         options,
         flags,
         known_attributes,
+        None,
+        None,
     )
 }
 
@@ -145,6 +173,8 @@ pub fn run_model_builder_with_options_and_compilation_flags<
     options: ModelBuilderOptions,
     flags: Flags,
     known_attributes: &BTreeSet<String>,
+    opt_move_sources_for_docs: Option<Vec<PackagePaths<Paths, NamedAddress>>>,
+    opt_deps_for_docs: Option<Vec<PackagePaths<Paths, NamedAddress>>>,
 ) -> anyhow::Result<GlobalEnv> {
     let mut env = GlobalEnv::new();
     env.set_language_version(options.language_version);
@@ -153,7 +183,7 @@ pub fn run_model_builder_with_options_and_compilation_flags<
 
     // Step 1: parse the program to get comments and a separation of targets and dependencies.
     let (files, comments_and_compiler_res) =
-        Compiler::from_package_paths(move_sources, deps, flags, known_attributes)
+        Compiler::from_package_paths(move_sources, deps, flags.clone(), known_attributes)
             .run::<PASS_PARSER>()?;
     let (comment_map, compiler) = match comments_and_compiler_res {
         Err(diags) => {
@@ -166,6 +196,7 @@ pub fn run_model_builder_with_options_and_compilation_flags<
                     fname.as_str(),
                     fsrc,
                     /* is_dep */ false,
+                    false,
                 );
             }
             add_move_lang_diagnostics(&mut env, diags);
@@ -182,6 +213,45 @@ pub fn run_model_builder_with_options_and_compilation_flags<
         .map(|p| p.def.file_hash())
         .collect();
 
+    let dep_files_for_doc = if let (Some(move_sources_for_docs), Some(deps_for_docs)) =
+        (opt_move_sources_for_docs, opt_deps_for_docs)
+    {
+        let (files, comments_and_compiler_res) = Compiler::from_package_paths(
+            move_sources_for_docs,
+            deps_for_docs,
+            flags,
+            known_attributes,
+        )
+        .run::<PASS_PARSER>()?;
+        let (_, compiler) = match comments_and_compiler_res {
+            Err(diags) => {
+                // Add source files so that the env knows how to translate locations of parse errors
+                let empty_alias = Rc::new(BTreeMap::new());
+                for (fhash, (fname, fsrc)) in &files {
+                    env.add_source(
+                        *fhash,
+                        empty_alias.clone(),
+                        fname.as_str(),
+                        fsrc,
+                        /* is_dep */ false,
+                        false,
+                    );
+                }
+                add_move_lang_diagnostics(&mut env, diags);
+                return Ok(env);
+            },
+            Ok(res) => res,
+        };
+        let (_, parsed_prog) = compiler.into_ast();
+        parsed_prog
+            .lib_definitions
+            .iter()
+            .map(|p| p.def.file_hash())
+            .collect()
+    } else {
+        dep_files.clone()
+    };
+
     for member in parsed_prog
         .source_definitions
         .iter()
@@ -190,13 +260,27 @@ pub fn run_model_builder_with_options_and_compilation_flags<
         let fhash = member.def.file_hash();
         let (fname, fsrc) = files.get(&fhash).unwrap();
         let is_dep = dep_files.contains(&fhash);
+        let is_dep_for_docs = dep_files_for_doc.contains(&fhash);
+        println!(
+            "fname:{}, is_dep:{}, is_dep_for_docs:{}",
+            fname.as_str(),
+            is_dep,
+            is_dep_for_docs
+        );
         let aliases = parsed_prog
             .named_address_maps
             .get(member.named_address_map)
             .iter()
             .map(|(symbol, addr)| (env.symbol_pool().make(symbol.as_str()), *addr))
             .collect();
-        env.add_source(fhash, Rc::new(aliases), fname.as_str(), fsrc, is_dep);
+        env.add_source(
+            fhash,
+            Rc::new(aliases),
+            fname.as_str(),
+            fsrc,
+            is_dep,
+            is_dep_for_docs,
+        );
     }
 
     // If a move file does not contain any definition, it will not appear in `parsed_prog`. Add them explicitly.
@@ -204,12 +288,14 @@ pub fn run_model_builder_with_options_and_compilation_flags<
         if env.get_file_id(*fhash).is_none() {
             let (fname, fsrc) = files.get(fhash).unwrap();
             let is_dep = dep_files.contains(fhash);
+            let is_dep_for_docs = dep_files_for_doc.contains(fhash);
             env.add_source(
                 *fhash,
                 Rc::new(BTreeMap::new()),
                 fname.as_str(),
                 fsrc,
                 is_dep,
+                is_dep_for_docs,
             );
         }
     }

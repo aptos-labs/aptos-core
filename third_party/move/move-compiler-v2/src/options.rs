@@ -7,7 +7,7 @@ use clap::Parser;
 use codespan_reporting::diagnostic::Severity;
 use itertools::Itertools;
 use move_command_line_common::env::read_env_var;
-use move_compiler::command_line as cli;
+use move_compiler::{command_line as cli, shared::PackagePaths};
 use move_model::metadata::LanguageVersion;
 use once_cell::sync::Lazy;
 use std::{
@@ -71,6 +71,10 @@ pub struct Options {
     /// Whether to compile #[test] and #[test_only] code
     #[clap(skip)]
     pub compile_test_code: bool,
+    #[clap(skip)]
+    pub source_paths: Option<PackagePaths>,
+    #[clap(skip)]
+    pub dep_paths: Option<Vec<PackagePaths>>,
 }
 
 impl Default for Options {
