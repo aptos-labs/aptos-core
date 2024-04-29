@@ -1313,7 +1313,6 @@ dependencies = [
  "num_cpus",
  "once_cell",
  "rayon",
- "tokio",
 ]
 
 [[package]]
