@@ -17,6 +17,7 @@ use move_symbol_pool::Symbol;
 use once_cell::sync::Lazy;
 use petgraph::{algo::astar as petgraph_astar, graphmap::DiGraphMap};
 use std::{
+    clone::Clone,
     collections::{BTreeMap, BTreeSet},
     fmt::{self, Debug},
     hash::Hash,
@@ -168,6 +169,21 @@ pub struct PackagePaths<
     pub name: Option<Symbol>,
     pub paths: Vec<Path>,
     pub named_address_map: BTreeMap<NamedAddress, NumericalAddress>,
+}
+
+// Convenient helper functions for dealing with PackagePaths
+pub fn string_vec_to_symbol_vec(string_vec: &[String]) -> Vec<Symbol> {
+    string_vec
+        .iter()
+        .map(|s| Symbol::from(s.as_str()))
+        .collect()
+}
+
+pub fn string_map_to_symbol_map<T: Clone>(string_map: &BTreeMap<String, T>) -> BTreeMap<Symbol, T> {
+    string_map
+        .iter()
+        .map(|(s, v)| (Symbol::from(s.as_str()), v.clone()))
+        .collect()
 }
 
 #[derive(Clone, Debug, Eq, PartialEq)]

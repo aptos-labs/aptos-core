@@ -35,7 +35,7 @@ use move_core_types::{
 };
 use move_model::metadata::LanguageVersion;
 use move_resource_viewer::MoveValueAnnotator;
-use move_stdlib::move_stdlib_named_addresses;
+use move_stdlib::{move_stdlib_files, move_stdlib_named_addresses};
 use move_symbol_pool::Symbol;
 use move_vm_runtime::{
     config::VMConfig,
@@ -459,6 +459,14 @@ static PRECOMPILED_MOVE_STDLIB: Lazy<Option<(FullyCompiledProgram, Vec<PackagePa
             },
         }
     });
+
+pub fn move_stdlib_named_addresses_as_symbols() -> BTreeMap<Symbol, NumericalAddress> {
+    string_map_to_symbol_map(&move_stdlib_named_addresses())
+}
+
+pub fn move_stdlib_files_as_symbols() -> Vec<Symbol> {
+    string_vec_to_symbol_vec(&move_stdlib_files())
+}
 
 pub struct PrecompiledFilesModules(Vec<String>, Vec<AnnotatedCompiledUnit>);
 

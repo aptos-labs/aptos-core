@@ -492,6 +492,13 @@ impl SharedTestingConfig {
         output: &TestOutput<impl Write>,
     ) -> TestStatistics {
         use move_binary_format::errors::Location;
+        use move_command_line_common::address::NumericalAddress;
+        use move_compiler::{attr_derivation, shared::PackagePaths, Flags};
+        use move_model::{
+            options::ModelBuilderOptions, run_model_builder_with_options_and_compilation_flags,
+        };
+        use move_symbol_pool::Symbol;
+        use std::collections::BTreeMap;
 
         let mut stats = TestStatistics::new();
 
@@ -505,15 +512,20 @@ impl SharedTestingConfig {
             .cloned()
             .collect::<Vec<_>>();
 
+        let flags = Flags::testing();
+        let empty_map = BTreeMap::<String, NumericalAddress>::new();
+        let source_path = PackagePaths {
+            name: None,
+            paths: filtered_sources,
+            named_address_map: empty_map,
+        };
         let model = run_model_builder_with_options_and_compilation_flags(
-            vec![PackagePaths {
-                name: None,
-                paths: filtered_sources,
-                named_address_map: self.named_address_values.clone(),
-            }],
-            vec![],
+            &vec![source_path],
+            &vec![],
             ModelBuilderOptions::default(),
-            Flags::testing(),
+            flags.clone(),
+            &attr_derivation::get_known_attributes_for_flavor(&flags),
+            None,
         )
         .unwrap_or_else(|e| panic!("Unable to build move model: {}", e));
 

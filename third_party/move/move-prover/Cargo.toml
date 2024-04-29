@@ -19,6 +19,7 @@ move-model = { path = "../move-model" }
 move-prover-boogie-backend = { path = "boogie-backend" }
 move-prover-bytecode-pipeline = { path = "bytecode-pipeline" }
 move-stackless-bytecode = { path = "../move-model/bytecode" }
+move-symbol-pool = { path = "../move-symbol-pool" }
 
 # external dependencies
 atty = { workspace = true }

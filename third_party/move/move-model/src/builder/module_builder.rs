@@ -62,6 +62,8 @@ pub(crate) struct ModuleBuilder<'env, 'translator> {
     pub module_id: ModuleId,
     /// Name of the currently build module.
     pub module_name: ModuleName,
+    /// Package name metadata from compiler arguments, not used for any language rules.
+    pub(crate) package_name: Option<Symbol>,
     /// Translated use declarations.
     pub use_decls: Vec<UseDecl>,
     /// Translated friend declarations.
@@ -137,11 +139,13 @@ impl<'env, 'translator> ModuleBuilder<'env, 'translator> {
         parent: &'translator mut ModelBuilder<'env>,
         module_id: ModuleId,
         module_name: ModuleName,
+        package_name: Option<Symbol>,
     ) -> Self {
         Self {
             parent,
             module_id,
             module_name,
+            package_name,
             use_decls: vec![],
             friend_decls: vec![],
             spec_funs: vec![],
@@ -3379,6 +3383,7 @@ impl<'env, 'translator> ModuleBuilder<'env, 'translator> {
         let module_id = self.parent.env.add(
             loc,
             self.module_name.clone(),
+            self.package_name,
             attributes,
             std::mem::take(&mut self.use_decls),
             std::mem::take(&mut self.friend_decls),

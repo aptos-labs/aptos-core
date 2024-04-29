@@ -61,13 +61,18 @@ pub fn construct_test_plan(
 
 fn construct_module_test_plan(
     env: &GlobalEnv,
-    _package_filter: Option<Symbol>,
+    package_filter: Option<Symbol>,
     module: ModuleEnv,
 ) -> Option<ModuleTestPlan> {
-    // TODO (#12885): what is a package?  Do we need this code?
-    // if package_filter.is_some() && module.package_name != package_filter {
-    // return None;
-    // }
+    if let Some(package_filter) = package_filter {
+        if let Some(package_name) = module.get_package_name() {
+            if package_filter != package_name {
+                return None;
+            }
+        } else {
+            return None;
+        }
+    }
 
     let current_module = module.get_name();
     let tests: BTreeMap<_, _> = module

@@ -29,7 +29,7 @@ pub fn test_runner(
 ) -> anyhow::Result<()> {
     let dep_sources = extract_test_directives(path, "// dep:")?;
     let mut env: GlobalEnv = run_model_builder_with_options(
-        vec![PackagePaths {
+        &vec![PackagePaths {
             name: None,
             paths: vec![path.to_string_lossy().to_string()],
             named_address_map: move_stdlib::move_stdlib_named_addresses(),
@@ -39,7 +39,7 @@ pub fn test_runner(
             paths: dep_sources,
             named_address_map: move_stdlib::move_stdlib_named_addresses(),
         }],
-        vec![],
+        &vec![],
         ModelBuilderOptions::default(),
         false,
         KnownAttribute::get_all_attribute_names(),

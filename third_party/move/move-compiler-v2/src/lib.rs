@@ -95,10 +95,12 @@ where
     if log_enabled!(Level::Debug) {
         // Dump bytecode, providing a name for the target derived from the first input file.
         let dump_base_name = options
-            .sources
-            .first()
+            .packages
+            .iter()
+            .flat_map(|x| x.paths.iter())
+            .next()
             .and_then(|f| {
-                Path::new(f)
+                Path::new(f.as_str())
                     .file_name()
                     .map(|f| f.to_string_lossy().as_ref().to_owned())
             })

@@ -54,7 +54,7 @@ pub fn run_to_yul<W: WriteColor>(error_writer: &mut W, mut options: Options) -> 
     let flags = Flags::empty().set_flavor("async");
     let known_attributes = get_known_attributes_for_flavor(&flags);
     let env = run_model_builder_with_options_and_compilation_flags(
-        vec![PackagePaths {
+        &vec![PackagePaths {
             name: None,
             paths: options.sources.clone(),
             named_address_map: addrs.clone(),
@@ -68,6 +68,7 @@ pub fn run_to_yul<W: WriteColor>(error_writer: &mut W, mut options: Options) -> 
         ModelBuilderOptions::default(),
         flags,
         &known_attributes,
+        None,
     )?;
     // If the model contains any errors, report them now and exit.
     check_errors(
@@ -111,7 +112,7 @@ pub fn run_to_abi_metadata<W: WriteColor>(
     let flags = Flags::empty().set_flavor("async");
     let known_attributes = get_known_attributes_for_flavor(&flags);
     let env = run_model_builder_with_options_and_compilation_flags(
-        vec![PackagePaths {
+        &vec![PackagePaths {
             name: None,
             paths: options.sources.clone(),
             named_address_map: addrs.clone(),
@@ -125,6 +126,7 @@ pub fn run_to_abi_metadata<W: WriteColor>(
         ModelBuilderOptions::default(),
         flags,
         &known_attributes,
+        None,
     )?;
     // If the model contains any errors, report them now and exit.
     check_errors(

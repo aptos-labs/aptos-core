@@ -153,20 +153,9 @@ impl ModelBuilder {
 }
 
 fn make_options_for_v2_compiler(targets: Vec<PackagePaths>, deps: Vec<PackagePaths>) -> Options {
-    let mut options = Options {
-        sources: targets
-            .iter()
-            .flat_map(|p| p.paths.iter().map(|s| s.to_string()).collect_vec())
-            .collect(),
-        ..Options::default()
-    };
-    options.dependencies = deps
+    let named_address_mapping = targets
         .iter()
-        .flat_map(|p| p.paths.iter().map(|s| s.to_string()).collect_vec())
-        .collect();
-    options.named_address_mapping = targets
-        .into_iter()
-        .chain(deps)
+        .chain(&deps)
         .flat_map(|p| {
             p.named_address_map
                 .iter()
@@ -174,5 +163,11 @@ fn make_options_for_v2_compiler(targets: Vec<PackagePaths>, deps: Vec<PackagePat
                 .collect_vec()
         })
         .collect_vec();
-    options
+
+    Options {
+        packages: targets,
+        dependencies: deps,
+        named_address_mapping,
+        ..Options::default()
+    }
 }

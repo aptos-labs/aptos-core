@@ -68,7 +68,7 @@ fn compile_yul_to_bytecode_bytes(filename: &str) -> Result<Vec<u8>> {
     let flags = Flags::verification().set_flavor("evm");
     let known_attributes = get_known_attributes_for_flavor(&flags);
     let env = run_model_builder_with_options_and_compilation_flags(
-        vec![PackagePaths {
+        &vec![PackagePaths {
             name: None,
             paths: vec![contract_path(filename).to_string_lossy().to_string()],
             named_address_map: named_address_map.clone(),
@@ -82,6 +82,7 @@ fn compile_yul_to_bytecode_bytes(filename: &str) -> Result<Vec<u8>> {
         ModelBuilderOptions::default(),
         flags,
         &known_attributes,
+        None,
     )?;
     let options = Options::default();
     let (_, out, _) = Generator::run(&options, &env)

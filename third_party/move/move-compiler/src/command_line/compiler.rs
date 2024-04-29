@@ -23,6 +23,7 @@ use move_command_line_common::files::{
 use move_core_types::language_storage::ModuleId as CompiledModuleId;
 use move_symbol_pool::Symbol;
 use std::{
+    clone::Clone,
     collections::{BTreeMap, BTreeSet},
     fmt::Debug,
     fs,
@@ -100,6 +101,7 @@ impl<'a> Compiler<'a> {
         deps: Vec<PackagePaths<Paths, NamedAddress>>,
         flags: Flags,
         known_attributes: &BTreeSet<String>,
+        extra_addrs: Option<&BTreeMap<String, NumericalAddress>>,
     ) -> Self {
         fn indexed_scopes(
             maps: &mut NamedAddressMaps,
@@ -127,8 +129,8 @@ impl<'a> Compiler<'a> {
             idx_paths
         }
         let mut maps = NamedAddressMaps::new();
-        let targets = indexed_scopes(&mut maps, targets);
-        let deps = indexed_scopes(&mut maps, deps);
+        let targets = Self::indexed_scopes(&mut maps, targets, extra_addrs);
+        let deps = Self::indexed_scopes(&mut maps, deps, extra_addrs);
 
         Self {
             maps,
@@ -159,7 +161,7 @@ impl<'a> Compiler<'a> {
             paths: deps,
             named_address_map,
         }];
-        Self::from_package_paths(targets, deps, flags, known_attributes)
+        Self::from_package_paths(&targets, &deps, flags, known_attributes, None)
     }
 
     pub fn set_interface_files_dir(mut self, dir: String) -> Self {
@@ -437,14 +439,11 @@ pub fn construct_pre_compiled_lib<
     flags: Flags,
     known_attributes: &BTreeSet<String>,
 ) -> anyhow::Result<Result<FullyCompiledProgram, (FilesSourceText, Diagnostics)>> {
-    let (files, pprog_and_comments_res) = Compiler::from_package_paths(
-        targets,
-        Vec::<PackagePaths<Paths, NamedAddress>>::new(),
-        flags,
-        known_attributes,
-    )
-    .set_interface_files_dir_opt(interface_files_dir_opt)
-    .run::<PASS_PARSER>()?;
+    let no_deps = Vec::<PackagePaths<Paths, NamedAddress>>::new();
+    let (files, pprog_and_comments_res) =
+        Compiler::from_package_paths(targets, &no_deps, flags, known_attributes, None)
+            .set_interface_files_dir_opt(interface_files_dir_opt)
+            .run::<PASS_PARSER>()?;
 
     let (_comments, stepped) = match pprog_and_comments_res {
         Err(errors) => return Ok(Err((files, errors))),

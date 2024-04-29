@@ -58,9 +58,7 @@ use move_binary_format::{
     CompiledModule,
 };
 use move_bytecode_source_map::{mapping::SourceMapping, source_map::SourceMap};
-use move_command_line_common::{
-    address::NumericalAddress, env::read_bool_env_var, files::FileHash,
-};
+use move_command_line_common::{address::NumericalAddress, files::FileHash};
 use move_compiler::command_line as cli;
 use move_core_types::{
     account_address::AccountAddress,
@@ -1389,6 +1387,7 @@ impl GlobalEnv {
         &mut self,
         loc: Loc,
         name: ModuleName,
+        package_name: Option<Symbol>,
         attributes: Vec<Attribute>,
         use_decls: Vec<UseDecl>,
         friend_decls: Vec<FriendDecl>,
@@ -1427,6 +1426,7 @@ impl GlobalEnv {
         self.module_data.push(ModuleData {
             name,
             id,
+            package_name,
             compiled_module: None,
             source_map: None,
             named_constants,
@@ -2472,6 +2472,9 @@ pub struct ModuleData {
     /// Id of this module in the global env.
     pub(crate) id: ModuleId,
 
+    /// Package name metadata from compiler arguments, not used for any language rules.
+    pub(crate) package_name: Option<Symbol>,
+
     /// Attributes attached to this module.
     attributes: Vec<Attribute>,
 
@@ -2553,6 +2556,17 @@ impl<'env> ModuleEnv<'env> {
     /// Returns true if either the full name or simple name of this module matches the given string
     pub fn matches_name(&self, name: &str) -> bool {
         self.get_full_name_str() == name || self.get_name().display(self.env).to_string() == name
+    }
+
+    /// Returns package_name as a string.
+    pub fn get_package_name(&self) -> Option<Symbol> {
+        self.data.package_name
+    }
+
+    /// Returns package_name as a string.
+    pub fn get_package_name_str(&self) -> Option<String> {
+        self.get_package_name()
+            .map(|name| name.display(self.env.symbol_pool()).to_string())
     }
 
     /// Returns the location of this module.

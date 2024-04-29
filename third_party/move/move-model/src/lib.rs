@@ -72,6 +72,7 @@ pub mod well_known;
 /// address mapping.
 #[derive(Debug, Clone)]
 pub struct PackageInfo {
+    pub name: Option<String>,
     pub sources: Vec<String>,
     pub address_map: BTreeMap<String, NumericalAddress>,
 }
@@ -92,14 +93,6 @@ pub fn run_model_builder_in_compiler_mode(
     language_version: LanguageVersion,
     compile_test_code: bool,
 ) -> anyhow::Result<GlobalEnv> {
-    let to_package_paths = |PackageInfo {
-                                sources,
-                                address_map,
-                            }| PackagePaths {
-        name: None,
-        paths: sources,
-        named_address_map: address_map,
-    };
     run_model_builder_with_options_and_compilation_flags(
         vec![to_package_paths(source)],
         vec![to_package_paths(source_deps)],
@@ -113,6 +106,7 @@ pub fn run_model_builder_in_compiler_mode(
             .set_skip_attribute_checks(skip_attribute_checks)
             .set_keep_testing_functions(compile_test_code),
         known_attributes,
+        extra_addrs,
     )
 }
 
@@ -140,6 +134,7 @@ pub fn run_model_builder_with_options<
         options,
         flags,
         known_attributes,
+        None,
     )
 }
 
@@ -154,6 +149,7 @@ pub fn run_model_builder_with_options_and_compilation_flags<
     options: ModelBuilderOptions,
     flags: Flags,
     known_attributes: &BTreeSet<String>,
+    extra_addrs: Option<&BTreeMap<String, NumericalAddress>>,
 ) -> anyhow::Result<GlobalEnv> {
     let mut env = GlobalEnv::new();
     env.set_language_version(options.language_version);
@@ -177,7 +173,7 @@ pub fn run_model_builder_with_options_and_compilation_flags<
 
     // Step 1: parse the program to get comments and a separation of targets and dependencies.
     let (files, comments_and_compiler_res) =
-        Compiler::from_package_paths(move_sources, deps, flags, known_attributes)
+        Compiler::from_package_paths(move_sources, deps, flags, known_attributes, extra_addrs)
             .run::<PASS_PARSER>()?;
     let (comment_map, compiler) = match comments_and_compiler_res {
         Err(diags) => {
@@ -419,16 +415,24 @@ fn run_move_checker(env: &mut GlobalEnv, program: E::Program) {
         );
         // Assign new module id in the model.
         let module_id = ModuleId::new(module_count);
+        let package_name = module_def
+            .package_name
+            .map(|package_name| builder.env.symbol_pool().make(package_name.as_str()));
         // Associate the module name with the module id for lookups.
         builder.module_table.insert(module_name.clone(), module_id);
-        let mut module_translator = ModuleBuilder::new(&mut builder, module_id, module_name);
+        let mut module_translator =
+            ModuleBuilder::new(&mut builder, module_id, module_name, package_name);
         module_translator.translate(loc, module_def, None);
     }
     for (i, (_, script_def)) in program.scripts.into_iter().enumerate() {
         let loc = builder.to_loc(&script_def.loc);
         let module_name = ModuleName::pseudo_script_name(builder.env.symbol_pool(), i);
         let module_id = ModuleId::new(builder.env.module_data.len());
-        let mut module_translator = ModuleBuilder::new(&mut builder, module_id, module_name);
+        let package_name = script_def
+            .package_name
+            .map(|package_name| builder.env.symbol_pool().make(package_name.as_str()));
+        let mut module_translator =
+            ModuleBuilder::new(&mut builder, module_id, module_name, package_name);
         let module_def = expansion_script_to_module(script_def);
         module_translator.translate(loc, module_def, None);
     }
@@ -767,7 +771,11 @@ fn run_spec_checker(env: &mut GlobalEnv, units: Vec<AnnotatedCompiledUnit>, mut 
                 .make(&module_id.value.module.0.value),
         );
         let module_id = ModuleId::new(module_count);
-        let mut module_translator = ModuleBuilder::new(&mut builder, module_id, module_name);
+        let package_name = expanded_module
+            .package_name
+            .map(|package_name| builder.env.symbol_pool().make(package_name.as_str()));
+        let mut module_translator =
+            ModuleBuilder::new(&mut builder, module_id, module_name, package_name);
         let compiled_module = BytecodeModule {
             compiled_module,
             source_map,

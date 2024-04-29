@@ -9,7 +9,9 @@ use crate::{
         taskify, InitCommand, PrintBytecodeCommand, PrintBytecodeInputChoice, PublishCommand,
         RunCommand, SyntaxChoice, TaskCommand, TaskInput, ViewCommand,
     },
-    vm_test_harness::{PrecompiledFilesModules, TestRunConfig},
+    vm_test_harness::{
+        move_stdlib_named_addresses_as_symbols, PrecompiledFilesModules, TestRunConfig,
+    },
 };
 use anyhow::{anyhow, Result};
 use clap::Parser;
@@ -810,8 +812,16 @@ fn compile_source_unit_v2(
     };
 
     let mut options = move_compiler_v2::Options {
-        sources: vec![path],
-        dependencies: deps.to_vec(),
+        packages: vec![PackagePaths {
+            name: None,
+            paths: vec![path.into()],
+            named_address_map: move_stdlib_named_addresses_as_symbols(),
+        }],
+        dependencies: vec![PackagePaths {
+            name: None,
+            paths: string_vec_to_symbol_vec(&deps),
+            named_address_map: move_stdlib_named_addresses_as_symbols(),
+        }],
         named_address_mapping: named_address_mapping
             .into_iter()
             .map(|(alias, addr)| format!("{}={}", alias, addr))

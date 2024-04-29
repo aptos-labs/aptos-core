@@ -340,10 +340,17 @@ static PRECOMPILED_APTOS_FRAMEWORK_V2: Lazy<PrecompiledFilesModules> = Lazy::new
         .map(|(string, num_addr)| format!("{}={}", string, num_addr))
         .collect();
 
+    let source_packages = vec![PackagePaths {
+        name: None,
+        paths: string_vec_to_symbol_vec(
+            &aptos_cached_packages::head_release_bundle()
+                .files()
+                .unwrap(),
+        ),
+        named_address_map: string_map_to_symbol_map(&aptos_framework::named_addresses()),
+    }];
     let options = move_compiler_v2::Options {
-        sources: aptos_cached_packages::head_release_bundle()
-            .files()
-            .unwrap(),
+        packages: source_packages,
         dependencies: vec![],
         named_address_mapping: named_address_mapping_strings,
         known_attributes: aptos_framework::extended_checks::get_all_attribute_names().clone(),

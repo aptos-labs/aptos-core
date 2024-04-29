@@ -444,7 +444,7 @@ impl CompiledPackage {
                 anyhow::format_err!(
                     "Unable to find module with name '{}' in package {}",
                     module_name,
-                    self.compiled_package_info.package_name
+                    self.compiled_package_info.package_name,
                 )
             })
     }
@@ -484,7 +484,7 @@ impl CompiledPackage {
                 anyhow::format_err!(
                     "Unable to find module with name '{}' in package {}",
                     module_name,
-                    self.compiled_package_info.package_name
+                    self.compiled_package_info.package_name,
                 )
             })
     }
@@ -670,6 +670,7 @@ impl CompiledPackage {
                                     , please use unique address aliases across dependencies",
                                     name, old, val, pack_name
                                 )
+                                }
                             }
                         }
                     }
