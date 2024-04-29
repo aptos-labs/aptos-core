@@ -364,9 +364,10 @@ impl VMRuntime {
         gas_meter: &mut impl GasMeter,
         extensions: &mut NativeContextExtensions,
     ) -> VMResult<SerializedReturnValues> {
+        let ty_builder = self.loader().ty_builder();
         let arg_types = param_types
             .into_iter()
-            .map(|ty| ty.subst(&ty_args))
+            .map(|ty| ty_builder.subst(&ty, &ty_args))
             .collect::<PartialVMResult<Vec<_>>>()
             .map_err(|err| err.finish(Location::Undefined))?;
         let mut_ref_args = arg_types
@@ -382,7 +383,7 @@ impl VMRuntime {
             .map_err(|e| e.finish(Location::Undefined))?;
         let return_types = return_types
             .into_iter()
-            .map(|ty| ty.subst(&ty_args))
+            .map(|ty| ty_builder.subst(&ty, &ty_args))
             .collect::<PartialVMResult<Vec<_>>>()
             .map_err(|err| err.finish(Location::Undefined))?;
 

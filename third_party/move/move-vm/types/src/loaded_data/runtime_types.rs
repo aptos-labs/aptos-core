@@ -25,15 +25,6 @@ use std::{
 };
 use triomphe::Arc as TriompheArc;
 
-/// Maximum depth of a fully-instantiated type, excluding field types of structs.
-#[cfg(not(test))]
-const MAX_INSTANTIATED_TYPE_DEPTH: usize = 256;
-
-/// Maximum number of nodes in a fully-instantiated type. This does not include
-/// field types of structs.
-#[cfg(not(test))]
-const MAX_INSTANTIATED_TYPE_NODE_COUNT: usize = 128;
-
 #[derive(PartialEq, Eq, PartialOrd, Ord, Hash, Clone, Debug)]
 /// A formula describing the value depth of a type, using (the depths of) the type parameters as inputs.
 ///
@@ -288,93 +279,6 @@ impl AbilityInfo {
 }
 
 impl Type {
-    fn clone_impl(&self, count: &mut usize, depth: usize) -> PartialVMResult<Type> {
-        self.apply_subst(|idx, _, _| Ok(Type::TyParam(idx)), count, depth)
-    }
-
-    fn apply_subst<F>(&self, subst: F, count: &mut usize, depth: usize) -> PartialVMResult<Type>
-    where
-        F: Fn(u16, &mut usize, usize) -> PartialVMResult<Type> + Copy,
-    {
-        if *count >= MAX_INSTANTIATED_TYPE_NODE_COUNT {
-            return Err(PartialVMError::new(StatusCode::TOO_MANY_TYPE_NODES));
-        }
-        if depth > MAX_INSTANTIATED_TYPE_DEPTH {
-            return Err(PartialVMError::new(StatusCode::VM_MAX_TYPE_DEPTH_REACHED));
-        }
-
-        *count += 1;
-        let res = match self {
-            Type::TyParam(idx) => {
-                // To avoid double-counting, revert counting the type parameter.
-                *count -= 1;
-                subst(*idx, count, depth)?
-            },
-            Type::Bool => Type::Bool,
-            Type::U8 => Type::U8,
-            Type::U16 => Type::U16,
-            Type::U32 => Type::U32,
-            Type::U64 => Type::U64,
-            Type::U128 => Type::U128,
-            Type::U256 => Type::U256,
-            Type::Address => Type::Address,
-            Type::Signer => Type::Signer,
-            Type::Vector(ty) => {
-                Type::Vector(TriompheArc::new(ty.apply_subst(subst, count, depth + 1)?))
-            },
-            Type::Reference(ty) => {
-                Type::Reference(Box::new(ty.apply_subst(subst, count, depth + 1)?))
-            },
-            Type::MutableReference(ty) => {
-                Type::MutableReference(Box::new(ty.apply_subst(subst, count, depth + 1)?))
-            },
-            Type::Struct { idx, ability } => Type::Struct {
-                idx: *idx,
-                ability: ability.clone(),
-            },
-            Type::StructInstantiation {
-                idx,
-                ty_args: instantiation,
-                ability,
-            } => {
-                let mut inst = vec![];
-                for ty in instantiation.iter() {
-                    inst.push(ty.apply_subst(subst, count, depth + 1)?)
-                }
-                Type::StructInstantiation {
-                    idx: *idx,
-                    ty_args: TriompheArc::new(inst),
-                    ability: ability.clone(),
-                }
-            },
-        };
-        Ok(res)
-    }
-
-    pub fn subst(&self, ty_args: &[Type]) -> PartialVMResult<Type> {
-        Ok(self.subst_impl(ty_args)?.0)
-    }
-
-    fn subst_impl(&self, ty_args: &[Type]) -> PartialVMResult<(Type, usize)> {
-        let mut count = 0;
-        let ty = self.apply_subst(
-            |idx, cnt, depth| match ty_args.get(idx as usize) {
-                Some(ty) => ty.clone_impl(cnt, depth),
-                None => Err(
-                    PartialVMError::new(StatusCode::UNKNOWN_INVARIANT_VIOLATION_ERROR)
-                        .with_message(format!(
-                            "type substitution failed: index out of bounds -- len {} got {}",
-                            ty_args.len(),
-                            idx
-                        )),
-                ),
-            },
-            &mut count,
-            1,
-        )?;
-        Ok((ty, count))
-    }
-
     pub fn check_vec_ref(&self, inner_ty: &Type, is_mut: bool) -> PartialVMResult<Type> {
         match self {
             Type::MutableReference(inner) => match &**inner {
@@ -635,6 +539,14 @@ impl TypeBuilder {
         }
     }
 
+    #[cfg(test)]
+    pub fn new_for_test() -> Self {
+        Self {
+            max_ty_size: 11,
+            max_ty_depth: 5,
+        }
+    }
+
     pub fn create_constant_ty(&self, const_tok: &SignatureToken) -> PartialVMResult<Type> {
         let mut count = 0;
         self.create_constant_ty_impl(const_tok, &mut count, 0)
@@ -688,13 +600,109 @@ impl TypeBuilder {
             },
         })
     }
-}
 
-// For tests, use smaller constants and ensure count is larger than depth.
-#[cfg(test)]
-const MAX_INSTANTIATED_TYPE_DEPTH: usize = 5;
-#[cfg(test)]
-const MAX_INSTANTIATED_TYPE_NODE_COUNT: usize = 11;
+    fn clone_impl(&self, ty: &Type, count: &mut usize, depth: usize) -> PartialVMResult<Type> {
+        self.apply_subst(ty, |idx, _, _| Ok(Type::TyParam(idx)), count, depth)
+    }
+
+    fn apply_subst<F>(
+        &self,
+        ty: &Type,
+        subst: F,
+        count: &mut usize,
+        depth: usize,
+    ) -> PartialVMResult<Type>
+    where
+        F: Fn(u16, &mut usize, usize) -> PartialVMResult<Type> + Copy,
+    {
+        use Type::*;
+
+        if *count >= self.max_ty_size {
+            return Err(PartialVMError::new(StatusCode::TOO_MANY_TYPE_NODES));
+        }
+        if depth > self.max_ty_depth {
+            return Err(PartialVMError::new(StatusCode::VM_MAX_TYPE_DEPTH_REACHED));
+        }
+
+        *count += 1;
+        let res = match ty {
+            TyParam(idx) => {
+                // To avoid double-counting, revert counting the type parameter.
+                *count -= 1;
+                subst(*idx, count, depth)?
+            },
+
+            Bool => Bool,
+            U8 => U8,
+            U16 => U16,
+            U32 => U32,
+            U64 => U64,
+            U128 => U128,
+            U256 => U256,
+            Address => Address,
+            Signer => Signer,
+            Vector(elem_ty) => {
+                let elem_ty = self.apply_subst(elem_ty, subst, count, depth + 1)?;
+                Vector(TriompheArc::new(elem_ty))
+            },
+            Reference(inner_ty) => {
+                let inner_ty = self.apply_subst(inner_ty, subst, count, depth + 1)?;
+                Reference(Box::new(inner_ty))
+            },
+            MutableReference(inner_ty) => {
+                let inner_ty = self.apply_subst(inner_ty, subst, count, depth + 1)?;
+                MutableReference(Box::new(inner_ty))
+            },
+            Struct { idx, ability } => Struct {
+                idx: *idx,
+                ability: ability.clone(),
+            },
+            StructInstantiation {
+                idx,
+                ty_args: non_instantiated_tys,
+                ability,
+            } => {
+                let mut instantiated_tys = vec![];
+                for non_instantiated_ty in non_instantiated_tys.iter() {
+                    let instantiated_ty =
+                        self.apply_subst(non_instantiated_ty, subst, count, depth + 1)?;
+                    instantiated_tys.push(instantiated_ty);
+                }
+                StructInstantiation {
+                    idx: *idx,
+                    ty_args: TriompheArc::new(instantiated_tys),
+                    ability: ability.clone(),
+                }
+            },
+        };
+        Ok(res)
+    }
+
+    fn subst_impl(&self, ty: &Type, ty_args: &[Type]) -> PartialVMResult<(Type, usize)> {
+        let mut count = 0;
+        let ty = self.apply_subst(
+            ty,
+            |idx, count, depth| match ty_args.get(idx as usize) {
+                Some(ty) => self.clone_impl(ty, count, depth),
+                None => Err(
+                    PartialVMError::new(StatusCode::UNKNOWN_INVARIANT_VIOLATION_ERROR)
+                        .with_message(format!(
+                            "Type substitution failed: there are {} type arguments and index {} is out of bounds",
+                            idx,
+                            ty_args.len()
+                        )),
+                ),
+            },
+            &mut count,
+            1,
+        )?;
+        Ok((ty, count))
+    }
+
+    pub fn subst(&self, ty: &Type, ty_args: &[Type]) -> PartialVMResult<Type> {
+        Ok(self.subst_impl(ty, ty_args)?.0)
+    }
+}
 
 #[cfg(test)]
 mod unit_tests {
@@ -743,6 +751,7 @@ mod unit_tests {
     fn test_num_nodes_in_subst() {
         use Type::*;
 
+        let ty_builder = TypeBuilder::new_for_test();
         let cases: Vec<(Type, Vec<Type>, usize)> = vec![
             (TyParam(0), vec![Bool], 1),
             (TyParam(0), vec![Vector(TriompheArc::new(Bool))], 2),
@@ -763,7 +772,7 @@ mod unit_tests {
         ];
 
         for (ty, ty_args, expected) in cases {
-            let num_nodes = ty.subst_impl(&ty_args).unwrap().1;
+            let num_nodes = ty_builder.subst_impl(&ty, &ty_args).unwrap().1;
             assert_eq!(num_nodes, expected);
             assert_eq!(ty.num_nodes_in_subst(&ty_args).unwrap(), expected);
         }
@@ -773,12 +782,14 @@ mod unit_tests {
     fn test_substitution_large_depth() {
         use Type::*;
 
+        let ty_builder = TypeBuilder::new_for_test();
+
         let ty = Vector(TriompheArc::new(Vector(TriompheArc::new(TyParam(0)))));
         let ty_arg = Vector(TriompheArc::new(Vector(TriompheArc::new(Bool))));
-        assert_ok!(ty.subst(&[ty_arg.clone()]));
+        assert_ok!(ty_builder.subst(&ty, &[ty_arg.clone()]));
 
         let ty_arg = Vector(TriompheArc::new(ty_arg));
-        let err = assert_err!(ty.subst(&[ty_arg]));
+        let err = assert_err!(ty_builder.subst(&ty, &[ty_arg]));
         assert_eq!(err.major_status(), StatusCode::VM_MAX_TYPE_DEPTH_REACHED);
     }
 
@@ -786,12 +797,14 @@ mod unit_tests {
     fn test_substitution_large_count() {
         use Type::*;
 
+        let ty_builder = TypeBuilder::new_for_test();
+
         let ty_params: Vec<Type> = (0..5).map(TyParam).collect();
         let ty = struct_inst_for_test(ty_params);
 
         // Each type argument contributes 2 nodes, so in total the count is 11.
         let ty_args: Vec<Type> = (0..5).map(|_| Vector(TriompheArc::new(Bool))).collect();
-        let count = assert_ok!(ty.subst_impl(&ty_args)).1;
+        let count = assert_ok!(ty_builder.subst_impl(&ty, &ty_args)).1;
         assert_eq!(count, 11);
 
         let ty_args: Vec<Type> = (0..5)
@@ -804,7 +817,7 @@ mod unit_tests {
                 }
             })
             .collect();
-        let err = assert_err!(ty.subst(&ty_args));
+        let err = assert_err!(ty_builder.subst(&ty, &ty_args));
         assert_eq!(err.major_status(), StatusCode::TOO_MANY_TYPE_NODES);
     }
 }

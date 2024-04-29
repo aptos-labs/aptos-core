@@ -1368,9 +1368,10 @@ impl<'a> Resolver<'a> {
             }
         }
 
+        let ty_builder = self.loader().ty_builder();
         let mut instantiation = vec![];
         for ty in &func_inst.instantiation {
-            instantiation.push(ty.subst(ty_args)?);
+            instantiation.push(ty_builder.subst(ty, ty_args)?);
         }
         Ok(instantiation)
     }
@@ -1400,6 +1401,7 @@ impl<'a> Resolver<'a> {
             BinaryType::Script(_) => unreachable!("Scripts cannot have type instructions"),
         };
 
+        let ty_builder = self.loader().ty_builder();
         let struct_ = &struct_inst.definition_struct_type;
         Ok(Type::StructInstantiation {
             idx: struct_.idx,
@@ -1407,7 +1409,7 @@ impl<'a> Resolver<'a> {
                 struct_inst
                     .instantiation
                     .iter()
-                    .map(|ty| ty.subst(ty_args))
+                    .map(|ty| ty_builder.subst(ty, ty_args))
                     .collect::<PartialVMResult<_>>()?,
             ),
             ability: AbilityInfo::generic_struct(
@@ -1438,14 +1440,17 @@ impl<'a> Resolver<'a> {
             BinaryType::Script(_) => unreachable!("Scripts cannot have type instructions"),
         };
 
+        let ty_builder = self.loader().ty_builder();
         let instantiation_types = field_instantiation
             .instantiation
             .iter()
-            .map(|inst_ty| inst_ty.subst(ty_args))
+            .map(|inst_ty| ty_builder.subst(inst_ty, ty_args))
             .collect::<PartialVMResult<Vec<_>>>()?;
 
-        field_instantiation.definition_struct_type.fields[field_instantiation.offset]
-            .subst(&instantiation_types)
+        ty_builder.subst(
+            &field_instantiation.definition_struct_type.fields[field_instantiation.offset],
+            &instantiation_types,
+        )
     }
 
     pub(crate) fn get_struct_fields(
@@ -1469,16 +1474,17 @@ impl<'a> Resolver<'a> {
         };
         let struct_type = &struct_inst.definition_struct_type;
 
+        let ty_builder = self.loader().ty_builder();
         let instantiation_types = struct_inst
             .instantiation
             .iter()
-            .map(|inst_ty| inst_ty.subst(ty_args))
+            .map(|inst_ty| ty_builder.subst(inst_ty, ty_args))
             .collect::<PartialVMResult<Vec<_>>>()?;
 
         struct_type
             .fields
             .iter()
-            .map(|ty| ty.subst(&instantiation_types))
+            .map(|inst_ty| ty_builder.subst(inst_ty, &instantiation_types))
             .collect::<PartialVMResult<Vec<_>>>()
     }
 
@@ -1497,7 +1503,8 @@ impl<'a> Resolver<'a> {
         let ty = self.single_type_at(idx);
 
         if !ty_args.is_empty() {
-            ty.subst(ty_args)
+            let ty_builder = self.loader().ty_builder();
+            ty_builder.subst(ty, ty_args)
         } else {
             Ok(ty.clone())
         }
@@ -1551,26 +1558,26 @@ impl<'a> Resolver<'a> {
     pub(crate) fn field_instantiation_to_struct(
         &self,
         idx: FieldInstantiationIndex,
-        args: &[Type],
+        ty_args: &[Type],
     ) -> PartialVMResult<Type> {
         match &self.binary {
             BinaryType::Module(module) => {
                 let field_inst = &module.field_instantiations[idx.0 as usize];
+                let struct_ty = &field_inst.definition_struct_type;
 
-                let struct_ = &field_inst.definition_struct_type;
-
+                let ty_builder = self.loader().ty_builder();
                 Ok(Type::StructInstantiation {
-                    idx: struct_.idx,
+                    idx: struct_ty.idx,
                     ty_args: triomphe::Arc::new(
                         field_inst
                             .instantiation
                             .iter()
-                            .map(|ty| ty.subst(args))
+                            .map(|ty| ty_builder.subst(ty, ty_args))
                             .collect::<PartialVMResult<Vec<_>>>()?,
                     ),
                     ability: AbilityInfo::generic_struct(
-                        struct_.abilities,
-                        struct_.phantom_ty_args_mask.clone(),
+                        struct_ty.abilities,
+                        struct_ty.phantom_ty_args_mask.clone(),
                     ),
                 })
             },
@@ -1790,10 +1797,11 @@ impl Loader {
         // times. Right now these are Aggregator and AggregatorSnapshot.
         let maybe_mapping = self.get_identifier_mapping_kind(name);
 
+        let ty_builder = self.ty_builder();
         let field_tys = struct_type
             .fields
             .iter()
-            .map(|ty| ty.subst(ty_args))
+            .map(|ty| ty_builder.subst(ty, ty_args))
             .collect::<PartialVMResult<Vec<_>>>()?;
         let (mut field_layouts, field_has_identifier_mappings): (Vec<MoveTypeLayout>, Vec<bool>) =
             field_tys
@@ -2000,12 +2008,14 @@ impl Loader {
             cost_per_byte: self.vm_config.type_byte_cost,
         };
         let struct_tag = self.struct_name_to_type_tag(struct_idx, ty_args, &mut gas_context)?;
+
+        let ty_builder = self.ty_builder();
         let field_layouts = struct_type
             .field_names
             .iter()
             .zip(&struct_type.fields)
             .map(|(n, ty)| {
-                let ty = ty.subst(ty_args)?;
+                let ty = ty_builder.subst(ty, ty_args)?;
                 let l =
                     self.type_to_fully_annotated_layout_impl(&ty, module_store, count, depth)?;
                 Ok(MoveFieldLayout::new(n.clone(), l))

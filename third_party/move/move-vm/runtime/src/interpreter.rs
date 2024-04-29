@@ -140,7 +140,7 @@ impl Interpreter {
         }
 
         let mut current_frame = self
-            .make_new_frame(gas_meter, function, ty_args, locals)
+            .make_new_frame(loader, gas_meter, function, ty_args, locals)
             .map_err(|err| self.set_location(err))?;
         // Access control for the new frame.
         self.access_control
@@ -324,6 +324,7 @@ impl Interpreter {
         let arg_count = func.arg_count();
         let is_generic = !ty_args.is_empty();
 
+        let ty_builder = loader.ty_builder();
         for i in 0..arg_count {
             locals.store_loc(
                 arg_count - i - 1,
@@ -336,14 +337,16 @@ impl Interpreter {
             if self.paranoid_type_checks {
                 let ty = self.operand_stack.pop_ty()?;
                 if is_generic {
-                    ty.check_eq(&func.local_types()[arg_count - i - 1].subst(&ty_args)?)?;
+                    ty.check_eq(
+                        &ty_builder.subst(&func.local_types()[arg_count - i - 1], &ty_args)?,
+                    )?;
                 } else {
                     // Directly check against the expected type to save a clone here.
                     ty.check_eq(&func.local_types()[arg_count - i - 1])?;
                 }
             }
         }
-        self.make_new_frame(gas_meter, func, ty_args, locals)
+        self.make_new_frame(loader, gas_meter, func, ty_args, locals)
     }
 
     /// Create a new `Frame` given a `Function` and the function `Locals`.
@@ -351,6 +354,7 @@ impl Interpreter {
     /// The locals must be loaded before calling this.
     fn make_new_frame(
         &self,
+        loader: &Loader,
         gas_meter: &mut impl GasMeter,
         function: Arc<Function>,
         ty_args: Vec<Type>,
@@ -365,10 +369,11 @@ impl Interpreter {
             if ty_args.is_empty() {
                 function.local_types().to_vec()
             } else {
+                let ty_builder = loader.ty_builder();
                 function
                     .local_types()
                     .iter()
-                    .map(|ty| ty.subst(&ty_args))
+                    .map(|ty| ty_builder.subst(ty, &ty_args))
                     .collect::<PartialVMResult<Vec<_>>>()?
             }
         } else {
@@ -438,9 +443,10 @@ impl Interpreter {
         }
 
         if self.paranoid_type_checks {
+            let ty_builder = resolver.loader().ty_builder();
             for i in 0..expected_args {
-                let expected_ty =
-                    function.parameter_types()[expected_args - i - 1].subst(&ty_args)?;
+                let expected_ty = ty_builder
+                    .subst(&function.parameter_types()[expected_args - i - 1], &ty_args)?;
                 let ty = self.operand_stack.pop_ty()?;
                 ty.check_eq(&expected_ty)?;
             }
@@ -509,8 +515,10 @@ impl Interpreter {
         }
 
         if self.paranoid_type_checks {
+            let ty_builder = resolver.loader().ty_builder();
             for ty in function.return_types() {
-                self.operand_stack.push_ty(ty.subst(&ty_args)?)?;
+                self.operand_stack
+                    .push_ty(ty_builder.subst(ty, &ty_args)?)?;
             }
         }
         Ok(())
