@@ -197,7 +197,7 @@ impl<'a> TransferFunctions for CopyDropAnalysis<'a> {
                         srcs.iter().cloned().zip(
                             self.target
                                 .data
-                                .src_locations
+                                .src_attrs
                                 .get(id)
                                 .unwrap()
                                 .iter()
@@ -309,7 +309,7 @@ impl<'a> Transformer<'a> {
                 use Operation::*;
                 match &op {
                     Function(..) => {
-                        let srcs_ids = self.builder.data.src_locations.get(&id).expect("src ids");
+                        let srcs_ids = self.builder.data.src_attrs.get(&id).expect("src ids");
                         let srcs = srcs.into_iter().zip(srcs_ids.iter().cloned()).collect();
                         let new_srcs = self.copy_args_if_needed(code_offset, id, srcs);
                         self.check_and_emit_bytecode(code_offset, Call(id, dests, op, new_srcs, ai))
@@ -602,7 +602,7 @@ impl<'a> Transformer<'a> {
         *self
             .builder
             .data
-            .src_locations
+            .src_attrs
             .get(&bytecode_id)
             .expect("src locations")
             .get(i)

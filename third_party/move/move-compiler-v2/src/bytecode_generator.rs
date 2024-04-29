@@ -77,7 +77,7 @@ pub fn generate_bytecode(env: &GlobalEnv, fid: QualifiedId<FunId>) -> FunctionDa
         // Need to clone expression if present because of sharing issues with `gen`. However, because
         // of interning, clone is cheap.
         gen.gen(results.clone(), vec![result_node_id; results.len()], &def);
-        let target_nodes = Vec::new();
+        let target_nodes = vec![];
         let src_nodes = vec![result_node_id; results.len()];
         gen.emit_with(def.result_node_id(), target_nodes, src_nodes, |attr| {
             Bytecode::Ret(attr, results)
@@ -185,7 +185,8 @@ impl<'env> Generator<'env> {
         self.code.push(b)
     }
 
-    /// Emit bytecode with attribute derived from node_id.
+    /// Emit bytecode with attribute derived from `id`,
+    /// and target and source attribute ids derived from `target_node_ids` and `source_node_ids`.
     fn emit_with(
         &mut self,
         id: NodeId,
@@ -208,8 +209,9 @@ impl<'env> Generator<'env> {
         self.emit(bytecode)
     }
 
-    /// Emit bytecode with attribute derived from node_id.
-    fn emit_without_target_src_ids(&mut self, id: NodeId, mk: impl FnOnce(AttrId) -> Bytecode) {
+    /// Emit bytecode with attribute derived from `id`.
+    /// The bytecode should not have any target or source temporaries.
+    fn emit_with_no_arg_id(&mut self, id: NodeId, mk: impl FnOnce(AttrId) -> Bytecode) {
         self.emit_with(id, Vec::new(), Vec::new(), mk)
     }
 
@@ -475,13 +477,13 @@ impl<'env> Generator<'env> {
                     Bytecode::Branch(attr, then_label, else_label, cond_temp)
                 });
                 let then_id = then_exp.node_id();
-                self.emit_without_target_src_ids(then_id, |attr| Bytecode::Label(attr, then_label));
+                self.emit_with_no_arg_id(then_id, |attr| Bytecode::Label(attr, then_label));
                 self.gen(targets.clone(), target_node_ids.clone(), then_exp);
-                self.emit_without_target_src_ids(then_id, |attr| Bytecode::Jump(attr, end_label));
+                self.emit_with_no_arg_id(then_id, |attr| Bytecode::Jump(attr, end_label));
                 let else_id = else_exp.node_id();
-                self.emit_without_target_src_ids(else_id, |attr| Bytecode::Label(attr, else_label));
+                self.emit_with_no_arg_id(else_id, |attr| Bytecode::Label(attr, else_label));
                 self.gen(targets, target_node_ids, else_exp);
-                self.emit_without_target_src_ids(else_id, |attr| Bytecode::Label(attr, end_label));
+                self.emit_with_no_arg_id(else_id, |attr| Bytecode::Label(attr, end_label));
             },
             ExpData::Loop(id, body) => {
                 let continue_label = self.new_label(*id);
@@ -490,11 +492,11 @@ impl<'env> Generator<'env> {
                     continue_label,
                     break_label,
                 });
-                self.emit_without_target_src_ids(*id, |attr| Bytecode::Label(attr, continue_label));
+                self.emit_with_no_arg_id(*id, |attr| Bytecode::Label(attr, continue_label));
                 self.gen(vec![], Vec::new(), body);
                 self.loops.pop();
-                self.emit_without_target_src_ids(*id, |attr| Bytecode::Jump(attr, continue_label));
-                self.emit_without_target_src_ids(*id, |attr| Bytecode::Label(attr, break_label));
+                self.emit_with_no_arg_id(*id, |attr| Bytecode::Jump(attr, continue_label));
+                self.emit_with_no_arg_id(*id, |attr| Bytecode::Label(attr, break_label));
             },
             ExpData::LoopCont(id, do_continue) => {
                 if let Some(LoopContext {
@@ -507,7 +509,7 @@ impl<'env> Generator<'env> {
                     } else {
                         *break_label
                     };
-                    self.emit_without_target_src_ids(*id, |attr| Bytecode::Jump(attr, target))
+                    self.emit_with_no_arg_id(*id, |attr| Bytecode::Jump(attr, target))
                 } else {
                     self.error(*id, "missing enclosing loop statement")
                 }
@@ -523,7 +525,7 @@ impl<'env> Generator<'env> {
                 };
                 let (_, spec) = ExpRewriter::new(self.env(), &mut replacer)
                     .rewrite_spec_descent(&SpecBlockTarget::Inline, spec);
-                self.emit_without_target_src_ids(*id, |attr| Bytecode::SpecBlock(attr, spec));
+                self.emit_with_no_arg_id(*id, |attr| Bytecode::SpecBlock(attr, spec));
             },
             ExpData::Invoke(id, _, _) | ExpData::Lambda(id, _, _) => {
                 self.internal_error(*id, format!("not yet implemented: {:?}", exp))
@@ -1004,7 +1006,7 @@ impl<'env> Generator<'env> {
         self.emit_with(id, Vec::new(), vec![args[0].node_id()], |attr| {
             Bytecode::Branch(attr, true_label, false_label, arg1)
         });
-        self.emit_without_target_src_ids(id, |attr| Bytecode::Label(attr, true_label));
+        self.emit_with_no_arg_id(id, |attr| Bytecode::Label(attr, true_label));
         if is_and {
             self.gen(vec![target], targets_node_ids.clone(), &args[1]);
         } else {
@@ -1012,8 +1014,8 @@ impl<'env> Generator<'env> {
                 Bytecode::Load(attr, target, Constant::Bool(true))
             })
         }
-        self.emit_without_target_src_ids(id, |attr| Bytecode::Jump(attr, done_label));
-        self.emit_without_target_src_ids(id, |attr| Bytecode::Label(attr, false_label));
+        self.emit_with_no_arg_id(id, |attr| Bytecode::Jump(attr, done_label));
+        self.emit_with_no_arg_id(id, |attr| Bytecode::Label(attr, false_label));
         if is_and {
             self.emit_with(id, targets_node_ids.clone(), vec![id], |attr| {
                 Bytecode::Load(attr, target, Constant::Bool(false))
@@ -1021,7 +1023,7 @@ impl<'env> Generator<'env> {
         } else {
             self.gen(vec![target], targets_node_ids, &args[1]);
         }
-        self.emit_without_target_src_ids(id, |attr| Bytecode::Label(attr, done_label));
+        self.emit_with_no_arg_id(id, |attr| Bytecode::Label(attr, done_label));
     }
 
     fn gen_function_call(

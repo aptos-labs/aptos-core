@@ -91,9 +91,9 @@ pub struct FunctionData {
     /// A map for temporaries to associated name, if available.
     pub local_names: BTreeMap<TempIndex, Symbol>,
     /// Maps the attribute id of a bytecode to the ids of the source temporaries.
-    pub target_locations: BTreeMap<AttrId, Vec<AttrId>>,
+    pub target_attrs: BTreeMap<AttrId, Vec<AttrId>>,
     /// Maps the attribute id of a bytecode to the ids of the source temporaries.
-    pub src_locations: BTreeMap<AttrId, Vec<AttrId>>,
+    pub src_attrs: BTreeMap<AttrId, Vec<AttrId>>,
 }
 
 impl<'env> FunctionTarget<'env> {
@@ -502,8 +502,8 @@ impl FunctionData {
         loop_unrolling: BTreeMap<AttrId, usize>,
         loop_invariants: BTreeSet<AttrId>,
         local_names: BTreeMap<TempIndex, Symbol>,
-        target_locations: BTreeMap<AttrId, Vec<AttrId>>,
-        src_locations: BTreeMap<AttrId, Vec<AttrId>>,
+        target_attrs: BTreeMap<AttrId, Vec<AttrId>>,
+        src_attrs: BTreeMap<AttrId, Vec<AttrId>>,
     ) -> Self {
         let modify_targets = func_env.get_modify_targets();
         FunctionData {
@@ -523,8 +523,8 @@ impl FunctionData {
             modify_targets,
             ghost_type_param_count: 0,
             local_names,
-            target_locations,
-            src_locations,
+            target_attrs,
+            src_attrs,
         }
     }
 
