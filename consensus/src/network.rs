@@ -312,7 +312,9 @@ impl NetworkSender {
             let self_msg = Event::RpcRequest(receiver, msg.clone(), RPC[0], tx, Instant::now());
             self.self_sender.clone().send(self_msg).await?;
             if let Ok(Ok(Ok(bytes))) = timeout(timeout_duration, rx).await {
-                Ok(protocol.from_bytes(&bytes)?)
+                let res_msg =
+                    tokio::task::spawn_blocking(move || protocol.from_bytes(&bytes)).await??;
+                Ok(res_msg)
             } else {
                 bail!("self rpc failed");
             }
@@ -579,7 +581,8 @@ impl TDAGNetworkSender for NetworkSender {
         message: DAGMessage,
         timeout: Duration,
     ) -> anyhow::Result<DAGRpcResult> {
-        self.send_rpc(receiver, message.into_network_message(), timeout)
+        let req_data = tokio::task::spawn_blocking(move || message.into_network_message()).await?;
+        self.send_rpc(receiver, req_data, timeout)
             .await
             .map_err(|e| anyhow!("invalid rpc response: {}", e))
             .and_then(TConsensusMsg::from_network_message)
@@ -619,10 +622,12 @@ impl<Req: TConsensusMsg + RBMessage + 'static, Res: TConsensusMsg + RBMessage + 
         message: Req,
         timeout: Duration,
     ) -> anyhow::Result<Res> {
-        self.send_rpc(receiver, message.into_network_message(), timeout)
+        let req_data = tokio::task::spawn_blocking(move || message.into_network_message()).await?;
+        let res = self
+            .send_rpc(receiver, req_data, timeout)
             .await
-            .map_err(|e| anyhow!("invalid rpc response: {}", e))
-            .and_then(TConsensusMsg::from_network_message)
+            .map_err(|e| anyhow!("invalid rpc response: {}", e))?;
+        tokio::task::spawn_blocking(move || TConsensusMsg::from_network_message(res)).await?
     }
 }
 
