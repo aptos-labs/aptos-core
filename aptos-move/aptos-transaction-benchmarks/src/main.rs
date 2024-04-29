@@ -34,11 +34,7 @@ enum BenchmarkCommand {
 
 #[derive(Debug, Parser)]
 struct ParamSweepOpt {
-<<<<<<< HEAD
     #[clap(long, default_value = "1000")]
-=======
-    #[clap(long, default_value = "100")]
->>>>>>> 98468b5de5 (change threadgarage generation)
     pub num_accounts: Vec<usize>,
 
     #[clap(long)]
@@ -96,11 +92,7 @@ struct ExecuteOpt {
 fn param_sweep(opt: ParamSweepOpt) {
     disable_speculative_logging();
 
-<<<<<<< HEAD
     let block_sizes = opt.block_sizes.unwrap_or_else(|| vec![10000]);
-=======
-    let block_sizes = opt.block_sizes.unwrap_or_else(|| vec![1000, 10000]);
->>>>>>> 98468b5de5 (change threadgarage generation)
     let concurrency_level = num_cpus::get();
 
     let bencher = TransactionBencher::new(any_with::<P2PTransferGen>((1_000, 1_000_000)));
