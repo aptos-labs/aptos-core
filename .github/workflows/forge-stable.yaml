@@ -8,9 +8,9 @@ permissions:
   id-token: write
   actions: write #required for workflow cancellation via check-aptos-core
 
-concurrency:
-  group: forge-stable-${{ github.ref_name }}
-  cancel-in-progress: true
+# concurrency:
+#   group: forge-stable-${{ github.ref_name }}
+#   cancel-in-progress: true
 
 on:
   # Allow triggering manually
@@ -122,7 +122,7 @@ jobs:
   ### Real-world-network tests.
   # Run forge framework upgradability test. This is a PR required job.
   run-forge-framework-upgrade-test:
-    if: ${{ github.event_name != 'pull_request' }}
+    # if: ${{ github.event_name != 'pull_request' }}
     needs:
       - determine-test-metadata
     uses: aptos-labs/aptos-core/.github/workflows/workflow-run-forge.yaml@main
