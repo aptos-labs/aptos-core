@@ -113,23 +113,20 @@ where
     {
         const MAX_TRIES: usize = 1024;
 
-        // generate the entry content outside the lock
-        let deserialized = inner_gen()?;
-
         for _ in 0..MAX_TRIES {
             let mut locked = self.inner.write();
 
             match locked.get_mut(key1) {
                 None => {
                     let mut map2 = locked.entry(key1.to_owned()).insert(HashMap::new());
-                    let entry = Arc::new(Entry::new(deserialized)?);
+                    let entry = Arc::new(Entry::new(inner_gen()?)?);
                     map2.get_mut()
                         .insert(key2.to_owned(), Arc::downgrade(&entry));
                     return Ok(entry);
                 },
                 Some(map2) => match map2.get(key2) {
                     None => {
-                        let entry = Arc::new(Entry::new(deserialized)?);
+                        let entry = Arc::new(Entry::new(inner_gen()?)?);
                         map2.insert(key2.to_owned(), Arc::downgrade(&entry));
                         return Ok(entry);
                     },
