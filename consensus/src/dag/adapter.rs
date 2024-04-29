@@ -185,16 +185,19 @@ impl OrderedNotifier for OrderedNotifierAdapter {
     ) {
         {
             let anchor_round = ordered_nodes.last().unwrap().round();
-            if let Some(last) = self.buffer.lock().last() {
-                if last.round() == anchor_round {
+            let last = self.buffer.lock().last().cloned();
+            if anchor_round > 100 {
+                if let Some(last) = last {
+                    if last.round() == anchor_round {
+                        self.buffer.lock().append(&mut ordered_nodes);
+                        return;
+                    } else {
+                        mem::swap(&mut *self.buffer.lock(), &mut ordered_nodes);
+                    }
+                } else {
                     self.buffer.lock().append(&mut ordered_nodes);
                     return;
-                } else {
-                    mem::swap(&mut *self.buffer.lock(), &mut ordered_nodes);
                 }
-            } else {
-                self.buffer.lock().append(&mut ordered_nodes);
-                return;
             }
         }
 
