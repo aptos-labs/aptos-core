@@ -145,7 +145,7 @@ template ParseEmailVerifiedField(maxKVPairLen, maxNameLen, maxValueLen) {
     signal char_before_value <== SelectArrayValue(maxKVPairLen)(field, value_index-1);
     signal before_is_quote      <== IsEqual()([char_before_value, 34]);
     signal before_is_whitespace <== isWhitespace()(char_before_value);
-    signal before_is_whitespace_or_quote<== OR()(before_is_quote, before_is_whitespace);
+    signal before_is_whitespace_or_quote <== OR()(before_is_quote, before_is_whitespace);
     // Check the char before is either quote or whitespace, OR that it is the colon
     (1 - before_is_whitespace_or_quote)*(value_index-1-colon_index) === 0;
     signal char_after_value <== SelectArrayValue(maxKVPairLen)(field, value_index+value_len);
