@@ -21,8 +21,11 @@ static DELEGATION_POOL_GET_STAKE_FUNCTION: Lazy<EntryFunctionId> =
     Lazy::new(|| "0x1::delegation_pool::get_stake".parse().unwrap());
 static STAKE_GET_LOCKUP_SECS_FUNCTION: Lazy<EntryFunctionId> =
     Lazy::new(|| "0x1::stake::get_lockup_secs".parse().unwrap());
-static STAKING_CONTRACT_AMOUNTS_FUNCTION: Lazy<EntryFunctionId> =
-    Lazy::new(|| "0x1::staking_contract::staking_contract_amounts".parse().unwrap());
+static STAKING_CONTRACT_AMOUNTS_FUNCTION: Lazy<EntryFunctionId> = Lazy::new(|| {
+    "0x1::staking_contract::staking_contract_amounts"
+        .parse()
+        .unwrap()
+});
 
 /// Errors that can be returned by the API
 ///
@@ -319,9 +322,8 @@ pub async fn get_stake_balances(
                 Some(version),
             )
             .await?;
-        let commission_not_yet_unlocked = parse_commission_not_yet_unlocked(
-            staking_contract_amounts_response.into_inner()
-        );
+        let commission_not_yet_unlocked =
+            parse_commission_not_yet_unlocked(staking_contract_amounts_response.into_inner());
 
         // see the get_staking_contract_amounts_internal function in staking_contract.move for more
         // information on why commission is only subtracted from active and total stake
@@ -339,7 +341,9 @@ pub async fn get_stake_balances(
             requested_balance = Some(stake_pool.pending_inactive.to_string());
         } else if owner_account.is_total_stake() {
             // total stake includes commission since it includes active stake, which includes commission
-            requested_balance = Some((stake_pool.get_total_staked_amount() - commission_not_yet_unlocked).to_string());
+            requested_balance = Some(
+                (stake_pool.get_total_staked_amount() - commission_not_yet_unlocked).to_string(),
+            );
         }
 
         if let Some(balance) = requested_balance {
@@ -545,6 +549,9 @@ mod test {
             serde_json::Value::String("456".to_string()),
             serde_json::Value::String("789".to_string()),
         ];
-        assert_eq!(789, parse_commission_not_yet_unlocked(commission_not_yet_unlocked));
+        assert_eq!(
+            789,
+            parse_commission_not_yet_unlocked(commission_not_yet_unlocked)
+        );
     }
 }
