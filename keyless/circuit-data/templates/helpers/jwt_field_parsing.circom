@@ -11,7 +11,6 @@ template ParseJWTFieldSharedLogic(maxKVPairLen, maxNameLen, maxValueLen) {
     signal input field[maxKVPairLen]; // ASCII
     signal input name[maxNameLen];
     signal input value[maxValueLen];
-    signal input field_string_bodies[maxKVPairLen];
     signal input field_len; // ASCII
     signal input name_len;
     signal input value_index; // index of value within `field`
@@ -79,9 +78,6 @@ template ParseJWTFieldWithQuotedValue(maxKVPairLen, maxNameLen, maxValueLen) {
     signal name_selector[maxKVPairLen] <== ArraySelector(maxKVPairLen)(1, name_len+1);
     signal value_selector[maxKVPairLen] <== ArraySelector(maxKVPairLen)(value_index, value_index+value_len);
 
-
-    signal name_selector[maxKVPairLen] <== ArraySelector(maxKVPairLen)(1, name_len+1);
-    signal value_selector[maxKVPairLen] <== ArraySelector(maxKVPairLen)(value_index, value_index+value_len);
 
     for (var i = 0; i < maxKVPairLen; i++) {
         (whitespace_selector_one[i] + whitespace_selector_two[i] + whitespace_selector_three[i]) * (1 - is_whitespace[i]) === 0;
