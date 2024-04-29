@@ -9,6 +9,7 @@ module aptos_framework::reconfiguration_with_dkg {
     use aptos_framework::jwk_consensus_config;
     use aptos_framework::jwks;
     use aptos_framework::keyless_account;
+    use aptos_framework::randomness_api_v0_config;
     use aptos_framework::randomness_config;
     use aptos_framework::randomness_config_seqnum;
     use aptos_framework::reconfiguration;
@@ -51,6 +52,7 @@ module aptos_framework::reconfiguration_with_dkg {
         jwks::on_new_epoch();
         randomness_config_seqnum::on_new_epoch();
         randomness_config::on_new_epoch();
+        randomness_api_v0_config::on_new_epoch(account);
         keyless_account::on_new_epoch(account);
         features::on_new_epoch(account);
         reconfiguration::reconfigure();
