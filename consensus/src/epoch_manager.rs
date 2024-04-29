@@ -1770,3 +1770,4 @@ enum NoRandomnessReason {
     KeyPairSerializationError(bcs::Error),
     KeyPairPersistError(anyhow::Error),
 }
+
