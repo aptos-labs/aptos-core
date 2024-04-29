@@ -134,33 +134,6 @@ impl BlockStore {
         Ok(())
     }
 
-    // TODO: Update this
-    // pub async fn insert_wrapped_ledger_info(
-    //     &self,
-    //     qc: &WrappedLedgerInfo,
-    //     retriever: &mut BlockRetriever,
-    // ) -> anyhow::Result<()> {
-    //     match self.need_fetch_for_quorum_cert(qc) {
-    //         NeedFetchResult::NeedFetch => self.fetch_quorum_cert(qc.clone(), retriever).await?,
-    //         NeedFetchResult::QCBlockExist => self.insert_single_quorum_cert(qc.clone())?,
-    //         NeedFetchResult::QCAlreadyExist => return Ok(()),
-    //         _ => (),
-    //     }
-    //     if self.ordered_root().round() < qc.commit_info().round() {
-    //         self.send_for_execution(qc.clone()).await?;
-    //         if qc.ends_epoch() {
-    //             retriever
-    //                 .network
-    //                 .broadcast_epoch_change(EpochChangeProof::new(
-    //                     vec![qc.ledger_info().clone()],
-    //                     /* more = */ false,
-    //                 ))
-    //                 .await;
-    //         }
-    //     }
-    //     Ok(())
-    // }
-
     /// Insert the quorum certificate separately from the block, used to split the processing of
     /// updating the consensus state(with qc) and deciding whether to vote(with block)
     /// The missing ancestors are going to be retrieved from the given peer. If a given peer
@@ -262,7 +235,7 @@ impl BlockStore {
         // although unlikely, we might wrap num_blocks around on a 32-bit machine
         assert!(num_blocks < std::usize::MAX as u64);
 
-        let mut blocks = retriever
+        let blocks = retriever
             .retrieve_block_for_qc(
                 highest_quorum_cert,
                 num_blocks,
@@ -296,41 +269,41 @@ impl BlockStore {
 
         // check if highest_commit_cert comes from a fork
         // if so, we need to fetch it's block as well, to have a proof of commit.
-        if !blocks
-            .iter()
-            .any(|block| block.id() == highest_commit_cert.certified_block().id())
-        {
-            info!(
-                "Found forked QC {}, fetching it as well",
-                highest_commit_cert
-            );
-            let mut additional_blocks = retriever
-                .retrieve_block_for_qc(
-                    &QuorumCert::new(
-                        highest_commit_cert.vote_data().clone(),
-                        highest_commit_cert.ledger_info().clone(),
-                    ),
-                    1,
-                    highest_commit_cert.certified_block().id(),
-                )
-                .await?;
+        // if !blocks
+        //     .iter()
+        //     .any(|block| block.id() == highest_commit_cert.certified_block().id())
+        // {
+        //     info!(
+        //         "Found forked QC {}, fetching it as well",
+        //         highest_commit_cert
+        //     );
+        //     let mut additional_blocks = retriever
+        //         .retrieve_block_for_qc(
+        //             &QuorumCert::new(
+        //                 highest_commit_cert.vote_data().clone(),
+        //                 highest_commit_cert.ledger_info().clone(),
+        //             ),
+        //             1,
+        //             highest_commit_cert.certified_block().id(),
+        //         )
+        //         .await?;
 
-            assert_eq!(additional_blocks.len(), 1);
-            let block = additional_blocks.pop().expect("blocks are empty");
-            assert_eq!(
-                block.id(),
-                highest_commit_cert.certified_block().id(),
-                "Expecting in the retrieval response, for commit certificate fork, first block should be {}, but got {}",
-                highest_commit_cert.certified_block().id(),
-                block.id(),
-            );
+        //     assert_eq!(additional_blocks.len(), 1);
+        //     let block = additional_blocks.pop().expect("blocks are empty");
+        //     assert_eq!(
+        //         block.id(),
+        //         highest_commit_cert.certified_block().id(),
+        //         "Expecting in the retrieval response, for commit certificate fork, first block should be {}, but got {}",
+        //         highest_commit_cert.certified_block().id(),
+        //         block.id(),
+        //     );
 
-            blocks.push(block);
-            quorum_certs.push(QuorumCert::new(
-                highest_commit_cert.vote_data().clone(),
-                highest_commit_cert.ledger_info().clone(),
-            ));
-        }
+        //     blocks.push(block);
+        //     quorum_certs.push(QuorumCert::new(
+        //         highest_commit_cert.vote_data().clone(),
+        //         highest_commit_cert.ledger_info().clone(),
+        //     ));
+        // }
 
         assert_eq!(blocks.len(), quorum_certs.len());
         for (i, block) in blocks.iter().enumerate() {

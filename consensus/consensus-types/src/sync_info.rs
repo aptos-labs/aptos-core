@@ -124,9 +124,9 @@ impl SyncInfo {
     }
 
     pub fn verify(&self, validator: &ValidatorVerifier) -> anyhow::Result<()> {
-        let epoch = self.highest_quorum_cert.certified_block().epoch();
+        let epoch = self.highest_quorum_cert.commit_info().epoch();
         ensure!(
-            epoch == self.highest_ordered_cert().certified_block().epoch(),
+            epoch == self.highest_ordered_cert().commit_info().epoch(),
             "Multi epoch in SyncInfo - HOC and HQC"
         );
         ensure!(
@@ -139,12 +139,12 @@ impl SyncInfo {
 
         ensure!(
             self.highest_quorum_cert.certified_block().round()
-                >= self.highest_ordered_cert().certified_block().round(),
+                >= self.highest_ordered_cert().commit_info().round(),
             "HQC has lower round than HOC"
         );
 
         ensure!(
-            self.highest_ordered_cert().certified_block().round() >= self.highest_commit_round(),
+            self.highest_ordered_round() >= self.highest_commit_round(),
             "HOC has lower round than HLI"
         );
 
