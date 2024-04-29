@@ -847,13 +847,11 @@ impl RoundManager {
         if let Some(fast_config) = &self.fast_rand_config {
             let ledger_info = vote.ledger_info();
             if !ledger_info.is_dummy() {
-                let metadata: RandMetadata = RandMetadata::new(
-                    ledger_info.epoch(),
-                    ledger_info.round(),
-                    ledger_info.consensus_block_id(),
-                    ledger_info.timestamp_usecs(),
-                );
-                let self_share = Share::generate(fast_config, metadata.clone());
+                let metadata = RandMetadata {
+                    epoch: ledger_info.epoch(),
+                    round: ledger_info.round(),
+                };
+                let self_share = Share::generate(fast_config, metadata);
                 let fast_share = FastShare::new(self_share);
                 info!(LogSchema::new(LogEvent::BroadcastRandShareFastPath)
                     .epoch(fast_share.epoch())

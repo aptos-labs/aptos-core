@@ -21,7 +21,7 @@ on:
         type: string
         description: The git SHA1 to checkout. This affects the Forge test runner that is used. If not specified, the latest main will be used
   schedule:
-    - cron: "0 6 * * *"  # The main branch cadence. This runs every day at 6am UTC.
+    - cron: "0 6 * * *" # The main branch cadence. This runs every day at 6am UTC.
   pull_request:
     paths:
       - ".github/workflows/forge-stable.yaml"
@@ -115,12 +115,24 @@ jobs:
           fi
           echo "IMAGE_TAG: [${IMAGE_TAG}](https://github.com/${{ github.repository }}/commit/${IMAGE_TAG})" >> $GITHUB_STEP_SUMMARY
 
-
   ### Real-world-network tests.
+  # Run forge framework upgradability test. This is a PR required job.
+  run-forge-framework-upgrade-test:
+    if: ${{ github.event_name != 'pull_request' }}
+    needs:
+      - determine-test-metadata
+    uses: aptos-labs/aptos-core/.github/workflows/workflow-run-forge.yaml@main
+    secrets: inherit
+    with:
+      IMAGE_TAG: 01b24e7e3548382dd25440b39a0438a993387f12 #aptos-node-v1.11 with randomness disabled in genesis
+      FORGE_NAMESPACE: forge-framework-upgrade-${{ needs.determine-test-metadata.outputs.BRANCH_HASH }}
+      FORGE_RUNNER_DURATION_SECS: 7200 # Run for 2 hours
+      FORGE_TEST_SUITE: framework_upgrade
+      POST_TO_SLACK: true
 
   run-forge-realistic-env-max-load-long:
-    if: ${{ github.event_name != 'pull_request' }}
-    needs: determine-test-metadata
+    if: ${{ github.event_name != 'pull_request' && always() }}
+    needs: [determine-test-metadata, run-forge-framework-upgrade-test] # Only run after the previous job completes
     uses: aptos-labs/aptos-core/.github/workflows/workflow-run-forge.yaml@main
     secrets: inherit
     with:
@@ -254,7 +266,7 @@ jobs:
       FORGE_RUNNER_DURATION_SECS: 300 # Run for 5 minutes
       # This will upgrade from testnet branch to the latest main
       FORGE_TEST_SUITE: compat
-      IMAGE_TAG: testnet
+      IMAGE_TAG: 01b24e7e3548382dd25440b39a0438a993387f12 #aptos-node-v1.11 with randomness disabled in genesis
       GIT_SHA: ${{ needs.determine-test-metadata.outputs.IMAGE_TAG }} # this is the git ref to checkout
       POST_TO_SLACK: true
 

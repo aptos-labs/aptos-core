@@ -24,7 +24,7 @@ use aptos_types::{
     chain_id::ChainId,
     contract_event::{ContractEvent, EventWithVersion},
     state_store::{
-        state_key::{StateKey, StateKeyInner},
+        state_key::{inner::StateKeyInner, StateKey},
         table::{TableHandle, TableInfo},
     },
     transaction::{
@@ -42,7 +42,7 @@ use move_core_types::{
     resolver::ModuleResolver,
     value::{MoveStructLayout, MoveTypeLayout},
 };
-use move_resource_viewer::MoveValueAnnotator;
+use move_resource_viewer::{Limiter, MoveValueAnnotator};
 use serde_json::Value;
 use std::{
     convert::{TryFrom, TryInto},
@@ -81,8 +81,13 @@ impl<'a, R: ModuleResolver + ?Sized> MoveConverter<'a, R> {
         &self,
         data: impl Iterator<Item = (StructTag, &'b [u8])>,
     ) -> Result<Vec<MoveResource>> {
-        data.map(|(typ, bytes)| self.try_into_resource(&typ, bytes))
-            .collect()
+        let mut limiter = Limiter::default();
+        data.map(|(typ, bytes)| {
+            self.inner
+                .view_resource_with_limit(&typ, bytes, &mut limiter)?
+                .try_into()
+        })
+        .collect()
     }
 
     pub fn try_into_resource(&self, typ: &StructTag, bytes: &'_ [u8]) -> Result<MoveResource> {
@@ -312,13 +317,13 @@ impl<'a, R: ModuleResolver + ?Sized> MoveConverter<'a, R> {
         op: WriteOp,
     ) -> Result<Vec<WriteSetChange>> {
         let hash = state_key.hash().to_hex_literal();
-        let state_key = state_key.into_inner();
+        let state_key = state_key.inner();
         match state_key {
             StateKeyInner::AccessPath(access_path) => {
                 self.try_access_path_into_write_set_changes(hash, access_path, op)
             },
             StateKeyInner::TableItem { handle, key } => {
-                vec![self.try_table_item_into_write_set_change(hash, handle, key, op)]
+                vec![self.try_table_item_into_write_set_change(hash, *handle, key.to_owned(), op)]
                     .into_iter()
                     .collect()
             },
@@ -332,7 +337,7 @@ impl<'a, R: ModuleResolver + ?Sized> MoveConverter<'a, R> {
     pub fn try_access_path_into_write_set_changes(
         &self,
         state_key_hash: String,
-        access_path: AccessPath,
+        access_path: &AccessPath,
         op: WriteOp,
     ) -> Result<Vec<WriteSetChange>> {
         let ret = match op.bytes() {
