@@ -11,9 +11,6 @@ module aptos_framework::version {
     friend aptos_framework::genesis;
     friend aptos_framework::reconfiguration_with_dkg;
 
-    /// API has been disabled.
-    const EAPI_DISABLED: u64 = 1;
-
     struct Version has drop, key, store {
         major: u64,
     }

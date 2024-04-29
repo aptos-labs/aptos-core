@@ -13,9 +13,6 @@ module aptos_framework::randomness_config_seqnum {
 
     friend aptos_framework::reconfiguration_with_dkg;
 
-    /// API has been disabled.
-    const EAPI_DISABLED: u64 = 1;
-
     /// If this seqnum is smaller than a validator local override, the on-chain `RandomnessConfig` will be ignored.
     /// Useful in a chain recovery from randomness stall.
     struct RandomnessConfigSeqNum has drop, key, store {

@@ -19,9 +19,6 @@ module aptos_framework::consensus_config {
     /// The provided on chain config bytes are empty or invalid
     const EINVALID_CONFIG: u64 = 1;
 
-    /// API has been disabled.
-    const EAPI_DISABLED: u64 = 2;
-
     /// Publishes the ConsensusConfig config.
     public(friend) fun initialize(aptos_framework: &signer, config: vector<u8>) {
         system_addresses::assert_aptos_framework(aptos_framework);

@@ -22,9 +22,6 @@ module aptos_framework::gas_schedule {
     const EINVALID_GAS_SCHEDULE: u64 = 1;
     const EINVALID_GAS_FEATURE_VERSION: u64 = 2;
 
-    /// API has been disabled.
-    const EAPI_DISABLED: u64 = 3;
-
     struct GasEntry has store, copy, drop {
         key: String,
         val: u64,

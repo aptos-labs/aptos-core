@@ -15,12 +15,11 @@ a governance proposal is needed to set <code><a href="randomness_config_seqnum.m
 
 
 -  [Resource `RandomnessConfigSeqNum`](#0x1_randomness_config_seqnum_RandomnessConfigSeqNum)
--  [Constants](#@Constants_0)
 -  [Function `set_for_next_epoch`](#0x1_randomness_config_seqnum_set_for_next_epoch)
 -  [Function `initialize`](#0x1_randomness_config_seqnum_initialize)
 -  [Function `on_new_epoch`](#0x1_randomness_config_seqnum_on_new_epoch)
--  [Specification](#@Specification_1)
-    -  [Function `on_new_epoch`](#@Specification_1_on_new_epoch)
+-  [Specification](#@Specification_0)
+    -  [Function `on_new_epoch`](#@Specification_0_on_new_epoch)
 
 
 <pre><code><b>use</b> <a href="config_buffer.md#0x1_config_buffer">0x1::config_buffer</a>;
@@ -57,21 +56,6 @@ Useful in a chain recovery from randomness stall.
 
 
 </details>
-
-<a id="@Constants_0"></a>
-
-## Constants
-
-
-<a id="0x1_randomness_config_seqnum_EAPI_DISABLED"></a>
-
-API has been disabled.
-
-
-<pre><code><b>const</b> <a href="randomness_config_seqnum.md#0x1_randomness_config_seqnum_EAPI_DISABLED">EAPI_DISABLED</a>: u64 = 1;
-</code></pre>
-
-
 
 <a id="0x1_randomness_config_seqnum_set_for_next_epoch"></a>
 
@@ -161,12 +145,12 @@ Only used in reconfigurations to apply the pending <code>RandomnessConfig</code>
 
 </details>
 
-<a id="@Specification_1"></a>
+<a id="@Specification_0"></a>
 
 ## Specification
 
 
-<a id="@Specification_1_on_new_epoch"></a>
+<a id="@Specification_0_on_new_epoch"></a>
 
 ### Function `on_new_epoch`
 

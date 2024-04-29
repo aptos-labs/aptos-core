@@ -19,9 +19,6 @@ module aptos_framework::jwk_consensus_config {
     /// `ConfigV1` creation failed with duplicated providers given.
     const EDUPLICATE_PROVIDERS: u64 = 1;
 
-    /// API has been disabled.
-    const EAPI_DISABLED: u64 = 2;
-
     /// The configuration of the JWK consensus feature.
     struct JWKConsensusConfig has drop, key, store {
         /// A config variant packed as an `Any`.

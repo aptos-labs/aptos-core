@@ -139,16 +139,6 @@ it costs to execute Move on the network.
 ## Constants
 
 
-<a id="0x1_gas_schedule_EAPI_DISABLED"></a>
-
-API has been disabled.
-
-
-<pre><code><b>const</b> <a href="gas_schedule.md#0x1_gas_schedule_EAPI_DISABLED">EAPI_DISABLED</a>: u64 = 3;
-</code></pre>
-
-
-
 <a id="0x1_gas_schedule_EINVALID_GAS_FEATURE_VERSION"></a>
 
 

@@ -59,16 +59,6 @@ Reconfiguration, and may be updated by root.
 ## Constants
 
 
-<a id="0x1_execution_config_EAPI_DISABLED"></a>
-
-API has been disabled.
-
-
-<pre><code><b>const</b> <a href="execution_config.md#0x1_execution_config_EAPI_DISABLED">EAPI_DISABLED</a>: u64 = 2;
-</code></pre>
-
-
-
 <a id="0x1_execution_config_EINVALID_CONFIG"></a>
 
 The provided on chain config bytes are empty or invalid

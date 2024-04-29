@@ -18,9 +18,6 @@ module aptos_framework::execution_config {
     /// The provided on chain config bytes are empty or invalid
     const EINVALID_CONFIG: u64 = 1;
 
-    /// API has been disabled.
-    const EAPI_DISABLED: u64 = 2;
-
     /// Deprecated by `set_for_next_epoch()`.
     ///
     /// WARNING: calling this while randomness is enabled will trigger a new epoch without randomness!

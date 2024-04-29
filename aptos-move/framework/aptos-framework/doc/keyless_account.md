@@ -794,7 +794,7 @@ Only used in reconfigurations to apply the queued up configuration changes, if t
 
 
 
-<pre><code><b>pragma</b> verify = <b>false</b>;
+<pre><code><b>pragma</b> verify=<b>false</b>;
 </code></pre>
 
 

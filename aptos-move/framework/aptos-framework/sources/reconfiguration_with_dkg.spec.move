@@ -34,8 +34,8 @@ spec aptos_framework::reconfiguration_with_dkg {
         use aptos_framework::transaction_fee;
         use aptos_framework::staking_config;
         use aptos_framework::config_buffer;
-        use aptos_framework::consensus_config;
         use aptos_framework::version;
+        use aptos_framework::consensus_config;
         use aptos_framework::execution_config;
         use aptos_framework::gas_schedule;
         use aptos_framework::jwks;
@@ -49,10 +49,10 @@ spec aptos_framework::reconfiguration_with_dkg {
         requires exists<stake::ValidatorFees>(@aptos_framework);
         include transaction_fee::RequiresCollectedFeesPerValueLeqBlockAptosSupply;
         requires exists<features::Features>(@std);
-        include config_buffer::OnNewEpochRequirement<consensus_config::ConsensusConfig>;
         include config_buffer::OnNewEpochRequirement<version::Version>;
         include config_buffer::OnNewEpochRequirement<gas_schedule::GasScheduleV2>;
         include config_buffer::OnNewEpochRequirement<execution_config::ExecutionConfig>;
+        include config_buffer::OnNewEpochRequirement<consensus_config::ConsensusConfig>;
         include config_buffer::OnNewEpochRequirement<jwks::SupportedOIDCProviders>;
         include config_buffer::OnNewEpochRequirement<randomness_config::RandomnessConfig>;
         include config_buffer::OnNewEpochRequirement<randomness_config_seqnum::RandomnessConfigSeqNum>;

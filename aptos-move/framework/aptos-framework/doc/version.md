@@ -93,16 +93,6 @@ Maintains the version number for the blockchain.
 ## Constants
 
 
-<a id="0x1_version_EAPI_DISABLED"></a>
-
-API has been disabled.
-
-
-<pre><code><b>const</b> <a href="version.md#0x1_version_EAPI_DISABLED">EAPI_DISABLED</a>: u64 = 1;
-</code></pre>
-
-
-
 <a id="0x1_version_EINVALID_MAJOR_VERSION_NUMBER"></a>
 
 Specified major version number must be greater than current version number.

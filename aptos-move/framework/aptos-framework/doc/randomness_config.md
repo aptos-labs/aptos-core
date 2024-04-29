@@ -171,16 +171,6 @@ A randomness config variant indicating the feature is enabled with fast path.
 ## Constants
 
 
-<a id="0x1_randomness_config_EAPI_DISABLED"></a>
-
-API has been disabled.
-
-
-<pre><code><b>const</b> <a href="randomness_config.md#0x1_randomness_config_EAPI_DISABLED">EAPI_DISABLED</a>: u64 = 2;
-</code></pre>
-
-
-
 <a id="0x1_randomness_config_EINVALID_CONFIG_VARIANT"></a>
 
 

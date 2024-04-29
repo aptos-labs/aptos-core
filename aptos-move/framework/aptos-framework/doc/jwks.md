@@ -610,15 +610,6 @@ This is what applications should consume.
 ## Constants
 
 
-<a id="0x1_jwks_EAPI_DISABLED"></a>
-
-
-
-<pre><code><b>const</b> <a href="jwks.md#0x1_jwks_EAPI_DISABLED">EAPI_DISABLED</a>: u64 = 7;
-</code></pre>
-
-
-
 <a id="0x1_jwks_EISSUER_NOT_FOUND"></a>
 
 

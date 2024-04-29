@@ -157,16 +157,6 @@ A JWK consensus config variant indicating JWK consensus should run to watch a gi
 ## Constants
 
 
-<a id="0x1_jwk_consensus_config_EAPI_DISABLED"></a>
-
-API has been disabled.
-
-
-<pre><code><b>const</b> <a href="jwk_consensus_config.md#0x1_jwk_consensus_config_EAPI_DISABLED">EAPI_DISABLED</a>: u64 = 2;
-</code></pre>
-
-
-
 <a id="0x1_jwk_consensus_config_EDUPLICATE_PROVIDERS"></a>
 
 <code><a href="jwk_consensus_config.md#0x1_jwk_consensus_config_ConfigV1">ConfigV1</a></code> creation failed with duplicated providers given.

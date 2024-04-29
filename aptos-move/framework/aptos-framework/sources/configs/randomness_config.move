@@ -11,9 +11,6 @@ module aptos_framework::randomness_config {
 
     const EINVALID_CONFIG_VARIANT: u64 = 1;
 
-    /// API has been disabled.
-    const EAPI_DISABLED: u64 = 2;
-
     /// The configuration of the on-chain randomness feature.
     struct RandomnessConfig has copy, drop, key, store {
         /// A config variant packed as an `Any`.
