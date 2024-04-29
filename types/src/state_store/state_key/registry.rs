@@ -33,6 +33,22 @@ pub struct Entry {
     pub hash_value: HashValue,
 }
 
+impl Entry {
+    fn new(deserialized: StateKeyInner) -> Result<Self> {
+        let encoded = deserialized.encode()?;
+        let hash_value = {
+            let mut state = StateKeyInnerHasher::default();
+            state.update(&encoded);
+            state.finish()
+        };
+        Ok(Self {
+            deserialized,
+            encoded,
+            hash_value,
+        })
+    }
+}
+
 impl Drop for Entry {
     fn drop(&mut self) {
         match &self.deserialized {
@@ -99,12 +115,6 @@ where
 
         // generate the entry content outside the lock
         let deserialized = inner_gen()?;
-        let encoded = deserialized.encode().expect("Failed to encode StateKey.");
-        let hash_value = {
-            let mut state = StateKeyInnerHasher::default();
-            state.update(&encoded);
-            state.finish()
-        };
 
         for _ in 0..MAX_TRIES {
             let mut locked = self.inner.write();
@@ -112,22 +122,14 @@ where
             match locked.get_mut(key1) {
                 None => {
                     let mut map2 = locked.entry(key1.to_owned()).insert(HashMap::new());
-                    let entry = Arc::new(Entry {
-                        deserialized,
-                        encoded,
-                        hash_value,
-                    });
+                    let entry = Arc::new(Entry::new(deserialized)?);
                     map2.get_mut()
                         .insert(key2.to_owned(), Arc::downgrade(&entry));
                     return Ok(entry);
                 },
                 Some(map2) => match map2.get(key2) {
                     None => {
-                        let entry = Arc::new(Entry {
-                            deserialized,
-                            encoded,
-                            hash_value,
-                        });
+                        let entry = Arc::new(Entry::new(deserialized)?);
                         map2.insert(key2.to_owned(), Arc::downgrade(&entry));
                         return Ok(entry);
                     },
