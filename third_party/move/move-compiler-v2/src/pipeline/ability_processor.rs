@@ -133,6 +133,7 @@ struct CopyDropState {
     needs_drop: SetDomain<TempIndex>,
     /// Those temps which are consumed by the instruction but need to be checked for the drop ability
     /// since they internally drop the value. These are currently equalities.
+    /// Need to store the attribute id to get the location of the temporary for the error messages.
     check_drop: SetDomain<(TempIndex, AttrId)>,
     /// Those temps which have been moved (that is consumed).
     moved: SetDomain<TempIndex>,
