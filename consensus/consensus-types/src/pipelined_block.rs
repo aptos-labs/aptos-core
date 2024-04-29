@@ -160,6 +160,7 @@ impl PipelinedBlock {
             self.block.clone(),
             self.compute_result().epoch_state().clone(),
             true,
+            self.block_info(),
         )
     }
 

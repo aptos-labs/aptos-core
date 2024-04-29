@@ -4,6 +4,7 @@
 
 use crate::{
     block_storage::{BlockReader, BlockStore},
+    counters::{FAILED_EXECUTION_WITH_ORDER_VOTE_QC, SUCCESSFUL_EXECUTED_WITH_ORDER_VOTE_QC},
     epoch_manager::LivenessStorageData,
     logging::{LogEvent, LogSchema},
     monitor,
@@ -120,7 +121,7 @@ impl BlockStore {
             _ => (),
         }
         if self.ordered_root().round() < qc.commit_info().round() {
-            self.send_for_execution(qc.clone()).await?;
+            self.send_for_execution(qc.ledger_info().clone()).await?;
             if qc.ends_epoch() {
                 retriever
                     .network
@@ -130,6 +131,32 @@ impl BlockStore {
                     ))
                     .await;
             }
+        }
+        Ok(())
+    }
+
+    pub async fn insert_aggregated_order_vote(
+        &self,
+        ledger_info_with_sig: &LedgerInfoWithSignatures,
+        retriever: &mut BlockRetriever,
+    ) -> anyhow::Result<()> {
+        if self.ordered_root().round() < ledger_info_with_sig.ledger_info().round() {
+            SUCCESSFUL_EXECUTED_WITH_ORDER_VOTE_QC.inc();
+            self.send_for_execution(ledger_info_with_sig.clone())
+                .await?;
+            if ledger_info_with_sig.ledger_info().ends_epoch() {
+                retriever
+                    .network
+                    .broadcast_epoch_change(EpochChangeProof::new(
+                        vec![ledger_info_with_sig.clone()],
+                        // TODO: Should more be true/false?
+                        /* more = */
+                        false,
+                    ))
+                    .await;
+            }
+        } else {
+            FAILED_EXECUTION_WITH_ORDER_VOTE_QC.inc();
         }
         Ok(())
     }

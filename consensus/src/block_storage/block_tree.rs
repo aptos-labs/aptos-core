@@ -11,7 +11,8 @@ use crate::{
 use anyhow::bail;
 use aptos_consensus_types::{
     pipelined_block::PipelinedBlock, quorum_cert::QuorumCert,
-    timeout_2chain::TwoChainTimeoutCertificate, wrapped_ledger_info::WrappedLedgerInfo,
+    timeout_2chain::TwoChainTimeoutCertificate, vote_data::VoteData,
+    wrapped_ledger_info::WrappedLedgerInfo,
 };
 use aptos_crypto::HashValue;
 use aptos_logger::prelude::*;
@@ -291,6 +292,12 @@ impl BlockTree {
         Ok(())
     }
 
+    pub fn insert_ordered_cert(&mut self, ordered_cert: WrappedLedgerInfo) {
+        if ordered_cert.commit_info().round() > self.highest_ordered_cert.commit_info().round() {
+            self.highest_ordered_cert = Arc::new(ordered_cert);
+        }
+    }
+
     /// Find the blocks to prune up to next_root_id (keep next_root_id's block). Any branches not
     /// part of the next_root_id's tree should be removed as well.
     ///
@@ -418,12 +425,9 @@ impl BlockTree {
         &mut self,
         storage: Arc<dyn PersistentLivenessStorage>,
         blocks_to_commit: &[Arc<PipelinedBlock>],
-        finality_proof: QuorumCert,
         commit_decision: LedgerInfoWithSignatures,
     ) {
-        let commit_proof = finality_proof
-            .create_merged_with_executed_state(commit_decision)
-            .expect("Inconsistent commit proof and evaluation decision, cannot commit block");
+        let commit_proof = WrappedLedgerInfo::new(VoteData::dummy(), commit_decision);
 
         let block_to_commit = blocks_to_commit.last().unwrap().clone();
         update_counters_for_committed_blocks(blocks_to_commit);
@@ -443,7 +447,7 @@ impl BlockTree {
             warn!(error = ?e, "fail to delete block");
         }
         self.process_pruned_blocks(id_to_remove);
-        self.update_highest_commit_cert(commit_proof.into_wrapped_ledger_info());
+        self.update_highest_commit_cert(commit_proof);
     }
 }
 

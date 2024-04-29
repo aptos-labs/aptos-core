@@ -18,6 +18,7 @@ use aptos_consensus_types::{
     vote_proposal::VoteProposal,
 };
 use aptos_crypto::hash::{CryptoHash, TransactionAccumulatorHasher};
+use aptos_executor_types::StateComputeResult;
 use aptos_secure_storage::{InMemoryStorage, Storage};
 use aptos_types::{
     aggregate_signature::{AggregateSignature, PartialSignatures},
@@ -58,20 +59,22 @@ pub fn make_proposal_with_qc_and_proof(
     qc: QuorumCert,
     validator_signer: &ValidatorSigner,
 ) -> VoteProposal {
-    VoteProposal::new(
-        proof,
-        Block::new_proposal(
-            payload,
-            round,
-            qc.certified_block().timestamp_usecs() + 1,
-            qc,
-            validator_signer,
-            Vec::new(),
-        )
-        .unwrap(),
-        None,
-        false,
+    let block = Block::new_proposal(
+        payload,
+        round,
+        qc.certified_block().timestamp_usecs() + 1,
+        qc,
+        validator_signer,
+        Vec::new(),
     )
+    .unwrap();
+    // TODO: Is this right way to generate BlockInfo here?
+    let block_info = block.gen_block_info(
+        StateComputeResult::new_dummy().root_hash(),
+        StateComputeResult::new_dummy().version(),
+        None,
+    );
+    VoteProposal::new(proof, block, None, false, block_info)
 }
 
 pub fn make_proposal_with_qc(

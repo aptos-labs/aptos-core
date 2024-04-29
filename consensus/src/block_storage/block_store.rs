@@ -19,7 +19,7 @@ use crate::{
 use anyhow::{bail, ensure, format_err, Context};
 use aptos_consensus_types::{
     block::Block, common::Round, pipelined_block::PipelinedBlock, quorum_cert::QuorumCert,
-    sync_info::SyncInfo, timeout_2chain::TwoChainTimeoutCertificate,
+    sync_info::SyncInfo, timeout_2chain::TwoChainTimeoutCertificate, vote_data::VoteData,
     wrapped_ledger_info::WrappedLedgerInfo,
 };
 use aptos_crypto::{hash::ACCUMULATOR_PLACEHOLDER_HASH, HashValue};
@@ -121,7 +121,7 @@ impl BlockStore {
                     qc.ledger_info()
                 );
 
-                if let Err(e) = self.send_for_execution(qc.clone()).await {
+                if let Err(e) = self.send_for_execution(qc.ledger_info().clone()).await {
                     error!("Error in try-committing blocks. {}", e.to_string());
                 }
             }
@@ -221,7 +221,10 @@ impl BlockStore {
     }
 
     /// Send an ordered block id with the proof for execution, returns () on success or error
-    pub async fn send_for_execution(&self, finality_proof: QuorumCert) -> anyhow::Result<()> {
+    pub async fn send_for_execution(
+        &self,
+        finality_proof: LedgerInfoWithSignatures,
+    ) -> anyhow::Result<()> {
         let block_id_to_commit = finality_proof.commit_info().id();
         let block_to_commit = self
             .get_block(block_id_to_commit)
@@ -246,14 +249,13 @@ impl BlockStore {
         self.execution_client
             .finalize_order(
                 &blocks_to_commit,
-                finality_proof.ledger_info().clone(),
+                finality_proof.clone(),
                 Box::new(
                     move |committed_blocks: &[Arc<PipelinedBlock>],
                           commit_decision: LedgerInfoWithSignatures| {
                         block_tree.write().commit_callback(
                             storage,
                             committed_blocks,
-                            finality_proof,
                             commit_decision,
                         );
                     },
@@ -263,6 +265,8 @@ impl BlockStore {
             .expect("Failed to persist commit");
 
         self.inner.write().update_ordered_root(block_to_commit.id());
+        let ordered_cert = WrappedLedgerInfo::new(VoteData::dummy(), finality_proof);
+        self.inner.write().insert_ordered_cert(ordered_cert);
         update_counters_for_ordered_blocks(&blocks_to_commit);
 
         Ok(())
@@ -611,7 +615,8 @@ impl BlockStore {
     pub async fn insert_block_with_qc(&self, block: Block) -> anyhow::Result<Arc<PipelinedBlock>> {
         self.insert_single_quorum_cert(block.quorum_cert().clone())?;
         if self.ordered_root().round() < block.quorum_cert().commit_info().round() {
-            self.send_for_execution(block.quorum_cert().clone()).await?;
+            self.send_for_execution(block.quorum_cert().ledger_info().clone())
+                .await?;
         }
         self.insert_ordered_block(block).await
     }

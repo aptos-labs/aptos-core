@@ -16,6 +16,7 @@ impl BlockStage {
     pub const EXECUTED: &'static str = "executed";
     pub const NETWORK_RECEIVED: &'static str = "network_received";
     pub const ORDERED: &'static str = "ordered";
+    pub const ORDER_VOTED: &'static str = "order_voted";
     pub const QC_ADDED: &'static str = "qc_added";
     pub const QC_AGGREGATED: &'static str = "qc_aggregated";
     pub const RAND_ADD_DECISION: &'static str = "rand_add_decision";
