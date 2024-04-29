@@ -46,5 +46,5 @@ def local_setup():
 if __name__ == "__main__":
     local_setup()
     replay_verify.main(
-        runner_no=None, runner_cnt=None, start_version=291217350, end_version=292975771
+        runner_no=0, runner_cnt=1, start_version=291217350, end_version=292975771
     )

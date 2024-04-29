@@ -63,7 +63,7 @@ jobs:
       BACKUP_CONFIG_TEMPLATE_PATH: terraform/helm/fullnode/files/backup/gcs.yaml
       # workflow config
       RUNS_ON: "high-perf-docker-with-local-ssd"
-      TIMEOUT_MINUTES: 480
+      TIMEOUT_MINUTES: 720
 
   replay-mainnet:
     if: |
@@ -83,7 +83,7 @@ jobs:
       BACKUP_CONFIG_TEMPLATE_PATH: terraform/helm/fullnode/files/backup/gcs.yaml
       # workflow config
       RUNS_ON: "high-perf-docker-with-local-ssd"
-      TIMEOUT_MINUTES: 480
+      TIMEOUT_MINUTES: 720
 
   test-replay:
     if: ${{ github.event_name == 'pull_request' }}

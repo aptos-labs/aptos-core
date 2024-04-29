@@ -158,7 +158,7 @@ def replay_verify_partition(
     return (n, process.returncode, b"\n".join(last_lines))
 
 
-def main(runner_no=None, runner_cnt=None, start_version=None, end_version=None):
+def main(runner_no=0, runner_cnt=1, start_version=None, end_version=None):
     # collect all required ENV variables
     REQUIRED_ENVS = [
         "BUCKET",
@@ -172,15 +172,11 @@ def main(runner_no=None, runner_cnt=None, start_version=None, end_version=None):
         raise Exception("Missing required ENV variables")
 
     # the runner may have small overlap at the boundary to prevent missing any transactions
-    runner_mapping = (
-        TESTNET_RANGES if "testnet" in os.environ["BUCKET"] else MAINNET_RANGES
+    start_version = (
+        TESTNET_RANGES[0][0]
+        if "testnet" in os.environ["BUCKET"]
+        else MAINNET_RANGES[0][0]
     )
-
-    # by default we only have 1 runner
-    if runner_no is None or runner_cnt is None:
-        runner_no = 0
-        runner_cnt = 1
-        runner_mapping = [[runner_mapping[0][0], runner_mapping[-1][1]]]
 
     assert (
         runner_no >= 0 and runner_no < runner_cnt
@@ -202,16 +198,15 @@ def main(runner_no=None, runner_cnt=None, start_version=None, end_version=None):
     else:
         print("[main process] skipping clearing backup artifacts")
 
-    assert runner_cnt == len(
-        runner_mapping
-    ), "runner_cnt must match the number of runners in the mapping"
-    runner_start = runner_mapping[runner_no][0]
-    runner_end = runner_mapping[runner_no][1]
     latest_version = query_backup_latest_version(BACKUP_CONFIG_TEMPLATE_PATH)
-    if runner_no == runner_cnt - 1:
-        runner_end = latest_version
-        if runner_end is None:
-            raise Exception("Failed to query latest version from backup")
+    runner_start = start_version + (
+        runner_no * (latest_version - start_version) // runner_cnt
+    )
+    runner_end = start_version + (
+        (runner_no + 1) * (latest_version - start_version) // runner_cnt
+    )
+    if latest_version is None:
+        raise Exception("Failed to query latest version from backup")
     print("runner start %d end %d" % (runner_start, runner_end))
     if start_version is not None and end_version is not None:
         runner_start = start_version
@@ -257,6 +252,6 @@ def main(runner_no=None, runner_cnt=None, start_version=None, end_version=None):
 if __name__ == "__main__":
     freeze_support()
     (runner_no, runner_cnt) = (
-        (int(sys.argv[1]), int(sys.argv[2])) if len(sys.argv) > 2 else (None, None)
+        (int(sys.argv[1]), int(sys.argv[2])) if len(sys.argv) > 2 else (0, 1)
     )
     main(runner_no, runner_cnt)
