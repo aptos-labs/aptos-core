@@ -41,6 +41,7 @@ use aptos_types::{
 use async_trait::async_trait;
 use std::{
     collections::{BTreeMap, HashMap},
+    mem,
     sync::Arc,
     time::{Duration, Instant},
 };
@@ -118,6 +119,7 @@ pub(super) struct OrderedNotifierAdapter {
     epoch_state: Arc<EpochState>,
     ledger_info_provider: Arc<RwLock<LedgerInfoProvider>>,
     block_ordered_ts: Arc<RwLock<BTreeMap<Round, Instant>>>,
+    buffer: Mutex<Vec<Arc<CertifiedNode>>>,
     allow_batches_without_pos_in_proposal: bool,
     author_to_index: HashMap<Author, usize>,
     idx_gen: Mutex<RoundIndexGenerator>,
@@ -151,6 +153,7 @@ impl OrderedNotifierAdapter {
                 current_round,
                 current_idx,
             }),
+            buffer: Mutex::new(Vec::new()),
         }
     }
 
@@ -177,9 +180,24 @@ pub struct ShoalppOrderBlocksInfo {
 impl OrderedNotifier for OrderedNotifierAdapter {
     fn send_ordered_nodes(
         &self,
-        ordered_nodes: Vec<Arc<CertifiedNode>>,
+        mut ordered_nodes: Vec<Arc<CertifiedNode>>,
         failed_author: Vec<(Round, Author)>,
     ) {
+        {
+            let anchor_round = ordered_nodes.last().unwrap().round();
+            if let Some(last) = self.buffer.lock().last() {
+                if last.round() == anchor_round {
+                    self.buffer.lock().append(&mut ordered_nodes);
+                    return;
+                } else {
+                    mem::swap(&mut *self.buffer.lock(), &mut ordered_nodes);
+                }
+            } else {
+                self.buffer.lock().append(&mut ordered_nodes);
+                return;
+            }
+        }
+
         let anchor = ordered_nodes.last().unwrap();
         let round = anchor.round();
 
