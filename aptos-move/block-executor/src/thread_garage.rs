@@ -11,6 +11,8 @@ use std::sync::{
     Arc,
 };
 
+use std::time::Instant;
+
 use crossbeam::utils::CachePadded;
 
 use std::any::Any;
@@ -308,9 +310,7 @@ impl ThreadGarage {
                     let mut global_lock = self.global_mutex.lock().unwrap();
 
                     global_lock.num_active -= 1;
-                    let cnt_sleeping = self.num_sleeping.fetch_add(1, Ordering::SeqCst)+1;
-
-                    println!("now sleeping={}", cnt_sleeping);
+                    
 
                     //notify one of the threads that since current thread is suspended, it can proceed with running main function
 
@@ -318,12 +318,20 @@ impl ThreadGarage {
 
                 }
                 //eprintln!("num sleeping prior {}", lock.num_sleeping);
+                let cnt_sleeping = self.num_sleeping.fetch_add(1, Ordering::SeqCst)+1;
 
                 let mut local_lock = self.asleep_mutex[thread_id].lock().unwrap();
+
+                let start = Instant::now();                
 
                 while *local_lock {
                     local_lock = self.baton_cv[thread_id].wait(local_lock).unwrap();
                 }
+
+                let end = Instant::now();
+
+                println!("now sleeping={}, {} thread slept for {:?}", cnt_sleeping, thread_id, end-start);
+
                 
                 self.num_sleeping.fetch_sub(1, Ordering::SeqCst);
                 //eprintln!("woke up thread={}", thread_id);
