@@ -71,6 +71,7 @@ trusted_setup() {
                 circom -l . main.circom --c
                 pushd main_c_cpp
                 {
+                  make
                   cp main_c $outdir/
                   cp main_c.dat $outdir/
                 }
