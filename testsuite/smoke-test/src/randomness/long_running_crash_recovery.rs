@@ -74,16 +74,16 @@ async fn long_running_crash_recovery() {
     let rest_clis: Vec<Client> =
         swarm.validators().map(|node| node.rest_client()).collect();
 
-    let root_addr = swarm.chain_info().root_account().address();
-    let root_idx = aptos_cli.add_account_with_address_to_cli(swarm.root_key(), root_addr);
-
     swarm
         .wait_for_all_nodes_to_catchup_to_epoch(3, Duration::from_secs(epoch_duration_secs + dkg_secs + 5))
         .await
         .expect("Waited too long for epoch 3.");
 
+    let root_addr = swarm.chain_info().root_account().address();
+    let root_idx = aptos_cli.add_account_with_address_to_cli(swarm.root_key(), root_addr);
+
     info!("Publishing dice module.");
-    publish_on_chain_dice_module(&mut aptos_cli, 0).await;
+    publish_on_chain_dice_module(&mut aptos_cli, root_idx).await;
 
     let mut rng = thread_rng();
     let mut node_states = vec![NodeState::default(); 4];
