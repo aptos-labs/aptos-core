@@ -54,16 +54,12 @@ impl WrappedLedgerInfo {
         }
     }
 
-    pub fn vote_data(&self) -> &VoteData {
-        &self.vote_data
-    }
-
     pub fn certified_block(&self) -> &BlockInfo {
-        self.vote_data().proposed()
+        self.vote_data.proposed()
     }
 
     pub fn parent_block(&self) -> &BlockInfo {
-        self.vote_data().parent()
+        self.vote_data.parent()
     }
 
     pub fn ledger_info(&self) -> &LedgerInfoWithSignatures {
@@ -77,46 +73,6 @@ impl WrappedLedgerInfo {
     /// If the QC commits reconfiguration and starts a new epoch
     pub fn ends_epoch(&self) -> bool {
         self.signed_ledger_info.ledger_info().ends_epoch()
-    }
-
-    /// WrappedLedgerInfo for the genesis block deterministically generated from end-epoch LedgerInfo:
-    /// - the ID of the block is determined by the generated genesis block.
-    /// - the accumulator root hash of the LedgerInfo is set to the last executed state of previous
-    ///   epoch.
-    /// - the map of signatures is empty because genesis block is implicitly agreed.
-    pub fn certificate_for_genesis_from_ledger_info(
-        ledger_info: &LedgerInfo,
-        genesis_id: HashValue,
-    ) -> WrappedLedgerInfo {
-        let ancestor = BlockInfo::new(
-            ledger_info
-                .epoch()
-                .checked_add(1)
-                .expect("Integer overflow when creating cert for genesis from ledger info"),
-            0,
-            genesis_id,
-            ledger_info.transaction_accumulator_hash(),
-            ledger_info.version(),
-            ledger_info.timestamp_usecs(),
-            None,
-        );
-
-        let vote_data = VoteData::new(ancestor.clone(), ancestor.clone());
-        let li = LedgerInfo::new(ancestor, vote_data.hash());
-
-        let validator_set_size = ledger_info
-            .next_epoch_state()
-            .expect("Next epoch state not found in ledger info")
-            .verifier
-            .len();
-
-        WrappedLedgerInfo::new(
-            vote_data,
-            LedgerInfoWithSignatures::new(
-                li,
-                AggregateSignature::new(BitVec::with_num_bits(validator_set_size as u16), None),
-            ),
-        )
     }
 
     pub fn verify(&self, validator: &ValidatorVerifier) -> anyhow::Result<()> {
@@ -137,20 +93,5 @@ impl WrappedLedgerInfo {
             .verify_signatures(validator)
             .context("Fail to verify WrappedLedgerInfo")?;
         Ok(())
-    }
-
-    pub fn create_merged_with_executed_state(
-        &self,
-        executed_ledger_info: LedgerInfoWithSignatures,
-    ) -> anyhow::Result<WrappedLedgerInfo> {
-        let self_commit_info = self.commit_info();
-        let executed_commit_info = executed_ledger_info.ledger_info().commit_info();
-        ensure!(
-            self_commit_info.match_ordered_only(executed_commit_info),
-            "Block info from QC and executed LI need to match, {:?} and {:?}",
-            self_commit_info,
-            executed_commit_info
-        );
-        Ok(Self::new(self.vote_data.clone(), executed_ledger_info))
     }
 }
