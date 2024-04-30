@@ -6,7 +6,6 @@ include "helpers/packing.circom";
 include "../node_modules/circomlib/circuits/gates.circom";
 include "../node_modules/circomlib/circuits/bitify.circom";
 
-
 // Checks if character 'char' is a whitespace character. Returns 1 if so, 0 otherwise
 // Assumes char is a valid ascii character. Does not check for non-ascii unicode whitespace chars.
 template isWhitespace() {

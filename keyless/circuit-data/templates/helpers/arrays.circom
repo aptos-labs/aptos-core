@@ -269,6 +269,9 @@ template ConcatenationCheck(maxFullStringLen, maxLeftStringLen, maxRightStringLe
 template CheckAreASCIIDigits(maxNumDigits) {
     signal input in[maxNumDigits];
     signal input len;
+    for (var i = 0; i < maxNumDigits; i++) {
+        log(in[i]);
+    }
     
     signal selector[maxNumDigits] <== ArraySelector(maxNumDigits)(0, len);
     for (var i = 0; i < maxNumDigits; i++) {
@@ -281,6 +284,7 @@ template CheckAreASCIIDigits(maxNumDigits) {
 
 // Given a string of digits in ASCII format, returns the digits represented as a single field element
 // Assumes the number represented by the ASCII digits is smaller than the scalar field used by the circuit
+// Does not work when maxLen = 1
 template ASCIIDigitsToField(maxLen) {
     signal input digits[maxLen]; 
     signal input len; 
