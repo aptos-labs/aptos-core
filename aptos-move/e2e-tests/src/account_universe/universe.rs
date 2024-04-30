@@ -208,7 +208,13 @@ impl AccountPicker {
             AccountPicker::Unlimited(num_accounts) => {  
                 //let temp = w % (*num_accounts/2);
                 //[2*temp, 2*temp+1]
-                Self::pick_pair_impl(*num_accounts, indexes)
+                //Self::pick_pair_impl(*num_accounts, indexes)
+                if w % 5 > 0 {
+                    let temp = Self::pick_pair_impl(*num_accounts-2, indexes);
+                    [temp[0]+2, temp[1]+2] 
+                } else {
+                    [0,1]
+                }
                 /*if w < 10 && *num_accounts > 15 {
                     //let half_accounts = (*num_accounts) / 2;
                     if w == 0 {
