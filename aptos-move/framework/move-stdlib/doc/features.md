@@ -126,7 +126,7 @@ return true.
 -  [Function `set`](#0x1_features_set)
 -  [Function `contains`](#0x1_features_contains)
 -  [Function `apply_diff`](#0x1_features_apply_diff)
--  [Function `ensure_vm_or_framework_signer`](#0x1_features_ensure_vm_or_framework_signer)
+-  [Function `ensure_framework_signer`](#0x1_features_ensure_framework_signer)
 -  [Function `change_feature_flags_for_verification`](#0x1_features_change_feature_flags_for_verification)
 -  [Specification](#@Specification_1)
     -  [Resource `Features`](#@Specification_1_Features)
@@ -2961,7 +2961,7 @@ While the scope is public, it can only be usd in system transactions like <code>
 who have permission to set the flag that's checked in <code>extract()</code>.
 
 
-<pre><code><b>public</b> <b>fun</b> <a href="features.md#0x1_features_on_new_epoch">on_new_epoch</a>(vm_or_framework: &<a href="signer.md#0x1_signer">signer</a>)
+<pre><code><b>public</b> <b>fun</b> <a href="features.md#0x1_features_on_new_epoch">on_new_epoch</a>(framework: &<a href="signer.md#0x1_signer">signer</a>)
 </code></pre>
 
 
@@ -2970,11 +2970,15 @@ who have permission to set the flag that's checked in <code>extract()</code>.
 <summary>Implementation</summary>
 
 
-<pre><code><b>public</b> <b>fun</b> <a href="features.md#0x1_features_on_new_epoch">on_new_epoch</a>(vm_or_framework: &<a href="signer.md#0x1_signer">signer</a>) <b>acquires</b> <a href="features.md#0x1_features_Features">Features</a>, <a href="features.md#0x1_features_PendingFeatures">PendingFeatures</a> {
-    <a href="features.md#0x1_features_ensure_vm_or_framework_signer">ensure_vm_or_framework_signer</a>(vm_or_framework);
+<pre><code><b>public</b> <b>fun</b> <a href="features.md#0x1_features_on_new_epoch">on_new_epoch</a>(framework: &<a href="signer.md#0x1_signer">signer</a>) <b>acquires</b> <a href="features.md#0x1_features_Features">Features</a>, <a href="features.md#0x1_features_PendingFeatures">PendingFeatures</a> {
+    <a href="features.md#0x1_features_ensure_framework_signer">ensure_framework_signer</a>(framework);
     <b>if</b> (<b>exists</b>&lt;<a href="features.md#0x1_features_PendingFeatures">PendingFeatures</a>&gt;(@std)) {
         <b>let</b> <a href="features.md#0x1_features_PendingFeatures">PendingFeatures</a> { <a href="features.md#0x1_features">features</a> } = <b>move_from</b>&lt;<a href="features.md#0x1_features_PendingFeatures">PendingFeatures</a>&gt;(@std);
-        <b>borrow_global_mut</b>&lt;<a href="features.md#0x1_features_Features">Features</a>&gt;(@std).<a href="features.md#0x1_features">features</a> = <a href="features.md#0x1_features">features</a>;
+        <b>if</b> (<b>exists</b>&lt;<a href="features.md#0x1_features_Features">Features</a>&gt;(@std)) {
+            <b>borrow_global_mut</b>&lt;<a href="features.md#0x1_features_Features">Features</a>&gt;(@std).<a href="features.md#0x1_features">features</a> = <a href="features.md#0x1_features">features</a>;
+        } <b>else</b> {
+            <b>move_to</b>(framework, <a href="features.md#0x1_features_Features">Features</a> { <a href="features.md#0x1_features">features</a> })
+        }
     }
 }
 </code></pre>
@@ -3100,13 +3104,13 @@ Helper to check whether a feature flag is enabled.
 
 </details>
 
-<a id="0x1_features_ensure_vm_or_framework_signer"></a>
+<a id="0x1_features_ensure_framework_signer"></a>
 
-## Function `ensure_vm_or_framework_signer`
+## Function `ensure_framework_signer`
 
 
 
-<pre><code><b>fun</b> <a href="features.md#0x1_features_ensure_vm_or_framework_signer">ensure_vm_or_framework_signer</a>(account: &<a href="signer.md#0x1_signer">signer</a>)
+<pre><code><b>fun</b> <a href="features.md#0x1_features_ensure_framework_signer">ensure_framework_signer</a>(account: &<a href="signer.md#0x1_signer">signer</a>)
 </code></pre>
 
 
@@ -3115,9 +3119,9 @@ Helper to check whether a feature flag is enabled.
 <summary>Implementation</summary>
 
 
-<pre><code><b>fun</b> <a href="features.md#0x1_features_ensure_vm_or_framework_signer">ensure_vm_or_framework_signer</a>(account: &<a href="signer.md#0x1_signer">signer</a>) {
+<pre><code><b>fun</b> <a href="features.md#0x1_features_ensure_framework_signer">ensure_framework_signer</a>(account: &<a href="signer.md#0x1_signer">signer</a>) {
     <b>let</b> addr = <a href="signer.md#0x1_signer_address_of">signer::address_of</a>(account);
-    <b>assert</b>!(addr == @std || addr == @vm, <a href="error.md#0x1_error_permission_denied">error::permission_denied</a>(<a href="features.md#0x1_features_EFRAMEWORK_SIGNER_NEEDED">EFRAMEWORK_SIGNER_NEEDED</a>));
+    <b>assert</b>!(addr == @std, <a href="error.md#0x1_error_permission_denied">error::permission_denied</a>(<a href="features.md#0x1_features_EFRAMEWORK_SIGNER_NEEDED">EFRAMEWORK_SIGNER_NEEDED</a>));
 }
 </code></pre>
 
@@ -3330,18 +3334,17 @@ Helper to check whether a feature flag is enabled.
 ### Function `on_new_epoch`
 
 
-<pre><code><b>public</b> <b>fun</b> <a href="features.md#0x1_features_on_new_epoch">on_new_epoch</a>(vm_or_framework: &<a href="signer.md#0x1_signer">signer</a>)
+<pre><code><b>public</b> <b>fun</b> <a href="features.md#0x1_features_on_new_epoch">on_new_epoch</a>(framework: &<a href="signer.md#0x1_signer">signer</a>)
 </code></pre>
 
 
 
 
-<pre><code><b>let</b> addr = <a href="signer.md#0x1_signer_address_of">signer::address_of</a>(vm_or_framework);
-<b>aborts_if</b> addr != @std && addr != @vm;
-<b>aborts_if</b> <b>exists</b>&lt;<a href="features.md#0x1_features_PendingFeatures">PendingFeatures</a>&gt;(@std) && !<b>exists</b>&lt;<a href="features.md#0x1_features_Features">Features</a>&gt;(@std);
+<pre><code><b>requires</b> @std == <a href="signer.md#0x1_signer_address_of">signer::address_of</a>(framework);
 <b>let</b> features_pending = <b>global</b>&lt;<a href="features.md#0x1_features_PendingFeatures">PendingFeatures</a>&gt;(@std).<a href="features.md#0x1_features">features</a>;
 <b>let</b> <b>post</b> features_std = <b>global</b>&lt;<a href="features.md#0x1_features_Features">Features</a>&gt;(@std).<a href="features.md#0x1_features">features</a>;
 <b>ensures</b> <b>exists</b>&lt;<a href="features.md#0x1_features_PendingFeatures">PendingFeatures</a>&gt;(@std) ==&gt; features_std == features_pending;
+<b>aborts_if</b> <b>false</b>;
 </code></pre>
 
 

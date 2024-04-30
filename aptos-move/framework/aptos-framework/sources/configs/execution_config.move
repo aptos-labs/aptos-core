@@ -52,10 +52,15 @@ module aptos_framework::execution_config {
     }
 
     /// Only used in reconfigurations to apply the pending `ExecutionConfig`, if there is any.
-    public(friend) fun on_new_epoch() acquires ExecutionConfig {
+    public(friend) fun on_new_epoch(framework: &signer) acquires ExecutionConfig {
+        system_addresses::assert_aptos_framework(framework);
         if (config_buffer::does_exist<ExecutionConfig>()) {
             let config = config_buffer::extract<ExecutionConfig>();
-            *borrow_global_mut<ExecutionConfig>(@aptos_framework) = config;
+            if (exists<ExecutionConfig>(@aptos_framework)) {
+                *borrow_global_mut<ExecutionConfig>(@aptos_framework) = config;
+            } else {
+                move_to(framework, config);
+            };
         }
     }
 }

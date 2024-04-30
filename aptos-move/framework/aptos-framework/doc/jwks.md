@@ -55,6 +55,8 @@ have a simple layout which is easily accessible in Rust.
 -  [Function `upsert_jwk`](#0x1_jwks_upsert_jwk)
 -  [Function `remove_jwk`](#0x1_jwks_remove_jwk)
 -  [Function `apply_patch`](#0x1_jwks_apply_patch)
+-  [Specification](#@Specification_1)
+    -  [Function `on_new_epoch`](#@Specification_1_on_new_epoch)
 
 
 <pre><code><b>use</b> <a href="chain_status.md#0x1_chain_status">0x1::chain_status</a>;
@@ -920,7 +922,7 @@ aptos_framework::aptos_governance::reconfigure(&framework_signer);
 Only used in reconfigurations to apply the pending <code><a href="jwks.md#0x1_jwks_SupportedOIDCProviders">SupportedOIDCProviders</a></code>, if there is any.
 
 
-<pre><code><b>public</b>(<b>friend</b>) <b>fun</b> <a href="jwks.md#0x1_jwks_on_new_epoch">on_new_epoch</a>()
+<pre><code><b>public</b>(<b>friend</b>) <b>fun</b> <a href="jwks.md#0x1_jwks_on_new_epoch">on_new_epoch</a>(framework: &<a href="../../aptos-stdlib/../move-stdlib/doc/signer.md#0x1_signer">signer</a>)
 </code></pre>
 
 
@@ -929,9 +931,15 @@ Only used in reconfigurations to apply the pending <code><a href="jwks.md#0x1_jw
 <summary>Implementation</summary>
 
 
-<pre><code><b>public</b>(<b>friend</b>) <b>fun</b> <a href="jwks.md#0x1_jwks_on_new_epoch">on_new_epoch</a>() <b>acquires</b> <a href="jwks.md#0x1_jwks_SupportedOIDCProviders">SupportedOIDCProviders</a> {
+<pre><code><b>public</b>(<b>friend</b>) <b>fun</b> <a href="jwks.md#0x1_jwks_on_new_epoch">on_new_epoch</a>(framework: &<a href="../../aptos-stdlib/../move-stdlib/doc/signer.md#0x1_signer">signer</a>) <b>acquires</b> <a href="jwks.md#0x1_jwks_SupportedOIDCProviders">SupportedOIDCProviders</a> {
+    <a href="system_addresses.md#0x1_system_addresses_assert_aptos_framework">system_addresses::assert_aptos_framework</a>(framework);
     <b>if</b> (<a href="config_buffer.md#0x1_config_buffer_does_exist">config_buffer::does_exist</a>&lt;<a href="jwks.md#0x1_jwks_SupportedOIDCProviders">SupportedOIDCProviders</a>&gt;()) {
-        *<b>borrow_global_mut</b>&lt;<a href="jwks.md#0x1_jwks_SupportedOIDCProviders">SupportedOIDCProviders</a>&gt;(@aptos_framework) = <a href="config_buffer.md#0x1_config_buffer_extract">config_buffer::extract</a>();
+        <b>let</b> new_config = <a href="config_buffer.md#0x1_config_buffer_extract">config_buffer::extract</a>&lt;<a href="jwks.md#0x1_jwks_SupportedOIDCProviders">SupportedOIDCProviders</a>&gt;();
+        <b>if</b> (<b>exists</b>&lt;<a href="jwks.md#0x1_jwks_SupportedOIDCProviders">SupportedOIDCProviders</a>&gt;(@aptos_framework)) {
+            *<b>borrow_global_mut</b>&lt;<a href="jwks.md#0x1_jwks_SupportedOIDCProviders">SupportedOIDCProviders</a>&gt;(@aptos_framework) = new_config;
+        } <b>else</b> {
+            <b>move_to</b>(framework, new_config);
+        }
     }
 }
 </code></pre>
@@ -1641,6 +1649,27 @@ Maintains the sorted-by-issuer invariant in <code><a href="jwks.md#0x1_jwks_AllP
 
 
 </details>
+
+<a id="@Specification_1"></a>
+
+## Specification
+
+
+<a id="@Specification_1_on_new_epoch"></a>
+
+### Function `on_new_epoch`
+
+
+<pre><code><b>public</b>(<b>friend</b>) <b>fun</b> <a href="jwks.md#0x1_jwks_on_new_epoch">on_new_epoch</a>(framework: &<a href="../../aptos-stdlib/../move-stdlib/doc/signer.md#0x1_signer">signer</a>)
+</code></pre>
+
+
+
+
+<pre><code><b>requires</b> @aptos_framework == std::signer::address_of(framework);
+<b>include</b> <a href="config_buffer.md#0x1_config_buffer_OnNewEpochRequirement">config_buffer::OnNewEpochRequirement</a>&lt;<a href="jwks.md#0x1_jwks_SupportedOIDCProviders">SupportedOIDCProviders</a>&gt;;
+<b>aborts_if</b> <b>false</b>;
+</code></pre>
 
 
 [move-book]: https://aptos.dev/move/book/SUMMARY

@@ -80,7 +80,7 @@ pub struct MoveHarness {
     txn_seq_no: BTreeMap<AccountAddress, u64>,
 
     pub default_gas_unit_price: u64,
-    max_gas_per_txn: u64,
+    pub max_gas_per_txn: u64,
 }
 
 #[derive(Debug, Clone, Copy, Eq, PartialEq)]
