@@ -81,6 +81,12 @@ where
             .and_then(|weak| weak.upgrade())
     }
 
+    fn insert_key2(map2: &mut HashMap<Key2, Weak<Entry>>, key2: Key2, entry: Entry) -> Arc<Entry> {
+        let entry = Arc::new(entry);
+        map2.insert(key2, Arc::downgrade(&entry));
+        entry
+    }
+
     fn write_lock_get_or_add<Ref1, Ref2, Gen>(
         &self,
         key1: &Ref1,
@@ -95,6 +101,7 @@ where
         Gen: FnOnce() -> Result<StateKeyInner>,
     {
         // generate the entry content outside the lock
+        // n.b. construct Entry only when decided to insert to registry, to save on drop
         let deserialized = inner_gen()?;
         let encoded = deserialized.encode().expect("Failed to encode StateKey.");
         let hash_value = {
@@ -105,46 +112,42 @@ where
 
         let mut locked = self.inner.write();
 
-        match locked.get_mut(key1) {
+        Ok(match locked.get_mut(key1) {
             None => {
                 let mut map2 = locked.entry(key1.to_owned()).insert(HashMap::new());
-                let entry = Arc::new(Entry {
+                let entry = Entry {
                     deserialized,
                     encoded,
                     hash_value,
-                });
-                map2.get_mut()
-                    .insert(key2.to_owned(), Arc::downgrade(&entry));
-                Ok(entry)
+                };
+                Self::insert_key2(map2.get_mut(), key2.to_owned(), entry)
             },
             Some(map2) => match map2.get(key2) {
                 None => {
-                    let entry = Arc::new(Entry {
+                    let entry = Entry {
                         deserialized,
                         encoded,
                         hash_value,
-                    });
-                    map2.insert(key2.to_owned(), Arc::downgrade(&entry));
-                    Ok(entry)
+                    };
+                    Self::insert_key2(map2, key2.to_owned(), entry)
                 },
                 Some(weak) => match weak.upgrade() {
                     Some(entry) => {
                         // some other thread has added it
-                        Ok(entry)
+                        entry
                     },
                     None => {
                         // previous version of this key is being dropped.
-                        let entry = Arc::new(Entry {
+                        let entry = Entry {
                             deserialized,
                             encoded,
                             hash_value,
-                        });
-                        map2.insert(key2.to_owned(), Arc::downgrade(&entry));
-                        Ok(entry)
+                        };
+                        Self::insert_key2(map2, key2.to_owned(), entry)
                     },
                 },
             },
-        }
+        })
     }
 
     fn maybe_remove(&self, key1: &Key1, key2: &Key2) {
