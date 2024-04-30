@@ -376,7 +376,10 @@ impl Interpreter {
                 let ty = self.operand_stack.pop_ty()?;
                 if is_generic {
                     ty.paranoid_check_eq(
-                        &ty_builder.subst(&func.local_types()[arg_count - i - 1], &ty_args)?,
+                        &ty_builder.create_ty_with_subst(
+                            &func.local_types()[arg_count - i - 1],
+                            &ty_args,
+                        )?,
                     )?;
                 } else {
                     // Directly check against the expected type to save a clone here.
@@ -411,7 +414,7 @@ impl Interpreter {
                 function
                     .local_types()
                     .iter()
-                    .map(|ty| ty_builder.subst(ty, &ty_args))
+                    .map(|ty| ty_builder.create_ty_with_subst(ty, &ty_args))
                     .collect::<PartialVMResult<Vec<_>>>()?
             }
         } else {
@@ -493,8 +496,10 @@ impl Interpreter {
 
         if self.paranoid_type_checks {
             for i in 0..expected_args {
-                let expected_ty = ty_builder
-                    .subst(&function.parameter_types()[expected_args - i - 1], &ty_args)?;
+                let expected_ty = ty_builder.create_ty_with_subst(
+                    &function.parameter_types()[expected_args - i - 1],
+                    &ty_args,
+                )?;
                 let ty = self.operand_stack.pop_ty()?;
                 ty.paranoid_check_eq(&expected_ty)?;
                 args_ty.push_front(ty);
@@ -550,7 +555,7 @@ impl Interpreter {
                 if self.paranoid_type_checks {
                     for ty in function.return_types() {
                         self.operand_stack
-                            .push_ty(ty_builder.subst(ty, &ty_args)?)?;
+                            .push_ty(ty_builder.create_ty_with_subst(ty, &ty_args)?)?;
                     }
                 }
 

@@ -369,7 +369,7 @@ impl VMRuntime {
         let ty_builder = self.loader().ty_builder();
         let arg_types = param_types
             .into_iter()
-            .map(|ty| ty_builder.subst(&ty, &ty_args))
+            .map(|ty| ty_builder.create_ty_with_subst(&ty, &ty_args))
             .collect::<PartialVMResult<Vec<_>>>()
             .map_err(|err| err.finish(Location::Undefined))?;
         let mut_ref_args = arg_types
@@ -385,7 +385,7 @@ impl VMRuntime {
             .map_err(|e| e.finish(Location::Undefined))?;
         let return_types = return_types
             .into_iter()
-            .map(|ty| ty_builder.subst(&ty, &ty_args))
+            .map(|ty| ty_builder.create_ty_with_subst(&ty, &ty_args))
             .collect::<PartialVMResult<Vec<_>>>()
             .map_err(|err| err.finish(Location::Undefined))?;
 

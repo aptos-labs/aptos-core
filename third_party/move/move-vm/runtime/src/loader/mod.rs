@@ -1321,7 +1321,7 @@ impl<'a> Resolver<'a> {
         let ty_builder = self.loader().ty_builder();
         let mut instantiation = vec![];
         for ty in &func_inst.instantiation {
-            instantiation.push(ty_builder.subst(ty, ty_args)?);
+            instantiation.push(ty_builder.create_ty_with_subst(ty, ty_args)?);
         }
         Ok(instantiation)
     }
@@ -1383,10 +1383,10 @@ impl<'a> Resolver<'a> {
         let instantiation_types = field_instantiation
             .instantiation
             .iter()
-            .map(|inst_ty| ty_builder.subst(inst_ty, ty_args))
+            .map(|inst_ty| ty_builder.create_ty_with_subst(inst_ty, ty_args))
             .collect::<PartialVMResult<Vec<_>>>()?;
 
-        ty_builder.subst(
+        ty_builder.create_ty_with_subst(
             &field_instantiation.definition_struct_type.fields[field_instantiation.offset],
             &instantiation_types,
         )
@@ -1417,13 +1417,13 @@ impl<'a> Resolver<'a> {
         let instantiation_types = struct_inst
             .instantiation
             .iter()
-            .map(|inst_ty| ty_builder.subst(inst_ty, ty_args))
+            .map(|inst_ty| ty_builder.create_ty_with_subst(inst_ty, ty_args))
             .collect::<PartialVMResult<Vec<_>>>()?;
 
         struct_type
             .fields
             .iter()
-            .map(|inst_ty| ty_builder.subst(inst_ty, &instantiation_types))
+            .map(|inst_ty| ty_builder.create_ty_with_subst(inst_ty, &instantiation_types))
             .collect::<PartialVMResult<Vec<_>>>()
     }
 
@@ -1443,7 +1443,7 @@ impl<'a> Resolver<'a> {
 
         if !ty_args.is_empty() {
             let ty_builder = self.loader().ty_builder();
-            ty_builder.subst(ty, ty_args)
+            ty_builder.create_ty_with_subst(ty, ty_args)
         } else {
             Ok(ty.clone())
         }
@@ -1730,7 +1730,7 @@ impl Loader {
         let field_tys = struct_type
             .fields
             .iter()
-            .map(|ty| ty_builder.subst(ty, ty_args))
+            .map(|ty| ty_builder.create_ty_with_subst(ty, ty_args))
             .collect::<PartialVMResult<Vec<_>>>()?;
         let (mut field_layouts, field_has_identifier_mappings): (Vec<MoveTypeLayout>, Vec<bool>) =
             field_tys
@@ -1944,7 +1944,7 @@ impl Loader {
             .iter()
             .zip(&struct_type.fields)
             .map(|(n, ty)| {
-                let ty = ty_builder.subst(ty, ty_args)?;
+                let ty = ty_builder.create_ty_with_subst(ty, ty_args)?;
                 let l =
                     self.type_to_fully_annotated_layout_impl(&ty, module_store, count, depth)?;
                 Ok(MoveFieldLayout::new(n.clone(), l))

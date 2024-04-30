@@ -445,7 +445,6 @@ impl Type {
         Ok(self.get_vec_ref_elem_ty())
     }
 
-    #[inline]
     fn get_vec_ref_elem_ty(&self) -> Self {
         match self {
             Self::Reference(inner_ty) | Self::MutableReference(inner_ty) => match inner_ty.as_ref()
@@ -706,22 +705,9 @@ pub struct TypeBuilder {
 
 impl TypeBuilder {
     pub fn new(ty_config: &TypeConfig) -> Self {
-        // To avoid extra size/depth checks when constructing a struct reference
-        // type, make sure we always have at least 2 nodes.
-        assert!(ty_config.max_ty_size > 2);
-        assert!(ty_config.max_ty_depth > 2);
-
         Self {
             max_ty_size: ty_config.max_ty_size,
             max_ty_depth: ty_config.max_ty_depth,
-        }
-    }
-
-    #[cfg(test)]
-    pub fn new_for_test() -> Self {
-        Self {
-            max_ty_size: 11,
-            max_ty_depth: 5,
         }
     }
 
@@ -760,11 +746,35 @@ impl TypeBuilder {
         Type::U256
     }
 
+    /// Creates a (possibly mutable) reference type from the given inner type.
+    /// Returns an error if the type size or depth are too large.
+    #[inline]
+    pub fn create_ref_ty(&self, inner_ty: &Type, is_mut: bool) -> PartialVMResult<Type> {
+        let mut count = 1;
+        let inner_ty = Box::new(self.clone_impl(inner_ty, &mut count, 2)?);
+        Ok(if is_mut {
+            Type::MutableReference(inner_ty)
+        } else {
+            Type::Reference(inner_ty)
+        })
+    }
+
+    /// Creates a vector type with the given element type, returning an error
+    /// if the type size or depth are too large.
+    #[inline]
+    pub fn create_vec_ty(&self, elem_ty: &Type) -> PartialVMResult<Type> {
+        let mut count = 1;
+        let elem_ty = self.clone_impl(elem_ty, &mut count, 2)?;
+        Ok(Type::Vector(TriompheArc::new(elem_ty)))
+    }
+
     #[inline]
     pub fn create_struct_ty(&self, idx: StructNameIndex, ability: AbilityInfo) -> Type {
         Type::Struct { idx, ability }
     }
 
+    /// Creates a fully-instantiated struct type, performing the type substitution.
+    /// Returns an error if the type size or depth are too large.
     #[inline]
     pub fn create_struct_instantiation_ty(
         &self,
@@ -780,30 +790,39 @@ impl TypeBuilder {
                 struct_ty.phantom_ty_args_mask.clone(),
             ),
         };
-        self.subst(&ty, ty_args)
+        self.create_ty_with_subst(&ty, ty_args)
     }
 
-    #[inline]
-    pub fn create_ref_ty(&self, inner_ty: &Type, is_mut: bool) -> PartialVMResult<Type> {
-        let mut count = 1;
-        let inner_ty = Box::new(self.clone_impl(inner_ty, &mut count, 2)?);
-        Ok(if is_mut {
-            Type::MutableReference(inner_ty)
-        } else {
-            Type::Reference(inner_ty)
-        })
-    }
-
-    #[inline]
-    pub fn create_vec_ty(&self, elem_ty: &Type) -> PartialVMResult<Type> {
-        let mut count = 1;
-        let elem_ty = self.clone_impl(elem_ty, &mut count, 2)?;
-        Ok(Type::Vector(TriompheArc::new(elem_ty)))
-    }
-
+    /// Creates a type for a Move constant. Note that constant types can be
+    /// more restrictive and therefore have their own creation API.
     pub fn create_constant_ty(&self, const_tok: &SignatureToken) -> PartialVMResult<Type> {
         let mut count = 0;
         self.create_constant_ty_impl(const_tok, &mut count, 1)
+    }
+
+    /// Creates a fully-instantiated type from its storage representation.
+    pub fn create_ty<F>(&self, ty_tag: &TypeTag, mut resolver: F) -> VMResult<Type>
+    where
+        F: FnMut(&StructTag) -> VMResult<Arc<StructType>>,
+    {
+        let mut count = 0;
+        self.create_ty_impl(ty_tag, &mut resolver, &mut count, 1)
+    }
+
+    /// Clones the given type, at the same time instantiating all its type parameters.
+    pub fn create_ty_with_subst(&self, ty: &Type, ty_args: &[Type]) -> PartialVMResult<Type> {
+        let mut count = 0;
+        self.subst_impl(ty, ty_args, &mut count, 1)
+    }
+
+    fn check(&self, count: &mut usize, depth: usize) -> PartialVMResult<()> {
+        if *count >= self.max_ty_size {
+            return Err(PartialVMError::new(StatusCode::TOO_MANY_TYPE_NODES));
+        }
+        if depth > self.max_ty_depth {
+            return Err(PartialVMError::new(StatusCode::VM_MAX_TYPE_DEPTH_REACHED));
+        }
+        Ok(())
     }
 
     fn create_constant_ty_impl(
@@ -813,28 +832,22 @@ impl TypeBuilder {
         depth: usize,
     ) -> PartialVMResult<Type> {
         use SignatureToken as S;
-        use Type as T;
+        use Type::*;
 
-        if *count >= self.max_ty_size {
-            return Err(PartialVMError::new(StatusCode::TOO_MANY_TYPE_NODES));
-        }
-        if depth > self.max_ty_depth {
-            return Err(PartialVMError::new(StatusCode::VM_MAX_TYPE_DEPTH_REACHED));
-        }
-
+        self.check(count, depth)?;
         *count += 1;
         Ok(match const_tok {
-            S::Bool => T::Bool,
-            S::U8 => T::U8,
-            S::U16 => T::U16,
-            S::U32 => T::U32,
-            S::U64 => T::U64,
-            S::U128 => T::U128,
-            S::U256 => T::U256,
-            S::Address => T::Address,
+            S::Bool => Bool,
+            S::U8 => U8,
+            S::U16 => U16,
+            S::U32 => U32,
+            S::U64 => U64,
+            S::U128 => U128,
+            S::U256 => U256,
+            S::Address => Address,
             S::Vector(elem_tok) => {
                 let elem_ty = self.create_constant_ty_impl(elem_tok, count, depth + 1)?;
-                T::Vector(TriompheArc::new(elem_ty))
+                Vector(TriompheArc::new(elem_ty))
             },
 
             S::Struct(_) | S::StructInstantiation(_, _) => {
@@ -855,17 +868,17 @@ impl TypeBuilder {
         })
     }
 
-    /// Instantiates all type parameters of the given type.
-    pub fn subst(&self, ty: &Type, ty_args: &[Type]) -> PartialVMResult<Type> {
-        Ok(self.subst_impl(ty, ty_args)?.0)
-    }
-
-    fn subst_impl(&self, ty: &Type, ty_args: &[Type]) -> PartialVMResult<(Type, usize)> {
-        let mut ty_size = 0;
-        let ty = self.apply_subst(
+    fn subst_impl(
+        &self,
+        ty: &Type,
+        ty_args: &[Type],
+        count: &mut usize,
+        depth: usize,
+    ) -> PartialVMResult<Type> {
+        self.apply_subst(
             ty,
-            |idx, count, depth| match ty_args.get(idx as usize) {
-                Some(ty) => self.clone_impl(ty, count, depth),
+            |idx, c, d| match ty_args.get(idx as usize) {
+                Some(ty) => self.clone_impl(ty, c, d),
                 None => Err(
                     PartialVMError::new(StatusCode::UNKNOWN_INVARIANT_VIOLATION_ERROR)
                         .with_message(format!(
@@ -875,10 +888,9 @@ impl TypeBuilder {
                         )),
                 ),
             },
-            &mut ty_size,
-            1,
-        )?;
-        Ok((ty, ty_size))
+            count,
+            depth,
+        )
     }
 
     fn clone_impl(&self, ty: &Type, count: &mut usize, depth: usize) -> PartialVMResult<Type> {
@@ -897,13 +909,7 @@ impl TypeBuilder {
     {
         use Type::*;
 
-        if *count >= self.max_ty_size {
-            return Err(PartialVMError::new(StatusCode::TOO_MANY_TYPE_NODES));
-        }
-        if depth > self.max_ty_depth {
-            return Err(PartialVMError::new(StatusCode::VM_MAX_TYPE_DEPTH_REACHED));
-        }
-
+        self.check(count, depth)?;
         *count += 1;
         Ok(match ty {
             TyParam(idx) => {
@@ -957,15 +963,6 @@ impl TypeBuilder {
         })
     }
 
-    /// Creates a fully-instantiated type from its storage representation.
-    pub fn create_ty<F>(&self, ty_tag: &TypeTag, mut resolver: F) -> VMResult<Type>
-    where
-        F: FnMut(&StructTag) -> VMResult<Arc<StructType>>,
-    {
-        let mut count = 0;
-        self.create_ty_impl(ty_tag, &mut resolver, &mut count, 1)
-    }
-
     fn create_ty_impl<F>(
         &self,
         ty_tag: &TypeTag,
@@ -979,16 +976,8 @@ impl TypeBuilder {
         use Type::*;
         use TypeTag as T;
 
-        if *count >= self.max_ty_size {
-            return Err(
-                PartialVMError::new(StatusCode::TOO_MANY_TYPE_NODES).finish(Location::Undefined)
-            );
-        }
-        if depth > self.max_ty_depth {
-            return Err(PartialVMError::new(StatusCode::VM_MAX_TYPE_DEPTH_REACHED)
-                .finish(Location::Undefined));
-        }
-
+        self.check(count, depth)
+            .map_err(|e| e.finish(Location::Undefined))?;
         *count += 1;
         Ok(match ty_tag {
             T::Bool => Bool,
@@ -1031,6 +1020,21 @@ impl TypeBuilder {
                 }
             },
         })
+    }
+
+    #[cfg(test)]
+    pub fn new_for_test() -> Self {
+        Self {
+            max_ty_size: 11,
+            max_ty_depth: 5,
+        }
+    }
+
+    #[cfg(test)]
+    fn num_nodes_in_subst(&self, ty: &Type, ty_args: &[Type]) -> PartialVMResult<usize> {
+        let mut count = 0;
+        self.subst_impl(ty, ty_args, &mut count, 1)?;
+        Ok(count)
     }
 }
 
@@ -1101,10 +1105,10 @@ mod unit_tests {
             ),
         ];
 
-        for (ty, ty_args, expected) in cases {
-            let num_nodes = ty_builder.subst_impl(&ty, &ty_args).unwrap().1;
-            assert_eq!(num_nodes, expected);
-            assert_eq!(ty.num_nodes_in_subst(&ty_args).unwrap(), expected);
+        for (ty, ty_args, expected_num_nodes) in cases {
+            let num_nodes = assert_ok!(ty_builder.num_nodes_in_subst(&ty, &ty_args));
+            assert_eq!(num_nodes, expected_num_nodes);
+            assert_eq!(ty.num_nodes_in_subst(&ty_args).unwrap(), expected_num_nodes);
         }
     }
 
@@ -1116,10 +1120,10 @@ mod unit_tests {
 
         let ty = Vector(TriompheArc::new(Vector(TriompheArc::new(TyParam(0)))));
         let ty_arg = Vector(TriompheArc::new(Vector(TriompheArc::new(Bool))));
-        assert_ok!(ty_builder.subst(&ty, &[ty_arg.clone()]));
+        assert_ok!(ty_builder.create_ty_with_subst(&ty, &[ty_arg.clone()]));
 
         let ty_arg = Vector(TriompheArc::new(ty_arg));
-        let err = assert_err!(ty_builder.subst(&ty, &[ty_arg]));
+        let err = assert_err!(ty_builder.create_ty_with_subst(&ty, &[ty_arg]));
         assert_eq!(err.major_status(), StatusCode::VM_MAX_TYPE_DEPTH_REACHED);
     }
 
@@ -1134,8 +1138,8 @@ mod unit_tests {
 
         // Each type argument contributes 2 nodes, so in total the count is 11.
         let ty_args: Vec<Type> = (0..5).map(|_| Vector(TriompheArc::new(Bool))).collect();
-        let count = assert_ok!(ty_builder.subst_impl(&ty, &ty_args)).1;
-        assert_eq!(count, 11);
+        let num_nodes = assert_ok!(ty_builder.num_nodes_in_subst(&ty, &ty_args));
+        assert_eq!(num_nodes, 11);
 
         let ty_args: Vec<Type> = (0..5)
             .map(|i| {
@@ -1147,7 +1151,7 @@ mod unit_tests {
                 }
             })
             .collect();
-        let err = assert_err!(ty_builder.subst(&ty, &ty_args));
+        let err = assert_err!(ty_builder.create_ty_with_subst(&ty, &ty_args));
         assert_eq!(err.major_status(), StatusCode::TOO_MANY_TYPE_NODES);
     }
 }
