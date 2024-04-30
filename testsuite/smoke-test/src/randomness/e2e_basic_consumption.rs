@@ -102,6 +102,7 @@ pub async fn publish_on_chain_dice_module(cli: &mut CliTestFramework, publisher_
 
     let mut named_addresses = BTreeMap::new();
     let account_str = cli.account_id(publisher_account_idx).to_string();
+    println!("account_str={}", account_str);
     named_addresses.insert("module_owner", account_str.as_str());
     cli.publish_package(0, None, named_addresses, None)
         .await
