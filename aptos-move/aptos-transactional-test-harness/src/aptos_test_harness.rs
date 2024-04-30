@@ -507,7 +507,6 @@ impl<'a> AptosTestAdapter<'a> {
             // TODO fetch values from state?
             block_gas_limit_type: BlockGasLimitType::Limit(30000),
         };
-        AptosVM::set_paranoid_type_checks(true);
         let mut outputs =
             AptosVM::execute_block(&sig_verified_block, &self.storage.clone(), onchain_config)?
                 .into_inner();
@@ -605,6 +604,7 @@ impl<'a> MoveTestAdapter<'a> for AptosTestAdapter<'a> {
         pre_compiled_deps_v2: Option<&'a PrecompiledFilesModules>,
         task_opt: Option<TaskInput<(InitCommand, Self::ExtraInitArgs)>>,
     ) -> (Self, Option<String>) {
+        AptosVM::set_paranoid_type_checks(true);
         // Named address mapping
         let additional_named_address_mapping = match task_opt.as_ref().map(|t| &t.command) {
             Some((InitCommand { named_addresses }, _)) => {
@@ -1032,5 +1032,6 @@ pub fn run_aptos_test_with_config(
         };
     let v1_lib = precompiled_v1_stdlib_if_needed(&config);
     let v2_lib = precompiled_v2_stdlib_if_needed(&config);
+    AptosVM::set_paranoid_type_checks(true);
     run_test_impl::<AptosTestAdapter>(config, path, v1_lib, v2_lib, &None)
 }

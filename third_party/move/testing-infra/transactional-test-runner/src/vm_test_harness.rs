@@ -199,7 +199,7 @@ impl<'a> MoveTestAdapter<'a> for SimpleVMTestAdapter<'a> {
                     }
                     Ok(())
                 },
-                default_test_vm_config(),
+                production_vm_config_with_paranoid_type_checks(),
             )
             .unwrap();
         let mut addr_to_name_mapping = BTreeMap::new();
@@ -250,7 +250,7 @@ impl<'a> MoveTestAdapter<'a> for SimpleVMTestAdapter<'a> {
                     compat,
                 )
             },
-            default_test_vm_config(),
+            production_vm_config_with_paranoid_type_checks(),
         ) {
             Ok(()) => Ok((None, module)),
             Err(vm_error) => Err(anyhow!(
@@ -560,7 +560,7 @@ impl From<AdapterExecuteArgs> for VMConfig {
     }
 }
 
-fn default_test_vm_config() -> VMConfig {
+fn production_vm_config_with_paranoid_type_checks() -> VMConfig {
     VMConfig {
         paranoid_type_checks: true,
         ..VMConfig::production()
