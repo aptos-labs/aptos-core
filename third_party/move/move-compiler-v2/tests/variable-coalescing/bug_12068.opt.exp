@@ -36,6 +36,41 @@ fun m::main() {
  24: return ()
 }
 
+============ after DeadStoreElimination: ================
+
+[variant baseline]
+fun m::main() {
+     var $t0: u64
+     var $t1: bool
+     var $t2: u64
+     var $t3: u64
+     var $t4: bool
+     var $t5: u64
+     var $t6: u64
+  0: $t0 := 0
+  1: label L0
+  2: $t1 := true
+  3: if ($t1) goto 4 else goto 9
+  4: label L2
+  5: $t3 := 1
+  6: $t2 := +($t0, $t3)
+  7: $t0 := move($t2)
+  8: goto 11
+  9: label L3
+ 10: goto 11
+ 11: label L1
+ 12: $t5 := 1
+ 13: $t4 := ==($t0, $t5)
+ 14: if ($t4) goto 15 else goto 17
+ 15: label L5
+ 16: goto 20
+ 17: label L6
+ 18: $t6 := 42
+ 19: abort($t6)
+ 20: label L7
+ 21: return ()
+}
+
 ============ after VariableCoalescingAnnotator: ================
 
 [variant baseline]
@@ -139,6 +174,41 @@ fun m::main() {
  21: return ()
 }
 
+============ after DeadStoreElimination: ================
+
+[variant baseline]
+fun m::main() {
+     var $t0: u64
+     var $t1: bool
+     var $t2: u64 [unused]
+     var $t3: u64
+     var $t4: bool [unused]
+     var $t5: u64 [unused]
+     var $t6: u64 [unused]
+  0: $t0 := 0
+  1: label L0
+  2: $t1 := true
+  3: if ($t1) goto 4 else goto 9
+  4: label L2
+  5: $t3 := 1
+  6: $t3 := +($t0, $t3)
+  7: $t0 := move($t3)
+  8: goto 11
+  9: label L3
+ 10: goto 11
+ 11: label L1
+ 12: $t3 := 1
+ 13: $t1 := ==($t0, $t3)
+ 14: if ($t1) goto 15 else goto 17
+ 15: label L5
+ 16: goto 20
+ 17: label L6
+ 18: $t0 := 42
+ 19: abort($t0)
+ 20: label L7
+ 21: return ()
+}
+
 
 ============ disassembled file-format ==================
 // Move bytecode v7
@@ -157,7 +227,7 @@ B1:
 	4: LdU64(1)
 	5: StLoc[1](loc1: u64)
 	6: MoveLoc[0](loc0: u64)
-	7: CopyLoc[1](loc1: u64)
+	7: MoveLoc[1](loc1: u64)
 	8: Add
 	9: StLoc[0](loc0: u64)
 	10: Branch(12)

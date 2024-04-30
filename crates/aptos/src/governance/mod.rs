@@ -997,6 +997,7 @@ impl CliCommand<()> for GenerateUpgradeProposal {
             move_options.named_addresses(),
             move_options.bytecode_version,
             move_options.compiler_version,
+            move_options.language_version,
             move_options.skip_attribute_checks,
             move_options.check_test_code,
         );

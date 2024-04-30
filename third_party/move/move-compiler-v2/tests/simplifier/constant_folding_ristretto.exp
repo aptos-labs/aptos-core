@@ -9,3 +9,6 @@ module 0xcafe::Ristretto {
         Tuple()
     }
 } // end 0xcafe::Ristretto
+
+
+============ bytecode verification succeeded ========

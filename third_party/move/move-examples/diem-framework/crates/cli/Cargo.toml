@@ -8,18 +8,16 @@ publish = false
 edition = "2021"
 
 [dependencies]
-anyhow = "1.0.52"
-clap = { version = "4.3.9", features = ["derive"] }
+anyhow = { workspace = true }
+clap = { workspace = true, features = ["derive"] }
 
-bcs = "0.1.4"
 move-cli = { path = "../../../../../tools/move-cli" }
 move-core-types = { path = "../../../../../move-core/types" }
 
 move-stdlib = { path = "../../../../../move-stdlib" }
 move-vm-test-utils = { path = "../../../../../move-vm/test-utils" }
-move-vm-types = { path = "../../../../../move-vm/types" }
 
 diem-framework-natives = { path = "../natives" }
 
 [dev-dependencies]
-datatest-stable = "0.1.1"
+datatest-stable = { workspace = true }

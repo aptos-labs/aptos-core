@@ -233,6 +233,7 @@ pub type AccessSpecifier = Spanned<AccessSpecifier_>;
 #[derive(PartialEq, Clone, Debug)]
 pub enum AddressSpecifier_ {
     Any,
+    Empty,
     Literal(NumericalAddress),
     Name(Name),
     Call(ModuleAccess, Option<Vec<Type>>, Name),

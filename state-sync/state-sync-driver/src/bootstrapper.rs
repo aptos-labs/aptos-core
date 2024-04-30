@@ -39,6 +39,7 @@ pub const GENESIS_TRANSACTION_VERSION: u64 = 0; // The expected version of the g
 
 /// A simple container for verified epoch states and epoch ending ledger infos
 /// that have been fetched from the network.
+#[derive(Clone)]
 pub(crate) struct VerifiedEpochStates {
     // If new epoch ending ledger infos have been fetched from the network
     fetched_epoch_ending_ledger_infos: bool,
@@ -142,10 +143,10 @@ impl VerifiedEpochStates {
 
             // Verify we haven't missed the waypoint
             if ledger_info_version > waypoint_version {
-                return Err(Error::VerificationError(
-                    format!("Failed to verify the waypoint: ledger info version is too high! Waypoint version: {:?}, ledger info version: {:?}",
-                            waypoint_version, ledger_info_version)
-                ));
+                panic!(
+                    "Failed to verify the waypoint: ledger info version is too high! Waypoint version: {:?}, ledger info version: {:?}",
+                    waypoint_version, ledger_info_version
+                );
             }
 
             // Check if we've found the ledger info corresponding to the waypoint version
@@ -153,10 +154,10 @@ impl VerifiedEpochStates {
                 match waypoint.verify(ledger_info) {
                     Ok(()) => self.set_verified_waypoint(waypoint_version),
                     Err(error) => {
-                        return Err(Error::VerificationError(
-                            format!("Failed to verify the waypoint: {:?}! Waypoint: {:?}, given ledger info: {:?}",
-                                    error, waypoint, ledger_info)
-                        ));
+                        panic!(
+                            "Failed to verify the waypoint: {:?}! Waypoint: {:?}, given ledger info: {:?}",
+                            error, waypoint, ledger_info
+                        );
                     },
                 }
             }
@@ -862,7 +863,11 @@ impl<
             self.verified_epoch_states
                 .set_fetched_epoch_ending_ledger_infos();
         } else {
-            return Err(Error::AdvertisedDataError("Our waypoint is unverified, but there's no higher epoch ending ledger infos advertised!".into()));
+            return Err(Error::AdvertisedDataError(format!(
+                "Our waypoint is unverified, but there's no higher epoch ending ledger infos \
+                advertised! Highest local epoch end: {:?}, highest advertised epoch end: {:?}",
+                highest_local_epoch_end, highest_advertised_epoch_end
+            )));
         };
 
         Ok(())
@@ -1551,5 +1556,11 @@ impl<
     #[cfg(test)]
     pub(crate) fn get_state_value_syncer(&mut self) -> &mut StateValueSyncer {
         &mut self.state_value_syncer
+    }
+
+    /// Manually sets the waypoint for testing purposes
+    #[cfg(test)]
+    pub(crate) fn set_waypoint(&mut self, waypoint: Waypoint) {
+        self.driver_configuration.waypoint = waypoint;
     }
 }

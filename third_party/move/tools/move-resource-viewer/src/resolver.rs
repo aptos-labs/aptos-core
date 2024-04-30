@@ -4,6 +4,7 @@
 
 use crate::{
     fat_type::{FatStructType, FatType, WrappedAbilitySet},
+    limit::Limiter,
     module_cache::ModuleCache,
 };
 use anyhow::{anyhow, Error, Result};
@@ -91,6 +92,7 @@ impl<'a, T: ModuleResolver + ?Sized> Resolver<'a, T> {
         module: &ModuleId,
         function: &IdentStr,
     ) -> Result<Vec<FatType>> {
+        let mut limit = Limiter::default();
         let m = self.get_module_by_id_or_err(module)?;
         for def in m.function_defs.iter() {
             let fhandle = m.function_handle_at(def.function);
@@ -100,39 +102,47 @@ impl<'a, T: ModuleResolver + ?Sized> Resolver<'a, T> {
                     .parameters()
                     .0
                     .iter()
-                    .map(|signature| self.resolve_signature(m.clone(), signature))
+                    .map(|signature| self.resolve_signature(m.clone(), signature, &mut limit))
                     .collect::<Result<_>>();
             }
         }
         Err(anyhow!("Function {:?} not found in {:?}", function, module))
     }
 
-    pub fn resolve_type(&self, type_tag: &TypeTag) -> Result<FatType> {
+    pub fn resolve_type_impl(&self, type_tag: &TypeTag, limit: &mut Limiter) -> Result<FatType> {
         Ok(match type_tag {
             TypeTag::Address => FatType::Address,
             TypeTag::Signer => FatType::Signer,
             TypeTag::Bool => FatType::Bool,
-            TypeTag::Struct(st) => FatType::Struct(Box::new(self.resolve_struct(st)?)),
+            TypeTag::Struct(st) => FatType::Struct(Box::new(self.resolve_struct_impl(st, limit)?)),
             TypeTag::U8 => FatType::U8,
             TypeTag::U16 => FatType::U16,
             TypeTag::U32 => FatType::U32,
             TypeTag::U64 => FatType::U64,
             TypeTag::U256 => FatType::U256,
             TypeTag::U128 => FatType::U128,
-            TypeTag::Vector(ty) => FatType::Vector(Box::new(self.resolve_type(ty)?)),
+            TypeTag::Vector(ty) => FatType::Vector(Box::new(self.resolve_type_impl(ty, limit)?)),
         })
     }
 
     pub fn resolve_struct(&self, struct_tag: &StructTag) -> Result<FatStructType> {
+        self.resolve_struct_impl(struct_tag, &mut Limiter::default())
+    }
+
+    fn resolve_struct_impl(
+        &self,
+        struct_tag: &StructTag,
+        limit: &mut Limiter,
+    ) -> Result<FatStructType> {
         let module = self.get_module(&struct_tag.address, &struct_tag.module)?;
         let struct_def = find_struct_def_in_module(module.clone(), struct_tag.name.as_ident_str())?;
         let ty_args = struct_tag
             .type_params
             .iter()
-            .map(|ty| self.resolve_type(ty))
+            .map(|ty| self.resolve_type_impl(ty, limit))
             .collect::<Result<Vec<_>>>()?;
-        let ty_body = self.resolve_struct_definition(module, struct_def)?;
-        ty_body.subst(&ty_args).map_err(|e: PartialVMError| {
+        let ty_body = self.resolve_struct_definition(module, struct_def, limit)?;
+        ty_body.subst(&ty_args, limit).map_err(|e: PartialVMError| {
             anyhow!("StructTag {:?} cannot be resolved: {:?}", struct_tag, e)
         })
     }
@@ -155,6 +165,7 @@ impl<'a, T: ModuleResolver + ?Sized> Resolver<'a, T> {
         &self,
         module: Rc<CompiledModule>,
         sig: &SignatureToken,
+        limit: &mut Limiter,
     ) -> Result<FatType> {
         Ok(match sig {
             SignatureToken::Bool => FatType::Bool,
@@ -167,20 +178,20 @@ impl<'a, T: ModuleResolver + ?Sized> Resolver<'a, T> {
             SignatureToken::Address => FatType::Address,
             SignatureToken::Signer => FatType::Signer,
             SignatureToken::Vector(ty) => {
-                FatType::Vector(Box::new(self.resolve_signature(module, ty)?))
+                FatType::Vector(Box::new(self.resolve_signature(module, ty, limit)?))
             },
             SignatureToken::Struct(idx) => {
-                FatType::Struct(Box::new(self.resolve_struct_handle(module, *idx)?))
+                FatType::Struct(Box::new(self.resolve_struct_handle(module, *idx, limit)?))
             },
             SignatureToken::StructInstantiation(idx, toks) => {
-                let struct_ty = self.resolve_struct_handle(module.clone(), *idx)?;
+                let struct_ty = self.resolve_struct_handle(module.clone(), *idx, limit)?;
                 let args = toks
                     .iter()
-                    .map(|tok| self.resolve_signature(module.clone(), tok))
+                    .map(|tok| self.resolve_signature(module.clone(), tok, limit))
                     .collect::<Result<Vec<_>>>()?;
                 FatType::Struct(Box::new(
                     struct_ty
-                        .subst(&args)
+                        .subst(&args, limit)
                         .map_err(|status| anyhow!("Substitution failure: {:?}", status))?,
                 ))
             },
@@ -197,6 +208,7 @@ impl<'a, T: ModuleResolver + ?Sized> Resolver<'a, T> {
         &self,
         module: Rc<CompiledModule>,
         idx: StructHandleIndex,
+        limit: &mut Limiter,
     ) -> Result<FatStructType> {
         let struct_handle = module.struct_handle_at(idx);
         let target_module = {
@@ -210,13 +222,14 @@ impl<'a, T: ModuleResolver + ?Sized> Resolver<'a, T> {
             target_module.clone(),
             module.identifier_at(struct_handle.name),
         )?;
-        self.resolve_struct_definition(target_module, target_idx)
+        self.resolve_struct_definition(target_module, target_idx, limit)
     }
 
     fn resolve_struct_definition(
         &self,
         module: Rc<CompiledModule>,
         idx: StructDefinitionIndex,
+        limit: &mut Limiter,
     ) -> Result<FatStructType> {
         let struct_def = module.struct_def_at(idx);
         let struct_handle = module.struct_handle_at(struct_def.struct_handle);
@@ -227,6 +240,11 @@ impl<'a, T: ModuleResolver + ?Sized> Resolver<'a, T> {
         let ty_args = (0..struct_handle.type_parameters.len())
             .map(FatType::TyParam)
             .collect();
+
+        limit.charge(std::mem::size_of::<AccountAddress>())?;
+        limit.charge(module_name.as_bytes().len())?;
+        limit.charge(name.as_bytes().len())?;
+
         match &struct_def.field_information {
             StructFieldInformation::Native => Err(anyhow!("Unexpected Native Struct")),
             StructFieldInformation::Declared(defs) => Ok(FatStructType {
@@ -237,7 +255,9 @@ impl<'a, T: ModuleResolver + ?Sized> Resolver<'a, T> {
                 ty_args,
                 layout: defs
                     .iter()
-                    .map(|field_def| self.resolve_signature(module.clone(), &field_def.signature.0))
+                    .map(|field_def| {
+                        self.resolve_signature(module.clone(), &field_def.signature.0, limit)
+                    })
                     .collect::<Result<_>>()?,
             }),
         }

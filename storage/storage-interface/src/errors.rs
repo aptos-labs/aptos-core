@@ -84,6 +84,7 @@ impl From<StateviewError> for AptosDbError {
         match error {
             StateviewError::NotFound(msg) => AptosDbError::NotFound(msg),
             StateviewError::Other(msg) => AptosDbError::Other(msg),
+            StateviewError::BcsError(err) => AptosDbError::BcsError(err.to_string()),
         }
     }
 }

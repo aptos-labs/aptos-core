@@ -11,6 +11,7 @@ use crate::{
         model_builder::{AnyFunEntry, ConstEntry, EntryVisibility, LocalVarEntry, StructEntry},
         module_builder::{ModuleBuilder, SpecBlockContext},
     },
+    metadata::LanguageVersion,
     model::{
         FieldId, GlobalEnv, Loc, ModuleId, NodeId, Parameter, QualifiedId, QualifiedInstId,
         SpecFunId, StructId, TypeParameter, TypeParameterKind,
@@ -24,7 +25,7 @@ use crate::{
 };
 use codespan_reporting::diagnostic::Severity;
 use itertools::Itertools;
-use move_binary_format::file_format::AbilitySet;
+use move_binary_format::file_format::{self, AbilitySet};
 use move_compiler::{
     expansion::ast as EA,
     hlir::ast as HA,
@@ -164,6 +165,18 @@ impl<'env, 'translator, 'module_translator> ExpTranslator<'env, 'translator, 'mo
             et.old_status = OldExpStatus::NotSupported;
         };
         et
+    }
+
+    pub fn check_language_version(&self, loc: &Loc, feature: &str, version_min: LanguageVersion) {
+        if self.env().language_version() < version_min {
+            self.env().error(
+                loc,
+                &format!(
+                    "not supported before language version `{}`: {}",
+                    version_min, feature
+                ),
+            )
+        }
     }
 
     pub fn set_spec_block_map(&mut self, map: BTreeMap<EA::SpecId, EA::SpecBlock>) {
@@ -468,13 +481,25 @@ impl<'env, 'translator, 'module_translator> ExpTranslator<'env, 'translator, 'mo
         if let Type::TypeParameter(..) = &ty {
             if self.type_params_table.insert(name, ty.clone()).is_some() && report_errors {
                 let param_name = name.display(self.symbol_pool());
-                self.error(
+                let prev_loc = self
+                    .type_params
+                    .iter()
+                    .find_map(
+                        |(prev_name, _ty, _kind, loc)| {
+                            if prev_name == &name {
+                                Some(loc)
+                            } else {
+                                None
+                            }
+                        },
+                    );
+                self.error_with_labels(
                     loc,
-                    &format!(
-                        "duplicate declaration of type parameter `{}`, \
-                        previously found in type parameters",
-                        param_name
-                    ),
+                    &format!("duplicate declaration of type parameter `{}`", param_name),
+                    vec![(
+                        prev_loc.expect("location").clone(),
+                        "previously declared here".to_string(),
+                    )],
                 );
                 return;
             }
@@ -1068,15 +1093,19 @@ impl<'env, 'translator, 'module_translator> ExpTranslator<'env, 'translator, 'mo
     ) -> Option<Vec<AccessSpecifier>> {
         specifiers.as_ref().map(|v| {
             v.iter()
-                .map(|s| self.translate_access_specifier(s))
+                .filter_map(|s| self.translate_access_specifier(s))
                 .collect()
         })
     }
 
-    fn translate_access_specifier(&mut self, specifier: &EA::AccessSpecifier) -> AccessSpecifier {
+    fn translate_access_specifier(
+        &mut self,
+        specifier: &EA::AccessSpecifier,
+    ) -> Option<AccessSpecifier> {
         fn is_wildcard(name: &Name) -> bool {
             name.value.as_str() == "*"
         }
+
         let loc = self.to_loc(&specifier.loc);
         let EA::AccessSpecifier_ {
             kind,
@@ -1087,6 +1116,21 @@ impl<'env, 'translator, 'module_translator> ExpTranslator<'env, 'translator, 'mo
             type_args,
             address,
         } = &specifier.value;
+        if *kind != file_format::AccessKind::Acquires {
+            self.check_language_version(
+                &loc,
+                "read/write access specifiers. Try `acquires` instead.",
+                LanguageVersion::V2_0,
+            )
+        } else if *negated {
+            self.check_language_version(&loc, "access specifier negation", LanguageVersion::V2_0)
+        } else if type_args.is_some() && !type_args.as_ref().unwrap().is_empty() {
+            self.check_language_version(
+                &loc,
+                "access specifier type instantiation. Try removing the type instantiation.",
+                LanguageVersion::V2_0,
+            )
+        }
         let resource = match (module_address, module_name, resource_name) {
             (None, None, None) => {
                 // This stems from a  specifier of the form `acquires *(0x1)`
@@ -1161,7 +1205,11 @@ impl<'env, 'translator, 'module_translator> ExpTranslator<'env, 'translator, 'mo
             (Some(_), Some(module), Some(resource))
                 if is_wildcard(&module.0) && !is_wildcard(resource) =>
             {
-                self.error(&loc, "invalid access specifier: a wildcard cannot be followed by a non-wildcard name component");
+                self.error(
+                    &loc,
+                    "invalid access specifier: a wildcard \
+                cannot be followed by a non-wildcard name component",
+                );
                 ResourceSpecifier::Any
             },
             _ => {
@@ -1169,28 +1217,55 @@ impl<'env, 'translator, 'module_translator> ExpTranslator<'env, 'translator, 'mo
                 ResourceSpecifier::Any
             },
         };
-        let address = self.translate_address_specifier(address);
-        AccessSpecifier {
+        if !matches!(resource, ResourceSpecifier::Resource(..)) {
+            self.check_language_version(
+                &loc,
+                "address and wildcard access specifiers. Only resource type names can be provided.",
+                LanguageVersion::V2_0,
+            );
+        }
+        let address = self.translate_address_specifier(address)?;
+        Some(AccessSpecifier {
             loc: loc.clone(),
             kind: *kind,
             negated: *negated,
             resource: (loc, resource),
             address,
-        }
+        })
     }
 
     fn translate_address_specifier(
         &mut self,
         specifier: &EA::AddressSpecifier,
-    ) -> (Loc, AddressSpecifier) {
+    ) -> Option<(Loc, AddressSpecifier)> {
         let loc = self.to_loc(&specifier.loc);
-        match &specifier.value {
-            EA::AddressSpecifier_::Any => (loc, AddressSpecifier::Any),
-            EA::AddressSpecifier_::Literal(addr) => (
-                loc,
-                AddressSpecifier::Address(Address::Numerical(addr.into_inner())),
-            ),
+        let res = match &specifier.value {
+            EA::AddressSpecifier_::Empty => (loc, AddressSpecifier::Any),
+            EA::AddressSpecifier_::Any => {
+                self.check_language_version(
+                    &loc,
+                    "wildcard address specifiers",
+                    LanguageVersion::V2_0,
+                );
+                (loc, AddressSpecifier::Any)
+            },
+            EA::AddressSpecifier_::Literal(addr) => {
+                self.check_language_version(
+                    &loc,
+                    "literal address specifiers",
+                    LanguageVersion::V2_0,
+                );
+                (
+                    loc,
+                    AddressSpecifier::Address(Address::Numerical(addr.into_inner())),
+                )
+            },
             EA::AddressSpecifier_::Name(name) => {
+                self.check_language_version(
+                    &loc,
+                    "named address specifiers",
+                    LanguageVersion::V2_0,
+                );
                 // Construct an expansion name exp for regular type check
                 let maccess = sp(name.loc, EA::ModuleAccess_::Name(*name));
                 self.translate_name(
@@ -1206,6 +1281,11 @@ impl<'env, 'translator, 'module_translator> ExpTranslator<'env, 'translator, 'mo
                 )
             },
             EA::AddressSpecifier_::Call(maccess, type_args, name) => {
+                self.check_language_version(
+                    &loc,
+                    "derived address specifiers",
+                    LanguageVersion::V2_0,
+                );
                 // Construct an expansion function call for regular type check
                 let name_exp = sp(
                     name.loc,
@@ -1236,7 +1316,8 @@ impl<'env, 'translator, 'module_translator> ExpTranslator<'env, 'translator, 'mo
                     (loc, AddressSpecifier::Any)
                 }
             },
-        }
+        };
+        Some(res)
     }
 
     fn translate_address(&mut self, loc: &Loc, addr: &EA::Address) -> Address {
@@ -2145,7 +2226,7 @@ impl<'env, 'translator, 'module_translator> ExpTranslator<'env, 'translator, 'mo
                     let specialized_expected_type = self.subs.specialize(expected_type);
                     if let Type::Tuple(tys) = specialized_expected_type {
                         if tys.len() != 1 {
-                            self.error(loc, &context.arity_mismatch(false, 1, tys.len()));
+                            self.error(loc, &context.arity_mismatch(false, tys.len(), 1));
                             return self.new_error_pat(loc);
                         }
                     }
@@ -3445,6 +3526,7 @@ impl<'env, 'translator, 'module_translator> ExpTranslator<'env, 'translator, 'mo
         args: Vec<Exp>,
         expected_type: &Type,
     ) -> ExpData {
+        self.check_language_version(loc, "receiver style function calls", LanguageVersion::V2_0);
         let generics = generics
             .as_ref()
             .map(|tys| self.translate_types_with_loc(tys));

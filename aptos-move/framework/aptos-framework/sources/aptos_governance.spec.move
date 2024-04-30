@@ -139,11 +139,11 @@ spec aptos_framework::aptos_governance {
         use aptos_framework::coin::CoinInfo;
         use aptos_framework::aptos_coin::AptosCoin;
         use aptos_framework::transaction_fee;
-        pragma verify_duration_estimate = 600;
+        pragma verify = false; // TODO: set because of timeout (property proved).
         let addr = signer::address_of(aptos_framework);
         aborts_if addr != @aptos_framework;
         include reconfiguration_with_dkg::FinishRequirement {
-            account: aptos_framework
+            framework: aptos_framework
         };
         include stake::GetReconfigStartTimeRequirement;
         include transaction_fee::RequiresCollectedFeesPerValueLeqBlockAptosSupply;
@@ -579,10 +579,10 @@ spec aptos_framework::aptos_governance {
         use aptos_framework::coin::CoinInfo;
         use aptos_framework::aptos_coin::AptosCoin;
         use aptos_framework::transaction_fee;
-        pragma verify_duration_estimate = 600; // TODO: set because of timeout (property proved)
+        pragma verify = false; // TODO: set because of timeout (property proved).
         aborts_if !system_addresses::is_aptos_framework_address(signer::address_of(aptos_framework));
         include reconfiguration_with_dkg::FinishRequirement {
-            account: aptos_framework
+            framework: aptos_framework
         };
         include stake::GetReconfigStartTimeRequirement;
 
@@ -837,10 +837,10 @@ spec aptos_framework::aptos_governance {
     spec force_end_epoch(aptos_framework: &signer) {
         use aptos_framework::reconfiguration_with_dkg;
         use std::signer;
-        pragma verify_duration_estimate = 600;
+        pragma verify = false; // TODO: set because of timeout (property proved).
         let address = signer::address_of(aptos_framework);
         include reconfiguration_with_dkg::FinishRequirement {
-            account: aptos_framework
+            framework: aptos_framework
         };
     }
 

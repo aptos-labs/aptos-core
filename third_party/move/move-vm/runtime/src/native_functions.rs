@@ -3,7 +3,10 @@
 // SPDX-License-Identifier: Apache-2.0
 
 use crate::{
-    data_cache::TransactionDataCache, interpreter::Interpreter, loader::Resolver,
+    data_cache::TransactionDataCache,
+    interpreter::Interpreter,
+    loader::{Function, Resolver},
+    module_traversal::TraversalContext,
     native_extensions::NativeContextExtensions,
 };
 use move_binary_format::errors::{
@@ -13,7 +16,7 @@ use move_core_types::{
     account_address::AccountAddress,
     gas_algebra::{InternalGas, NumBytes},
     identifier::Identifier,
-    language_storage::TypeTag,
+    language_storage::{ModuleId, TypeTag},
     value::MoveTypeLayout,
     vm_status::StatusCode,
 };
@@ -99,6 +102,7 @@ pub struct NativeContext<'a, 'b, 'c> {
     resolver: &'a Resolver<'a>,
     extensions: &'a mut NativeContextExtensions<'b>,
     gas_balance: InternalGas,
+    traversal_context: &'a TraversalContext<'a>,
 }
 
 impl<'a, 'b, 'c> NativeContext<'a, 'b, 'c> {
@@ -108,6 +112,7 @@ impl<'a, 'b, 'c> NativeContext<'a, 'b, 'c> {
         resolver: &'a Resolver<'a>,
         extensions: &'a mut NativeContextExtensions<'b>,
         gas_balance: InternalGas,
+        traversal_context: &'a TraversalContext<'a>,
     ) -> Self {
         Self {
             interpreter,
@@ -115,6 +120,7 @@ impl<'a, 'b, 'c> NativeContext<'a, 'b, 'c> {
             resolver,
             extensions,
             gas_balance,
+            traversal_context,
         }
     }
 }
@@ -181,5 +187,32 @@ impl<'a, 'b, 'c> NativeContext<'a, 'b, 'c> {
 
     pub fn gas_balance(&self) -> InternalGas {
         self.gas_balance
+    }
+
+    pub fn traversal_context(&self) -> &TraversalContext {
+        self.traversal_context
+    }
+
+    pub fn load_function(
+        &mut self,
+        module: &ModuleId,
+        function_name: &Identifier,
+    ) -> PartialVMResult<Arc<Function>> {
+        // Load the module that contains this function regardless of the traversal context.
+        //
+        // This is just a precautionary step to make sure that caching status of the VM will not alter execution
+        // result in case framework code forgot to use LoadFunction result to load the modules into cache
+        // and charge properly.
+        self.resolver
+            .loader()
+            .load_module(module, self.data_store, self.resolver.module_store())
+            .map_err(|_| {
+                PartialVMError::new(StatusCode::FUNCTION_RESOLUTION_FAILURE)
+                    .with_message(format!("Module {} doesn't exist", module))
+            })?;
+
+        self.resolver
+            .module_store()
+            .resolve_function_by_name(function_name, module)
     }
 }

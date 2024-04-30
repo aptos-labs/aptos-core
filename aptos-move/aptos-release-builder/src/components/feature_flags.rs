@@ -106,6 +106,14 @@ pub enum FeatureFlag {
     MaxObjectNestingCheck,
     KeylessAccountsWithPasskeys,
     MultisigV2Enhancement,
+    DelegationPoolAllowlisting,
+    ModuleEventMigration,
+    RejectUnstableBytecode,
+    TransactionContextExtension,
+    CoinToFungibleAssetMigration,
+    PrimaryAPTFungibleStoreAtUserAddress,
+    ObjectNativeDerivedAddress,
+    DispatchableFungibleAsset,
 }
 
 fn generate_features_blob(writer: &CodeWriter, data: &[u64]) {
@@ -266,6 +274,24 @@ impl From<FeatureFlag> for AptosFeatureFlag {
                 AptosFeatureFlag::KEYLESS_ACCOUNTS_WITH_PASSKEYS
             },
             FeatureFlag::MultisigV2Enhancement => AptosFeatureFlag::MULTISIG_V2_ENHANCEMENT,
+            FeatureFlag::DelegationPoolAllowlisting => {
+                AptosFeatureFlag::DELEGATION_POOL_ALLOWLISTING
+            },
+            FeatureFlag::ModuleEventMigration => AptosFeatureFlag::MODULE_EVENT_MIGRATION,
+            FeatureFlag::RejectUnstableBytecode => AptosFeatureFlag::REJECT_UNSTABLE_BYTECODE,
+            FeatureFlag::TransactionContextExtension => {
+                AptosFeatureFlag::TRANSACTION_CONTEXT_EXTENSION
+            },
+            FeatureFlag::CoinToFungibleAssetMigration => {
+                AptosFeatureFlag::COIN_TO_FUNGIBLE_ASSET_MIGRATION
+            },
+            FeatureFlag::PrimaryAPTFungibleStoreAtUserAddress => {
+                AptosFeatureFlag::PRIMARY_APT_FUNGIBLE_STORE_AT_USER_ADDRESS
+            },
+            FeatureFlag::ObjectNativeDerivedAddress => {
+                AptosFeatureFlag::OBJECT_NATIVE_DERIVED_ADDRESS
+            },
+            FeatureFlag::DispatchableFungibleAsset => AptosFeatureFlag::DISPATCHABLE_FUNGIBLE_ASSET,
         }
     }
 }
@@ -355,6 +381,24 @@ impl From<AptosFeatureFlag> for FeatureFlag {
                 FeatureFlag::KeylessAccountsWithPasskeys
             },
             AptosFeatureFlag::MULTISIG_V2_ENHANCEMENT => FeatureFlag::MultisigV2Enhancement,
+            AptosFeatureFlag::DELEGATION_POOL_ALLOWLISTING => {
+                FeatureFlag::DelegationPoolAllowlisting
+            },
+            AptosFeatureFlag::MODULE_EVENT_MIGRATION => FeatureFlag::ModuleEventMigration,
+            AptosFeatureFlag::REJECT_UNSTABLE_BYTECODE => FeatureFlag::RejectUnstableBytecode,
+            AptosFeatureFlag::TRANSACTION_CONTEXT_EXTENSION => {
+                FeatureFlag::TransactionContextExtension
+            },
+            AptosFeatureFlag::COIN_TO_FUNGIBLE_ASSET_MIGRATION => {
+                FeatureFlag::CoinToFungibleAssetMigration
+            },
+            AptosFeatureFlag::PRIMARY_APT_FUNGIBLE_STORE_AT_USER_ADDRESS => {
+                FeatureFlag::PrimaryAPTFungibleStoreAtUserAddress
+            },
+            AptosFeatureFlag::OBJECT_NATIVE_DERIVED_ADDRESS => {
+                FeatureFlag::ObjectNativeDerivedAddress
+            },
+            AptosFeatureFlag::DISPATCHABLE_FUNGIBLE_ASSET => FeatureFlag::DispatchableFungibleAsset,
         }
     }
 }

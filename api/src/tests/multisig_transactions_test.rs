@@ -367,12 +367,11 @@ async fn test_multisig_transaction_simulation() {
     let withdraw_event = &simulation_resp["events"].as_array().unwrap()[0];
     assert_eq!(
         withdraw_event["type"].as_str().unwrap(),
-        "0x1::coin::WithdrawEvent"
+        "0x1::coin::Withdraw<0x1::aptos_coin::AptosCoin>"
     );
-    let withdraw_from_account = AccountAddress::from_hex_literal(
-        withdraw_event["guid"]["account_address"].as_str().unwrap(),
-    )
-    .unwrap();
+    let withdraw_from_account =
+        AccountAddress::from_hex_literal(withdraw_event["data"]["account"].as_str().unwrap())
+            .unwrap();
     let withdrawn_amount = withdraw_event["data"]["amount"].as_str().unwrap();
     assert_eq!(withdraw_from_account, multisig_account);
     assert_eq!(withdrawn_amount, "1000");

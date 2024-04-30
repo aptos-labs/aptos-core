@@ -217,13 +217,13 @@ pub fn attach_poem_to_runtime(
 
         // Build routes for the API
         let route = Route::new()
-            .at("/", root_handler)
+            .at("/", poem::get(root_handler))
             .nest(
                 "/v1",
                 Route::new()
                     .nest("/", api_service)
-                    .at("/spec.json", spec_json)
-                    .at("/spec.yaml", spec_yaml)
+                    .at("/spec.json", poem::get(spec_json))
+                    .at("/spec.yaml", poem::get(spec_yaml))
                     // TODO: We add this manually outside of the OpenAPI spec for now.
                     // https://github.com/poem-web/poem/issues/364
                     .at(

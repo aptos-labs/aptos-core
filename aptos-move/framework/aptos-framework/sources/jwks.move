@@ -247,9 +247,15 @@ module aptos_framework::jwks {
     }
 
     /// Only used in reconfigurations to apply the pending `SupportedOIDCProviders`, if there is any.
-    public(friend) fun on_new_epoch() acquires SupportedOIDCProviders {
+    public(friend) fun on_new_epoch(framework: &signer) acquires SupportedOIDCProviders {
+        system_addresses::assert_aptos_framework(framework);
         if (config_buffer::does_exist<SupportedOIDCProviders>()) {
-            *borrow_global_mut<SupportedOIDCProviders>(@aptos_framework) = config_buffer::extract();
+            let new_config = config_buffer::extract<SupportedOIDCProviders>();
+            if (exists<SupportedOIDCProviders>(@aptos_framework)) {
+                *borrow_global_mut<SupportedOIDCProviders>(@aptos_framework) = new_config;
+            } else {
+                move_to(framework, new_config);
+            }
         }
     }
 

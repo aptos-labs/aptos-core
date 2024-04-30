@@ -7,10 +7,9 @@ edition = "2021"
 license = "Apache-2.0"
 
 [dependencies]
-anyhow = "1.0.52"
+anyhow = { workspace = true }
 move-binary-format = { path = "../move-binary-format" }
 move-bytecode-source-map = { path = "../move-ir-compiler/move-bytecode-source-map" }
-move-bytecode-verifier = { path = "../move-bytecode-verifier" }
 move-command-line-common = { path = "../move-command-line-common" }
 # diem dependencies
 move-compiler = { path = "../move-compiler" }
@@ -20,22 +19,19 @@ move-ir-types = { path = "../move-ir/types" }
 move-symbol-pool = { path = "../move-symbol-pool" }
 
 # external dependencies
-codespan = "0.11.1"
-codespan-reporting = "0.11.1"
-internment = { version = "0.5.0", features = [ "arc"] }
-itertools = "0.10.0"
-log = "0.4.14"
-num = "0.4.0"
-num-traits = "0.2.15"
-once_cell = "1.7.2"
-regex = "1.5.5"
-serde = { version = "1.0.124", features = ["derive"] }
-
-# DNS
-trace = "0.1.7"
+codespan = { workspace = true }
+codespan-reporting = { workspace = true }
+internment = { workspace = true, features = ["arc"] }
+itertools = { workspace = true }
+log = { workspace = true }
+num = { workspace = true }
+num-traits = { workspace = true }
+once_cell = { workspace = true }
+regex = { workspace = true }
+serde = { workspace = true, features = ["derive"] }
 
 [dev-dependencies]
-datatest-stable = "0.1.1"
+datatest-stable = { workspace = true }
 move-prover-test-utils = { path = "../move-prover/test-utils" }
 
 [[test]]

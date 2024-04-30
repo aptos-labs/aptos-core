@@ -10,42 +10,39 @@ publish = false
 edition = "2021"
 
 [dependencies]
-anyhow = "1.0.52"
-better_any = "0.1.1"
-bytes = { version = "1.4.0" }
-clap = { version = "4.3.9", features = ["derive"] }
-codespan-reporting = "0.11.1"
-colored = "2.0.0"
+anyhow = { workspace = true }
+better_any = { workspace = true }
+clap = { workspace = true, features = ["derive"] }
+codespan-reporting = { workspace = true }
+colored = { workspace = true }
 evm-exec-utils = { path = "../../evm/exec-utils", optional = true }
-itertools = "0.10.1"
+itertools = { workspace = true }
 move-binary-format = { path = "../../move-binary-format" }
 move-bytecode-utils = { path = "../move-bytecode-utils" }
-once_cell = "1.7.2"
-rayon = "1.5.0"
-regex = "1.5.5"
+once_cell = { workspace = true }
+rayon = { workspace = true }
+regex = { workspace = true }
 
 move-command-line-common = { path = "../../move-command-line-common" }
 move-compiler = { path = "../../move-compiler" }
 move-core-types = { path = "../../move-core/types" }
 move-ir-types = { path = "../../move-ir/types" }
-move-model = { path = "../../move-model" }
 move-resource-viewer = { path = "../move-resource-viewer" }
 move-stdlib = { path = "../../move-stdlib", features = ["testing"] }
 move-symbol-pool = { path = "../../move-symbol-pool" }
 move-table-extension = { path = "../../extensions/move-table-extension" }
 move-vm-runtime = { path = "../../move-vm/runtime", features = ["testing"] }
 move-vm-test-utils = { path = "../../move-vm/test-utils" }
-move-vm-types = { path = "../../move-vm/types" }
 
 # EVM-specific dependencies
 move-to-yul = { path = "../../evm/move-to-yul", optional = true }
 
-evm = { version = "0.41.1", optional = true }
-primitive-types = { version = "0.10.1", optional = true }
+evm = { workspace = true, optional = true }
+primitive-types = { workspace = true, optional = true }
 
 [dev-dependencies]
-datatest-stable = "0.1.1"
-difference = "2.0.0"
+datatest-stable = { workspace = true }
+difference = { workspace = true }
 
 [[bin]]
 name = "move-unit-test"
@@ -58,6 +55,6 @@ harness = false
 [features]
 evm-backend = ["move-to-yul", "evm-exec-utils", "evm", "primitive-types"]
 table-extension = [
- "move-vm-test-utils/table-extension"
+    "move-vm-test-utils/table-extension"
 ]
 debugging = ["move-vm-runtime/debugging"]

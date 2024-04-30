@@ -14,7 +14,7 @@ module 0x8675309::M {
         let y_ref = &mut y;
         let r = take_imm_mut_give_mut(x_ref, y_ref);
         *x_ref;
-        move x; // error in v2 (bug in v1)?
+        move x;
         *r = 1;
     }
 

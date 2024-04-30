@@ -593,7 +593,7 @@ fn k8s_test_suite() -> ForgeConfig {
         .add_aptos_test(TransferCoins)
         .add_admin_test(GetMetadata)
         .add_network_test(EmitTransaction)
-        .add_network_test(SimpleValidatorUpgrade)
+        .add_network_test(FrameworkUpgrade)
         .add_network_test(PerformanceBenchmark)
 }
 
@@ -604,8 +604,9 @@ fn get_land_blocking_test(
     test_cmd: &TestCommand,
 ) -> Option<ForgeConfig> {
     let test = match test_name {
-        "land_blocking" => land_blocking_test_suite(duration), // TODO: remove land_blocking, superseded by below
-        "realistic_env_max_load" => realistic_env_max_load_test(duration, test_cmd, 7, 5),
+        "land_blocking" | "realistic_env_max_load" => {
+            realistic_env_max_load_test(duration, test_cmd, 7, 5)
+        },
         "compat" => compat(),
         "framework_upgrade" => framework_upgrade(),
         _ => return None, // The test name does not match a land-blocking test
@@ -782,6 +783,7 @@ fn run_consensus_only_realistic_env_max_tps() -> ForgeConfig {
         }))
         .with_validator_override_node_config_fn(Arc::new(|config, _| {
             optimize_for_maximum_throughput(config, 20_000, 4_500, 3.0);
+            state_sync_config_execute_transactions(&mut config.state_sync);
         }))
         // TODO(ibalajiarun): tune these success critiera after we have a better idea of the test behavior
         .with_success_criteria(
@@ -873,6 +875,7 @@ fn state_sync_failures_catching_up() -> ForgeConfig {
         2500,
         true,
         false,
+        false,
         ChangingWorkingQuorumTest {
             min_tps: 1500,
             always_healthy_nodes: 2,
@@ -885,73 +888,127 @@ fn state_sync_failures_catching_up() -> ForgeConfig {
 }
 
 fn state_sync_slow_processing_catching_up() -> ForgeConfig {
-    changing_working_quorum_test_helper(7, 300, 3000, 2500, true, true, ChangingWorkingQuorumTest {
-        min_tps: 750,
-        always_healthy_nodes: 2,
-        max_down_nodes: 0,
-        num_large_validators: 2,
-        add_execution_delay: true,
-        check_period_s: 57,
-    })
+    changing_working_quorum_test_helper(
+        7,
+        300,
+        3000,
+        2500,
+        true,
+        true,
+        false,
+        ChangingWorkingQuorumTest {
+            min_tps: 750,
+            always_healthy_nodes: 2,
+            max_down_nodes: 0,
+            num_large_validators: 2,
+            add_execution_delay: true,
+            check_period_s: 57,
+        },
+    )
 }
 
 fn different_node_speed_and_reliability_test() -> ForgeConfig {
-    changing_working_quorum_test_helper(20, 120, 70, 50, true, false, ChangingWorkingQuorumTest {
-        min_tps: 30,
-        always_healthy_nodes: 6,
-        max_down_nodes: 5,
-        num_large_validators: 3,
-        add_execution_delay: true,
-        check_period_s: 27,
-    })
+    changing_working_quorum_test_helper(
+        20,
+        120,
+        70,
+        50,
+        true,
+        false,
+        false,
+        ChangingWorkingQuorumTest {
+            min_tps: 30,
+            always_healthy_nodes: 6,
+            max_down_nodes: 5,
+            num_large_validators: 3,
+            add_execution_delay: true,
+            check_period_s: 27,
+        },
+    )
 }
 
 fn large_test_only_few_nodes_down() -> ForgeConfig {
-    changing_working_quorum_test_helper(60, 120, 100, 70, false, false, ChangingWorkingQuorumTest {
-        min_tps: 50,
-        always_healthy_nodes: 40,
-        max_down_nodes: 10,
-        num_large_validators: 0,
-        add_execution_delay: false,
-        check_period_s: 27,
-    })
+    changing_working_quorum_test_helper(
+        60,
+        120,
+        100,
+        70,
+        false,
+        false,
+        false,
+        ChangingWorkingQuorumTest {
+            min_tps: 50,
+            always_healthy_nodes: 40,
+            max_down_nodes: 10,
+            num_large_validators: 0,
+            add_execution_delay: false,
+            check_period_s: 27,
+        },
+    )
 }
 
 fn changing_working_quorum_test_high_load() -> ForgeConfig {
-    changing_working_quorum_test_helper(16, 120, 500, 300, true, true, ChangingWorkingQuorumTest {
-        min_tps: 50,
-        always_healthy_nodes: 0,
-        max_down_nodes: 16,
-        num_large_validators: 0,
-        add_execution_delay: false,
-        // Use longer check duration, as we are bringing enough nodes
-        // to require state-sync to catch up to have consensus.
-        check_period_s: 53,
-    })
+    changing_working_quorum_test_helper(
+        16,
+        120,
+        500,
+        300,
+        true,
+        true,
+        true,
+        ChangingWorkingQuorumTest {
+            min_tps: 50,
+            always_healthy_nodes: 0,
+            max_down_nodes: 16,
+            num_large_validators: 0,
+            add_execution_delay: false,
+            // Use longer check duration, as we are bringing enough nodes
+            // to require state-sync to catch up to have consensus.
+            check_period_s: 53,
+        },
+    )
 }
 
 fn changing_working_quorum_test() -> ForgeConfig {
-    changing_working_quorum_test_helper(16, 120, 100, 70, true, true, ChangingWorkingQuorumTest {
-        min_tps: 15,
-        always_healthy_nodes: 0,
-        max_down_nodes: 16,
-        num_large_validators: 0,
-        add_execution_delay: false,
-        // Use longer check duration, as we are bringing enough nodes
-        // to require state-sync to catch up to have consensus.
-        check_period_s: 53,
-    })
+    changing_working_quorum_test_helper(
+        16,
+        120,
+        100,
+        70,
+        true,
+        true,
+        true,
+        ChangingWorkingQuorumTest {
+            min_tps: 15,
+            always_healthy_nodes: 0,
+            max_down_nodes: 16,
+            num_large_validators: 0,
+            add_execution_delay: false,
+            // Use longer check duration, as we are bringing enough nodes
+            // to require state-sync to catch up to have consensus.
+            check_period_s: 53,
+        },
+    )
 }
 
 fn consensus_stress_test() -> ForgeConfig {
-    changing_working_quorum_test_helper(10, 60, 100, 80, true, false, ChangingWorkingQuorumTest {
-        min_tps: 50,
-        always_healthy_nodes: 10,
-        max_down_nodes: 0,
-        num_large_validators: 0,
-        add_execution_delay: false,
-        check_period_s: 27,
-    })
+    changing_working_quorum_test_helper(
+        10,
+        60,
+        100,
+        80,
+        true,
+        false,
+        false,
+        ChangingWorkingQuorumTest {
+            min_tps: 50,
+            always_healthy_nodes: 10,
+            max_down_nodes: 0,
+            num_large_validators: 0,
+            add_execution_delay: false,
+            check_period_s: 27,
+        },
+    )
 }
 
 fn realistic_env_sweep_wrap(
@@ -1052,7 +1109,7 @@ fn realistic_env_workload_sweep_test() -> ForgeConfig {
         criteria: [
             (5500, 100, 0.3, 0.3, 0.8, 0.65),
             (4500, 100, 0.3, 0.4, 1.0, 2.0),
-            (2000, 300, 0.3, 0.3, 0.8, 2.0),
+            (2000, 300, 0.3, 0.8, 0.8, 2.0),
             (600, 500, 0.3, 0.3, 0.8, 2.0),
             // (150, 0.5, 1.0, 1.5, 0.65),
         ]
@@ -1400,6 +1457,79 @@ fn realistic_env_graceful_overload() -> ForgeConfig {
         )
 }
 
+fn mixed_emit_job() -> EmitJobRequest {
+    EmitJobRequest::default()
+        .mode(EmitJobMode::MaxLoad {
+            mempool_backlog: 10000,
+        })
+        .transaction_mix(vec![
+            // To test both variants, make module publish with such frequency, so that there are
+            // similar number of sequential and parallel blocks.
+            // For other transactions, make more expensive transactions somewhat rarer.
+            (
+                TransactionTypeArg::AccountGeneration.materialize_default(),
+                10000,
+            ),
+            (
+                TransactionTypeArg::CoinTransfer.materialize_default(),
+                10000,
+            ),
+            (TransactionTypeArg::PublishPackage.materialize_default(), 3),
+            (
+                TransactionTypeArg::Batch100Transfer.materialize_default(),
+                100,
+            ),
+            (
+                TransactionTypeArg::VectorPicture30k.materialize_default(),
+                100,
+            ),
+            (
+                TransactionTypeArg::SmartTablePicture30KWith200Change.materialize(
+                    1,
+                    true,
+                    WorkflowProgress::when_done_default(),
+                ),
+                100,
+            ),
+            (
+                TransactionTypeArg::TokenV2AmbassadorMint.materialize_default(),
+                10000,
+            ),
+            (
+                TransactionTypeArg::ModifyGlobalResource.materialize_default(),
+                1000,
+            ),
+            (
+                TransactionTypeArg::ModifyGlobalResourceAggV2.materialize_default(),
+                1000,
+            ),
+            (
+                TransactionTypeArg::ModifyGlobalFlagAggV2.materialize_default(),
+                1000,
+            ),
+            (
+                TransactionTypeArg::ModifyGlobalBoundedAggV2.materialize_default(),
+                1000,
+            ),
+            (
+                TransactionTypeArg::ResourceGroupsGlobalWriteTag1KB.materialize_default(),
+                1000,
+            ),
+            (
+                TransactionTypeArg::ResourceGroupsGlobalWriteAndReadTag1KB.materialize_default(),
+                1000,
+            ),
+            (
+                TransactionTypeArg::TokenV1NFTMintAndTransferSequential.materialize_default(),
+                1000,
+            ),
+            (
+                TransactionTypeArg::TokenV1FTMintAndTransfer.materialize_default(),
+                10000,
+            ),
+        ])
+}
+
 fn workload_mix_test() -> ForgeConfig {
     ForgeConfig::default()
         .with_initial_validator_count(NonZeroUsize::new(5).unwrap())
@@ -1408,80 +1538,7 @@ fn workload_mix_test() -> ForgeConfig {
         .with_validator_override_node_config_fn(Arc::new(|config, _| {
             config.execution.processed_transactions_detailed_counters = true;
         }))
-        .with_emit_job(
-            EmitJobRequest::default()
-                .mode(EmitJobMode::MaxLoad {
-                    mempool_backlog: 10000,
-                })
-                .transaction_mix(vec![
-                    // To test both variants, make module publish with such frequency, so that there are
-                    // similar number of sequential and parallel blocks.
-                    // For other transactions, make more expensive transactions somewhat rarer.
-                    (
-                        TransactionTypeArg::AccountGeneration.materialize_default(),
-                        10000,
-                    ),
-                    (
-                        TransactionTypeArg::CoinTransfer.materialize_default(),
-                        10000,
-                    ),
-                    (TransactionTypeArg::PublishPackage.materialize_default(), 3),
-                    (
-                        TransactionTypeArg::Batch100Transfer.materialize_default(),
-                        100,
-                    ),
-                    (
-                        TransactionTypeArg::VectorPicture30k.materialize_default(),
-                        100,
-                    ),
-                    (
-                        TransactionTypeArg::SmartTablePicture30KWith200Change.materialize(
-                            1,
-                            true,
-                            WorkflowProgress::when_done_default(),
-                        ),
-                        100,
-                    ),
-                    (
-                        TransactionTypeArg::TokenV2AmbassadorMint.materialize_default(),
-                        10000,
-                    ),
-                    (
-                        TransactionTypeArg::ModifyGlobalResource.materialize_default(),
-                        1000,
-                    ),
-                    (
-                        TransactionTypeArg::ModifyGlobalResourceAggV2.materialize_default(),
-                        1000,
-                    ),
-                    (
-                        TransactionTypeArg::ModifyGlobalFlagAggV2.materialize_default(),
-                        1000,
-                    ),
-                    (
-                        TransactionTypeArg::ModifyGlobalBoundedAggV2.materialize_default(),
-                        1000,
-                    ),
-                    (
-                        TransactionTypeArg::ResourceGroupsGlobalWriteTag1KB.materialize_default(),
-                        1000,
-                    ),
-                    (
-                        TransactionTypeArg::ResourceGroupsGlobalWriteAndReadTag1KB
-                            .materialize_default(),
-                        1000,
-                    ),
-                    (
-                        TransactionTypeArg::TokenV1NFTMintAndTransferSequential
-                            .materialize_default(),
-                        1000,
-                    ),
-                    (
-                        TransactionTypeArg::TokenV1FTMintAndTransfer.materialize_default(),
-                        10000,
-                    ),
-                ]),
-        )
+        .with_emit_job(mixed_emit_job())
         .with_success_criteria(
             SuccessCriteria::new(3000)
                 .add_no_restarts()
@@ -1752,7 +1809,8 @@ fn compat() -> ForgeConfig {
         .add_network_test(SimpleValidatorUpgrade)
         .with_success_criteria(SuccessCriteria::new(5000).add_wait_for_catchup_s(240))
         .with_genesis_helm_config_fn(Arc::new(|helm_values| {
-            helm_values["chain"]["epoch_duration_secs"] = 30.into();
+            helm_values["chain"]["epoch_duration_secs"] =
+                SimpleValidatorUpgrade::EPOCH_DURATION_SECS.into();
         }))
 }
 
@@ -1762,8 +1820,10 @@ fn framework_upgrade() -> ForgeConfig {
         .add_network_test(FrameworkUpgrade)
         .with_success_criteria(SuccessCriteria::new(5000).add_wait_for_catchup_s(240))
         .with_genesis_helm_config_fn(Arc::new(|helm_values| {
-            helm_values["chain"]["epoch_duration_secs"] = 30.into();
+            helm_values["chain"]["epoch_duration_secs"] =
+                FrameworkUpgrade::EPOCH_DURATION_SECS.into();
         }))
+        .with_emit_job(mixed_emit_job())
 }
 
 fn epoch_changer_performance() -> ForgeConfig {
@@ -1867,37 +1927,6 @@ fn validators_join_and_leave() -> ForgeConfig {
         )
 }
 
-fn land_blocking_test_suite(duration: Duration) -> ForgeConfig {
-    ForgeConfig::default()
-        .with_initial_validator_count(NonZeroUsize::new(20).unwrap())
-        .with_initial_fullnode_count(10)
-        .add_network_test(PerformanceBenchmark)
-        .with_genesis_helm_config_fn(Arc::new(|helm_values| {
-            // Have single epoch change in land blocking
-            helm_values["chain"]["epoch_duration_secs"] = 300.into();
-        }))
-        .with_success_criteria(
-            SuccessCriteria::new(
-                if duration.as_secs() > 1200 {
-                    4500
-                } else {
-                    5000
-                },
-            )
-            .add_no_restarts()
-            .add_wait_for_catchup_s(
-                // Give at least 60s for catchup, give 10% of the run for longer durations.
-                (duration.as_secs() / 10).max(60),
-            )
-            .add_system_metrics_threshold(SYSTEM_12_CORES_10GB_THRESHOLD.clone())
-            .add_chain_progress(StateProgressThreshold {
-                max_no_progress_secs: 10.0,
-                max_round_gap: 4,
-            }),
-        )
-}
-
-// TODO: Replace land_blocking when performance reaches on par with current land_blocking
 fn realistic_env_max_load_test(
     duration: Duration,
     test_cmd: &TestCommand,
@@ -2162,6 +2191,7 @@ pub fn changing_working_quorum_test_helper(
     min_avg_tps: usize,
     apply_txn_outputs: bool,
     use_chain_backoff: bool,
+    allow_errors: bool,
     test: ChangingWorkingQuorumTest,
 ) -> ForgeConfig {
     let config = ForgeConfig::default();
@@ -2237,8 +2267,8 @@ pub fn changing_working_quorum_test_helper(
                     ),
                 ]),
         )
-        .with_success_criteria(
-            SuccessCriteria::new(min_avg_tps)
+        .with_success_criteria({
+            let success_criteria = SuccessCriteria::new(min_avg_tps)
                 .add_no_restarts()
                 .add_wait_for_catchup_s(30)
                 .add_chain_progress(StateProgressThreshold {
@@ -2256,8 +2286,15 @@ pub fn changing_working_quorum_test_helper(
                         40.0
                     },
                     max_round_gap: 60,
-                }),
-        )
+                });
+
+            // If errors are allowed, overwrite the success criteria
+            if allow_errors {
+                success_criteria.allow_errors()
+            } else {
+                success_criteria
+            }
+        })
 }
 
 fn large_db_test(

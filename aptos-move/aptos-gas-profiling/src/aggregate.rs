@@ -6,11 +6,7 @@ use crate::{
     render::{Render, TableKey},
 };
 use aptos_gas_algebra::{GasQuantity, GasScalingFactor, InternalGas};
-use aptos_types::state_store::state_key::StateKeyInner;
-use std::{
-    collections::{btree_map, BTreeMap},
-    ops::Deref,
-};
+use std::collections::{btree_map, BTreeMap};
 
 /// Represents an aggregation of execution gas events, including the count and total gas costs for each type of event.
 ///
@@ -25,6 +21,8 @@ pub struct AggregatedExecutionGasEvents {
 
     // TODO: Make this more strongly typed?
     pub ops: Vec<(String, usize, InternalGas)>,
+    pub transaction_write: InternalGas,
+    pub event_writes: Vec<(String, usize, InternalGas)>,
     pub storage_reads: Vec<(String, usize, InternalGas)>,
     pub storage_writes: Vec<(String, usize, InternalGas)>,
 }
@@ -73,6 +71,7 @@ impl ExecutionAndIOCosts {
         let mut ops = BTreeMap::new();
         let mut storage_reads = BTreeMap::new();
         let mut storage_writes = BTreeMap::new();
+        let mut event_writes = BTreeMap::new();
 
         for event in self.gas_events() {
             match event {
@@ -104,10 +103,18 @@ impl ExecutionAndIOCosts {
             }
         }
 
-        for write in &self.write_set_transient {
-            use StateKeyInner::*;
+        for event in &self.events_transient {
+            insert_or_add(
+                &mut event_writes,
+                format!("{}", Render(&event.ty)),
+                event.cost,
+            );
+        }
 
-            let key = match write.key.deref() {
+        for write in &self.write_set_transient {
+            use aptos_types::state_store::state_key::inner::StateKeyInner::*;
+
+            let key = match write.key.inner() {
                 AccessPath(ap) => format!("{}", Render(&ap.get_path())),
                 TableItem { handle, key } => {
                     format!("table_item<{},{}>", Render(handle), TableKey { bytes: key },)
@@ -123,6 +130,8 @@ impl ExecutionAndIOCosts {
             total: self.total,
 
             ops: into_sorted_vec(ops),
+            transaction_write: self.transaction_transient.unwrap_or_else(|| 0.into()),
+            event_writes: into_sorted_vec(event_writes),
             storage_reads: into_sorted_vec(storage_reads),
             storage_writes: into_sorted_vec(storage_writes),
         }
