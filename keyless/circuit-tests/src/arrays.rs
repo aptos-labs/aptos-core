@@ -44,7 +44,7 @@ fn array_selector_test_large() {
 
         let out_len = 2000;
         let start = rng.gen_range(0,2000);
-        let end = rng.gen_range(start+1,2000);
+        let end = rng.gen_range(start+1,2001);
 
         let output = build_array_selector_output(out_len, start, end);
         let config = CircuitPaddingConfig::new().max_length("expected_output", out_len as usize);
@@ -227,7 +227,7 @@ fn right_array_selector_test_large() {
     let circuit_handle = TestCircuitHandle::new("arrays/right_array_selector_large_test.circom").unwrap();
     let out_len = 2000;
     let mut rng = rand::thread_rng();
-    let index = rng.gen_range(0,2000);
+    let index = rng.gen_range(0,2001);
     let output = build_right_array_selector_output(out_len, index);
     let config = CircuitPaddingConfig::new().max_length("expected_output", out_len as usize);
     let circuit_input_signals = CircuitInputSignals::new().u64_input("index", index as u64).bytes_input("expected_output", &output).pad(&config).unwrap();
@@ -288,7 +288,7 @@ fn single_one_array_large_test() {
     let circuit_handle = TestCircuitHandle::new("arrays/single_one_array_large_test.circom").unwrap();
     let out_len = 2000;
     let mut rng = rand::thread_rng();
-    let index = rng.gen_range(0,2000);
+    let index = rng.gen_range(0,2001);
     let output = build_single_one_array_output(out_len, index);
     let config = CircuitPaddingConfig::new().max_length("expected_output", out_len);
     let circuit_input_signals = CircuitInputSignals::new().u64_input("index", index as u64).bytes_input("expected_output", &output).pad(&config).unwrap();
@@ -408,7 +408,7 @@ fn single_neg_one_array_large_test() {
     let circuit_handle = TestCircuitHandle::new("arrays/single_neg_one_array_large_test.circom").unwrap();
     let out_len = 2000;
     let mut rng = rand::thread_rng();
-    let index = rng.gen_range(0,2000);
+    let index = rng.gen_range(0,2001);
     let output = build_single_neg_one_array_output(out_len, index);
     let config = CircuitPaddingConfig::new().max_length("expected_output", out_len);
     let circuit_input_signals = CircuitInputSignals::new().u64_input("index", index as u64).frs_input("expected_output", &output).pad(&config).unwrap();
