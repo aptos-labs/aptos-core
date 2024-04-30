@@ -44,7 +44,7 @@ fn array_selector_test_large() {
 
         let out_len = 2000;
         let start = rng.gen_range(0,2000);
-        let end = rng.gen_range(start+1,2000);
+        let end = rng.gen_range(start+1,2001);
 
         let output = build_array_selector_output(out_len, start, end);
         let config = CircuitPaddingConfig::new().max_length("expected_output", out_len as usize);
@@ -171,7 +171,9 @@ fn left_array_selector_test() {
 fn left_array_selector_test_large() {
     let circuit_handle = TestCircuitHandle::new("arrays/left_array_selector_large_test.circom").unwrap();
     let out_len = 2000;
-    let index = 1143;
+    let mut rng = rand::thread_rng();
+    let index = rng.gen_range(0,2000);
+    let mut rng = rand::thread_rng();
     let output = build_left_array_selector_output(out_len, index);
     let config = CircuitPaddingConfig::new().max_length("expected_output", out_len as usize);
     let circuit_input_signals = CircuitInputSignals::new().u64_input("index", index as u64).bytes_input("expected_output", &output).pad(&config).unwrap();
@@ -224,7 +226,8 @@ fn right_array_selector_test() {
 fn right_array_selector_test_large() {
     let circuit_handle = TestCircuitHandle::new("arrays/right_array_selector_large_test.circom").unwrap();
     let out_len = 2000;
-    let index = 1143;
+    let mut rng = rand::thread_rng();
+    let index = rng.gen_range(0,2001);
     let output = build_right_array_selector_output(out_len, index);
     let config = CircuitPaddingConfig::new().max_length("expected_output", out_len as usize);
     let circuit_input_signals = CircuitInputSignals::new().u64_input("index", index as u64).bytes_input("expected_output", &output).pad(&config).unwrap();
@@ -284,7 +287,8 @@ fn single_one_array_test() {
 fn single_one_array_large_test() {
     let circuit_handle = TestCircuitHandle::new("arrays/single_one_array_large_test.circom").unwrap();
     let out_len = 2000;
-    let index = 1143;
+    let mut rng = rand::thread_rng();
+    let index = rng.gen_range(0,2001);
     let output = build_single_one_array_output(out_len, index);
     let config = CircuitPaddingConfig::new().max_length("expected_output", out_len);
     let circuit_input_signals = CircuitInputSignals::new().u64_input("index", index as u64).bytes_input("expected_output", &output).pad(&config).unwrap();
@@ -403,7 +407,8 @@ fn single_neg_one_array_test() {
 fn single_neg_one_array_large_test() {
     let circuit_handle = TestCircuitHandle::new("arrays/single_neg_one_array_large_test.circom").unwrap();
     let out_len = 2000;
-    let index = 1143;
+    let mut rng = rand::thread_rng();
+    let index = rng.gen_range(0,2001);
     let output = build_single_neg_one_array_output(out_len, index);
     let config = CircuitPaddingConfig::new().max_length("expected_output", out_len);
     let circuit_input_signals = CircuitInputSignals::new().u64_input("index", index as u64).frs_input("expected_output", &output).pad(&config).unwrap();
@@ -911,8 +916,6 @@ fn ascii_digits_to_field_large_test() {
 
     let digits = [2,1,2,4,7,4,8,0,1,9,2,1,8,3,6,7,4,1,5,14,41,180,1,31,47,2,3,6,7,31,35];
     let mut ascii_digits = digits_to_ascii_digits(digits.to_vec());
-    /*let mut not_digits: Vec<u8> = (0..31-19).map(|_| rng.gen_range(0, 250)).collect();
-    ascii_digits.append(&mut not_digits);*/
 
     let len = 19;
     let expected_output = 2124748019218367415;
