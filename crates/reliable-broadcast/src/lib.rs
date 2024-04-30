@@ -10,7 +10,13 @@ use futures::{
     stream::{AbortHandle, FuturesUnordered},
     Future, FutureExt, StreamExt,
 };
+use once_cell::sync::Lazy;
+use prometheus::{register_histogram_vec, HistogramVec};
 use std::{collections::HashMap, fmt::Debug, sync::Arc, time::Duration};
+
+pub static RPC_PROCESS_DURATION: Lazy<HistogramVec> = Lazy::new(|| {
+    register_histogram_vec!("aptos_rb_rpc_duration", "rb rpc duration", &["to_peer"],).unwrap()
+});
 
 pub trait RBMessage: Send + Sync + Clone {}
 
@@ -101,10 +107,13 @@ where
             .collect();
         let executor = self.executor.clone();
         async move {
-            let send_message = |receiver, message, sleep_duration: Option<Duration>| {
+            let send_message = |receiver: Author, message, sleep_duration: Option<Duration>| {
                 let network_sender = network_sender.clone();
                 let time_service = time_service.clone();
                 async move {
+                    let _timer = RPC_PROCESS_DURATION
+                        .with_label_values(&[&receiver.short_str_lossless()])
+                        .start_timer();
                     if let Some(duration) = sleep_duration {
                         time_service.sleep(duration).await;
                     }

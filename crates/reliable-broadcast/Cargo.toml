@@ -26,6 +26,8 @@ futures = { workspace = true }
 futures-channel = { workspace = true }
 tokio = { workspace = true }
 tokio-retry = { workspace = true }
+prometheus = { workspace = true }
+once_cell = { workspace = true }
 
 [dev-dependencies]
 aptos-consensus-types = { workspace = true, features = ["fuzzing"] }
