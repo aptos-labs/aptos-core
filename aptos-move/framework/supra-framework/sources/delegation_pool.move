@@ -4282,7 +4282,7 @@ module supra_framework::delegation_pool {
     #[test(staker = @0xe256f4f4e2986cada739e339895cf5585082ff247464cab8ec56eea726bd2263)]
     public entry fun test_get_expected_stake_pool_address(staker: address) {
         let pool_address = get_expected_stake_pool_address(staker, vector[0x42, 0x42]);
-        assert!(pool_address == @0xe9fc2fbb82b7e1cb7af3daef8c7a24e66780f9122d15e4f1d486ee7c7c36c48d, 0);
+        assert!(pool_address == @0x7c025e96c0d497578620f66cf9b768271cdf6444e18669244904637c4dfa4c56, 0);
     }
 
     #[test_only]

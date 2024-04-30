@@ -1433,7 +1433,7 @@ module supra_framework::staking_contract {
     #[test(staker = @0xe256f4f4e2986cada739e339895cf5585082ff247464cab8ec56eea726bd2263, operator= @0x9f0a211d218b082987408f1e393afe1ba0c202c6d280f081399788d3360c7f09)]
     public entry fun test_get_expected_stake_pool_address(staker: address, operator: address) {
         let pool_address = get_expected_stake_pool_address(staker, operator, vector[0x42, 0x42]);
-        assert!(pool_address == @0x9d9648031ada367c26f7878eb0b0406ae6a969b1a43090269e5cdfabe1b48f0f, 0);
+        assert!(pool_address == @0xb500b8db823e529929e1f9ec79abd731dcc235a2027b28bbb78d65ee928d001a, 0);
     }
 
     #[test_only]
