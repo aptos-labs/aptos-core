@@ -7,8 +7,9 @@ use aptos_keyless_common::input_processing::{
     circuit_input_signals::{CircuitInputSignals, Padded}, config::CircuitPaddingConfig,
 };
 use std::iter::zip;
-use rand::{distributions::Alphanumeric, Rng}; // 0.8
-use ark_bn254::Fr;
+use rand::{distributions::Alphanumeric, rngs::ThreadRng, Rng}; // 0.8
+use ark_bn254::{Fr};
+use ark_ff::{PrimeField, UniformRand};
 
 
 
@@ -273,6 +274,12 @@ fn calculate_total_test() {
 
 #[test]
 fn assert_equal_if_true_test() {
+
+    fn rand_fr(rng: &mut ThreadRng) -> Fr {
+        let bytes : [u8; 32] = rng.gen();
+        Fr::from_le_bytes_mod_order(&bytes)
+    }
+
     let circuit_handle = TestCircuitHandle::new("misc/assert_equal_if_true_test.circom").unwrap();
 
     let mut rng = rand::thread_rng();
@@ -282,8 +289,9 @@ fn assert_equal_if_true_test() {
         let (nums, are_equal) = 
             if rng.gen_bool(0.5) {
                 let nums : Vec<Fr> = (0..2)
-                    .map(|_| Fr::from(rng.gen::<u64>()) )
+                    .map(|_| rand_fr(&mut rng) )
                     .collect();
+
 
                 let mut are_equal = nums[0] == nums[1];
 
@@ -293,7 +301,7 @@ fn assert_equal_if_true_test() {
 
                 (nums, are_equal)
             } else {
-                let num = Fr::from(rng.gen::<u64>());
+                let num = rand_fr(&mut rng);
                 let nums : Vec<Fr> = vec![num, num];
 
                 (nums, true)
