@@ -112,10 +112,21 @@ impl StateKey {
 
         let myself = match deserialized {
             StateKeyInner::AccessPath(AccessPath { address, path }) => {
-                match bcs::from_bytes::<Path>(&path)? {
-                    Path::Code(module_id) => Self::module_id(&module_id),
-                    Path::Resource(struct_tag) => Self::resource(&address, &struct_tag)?,
-                    Path::ResourceGroup(struct_tag) => Self::resource_group(&address, &struct_tag),
+                match bcs::from_bytes::<Path>(&path) {
+                    Err(err) => {
+                        if cfg!(feature = "fuzzing") {
+                            // note: to make analyze-serde-formats test happy, do not error out
+                            //       alternative is to wrap `AccessPath::path: Vec<u8>` in an enum
+                            Self::raw(&bcs::to_bytes(&(address, path)).unwrap())
+                        } else {
+                            return Err(err.into());
+                        }
+                    },
+                    Ok(Path::Code(module_id)) => Self::module_id(&module_id),
+                    Ok(Path::Resource(struct_tag)) => Self::resource(&address, &struct_tag)?,
+                    Ok(Path::ResourceGroup(struct_tag)) => {
+                        Self::resource_group(&address, &struct_tag)
+                    },
                 }
             },
             StateKeyInner::TableItem { handle, key } => Self::table_item(&handle, &key),
