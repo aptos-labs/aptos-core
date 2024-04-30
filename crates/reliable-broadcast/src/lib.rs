@@ -111,18 +111,22 @@ where
                 let network_sender = network_sender.clone();
                 let time_service = time_service.clone();
                 async move {
-                    let _timer = RPC_PROCESS_DURATION
-                        .with_label_values(&[&receiver.short_str_lossless()])
-                        .start_timer();
-                    if let Some(duration) = sleep_duration {
-                        time_service.sleep(duration).await;
-                    }
-                    (
-                        receiver,
-                        network_sender
-                            .send_rb_rpc(receiver, message, rpc_timeout_duration)
-                            .await,
-                    )
+                    tokio::spawn(async move {
+                        let _timer = RPC_PROCESS_DURATION
+                            .with_label_values(&[&receiver.short_str_lossless()])
+                            .start_timer();
+                        if let Some(duration) = sleep_duration {
+                            time_service.sleep(duration).await;
+                        }
+                        (
+                            receiver,
+                            network_sender
+                                .send_rb_rpc(receiver, message, rpc_timeout_duration)
+                                .await,
+                        )
+                    })
+                    .await
+                    .expect("must finish")
                 }
                 .boxed()
             };
