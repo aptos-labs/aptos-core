@@ -56,17 +56,14 @@ async fn long_running_crash_recovery() {
     let epoch_duration_secs = 20;
     let dkg_secs = 20;
     let (mut swarm, mut aptos_cli, _faucet) = SwarmBuilder::new_local(4)
+        .with_num_fullnodes(1)
         .with_aptos()
-        .with_init_config(Arc::new(|_, conf, _| {
-            conf.api.failpoints_enabled = true;
-        }))
         .with_init_genesis_config(Arc::new(move |conf| {
             conf.epoch_duration_secs = epoch_duration_secs;
-            conf.allow_new_validators = true;
 
             // start with vtxn disabled and randomness off.
-            conf.consensus_config.disable_validator_txns();
-            conf.randomness_config_override = Some(OnChainRandomnessConfig::default_disabled());
+            conf.consensus_config.enable_validator_txns();
+            conf.randomness_config_override = Some(OnChainRandomnessConfig::default_enabled());
         }))
         .build_with_cli(0)
         .await;
@@ -75,7 +72,7 @@ async fn long_running_crash_recovery() {
         swarm.validators().map(|node| node.rest_client()).collect();
 
     swarm
-        .wait_for_all_nodes_to_catchup_to_epoch(3, Duration::from_secs(epoch_duration_secs + dkg_secs + 5))
+        .wait_for_all_nodes_to_catchup_to_epoch(2, Duration::from_secs(epoch_duration_secs + dkg_secs + 5))
         .await
         .expect("Waited too long for epoch 3.");
 
@@ -83,7 +80,7 @@ async fn long_running_crash_recovery() {
     let root_idx = aptos_cli.add_account_with_address_to_cli(swarm.root_key(), root_addr);
 
     info!("Publishing dice module.");
-    publish_on_chain_dice_module(&mut aptos_cli, root_idx).await;
+    publish_on_chain_dice_module(&mut aptos_cli, 0).await;
 
     let mut rng = thread_rng();
     let mut node_states = vec![NodeState::default(); 4];
