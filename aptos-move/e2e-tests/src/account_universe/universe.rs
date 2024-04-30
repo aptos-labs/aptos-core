@@ -11,8 +11,7 @@ use crate::{
 };
 use aptos_proptest_helpers::{pick_slice_idxs, Index};
 use proptest::{
-    collection::{vec, SizeRange},
-    prelude::*,
+    collection::{vec, SizeRange}, num, prelude::*
 };
 use proptest_derive::Arbitrary;
 
@@ -207,9 +206,9 @@ impl AccountPicker {
     fn pick_pair(&mut self, indexes: &[Index; 2],  w: usize) -> [usize; 2] {
         match self {
             AccountPicker::Unlimited(num_accounts) => {  
-                let temp = w % (*num_accounts/2);
-                [2*temp, 2*temp+1]
-
+                //let temp = w % (*num_accounts/2);
+                //[2*temp, 2*temp+1]
+                Self::pick_pair_impl(*num_accounts, indexes)
                 /*if w < 10 && *num_accounts > 15 {
                     //let half_accounts = (*num_accounts) / 2;
                     if w == 0 {

@@ -19,7 +19,7 @@ use once_cell::sync::Lazy;
 use proptest::strategy::Strategy;
 use std::{net::SocketAddr, sync::Arc};
 
-pub static RAYON_EXEC_POOL: Lazy<Arc<rayon::ThreadPool>> = Lazy::new(|| {
+/*pub static RAYON_EXEC_POOL: Lazy<Arc<rayon::ThreadPool>> = Lazy::new(|| {
     Arc::new(
         rayon::ThreadPoolBuilder::new()
             .num_threads(num_cpus::get())
@@ -33,7 +33,7 @@ pub static THREAD_GARAGE_EXECUTOR: Lazy<Arc<ThreadGarageExecutor>> = Lazy::new(|
     Arc::new(
         ThreadGarageExecutor::new(10, 10)
     )
-});
+});*/
 
 
 /// Benchmarking support for transactions.
