@@ -279,7 +279,7 @@ async fn assert_state(node_states: &Vec<NodeState>, swarm: &mut LocalSwarm) {
 
 async fn roll_dice(aptos_cli: &CliTestFramework) {
     let gas_options = GasOptions {
-        gas_unit_price: Some(1),
+        gas_unit_price: Some(100),
         max_gas: Some(10000),
         expiration_secs: 60,
     };
