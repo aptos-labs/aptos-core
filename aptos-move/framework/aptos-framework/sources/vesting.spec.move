@@ -435,6 +435,8 @@ spec aptos_framework::vesting {
         shareholder: address,
         new_beneficiary: address,
     ) {
+        // TODO: set because of timeout (property proved)
+        pragma verify_duration_estimate = 300;
         pragma aborts_if_is_partial;
         aborts_if !account::exists_at(new_beneficiary);
         aborts_if !coin::spec_is_account_registered<AptosCoin>(new_beneficiary);
