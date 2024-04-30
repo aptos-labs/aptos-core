@@ -4,7 +4,8 @@ use crate::TestCircuitHandle;
 use aptos_crypto::poseidon_bn254;
 use ark_bn254::Fr;
 use ark_ff::{Zero, One};
-use rand::Rng;
+use rand::{Rng, thread_rng};
+
 
 fn build_array_selector_output(len: u32, start: u32, end: u32) -> Vec<u8> {
     let mut output = Vec::new();
@@ -38,15 +39,21 @@ fn array_selector_test() {
 #[test]
 fn array_selector_test_large() {
     let circuit_handle = TestCircuitHandle::new("arrays/array_selector_test_large.circom").unwrap();
-    let out_len = 2000;
-    let start = 146;
-    let end = 1437;
-    let output = build_array_selector_output(out_len, start, end);
-    let config = CircuitPaddingConfig::new().max_length("expected_output", out_len as usize);
-    let circuit_input_signals = CircuitInputSignals::new().u64_input("start_index", start as u64).u64_input("end_index", end as u64).bytes_input("expected_output", &output).pad(&config).unwrap();
-     
-    let result = circuit_handle.gen_witness(circuit_input_signals);
-    assert!(result.is_ok());
+    for _i in 0..10 {
+
+        let mut rng = thread_rng();
+
+        let out_len = 2000;
+        let start = rng.gen_range(0,2000);
+        let end = rng.gen_range(start+1,2000);
+
+        let output = build_array_selector_output(out_len, start, end);
+        let config = CircuitPaddingConfig::new().max_length("expected_output", out_len as usize);
+        let circuit_input_signals = CircuitInputSignals::new().u64_input("start_index", start as u64).u64_input("end_index", end as u64).bytes_input("expected_output", &output).pad(&config).unwrap();
+
+        let result = circuit_handle.gen_witness(circuit_input_signals);
+        assert!(result.is_ok());
+    }
 }
 
 #[test]
