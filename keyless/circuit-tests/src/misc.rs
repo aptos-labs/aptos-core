@@ -285,7 +285,12 @@ fn assert_equal_if_true_test() {
                     .map(|_| Fr::from(rng.gen::<u64>()) )
                     .collect();
 
-                let are_equal = nums[0] == nums[1];
+                let mut are_equal = nums[0] == nums[1];
+
+                if rng.gen_bool(0.5) { 
+                    are_equal = true;
+                }
+
                 (nums, are_equal)
             } else {
                 let num = Fr::from(rng.gen::<u64>());
@@ -293,8 +298,6 @@ fn assert_equal_if_true_test() {
 
                 (nums, true)
             };
-
-
 
 
         let config = CircuitPaddingConfig::new()
@@ -308,7 +311,11 @@ fn assert_equal_if_true_test() {
 
         let result = circuit_handle.gen_witness(circuit_input_signals);
         println!("{:?}", result);
-        assert!(result.is_ok());
+        if are_equal == (nums[0] == nums[1]) {
+            assert!(result.is_ok());
+        } else {
+            assert!(result.is_err());
+        }
     }
 }
 
