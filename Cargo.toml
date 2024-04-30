@@ -521,6 +521,7 @@ dashmap = { version = "5.5.3", features = ["inline"] }
 datatest-stable = "0.1.1"
 debug-ignore = { version = "1.0.3", features = ["serde"] }
 derivative = "2.2.0"
+derivation-path = "0.2.0"
 determinator = "0.12.0"
 derive_more = "0.99.11"
 diesel = "2.1"
@@ -560,6 +561,7 @@ handlebars = "4.2.2"
 heck = "0.4.1"
 hex = { version = "0.4.3", features = ["serde"] }
 hkdf = "0.10.0"
+hmac = "0.12.0"
 hostname = "0.3.1"
 http = "0.2.9"
 httpmock = "0.6.8"

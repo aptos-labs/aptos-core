@@ -11,7 +11,7 @@ use aptos_crypto::asymmetric_encryption::{
 };
 use aptos_keyless_pepper_common::{
     jwt::Claims,
-    vuf::{self, VUF},
+    vuf::{self, bls12381_g1_bls::PinkasPepper, slip_10::{get_aptos_derivation_path, ExtendedPepper}, VUF},
     PepperInput, PepperRequest, PepperRequestV1, PepperResponse, PepperResponseV1,
 };
 use aptos_logger::info;
@@ -22,7 +22,9 @@ use aptos_types::{
 use jsonwebtoken::{Algorithm::RS256, Validation};
 use rand::thread_rng;
 use serde::{Deserialize, Serialize};
-use std::time::{SystemTime, UNIX_EPOCH};
+use std::
+    time::{SystemTime, UNIX_EPOCH}
+;
 use uuid::Uuid;
 
 pub mod about;
@@ -40,6 +42,8 @@ pub enum ProcessingFailure {
     InternalError(String),
 }
 
+pub const DEFAULT_DERIVATION_PATH: &str = "m/44'/637'/0'/0'/0'";
+
 pub fn process_v0(request: PepperRequest) -> Result<PepperResponse, ProcessingFailure> {
     let session_id = Uuid::new_v4();
     let PepperRequest {
@@ -48,7 +52,13 @@ pub fn process_v0(request: PepperRequest) -> Result<PepperResponse, ProcessingFa
         exp_date_secs,
         epk_blinder,
         uid_key,
+        derivation_path,
     } = request;
+    let derivation_path = if let Some(path) = derivation_path {
+        path
+    } else {
+        DEFAULT_DERIVATION_PATH.to_owned()
+    };
     let pepper = process_common(
         &session_id,
         jwt,
@@ -59,7 +69,19 @@ pub fn process_v0(request: PepperRequest) -> Result<PepperResponse, ProcessingFa
         false,
         None,
     )?;
-    Ok(PepperResponse { signature: pepper })
+    let derive_path = get_aptos_derivation_path(&derivation_path) .or_else(|e| Err(BadRequest(e.to_string())))?;
+
+    let pinkas_pepper = PinkasPepper::from_affine_bytes(&pepper)
+        .or_else(|_| Err(InternalError("Failed to derive pinkas pepper".to_string())))?;
+    let master_pepper = pinkas_pepper.to_master_pepper();
+    let derivation_path_pepper = ExtendedPepper::from_seed(master_pepper.to_bytes())
+        .or_else(|e| Err(InternalError(e.to_string())))?
+        .derive(&derive_path)
+        .or_else(|e| Err(InternalError(e.to_string())))?;
+    Ok(PepperResponse {
+        signature: pepper,
+        pepper: derivation_path_pepper.get_pepper().to_vec(),
+    })
 }
 
 pub fn process_v1(request: PepperRequestV1) -> Result<PepperResponseV1, ProcessingFailure> {
