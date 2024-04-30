@@ -70,12 +70,12 @@ async fn e2e_basic_consumption() {
         .unwrap()
         .into_inner();
 
-    info!("Roll history: {:?}", dice_roll_history.rolls);
+    info!("Roll history: {:?}", dice_roll_history);
 }
 
-#[derive(Deserialize, Serialize)]
+#[derive(Debug, Deserialize, Serialize)]
 struct DiceRollHistory {
-    rolls: Vec<u64>,
+    last_roll: u64,
 }
 
 pub async fn publish_on_chain_dice_module(cli: &mut CliTestFramework, publisher_account_idx: usize) {
