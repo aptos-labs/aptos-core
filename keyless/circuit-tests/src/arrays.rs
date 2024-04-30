@@ -6,7 +6,6 @@ use ark_bn254::Fr;
 use ark_ff::{Zero, One};
 use rand::{Rng, thread_rng};
 
-
 fn build_array_selector_output(len: u32, start: u32, end: u32) -> Vec<u8> {
     let mut output = Vec::new();
     for _ in 0..start {

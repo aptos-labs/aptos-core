@@ -58,6 +58,8 @@ trusted_setup() {
             {
                 echo
                 echo "Re-compiling circuit. This will take several seconds..."
+                rm -rf main_js
+                rm -rf main_c_cpp
                 circom -l . main.circom --r1cs --wasm --sym 
 
                 pushd main_js
@@ -67,9 +69,11 @@ trusted_setup() {
                 popd
 
                 circom -l . main.circom --c
-                pushd main_js
+                pushd main_c_cpp
                 {
-                  cp * $outdir/
+                  make
+                  cp main_c $outdir/
+                  cp main_c.dat $outdir/
                 }
                 popd
 

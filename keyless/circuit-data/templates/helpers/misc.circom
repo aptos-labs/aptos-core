@@ -76,6 +76,7 @@ template EmailVerifiedCheck(maxEVNameLen, maxEVValueLen, maxUIDNameLen) {
     var uid_starts_with_email_2 = IsEqual()([email[2], uid_name[2]]);
     var uid_starts_with_email_3 = IsEqual()([email[3], uid_name[3]]);
     var uid_starts_with_email_4 = IsEqual()([email[4], uid_name[4]]);
+
     var uid_starts_with_email = MultiAND(5)([uid_starts_with_email_0, uid_starts_with_email_1, uid_starts_with_email_2, uid_starts_with_email_3, uid_starts_with_email_4]);
 
 
@@ -108,6 +109,48 @@ template EmailVerifiedCheck(maxEVNameLen, maxEVValueLen, maxUIDNameLen) {
     for (var i = 0; i < 6; i++) {
         AssertEqualIfTrue()([required_ev_val_len_6[i], ev_value[i]], check_ev_val_str);
     }
+}
+
+
+template StringBodies(len) {
+  signal input in[len];
+  signal output out[len];
+
+
+  signal quotes[len];
+  signal quote_parity[len];
+  signal quote_parity_1[len];
+  signal quote_parity_2[len];
+
+  signal backslashes[len];
+  signal adjacent_backslash_parity[len];
+
+  quotes[0] <== IsEqual()([in[0], 34]); 
+  quote_parity[0] <== IsEqual()([in[0], 34]); 
+
+  backslashes[0] <== IsEqual()([in[0], 92]);
+  adjacent_backslash_parity[0] <== IsEqual()([in[0], 92]);
+
+  for (var i = 1; i < len; i++) {
+    backslashes[i] <== IsEqual()([in[i], 92]);
+    adjacent_backslash_parity[i] <== backslashes[i] * (1 - adjacent_backslash_parity[i-1]);
+  }
+
+  for (var i = 1; i < len; i++) {
+    var is_quote = IsEqual()([in[i], 34]); 
+    var prev_is_odd_backslash = adjacent_backslash_parity[i-1];
+    quotes[i] <== is_quote * (1 - prev_is_odd_backslash);
+    quote_parity_1[i] <== quotes[i] * (1 - quote_parity[i-1]);
+    quote_parity_2[i] <== (1 - quotes[i]) * quote_parity[i-1];
+    quote_parity[i] <== quote_parity_1[i] + quote_parity_2[i];
+  }
+
+
+  out[0] <== 0;
+
+  for (var i = 1; i < len; i++) {
+    out[i] <== AND()(quote_parity[i-1], quote_parity[i]);
+  }
 }
 
 
