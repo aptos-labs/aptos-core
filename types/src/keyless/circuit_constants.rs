@@ -17,7 +17,8 @@ pub(crate) const MAX_JWT_HEADER_B64_BYTES: u32 = 300;
 
 /// This constant is not explicitly defined in the circom template, but only implicitly in the way
 /// we hash the EPK.
-pub(crate) const MAX_COMMITED_EPK_BYTES: u16 = 3 * poseidon_bn254::BYTES_PACKED_PER_SCALAR as u16;
+pub(crate) const MAX_COMMITED_EPK_BYTES: u16 =
+    3 * poseidon_bn254::keyless::BYTES_PACKED_PER_SCALAR as u16;
 
 /// This function uses the decimal uncompressed point serialization which is outputted by circom.
 /// https://github.com/aptos-labs/devnet-groth16-keys/commit/02e5675f46ce97f8b61a4638e7a0aaeaa4351f76
