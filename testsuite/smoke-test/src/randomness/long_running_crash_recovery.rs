@@ -56,6 +56,7 @@ async fn long_running_crash_recovery() {
     let epoch_duration_secs = 20;
     let dkg_secs = 20;
     let (mut swarm, mut aptos_cli, _faucet) = SwarmBuilder::new_local(4)
+        .with_num_fullnodes(1)
         .with_aptos()
         .with_init_config(Arc::new(|_, conf, _| {
             conf.api.failpoints_enabled = true;
