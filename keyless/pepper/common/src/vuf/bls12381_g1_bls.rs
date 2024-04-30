@@ -28,9 +28,9 @@ pub struct Bls12381G1Bls {}
 
 pub static DST: &[u8] = b"APTOS_PEPPER_BLS12381_VUF_DST";
 
-pub static PINKAS_DST: &[u8] = b"APTOS_PEPPER_PINKAS_VUF_DST";
+pub static PINKAS_DST: &[u8] = b"APTOS_PINKAS_PEPPER_DST";
 
-pub static PINKAS_SECRET_KEY_BASE_SEED: &[u8] = b"APTOS_PEPPER_PINKAS_VUF_SECRET_KEY_BASE";
+pub static PINKAS_SECRET_KEY_BASE_SEED: &[u8] = b"APTOS_PINKAS_PEPPER__SECRET_KEY_BASE_SEED";
 
 pub static PINKAS_SECRET_KEY_BASE_G2: Lazy<blstrs::G2Projective> =
     Lazy::new(|| blstrs::G2Projective::hash_to_curve(PINKAS_SECRET_KEY_BASE_SEED, PINKAS_DST, b""));
