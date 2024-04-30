@@ -429,14 +429,15 @@ fn check_substr_inclusion_poly_test() {
     let string = "Hello World!";
     let string_len = string.len();
     let string_hash = poseidon_bn254::pad_and_hash_string(&string, max_str_len).unwrap();
-    let substring_len = 3;
-    for start_index in 0..string_len-substring_len {
-        let substring = &string[start_index..start_index+substring_len];//"lo Wor";
+    for substring_len in 1..string_len  {
+        for start_index in 0..string_len-substring_len {
+            let substring = &string[start_index..start_index+substring_len];//"lo Wor";
 
-        let circuit_input_signals = CircuitInputSignals::new().str_input("str", string).str_input("substr", substring).u64_input("substr_len", substring_len as u64).u64_input("start_index", start_index as u64).fr_input("str_hash", string_hash).pad(&config).unwrap();
+            let circuit_input_signals = CircuitInputSignals::new().str_input("str", string).str_input("substr", substring).u64_input("substr_len", substring_len as u64).u64_input("start_index", start_index as u64).fr_input("str_hash", string_hash).pad(&config).unwrap();
 
-        let result = circuit_handle.gen_witness(circuit_input_signals);
-        assert!(result.is_ok());
+            let result = circuit_handle.gen_witness(circuit_input_signals);
+            assert!(result.is_ok());
+        }
     }
 }
 
@@ -561,14 +562,15 @@ fn check_substr_inclusion_poly_boolean_test() {
     let string = "Hello World!";
     let string_len = string.len();
     let string_hash = poseidon_bn254::pad_and_hash_string(&string, max_str_len).unwrap();
-    let substring_len = 3;
-    for start_index in 0..string_len-substring_len {
-        let substring = &string[start_index..start_index+substring_len];
+    for substring_len in 1..string_len {
+        for start_index in 0..string_len-substring_len {
+            let substring = &string[start_index..start_index+substring_len];
 
-        let circuit_input_signals = CircuitInputSignals::new().str_input("str", string).str_input("substr", substring).u64_input("substr_len", substring_len as u64).u64_input("start_index", start_index as u64).fr_input("str_hash", string_hash).u64_input("expected_output", 1).pad(&config).unwrap();
+            let circuit_input_signals = CircuitInputSignals::new().str_input("str", string).str_input("substr", substring).u64_input("substr_len", substring_len as u64).u64_input("start_index", start_index as u64).fr_input("str_hash", string_hash).u64_input("expected_output", 1).pad(&config).unwrap();
 
-        let result = circuit_handle.gen_witness(circuit_input_signals);
-        assert!(result.is_ok());
+            let result = circuit_handle.gen_witness(circuit_input_signals);
+            assert!(result.is_ok());
+        }
     }
 }
 
