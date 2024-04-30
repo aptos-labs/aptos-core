@@ -564,7 +564,7 @@ fn run_test(path: &Path, config: TestConfig) -> datatest_stable::Result<()> {
     options.dependencies = if extract_test_directives(path, "// no-stdlib")?.is_empty() {
         vec![PackagePaths {
             name: Some("std".into()),
-            paths: string_vec_to_symbol_vec(&vec![path_from_crate_root("../move-stdlib/sources")]),
+            paths: string_vec_to_symbol_vec(&[path_from_crate_root("../move-stdlib/sources")]),
             named_address_map: BTreeMap::new(),
         }]
     } else {

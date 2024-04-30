@@ -13,7 +13,7 @@ use std::{collections::BTreeMap, path::Path};
 fn test_runner(path: &Path, options: ModelBuilderOptions) -> datatest_stable::Result<()> {
     let targets = vec![PackagePaths {
         name: None,
-        paths: string_vec_to_symbol_vec(&vec![path.to_str().unwrap().to_string()]),
+        paths: string_vec_to_symbol_vec(&[path.to_str().unwrap().to_string()]),
         named_address_map: BTreeMap::<Symbol, NumericalAddress>::new(),
     }];
     let env = run_model_builder_with_options(

@@ -153,7 +153,7 @@ fn run_benchmark(
     let skip_attribute_checks = true;
     let known_attributes = KnownAttribute::get_all_attribute_names().clone();
     let env = run_model_builder_with_options(
-        vec![PackagePaths {
+        &vec![PackagePaths {
             name: None,
             paths: modules.to_vec(),
             named_address_map: addrs.clone(),
