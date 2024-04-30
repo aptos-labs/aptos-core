@@ -37,8 +37,7 @@ use aptos_types::{
     ledger_info::LedgerInfoWithSignatures,
     on_chain_config::{GasSchedule, GasScheduleV2, OnChainConfig, OnChainExecutionConfig},
     state_store::{
-        state_key::{StateKey, StateKeyInner},
-        state_key_prefix::StateKeyPrefix,
+        state_key::{inner::StateKeyInner, prefix::StateKeyPrefix, StateKey},
         state_value::StateValue,
         TStateView,
     },
@@ -306,8 +305,7 @@ impl Context {
         address: AccountAddress,
         version: Version,
     ) -> Result<Option<T>> {
-        let access_path = AccessPath::resource_access_path(address, T::struct_tag())?;
-        let bytes_opt = self.get_state_value(&StateKey::access_path(access_path), version)?;
+        let bytes_opt = self.get_state_value(&StateKey::resource_typed::<T>(&address)?, version)?;
         bytes_opt
             .map(|bytes| bcs::from_bytes(&bytes))
             .transpose()
@@ -460,10 +458,7 @@ impl Context {
             .collect();
 
         let next_key = if let Some((struct_tag, _v)) = resource_iter.next().transpose()? {
-            Some(StateKey::access_path(AccessPath::new(
-                address,
-                AccessPath::resource_path_vec(struct_tag)?,
-            )))
+            Some(StateKey::resource(&address, &struct_tag)?)
         } else {
             None
         };
@@ -504,12 +499,10 @@ impl Context {
             .by_ref()
             .take(limit as usize)
             .collect::<Result<_>>()?;
-        let next_key = module_iter.next().transpose()?.map(|(module_id, _v)| {
-            StateKey::access_path(AccessPath::new(
-                address,
-                AccessPath::code_path_vec(module_id),
-            ))
-        });
+        let next_key = module_iter
+            .next()
+            .transpose()?
+            .map(|(module_id, _v)| StateKey::module_id(&module_id));
         Ok((kvs, next_key))
     }
 

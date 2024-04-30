@@ -3,7 +3,7 @@ Diagnostics:
 warning: Unused parameter `x`. Consider removing or prefixing with an underscore: `_x`
    ┌─ tests/bytecode-generator/globals.move:18:27
    │
-18 │     fun write(a: address, x: u64): u64 {
+18 │     fun write(a: address, x: u64): u64 acquires R {
    │                           ^
 
 // -- Model dump before bytecode pipeline
@@ -18,13 +18,17 @@ module 0x42::globals {
         MoveTo<globals::R>(s, pack globals::R(1));
         Tuple()
     }
-    private fun read(a: address): u64 {
+    private fun read(a: address): u64
+        acquires globals::R(*)
+     {
         {
           let r: &globals::R = BorrowGlobal(Immutable)<globals::R>(a);
           select globals::R.f<&globals::R>(r)
         }
     }
-    private fun write(a: address,x: u64): u64 {
+    private fun write(a: address,x: u64): u64
+        acquires globals::R(*)
+     {
         {
           let r: &mut globals::R = BorrowGlobal(Mutable)<globals::R>(a);
           select globals::R.f<&mut globals::R>(r) = 2;
@@ -79,3 +83,6 @@ fun globals::write($t0: address, $t1: u64): u64 {
   4: $t2 := 9
   5: return $t2
 }
+
+
+============ bytecode verification succeeded ========

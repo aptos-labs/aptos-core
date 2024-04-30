@@ -41,6 +41,7 @@ jobs:
       - run: cargo llvm-cov --ignore-run-fail --workspace --exclude smoke-test --exclude aptos-testcases --lcov --jobs 32 --output-path lcov_unit.info -vv
         env:
           INDEXER_DATABASE_URL: postgresql://postgres@localhost/postgres
+          RUST_MIN_STACK: 33554432 # 32 MB of stack
       - uses: actions/upload-artifact@v3
         with:
           name: lcov_unit
@@ -65,6 +66,7 @@ jobs:
       - run: cargo llvm-cov --ignore-run-fail --package smoke-test --lcov --output-path lcov_smoke.info -vv
         env:
           INDEXER_DATABASE_URL: postgresql://postgres@localhost/postgres
+          RUST_MIN_STACK: 33554432
       - uses: actions/upload-artifact@v3
         with:
           name: lcov_smoke
@@ -77,6 +79,9 @@ jobs:
       && !cancelled()
     needs: [ rust-unit-coverage, rust-smoke-coverage ]
     runs-on: ubuntu-latest
+    continue-on-error: true # Don't fail if the codecov upload fails
+    env:
+      CODECOV_TOKEN: ${{ secrets.CODECOV_TOKEN }}
     steps:
       - uses: actions/checkout@v3
       - uses: actions/download-artifact@v3

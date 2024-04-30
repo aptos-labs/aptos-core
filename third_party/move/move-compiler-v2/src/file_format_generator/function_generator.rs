@@ -793,7 +793,8 @@ impl<'a> FunctionGenerator<'a> {
                     // Copy the temporary if it is copyable and still used after this code point, or
                     // if it appears again in temps_to_push.
                     if fun_ctx.is_copyable(*temp)
-                        && (ctx.is_alive_after(*temp) || temps_to_push[pos + 1..].contains(temp))
+                        && (ctx.is_alive_after(*temp, true)
+                            || temps_to_push[pos + 1..].contains(temp))
                     {
                         self.emit(FF::Bytecode::CopyLoc(local))
                     } else {
@@ -832,7 +833,7 @@ impl<'a> FunctionGenerator<'a> {
         let mut stack_to_flush = self.stack.len();
         for temp in temps {
             if let Some(pos) = self.stack.iter().position(|t| t == temp) {
-                if ctx.is_alive_after(*temp) {
+                if ctx.is_alive_after(*temp, true) {
                     // Determine new lowest point to which we need to flush
                     stack_to_flush = std::cmp::min(stack_to_flush, pos);
                 }
@@ -866,7 +867,7 @@ impl<'a> FunctionGenerator<'a> {
         while self.stack.len() > top {
             let temp = self.stack.pop().unwrap();
             if before && ctx.is_alive_before(temp)
-                || !before && ctx.is_alive_after(temp)
+                || !before && ctx.is_alive_after(temp, false)
                 || self.pinned.contains(&temp)
             {
                 // Only need to save to a local if the temp is still used afterwards
@@ -927,7 +928,10 @@ impl<'a> FunctionGenerator<'a> {
         local
     }
 
-    /// Allocates a local for the given temporary
+    /// Allocates a local for the given temporary.
+    /// If a local is not already available, then allocates one.
+    /// While allocating one, it adds it to the source map, unless
+    /// it is a parameter (these are recorded elsewhere).
     fn temp_to_local(
         &mut self,
         ctx: &FunctionContext,
@@ -940,23 +944,26 @@ impl<'a> FunctionGenerator<'a> {
             let idx = self.new_local(ctx, ctx.temp_type(temp).to_owned());
             self.temps.insert(temp, TempInfo::new(idx));
 
-            let loc = if let Some(id) = bc_attr_opt {
-                // Have a bytecode specific location for this local
-                ctx.fun.get_bytecode_loc(id)
-            } else if temp < ctx.fun.get_parameter_count() {
-                // Take location from parameter
-                ctx.fun.func_env.get_parameters()[temp].2.clone()
+            if temp < ctx.fun.get_parameter_count() {
+                // `temp` is a parameter.
+                // Don't add it to the source map here.
+                idx
             } else {
-                // Fall back to function identifier
-                ctx.fun.func_env.get_id_loc()
-            };
-            let name = ctx.fun.get_local_name(temp);
-            self.gen
-                .source_map
-                .add_local_mapping(ctx.def_idx, ctx.module.source_name(name, loc))
-                .expect(SOURCE_MAP_OK);
-
-            idx
+                let loc = if let Some(id) = bc_attr_opt {
+                    // Have a bytecode specific location for this local
+                    ctx.fun.get_bytecode_loc(id)
+                } else {
+                    // Fall back to function identifier
+                    ctx.fun.func_env.get_id_loc()
+                };
+                // Only add to the source map if it wasn't a parameter.
+                let name = ctx.fun.get_local_name(temp);
+                self.gen
+                    .source_map
+                    .add_local_mapping(ctx.def_idx, ctx.module.source_name(name, loc))
+                    .expect(SOURCE_MAP_OK);
+                idx
+            }
         }
     }
 }
@@ -984,8 +991,15 @@ impl<'env> FunctionContext<'env> {
 }
 
 impl<'env> BytecodeContext<'env> {
-    /// Determine whether the temporary is alive (used) in the reachable code after this point.
-    pub fn is_alive_after(&self, temp: TempIndex) -> bool {
+    /// Determine whether `temp` is alive (used) in the reachable code after this point.
+    /// When `dest_check` is true, we additionally check if `temp` is also written to
+    /// by the current instruction; if it is, then the definition of `temp` being
+    /// considered here is killed, making it not alive after this point.
+    pub fn is_alive_after(&self, temp: TempIndex, dest_check: bool) -> bool {
+        let bc = &self.fun_ctx.fun.data.code[self.code_offset as usize];
+        if dest_check && bc.dests().contains(&temp) {
+            return false;
+        }
         let an = self
             .fun_ctx
             .fun
@@ -997,7 +1011,7 @@ impl<'env> BytecodeContext<'env> {
             .unwrap_or(false)
     }
 
-    /// Determine whether the temporary is alive (used) in the reachable code before and until
+    /// Determine whether `temp` is alive (used) in the reachable code before and until
     /// this point.
     pub fn is_alive_before(&self, temp: TempIndex) -> bool {
         let an = self

@@ -11,10 +11,15 @@ use clap::{builder::PossibleValuesParser, Arg, ArgAction, ArgAction::SetTrue, Co
 use codespan_reporting::diagnostic::Severity;
 use log::LevelFilter;
 use move_abigen::AbigenOptions;
+use move_command_line_common::env::{bool_to_str, get_move_compiler_v2_from_env};
 use move_compiler::{command_line::SKIP_ATTRIBUTE_CHECKS, shared::NumericalAddress};
 use move_docgen::DocgenOptions;
 use move_errmapgen::ErrmapOptions;
-use move_model::{model::VerificationScope, options::ModelBuilderOptions};
+use move_model::{
+    metadata::{CompilerVersion, LanguageVersion},
+    model::VerificationScope,
+    options::ModelBuilderOptions,
+};
 use move_prover_boogie_backend::options::{BoogieOptions, CustomNativeOptions, VectorTheory};
 use move_prover_bytecode_pipeline::options::{AutoTraceLevel, ProverOptions};
 use once_cell::sync::Lazy;
@@ -67,7 +72,8 @@ pub struct Options {
     pub skip_attribute_checks: bool,
     /// Whether to use compiler v2 to compile Move code
     pub compiler_v2: bool,
-
+    /// The language version to use
+    pub language_version: Option<LanguageVersion>,
     /// BEGIN OF STRUCTURED OPTIONS. DO NOT ADD VALUE FIELDS AFTER THIS
     /// Options for the model builder.
     pub model_builder: ModelBuilderOptions,
@@ -105,7 +111,11 @@ impl Default for Options {
             errmapgen: ErrmapOptions::default(),
             experimental_pipeline: false,
             skip_attribute_checks: false,
-            compiler_v2: false,
+            compiler_v2: match CompilerVersion::default() {
+                CompilerVersion::V1 => false,
+                CompilerVersion::V2_0 => true,
+            },
+            language_version: None,
         }
     }
 }
@@ -169,9 +179,15 @@ impl Options {
             .arg(
                 Arg::new("compiler-v2")
                     .long("compiler-v2")
-                    .env("MOVE_COMPILER_V2")
+                    .default_value(bool_to_str(get_move_compiler_v2_from_env()))
                     .action(SetTrue)
                     .help("whether to use Move compiler v2 to compile to bytecode")
+            )
+            .arg(
+                Arg::new("language-version")
+                    .long("language-version")
+                    .value_parser(clap::value_parser!(LanguageVersion))
+                    .help("the language version to use")
             )
             .arg(
                 Arg::new("output")
@@ -797,6 +813,11 @@ impl Options {
         }
         if matches.get_flag("compiler-v2") {
             options.compiler_v2 = true;
+        }
+        if matches.contains_id("language-version") {
+            options.language_version = matches
+                .get_one::<LanguageVersion>("language-version")
+                .cloned();
         }
 
         options.backend.derive_options();

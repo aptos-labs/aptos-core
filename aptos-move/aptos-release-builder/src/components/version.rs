@@ -3,11 +3,11 @@
 
 use crate::{components::get_signer_arg, utils::*};
 use anyhow::Result;
-use aptos_types::on_chain_config::Version;
+use aptos_types::on_chain_config::AptosVersion;
 use move_model::{code_writer::CodeWriter, emitln, model::Loc};
 
 pub fn generate_version_upgrade_proposal(
-    version: &Version,
+    version: &AptosVersion,
     is_testnet: bool,
     next_execution_hash: Vec<u8>,
 ) -> Result<Vec<(String, String)>> {

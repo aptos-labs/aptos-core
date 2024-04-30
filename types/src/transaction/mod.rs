@@ -48,6 +48,7 @@ mod module;
 mod multisig;
 mod script;
 pub mod signature_verified_transaction;
+pub mod user_transaction_context;
 pub mod webauthn;
 
 #[cfg(any(test, feature = "fuzzing"))]
@@ -475,10 +476,13 @@ pub struct SignedTransaction {
     /// Prevents serializing the same authenticator multiple times to determine size.
     #[serde(skip)]
     authenticator_size: OnceCell<usize>,
+
+    /// A cached hash of the transaction.
+    #[serde(skip)]
+    committed_hash: OnceCell<HashValue>,
 }
 
-/// PartialEq ignores the "bytes" field as this is a OnceCell that may or
-/// may not be initialized during runtime comparison.
+/// PartialEq ignores the cached OnceCell fields that may or may not be initialized.
 impl PartialEq for SignedTransaction {
     fn eq(&self, other: &Self) -> bool {
         self.raw_txn == other.raw_txn && self.authenticator == other.authenticator
@@ -534,6 +538,7 @@ impl SignedTransaction {
             authenticator,
             raw_txn_size: OnceCell::new(),
             authenticator_size: OnceCell::new(),
+            committed_hash: OnceCell::new(),
         }
     }
 
@@ -548,6 +553,7 @@ impl SignedTransaction {
             authenticator,
             raw_txn_size: OnceCell::new(),
             authenticator_size: OnceCell::new(),
+            committed_hash: OnceCell::new(),
         }
     }
 
@@ -570,6 +576,7 @@ impl SignedTransaction {
             ),
             raw_txn_size: OnceCell::new(),
             authenticator_size: OnceCell::new(),
+            committed_hash: OnceCell::new(),
         }
     }
 
@@ -584,6 +591,7 @@ impl SignedTransaction {
             authenticator,
             raw_txn_size: OnceCell::new(),
             authenticator_size: OnceCell::new(),
+            committed_hash: OnceCell::new(),
         }
     }
 
@@ -602,6 +610,7 @@ impl SignedTransaction {
             ),
             raw_txn_size: OnceCell::new(),
             authenticator_size: OnceCell::new(),
+            committed_hash: OnceCell::new(),
         }
     }
 
@@ -621,6 +630,7 @@ impl SignedTransaction {
             authenticator,
             raw_txn_size: OnceCell::new(),
             authenticator_size: OnceCell::new(),
+            committed_hash: OnceCell::new(),
         }
     }
 
@@ -640,6 +650,7 @@ impl SignedTransaction {
             authenticator,
             raw_txn_size: OnceCell::new(),
             authenticator_size: OnceCell::new(),
+            committed_hash: OnceCell::new(),
         }
     }
 
@@ -652,6 +663,7 @@ impl SignedTransaction {
             authenticator: TransactionAuthenticator::single_sender(authenticator),
             raw_txn_size: OnceCell::new(),
             authenticator_size: OnceCell::new(),
+            committed_hash: OnceCell::new(),
         }
     }
 
@@ -664,6 +676,7 @@ impl SignedTransaction {
             authenticator,
             raw_txn_size: OnceCell::new(),
             authenticator_size: OnceCell::new(),
+            committed_hash: OnceCell::new(),
         }
     }
 
@@ -751,9 +764,11 @@ impl SignedTransaction {
         )
     }
 
-    /// Returns the hash when the transaction is commited onchain.
-    pub fn committed_hash(self) -> HashValue {
-        Transaction::UserTransaction(self).hash()
+    /// Returns the hash when the transaction is committed onchain.
+    pub fn committed_hash(&self) -> HashValue {
+        *self
+            .committed_hash
+            .get_or_init(|| Transaction::UserTransaction(self.clone()).hash())
     }
 }
 

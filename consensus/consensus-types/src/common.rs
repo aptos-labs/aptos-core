@@ -18,7 +18,7 @@ use aptos_types::{
 use once_cell::sync::OnceCell;
 use rayon::prelude::*;
 use serde::{Deserialize, Serialize};
-use std::{cmp::min, collections::HashSet, fmt, fmt::Write, sync::Arc};
+use std::{collections::HashSet, fmt, fmt::Write, sync::Arc};
 use tokio::sync::oneshot;
 
 /// The round of a block is a consensus-internal counter, which starts with 0 and increases
@@ -32,13 +32,15 @@ pub type Author = AccountAddress;
 pub struct TransactionSummary {
     pub sender: AccountAddress,
     pub sequence_number: u64,
+    pub hash: HashValue,
 }
 
 impl TransactionSummary {
-    pub fn new(sender: AccountAddress, sequence_number: u64) -> Self {
+    pub fn new(sender: AccountAddress, sequence_number: u64, hash: HashValue) -> Self {
         Self {
             sender,
             sequence_number,
+            hash,
         }
     }
 }
@@ -255,28 +257,16 @@ impl Payload {
             Payload::DirectMempool(txns) => txns.len(),
             Payload::InQuorumStore(proof_with_status) => proof_with_status.len(),
             Payload::InQuorumStoreWithLimit(proof_with_status) => {
-                let num_txns = proof_with_status.proof_with_data.len();
-                if proof_with_status.max_txns_to_execute.is_some() {
-                    min(proof_with_status.max_txns_to_execute.unwrap(), num_txns)
-                } else {
-                    num_txns
-                }
+                // here we return the actual length of the payload; limit is considered at the stage
+                // where we prepare the block from the payload
+                proof_with_status.proof_with_data.len()
             },
-            Payload::QuorumStoreInlineHybrid(
-                inline_batches,
-                proof_with_data,
-                max_txns_to_execute,
-            ) => {
-                let num_txns = proof_with_data.len()
+            Payload::QuorumStoreInlineHybrid(inline_batches, proof_with_data, _) => {
+                proof_with_data.len()
                     + inline_batches
                         .iter()
                         .map(|(_, txns)| txns.len())
-                        .sum::<usize>();
-                if max_txns_to_execute.is_some() {
-                    min(max_txns_to_execute.unwrap(), num_txns)
-                } else {
-                    num_txns
-                }
+                        .sum::<usize>()
             },
         }
     }
@@ -287,15 +277,9 @@ impl Payload {
             Payload::InQuorumStore(proof_with_status) => proof_with_status.proofs.is_empty(),
             Payload::InQuorumStoreWithLimit(proof_with_status) => {
                 proof_with_status.proof_with_data.proofs.is_empty()
-                    || proof_with_status.max_txns_to_execute == Some(0)
             },
-            Payload::QuorumStoreInlineHybrid(
-                inline_batches,
-                proof_with_data,
-                max_txns_to_execute,
-            ) => {
-                *max_txns_to_execute == Some(0)
-                    || (proof_with_data.proofs.is_empty() && inline_batches.is_empty())
+            Payload::QuorumStoreInlineHybrid(inline_batches, proof_with_data, _) => {
+                proof_with_data.proofs.is_empty() && inline_batches.is_empty()
             },
         }
     }
@@ -371,8 +355,6 @@ impl Payload {
                 .map(|txn| txn.raw_txn_bytes_len())
                 .sum(),
             Payload::InQuorumStore(proof_with_status) => proof_with_status.num_bytes(),
-            // We dedeup, shuffle and finally truncate the txns in the payload to the length == 'max_txns_to_execute'.
-            // Hence, it makes sense to pass the full size of the payload here.
             Payload::InQuorumStoreWithLimit(proof_with_status) => {
                 proof_with_status.proof_with_data.num_bytes()
             },
@@ -550,6 +532,7 @@ impl From<&Vec<&Payload>> for PayloadFilter {
                         exclude_txns.push(TransactionSummary {
                             sender: txn.sender(),
                             sequence_number: txn.sequence_number(),
+                            hash: txn.committed_hash(),
                         });
                     }
                 }

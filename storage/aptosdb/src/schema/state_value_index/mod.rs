@@ -17,7 +17,7 @@ use aptos_schemadb::{
     schema::{KeyCodec, SeekKeyCodec, ValueCodec},
 };
 use aptos_types::{
-    state_store::{state_key::StateKey, state_key_prefix::StateKeyPrefix},
+    state_store::state_key::{prefix::StateKeyPrefix, StateKey},
     transaction::Version,
 };
 use byteorder::{BigEndian, ReadBytesExt, WriteBytesExt};

@@ -64,9 +64,15 @@ module aptos_framework::version {
     }
 
     /// Only used in reconfigurations to apply the pending `Version`, if there is any.
-    public(friend) fun on_new_epoch() acquires Version {
+    public(friend) fun on_new_epoch(framework: &signer) acquires Version {
+        system_addresses::assert_aptos_framework(framework);
         if (config_buffer::does_exist<Version>()) {
-            *borrow_global_mut<Version>(@aptos_framework) = config_buffer::extract<Version>();
+            let new_value = config_buffer::extract<Version>();
+            if (exists<Version>(@aptos_framework)) {
+                *borrow_global_mut<Version>(@aptos_framework) = new_value;
+            } else {
+                move_to(framework, new_value);
+            }
         }
     }
 

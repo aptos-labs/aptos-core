@@ -14,7 +14,13 @@ use crate::{
 use aptos_forge::{NodeExt, Swarm, SwarmExt};
 use aptos_logger::{debug, info};
 use aptos_types::{
-    jwks::{jwk::JWK, unsupported::UnsupportedJWK, AllProvidersJWKs, ProviderJWKs},
+    jwks::{
+        jwk::{JWKMoveStruct, JWK},
+        rsa::RSA_JWK,
+        unsupported::UnsupportedJWK,
+        AllProvidersJWKs, ProviderJWKs,
+    },
+    keyless::test_utils::get_sample_iss,
     on_chain_config::{JWKConsensusConfigV1, OIDCProvider, OnChainJWKConsensusConfig},
 };
 use std::{sync::Arc, time::Duration};
@@ -46,12 +52,12 @@ async fn jwk_consensus_provider_change_mind() {
         .await
         .expect("Epoch 2 taking too long to arrive!");
 
-    info!("Initially the provider set is empty. So should be the ObservedJWKs.");
+    info!("Initially the provider set is empty. The JWK map should have the secure test jwk added via a patch at genesis.");
 
     sleep(Duration::from_secs(10)).await;
     let patched_jwks = get_patched_jwks(&client).await;
     debug!("patched_jwks={:?}", patched_jwks);
-    assert!(patched_jwks.jwks.entries.is_empty());
+    assert!(patched_jwks.jwks.entries.len() == 1);
 
     info!("Adding some providers.");
     let (provider_alice, provider_bob) =
@@ -102,6 +108,11 @@ async fn jwk_consensus_provider_change_mind() {
                         "\"BOB_JWK_V0_1\""
                     ))
                     .into()],
+                },
+                ProviderJWKs {
+                    issuer: get_sample_iss().into_bytes(),
+                    version: 0,
+                    jwks: vec![JWKMoveStruct::from(RSA_JWK::secure_test_jwk())],
                 },
             ]
         },

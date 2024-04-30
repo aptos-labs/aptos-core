@@ -29,14 +29,14 @@ use aptos_jwk_consensus::start_jwk_consensus_runtime;
 use aptos_logger::{prelude::*, telemetry_log_writer::TelemetryLog, Level, LoggerFilterUpdater};
 use aptos_safety_rules::safety_rules_manager::load_consensus_key_from_secure_storage;
 use aptos_state_sync_driver::driver_factory::StateSyncRuntimes;
-use aptos_types::chain_id::ChainId;
+use aptos_types::{chain_id::ChainId, on_chain_config::OnChainJWKConsensusConfig};
 use aptos_validator_transaction_pool::VTxnPoolState;
 use clap::Parser;
 use futures::channel::mpsc;
 use hex::{FromHex, FromHexError};
 use rand::{rngs::StdRng, SeedableRng};
 use std::{
-    fs,
+    env, fs,
     io::Write,
     path::{Path, PathBuf},
     sync::{
@@ -76,6 +76,10 @@ pub struct AptosNodeArgs {
     /// Run only a single validator node testnet.
     #[clap(long)]
     test: bool,
+
+    /// Optimize the single validator node testnet for higher performance
+    #[clap(long, requires("test"))]
+    performance: bool,
 
     /// Random number generator seed for starting a single validator testnet.
     #[clap(long, value_parser = load_seed, requires("test"))]
@@ -132,6 +136,9 @@ impl AptosNodeArgs {
 
         if self.test {
             println!("WARNING: Entering test mode! This should never be used in production!");
+            if self.performance {
+                println!("WARNING: Entering performance mode! System utilization may be high!");
+            }
 
             // Set the genesis framework
             let genesis_framework = if let Some(path) = self.genesis_framework {
@@ -152,6 +159,7 @@ impl AptosNodeArgs {
                 self.test_dir,
                 self.random_ports,
                 self.lazy,
+                self.performance,
                 &genesis_framework,
                 rng,
             )
@@ -266,6 +274,7 @@ pub fn load_node_config<R>(
     test_dir: &Path,
     random_ports: bool,
     enable_lazy_mode: bool,
+    enable_performance_mode: bool,
     framework: &ReleaseBundle,
     rng: R,
 ) -> anyhow::Result<NodeConfig>
@@ -286,6 +295,7 @@ where
             test_dir,
             random_ports,
             enable_lazy_mode,
+            enable_performance_mode,
             framework,
             rng,
         )?;
@@ -366,6 +376,7 @@ pub fn setup_test_environment_and_start_node<R>(
     test_dir: Option<PathBuf>,
     random_ports: bool,
     enable_lazy_mode: bool,
+    enable_performance_mode: bool,
     framework: &ReleaseBundle,
     rng: R,
 ) -> anyhow::Result<()>
@@ -388,6 +399,7 @@ where
             &test_dir,
             random_ports,
             enable_lazy_mode,
+            enable_performance_mode,
             framework,
             rng,
         )?,
@@ -405,6 +417,7 @@ pub fn create_single_node_test_config<R>(
     test_dir: &Path,
     random_ports: bool,
     enable_lazy_mode: bool,
+    enable_performance_mode: bool,
     framework: &ReleaseBundle,
     rng: R,
 ) -> anyhow::Result<NodeConfig>
@@ -435,14 +448,27 @@ where
 
     // Adjust some fields in the default template to lower the overhead of
     // running on a local machine.
+    // Some are further overridden to give us higher performance when enable_performance_mode is true
     node_config
         .consensus
         .quorum_store
         .num_workers_for_remote_batches = 1;
-    node_config.consensus.quorum_store_poll_time_ms = 1000;
 
-    node_config.execution.concurrency_level = 1;
-    node_config.execution.num_proof_reading_threads = 1;
+    if enable_performance_mode {
+        // Setting to a pretty conservative concurrency level. It can be tuned locally.
+        node_config.execution.concurrency_level = 4;
+        // Don't constrain the TPS of Quorum Store for this single node.
+        node_config
+            .consensus
+            .quorum_store
+            .back_pressure
+            .dynamic_max_txn_per_s = 10_000;
+    } else {
+        node_config.execution.concurrency_level = 1;
+        node_config.execution.num_proof_reading_threads = 1;
+        node_config.consensus.quorum_store_poll_time_ms = 1000;
+    }
+
     node_config.execution.paranoid_hot_potato_verification = false;
     node_config.execution.paranoid_type_verification = false;
     node_config
@@ -454,11 +480,19 @@ where
         .peer_monitoring_service
         .enable_peer_monitoring_client = false;
 
-    node_config
-        .mempool
-        .shared_mempool_max_concurrent_inbound_syncs = 1;
-    node_config.mempool.default_failovers = 1;
-    node_config.mempool.max_broadcasts_per_peer = 1;
+    if enable_performance_mode {
+        node_config
+            .mempool
+            .shared_mempool_max_concurrent_inbound_syncs = 16;
+        node_config.mempool.shared_mempool_tick_interval_ms = 10;
+        node_config.mempool.default_failovers = 0;
+    } else {
+        node_config
+            .mempool
+            .shared_mempool_max_concurrent_inbound_syncs = 1;
+        node_config.mempool.default_failovers = 1;
+        node_config.mempool.max_broadcasts_per_peer = 1;
+    }
 
     node_config
         .state_sync
@@ -529,6 +563,14 @@ where
             genesis_config.allow_new_validators = true;
             genesis_config.epoch_duration_secs = EPOCH_LENGTH_SECS;
             genesis_config.recurring_lockup_duration_secs = 7200;
+            genesis_config.jwk_consensus_config_override = match env::var("INITIALIZE_JWK_CONSENSUS") {
+                Ok(val) if val.as_str() == "1" => {
+                    let config = OnChainJWKConsensusConfig::default_enabled();
+                    println!("Flag `INITIALIZE_JWK_CONSENSUS` detected, will enable JWK Consensus for all default OIDC providers in genesis: {:?}", config);
+                    Some(config)
+                },
+                _ => None,
+            };
         })))
         .with_randomize_first_validator_ports(random_ports);
     let (root_key, _genesis, genesis_waypoint, mut validators) = builder.build(rng)?;
@@ -695,6 +737,7 @@ pub fn setup_environment_and_start_node(
                 dkg_start_events,
                 vtxn_pool.clone(),
                 rb_config,
+                node_config.randomness_override_seq_num,
             );
             Some(dkg_runtime)
         },

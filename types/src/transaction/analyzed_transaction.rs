@@ -2,10 +2,9 @@
 // SPDX-License-Identifier: Apache-2.0
 
 use crate::{
-    access_path::AccessPath,
     account_config::{AccountResource, CoinInfoResource, CoinStoreResource},
     chain_id::ChainId,
-    on_chain_config::{CurrentTimeMicroseconds, Features, OnChainConfig, TransactionFeeBurnCap},
+    on_chain_config::{CurrentTimeMicroseconds, Features, TransactionFeeBurnCap},
     state_store::{state_key::StateKey, table::TableHandle},
     transaction::{
         signature_verified_transaction::SignatureVerifiedTransaction, Transaction,
@@ -16,9 +15,7 @@ use aptos_crypto::HashValue;
 pub use move_core_types::abi::{
     ArgumentABI, ScriptFunctionABI as EntryFunctionABI, TransactionScriptABI, TypeArgumentABI,
 };
-use move_core_types::{
-    account_address::AccountAddress, language_storage::StructTag, move_resource::MoveStructType,
-};
+use move_core_types::{account_address::AccountAddress, language_storage::StructTag};
 use serde::{Deserialize, Serialize};
 use std::hash::{Hash, Hasher};
 
@@ -160,44 +157,33 @@ impl From<Transaction> for AnalyzedTransaction {
 }
 
 pub fn account_resource_location(address: AccountAddress) -> StorageLocation {
-    StorageLocation::Specific(StateKey::access_path(AccessPath::new(
-        address,
-        AccountResource::struct_tag().access_vector(),
-    )))
+    StorageLocation::Specific(StateKey::resource_typed::<AccountResource>(&address).unwrap())
 }
 
 pub fn coin_store_location(address: AccountAddress) -> StorageLocation {
-    StorageLocation::Specific(StateKey::access_path(AccessPath::new(
-        address,
-        CoinStoreResource::struct_tag().access_vector(),
-    )))
+    StorageLocation::Specific(StateKey::resource_typed::<CoinStoreResource>(&address).unwrap())
 }
 
 pub fn current_ts_location() -> StorageLocation {
-    StorageLocation::Specific(StateKey::access_path(
-        CurrentTimeMicroseconds::access_path().unwrap(),
-    ))
+    StorageLocation::Specific(StateKey::on_chain_config::<CurrentTimeMicroseconds>().unwrap())
 }
 
 pub fn features_location() -> StorageLocation {
-    StorageLocation::Specific(StateKey::access_path(Features::access_path().unwrap()))
+    StorageLocation::Specific(StateKey::on_chain_config::<Features>().unwrap())
 }
 
 pub fn aptos_coin_info_location() -> StorageLocation {
-    StorageLocation::Specific(StateKey::access_path(AccessPath::new(
-        AccountAddress::ONE,
-        CoinInfoResource::struct_tag().access_vector(),
-    )))
+    StorageLocation::Specific(
+        StateKey::resource_typed::<CoinInfoResource>(&AccountAddress::ONE).unwrap(),
+    )
 }
 
 pub fn chain_id_location() -> StorageLocation {
-    StorageLocation::Specific(StateKey::access_path(ChainId::access_path().unwrap()))
+    StorageLocation::Specific(StateKey::on_chain_config::<ChainId>().unwrap())
 }
 
 pub fn transaction_fee_burn_cap_location() -> StorageLocation {
-    StorageLocation::Specific(StateKey::access_path(
-        TransactionFeeBurnCap::access_path().unwrap(),
-    ))
+    StorageLocation::Specific(StateKey::on_chain_config::<TransactionFeeBurnCap>().unwrap())
 }
 
 pub fn rw_set_for_coin_transfer(

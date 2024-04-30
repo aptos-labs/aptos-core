@@ -9,13 +9,17 @@ module 0x42::m {
     private fun make(): m::Object {
         Abort(0)
     }
-    private fun owner_correct(o: m::Object): address {
+    private fun owner_correct(o: m::Object): address
+        acquires m::ObjectCore(*)
+     {
         {
           let addr: address = select m::Object.inner<m::Object>(o);
           select m::ObjectCore.owner<&m::ObjectCore>(BorrowGlobal(Immutable)<m::ObjectCore>(addr))
         }
     }
-    private fun owner_read_ref_missing(o: m::Object): address {
+    private fun owner_read_ref_missing(o: m::Object): address
+        acquires m::ObjectCore(*)
+     {
         select m::ObjectCore.owner<&m::ObjectCore>(BorrowGlobal(Immutable)<m::ObjectCore>(select m::Object.inner<m::Object>(o)))
     }
     private fun will_autoref(): address {
@@ -83,3 +87,6 @@ fun m::will_autoref(): address {
   3: $t0 := read_ref($t3)
   4: return $t0
 }
+
+
+============ bytecode verification succeeded ========

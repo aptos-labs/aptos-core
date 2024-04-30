@@ -43,3 +43,6 @@ fun pack_unpack::unpack($t0: pack_unpack::S): (u64, u64) {
   3: $t2 := infer($t4)
   4: return ($t1, $t2)
 }
+
+
+============ bytecode verification succeeded ========

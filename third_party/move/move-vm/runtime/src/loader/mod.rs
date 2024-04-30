@@ -1395,6 +1395,15 @@ impl<'a> Resolver<'a> {
         self.module_store.function_at(&func_inst.handle)
     }
 
+    pub(crate) fn function_from_name(
+        &self,
+        module_id: &ModuleId,
+        func_name: &IdentStr,
+    ) -> PartialVMResult<Arc<Function>> {
+        self.module_store
+            .resolve_function_by_name(func_name, module_id)
+    }
+
     pub(crate) fn instantiate_generic_function(
         &self,
         gas_meter: Option<&mut impl GasMeter>,
@@ -1741,7 +1750,7 @@ impl TypeCache {
 /// Maximal depth of a value in terms of type depth.
 pub const VALUE_DEPTH_MAX: u64 = 128;
 
-/// Maximal nodes which are allowed when converting to layout. This includes the the types of
+/// Maximal nodes which are allowed when converting to layout. This includes the types of
 /// fields for struct types.
 const MAX_TYPE_TO_LAYOUT_NODES: u64 = 256;
 

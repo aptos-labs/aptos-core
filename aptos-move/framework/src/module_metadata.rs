@@ -22,6 +22,7 @@ use move_core_types::{
     language_storage::{ModuleId, StructTag},
     metadata::Metadata,
 };
+use move_model::metadata::{CompilationMetadata, COMPILATION_METADATA_KEY};
 use move_vm_runtime::move_vm::MoveVM;
 use serde::{Deserialize, Serialize};
 use std::{cell::RefCell, collections::BTreeMap, env, sync::Arc};
@@ -225,6 +226,7 @@ pub fn get_vm_metadata_v0(
 /// Check if the metadata has unknown key/data types
 pub fn check_metadata_format(module: &CompiledModule) -> Result<(), MalformedError> {
     let mut exist = false;
+    let mut compilation_key_exist = false;
     for data in module.metadata.iter() {
         if data.key == *APTOS_METADATA_KEY || data.key == *APTOS_METADATA_KEY_V1 {
             if exist {
@@ -239,6 +241,13 @@ pub fn check_metadata_format(module: &CompiledModule) -> Result<(), MalformedErr
                 bcs::from_bytes::<RuntimeModuleMetadataV1>(&data.value)
                     .map_err(|e| MalformedError::DeserializedError(data.key.clone(), e))?;
             }
+        } else if data.key == *COMPILATION_METADATA_KEY {
+            if compilation_key_exist {
+                return Err(MalformedError::DuplicateKey);
+            }
+            compilation_key_exist = true;
+            bcs::from_bytes::<CompilationMetadata>(&data.value)
+                .map_err(|e| MalformedError::DeserializedError(data.key.clone(), e))?;
         } else {
             return Err(MalformedError::UnknownKey(data.key.clone()));
         }
@@ -266,6 +275,17 @@ pub fn get_metadata_from_compiled_module(
         // Old format available, upgrade to new one on the fly
         let data_v0 = bcs::from_bytes::<RuntimeModuleMetadata>(&data.value).ok()?;
         Some(data_v0.upgrade())
+    } else {
+        None
+    }
+}
+
+/// Extract compilation metadata from a compiled module
+pub fn get_compilation_metadata_from_compiled_module(
+    module: &CompiledModule,
+) -> Option<CompilationMetadata> {
+    if let Some(data) = find_metadata(module, COMPILATION_METADATA_KEY) {
+        bcs::from_bytes::<CompilationMetadata>(&data.value).ok()
     } else {
         None
     }

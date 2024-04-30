@@ -23,7 +23,7 @@ use aptos_mempool_notifications::MempoolNotificationSender;
 use aptos_storage_interface::DbReaderWriter;
 use aptos_storage_service_notifications::StorageServiceNotificationSender;
 use aptos_time_service::TimeService;
-use aptos_types::{move_resource::MoveStorage, waypoint::Waypoint};
+use aptos_types::waypoint::Waypoint;
 use futures::{
     channel::{mpsc, mpsc::UnboundedSender},
     executor::block_on,
@@ -101,8 +101,8 @@ impl DriverFactory {
         time_service: TimeService,
     ) -> (Self, UnboundedSender<CommitNotification>) {
         // Notify subscribers of the initial on-chain config values
-        match (&*storage.reader).fetch_latest_state_checkpoint_version() {
-            Ok(synced_version) => {
+        match storage.reader.get_latest_state_checkpoint_version() {
+            Ok(Some(synced_version)) => {
                 if let Err(error) =
                     event_subscription_service.notify_initial_configs(synced_version)
                 {
@@ -111,6 +111,9 @@ impl DriverFactory {
                         error
                     )
                 }
+            },
+            Ok(None) => {
+                panic!("Latest state checkpoint version not found.")
             },
             Err(error) => panic!("Failed to fetch the initial synced version: {:?}", error),
         }

@@ -422,7 +422,7 @@ mod tests {
             (mock_tag_2(), vec![3, 3, 3].into()),
         ]);
         let metadata = raw_metadata(100);
-        let key = StateKey::raw(vec![0]);
+        let key = StateKey::raw(&[0]);
 
         let data = BTreeMap::from([(
             key.clone(),
@@ -478,7 +478,7 @@ mod tests {
             (mock_tag_1(), vec![2, 2].into()),
         ]);
         let metadata = raw_metadata(100);
-        let key = StateKey::raw(vec![0]);
+        let key = StateKey::raw(&[0]);
 
         let data = BTreeMap::from([(
             key.clone(),
@@ -520,7 +520,7 @@ mod tests {
         // TODO[agg_v2](test): Layout hardcoded to None. Test with layout = Some(..)
         let group_changes =
             BTreeMap::from([(mock_tag_1(), MoveStorageOp::New((vec![2, 2].into(), None)))]);
-        let key = StateKey::raw(vec![0]);
+        let key = StateKey::raw(&[0]);
         let converter = WriteOpConverter::new(&resolver, true);
         let group_write = converter
             .convert_resource_group_v1(&key, group_changes)
@@ -545,7 +545,7 @@ mod tests {
             (mock_tag_1(), vec![2, 2].into()),
         ]);
         let metadata = raw_metadata(100);
-        let key = StateKey::raw(vec![0]);
+        let key = StateKey::raw(&[0]);
 
         let data = BTreeMap::from([(
             key.clone(),

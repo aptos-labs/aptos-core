@@ -177,7 +177,7 @@ impl<'r> TDelayedFieldView for ExecutorViewWithChangeSet<'r> {
         &self,
         delayed_write_set_keys: &HashSet<Self::Identifier>,
         skip: &HashSet<Self::ResourceKey>,
-    ) -> Result<BTreeMap<Self::ResourceKey, (StateValueMetadata, u64)>, PanicError> {
+    ) -> PartialVMResult<BTreeMap<Self::ResourceKey, (StateValueMetadata, u64)>> {
         self.base_executor_view
             .get_group_reads_needing_exchange(delayed_write_set_keys, skip)
     }
@@ -364,7 +364,7 @@ mod test {
     }
 
     fn key(s: impl ToString) -> StateKey {
-        StateKey::raw(s.to_string().into_bytes())
+        StateKey::raw(s.to_string().as_bytes())
     }
 
     fn write(v: u128) -> WriteOp {

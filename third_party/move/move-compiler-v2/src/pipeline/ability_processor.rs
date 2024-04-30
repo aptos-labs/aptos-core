@@ -20,7 +20,7 @@
 //! - Every copied value must have the `copy` ability
 //! - Every dropped value must have the `drop` ability
 //! - Every type used in storage operations must have the `key` ability (TODO(#12036): this check should
-//!   go the the frontend where also `store` is checked)
+//!   go the frontend where also `store` is checked)
 //! - All type instantiations in the program must satisfy ability constraints (TODO: also frontend)
 //!
 //! Precondition: LiveVarAnnotation, LifetimeAnnotation, ExitStateAnnotation
@@ -157,6 +157,7 @@ impl<'a> TransferFunctions for CopyDropAnalysis<'a> {
         // Clear local state info
         state.needs_copy.clear();
         state.needs_drop.clear();
+        state.check_drop.clear();
         let live_var = self.live_var.get_info_at(offset);
         let lifetime = self.lifetime.get_info_at(offset);
         let exit_state = self.exit_state.get_state_at(offset);
@@ -439,7 +440,7 @@ impl<'a> Transformer<'a> {
             for temp in copy_drop_at.check_drop.iter() {
                 self.check_drop(bytecode.get_attr_id(), *temp, || {
                     (
-                        "operator drops value here (consider to borrow the argument)".to_string(),
+                        "operator drops value here (consider borrowing the argument)".to_string(),
                         vec![],
                     )
                 });

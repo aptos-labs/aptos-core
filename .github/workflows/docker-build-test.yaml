@@ -125,6 +125,18 @@ jobs:
         id: determine_file_changes
         uses: ./.github/actions/file-change-determinator
 
+  # This job determines if the framework upgrade test should be run
+  framework-upgrade-determinator:
+    needs: [permission-check]
+    runs-on: ubuntu-latest
+    outputs:
+      run_framework_upgrade_test: ${{ steps.determine_framework_upgrade_test.outputs.run_framework_upgrade_test }}
+    steps:
+      - uses: actions/checkout@v3
+      - name: Run the framework upgrade test determinator
+        id: determine_framework_upgrade_test
+        uses: ./.github/actions/framework-upgrade-determinator
+
   # This is a PR required job.
   rust-images:
     needs: [permission-check, determine-docker-build-metadata]
@@ -300,7 +312,7 @@ jobs:
     with:
       GIT_SHA: ${{ needs.determine-docker-build-metadata.outputs.gitSha }}
       FORGE_TEST_SUITE: compat
-      IMAGE_TAG: aptos-node-v1.9.5 # test against a previous testnet release
+      IMAGE_TAG: 01b24e7e3548382dd25440b39a0438a993387f12 #aptos-node-v1.11 with randomness disabled in genesis
       FORGE_RUNNER_DURATION_SECS: 300
       COMMENT_HEADER: forge-compat
       FORGE_NAMESPACE: forge-compat-${{ needs.determine-docker-build-metadata.outputs.targetCacheId }}
@@ -315,23 +327,24 @@ jobs:
       - rust-images-failpoints
       - rust-images-performance
       - rust-images-consensus-only-perf-test
-      - file_change_determinator
+      - framework-upgrade-determinator
     if: |
       !failure() && !cancelled() && needs.permission-check.result == 'success' && (
         (github.event_name == 'push' && github.ref_name != 'main') ||
         github.event_name == 'workflow_dispatch' ||
-        contains(github.event.pull_request.labels.*.name, 'CICD:run-framework-upgrade-test')
+        contains(github.event.pull_request.labels.*.name, 'CICD:run-framework-upgrade-test') ||
+        github.event.pull_request.auto_merge != null
       )
     uses: aptos-labs/aptos-core/.github/workflows/workflow-run-forge.yaml@main
     secrets: inherit
     with:
       GIT_SHA: ${{ needs.determine-docker-build-metadata.outputs.gitSha }}
       FORGE_TEST_SUITE: framework_upgrade
-      IMAGE_TAG: aptos-node-v1.9.5 # This workflow will test the upgradability from the current tip of the release branch to the current main branch.
+      IMAGE_TAG: 01b24e7e3548382dd25440b39a0438a993387f12 #aptos-node-v1.11 with randomness disabled in genesis
       FORGE_RUNNER_DURATION_SECS: 3600
       COMMENT_HEADER: forge-framework-upgrade
       FORGE_NAMESPACE: forge-framework-upgrade-${{ needs.determine-docker-build-metadata.outputs.targetCacheId }}
-      SKIP_JOB: ${{ needs.file_change_determinator.outputs.only_docs_changed == 'true' }}
+      SKIP_JOB: ${{ !contains(github.event.pull_request.labels.*.name, 'CICD:run-framework-upgrade-test') && (needs.framework-upgrade-determinator.outputs.run_framework_upgrade_test == 'false') }}
 
   forge-consensus-only-perf-test:
     needs:

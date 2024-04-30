@@ -1,0 +1,10 @@
+
+Diagnostics:
+error: address with no value
+  ┌─ tests/unit_test/test/named_address_no_value_in_annotation.move:2:18
+  │
+2 │     #[test(_a = @UnboundAddr)]
+  │                  ^^^^^^^^^^^ address 'UnboundAddr' is not assigned a value. Try assigning it a value when calling the compiler
+
+
+============ bytecode verification succeeded ========

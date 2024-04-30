@@ -40,3 +40,6 @@ fun reference_conversion::use_it(): u64 {
   5: $t0 := reference_conversion::deref($t4)
   6: return $t0
 }
+
+
+============ bytecode verification succeeded ========

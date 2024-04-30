@@ -1,7 +1,8 @@
-// Copyright © Aptos Foundation
-// Parts of the project are originally copyright © Meta Platforms, Inc.
+// Copyright (c) Aptos Foundation
+// Parts of the project are originally copyright (c) Meta Platforms, Inc.
 // SPDX-License-Identifier: Apache-2.0
 
+pub mod acquires_checker;
 pub mod ast_simplifier;
 mod bytecode_generator;
 pub mod cyclic_instantiation_checker;
@@ -14,7 +15,9 @@ pub mod inliner;
 pub mod logging;
 pub mod options;
 pub mod pipeline;
+pub mod plan_builder;
 pub mod recursive_struct_checker;
+pub mod unused_params_checker;
 
 use crate::{
     env_pipeline::{
@@ -35,31 +38,26 @@ use crate::{
 };
 use anyhow::bail;
 use codespan_reporting::term::termcolor::{ColorChoice, StandardStream, WriteColor};
-pub use experiments::*;
+pub use experiments::Experiment;
 use log::{debug, info, log_enabled, Level};
 use move_binary_format::binary_views::BinaryIndexedView;
 use move_command_line_common::files::FileHash;
 use move_compiler::{
     compiled_unit::{
         verify_units, AnnotatedCompiledModule, AnnotatedCompiledScript, AnnotatedCompiledUnit,
-        CompiledUnit, FunctionInfo, NamedCompiledModule, NamedCompiledScript,
+        CompiledUnit, FunctionInfo,
     },
     diagnostics::FilesSourceText,
     shared::{known_attributes::KnownAttribute, unique_map::UniqueMap},
 };
 use move_disassembler::disassembler::Disassembler;
 use move_ir_types::location;
-use move_model::{
-    add_move_lang_diagnostics,
-    ast::{Address, ModuleName},
-    model::GlobalEnv,
-    PackageInfo,
-};
+use move_model::{add_move_lang_diagnostics, model::GlobalEnv, PackageInfo};
 use move_stackless_bytecode::function_target_pipeline::{
     FunctionTargetPipeline, FunctionTargetsHolder, FunctionVariant,
 };
 use move_symbol_pool::Symbol;
-pub use options::*;
+pub use options::Options;
 use std::{collections::BTreeSet, io::Write, path::Path};
 
 /// Run Move compiler and print errors to stderr.
@@ -115,7 +113,7 @@ where
     }
     check_errors(&env, error_writer, "stackless-bytecode analysis errors")?;
 
-    let modules_and_scripts = run_file_format_gen(&env, &targets);
+    let modules_and_scripts = run_file_format_gen(&mut env, &targets);
     check_errors(&env, error_writer, "assembling errors")?;
 
     debug!(
@@ -142,66 +140,10 @@ pub fn run_move_compiler_for_analysis(
 ) -> anyhow::Result<GlobalEnv> {
     options.whole_program = true; // will set `treat_everything_as_target`
     options = options.set_experiment(Experiment::SPEC_REWRITE, true);
-    let (mut env, units) = run_move_compiler(error_writer, options)?;
+    options = options.set_experiment(Experiment::ATTACH_COMPILED_MODULE, true);
+    let (env, _units) = run_move_compiler(error_writer, options)?;
     // Reset for subsequent analysis
     env.treat_everything_as_target(false);
-    // Script pseudo module names are sequentially constructed as `<SELF>_1 .. <SELF>_n`. To
-    // associate the bytecode module by name we need to count the index. This
-    // assumes script modules come out in the same order as they are were
-    // added to the environment.
-    let mut script_index = 0; // script names are named using a sequential index
-    for unit in units {
-        let unit = unit.into_compiled_unit();
-        match unit {
-            CompiledUnit::Module(NamedCompiledModule {
-                package_name: _,
-                address,
-                name,
-                module,
-                source_map,
-            }) => {
-                let name = ModuleName::new(
-                    Address::Numerical(address.into_inner()),
-                    env.symbol_pool().make(name.as_str()),
-                );
-                if let Some(id) = env.find_module(&name).map(|m| m.get_id()) {
-                    env.attach_compiled_module(id, module, source_map)
-                } else {
-                    env.error(
-                        &env.unknown_loc(),
-                        &format!(
-                            "failed to attach bytecode: cannot find module `{}`",
-                            name.display_full(&env)
-                        ),
-                    );
-                }
-            },
-            CompiledUnit::Script(NamedCompiledScript {
-                package_name: _,
-                name: _,
-                script,
-                source_map,
-            }) => {
-                let name = ModuleName::pseudo_script_name(env.symbol_pool(), script_index);
-                script_index += 1;
-                let module = move_model::script_into_module(
-                    script,
-                    &name.name().display(env.symbol_pool()).to_string(),
-                );
-                if let Some(id) = env.find_module(&name).map(|m| m.get_id()) {
-                    env.attach_compiled_module(id, module, source_map)
-                } else {
-                    env.error(
-                        &env.unknown_loc(),
-                        &format!(
-                            "failed to attach bytecode: cannot find script `{}`",
-                            name.display_full(&env)
-                        ),
-                    );
-                }
-            },
-        }
-    }
     Ok(env)
 }
 
@@ -226,6 +168,8 @@ pub fn run_checker(options: Options) -> anyhow::Result<GlobalEnv> {
         } else {
             &options.known_attributes
         },
+        options.language_version.unwrap_or_default(),
+        options.compile_test_code,
     )?;
     // Store address aliases
     let map = addrs
@@ -292,7 +236,10 @@ pub fn run_bytecode_gen(env: &GlobalEnv) -> FunctionTargetsHolder {
     targets
 }
 
-pub fn run_file_format_gen(env: &GlobalEnv, targets: &FunctionTargetsHolder) -> Vec<CompiledUnit> {
+pub fn run_file_format_gen(
+    env: &mut GlobalEnv,
+    targets: &FunctionTargetsHolder,
+) -> Vec<CompiledUnit> {
     info!("File Format Generation");
     file_format_generator::generate_file_format(env, targets)
 }
@@ -328,6 +275,12 @@ pub fn check_and_rewrite_pipeline<'a, 'b>(
         });
     }
 
+    if !for_v1_model && options.experiment_on(Experiment::UNUSED_STRUCT_PARAMS_CHECK) {
+        env_pipeline.add("unused struct params check", |env| {
+            unused_params_checker::unused_params_checker(env)
+        });
+    }
+
     if !for_v1_model && options.experiment_on(Experiment::ACCESS_CHECK) {
         env_pipeline.add(
             "access and use check before inlining",
@@ -347,6 +300,12 @@ pub fn check_and_rewrite_pipeline<'a, 'b>(
             "access and use check after inlining",
             |env: &mut GlobalEnv| function_checker::check_access_and_use(env, false),
         );
+    }
+
+    if !for_v1_model && options.experiment_on(Experiment::ACQUIRES_CHECK) {
+        env_pipeline.add("acquires check", |env| {
+            acquires_checker::acquires_checker(env)
+        });
     }
 
     if options.experiment_on(Experiment::AST_SIMPLIFY_FULL) {

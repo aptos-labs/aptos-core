@@ -4,14 +4,10 @@
 use anyhow::{bail, format_err, Result};
 use aptos_gas_meter::{StandardGasAlgebra, StandardGasMeter};
 use aptos_gas_profiling::{GasProfiler, TransactionGasLog};
-use aptos_gas_schedule::{MiscGasParameters, NativeGasParameters, LATEST_GAS_FEATURE_VERSION};
 use aptos_memory_usage_tracker::MemoryTrackedGasMeter;
-use aptos_resource_viewer::{AnnotatedAccountStateBlob, AptosValueAnnotator};
 use aptos_rest_client::Client;
 use aptos_types::{
     account_address::AccountAddress,
-    chain_id::ChainId,
-    on_chain_config::{Features, OnChainConfig, TimedFeaturesBuilder},
     state_store::TStateView,
     transaction::{
         signature_verified_transaction::SignatureVerifiedTransaction, SignedTransaction,
@@ -22,16 +18,9 @@ use aptos_types::{
 use aptos_validator_interface::{
     AptosValidatorInterface, DBDebuggerInterface, DebuggerStateView, RestDebuggerInterface,
 };
-use aptos_vm::{
-    data_cache::AsMoveResolver,
-    move_vm_ext::{MoveVmExt, SessionExt, SessionId},
-    AptosVM, VMExecutor,
-};
+use aptos_vm::{data_cache::AsMoveResolver, AptosVM, VMExecutor};
 use aptos_vm_logging::log_schema::AdapterLogSchema;
-use aptos_vm_types::{
-    change_set::VMChangeSet, output::VMOutput, storage::change_set_configs::ChangeSetConfigs,
-};
-use move_binary_format::errors::VMResult;
+use aptos_vm_types::output::VMOutput;
 use std::{path::Path, sync::Arc};
 
 pub struct AptosDebugger {
@@ -133,7 +122,7 @@ impl AptosDebugger {
 
                     // Deprecated.
                     TransactionPayload::ModuleBundle(..) => {
-                        unreachable!("Module bundle payload has already been checked")
+                        unreachable!("Module bundle payload has already been checked because before this function is called")
                     },
                 };
                 Ok(gas_profiler)
@@ -232,42 +221,6 @@ impl AptosDebugger {
         Ok(ret)
     }
 
-    pub async fn annotate_account_state_at_version(
-        &self,
-        account: AccountAddress,
-        version: Version,
-    ) -> Result<Option<AnnotatedAccountStateBlob>> {
-        let state_view = DebuggerStateView::new(self.debugger.clone(), version);
-        let remote_storage = state_view.as_move_resolver();
-        let annotator = AptosValueAnnotator::new(&remote_storage);
-        Ok(
-            match self
-                .debugger
-                .get_account_state_by_version(account, version)
-                .await?
-            {
-                Some(account_state) => Some(annotator.view_account_state(&account_state)?),
-                None => None,
-            },
-        )
-    }
-
-    pub async fn annotate_key_accounts_at_version(
-        &self,
-        version: Version,
-    ) -> Result<Vec<(AccountAddress, AnnotatedAccountStateBlob)>> {
-        let accounts = self.debugger.get_admin_accounts(version).await?;
-        let state_view = DebuggerStateView::new(self.debugger.clone(), version);
-        let remote_storage = state_view.as_move_resolver();
-        let annotator = AptosValueAnnotator::new(&remote_storage);
-
-        let mut result = vec![];
-        for (addr, state) in accounts.into_iter() {
-            result.push((addr, annotator.view_account_state(&state)?));
-        }
-        Ok(result)
-    }
-
     pub async fn get_latest_version(&self) -> Result<Version> {
         self.debugger.get_latest_version().await
     }
@@ -298,34 +251,6 @@ impl AptosDebugger {
 
     pub fn state_view_at_version(&self, version: Version) -> DebuggerStateView {
         DebuggerStateView::new(self.debugger.clone(), version)
-    }
-
-    pub fn run_session_at_version<F>(&self, version: Version, f: F) -> Result<VMChangeSet>
-    where
-        F: FnOnce(&mut SessionExt) -> VMResult<()>,
-    {
-        let state_view = DebuggerStateView::new(self.debugger.clone(), version);
-        let state_view_storage = state_view.as_move_resolver();
-        let features = Features::fetch_config(&state_view_storage).unwrap_or_default();
-        let move_vm = MoveVmExt::new(
-            NativeGasParameters::zeros(),
-            MiscGasParameters::zeros(),
-            LATEST_GAS_FEATURE_VERSION,
-            ChainId::test().id(),
-            features,
-            TimedFeaturesBuilder::enable_all().build(),
-            &state_view_storage,
-            /*aggregator_v2_type_tagging*/ false,
-        )
-        .unwrap();
-        let mut session = move_vm.new_session(&state_view_storage, SessionId::Void);
-        f(&mut session).map_err(|err| format_err!("Unexpected VM Error: {:?}", err))?;
-        let change_set = session
-            .finish(&ChangeSetConfigs::unlimited_at_gas_feature_version(
-                LATEST_GAS_FEATURE_VERSION,
-            ))
-            .map_err(|err| format_err!("Unexpected VM Error: {:?}", err))?;
-        Ok(change_set)
     }
 }
 

@@ -23,8 +23,8 @@ module aptos_framework::randomness {
     const DST: vector<u8> = b"APTOS_RANDOMNESS";
 
     /// Randomness APIs calls must originate from a private entry function with
-    /// `#[randomness]` annotation. Otherwise, test-and-abort attacks are possible.
-    const E_API_USE_SUSCEPTIBLE_TO_TEST_AND_ABORT: u64 = 1;
+    /// `#[randomness]` annotation. Otherwise, malicious users can bias randomness result.
+    const E_API_USE_IS_BIASIBLE: u64 = 1;
 
     const MAX_U256: u256 = 115792089237316195423570985008687907853269984665640564039457584007913129639935;
 
@@ -74,7 +74,7 @@ module aptos_framework::randomness {
     /// Generate the next 32 random bytes. Repeated calls will yield different results (assuming the collision-resistance
     /// of the hash function).
     fun next_32_bytes(): vector<u8> acquires PerBlockRandomness {
-        assert!(is_unbiasable(), E_API_USE_SUSCEPTIBLE_TO_TEST_AND_ABORT);
+        assert!(is_unbiasable(), E_API_USE_IS_BIASIBLE);
 
         let input = DST;
         let randomness = borrow_global<PerBlockRandomness>(@aptos_framework);
@@ -167,11 +167,6 @@ module aptos_framework::randomness {
         let i = 0;
         let ret: u128 = 0;
         while (i < 16) {
-            spec {
-                // TODO: Prove these with proper loop invaraints.
-                assume ret * 256 + 255 <= MAX_U256;
-                assume len(raw) > 0;
-            };
             ret = ret * 256 + (vector::pop_back(&mut raw) as u128);
             i = i + 1;
         };
@@ -193,11 +188,6 @@ module aptos_framework::randomness {
         let i = 0;
         let ret: u256 = 0;
         while (i < 32) {
-            spec {
-                // TODO: Prove these with proper loop invaraints.
-                assume ret * 256 + 255 <= MAX_U256;
-                assume len(raw) > 0;
-            };
             ret = ret * 256 + (vector::pop_back(&mut raw) as u256);
             i = i + 1;
         };

@@ -1,7 +1,7 @@
 // Copyright © Aptos Foundation
 // SPDX-License-Identifier: Apache-2.0
 
-use super::{health_checker::HealthChecker, traits::ServiceManager, RunLocalTestnet};
+use super::{health_checker::HealthChecker, traits::ServiceManager, RunLocalnet};
 use anyhow::Result;
 use aptos_faucet_core::server::{FunderKeyEnum, RunConfig};
 use async_trait::async_trait;
@@ -10,7 +10,7 @@ use maplit::hashset;
 use reqwest::Url;
 use std::{collections::HashSet, net::Ipv4Addr, path::PathBuf};
 
-/// Args related to running a faucet in the local testnet.
+/// Args related to running a faucet in the localnet.
 #[derive(Debug, Parser)]
 pub struct FaucetArgs {
     /// Do not run a faucet alongside the node.
@@ -46,7 +46,7 @@ pub struct FaucetManager {
 
 impl FaucetManager {
     pub fn new(
-        args: &RunLocalTestnet,
+        args: &RunLocalnet,
         prerequisite_health_checkers: HashSet<HealthChecker>,
         bind_to: Ipv4Addr,
         test_dir: PathBuf,

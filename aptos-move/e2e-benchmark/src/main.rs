@@ -33,7 +33,11 @@ pub fn execute_txn(
 
     let txn_output = executor.execute_transaction(sign_tx);
     executor.apply_write_set(txn_output.write_set());
-    assert!(txn_output.status().status().unwrap().is_success());
+    assert!(
+        txn_output.status().status().unwrap().is_success(),
+        "txn failed with {:?}",
+        txn_output.status()
+    );
 }
 
 fn execute_and_time_entry_point(
@@ -97,7 +101,7 @@ fn main() {
         }),
         // This is a cheap bcs (serializing vec<u8>), so not representative of what BCS native call should cost.
         // (, EntryPoints::Loop { loop_count: Some(1000), loop_type: LoopType::BCS { len: 1024 }}),
-        (117, EntryPoints::CreateObjects {
+        (135, EntryPoints::CreateObjects {
             num_objects: 10,
             object_payload_size: 0,
         }),
@@ -105,7 +109,7 @@ fn main() {
             num_objects: 10,
             object_payload_size: 10 * 1024,
         }),
-        (1187, EntryPoints::CreateObjects {
+        (1369, EntryPoints::CreateObjects {
             num_objects: 100,
             object_payload_size: 0,
         }),
@@ -138,6 +142,8 @@ fn main() {
         (257, EntryPoints::TokenV1MintAndTransferFT),
         (412, EntryPoints::TokenV1MintAndTransferNFTSequential),
         (368, EntryPoints::TokenV2AmbassadorMint { numbered: true }),
+        (494, EntryPoints::LiquidityPoolSwap { is_stable: true }),
+        (463, EntryPoints::LiquidityPoolSwap { is_stable: false }),
     ];
 
     let mut failures = Vec::new();
@@ -160,6 +166,7 @@ fn main() {
             0,
             package.publish_transaction_payload(),
         );
+        println!("Published package: {:?}", entry_point.package_name());
         if let Some(init_entry_point) = entry_point.initialize_entry_point() {
             execute_txn(
                 &mut executor,
@@ -170,6 +177,10 @@ fn main() {
                     Some(&mut rng),
                     Some(publisher.address()),
                 ),
+            );
+            println!(
+                "Executed init entry point: {:?}",
+                entry_point.initialize_entry_point()
             );
         }
 
@@ -230,5 +241,9 @@ fn main() {
     }
 
     // Assert there were no error log lines in the run.
-    assert_eq!(0, aptos_logger::ERROR_LOG_COUNT.get());
+    assert_eq!(
+        0,
+        aptos_logger::ERROR_LOG_COUNT.get(),
+        "Error logs were found in the run."
+    );
 }

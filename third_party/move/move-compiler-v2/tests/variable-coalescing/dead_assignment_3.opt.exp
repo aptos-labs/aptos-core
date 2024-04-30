@@ -18,6 +18,23 @@ public fun m::test($t0: bool): u32 {
  11: return $t1
 }
 
+============ after DeadStoreElimination: ================
+
+[variant baseline]
+public fun m::test($t0: bool): u32 {
+     var $t1: u32
+     var $t2: u32
+  0: $t2 := 1
+  1: if ($t0) goto 2 else goto 5
+  2: label L0
+  3: $t1 := move($t2)
+  4: goto 7
+  5: label L1
+  6: $t1 := 9
+  7: label L2
+  8: return $t1
+}
+
 ============ after VariableCoalescingAnnotator: ================
 
 [variant baseline]
@@ -50,6 +67,23 @@ public fun m::test($t0: bool): u32 {
 }
 
 ============ after VariableCoalescingTransformer: ================
+
+[variant baseline]
+public fun m::test($t0: bool): u32 {
+     var $t1: u32
+     var $t2: u32
+  0: $t2 := 1
+  1: if ($t0) goto 2 else goto 5
+  2: label L0
+  3: $t1 := move($t2)
+  4: goto 7
+  5: label L1
+  6: $t1 := 9
+  7: label L2
+  8: return $t1
+}
+
+============ after DeadStoreElimination: ================
 
 [variant baseline]
 public fun m::test($t0: bool): u32 {

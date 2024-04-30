@@ -7,6 +7,7 @@ use move_command_line_common::testing::{
     add_update_baseline_fix, format_diff, read_env_update_baseline, EXP_EXT, EXP_EXT_V2,
 };
 use move_compiler::shared::known_attributes::KnownAttribute;
+use move_model::metadata::{CompilerVersion, LanguageVersion};
 use move_package::{
     compilation::{build_plan::BuildPlan, model_builder::ModelBuilder},
     package_hooks,
@@ -16,7 +17,7 @@ use move_package::{
         manifest_parser as MP,
         parsed_manifest::{CustomDepInfo, PackageDigest},
     },
-    BuildConfig, CompilerConfig, CompilerVersion, ModelConfig,
+    BuildConfig, CompilerConfig, ModelConfig,
 };
 use move_symbol_pool::Symbol;
 use std::{
@@ -85,6 +86,7 @@ fn run_test_impl(
                 all_files_as_targets: false,
                 target_filter: None,
                 compiler_version,
+                language_version: LanguageVersion::default(),
             })
             .build_model()
             {
@@ -111,7 +113,7 @@ fn check_or_update(
     update_baseline: bool,
     compiler_version: CompilerVersion,
 ) -> datatest_stable::Result<()> {
-    let exp_ext = if compiler_version == CompilerVersion::V2 {
+    let exp_ext = if compiler_version == CompilerVersion::V2_0 {
         EXP_EXT_V2
     } else {
         EXP_EXT

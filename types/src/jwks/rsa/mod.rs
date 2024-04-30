@@ -12,7 +12,7 @@ use serde::{Deserialize, Serialize};
 /// Move type `0x1::jwks::RSA_JWK` in rust.
 /// See its doc in Move for more details.
 #[allow(non_camel_case_types)]
-#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
+#[derive(Clone, Debug, Hash, PartialEq, Eq, Serialize, Deserialize)]
 pub struct RSA_JWK {
     pub kid: String,
     pub kty: String,
@@ -47,7 +47,18 @@ impl RSA_JWK {
         }
     }
 
-    pub fn verify_signature(&self, jwt_token: &str) -> Result<TokenData<Claims>> {
+    // The private key to this JWK is found under INTERNAL_TEST_OIDC_PROVIDER_PRIVATE_KEY in aptos-keyless-prod in gcloud secrets
+    pub fn secure_test_jwk() -> RSA_JWK {
+        RSA_JWK {
+            kid:"test-rsa".to_owned(),
+            kty:"RSA".to_owned(),
+            alg:"RS256".to_owned(),
+            e:"AQAB".to_owned(),
+            n:"y5Efs1ZzisLLKCARSvTztgWj5JFP3778dZWt-od78fmOZFxem3a_aYbOXSJToRp862do0PxJ4PDMpmqwV5f7KplFI6NswQV-WPufQH8IaHXZtuPdCjPOcHybcDiLkO12d0dG6iZQUzypjAJf63APcadio-4JDNWlGC5_Ow_XQ9lIY71kTMiT9lkCCd0ZxqEifGtnJe5xSoZoaMRKrvlOw-R6iVjLUtPAk5hyUX95LDKxwAR-oshnj7gmATejga2EvH9ozdn3M8Go11PSDa04OQxPcA25OoDTfxLvT28LRpSXrbmUWZ-O_lGtDl3ZAtjIguYGEobTk4N11eRssC95Cw".to_owned()
+        }
+    }
+
+    pub fn verify_signature_without_exp_check(&self, jwt_token: &str) -> Result<TokenData<Claims>> {
         let mut validation = Validation::new(Algorithm::RS256);
         validation.validate_exp = false;
         let key = &DecodingKey::from_rsa_components(&self.n, &self.e)?;
@@ -77,7 +88,8 @@ impl RSA_JWK {
         let mut scalars = modulus
             .chunks(24) // Pack 3 64 bit limbs per scalar, so chunk into 24 bytes per scalar
             .map(|chunk| {
-                poseidon_bn254::pack_bytes_to_one_scalar(chunk).expect("chunk converts to scalar")
+                poseidon_bn254::keyless::pack_bytes_to_one_scalar(chunk)
+                    .expect("chunk converts to scalar")
             })
             .collect::<Vec<ark_bn254::Fr>>();
         scalars.push(ark_bn254::Fr::from(Self::RSA_MODULUS_BYTES as i32));
