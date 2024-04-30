@@ -248,13 +248,7 @@ impl Interpreter {
                         module_store,
                         func,
                         vec![],
-                    )
-                    .map_err(|err| {
-                        self.attach_state_if_invariant_violation(
-                            self.set_location(err),
-                            &current_frame,
-                        )
-                    })?;
+                    )?;
                 },
                 ExitCode::CallGeneric(idx) => {
                     let ty_args = resolver
@@ -309,13 +303,7 @@ impl Interpreter {
                         module_store,
                         func,
                         ty_args,
-                    )
-                    .map_err(|err| {
-                        self.attach_state_if_invariant_violation(
-                            self.set_location(err),
-                            &current_frame,
-                        )
-                    })?;
+                    )?;
                 },
             }
         }
@@ -329,15 +317,18 @@ impl Interpreter {
         module_store: &ModuleStorageAdapter,
         func: Arc<Function>,
         ty_args: Vec<Type>,
-    ) -> PartialVMResult<()> {
+    ) -> VMResult<()> {
         match (func.module_id(), current_frame.function.module_id()) {
             (Some(module_id), Some(current_module_id)) if module_id != current_module_id => {
                 if self.active_modules.contains(module_id) {
-                    return Err(PartialVMError::new(StatusCode::RUNTIME_DISPATCH_ERROR)
-                        .with_message(format!(
-                            "Re-entrancy detected: {} already exists on top of the stack",
-                            module_id
-                        )));
+                    return Err(self.set_location(
+                        PartialVMError::new(StatusCode::RUNTIME_DISPATCH_ERROR).with_message(
+                            format!(
+                                "Re-entrancy detected: {} already exists on top of the stack",
+                                module_id
+                            ),
+                        ),
+                    ));
                 }
                 self.active_modules.insert(module_id.clone());
             },
@@ -347,17 +338,23 @@ impl Interpreter {
             _ => (),
         }
 
-        let mut frame = self.make_call_frame(gas_meter, loader, module_store, func, ty_args)?;
+        let mut frame = self
+            .make_call_frame(gas_meter, loader, module_store, func, ty_args)
+            .map_err(|err| {
+                self.attach_state_if_invariant_violation(self.set_location(err), current_frame)
+            })?;
 
         // Access control for the new frame.
         self.access_control
-            .enter_function(&frame, frame.function.as_ref())?;
+            .enter_function(&frame, frame.function.as_ref())
+            .map_err(|e| self.set_location(e))?;
 
         std::mem::swap(current_frame, &mut frame);
-        self.call_stack
-            .push(frame)
-            .map_err(|_| PartialVMError::new(StatusCode::CALL_STACK_OVERFLOW))?;
-
+        self.call_stack.push(frame).map_err(|frame| {
+            let err = PartialVMError::new(StatusCode::CALL_STACK_OVERFLOW);
+            let err = set_err_info!(frame, err);
+            self.attach_state_if_invariant_violation(err, &frame)
+        })?;
         Ok(())
     }
 
@@ -660,6 +657,7 @@ impl Interpreter {
                     target_func,
                     ty_args,
                 )
+                .map_err(|err| err.to_partial())
             },
             NativeResult::LoadModule { module_name } => {
                 let arena_id = traversal_context
