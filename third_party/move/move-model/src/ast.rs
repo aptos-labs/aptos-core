@@ -2490,27 +2490,27 @@ impl Operation {
 
     /// Get the string representation, if this is a binary operator.
     /// Returns `None` for non-binary operators.
-    pub fn to_string_if_binop(&self) -> Option<String> {
+    pub fn to_string_if_binop(&self) -> Option<&'static str> {
         use Operation::*;
         match self {
-            Add => Some("+".to_owned()),
-            Sub => Some("-".to_owned()),
-            Mul => Some("*".to_owned()),
-            Mod => Some("%".to_owned()),
-            Div => Some("/".to_owned()),
-            BitOr => Some("|".to_owned()),
-            BitAnd => Some("&".to_owned()),
-            Xor => Some("^".to_owned()),
-            Shl => Some("<<".to_owned()),
-            Shr => Some(">>".to_owned()),
-            And => Some("&&".to_owned()),
-            Or => Some("||".to_owned()),
-            Eq => Some("==".to_owned()),
-            Neq => Some("!=".to_owned()),
-            Lt => Some("<".to_owned()),
-            Gt => Some(">".to_owned()),
-            Le => Some("<=".to_owned()),
-            Ge => Some(">=".to_owned()),
+            Add => Some("+"),
+            Sub => Some("-"),
+            Mul => Some("*"),
+            Mod => Some("%"),
+            Div => Some("/"),
+            BitOr => Some("|"),
+            BitAnd => Some("&"),
+            Xor => Some("^"),
+            Shl => Some("<<"),
+            Shr => Some(">>"),
+            And => Some("&&"),
+            Or => Some("||"),
+            Eq => Some("=="),
+            Neq => Some("!="),
+            Lt => Some("<"),
+            Gt => Some(">"),
+            Le => Some("<="),
+            Ge => Some(">="),
             _ => None,
         }
     }
