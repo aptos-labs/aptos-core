@@ -347,7 +347,7 @@ static PRECOMPILED_APTOS_FRAMEWORK_V2: Lazy<PrecompiledFilesModules> = Lazy::new
                 .files()
                 .unwrap(),
         ),
-        named_address_map: string_map_to_symbol_map(&aptos_framework::named_addresses()),
+        named_address_map: string_map_to_symbol_map(aptos_framework::named_addresses()),
     }];
     let options = move_compiler_v2::Options {
         packages: source_packages,
