@@ -34,7 +34,7 @@ enum BenchmarkCommand {
 
 #[derive(Debug, Parser)]
 struct ParamSweepOpt {
-    #[clap(long, default_value = "1000")]
+    #[clap(long, default_value = "100")]
     pub num_accounts: Vec<usize>,
 
     #[clap(long)]
@@ -58,7 +58,7 @@ struct ParamSweepOpt {
 
 #[derive(Debug, Parser)]
 struct ExecuteOpt {
-    #[clap(long, default_value_t = 100000)]
+    #[clap(long, default_value_t = 100)]
     pub num_accounts: usize,
 
     #[clap(long, default_value_t = 5)]

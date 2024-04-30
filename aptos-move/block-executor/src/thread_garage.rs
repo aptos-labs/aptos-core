@@ -258,13 +258,13 @@ impl ThreadGarage {
         //create new baton for current_thread, using default_value
         let baton: Baton<T>;
         {
-            let mut lock = self.asleep_mutex[thread_id].lock().unwrap();
+            let mut local_lock = self.asleep_mutex[thread_id].lock().unwrap();
             
             if self.is_halted() {
                 return Ok(SuspendResult::FailedRegisteringHook);
             }
 
-            *lock = true;
+            *local_lock = true;
             baton = Baton::new(thread_id, default_value);
         }
         
@@ -275,12 +275,14 @@ impl ThreadGarage {
         //eprintln!("returned from hook, thread = {}", thread_id);
         match hook_result {
             Some(val) => {
-                eprintln!("dependency already resolved thread={}", thread_id);
+                //eprintln!("dependency already resolved thread={}", thread_id);
                 //depencency already satisfied, no need to suspend
                 {
                     let mut global_lock = self.global_mutex.lock().unwrap();
                     let mut local_lock = self.asleep_mutex[thread_id].lock().unwrap();
-                    if !*local_lock {
+                    let is_asleep = *local_lock;
+                    if !is_asleep {
+                        drop(local_lock);
                         global_lock.num_active -= 1;
                         self.global_cv.notify_one();
                     }
@@ -322,15 +324,15 @@ impl ThreadGarage {
 
                 let mut local_lock = self.asleep_mutex[thread_id].lock().unwrap();
 
-                let start = Instant::now();                
+                //let start = Instant::now();                
 
                 while *local_lock {
                     local_lock = self.baton_cv[thread_id].wait(local_lock).unwrap();
                 }
 
-                let end = Instant::now();
+                //let end = Instant::now();
 
-                println!("now sleeping={}, {} thread slept for {:?}", cnt_sleeping, thread_id, end-start);
+                //println!("now sleeping={}, {} thread slept for {:?}", cnt_sleeping, thread_id, end-start);
 
                 
                 self.num_sleeping.fetch_sub(1, Ordering::SeqCst);

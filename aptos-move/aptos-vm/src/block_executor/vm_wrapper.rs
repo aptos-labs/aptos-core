@@ -126,7 +126,7 @@ impl<'a, S: 'a + StateView + Sync> ExecutorTask for AptosExecutorTask<'a, S> {
                 }
             },
         };
-        //spin_wait(10000);
+        //spin_wait(2000);
         res
     }
 
