@@ -30,10 +30,10 @@ pub static DST: &[u8] = b"APTOS_PEPPER_BLS12381_VUF_DST";
 
 pub static PINKAS_DST: &[u8] = b"APTOS_PEPPER_PINKAS_VUF_DST";
 
-pub static PINKAS_SECRET_KEY_BASE: &[u8] = b"APTOS_PEPPER_PINKAS_VUF_SECRET_KEY_BASE";
+pub static PINKAS_SECRET_KEY_BASE_SEED: &[u8] = b"APTOS_PEPPER_PINKAS_VUF_SECRET_KEY_BASE";
 
 pub static PINKAS_SECRET_KEY_BASE_AFFINE: Lazy<G2Affine> =
-    Lazy::new(|| Bls12381G1Bls::hash_to_g2(PINKAS_SECRET_KEY_BASE, PINKAS_DST));
+    Lazy::new(|| Bls12381G1Bls::hash_to_g2(PINKAS_SECRET_KEY_BASE_SEED, PINKAS_DST));
 
 pub static PINKAS_SECRET_KEY_BASE_G2: Lazy<blstrs::G2Projective> =
     Lazy::new(|| {
