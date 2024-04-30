@@ -277,7 +277,7 @@ fn assert_equal_if_true_test() {
 
     let mut rng = rand::thread_rng();
 
-    for i in 0..256 {
+    for _i in 0..256 {
 
         let (nums, are_equal) = 
             if rng.gen_bool(0.5) {
@@ -311,3 +311,48 @@ fn assert_equal_if_true_test() {
         assert!(result.is_ok());
     }
 }
+
+#[test]
+fn email_verified_check_test() {
+    let circuit_handle = TestCircuitHandle::new("misc/email_verified_check_test.circom").unwrap();
+
+    let testcases = [
+        ("email_verified", "true", "email", true, true),
+        // Note that this template doesn't actually check that ev_name is exactly equal to
+        // "email_verified". It only checks that it starts with this string. I believe that this
+        // is not an issue because ParseEmailVerifiedField enforces that ev_name has len == 14.
+        ("email_verified000", "true", "email", true, true),
+        ("email_verified", "false", "email", true, false),
+        ("email_verified", "true", "sub", false, true),
+        ("email_verified", "false", "sub", false, true),
+    ];
+
+    for t in testcases {
+
+        let ev_name = t.0;
+        let ev_value = t.1;
+        let uid_name = t.2;
+        let expected_uid_is_email = t.3;
+        let test_should_pass = t.4;
+
+        let config = CircuitPaddingConfig::new()
+            .max_length("ev_name", 20)
+            .max_length("ev_value", 10)
+            .max_length("uid_name", 30);
+
+        let circuit_input_signals = CircuitInputSignals::new()
+            .str_input("ev_name", ev_name)
+            .str_input("ev_value", ev_value)
+            .str_input("uid_name", uid_name)
+            .usize_input("ev_value_len", ev_value.len())
+            .usize_input("uid_name_len", uid_name.len())
+            .bool_input("uid_is_email", expected_uid_is_email)
+            .pad(&config)
+            .unwrap();
+
+        let result = circuit_handle.gen_witness(circuit_input_signals);
+        println!("{:?}", result);
+        if test_should_pass { assert!(result.is_ok()); } else { assert!(result.is_err()); }
+    }
+}
+

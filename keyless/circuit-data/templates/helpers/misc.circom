@@ -77,6 +77,7 @@ template EmailVerifiedCheck(maxEVNameLen, maxEVValueLen, maxUIDNameLen) {
     var uid_starts_with_email_2 = IsEqual()([email[2], uid_name[2]]);
     var uid_starts_with_email_3 = IsEqual()([email[3], uid_name[3]]);
     var uid_starts_with_email_4 = IsEqual()([email[4], uid_name[4]]);
+
     var uid_starts_with_email = MultiAND(5)([uid_starts_with_email_0, uid_starts_with_email_1, uid_starts_with_email_2, uid_starts_with_email_3, uid_starts_with_email_4]);
 
 
