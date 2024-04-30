@@ -1,21 +1,17 @@
-#![cfg_attr(not(feature = "std"), no_std)]
-
 // Copyright (c) Aptos Foundation
 // SPDX-License-Identifier: Apache-2.0
 
 pub extern crate derivation_path;
 pub extern crate ed25519_dalek;
 
+use anyhow::{bail, Result};
+use core::fmt;
 pub use derivation_path::{ChildIndex, DerivationPath};
 pub use ed25519_dalek::{PublicKey, SecretKey};
-
-use core::fmt;
 use hmac::{Hmac, Mac};
-use sha2_0_10_6::Sha512;
 use regex::Regex;
+use sha2_0_10_6::Sha512;
 use std::str::FromStr;
-use anyhow::{bail, Result};
-
 
 const PEPPER_SLIP_10_NAME: &str = "32 bytes";
 
@@ -32,7 +28,7 @@ impl fmt::Display for Error {
             Self::Ed25519 => f.write_str("ed25519 error"),
             Self::ExpectedHardenedIndex(index) => {
                 f.write_fmt(format_args!("expected hardened child index: {}", index))
-            }
+            },
         }
     }
 }
@@ -140,11 +136,5 @@ impl ExtendedPepper {
             pepper: self.pepper,
             chain_code: self.chain_code,
         }
-    }
-}
-
-impl From<ed25519_dalek::SignatureError> for Error {
-    fn from(_: ed25519_dalek::SignatureError) -> Self {
-        Self::Ed25519
     }
 }

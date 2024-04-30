@@ -11,7 +11,12 @@ use aptos_crypto::asymmetric_encryption::{
 };
 use aptos_keyless_pepper_common::{
     jwt::Claims,
-    vuf::{self, bls12381_g1_bls::PinkasPepper, slip_10::{get_aptos_derivation_path, ExtendedPepper}, VUF},
+    vuf::{
+        self,
+        bls12381_g1_bls::PinkasPepper,
+        slip_10::{get_aptos_derivation_path, ExtendedPepper},
+        VUF,
+    },
     PepperInput, PepperRequest, PepperRequestV1, PepperResponse, PepperResponseV1,
 };
 use aptos_logger::info;
@@ -22,9 +27,7 @@ use aptos_types::{
 use jsonwebtoken::{Algorithm::RS256, Validation};
 use rand::thread_rng;
 use serde::{Deserialize, Serialize};
-use std::
-    time::{SystemTime, UNIX_EPOCH}
-;
+use std::time::{SystemTime, UNIX_EPOCH};
 use uuid::Uuid;
 
 pub mod about;
@@ -54,33 +57,21 @@ pub fn process_v0(request: PepperRequest) -> Result<PepperResponse, ProcessingFa
         uid_key,
         derivation_path,
     } = request;
-    let derivation_path = if let Some(path) = derivation_path {
-        path
-    } else {
-        DEFAULT_DERIVATION_PATH.to_owned()
-    };
-    let pepper = process_common(
+
+    let (pepper_base, pepper) = process_common(
         &session_id,
         jwt,
         epk,
         exp_date_secs,
         epk_blinder,
         uid_key,
+        derivation_path,
         false,
         None,
     )?;
-    let derive_path = get_aptos_derivation_path(&derivation_path) .or_else(|e| Err(BadRequest(e.to_string())))?;
-
-    let pinkas_pepper = PinkasPepper::from_affine_bytes(&pepper)
-        .or_else(|_| Err(InternalError("Failed to derive pinkas pepper".to_string())))?;
-    let master_pepper = pinkas_pepper.to_master_pepper();
-    let derivation_path_pepper = ExtendedPepper::from_seed(master_pepper.to_bytes())
-        .or_else(|e| Err(InternalError(e.to_string())))?
-        .derive(&derive_path)
-        .or_else(|e| Err(InternalError(e.to_string())))?;
     Ok(PepperResponse {
-        signature: pepper,
-        pepper: derivation_path_pepper.get_pepper().to_vec(),
+        signature: pepper_base,
+        pepper,
     })
 }
 
@@ -94,18 +85,20 @@ pub fn process_v1(request: PepperRequestV1) -> Result<PepperResponseV1, Processi
         uid_key,
         aud,
     } = request;
-    let pepper_encrypted = process_common(
+    let (pepper_base_encrypted, pepper_encrypted) = process_common(
         &session_id,
         jwt,
         epk,
         exp_date_secs,
         epk_blinder,
         uid_key,
+        None,
         true,
         aud,
     )?;
     Ok(PepperResponseV1 {
-        signature_encrypted: pepper_encrypted,
+        signature_encrypted: pepper_base_encrypted,
+        pepper_encrypted,
     })
 }
 
@@ -116,10 +109,19 @@ fn process_common(
     exp_date_secs: u64,
     epk_blinder: Vec<u8>,
     uid_key: Option<String>,
+    derivation_path: Option<String>,
     encrypts_pepper: bool,
     aud: Option<String>,
-) -> Result<Vec<u8>, ProcessingFailure> {
+) -> Result<(Vec<u8>, Vec<u8>), ProcessingFailure> {
     let config = Configuration::new_for_devnet();
+
+    let derivation_path = if let Some(path) = derivation_path {
+        path
+    } else {
+        DEFAULT_DERIVATION_PATH.to_owned()
+    };
+    let checked_derivation_path =
+        get_aptos_derivation_path(&derivation_path).or_else(|e| Err(BadRequest(e.to_string())))?;
 
     let curve25519_pk_point = match &epk {
         EphemeralPublicKey::Ed25519 { public_key } => public_key
@@ -213,24 +215,39 @@ fn process_common(
         "PepperInput is available."
     );
     let input_bytes = bcs::to_bytes(&input).unwrap();
-    let (pepper, vuf_proof) = vuf::bls12381_g1_bls::Bls12381G1Bls::eval(&VUF_SK, &input_bytes)
+    let (pepper_base, vuf_proof) = vuf::bls12381_g1_bls::Bls12381G1Bls::eval(&VUF_SK, &input_bytes)
         .map_err(|e| InternalError(format!("bls12381_g1_bls eval error: {e}")))?;
     if !vuf_proof.is_empty() {
         return Err(InternalError("proof size should be 0".to_string()));
     }
 
+    let pinkas_pepper = PinkasPepper::from_affine_bytes(&pepper_base)
+        .or_else(|_| Err(InternalError("Failed to derive pinkas pepper".to_string())))?;
+    let master_pepper = pinkas_pepper.to_master_pepper();
+    let derived_pepper = ExtendedPepper::from_seed(master_pepper.to_bytes())
+        .or_else(|e| Err(InternalError(e.to_string())))?
+        .derive(&checked_derivation_path)
+        .or_else(|e| Err(InternalError(e.to_string())))?;
+
     if encrypts_pepper {
-        let mut main_rng = thread_rng();
+        let mut main_rng: rand::prelude::ThreadRng = thread_rng();
         let mut aead_rng = aes_gcm::aead::OsRng;
+        let pepper_base_encrypted = ElGamalCurve25519Aes256Gcm::enc(
+            &mut main_rng,
+            &mut aead_rng,
+            &curve25519_pk_point,
+            &pepper_base,
+        )
+        .map_err(|e| InternalError(format!("ElGamalCurve25519Aes256Gcm enc error: {e}")))?;
         let pepper_encrypted = ElGamalCurve25519Aes256Gcm::enc(
             &mut main_rng,
             &mut aead_rng,
             &curve25519_pk_point,
-            &pepper,
+            &derived_pepper.get_pepper(),
         )
         .map_err(|e| InternalError(format!("ElGamalCurve25519Aes256Gcm enc error: {e}")))?;
-        Ok(pepper_encrypted)
+        Ok((pepper_base_encrypted, pepper_encrypted))
     } else {
-        Ok(pepper)
+        Ok((pepper_base, derived_pepper.get_pepper().to_vec()))
     }
 }
