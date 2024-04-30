@@ -32,6 +32,16 @@ pub struct Entry {
     pub hash_value: HashValue,
 }
 
+impl Entry {
+    fn new(deserialized: StateKeyInner, encoded: Bytes, hash_value: HashValue) -> Self {
+        Entry {
+            deserialized,
+            encoded,
+            hash_value,
+        }
+    }
+}
+
 impl Drop for Entry {
     fn drop(&mut self) {
         match &self.deserialized {
@@ -115,20 +125,12 @@ where
         Ok(match locked.get_mut(key1) {
             None => {
                 let mut map2 = locked.entry(key1.to_owned()).insert(HashMap::new());
-                let entry = Entry {
-                    deserialized,
-                    encoded,
-                    hash_value,
-                };
+                let entry = Entry::new(deserialized, encoded, hash_value);
                 Self::insert_key2(map2.get_mut(), key2.to_owned(), entry)
             },
             Some(map2) => match map2.get(key2) {
                 None => {
-                    let entry = Entry {
-                        deserialized,
-                        encoded,
-                        hash_value,
-                    };
+                    let entry = Entry::new(deserialized, encoded, hash_value);
                     Self::insert_key2(map2, key2.to_owned(), entry)
                 },
                 Some(weak) => match weak.upgrade() {
@@ -138,11 +140,7 @@ where
                     },
                     None => {
                         // previous version of this key is being dropped.
-                        let entry = Entry {
-                            deserialized,
-                            encoded,
-                            hash_value,
-                        };
+                        let entry = Entry::new(deserialized, encoded, hash_value);
                         Self::insert_key2(map2, key2.to_owned(), entry)
                     },
                 },
