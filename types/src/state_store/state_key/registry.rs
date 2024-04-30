@@ -41,19 +41,19 @@ impl Drop for Entry {
                 match &bcs::from_bytes::<Path>(path).expect("Failed to deserialize Path.") {
                     Path::Code(module_id) => REGISTRY
                         .module(address, &module_id.name)
-                        .remove(&module_id.address, &module_id.name),
+                        .maybe_remove(&module_id.address, &module_id.name),
                     Path::Resource(struct_tag) => REGISTRY
                         .resource(struct_tag, address)
-                        .remove(struct_tag, address),
+                        .maybe_remove(struct_tag, address),
                     Path::ResourceGroup(struct_tag) => REGISTRY
                         .resource_group(struct_tag, address)
-                        .remove(struct_tag, address),
+                        .maybe_remove(struct_tag, address),
                 }
             },
             StateKeyInner::TableItem { handle, key } => {
-                REGISTRY.table_item(handle, key).remove(handle, key)
+                REGISTRY.table_item(handle, key).maybe_remove(handle, key)
             },
-            StateKeyInner::Raw(bytes) => REGISTRY.raw(bytes).remove(bytes, &()),
+            StateKeyInner::Raw(bytes) => REGISTRY.raw(bytes).maybe_remove(bytes, &()),
         }
     }
 }
@@ -94,8 +94,6 @@ where
         Ref2: Eq + Hash + ToOwned<Owned = Key2> + ?Sized,
         Gen: FnOnce() -> Result<StateKeyInner>,
     {
-        const MAX_TRIES: usize = 1024;
-
         // generate the entry content outside the lock
         let deserialized = inner_gen()?;
         let encoded = deserialized.encode().expect("Failed to encode StateKey.");
@@ -105,58 +103,61 @@ where
             state.finish()
         };
 
-        for _ in 0..MAX_TRIES {
-            let mut locked = self.inner.write();
+        let mut locked = self.inner.write();
 
-            match locked.get_mut(key1) {
+        match locked.get_mut(key1) {
+            None => {
+                let mut map2 = locked.entry(key1.to_owned()).insert(HashMap::new());
+                let entry = Arc::new(Entry {
+                    deserialized,
+                    encoded,
+                    hash_value,
+                });
+                map2.get_mut()
+                    .insert(key2.to_owned(), Arc::downgrade(&entry));
+                Ok(entry)
+            },
+            Some(map2) => match map2.get(key2) {
                 None => {
-                    let mut map2 = locked.entry(key1.to_owned()).insert(HashMap::new());
                     let entry = Arc::new(Entry {
                         deserialized,
                         encoded,
                         hash_value,
                     });
-                    map2.get_mut()
-                        .insert(key2.to_owned(), Arc::downgrade(&entry));
-                    return Ok(entry);
+                    map2.insert(key2.to_owned(), Arc::downgrade(&entry));
+                    Ok(entry)
                 },
-                Some(map2) => match map2.get(key2) {
+                Some(weak) => match weak.upgrade() {
+                    Some(entry) => {
+                        // some other thread has added it
+                        Ok(entry)
+                    },
                     None => {
+                        // previous version of this key is being dropped.
                         let entry = Arc::new(Entry {
                             deserialized,
                             encoded,
                             hash_value,
                         });
                         map2.insert(key2.to_owned(), Arc::downgrade(&entry));
-                        return Ok(entry);
-                    },
-                    Some(weak) => match weak.upgrade() {
-                        Some(entry) => {
-                            // some other thread has added it
-                            return Ok(entry);
-                        },
-                        None => {
-                            // the key is being dropped, release lock and retry
-                            continue;
-                        },
+                        Ok(entry)
                     },
                 },
-            }
+            },
         }
-        unreachable!("Looks like deadlock??");
     }
 
-    fn remove(&self, key1: &Key1, key2: &Key2) {
+    fn maybe_remove(&self, key1: &Key1, key2: &Key2) {
         let mut locked = self.inner.write();
-        let map2 = locked
-            .get_mut(key1)
-            .expect("Level 1 map must exist when an entry is to be dropped from it.");
-        assert!(
-            map2.remove(key2).is_some(),
-            "Entry missing in registry when dropping."
-        );
-        if map2.is_empty() {
-            locked.remove(key1).expect("Just saw it, can't be gone.");
+        if let Some(map2) = locked.get_mut(key1) {
+            if let Some(entry) = map2.get(key2) {
+                if entry.upgrade().is_none() {
+                    map2.remove(key2);
+                }
+            }
+            if map2.is_empty() {
+                locked.remove(key1);
+            }
         }
     }
 
