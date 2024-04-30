@@ -6,7 +6,7 @@
 
 use crate::{
     dag::DAGNetworkMessage,
-    pipeline,
+    monitor, pipeline,
     quorum_store::types::{Batch, BatchMsg, BatchRequest, BatchResponse},
     rand::rand_gen::network_messages::RandGenMessage,
 };

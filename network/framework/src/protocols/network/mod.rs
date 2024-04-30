@@ -8,6 +8,7 @@ pub use crate::protocols::rpc::error::RpcError;
 use crate::{
     counters::INCOMING_RPC_STEP_DURATION,
     error::NetworkError,
+    monitor,
     peer_manager::{
         ConnectionNotification, ConnectionRequestSender, PeerManagerNotification,
         PeerManagerRequestSender,
@@ -419,10 +420,12 @@ impl<TMessage: Message + Send + 'static> NetworkSender<TMessage> {
             .into();
 
         // Send the request and wait for the response
-        let res_data = self
-            .peer_mgr_reqs_tx
-            .send_rpc(recipient, protocol, req_data, timeout)
-            .await?;
+        let res_data = monitor!(
+            "sender_send_rpc",
+            self.peer_mgr_reqs_tx
+                .send_rpc(recipient, protocol, req_data, timeout)
+                .await
+        )?;
 
         // Deserialize the response using a blocking task
         let res_msg = tokio::task::spawn_blocking(move || protocol.from_bytes(&res_data)).await??;

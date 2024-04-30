@@ -4,6 +4,7 @@
 
 use crate::{
     application::{error::Error, storage::PeersAndMetadata},
+    monitor,
     protocols::{
         network::{Message, NetworkEvents, NetworkSender},
         wire::handshake::v1::{ProtocolId, ProtocolIdSet},
@@ -218,8 +219,10 @@ impl<Message: NetworkMessageTrait> NetworkClientInterface<Message> for NetworkCl
         peer: PeerNetworkId,
     ) -> Result<Message, Error> {
         let network_sender = self.get_sender_for_network_id(&peer.network_id())?;
-        let rpc_protocol_id =
-            self.get_preferred_protocol_for_peer(&peer, &self.rpc_protocols_and_preferences)?;
+        let rpc_protocol_id = monitor!(
+            "get_preferred_protocol",
+            self.get_preferred_protocol_for_peer(&peer, &self.rpc_protocols_and_preferences)
+        )?;
         Ok(network_sender
             .send_rpc(peer.peer_id(), rpc_protocol_id, message, rpc_timeout)
             .await?)

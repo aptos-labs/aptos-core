@@ -121,7 +121,7 @@ impl Default for ReliableBroadcastConfig {
             backoff_policy_factor: 100,
             backoff_policy_max_delay_ms: 2000,
 
-            rpc_timeout_ms: 5000,
+            rpc_timeout_ms: 4000,
         }
     }
 }

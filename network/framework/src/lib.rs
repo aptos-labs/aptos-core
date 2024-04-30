@@ -11,6 +11,8 @@
 // tracking issue: https://github.com/rust-lang/rust/issues/78835
 // #![doc = include_str!("../README.md")]
 
+use aptos_metrics_core::IntGauge;
+
 pub mod application;
 pub mod connectivity_manager;
 pub mod constants;
@@ -31,3 +33,31 @@ pub mod testutils;
 pub type DisconnectReason = peer::DisconnectReason;
 pub type ConnectivityRequest = connectivity_manager::ConnectivityRequest;
 pub type ProtocolId = protocols::wire::handshake::v1::ProtocolId;
+
+/// It assumes a OpMetrics defined as OP_COUNTERS in crate::counters;
+#[macro_export]
+macro_rules! monitor {
+    ($name:literal, $fn:expr) => {{
+        use $crate::{counters::OP_COUNTERS, IntGaugeGuard};
+        let _timer = OP_COUNTERS.timer($name);
+        let _guard = IntGaugeGuard::new(OP_COUNTERS.gauge(concat!($name, "_running")));
+        $fn
+    }};
+}
+
+struct IntGaugeGuard {
+    gauge: IntGauge,
+}
+
+impl IntGaugeGuard {
+    fn new(gauge: IntGauge) -> Self {
+        gauge.inc();
+        Self { gauge }
+    }
+}
+
+impl Drop for IntGaugeGuard {
+    fn drop(&mut self) {
+        self.gauge.dec();
+    }
+}

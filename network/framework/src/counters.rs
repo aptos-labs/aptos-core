@@ -658,3 +658,7 @@ pub static INCOMING_RPC_STEP_DURATION: Lazy<HistogramVec> = Lazy::new(|| {
 pub static PEER_LOOP: Lazy<HistogramVec> = Lazy::new(|| {
     register_histogram_vec!("aptos_network_peer_loop", "network peer loop", &["peer_id"],).unwrap()
 });
+
+/// Monitor counters, used by monitor! macro
+pub static OP_COUNTERS: Lazy<aptos_metrics_core::op_counters::OpMetrics> =
+    Lazy::new(|| aptos_metrics_core::op_counters::OpMetrics::new_and_registered("network"));

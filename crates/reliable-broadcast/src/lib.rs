@@ -112,12 +112,12 @@ where
                 let time_service = time_service.clone();
                 async move {
                     tokio::spawn(async move {
-                        let _timer = RPC_PROCESS_DURATION
-                            .with_label_values(&[&receiver.short_str_lossless()])
-                            .start_timer();
                         if let Some(duration) = sleep_duration {
                             time_service.sleep(duration).await;
                         }
+                        let _timer = RPC_PROCESS_DURATION
+                            .with_label_values(&[&receiver.short_str_lossless()])
+                            .start_timer();
                         (
                             receiver,
                             network_sender
