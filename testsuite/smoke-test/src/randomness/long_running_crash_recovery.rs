@@ -56,7 +56,6 @@ async fn long_running_crash_recovery() {
     let epoch_duration_secs = 20;
     let dkg_secs = 20;
     let (mut swarm, mut aptos_cli, _faucet) = SwarmBuilder::new_local(4)
-        .with_num_fullnodes(1)
         .with_aptos()
         .with_init_config(Arc::new(|_, conf, _| {
             conf.api.failpoints_enabled = true;
@@ -65,8 +64,8 @@ async fn long_running_crash_recovery() {
             conf.epoch_duration_secs = epoch_duration_secs;
 
             // start with vtxn disabled and randomness off.
-            conf.consensus_config.enable_validator_txns();
-            conf.randomness_config_override = Some(OnChainRandomnessConfig::default_enabled());
+            conf.consensus_config.disable_validator_txns();
+            conf.randomness_config_override = Some(OnChainRandomnessConfig::default_disabled());
         }))
         .build_with_cli(0)
         .await;
