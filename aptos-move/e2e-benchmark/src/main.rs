@@ -101,7 +101,7 @@ fn main() {
         }),
         // This is a cheap bcs (serializing vec<u8>), so not representative of what BCS native call should cost.
         // (, EntryPoints::Loop { loop_count: Some(1000), loop_type: LoopType::BCS { len: 1024 }}),
-        (117, EntryPoints::CreateObjects {
+        (135, EntryPoints::CreateObjects {
             num_objects: 10,
             object_payload_size: 0,
         }),
@@ -109,7 +109,7 @@ fn main() {
             num_objects: 10,
             object_payload_size: 10 * 1024,
         }),
-        (1187, EntryPoints::CreateObjects {
+        (1369, EntryPoints::CreateObjects {
             num_objects: 100,
             object_payload_size: 0,
         }),
@@ -142,8 +142,8 @@ fn main() {
         (257, EntryPoints::TokenV1MintAndTransferFT),
         (412, EntryPoints::TokenV1MintAndTransferNFTSequential),
         (368, EntryPoints::TokenV2AmbassadorMint { numbered: true }),
-        (520, EntryPoints::LiquidityPoolSwap { is_stable: true }),
-        (500, EntryPoints::LiquidityPoolSwap { is_stable: false }),
+        (494, EntryPoints::LiquidityPoolSwap { is_stable: true }),
+        (463, EntryPoints::LiquidityPoolSwap { is_stable: false }),
     ];
 
     let mut failures = Vec::new();

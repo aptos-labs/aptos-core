@@ -1,0 +1,7 @@
+
+Diagnostics:
+error: local `s` of type `M::X` does not have the `drop` ability
+  ┌─ tests/reference-safety/v1-borrow-tests/return_with_borrowed_loc_resource_invalid.move:6:18
+  │
+6 │         let u = &s.u;
+  │                  ^ still borrowed but will be implicitly dropped later since it is no longer used

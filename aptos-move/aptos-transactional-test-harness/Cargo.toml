@@ -31,6 +31,7 @@ move-binary-format = { workspace = true, features = ["fuzzing"] }
 move-bytecode-verifier = { workspace = true }
 move-command-line-common = { workspace = true }
 move-compiler = { workspace = true }
+move-compiler-v2 = { workspace = true }
 move-core-types = { workspace = true, features = ["fuzzing"] }
 move-model = { workspace = true }
 move-resource-viewer = { workspace = true }

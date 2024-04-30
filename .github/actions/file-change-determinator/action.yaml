@@ -1,9 +1,6 @@
 name: File Change Determinator
 description: Runs the file change determinator (to identify which files changed in a pull request)
 outputs:
-  move_compiler_v2_changes:
-    description: "Returns true if changes were detected that require the move compiler v2 tests to run"
-    value: ${{ !steps.move_compiler_v2_determinator.outputs.should_skip }}
   only_docs_changed:
     description: "Returns true if only docs files were changed in the pull request"
     value: ${{ steps.doc_change_determinator.outputs.should_skip }}
@@ -18,18 +15,3 @@ runs:
       with:
         skip_after_successful_duplicate: false # Don't skip if the action is a duplicate (this may cause false positives)
         paths_ignore: '["**/*.md"]'
-    # Run the move compiler v2 change determinator
-    - id: move_compiler_v2_determinator
-      continue-on-error: true # Avoid skipping any checks if this job fails (see: https://github.com/fkirc/skip-duplicate-actions/issues/301)
-      uses: fkirc/skip-duplicate-actions@v5
-      with:
-          skip_after_successful_duplicate: false # Don't skip if the action is a duplicate (this may cause false positives)
-          paths: '[
-                    "aptos-move/aptos-transactional-test-harness",
-                    "aptos-move/e2e-move-tests/**",
-                    "aptos-move/framework/**",
-                    "aptos-move/move-examples",
-                    "third_party/move/**",
-                    ".github/workflows/move-test-compiler-v2.yaml",
-                    ".github/actions/move-tests-compiler-v2/**"
-                  ]'

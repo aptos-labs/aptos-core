@@ -71,6 +71,10 @@ pub struct NodeConfig {
     pub node_startup: NodeStartupConfig,
     #[serde(default)]
     pub peer_monitoring_service: PeerMonitoringServiceConfig,
+    /// In a randomness stall, set this to be on-chain `RandomnessConfigSeqNum` + 1.
+    /// Once enough nodes restarted with the new value, the chain should unblock with randomness disabled.
+    #[serde(default)]
+    pub randomness_override_seq_num: u64,
     #[serde(default)]
     pub state_sync: StateSyncConfig,
     #[serde(default)]

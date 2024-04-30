@@ -182,8 +182,8 @@ fn test_get_latest_executed_trees() {
     assert!(empty.is_same_view(&ExecutedTrees::new_empty()));
 
     // bootstrapped db (any transaction info is in)
-    let key = StateKey::raw(String::from("test_key").into_bytes());
-    let value = StateValue::from(String::from("test_val").into_bytes());
+    let key = StateKey::raw(b"test_key");
+    let value = StateValue::from(b"test_val".to_vec());
     let hash = SparseMerkleLeafNode::new(key.hash(), value.hash()).hash();
     put_as_state_root(&db, 0, key, value);
     let txn_info = TransactionInfo::new(

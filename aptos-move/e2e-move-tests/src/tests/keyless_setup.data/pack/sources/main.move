@@ -19,6 +19,8 @@ script {
         ];
         jwks::set_patches(&fx, patches);
 
-        keyless_account::update_max_exp_horizon(&fx, max_exp_horizon_secs);
+        keyless_account::update_max_exp_horizon_for_next_epoch(&fx, max_exp_horizon_secs);
+        // sets the pending Configuration change to the max expiration horizon from above
+        aptos_governance::force_end_epoch_test_only(core_resources);
     }
 }

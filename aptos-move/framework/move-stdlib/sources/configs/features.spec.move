@@ -96,12 +96,11 @@ spec std::features {
         ensures [abstract] result == spec_module_event_enabled();
     }
 
-    spec on_new_epoch(vm_or_framework: &signer) {
-        let addr = signer::address_of(vm_or_framework);
-        aborts_if addr != @std && addr != @vm;
-        aborts_if exists<PendingFeatures>(@std) && !exists<Features>(@std);
+    spec on_new_epoch(framework: &signer) {
+        requires @std == signer::address_of(framework);
         let features_pending = global<PendingFeatures>(@std).features;
         let post features_std = global<Features>(@std).features;
         ensures exists<PendingFeatures>(@std) ==> features_std == features_pending;
+        aborts_if false;
     }
 }

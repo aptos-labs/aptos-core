@@ -27,6 +27,7 @@ arr_macro = { workspace = true }
 base64 = { workspace = true }
 bcs = { workspace = true }
 bytes = { workspace = true }
+criterion = { workspace = true }
 derivative = { workspace = true }
 fixed = { workspace = true }
 hex = { workspace = true }
@@ -43,6 +44,7 @@ once_cell = { workspace = true }
 passkey-types = { workspace = true }
 proptest = { workspace = true, optional = true }
 proptest-derive = { workspace = true, optional = true }
+quick_cache = { workspace = true }
 rand = { workspace = true }
 rayon = { workspace = true }
 ring = { workspace = true }
@@ -70,6 +72,7 @@ passkey-client = { workspace = true }
 proptest = { workspace = true }
 proptest-derive = { workspace = true }
 regex = { workspace = true }
+reqwest = { workspace = true }
 serde_json = { workspace = true }
 tokio = { workspace = true }
 url = { workspace = true }
@@ -77,3 +80,7 @@ url = { workspace = true }
 [features]
 default = []
 fuzzing = ["proptest", "proptest-derive", "aptos-crypto/fuzzing", "move-core-types/fuzzing"]
+
+[[bench]]
+name = "keyless"
+harness = false

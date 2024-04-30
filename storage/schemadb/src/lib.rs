@@ -40,7 +40,11 @@ pub use rocksdb::{
     BlockBasedOptions, Cache, ColumnFamilyDescriptor, DBCompressionType, Options, ReadOptions,
     SliceTransform, DEFAULT_COLUMN_FAMILY_NAME,
 };
-use std::{collections::HashMap, iter::Iterator, path::Path};
+use std::{
+    collections::{HashMap, HashSet},
+    iter::Iterator,
+    path::Path,
+};
 
 pub type ColumnFamilyName = &'static str;
 
@@ -114,7 +118,7 @@ impl DB {
         path: impl AsRef<Path>,
         name: &str,
         column_families: Vec<ColumnFamilyName>,
-        db_opts: &rocksdb::Options,
+        db_opts: &Options,
     ) -> DbResult<Self> {
         let db = DB::open_cf(
             db_opts,
@@ -123,9 +127,9 @@ impl DB {
             column_families
                 .iter()
                 .map(|cf_name| {
-                    let mut cf_opts = rocksdb::Options::default();
-                    cf_opts.set_compression_type(rocksdb::DBCompressionType::Lz4);
-                    rocksdb::ColumnFamilyDescriptor::new((*cf_name).to_string(), cf_opts)
+                    let mut cf_opts = Options::default();
+                    cf_opts.set_compression_type(DBCompressionType::Lz4);
+                    ColumnFamilyDescriptor::new((*cf_name).to_string(), cf_opts)
                 })
                 .collect(),
         )?;
@@ -133,12 +137,30 @@ impl DB {
     }
 
     pub fn open_cf(
-        db_opts: &rocksdb::Options,
+        db_opts: &Options,
         path: impl AsRef<Path>,
         name: &str,
-        cfds: Vec<rocksdb::ColumnFamilyDescriptor>,
+        cfds: Vec<ColumnFamilyDescriptor>,
     ) -> DbResult<DB> {
-        let inner = rocksdb::DB::open_cf_descriptors(db_opts, path.de_unc(), cfds)?;
+        // ignore error, since it'll fail to list cfs on the first open
+        let existing_cfs = rocksdb::DB::list_cf(db_opts, path.de_unc()).unwrap_or_default();
+
+        let unrecognized_cfds = existing_cfs
+            .iter()
+            .map(AsRef::as_ref)
+            .collect::<HashSet<&str>>()
+            .difference(&cfds.iter().map(|cfd| cfd.name()).collect())
+            .map(|cf| {
+                warn!("Unrecognized CF: {}", cf);
+
+                let mut cf_opts = Options::default();
+                cf_opts.set_compression_type(DBCompressionType::Lz4);
+                ColumnFamilyDescriptor::new(cf.to_string(), cf_opts)
+            })
+            .collect::<Vec<_>>();
+        let all_cfds = cfds.into_iter().chain(unrecognized_cfds);
+
+        let inner = rocksdb::DB::open_cf_descriptors(db_opts, path.de_unc(), all_cfds)?;
         Ok(Self::log_construct(name, inner))
     }
 
@@ -146,7 +168,7 @@ impl DB {
     /// Note that this still assumes there's only one process that opens the same DB.
     /// See `open_as_secondary`
     pub fn open_cf_readonly(
-        opts: &rocksdb::Options,
+        opts: &Options,
         path: impl AsRef<Path>,
         name: &str,
         cfs: Vec<ColumnFamilyName>,
@@ -159,7 +181,7 @@ impl DB {
     }
 
     pub fn open_cf_as_secondary<P: AsRef<Path>>(
-        opts: &rocksdb::Options,
+        opts: &Options,
         primary_path: P,
         secondary_path: P,
         name: &str,

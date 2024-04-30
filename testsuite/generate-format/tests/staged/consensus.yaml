@@ -717,13 +717,6 @@ RandGenMessage:
     - data: BYTES
 RandMetadata:
   STRUCT:
-    - metadata_to_sign:
-        TYPENAME: RandMetadataToSign
-    - block_id:
-        TYPENAME: HashValue
-    - timestamp: U64
-RandMetadataToSign:
-  STRUCT:
     - epoch: U64
     - round: U64
 Randomness:

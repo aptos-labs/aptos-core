@@ -88,7 +88,7 @@ mod dbtool_tests {
     use aptos_storage_interface::DbReader;
     use aptos_temppath::TempPath;
     use aptos_types::{
-        state_store::{state_key::StateKeyTag::AccessPath, state_key_prefix::StateKeyPrefix},
+        state_store::state_key::{inner::StateKeyTag::AccessPath, prefix::StateKeyPrefix},
         transaction::Version,
     };
     use clap::Parser;

@@ -45,19 +45,14 @@ use move_command_line_common::files::FileHash;
 use move_compiler::{
     compiled_unit::{
         verify_units, AnnotatedCompiledModule, AnnotatedCompiledScript, AnnotatedCompiledUnit,
-        CompiledUnit, FunctionInfo, NamedCompiledModule, NamedCompiledScript,
+        CompiledUnit, FunctionInfo,
     },
     diagnostics::FilesSourceText,
     shared::{known_attributes::KnownAttribute, unique_map::UniqueMap},
 };
 use move_disassembler::disassembler::Disassembler;
 use move_ir_types::location;
-use move_model::{
-    add_move_lang_diagnostics,
-    ast::{Address, ModuleName},
-    model::GlobalEnv,
-    PackageInfo,
-};
+use move_model::{add_move_lang_diagnostics, model::GlobalEnv, PackageInfo};
 use move_stackless_bytecode::function_target_pipeline::{
     FunctionTargetPipeline, FunctionTargetsHolder, FunctionVariant,
 };
@@ -118,7 +113,7 @@ where
     }
     check_errors(&env, error_writer, "stackless-bytecode analysis errors")?;
 
-    let modules_and_scripts = run_file_format_gen(&env, &targets);
+    let modules_and_scripts = run_file_format_gen(&mut env, &targets);
     check_errors(&env, error_writer, "assembling errors")?;
 
     debug!(
@@ -145,66 +140,10 @@ pub fn run_move_compiler_for_analysis(
 ) -> anyhow::Result<GlobalEnv> {
     options.whole_program = true; // will set `treat_everything_as_target`
     options = options.set_experiment(Experiment::SPEC_REWRITE, true);
-    let (mut env, units) = run_move_compiler(error_writer, options)?;
+    options = options.set_experiment(Experiment::ATTACH_COMPILED_MODULE, true);
+    let (env, _units) = run_move_compiler(error_writer, options)?;
     // Reset for subsequent analysis
     env.treat_everything_as_target(false);
-    // Script pseudo module names are sequentially constructed as `<SELF>_1 .. <SELF>_n`. To
-    // associate the bytecode module by name we need to count the index. This
-    // assumes script modules come out in the same order as they are were
-    // added to the environment.
-    let mut script_index = 0; // script names are named using a sequential index
-    for unit in units {
-        let unit = unit.into_compiled_unit();
-        match unit {
-            CompiledUnit::Module(NamedCompiledModule {
-                package_name: _,
-                address,
-                name,
-                module,
-                source_map,
-            }) => {
-                let name = ModuleName::new(
-                    Address::Numerical(address.into_inner()),
-                    env.symbol_pool().make(name.as_str()),
-                );
-                if let Some(id) = env.find_module(&name).map(|m| m.get_id()) {
-                    env.attach_compiled_module(id, module, source_map)
-                } else {
-                    env.error(
-                        &env.unknown_loc(),
-                        &format!(
-                            "failed to attach bytecode: cannot find module `{}`",
-                            name.display_full(&env)
-                        ),
-                    );
-                }
-            },
-            CompiledUnit::Script(NamedCompiledScript {
-                package_name: _,
-                name: _,
-                script,
-                source_map,
-            }) => {
-                let name = ModuleName::pseudo_script_name(env.symbol_pool(), script_index);
-                script_index += 1;
-                let module = move_model::script_into_module(
-                    script,
-                    &name.name().display(env.symbol_pool()).to_string(),
-                );
-                if let Some(id) = env.find_module(&name).map(|m| m.get_id()) {
-                    env.attach_compiled_module(id, module, source_map)
-                } else {
-                    env.error(
-                        &env.unknown_loc(),
-                        &format!(
-                            "failed to attach bytecode: cannot find script `{}`",
-                            name.display_full(&env)
-                        ),
-                    );
-                }
-            },
-        }
-    }
     Ok(env)
 }
 
@@ -297,7 +236,10 @@ pub fn run_bytecode_gen(env: &GlobalEnv) -> FunctionTargetsHolder {
     targets
 }
 
-pub fn run_file_format_gen(env: &GlobalEnv, targets: &FunctionTargetsHolder) -> Vec<CompiledUnit> {
+pub fn run_file_format_gen(
+    env: &mut GlobalEnv,
+    targets: &FunctionTargetsHolder,
+) -> Vec<CompiledUnit> {
     info!("File Format Generation");
     file_format_generator::generate_file_format(env, targets)
 }

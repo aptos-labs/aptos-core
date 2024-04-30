@@ -4,17 +4,39 @@
 mod cargo;
 mod common;
 
+use crate::common::PACKAGE_NAME_DELIMITER;
+use camino::Utf8PathBuf;
 use cargo::Cargo;
 use clap::{command, Args, Parser, Subcommand};
 pub use common::SelectedPackageArgs;
 use determinator::Utf8Paths0;
 use log::{debug, trace};
 
-// The CLI package name to match against for targeted CLI tests
+// Useful package name constants for targeted tests
 const APTOS_CLI_PACKAGE_NAME: &str = "aptos";
 
+// Relevant file paths to monitor when deciding to run the targeted tests.
+// Note: these paths should be relative to the root of the `aptos-core` repository,
+// and will be transformed into UTF-8 paths for cross-platform compatibility.
+const RELEVANT_FILE_PATHS_FOR_COMPILER_V2: [&str; 7] = [
+    "aptos-move/aptos-transactional-test-harness",
+    "aptos-move/e2e-move-tests",
+    "aptos-move/framework",
+    "aptos-move/move-examples",
+    "third_party/move",
+    ".github/workflows/move-test-compiler-v2.yaml",
+    ".github/actions/move-tests-compiler-v2",
+];
+const RELEVANT_FILE_PATHS_FOR_FRAMEWORK_UPGRADE_TESTS: [&str; 2] =
+    ["aptos-move/aptos-release-builder", "aptos-move/framework"];
+
+// Relevant packages to monitor when deciding to run the targeted tests
+const RELEVANT_PACKAGES_FOR_COMPILER_V2: [&str; 2] = ["aptos-framework", "e2e-move-tests"];
+const RELEVANT_PACKAGES_FOR_FRAMEWORK_UPGRADE_TESTS: [&str; 2] =
+    ["aptos-framework", "aptos-release-builder"];
+
 // The targeted unit test packages to ignore (these will be run separately, by other jobs)
-const TARGETED_TEST_PACKAGES_TO_IGNORE: [&str; 2] = ["aptos-testcases", "smoke-test"];
+const TARGETED_UNIT_TEST_PACKAGES_TO_IGNORE: [&str; 2] = ["aptos-testcases", "smoke-test"];
 
 #[derive(Args, Clone, Debug)]
 #[command(disable_help_flag = true)]
@@ -43,6 +65,8 @@ pub enum AptosCargoCommand {
     Fmt(CommonArgs),
     Nextest(CommonArgs),
     TargetedCLITests(CommonArgs),
+    TargetedCompilerV2Tests(CommonArgs),
+    TargetedFrameworkUpgradeTests(CommonArgs),
     TargetedUnitTests(CommonArgs),
     Test(CommonArgs),
 }
@@ -68,6 +92,8 @@ impl AptosCargoCommand {
             AptosCargoCommand::Fmt(args) => args,
             AptosCargoCommand::Nextest(args) => args,
             AptosCargoCommand::TargetedCLITests(args) => args,
+            AptosCargoCommand::TargetedCompilerV2Tests(args) => args,
+            AptosCargoCommand::TargetedFrameworkUpgradeTests(args) => args,
             AptosCargoCommand::TargetedUnitTests(args) => args,
             AptosCargoCommand::Test(args) => args,
         }
@@ -117,8 +143,8 @@ impl AptosCargoCommand {
         match self {
             AptosCargoCommand::AffectedPackages(_) => {
                 // Calculate and display the affected packages
-                let packages = package_args.compute_target_packages()?;
-                output_affected_packages(packages)
+                let affected_package_paths = package_args.compute_target_packages()?;
+                output_affected_packages(affected_package_paths)
             },
             AptosCargoCommand::ChangedFiles(_) => {
                 // Calculate and display the changed files
@@ -126,19 +152,19 @@ impl AptosCargoCommand {
                 output_changed_files(changed_files)
             },
             AptosCargoCommand::TargetedCLITests(_) => {
-                // Calculate the affected packages and run the targeted CLI tests (if any).
-                // Start by fetching the affected packages.
-                let packages = package_args.compute_target_packages()?;
+                // Run the targeted CLI tests (if necessary).
+                // First, start by calculating the affected packages.
+                let affected_package_paths = package_args.compute_target_packages()?;
 
                 // Check if the affected packages contains the Aptos CLI
                 let mut cli_affected = false;
-                for package_path in packages {
+                for package_path in affected_package_paths {
                     // Extract the package name from the full path
                     let package_name = get_package_name_from_path(&package_path);
 
                     // Check if the package is the Aptos CLI
                     if package_name == APTOS_CLI_PACKAGE_NAME {
-                        cli_affected = true;
+                        cli_affected = true; // The Aptos CLI was affected
                         break;
                     }
                 }
@@ -153,27 +179,76 @@ impl AptosCargoCommand {
                 println!("Skipping CLI tests as the Aptos CLI package was not affected!");
                 Ok(())
             },
-            AptosCargoCommand::TargetedUnitTests(_) => {
-                // Calculate the affected packages and run the targeted unit tests (if any).
-                // Start by fetching the arguments and affected packages.
-                let (direct_args, push_through_args, packages) =
+            AptosCargoCommand::TargetedCompilerV2Tests(_) => {
+                // Run the targeted compiler v2 tests (if necessary).
+                // Start by calculating the changed files and affected packages.
+                let (_, _, changed_files) = package_args.identify_changed_files()?;
+                let (direct_args, push_through_args, affected_package_paths) =
                     self.get_args_and_affected_packages(package_args)?;
 
-                // Collect all the affected packages to test, but filter out the packages
-                // that should not be run as unit tests.
+                // Determine if any relevant files or packages were changed
+                let relevant_changes_detected = detect_relevant_changes(
+                    RELEVANT_FILE_PATHS_FOR_COMPILER_V2.to_vec(),
+                    RELEVANT_PACKAGES_FOR_COMPILER_V2.to_vec(),
+                    changed_files,
+                    affected_package_paths,
+                );
+
+                // If relevant changes were detected, run the targeted compiler v2 tests
+                if relevant_changes_detected {
+                    println!("Running the targeted compiler v2 tests...");
+                    return run_targeted_compiler_v2_tests(direct_args, push_through_args);
+                }
+
+                // Otherwise, skip the targeted compiler v2 tests
+                println!("Skipping targeted compiler v2 tests because no relevant files or packages were affected!");
+                Ok(())
+            },
+            AptosCargoCommand::TargetedFrameworkUpgradeTests(_) => {
+                // Determine if the framework upgrade tests should be run.
+                // Start by calculating the changed files and affected packages.
+                let (_, _, changed_files) = package_args.identify_changed_files()?;
+                let (_, _, affected_package_paths) =
+                    self.get_args_and_affected_packages(package_args)?;
+
+                // Determine if any relevant files or packages were changed
+                let relevant_changes_detected = detect_relevant_changes(
+                    RELEVANT_FILE_PATHS_FOR_FRAMEWORK_UPGRADE_TESTS.to_vec(),
+                    RELEVANT_PACKAGES_FOR_FRAMEWORK_UPGRADE_TESTS.to_vec(),
+                    changed_files,
+                    affected_package_paths,
+                );
+
+                // Output if relevant changes were detected that require the framework upgrade
+                // test. This will be consumed by Github Actions and used to run the test.
+                // TODO: is there a cleaner way to output this for Github Actions?
+                println!(
+                    "Framework upgrade test required: {}",
+                    relevant_changes_detected
+                );
+
+                Ok(())
+            },
+            AptosCargoCommand::TargetedUnitTests(_) => {
+                // Run the targeted unit tests (if necessary).
+                // Start by calculating the affected packages.
+                let (direct_args, push_through_args, affected_package_paths) =
+                    self.get_args_and_affected_packages(package_args)?;
+
+                // Filter out the ignored packages
                 let mut packages_to_test = vec![];
-                for package_path in packages {
+                for package_path in affected_package_paths {
                     // Extract the package name from the full path
                     let package_name = get_package_name_from_path(&package_path);
 
                     // Only add the package if it is not in the ignore list
-                    if TARGETED_TEST_PACKAGES_TO_IGNORE.contains(&package_name.as_str()) {
+                    if TARGETED_UNIT_TEST_PACKAGES_TO_IGNORE.contains(&package_name.as_str()) {
                         debug!(
                             "Ignoring package when running targeted-unit-tests: {:?}",
                             package_name
                         );
                     } else {
-                        packages_to_test.push(package_path);
+                        packages_to_test.push(package_path); // Add the package to the list
                     }
                 }
 
@@ -194,11 +269,11 @@ impl AptosCargoCommand {
             _ => {
                 // Otherwise, we need to parse and run the command.
                 // Start by fetching the arguments and affected packages.
-                let (mut direct_args, mut push_through_args, packages) =
+                let (mut direct_args, mut push_through_args, affected_package_paths) =
                     self.get_args_and_affected_packages(package_args)?;
 
                 // Add each affected package to the arguments
-                for package_path in packages {
+                for package_path in affected_package_paths {
                     direct_args.push("-p".into());
                     direct_args.push(package_path);
                 }
@@ -234,12 +309,68 @@ impl AptosCargoCommand {
     }
 }
 
-/// Returns the package name from the given package path
-fn get_package_name_from_path(package_path: &str) -> String {
-    package_path.split('#').last().unwrap().to_string()
+/// Returns true iff relevant changes are detected. This includes: (i) changes
+/// to relevant file paths; or (ii) changes to relevant packages.
+fn detect_relevant_changes(
+    relevant_file_paths: Vec<&str>,
+    relevant_package_names: Vec<&str>,
+    changed_file_paths: Utf8Paths0,
+    affected_package_paths: Vec<String>,
+) -> bool {
+    // Transform the relevant file paths into UTF-8 paths
+    let relevant_file_paths: Vec<Utf8PathBuf> =
+        relevant_file_paths.iter().map(Utf8PathBuf::from).collect();
+
+    // Check if the changed files contain any of the relevant paths
+    for changed_file_path in changed_file_paths.into_iter() {
+        for relevant_file_path in &relevant_file_paths {
+            if changed_file_path.starts_with(relevant_file_path.as_path()) {
+                return true; // A relevant file was changed
+            }
+        }
+    }
+
+    // Check if the affected packages contain any of the relevant packages
+    for package_path in affected_package_paths {
+        // Extract the package name from the full path
+        let package_name = get_package_name_from_path(&package_path);
+
+        // Check if the package is a relevant package
+        if relevant_package_names.contains(&package_name.as_str()) {
+            return true; // A relevant package was changed
+        }
+    }
+
+    false // No relevant changes detected
 }
 
-/// Runs the targeted CLI tests. This includes building and testing the CLI.
+/// Returns the package name from the given package path
+fn get_package_name_from_path(package_path: &str) -> String {
+    // Verify the package path contains a package delimiter
+    if !package_path.contains(PACKAGE_NAME_DELIMITER) {
+        panic!(
+            "Package path missing delimiter ({}): {}",
+            PACKAGE_NAME_DELIMITER, package_path
+        );
+    }
+
+    // Next, split the package path on the delimiter
+    match package_path.split(PACKAGE_NAME_DELIMITER).last() {
+        Some(package_name) => {
+            if package_name.is_empty() {
+                panic!("Failed to extract package name from path: {}", package_path);
+            } else {
+                package_name.to_string()
+            }
+        },
+        None => panic!(
+            "Failed to split package path on delimiter ({}): {:}",
+            PACKAGE_NAME_DELIMITER, package_path
+        ),
+    }
+}
+
+/// Runs the targeted CLI tests
 fn run_targeted_cli_tests() -> anyhow::Result<()> {
     // First, run the CLI tests
     let mut command = Cargo::command("test");
@@ -260,7 +391,28 @@ fn run_targeted_cli_tests() -> anyhow::Result<()> {
     Ok(())
 }
 
-/// Runs the targeted unit tests. This includes building and testing the unit tests.
+/// Runs the targeted compiler v2 tests
+fn run_targeted_compiler_v2_tests(
+    mut direct_args: Vec<String>,
+    push_through_args: Vec<String>,
+) -> anyhow::Result<()> {
+    // Add the compiler v2 packages to test to the arguments
+    for package in RELEVANT_PACKAGES_FOR_COMPILER_V2.iter() {
+        direct_args.push("-p".into());
+        direct_args.push(package.to_string());
+    }
+
+    // Create the command to run the compiler v2 tests
+    let mut command = Cargo::command("nextest");
+    command.args(["run"]);
+    command.args(direct_args).pass_through(push_through_args);
+
+    // Run the compiler v2 tests
+    command.run(false);
+    Ok(())
+}
+
+/// Runs the targeted unit tests
 fn run_targeted_unit_tests(
     packages_to_test: Vec<String>,
     mut direct_args: Vec<String>,
@@ -330,5 +482,190 @@ pub struct AptosCargoCli {
 impl AptosCargoCli {
     pub fn execute(&self) -> anyhow::Result<()> {
         self.cmd.execute(&self.package_args)
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_detect_relevant_changes() {
+        // Create relevant paths and packages for testing
+        let relevant_file_paths = vec![".github/actions/", "aptos-move/", "Cargo.lock", "crates/"];
+        let relevant_package_names = vec!["aptos-node", "e2e-move-tests"];
+
+        // Verify that no changes are detected
+        let changed_file_paths = Utf8Paths0::from_bytes(b"developer-docs-site/").unwrap();
+        let affected_package_paths =
+            vec!["file:///home/aptos-core/crates/test-crate#test-crate".into()];
+        let relevant_changes_detected = detect_relevant_changes(
+            relevant_file_paths.clone(),
+            relevant_package_names.clone(),
+            changed_file_paths,
+            affected_package_paths,
+        );
+        assert!(!relevant_changes_detected);
+
+        // Verify that file changes are detected correctly
+        let changed_file_path =
+            Utf8Paths0::from_bytes(b".github///actions/test-action/action.yaml").unwrap();
+        let relevant_changes_detected = detect_relevant_changes(
+            relevant_file_paths.clone(),
+            relevant_package_names.clone(),
+            changed_file_path,
+            vec![], // No affected packages
+        );
+        assert!(relevant_changes_detected);
+
+        // Verify that package changes are detected correctly
+        let affected_package_paths =
+            vec!["file:///home/aptos-core/crates/aptos-node#aptos-node".into()];
+        let relevant_changes_detected = detect_relevant_changes(
+            relevant_file_paths.clone(),
+            relevant_package_names.clone(),
+            Utf8Paths0::from_bytes(b"").unwrap(), // No changed files
+            affected_package_paths,
+        );
+        assert!(relevant_changes_detected);
+
+        // Verify that both file and package changes are detected correctly
+        let changed_file_path = Utf8Paths0::from_bytes(b"Cargo.lock").unwrap();
+        let affected_package_paths =
+            vec!["file:///home/aptos-core/crates/e2e-move-tests#e2e-move-tests".into()];
+        let relevant_changes_detected = detect_relevant_changes(
+            relevant_file_paths.clone(),
+            relevant_package_names.clone(),
+            changed_file_path,
+            affected_package_paths,
+        );
+        assert!(relevant_changes_detected);
+    }
+
+    #[test]
+    fn test_detect_relevant_changes_file_paths() {
+        // Create relevant file paths for testing
+        let relevant_file_paths = vec![".github/actions/", "aptos-move/", "Cargo.lock", "crates/"];
+
+        // Verify that no changes are detected
+        let changed_file_paths = vec![
+            ".githubb/",
+            "aptos-nove/file.txt",
+            "Cargo.lockity",
+            "/my/crates/",
+        ];
+        for changed_file_path in changed_file_paths {
+            // Convert the changed file path to a UTF-8 path
+            let changed_file_path = Utf8Paths0::from_bytes(changed_file_path.as_bytes()).unwrap();
+
+            // Verify that no changes are detected
+            let relevant_changes_detected = detect_relevant_changes(
+                relevant_file_paths.clone(),
+                vec![], // No relevant packages
+                changed_file_path,
+                vec![], // No affected packages
+            );
+            assert!(!relevant_changes_detected);
+        }
+
+        // Verify that file changes are detected correctly
+        let changed_file_paths = vec![
+            ".github///actions/test-action/action.yaml",
+            "aptos-move/file.txt",
+            "Cargo.lock",
+            "crates/",
+        ];
+        for changed_file_path in changed_file_paths {
+            // Convert the changed file path to a UTF-8 path
+            let changed_file_path = Utf8Paths0::from_bytes(changed_file_path.as_bytes()).unwrap();
+
+            // Verify changes are detected
+            let relevant_changes_detected = detect_relevant_changes(
+                relevant_file_paths.clone(),
+                vec![], // No relevant packages
+                changed_file_path,
+                vec![], // No affected packages
+            );
+            assert!(relevant_changes_detected);
+        }
+    }
+
+    #[test]
+    fn test_detect_relevant_changes_package_paths() {
+        // Create relevant package names for testing
+        let relevant_package_names = vec!["aptos-node", "e2e-move-tests"];
+
+        // Verify that no changes are detected
+        let affected_package_paths = vec![
+            "file:///home/aptos-core/aptos-mode/tests/e2e-move-tests#test-crate",
+            "file:///home/aptos-core/crates/test-crate#other-test-crate",
+            "file:///home/aptos-core/crates/other-crate#other-crate",
+            "file:///home/aptos-core/aptos-node#other-node-crate",
+        ];
+        for affected_package_path in affected_package_paths {
+            // Verify that no changes are detected
+            let relevant_changes_detected = detect_relevant_changes(
+                vec![], // No relevant file paths
+                relevant_package_names.clone(),
+                Utf8Paths0::from_bytes(b"").unwrap(), // No changed files
+                vec![affected_package_path.into()],
+            );
+            assert!(!relevant_changes_detected);
+        }
+
+        // Verify that package changes are detected correctly
+        let affected_package_paths = vec![
+            "file:///home/aptos-core/crates/aptos-node#aptos-node",
+            "file:///home/aptos-core/crates/e2e-move-tests#e2e-move-tests",
+        ];
+        for affected_package_path in affected_package_paths {
+            // Verify changes are detected
+            let relevant_changes_detected = detect_relevant_changes(
+                vec![], // No relevant file paths
+                relevant_package_names.clone(),
+                Utf8Paths0::from_bytes(b"").unwrap(), // No changed files
+                vec![affected_package_path.into()],
+            );
+            assert!(relevant_changes_detected);
+        }
+    }
+
+    #[test]
+    fn test_get_package_name_from_path() {
+        // Create a fully qualified test package path
+        let package_name = "test-package-name".to_string();
+        let package_path = format!(
+            "file:///home/aptos-core/devtools/aptos-cargo-cli#{}",
+            package_name
+        );
+
+        // Extract the package name from the path and check it
+        assert_eq!(get_package_name_from_path(&package_path), package_name);
+
+        // Create a relative test package path
+        let package_path = format!("#{}", package_name);
+
+        // Extract the package name from the path and check it
+        assert_eq!(get_package_name_from_path(&package_path), package_name);
+    }
+
+    #[test]
+    #[should_panic(expected = "Failed to extract package name from path")]
+    fn test_get_package_name_from_path_empty() {
+        // Create a test package path with an empty package name
+        let package_path = "file:///home/aptos-core/devtools/aptos-cargo-cli#";
+
+        // Extract the package name from the path (this should panic)
+        get_package_name_from_path(package_path);
+    }
+
+    #[test]
+    #[should_panic(expected = "Package path missing delimiter")]
+    fn test_get_package_name_from_path_missing_delimiter() {
+        // Create a test package path without a package name
+        let package_path = "file:///home/aptos-core/devtools/aptos-cargo-cli";
+
+        // Extract the package name from the path (this should panic)
+        get_package_name_from_path(package_path);
     }
 }

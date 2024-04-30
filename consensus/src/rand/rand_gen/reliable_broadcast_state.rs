@@ -110,12 +110,12 @@ pub struct ShareAggregateState<S> {
 impl<S> ShareAggregateState<S> {
     pub fn new(
         rand_store: Arc<Mutex<RandStore<S>>>,
-        metadata: RandMetadata,
+        rand_metadata: RandMetadata,
         rand_config: RandConfig,
     ) -> Self {
         Self {
             rand_store,
-            rand_metadata: metadata,
+            rand_metadata,
             rand_config,
         }
     }
@@ -139,7 +139,7 @@ impl<S: TShare, D: TAugmentedData> BroadcastStatus<RandMessage<S, D>, RandMessag
         share.verify(&self.rand_config)?;
         info!(LogSchema::new(LogEvent::ReceiveReactiveRandShare)
             .epoch(share.epoch())
-            .round(share.metadata().round())
+            .round(share.metadata().round)
             .remote_peer(*share.author()));
         let mut store = self.rand_store.lock();
         let aggregated = if store.add_share(share, PathType::Slow)? {

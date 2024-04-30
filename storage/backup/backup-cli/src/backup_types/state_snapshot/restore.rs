@@ -33,7 +33,7 @@ use aptos_types::{
     on_chain_config::{Features, TimedFeatureOverride, TimedFeaturesBuilder},
     proof::TransactionInfoWithProof,
     state_store::{
-        state_key::{StateKey, StateKeyInner},
+        state_key::{inner::StateKeyInner, StateKey},
         state_value::StateValue,
     },
     transaction::Version,

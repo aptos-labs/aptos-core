@@ -6,7 +6,7 @@
 //! and otherwise delegate to the derived serializers.
 //!
 //! This is currently only implemented for type tags, but can be easily
-//! generalized, as the the only type-tag specific thing is the allowed nesting.
+//! generalized, as the only type-tag specific thing is the allowed nesting.
 
 use serde::{Deserialize, Deserializer, Serialize, Serializer};
 use std::cell::RefCell;
