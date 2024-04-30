@@ -897,8 +897,7 @@ module aptos_framework::multisig_account {
         assert!(vector::length(&payload) > 0, error::invalid_argument(EPAYLOAD_CANNOT_BE_EMPTY));
 
         assert_multisig_account_exists(multisig_account);
-        let multisig_account_resource = borrow_global_mut<MultisigAccount>(multisig_account);
-        assert_is_owner_internal(owner, multisig_account_resource);
+        assert_is_owner(owner, multisig_account);
 
         let creator = address_of(owner);
         let transaction = MultisigTransaction {
@@ -908,7 +907,7 @@ module aptos_framework::multisig_account {
             creator,
             creation_time_secs: now_seconds(),
         };
-        add_transaction(creator, multisig_account, multisig_account_resource, transaction);
+        add_transaction(creator, multisig_account, transaction);
     }
 
     /// Create a multisig transaction with a transaction hash instead of the full payload.
@@ -923,8 +922,7 @@ module aptos_framework::multisig_account {
         assert!(vector::length(&payload_hash) == 32, error::invalid_argument(EINVALID_PAYLOAD_HASH));
 
         assert_multisig_account_exists(multisig_account);
-        let multisig_account_resource = borrow_global_mut<MultisigAccount>(multisig_account);
-        assert_is_owner_internal(owner, multisig_account_resource);
+        assert_is_owner(owner, multisig_account);
 
         let creator = address_of(owner);
         let transaction = MultisigTransaction {
@@ -934,7 +932,7 @@ module aptos_framework::multisig_account {
             creator,
             creation_time_secs: now_seconds(),
         };
-        add_transaction(creator, multisig_account, multisig_account_resource, transaction);
+        add_transaction(creator, multisig_account, transaction);
     }
 
     /// Approve a multisig transaction.
@@ -1016,8 +1014,9 @@ module aptos_framework::multisig_account {
         multisig_account: address,
     ) acquires MultisigAccount {
         assert_multisig_account_exists(multisig_account);
-        let sequence_number = last_resolved_sequence_number(multisig_account) + 1;
+        assert_is_owner(owner, multisig_account);
 
+        let sequence_number = last_resolved_sequence_number(multisig_account) + 1;
         let owner_addr = address_of(owner);
         if(features::multisig_v2_enhancement_feature_enabled()) {
             // Implicitly vote for rejection if the owner has not voted for rejection yet.
@@ -1203,33 +1202,33 @@ module aptos_framework::multisig_account {
         num_approvals_and_rejections_internal(&multisig_account_resource.owners, &transaction)
     }
 
-    fun add_transaction(
+    inline fun add_transaction(
         creator: address,
-        multisig_account_address: address,
-        multisig_account: &mut MultisigAccount,
+        multisig_account: address,
         transaction: MultisigTransaction
     ) {
         if(features::multisig_v2_enhancement_feature_enabled()) {
-            let num_pending_transactions = multisig_account.next_sequence_number - (multisig_account.last_executed_sequence_number + 1);
             assert!(
-                num_pending_transactions < MAX_PENDING_TRANSACTIONS,
+                available_transaction_queue_capacity(multisig_account) > 0,
                 error::invalid_state(EMAX_PENDING_TRANSACTIONS_EXCEEDED)
             );
         };
 
+        let multisig_account_resource = borrow_global_mut<MultisigAccount>(multisig_account);
+
         // The transaction creator also automatically votes for the transaction.
         simple_map::add(&mut transaction.votes, creator, true);
 
-        let sequence_number = multisig_account.next_sequence_number;
-        multisig_account.next_sequence_number = sequence_number + 1;
-        table::add(&mut multisig_account.transactions, sequence_number, transaction);
+        let sequence_number = multisig_account_resource.next_sequence_number;
+        multisig_account_resource.next_sequence_number = sequence_number + 1;
+        table::add(&mut multisig_account_resource.transactions, sequence_number, transaction);
         if (std::features::module_event_migration_enabled()) {
             emit(
-                CreateTransaction { multisig_account: multisig_account_address, creator, sequence_number, transaction }
+                CreateTransaction { multisig_account: multisig_account, creator, sequence_number, transaction }
             );
         };
         emit_event(
-            &mut multisig_account.create_transaction_events,
+            &mut multisig_account_resource.create_transaction_events,
             CreateTransactionEvent { creator, sequence_number, transaction },
         );
     }
@@ -2317,5 +2316,127 @@ module aptos_framework::multisig_account {
 
         // execute the eviction transaction to remove the compromised owner.
         assert!(can_be_executed(multisig_address, 11), 0);
+    }
+
+    #[test(owner = @0x123, non_owner = @0x234)]
+    #[expected_failure(abort_code = 329683, location = Self)]
+    public entry fun test_create_transaction_should_fail_if_not_owner(
+        owner: &signer,
+        non_owner: &signer
+    ) acquires MultisigAccount {
+        setup();
+        create_account(address_of(owner));
+        let multisig_account = get_next_multisig_account_address(address_of(owner));
+        create(owner, 1, vector[], vector[]);
+        // Transaction is created with id 1.
+        create_transaction(non_owner, multisig_account, PAYLOAD);
+    }
+
+    #[test(owner = @0x123, non_owner = @0x234)]
+    #[expected_failure(abort_code = 329683, location = Self)]
+    public entry fun test_create_transaction_with_hash_should_fail_if_not_owner(
+        owner: &signer,
+        non_owner: &signer
+    ) acquires MultisigAccount {
+        setup();
+        create_account(address_of(owner));
+        let multisig_account = get_next_multisig_account_address(address_of(owner));
+        create(owner, 1, vector[], vector[]);
+        // Transaction is created with id 1.
+        create_transaction_with_hash(non_owner, multisig_account, sha3_256(PAYLOAD));
+    }
+
+    #[test(owner = @0x123, non_owner = @0x234)]
+    #[expected_failure(abort_code = 329683, location = Self)]
+    public entry fun test_reject_transaction_should_fail_if_not_owner(
+        owner: &signer,
+        non_owner: &signer
+    ) acquires MultisigAccount {
+        setup();
+        create_account(address_of(owner));
+        let multisig_account = get_next_multisig_account_address(address_of(owner));
+        create(owner, 1, vector[], vector[]);
+        // Transaction is created with id 1.
+        create_transaction(owner, multisig_account, PAYLOAD);
+        reject_transaction(non_owner, multisig_account, 1);
+    }
+
+
+    #[test(owner = @0x123, non_owner = @0x234)]
+    #[expected_failure(abort_code = 329683, location = Self)]
+    public entry fun test_approve_transaction_should_fail_if_not_owner(
+        owner: &signer,
+        non_owner: &signer
+    ) acquires MultisigAccount {
+        setup();
+        create_account(address_of(owner));
+        let multisig_account = get_next_multisig_account_address(address_of(owner));
+        create(owner, 1, vector[], vector[]);
+        // Transaction is created with id 1.
+        create_transaction(owner, multisig_account, PAYLOAD);
+        approve_transaction(non_owner, multisig_account, 1);
+    }
+
+    #[test(owner = @0x123, non_owner = @0x234)]
+    #[expected_failure(abort_code = 329683, location = Self)]
+    public entry fun test_vote_transaction_should_fail_if_not_owner(
+        owner: &signer,
+        non_owner: &signer
+    ) acquires MultisigAccount {
+        setup();
+        create_account(address_of(owner));
+        let multisig_account = get_next_multisig_account_address(address_of(owner));
+        create(owner, 1, vector[], vector[]);
+        // Transaction is created with id 1.
+        create_transaction(owner, multisig_account, PAYLOAD);
+        vote_transaction(non_owner, multisig_account, 1, true);
+    }
+
+    #[test(owner = @0x123, non_owner = @0x234)]
+    #[expected_failure(abort_code = 329683, location = Self)]
+    public entry fun test_vote_transactions_should_fail_if_not_owner(
+        owner: &signer,
+        non_owner: &signer
+    ) acquires MultisigAccount {
+        setup();
+        create_account(address_of(owner));
+        let multisig_account = get_next_multisig_account_address(address_of(owner));
+        create(owner, 1, vector[], vector[]);
+        // Transaction is created with id 1.
+        create_transaction(owner, multisig_account, PAYLOAD);
+        vote_transactions(non_owner, multisig_account, 1, 1, true);
+    }
+
+    #[test(owner = @0x123, non_owner = @0x234)]
+    #[expected_failure(abort_code = 329683, location = Self)]
+    public entry fun test_execute_rejected_transaction_should_fail_if_not_owner(
+        owner: &signer,
+        non_owner: &signer
+    ) acquires MultisigAccount {
+        setup();
+        create_account(address_of(owner));
+        let multisig_account = get_next_multisig_account_address(address_of(owner));
+        create(owner, 1, vector[], vector[]);
+        // Transaction is created with id 1.
+        create_transaction(owner, multisig_account, PAYLOAD);
+        reject_transaction(owner, multisig_account, 1);
+        execute_rejected_transaction(non_owner, multisig_account);
+    }
+
+
+    #[test(owner = @0x123, non_owner = @0x234)]
+    #[expected_failure(abort_code = 329683, location = Self)]
+    public entry fun test_execute_rejected_transactions_should_fail_if_not_owner(
+        owner: &signer,
+        non_owner: &signer
+    ) acquires MultisigAccount {
+        setup();
+        create_account(address_of(owner));
+        let multisig_account = get_next_multisig_account_address(address_of(owner));
+        create(owner, 1, vector[], vector[]);
+        // Transaction is created with id 1.
+        create_transaction(owner, multisig_account, PAYLOAD);
+        reject_transaction(owner, multisig_account, 1);
+        execute_rejected_transactions(non_owner, multisig_account, 1);
     }
 }

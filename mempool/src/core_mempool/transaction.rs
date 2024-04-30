@@ -60,7 +60,7 @@ impl MempoolTransaction {
     }
 
     pub(crate) fn get_committed_hash(&self) -> HashValue {
-        self.txn.clone().committed_hash()
+        self.txn.committed_hash()
     }
 
     pub(crate) fn get_estimated_bytes(&self) -> usize {

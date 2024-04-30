@@ -13,6 +13,11 @@ pub enum ReleaseFriendlyRandomnessConfig {
         secrecy_threshold_in_percentage: u64,
         reconstruct_threshold_in_percentage: u64,
     },
+    V2 {
+        secrecy_threshold_in_percentage: u64,
+        reconstruct_threshold_in_percentage: u64,
+        fast_path_secrecy_threshold_in_percentage: u64,
+    },
 }
 
 impl From<ReleaseFriendlyRandomnessConfig> for OnChainRandomnessConfig {
@@ -25,6 +30,15 @@ impl From<ReleaseFriendlyRandomnessConfig> for OnChainRandomnessConfig {
             } => OnChainRandomnessConfig::new_v1(
                 secrecy_threshold_in_percentage,
                 reconstruct_threshold_in_percentage,
+            ),
+            ReleaseFriendlyRandomnessConfig::V2 {
+                secrecy_threshold_in_percentage,
+                reconstruct_threshold_in_percentage,
+                fast_path_secrecy_threshold_in_percentage,
+            } => OnChainRandomnessConfig::new_v2(
+                secrecy_threshold_in_percentage,
+                reconstruct_threshold_in_percentage,
+                fast_path_secrecy_threshold_in_percentage,
             ),
         }
     }
@@ -76,6 +90,34 @@ pub fn generate_randomness_config_update_proposal(
                     emitln!(
                         writer,
                         "randomness_config::set_for_next_epoch({}, v1);",
+                        signer_arg
+                    );
+                },
+                ReleaseFriendlyRandomnessConfig::V2 {
+                    secrecy_threshold_in_percentage,
+                    reconstruct_threshold_in_percentage,
+                    fast_path_secrecy_threshold_in_percentage,
+                } => {
+                    emitln!(writer, "let v2 = randomness_config::new_v2(");
+                    emitln!(
+                        writer,
+                        "    fixed_point64::create_from_rational({}, 100),",
+                        secrecy_threshold_in_percentage
+                    );
+                    emitln!(
+                        writer,
+                        "    fixed_point64::create_from_rational({}, 100),",
+                        reconstruct_threshold_in_percentage
+                    );
+                    emitln!(
+                        writer,
+                        "    fixed_point64::create_from_rational({}, 100),",
+                        fast_path_secrecy_threshold_in_percentage
+                    );
+                    emitln!(writer, ");");
+                    emitln!(
+                        writer,
+                        "randomness_config::set_for_next_epoch({}, v2);",
                         signer_arg
                     );
                 },
