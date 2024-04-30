@@ -15,7 +15,10 @@ use move_binary_format::{
 use move_core_types::{
     identifier::Identifier,
     language_storage::{ModuleId, StructTag, TypeTag},
-    vm_status::{sub_status::unknown_invariant_violation::EPARANOID_FAILURE, StatusCode},
+    vm_status::{
+        sub_status::unknown_invariant_violation::EPARANOID_FAILURE, StatusCode,
+        StatusCode::UNKNOWN_INVARIANT_VIOLATION_ERROR,
+    },
 };
 use serde::Serialize;
 use smallbitvec::SmallBitVec;
@@ -751,7 +754,16 @@ impl TypeBuilder {
     #[inline]
     pub fn create_ref_ty(&self, inner_ty: &Type, is_mut: bool) -> PartialVMResult<Type> {
         let mut count = 1;
-        let inner_ty = Box::new(self.clone_impl(inner_ty, &mut count, 2)?);
+        let inner_ty = self.clone_impl(inner_ty, &mut count, 2).map_err(|e| {
+            e.append_message_with_separator(
+                '.',
+                format!(
+                    "Failed to create a (mutable: {}) reference type with inner type {}",
+                    is_mut, inner_ty
+                ),
+            )
+        })?;
+        let inner_ty = Box::new(inner_ty);
         Ok(if is_mut {
             Type::MutableReference(inner_ty)
         } else {
@@ -764,7 +776,15 @@ impl TypeBuilder {
     #[inline]
     pub fn create_vec_ty(&self, elem_ty: &Type) -> PartialVMResult<Type> {
         let mut count = 1;
-        let elem_ty = self.clone_impl(elem_ty, &mut count, 2)?;
+        let elem_ty = self.clone_impl(elem_ty, &mut count, 2).map_err(|e| {
+            e.append_message_with_separator(
+                '.',
+                format!(
+                    "Failed to create a vector type with element type {}",
+                    elem_ty
+                ),
+            )
+        })?;
         Ok(Type::Vector(TriompheArc::new(elem_ty)))
     }
 
@@ -790,7 +810,18 @@ impl TypeBuilder {
                 struct_ty.phantom_ty_args_mask.clone(),
             ),
         };
-        self.create_ty_with_subst(&ty, ty_args)
+
+        // We need to count the struct type itself.
+        let mut count = 1;
+        self.subst_impl(&ty, ty_args, &mut count, 2).map_err(|e| {
+            e.append_message_with_separator(
+                '.',
+                format!(
+                    "Failed to instantiate a type {} with type arguments {:?}",
+                    ty, ty_args
+                ),
+            )
+        })
     }
 
     /// Creates a type for a Move constant. Note that constant types can be
@@ -798,6 +829,15 @@ impl TypeBuilder {
     pub fn create_constant_ty(&self, const_tok: &SignatureToken) -> PartialVMResult<Type> {
         let mut count = 0;
         self.create_constant_ty_impl(const_tok, &mut count, 1)
+            .map_err(|e| {
+                e.append_message_with_separator(
+                    '.',
+                    format!(
+                        "Failed to construct a type for constant token {:?}",
+                        const_tok
+                    ),
+                )
+            })
     }
 
     /// Creates a fully-instantiated type from its storage representation.
@@ -857,12 +897,13 @@ impl TypeBuilder {
                 )
             },
 
-            S::TypeParameter(_) | S::Reference(_) | S::MutableReference(_) | S::Signer => {
+            tok => {
                 return Err(
                     PartialVMError::new(StatusCode::UNKNOWN_INVARIANT_VIOLATION_ERROR)
-                        .with_message(
-                            "Not allowed or not meaningful type for a constant".to_string(),
-                        ),
+                        .with_message(format!(
+                            "{:?} is not allowed or is not a meaningful token for a constant",
+                            tok
+                        )),
                 )
             },
         })
@@ -894,7 +935,22 @@ impl TypeBuilder {
     }
 
     fn clone_impl(&self, ty: &Type, count: &mut usize, depth: usize) -> PartialVMResult<Type> {
-        self.apply_subst(ty, |idx, _, _| Ok(Type::TyParam(idx)), count, depth)
+        self.apply_subst(
+            ty,
+            |idx, _, _| {
+                // The type cannot contain type parameters anymore (it also does not make
+                // sense to have them!), and so it is the caller's responsibility to ensure
+                // type substitution has been performed.
+                Err(
+                    PartialVMError::new(UNKNOWN_INVARIANT_VIOLATION_ERROR).with_message(format!(
+                        "There is an unresolved type parameter (index: {}) when cloning type {}",
+                        idx, ty
+                    )),
+                )
+            },
+            count,
+            depth,
+        )
     }
 
     fn apply_subst<F>(
@@ -1043,7 +1099,7 @@ mod unit_tests {
     use super::*;
     use claims::{assert_err, assert_ok};
 
-    fn struct_inst_for_test(ty_args: Vec<Type>) -> Type {
+    fn struct_instantiation_ty_for_test(ty_args: Vec<Type>) -> Type {
         Type::StructInstantiation {
             idx: StructNameIndex(0),
             ability: AbilityInfo::struct_(AbilitySet::EMPTY),
@@ -1051,11 +1107,23 @@ mod unit_tests {
         }
     }
 
-    fn struct_for_test() -> Type {
+    fn struct_ty_for_test() -> Type {
         Type::Struct {
             idx: StructNameIndex(0),
             ability: AbilityInfo::struct_(AbilitySet::EMPTY),
         }
+    }
+
+    fn vec_ty_for_test(mut depth: usize) -> Type {
+        use Type::*;
+
+        let mut ty = Address;
+        depth -= 1;
+        while depth > 0 {
+            ty = Vector(TriompheArc::new(ty.clone()));
+            depth -= 1;
+        }
+        ty
     }
 
     #[test]
@@ -1068,10 +1136,14 @@ mod unit_tests {
             (Vector(TriompheArc::new(Vector(TriompheArc::new(U8)))), 3),
             (Reference(Box::new(Bool)), 2),
             (TyParam(0), 1),
-            (struct_for_test(), 1),
-            (struct_inst_for_test(vec![U8, U8]), 3),
+            (struct_ty_for_test(), 1),
+            (struct_instantiation_ty_for_test(vec![U8, U8]), 3),
             (
-                struct_inst_for_test(vec![U8, struct_inst_for_test(vec![Bool, Bool, Bool]), U8]),
+                struct_instantiation_ty_for_test(vec![
+                    U8,
+                    struct_instantiation_ty_for_test(vec![Bool, Bool, Bool]),
+                    U8,
+                ]),
                 7,
             ),
         ];
@@ -1091,12 +1163,12 @@ mod unit_tests {
             (TyParam(0), vec![Vector(TriompheArc::new(Bool))], 2),
             (Bool, vec![], 1),
             (
-                struct_inst_for_test(vec![TyParam(0), TyParam(0)]),
+                struct_instantiation_ty_for_test(vec![TyParam(0), TyParam(0)]),
                 vec![Vector(TriompheArc::new(Bool))],
                 5,
             ),
             (
-                struct_inst_for_test(vec![TyParam(0), TyParam(1)]),
+                struct_instantiation_ty_for_test(vec![TyParam(0), TyParam(1)]),
                 vec![
                     Vector(TriompheArc::new(Bool)),
                     Vector(TriompheArc::new(Vector(TriompheArc::new(Bool)))),
@@ -1134,7 +1206,7 @@ mod unit_tests {
         let ty_builder = TypeBuilder::new_for_test();
 
         let ty_params: Vec<Type> = (0..5).map(TyParam).collect();
-        let ty = struct_inst_for_test(ty_params);
+        let ty = struct_instantiation_ty_for_test(ty_params);
 
         // Each type argument contributes 2 nodes, so in total the count is 11.
         let ty_args: Vec<Type> = (0..5).map(|_| Vector(TriompheArc::new(Bool))).collect();
@@ -1145,7 +1217,7 @@ mod unit_tests {
             .map(|i| {
                 if i == 4 {
                     // 3 nodes, to increase the total count to 12.
-                    struct_inst_for_test(vec![U64, struct_for_test()])
+                    struct_instantiation_ty_for_test(vec![U64, struct_ty_for_test()])
                 } else {
                     Vector(TriompheArc::new(Bool))
                 }
@@ -1153,5 +1225,31 @@ mod unit_tests {
             .collect();
         let err = assert_err!(ty_builder.create_ty_with_subst(&ty, &ty_args));
         assert_eq!(err.major_status(), StatusCode::TOO_MANY_TYPE_NODES);
+    }
+
+    #[test]
+    fn test_create_nested_tys() {
+        let ty_builder = TypeBuilder::new_for_test();
+        let ty = vec_ty_for_test(ty_builder.max_ty_depth - 1);
+
+        // These types have the maximum possible depth!
+        let vec_ty = assert_ok!(ty_builder.create_vec_ty(&ty));
+        let ref_ty = assert_ok!(ty_builder.create_ref_ty(&ty, false));
+        let mut_ref_ty = assert_ok!(ty_builder.create_ref_ty(&ty, true));
+
+        let err = assert_err!(ty_builder.create_vec_ty(&vec_ty));
+        assert_eq!(err.major_status(), StatusCode::VM_MAX_TYPE_DEPTH_REACHED);
+
+        let err = assert_err!(ty_builder.create_ref_ty(&vec_ty, false));
+        assert_eq!(err.major_status(), StatusCode::VM_MAX_TYPE_DEPTH_REACHED);
+
+        let err = assert_err!(ty_builder.create_ref_ty(&vec_ty, true));
+        assert_eq!(err.major_status(), StatusCode::VM_MAX_TYPE_DEPTH_REACHED);
+
+        let err = assert_err!(ty_builder.create_vec_ty(&ref_ty));
+        assert_eq!(err.major_status(), StatusCode::VM_MAX_TYPE_DEPTH_REACHED);
+
+        let err = assert_err!(ty_builder.create_vec_ty(&mut_ref_ty));
+        assert_eq!(err.major_status(), StatusCode::VM_MAX_TYPE_DEPTH_REACHED);
     }
 }
