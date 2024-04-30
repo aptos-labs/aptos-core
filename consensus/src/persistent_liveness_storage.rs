@@ -7,7 +7,7 @@ use anyhow::{format_err, Context, Result};
 use aptos_config::config::NodeConfig;
 use aptos_consensus_types::{
     block::Block, quorum_cert::QuorumCert, timeout_2chain::TwoChainTimeoutCertificate, vote::Vote,
-    wrapped_ledger_info::WrappedLedgerInfo,
+    vote_data::VoteData, wrapped_ledger_info::WrappedLedgerInfo,
 };
 use aptos_crypto::HashValue;
 use aptos_logger::prelude::*;
@@ -142,9 +142,7 @@ impl LedgerRecoveryData {
 
         info!("Consensus root block is {}", root_block);
 
-        let root_commit_cert = root_ordered_cert
-            .create_merged_with_executed_state(latest_ledger_info_sig)
-            .expect("Inconsistent commit proof and evaluation decision, cannot commit block");
+        let root_commit_cert = WrappedLedgerInfo::new(VoteData::dummy(), latest_ledger_info_sig);
         Ok(RootInfo(
             Box::new(root_block),
             root_quorum_cert,
