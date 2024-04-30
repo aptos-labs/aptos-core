@@ -18,6 +18,7 @@ use crate::{
 use anyhow::{bail, ensure, format_err, Context as AnyhowContext, Result};
 use aptos_crypto::{hash::CryptoHash, HashValue};
 use aptos_db_indexer::table_info_reader::TableInfoReader;
+use aptos_logger::{sample, sample::SampleRate};
 use aptos_storage_interface::DbReader;
 use aptos_types::{
     access_path::{AccessPath, Path},
@@ -49,6 +50,7 @@ use std::{
     iter::IntoIterator,
     rc::Rc,
     sync::Arc,
+    time::Duration,
 };
 
 const OBJECT_MODULE: &IdentStr = ident_str!("object");
@@ -430,10 +432,7 @@ impl<'a, R: ModuleResolver + ?Sized> MoveConverter<'a, R> {
         let table_info = match self.get_table_info(handle)? {
             Some(ti) => ti,
             None => {
-                aptos_logger::warn!(
-                    "Table info not found for handle {:?}, can't decode table item. OK for simulation",
-                    handle
-                );
+                log_missing_table_info(handle);
                 return Ok(None); // if table item not found return None anyway to avoid crash
             },
         };
@@ -457,10 +456,7 @@ impl<'a, R: ModuleResolver + ?Sized> MoveConverter<'a, R> {
         let table_info = match self.get_table_info(handle)? {
             Some(ti) => ti,
             None => {
-                aptos_logger::warn!(
-                    "Table info not found for handle {:?}, can't decode table item. OK for simulation",
-                    handle
-                );
+                log_missing_table_info(handle);
                 return Ok(None); // if table item not found return None anyway to avoid crash
             },
         };
@@ -930,6 +926,16 @@ impl<'a, R: ModuleResolver + ?Sized> MoveConverter<'a, R> {
             Ok(None)
         }
     }
+}
+
+fn log_missing_table_info(handle: TableHandle) {
+    sample!(
+        SampleRate::Duration(Duration::from_secs(1)),
+        aptos_logger::debug!(
+            "Table info not found for handle {:?}, can't decode table item. OK for simulation",
+            handle
+        )
+    );
 }
 
 impl<'a, R: ModuleResolver + ?Sized> ExplainVMStatus for MoveConverter<'a, R> {
