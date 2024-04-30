@@ -166,11 +166,14 @@ impl SyncInfo {
                 self.highest_ordered_cert
                     .as_ref()
                     .map_or(Ok(()), |cert| cert.verify(validator))
+                    .context("Fail to verify ordered certificate")
             })
             .and_then(|_| {
                 // we do not verify genesis ledger info
                 if self.highest_commit_cert.commit_info().round() > 0 {
-                    self.highest_commit_cert.verify(validator)?;
+                    self.highest_commit_cert
+                        .verify(validator)
+                        .context("Fail to verify commit certificate")?
                 }
                 Ok(())
             })
