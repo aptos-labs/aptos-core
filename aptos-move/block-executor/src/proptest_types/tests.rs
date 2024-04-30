@@ -13,6 +13,7 @@ use crate::{
             MAX_GAS_PER_TXN,
         },
     },
+    thread_garage::ThreadGarageExecutor,
     txn_commit_hook::NoOpTransactionCommitHook,
 };
 use aptos_types::{
@@ -63,7 +64,8 @@ fn run_transactions<K, V, E>(
         phantom: PhantomData,
     };
 
-    
+    let garage = Arc::new(ThreadGarageExecutor::new(num_cpus::get(), 2*num_cpus::get()));
+
 
     for _ in 0..num_repeat {
         let output = BlockExecutor::<
@@ -74,6 +76,7 @@ fn run_transactions<K, V, E>(
             ExecutableTestType,
         >::new(
             BlockExecutorConfig::new_maybe_block_limit(num_cpus::get(), maybe_block_gas_limit),
+            Arc::clone(&garage),
             None,
         )
         .execute_transactions_parallel((), &transactions, &data_view);
@@ -192,7 +195,8 @@ fn deltas_writes_mixed_with_block_gas_limit(num_txns: usize, maybe_block_gas_lim
         phantom: PhantomData,
     };
 
-    
+    let garage = Arc::new(ThreadGarageExecutor::new(num_cpus::get(), 2*num_cpus::get()));
+
 
     for _ in 0..20 {
         let output = BlockExecutor::<
@@ -203,6 +207,7 @@ fn deltas_writes_mixed_with_block_gas_limit(num_txns: usize, maybe_block_gas_lim
             ExecutableTestType,
         >::new(
             BlockExecutorConfig::new_maybe_block_limit(num_cpus::get(), maybe_block_gas_limit),
+            Arc::clone(&garage),
             None,
         )
         .execute_transactions_parallel((), &transactions, &data_view);
@@ -237,6 +242,7 @@ fn deltas_resolver_with_block_gas_limit(num_txns: usize, maybe_block_gas_limit: 
         .map(|txn_gen| txn_gen.materialize_with_deltas(&universe, 15, false))
         .collect();
 
+    let garage = Arc::new(ThreadGarageExecutor::new(num_cpus::get(), 2*num_cpus::get()));
     
 
     for _ in 0..20 {
@@ -248,6 +254,7 @@ fn deltas_resolver_with_block_gas_limit(num_txns: usize, maybe_block_gas_limit: 
             ExecutableTestType,
         >::new(
             BlockExecutorConfig::new_maybe_block_limit(num_cpus::get(), maybe_block_gas_limit),
+            Arc::clone(&garage),
             None,
         )
         .execute_transactions_parallel((), &transactions, &data_view);
@@ -387,6 +394,7 @@ fn publishing_fixed_params_with_block_gas_limit(
         phantom: PhantomData,
     };
 
+    let garage = Arc::new(ThreadGarageExecutor::new(num_cpus::get(), 2*num_cpus::get()));
 
     // Confirm still no intersection
     let output = BlockExecutor::<
@@ -397,6 +405,7 @@ fn publishing_fixed_params_with_block_gas_limit(
         ExecutableTestType,
     >::new(
         BlockExecutorConfig::new_maybe_block_limit(num_cpus::get(), maybe_block_gas_limit),
+        Arc::clone(&garage),
         None,
     )
     .execute_transactions_parallel((), &transactions, &data_view);
@@ -433,6 +442,7 @@ fn publishing_fixed_params_with_block_gas_limit(
                 num_cpus::get(),
                 Some(max(w_index, r_index) as u64 * MAX_GAS_PER_TXN + 1),
             ),
+            Arc::clone(&garage),
             None,
         ) // Ensure enough gas limit to commit the module txns (4 is maximum gas per txn)
         .execute_transactions_parallel((), &transactions, &data_view);
@@ -495,6 +505,7 @@ fn non_empty_group(
             .collect(),
     };
 
+    let garage = Arc::new(ThreadGarageExecutor::new(num_cpus::get(), 2*num_cpus::get()));
 
     for _ in 0..num_repeat_parallel {
         let output = BlockExecutor::<
@@ -505,6 +516,7 @@ fn non_empty_group(
             ExecutableTestType,
         >::new(
             BlockExecutorConfig::new_no_block_limit(num_cpus::get()),
+            Arc::clone(&garage),
             None,
         )
         .execute_transactions_parallel((), &transactions, &data_view);
@@ -521,6 +533,7 @@ fn non_empty_group(
             ExecutableTestType,
         >::new(
             BlockExecutorConfig::new_no_block_limit(num_cpus::get()),
+            Arc::clone(&garage),
             None,
         )
         .execute_transactions_sequential((), &transactions, &data_view, false);

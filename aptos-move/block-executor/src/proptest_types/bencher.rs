@@ -3,15 +3,13 @@
 // SPDX-License-Identifier: Apache-2.0
 
 use crate::{
-    executor::BlockExecutor,
-    proptest_types::{
+    executor::BlockExecutor, proptest_types::{
         baseline::BaselineOutput,
         types::{
             EmptyDataView, KeyType, MockOutput, MockTask, MockTransaction, TransactionGen,
             TransactionGenParams,
         },
-    },
-    txn_commit_hook::NoOpTransactionCommitHook,
+    }, thread_garage::ThreadGarageExecutor, txn_commit_hook::NoOpTransactionCommitHook
 };
 use aptos_types::{
     block_executor::config::BlockExecutorConfig, contract_event::TransactionEvent,
@@ -121,6 +119,7 @@ where
             phantom: PhantomData,
         };
 
+        let garage = Arc::new(ThreadGarageExecutor::new(num_cpus::get(), num_cpus::get()*2));
         
         let config = BlockExecutorConfig::new_no_block_limit(num_cpus::get());
         let output = BlockExecutor::<
@@ -129,7 +128,7 @@ where
             EmptyDataView<KeyType<K>>,
             NoOpTransactionCommitHook<MockOutput<KeyType<K>, E>, usize>,
             ExecutableTestType,
-        >::new(config, None)
+        >::new(config, garage, None)
         .execute_transactions_parallel((), &self.transactions, &data_view);
 
         self.baseline_output.assert_parallel_output(&output);

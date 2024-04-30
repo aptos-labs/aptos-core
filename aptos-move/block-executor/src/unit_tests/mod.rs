@@ -15,7 +15,7 @@ use crate::{
     scheduler::{
         DependencyStatus, ExecutionTaskType, Scheduler, SchedulerTask, TWaitForDependency
     },
-    thread_garage::Baton,
+    thread_garage::{ThreadGarageExecutor,Baton},
     txn_commit_hook::NoOpTransactionCommitHook,
 };
 use aptos_aggregator::{
@@ -78,7 +78,8 @@ fn resource_group_bcs_fallback() {
     let data_view = NonEmptyGroupDataView::<KeyType<u32>> {
         group_keys: HashSet::new(),
     };
-    
+    let garage = Arc::new(ThreadGarageExecutor::new(num_cpus::get(), num_cpus::get()*2));
+
     let block_executor = BlockExecutor::<
         MockTransaction<KeyType<u32>, MockEvent>,
         MockTask<KeyType<u32>, MockEvent>,
@@ -87,6 +88,7 @@ fn resource_group_bcs_fallback() {
         ExecutableTestType,
     >::new(
         BlockExecutorConfig::new_no_block_limit(num_cpus::get()),
+        garage,
         None,
     );
 
@@ -166,6 +168,8 @@ fn block_output_err_precedence() {
         phantom: PhantomData,
     };
     
+    let garage = Arc::new(ThreadGarageExecutor::new(num_cpus::get(), num_cpus::get()*2));
+
     let block_executor = BlockExecutor::<
         MockTransaction<KeyType<u32>, MockEvent>,
         MockTask<KeyType<u32>, MockEvent>,
@@ -174,6 +178,7 @@ fn block_output_err_precedence() {
         ExecutableTestType,
     >::new(
         BlockExecutorConfig::new_no_block_limit(num_cpus::get()),
+        garage,
         None,
     );
 
@@ -198,6 +203,8 @@ fn skip_rest_gas_limit() {
         phantom: PhantomData,
     };
     
+    let garage = Arc::new(ThreadGarageExecutor::new(num_cpus::get(), num_cpus::get()*2));
+
     let block_executor = BlockExecutor::<
         MockTransaction<KeyType<u32>, MockEvent>,
         MockTask<KeyType<u32>, MockEvent>,
@@ -206,6 +213,7 @@ fn skip_rest_gas_limit() {
         ExecutableTestType,
     >::new(
         BlockExecutorConfig::new_maybe_block_limit(num_cpus::get(), Some(5)),
+        garage,
         None,
     );
 
@@ -223,7 +231,7 @@ where
         phantom: PhantomData,
     };
 
-    
+    let garage = Arc::new(ThreadGarageExecutor::new(num_cpus::get(), num_cpus::get()*2));
 
     let output = BlockExecutor::<
         MockTransaction<K, E>,
@@ -233,6 +241,7 @@ where
         ExecutableTestType,
     >::new(
         BlockExecutorConfig::new_no_block_limit(num_cpus::get()),
+        garage,
         None,
     )
     .execute_transactions_parallel((), &transactions, &data_view);
