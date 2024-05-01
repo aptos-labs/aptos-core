@@ -2,6 +2,7 @@
 // Parts of the project are originally copyright © Meta Platforms, Inc.
 // SPDX-License-Identifier: Apache-2.0
 
+use aptos_crypto::HashValue;
 use serde::{Deserialize, Serialize};
 use thiserror::Error;
 
@@ -60,6 +61,8 @@ pub enum Error {
     WaypointOutOfDate(u64, u64, u64, u64),
     #[error("Invalid Timeout: {0}")]
     InvalidTimeout(String),
+    #[error("Incorrect 1-chain Quorum Certificate provided for signing order votes. Quorum Certificate: {0}, block id: {1}")]
+    InvalidOneChainQuorumCertificate(HashValue, HashValue),
 }
 
 impl From<serde_json::Error> for Error {

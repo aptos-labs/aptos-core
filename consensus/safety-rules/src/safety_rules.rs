@@ -88,11 +88,14 @@ impl SafetyRules {
         self.verify_epoch(proposed_block.epoch(), &safety_data)?;
 
         let qc = order_vote_proposal.quorum_cert();
-        self.verify_qc(qc)?;
-        assert!(qc.certified_block().round() == proposed_block.round());
-        assert!(qc.certified_block().id() == proposed_block.id());
-        assert!(qc.certified_block().epoch() == proposed_block.epoch());
+        if qc.certified_block() != order_vote_proposal.block_info() {
+            return Err(Error::InvalidOneChainQuorumCertificate(
+                qc.certified_block().id(),
+                order_vote_proposal.block_info().id(),
+            ));
+        }
 
+        self.verify_qc(qc)?;
         proposed_block
             .validate_signature(&self.epoch_state()?.verifier)
             .map_err(|error| Error::InvalidProposal(error.to_string()))?;

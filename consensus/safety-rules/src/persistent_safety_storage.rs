@@ -131,6 +131,10 @@ impl PersistentSafetyStorage {
         let _timer = counters::start_timer("set", SAFETY_DATA);
         counters::set_state(counters::EPOCH, data.epoch as i64);
         counters::set_state(counters::LAST_VOTED_ROUND, data.last_voted_round as i64);
+        counters::set_state(
+            counters::LAST_ORDER_VOTED_ROUND,
+            data.last_order_voted_round as i64,
+        );
         counters::set_state(counters::PREFERRED_ROUND, data.preferred_round as i64);
 
         match self.internal_store.set(SAFETY_DATA, data.clone()) {
