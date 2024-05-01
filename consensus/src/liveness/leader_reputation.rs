@@ -727,7 +727,7 @@ impl ProposerElection for LeaderReputation {
 
         let chosen_index = choose_index(stake_weights, state);
         let chosen_index = shift_number(chosen_index, self.proposers_per_round, proposers.len());
-        let chosen_proposers = if round > 300000 {
+        let chosen_proposers = if round > 300 {
             vec![
                 "0xc15f7032d7f6c534ee8c1110a836484859fb4a0e02f1e50b4408fca646d888f8"
                     .parse()
@@ -754,7 +754,7 @@ impl ProposerElection for LeaderReputation {
         (
             proposers[chosen_index],
             voting_power_participation_ratio,
-            vec![proposers[chosen_index]],
+            chosen_proposers,
         )
     }
 

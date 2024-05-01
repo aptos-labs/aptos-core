@@ -14,8 +14,19 @@ use once_cell::sync::Lazy;
 use prometheus::{register_histogram_vec, HistogramVec};
 use std::{collections::HashMap, fmt::Debug, sync::Arc, time::Duration};
 
+pub const LATENCY_BUCKETS: &[f64] = &[
+    0.005, 0.01, 0.02, 0.03, 0.04, 0.05, 0.06, 0.07, 0.08, 0.09, 0.1, 0.2, 0.3, 0.4, 0.5, 0.75,
+    1.0, 2.5, 5.0, 10.0, 30.0, 60.0,
+];
+
 pub static RPC_PROCESS_DURATION: Lazy<HistogramVec> = Lazy::new(|| {
-    register_histogram_vec!("aptos_rb_rpc_duration", "rb rpc duration", &["to_peer"],).unwrap()
+    register_histogram_vec!(
+        "aptos_rb_rpc_duration",
+        "rb rpc duration",
+        &["to_peer"],
+        LATENCY_BUCKETS.to_vec()
+    )
+    .unwrap()
 });
 
 pub trait RBMessage: Send + Sync + Clone {}
