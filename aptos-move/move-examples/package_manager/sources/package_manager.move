@@ -16,7 +16,7 @@
 /// 5. If new modules need to be deployed or existing modules in this package need to be updated, an assigned admin
 /// account (defaults to the deployer account) can call package_manager::publish_package to with the new code.
 ///
-/// Other modules can store and obtain stored addreses by calling add_address or get_address. This is useful for
+/// Other modules can store and obtain stored addresses by calling add_address or get_address. This is useful for
 /// storing addresses of other modules in the same package or system addresses such as the NFT collection.
 module package::package_manager {
     use aptos_framework::account::{Self, SignerCapability};
