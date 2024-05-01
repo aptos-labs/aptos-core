@@ -105,12 +105,15 @@ module aptos_framework::aggregator_v2 {
         assert!(try_sub(aggregator, value), error::out_of_range(EAGGREGATOR_UNDERFLOW));
     }
 
-    public fun is_at_least<IntElement: copy + drop>(aggregator: &mut Aggregator<IntElement>, min_amount: IntElement): bool {
-        let result = try_sub(aggregator, min_amount);
-        if (result) {
-            add(aggregator, min_amount);
-        };
-        result
+    native fun is_at_least_impl<IntElement: copy + drop>(aggregator: &Aggregator<IntElement>, min_amount: IntElement): bool;
+
+    public fun is_at_least<IntElement: copy + drop>(aggregator: &Aggregator<IntElement>, min_amount: IntElement): bool {
+        is_at_least_impl(aggregator, min_amount)
+        // let result = try_sub(aggregator, min_amount);
+        // if (result) {
+        //     add(aggregator, min_amount);
+        // };
+        // result
     }
 
     /// Returns a value stored in this aggregator.

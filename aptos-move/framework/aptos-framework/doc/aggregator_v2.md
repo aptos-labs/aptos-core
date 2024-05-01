@@ -21,11 +21,15 @@ operation that also reduced parallelism, and should be avoided as much as possib
 -  [Constants](#@Constants_0)
 -  [Function `max_value`](#0x1_aggregator_v2_max_value)
 -  [Function `create_aggregator`](#0x1_aggregator_v2_create_aggregator)
+-  [Function `create_aggregator_with_value`](#0x1_aggregator_v2_create_aggregator_with_value)
 -  [Function `create_unbounded_aggregator`](#0x1_aggregator_v2_create_unbounded_aggregator)
+-  [Function `create_unbounded_aggregator_with_value`](#0x1_aggregator_v2_create_unbounded_aggregator_with_value)
 -  [Function `try_add`](#0x1_aggregator_v2_try_add)
 -  [Function `add`](#0x1_aggregator_v2_add)
 -  [Function `try_sub`](#0x1_aggregator_v2_try_sub)
 -  [Function `sub`](#0x1_aggregator_v2_sub)
+-  [Function `is_at_least_impl`](#0x1_aggregator_v2_is_at_least_impl)
+-  [Function `is_at_least`](#0x1_aggregator_v2_is_at_least)
 -  [Function `read`](#0x1_aggregator_v2_read)
 -  [Function `snapshot`](#0x1_aggregator_v2_snapshot)
 -  [Function `create_snapshot`](#0x1_aggregator_v2_create_snapshot)
@@ -280,6 +284,32 @@ EAGGREGATOR_ELEMENT_TYPE_NOT_SUPPORTED raised if called with a different type.
 
 </details>
 
+<a id="0x1_aggregator_v2_create_aggregator_with_value"></a>
+
+## Function `create_aggregator_with_value`
+
+
+
+<pre><code><b>public</b> <b>fun</b> <a href="aggregator_v2.md#0x1_aggregator_v2_create_aggregator_with_value">create_aggregator_with_value</a>&lt;IntElement: <b>copy</b>, drop&gt;(start_value: IntElement, max_value: IntElement): <a href="aggregator_v2.md#0x1_aggregator_v2_Aggregator">aggregator_v2::Aggregator</a>&lt;IntElement&gt;
+</code></pre>
+
+
+
+<details>
+<summary>Implementation</summary>
+
+
+<pre><code><b>public</b> <b>fun</b> <a href="aggregator_v2.md#0x1_aggregator_v2_create_aggregator_with_value">create_aggregator_with_value</a>&lt;IntElement: <b>copy</b> + drop&gt;(start_value: IntElement, max_value: IntElement): <a href="aggregator_v2.md#0x1_aggregator_v2_Aggregator">Aggregator</a>&lt;IntElement&gt; {
+    <b>let</b> <a href="aggregator.md#0x1_aggregator">aggregator</a> = <a href="aggregator_v2.md#0x1_aggregator_v2_create_aggregator">create_aggregator</a>(max_value);
+    <a href="aggregator_v2.md#0x1_aggregator_v2_add">add</a>(&<b>mut</b> <a href="aggregator.md#0x1_aggregator">aggregator</a>, start_value);
+    <a href="aggregator.md#0x1_aggregator">aggregator</a>
+}
+</code></pre>
+
+
+
+</details>
+
 <a id="0x1_aggregator_v2_create_unbounded_aggregator"></a>
 
 ## Function `create_unbounded_aggregator`
@@ -301,6 +331,32 @@ EAGGREGATOR_ELEMENT_TYPE_NOT_SUPPORTED raised if called with a different type.
 
 
 <pre><code><b>public</b> <b>native</b> <b>fun</b> <a href="aggregator_v2.md#0x1_aggregator_v2_create_unbounded_aggregator">create_unbounded_aggregator</a>&lt;IntElement: <b>copy</b> + drop&gt;(): <a href="aggregator_v2.md#0x1_aggregator_v2_Aggregator">Aggregator</a>&lt;IntElement&gt;;
+</code></pre>
+
+
+
+</details>
+
+<a id="0x1_aggregator_v2_create_unbounded_aggregator_with_value"></a>
+
+## Function `create_unbounded_aggregator_with_value`
+
+
+
+<pre><code><b>public</b> <b>fun</b> <a href="aggregator_v2.md#0x1_aggregator_v2_create_unbounded_aggregator_with_value">create_unbounded_aggregator_with_value</a>&lt;IntElement: <b>copy</b>, drop&gt;(start_value: IntElement): <a href="aggregator_v2.md#0x1_aggregator_v2_Aggregator">aggregator_v2::Aggregator</a>&lt;IntElement&gt;
+</code></pre>
+
+
+
+<details>
+<summary>Implementation</summary>
+
+
+<pre><code><b>public</b> <b>fun</b> <a href="aggregator_v2.md#0x1_aggregator_v2_create_unbounded_aggregator_with_value">create_unbounded_aggregator_with_value</a>&lt;IntElement: <b>copy</b> + drop&gt;(start_value: IntElement): <a href="aggregator_v2.md#0x1_aggregator_v2_Aggregator">Aggregator</a>&lt;IntElement&gt; {
+    <b>let</b> <a href="aggregator.md#0x1_aggregator">aggregator</a> = <a href="aggregator_v2.md#0x1_aggregator_v2_create_unbounded_aggregator">create_unbounded_aggregator</a>();
+    <a href="aggregator_v2.md#0x1_aggregator_v2_add">add</a>(&<b>mut</b> <a href="aggregator.md#0x1_aggregator">aggregator</a>, start_value);
+    <a href="aggregator.md#0x1_aggregator">aggregator</a>
+}
 </code></pre>
 
 
@@ -396,6 +452,57 @@ If subtraction would result in a negative value, <code><b>false</b></code> is re
 
 <pre><code><b>public</b> <b>fun</b> <a href="aggregator_v2.md#0x1_aggregator_v2_sub">sub</a>&lt;IntElement&gt;(<a href="aggregator.md#0x1_aggregator">aggregator</a>: &<b>mut</b> <a href="aggregator_v2.md#0x1_aggregator_v2_Aggregator">Aggregator</a>&lt;IntElement&gt;, value: IntElement) {
     <b>assert</b>!(<a href="aggregator_v2.md#0x1_aggregator_v2_try_sub">try_sub</a>(<a href="aggregator.md#0x1_aggregator">aggregator</a>, value), <a href="../../aptos-stdlib/../move-stdlib/doc/error.md#0x1_error_out_of_range">error::out_of_range</a>(<a href="aggregator_v2.md#0x1_aggregator_v2_EAGGREGATOR_UNDERFLOW">EAGGREGATOR_UNDERFLOW</a>));
+}
+</code></pre>
+
+
+
+</details>
+
+<a id="0x1_aggregator_v2_is_at_least_impl"></a>
+
+## Function `is_at_least_impl`
+
+
+
+<pre><code><b>fun</b> <a href="aggregator_v2.md#0x1_aggregator_v2_is_at_least_impl">is_at_least_impl</a>&lt;IntElement: <b>copy</b>, drop&gt;(<a href="aggregator.md#0x1_aggregator">aggregator</a>: &<a href="aggregator_v2.md#0x1_aggregator_v2_Aggregator">aggregator_v2::Aggregator</a>&lt;IntElement&gt;, min_amount: IntElement): bool
+</code></pre>
+
+
+
+<details>
+<summary>Implementation</summary>
+
+
+<pre><code><b>native</b> <b>fun</b> <a href="aggregator_v2.md#0x1_aggregator_v2_is_at_least_impl">is_at_least_impl</a>&lt;IntElement: <b>copy</b> + drop&gt;(<a href="aggregator.md#0x1_aggregator">aggregator</a>: &<a href="aggregator_v2.md#0x1_aggregator_v2_Aggregator">Aggregator</a>&lt;IntElement&gt;, min_amount: IntElement): bool;
+</code></pre>
+
+
+
+</details>
+
+<a id="0x1_aggregator_v2_is_at_least"></a>
+
+## Function `is_at_least`
+
+
+
+<pre><code><b>public</b> <b>fun</b> <a href="aggregator_v2.md#0x1_aggregator_v2_is_at_least">is_at_least</a>&lt;IntElement: <b>copy</b>, drop&gt;(<a href="aggregator.md#0x1_aggregator">aggregator</a>: &<a href="aggregator_v2.md#0x1_aggregator_v2_Aggregator">aggregator_v2::Aggregator</a>&lt;IntElement&gt;, min_amount: IntElement): bool
+</code></pre>
+
+
+
+<details>
+<summary>Implementation</summary>
+
+
+<pre><code><b>public</b> <b>fun</b> <a href="aggregator_v2.md#0x1_aggregator_v2_is_at_least">is_at_least</a>&lt;IntElement: <b>copy</b> + drop&gt;(<a href="aggregator.md#0x1_aggregator">aggregator</a>: &<a href="aggregator_v2.md#0x1_aggregator_v2_Aggregator">Aggregator</a>&lt;IntElement&gt;, min_amount: IntElement): bool {
+    <a href="aggregator_v2.md#0x1_aggregator_v2_is_at_least_impl">is_at_least_impl</a>(<a href="aggregator.md#0x1_aggregator">aggregator</a>, min_amount)
+    // <b>let</b> result = <a href="aggregator_v2.md#0x1_aggregator_v2_try_sub">try_sub</a>(<a href="aggregator.md#0x1_aggregator">aggregator</a>, min_amount);
+    // <b>if</b> (result) {
+    //     <a href="aggregator_v2.md#0x1_aggregator_v2_add">add</a>(<a href="aggregator.md#0x1_aggregator">aggregator</a>, min_amount);
+    // };
+    // result
 }
 </code></pre>
 

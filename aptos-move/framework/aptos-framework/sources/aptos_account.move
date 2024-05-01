@@ -53,7 +53,7 @@ module aptos_framework::aptos_account {
     // }
 
     public entry fun create_account(auth_key: address) {
-        let signer = account::create_account(auth_key);
+        let _signer = account::create_account(auth_key);
         // register_apt(&signer);
     }
 

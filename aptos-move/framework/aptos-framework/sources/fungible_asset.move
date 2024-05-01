@@ -470,7 +470,7 @@ module aptos_framework::fungible_asset {
     /// Get the balance of a given store.
     public fun balance<T: key>(store: Object<T>): u64 acquires FungibleStore, ConcurrentFungibleBalance {
         let store_addr = object::object_address(&store);
-        if (concurrent_fungible_balance_exists(store_addr)) {
+        if (concurrent_fungible_balance_exists_inline(store_addr)) {
             let balance_resource = borrow_global<ConcurrentFungibleBalance>(store_addr);
             aggregator_v2::read(&balance_resource.balance)
         } else if (store_exists_inline(store_addr)) {
@@ -488,12 +488,12 @@ module aptos_framework::fungible_asset {
     }
 
     /// Check whether the balance of a given store is >= `amount`.
-    public(friend) fun is_address_balance_at_least(store_addr: address, amount: u64): bool acquires FungibleStore {
-        if (concurrent_fungible_balance_exists(store_addr)) {
+    public(friend) fun is_address_balance_at_least(store_addr: address, amount: u64): bool acquires FungibleStore, ConcurrentFungibleBalance {
+        if (concurrent_fungible_balance_exists_inline(store_addr)) {
             let balance_resource = borrow_global<ConcurrentFungibleBalance>(store_addr);
             aggregator_v2::is_at_least(&balance_resource.balance, amount)
         } else if (store_exists_inline(store_addr)) {
-            borrow_global<FungibleStore>(&store).balance >= amount
+            borrow_global<FungibleStore>(store_addr).balance >= amount
         } else {
             amount == 0
         }
@@ -627,7 +627,7 @@ module aptos_framework::fungible_asset {
             = move_from<FungibleStore>(addr);
         assert!(balance == 0, error::permission_denied(EBALANCE_IS_NOT_ZERO));
 
-        if (concurrent_fungible_balance_exists(addr)) {
+        if (concurrent_fungible_balance_exists_inline(addr)) {
             let ConcurrentFungibleBalance { balance } = move_from<ConcurrentFungibleBalance>(addr);
             assert!(aggregator_v2::read(&balance) == 0, error::permission_denied(EBALANCE_IS_NOT_ZERO));
         };
@@ -772,7 +772,7 @@ module aptos_framework::fungible_asset {
         ref: &BurnRef,
         store_addr: address,
         amount: u64
-    ) acquires FungibleStore, Supply, ConcurrentSupply {
+    ) acquires FungibleStore, Supply, ConcurrentSupply, ConcurrentFungibleBalance {
         burn(ref, withdraw_internal(store_addr, amount));
     }
 
@@ -846,24 +846,25 @@ module aptos_framework::fungible_asset {
         assert!(amount == 0, error::invalid_argument(EAMOUNT_IS_NOT_ZERO));
     }
 
-    public(friend) fun deposit_internal(store_addr: address, fa: FungibleAsset) acquires FungibleStore {
+    public(friend) fun deposit_internal(store_addr: address, fa: FungibleAsset) acquires FungibleStore, ConcurrentFungibleBalance {
         let FungibleAsset { metadata, amount } = fa;
         if (amount == 0) return;
 
         assert!(exists<FungibleStore>(store_addr), error::not_found(EFUNGIBLE_STORE_EXISTENCE));
-        let store_metadata = store.metadata;
-
-        assert!(metadata == store_metadata, error::invalid_argument(EFUNGIBLE_ASSET_AND_STORE_MISMATCH));
 
         if (auto_upgrade_to_concurrent_fungible_balance()) {
             ensure_store_upgraded_to_concurrent_internal(store_addr);
         };
 
-        if (concurrent_fungible_balance_exists(store_addr)) {
+        let store = borrow_global_mut<FungibleStore>(store_addr);
+        let store_metadata = store.metadata;
+
+        assert!(metadata == store_metadata, error::invalid_argument(EFUNGIBLE_ASSET_AND_STORE_MISMATCH));
+
+        if (concurrent_fungible_balance_exists_inline(store_addr)) {
             let balance_resource = borrow_global_mut<ConcurrentFungibleBalance>(store_addr);
             aggregator_v2::add(&mut balance_resource.balance, amount);
         } else {
-            let store = borrow_global_mut<FungibleStore>(store_addr);
             store.balance = store.balance + amount;
         };
 
@@ -876,14 +877,14 @@ module aptos_framework::fungible_asset {
         amount: u64,
     ): FungibleAsset acquires FungibleStore, ConcurrentFungibleBalance {
         assert!(exists<FungibleStore>(store_addr), error::not_found(EFUNGIBLE_STORE_EXISTENCE));
-        if (auto_upgrade_to_concurrent_fungible_balance()) {
-            ensure_store_upgraded_to_concurrent_internal(store_addr);
-        };
+        // if (auto_upgrade_to_concurrent_fungible_balance()) {
+        //     ensure_store_upgraded_to_concurrent_internal(store_addr);
+        // };
 
         let store = borrow_global<FungibleStore>(store_addr);
         let metadata = store.metadata;
         if (amount != 0) {
-            if (concurrent_fungible_balance_exists(store_addr)) {
+            if (concurrent_fungible_balance_exists_inline(store_addr)) {
                 let balance_resource = borrow_global_mut<ConcurrentFungibleBalance>(store_addr);
                 assert!(
                     aggregator_v2::try_sub(&mut balance_resource.balance, amount),
@@ -993,14 +994,12 @@ module aptos_framework::fungible_asset {
         let unlimited = option::is_none(&maximum);
         let supply = ConcurrentSupply {
             current: if (unlimited) {
-                aggregator_v2::create_unbounded_aggregator()
+                aggregator_v2::create_unbounded_aggregator_with_value(current)
             }
             else {
-                aggregator_v2::create_aggregator(option::extract(&mut maximum))
+                aggregator_v2::create_aggregator_with_value(option::extract(&mut maximum), current)
             },
         };
-        // update current state:
-        aggregator_v2::add(&mut supply.current, current);
         move_to(&metadata_object_signer, supply);
     }
 
@@ -1020,8 +1019,7 @@ module aptos_framework::fungible_asset {
     ) acquires FungibleStore {
         if (!exists<ConcurrentFungibleBalance>(fungible_store_address)) {
             let store = borrow_global_mut<FungibleStore>(fungible_store_address);
-            let balance = aggregator_v2::create_unbounded_aggregator();
-            aggregator_v2::add(&mut balance, store.balance);
+            let balance = aggregator_v2::create_unbounded_aggregator_with_value(store.balance);
             store.balance = 0;
             let object_signer = create_signer::create_signer(fungible_store_address);
             move_to(&object_signer, ConcurrentFungibleBalance { balance });

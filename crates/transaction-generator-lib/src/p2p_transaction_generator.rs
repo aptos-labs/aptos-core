@@ -6,7 +6,7 @@ use aptos_sdk::{
     move_types::{
         account_address::AccountAddress,
         ident_str,
-        language_storage::{ModuleId, TypeTag},
+        language_storage::ModuleId,
     },
     transaction_builder::TransactionFactory,
     types::{
@@ -23,7 +23,6 @@ use rand::{
 };
 use std::{
     cmp::{max, min},
-    str::FromStr,
     sync::Arc,
 };
 
