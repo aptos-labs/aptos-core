@@ -3587,7 +3587,6 @@ dependencies = [
  "proptest",
  "proptest-derive",
  "rayon",
- "rocksdb",
  "serde",
  "thiserror",
  "threadpool",
