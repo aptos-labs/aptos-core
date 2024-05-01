@@ -940,22 +940,26 @@ impl RoundManager {
     }
 
     async fn process_order_vote_msg(&mut self, order_vote: OrderVote) -> anyhow::Result<()> {
-        fail_point!("consensus::process_order_vote_msg", |_| {
-            Err(anyhow::anyhow!("Injected error in process_order_vote_msg"))
-        });
-        info!(self.new_log(LogEvent::ReceiveOrderVote), "{}", order_vote);
+        if self.onchain_config.order_vote_enabled() {
+            fail_point!("consensus::process_order_vote_msg", |_| {
+                Err(anyhow::anyhow!("Injected error in process_order_vote_msg"))
+            });
+            info!(self.new_log(LogEvent::ReceiveOrderVote), "{}", order_vote);
 
-        if self
-            .round_state
-            .has_enough_order_votes(order_vote.ledger_info())
-        {
-            return Ok(());
+            if self
+                .round_state
+                .has_enough_order_votes(order_vote.ledger_info())
+            {
+                return Ok(());
+            }
+            let vote_reception_result = self
+                .round_state
+                .insert_order_vote(&order_vote, &self.epoch_state.verifier);
+            self.process_order_vote_reception_result(&order_vote, vote_reception_result)
+                .await
+        } else {
+            Ok(())
         }
-        let vote_reception_result = self
-            .round_state
-            .insert_order_vote(&order_vote, &self.epoch_state.verifier);
-        self.process_order_vote_reception_result(&order_vote, vote_reception_result)
-            .await
     }
 
     async fn broadcast_order_vote(&mut self, vote: &Vote) -> anyhow::Result<()> {
@@ -1076,11 +1080,13 @@ impl RoundManager {
                     );
                 }
                 let result = self.new_qc_aggregated(qc.clone(), vote.author()).await;
-                if result.is_ok() {
-                    info!("OrderVoteBrodcast");
-                    let _ = self.broadcast_order_vote(vote).await;
-                } else {
-                    warn!("OrderVoteBrodcastFailed");
+                if self.onchain_config.order_vote_enabled() {
+                    if result.is_ok() {
+                        info!("OrderVoteBrodcast");
+                        let _ = self.broadcast_order_vote(vote).await;
+                    } else {
+                        warn!("OrderVoteBrodcastFailed");
+                    }
                 }
                 result
             },
