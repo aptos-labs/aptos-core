@@ -6,7 +6,6 @@ use crate::{block::Block, vote_data::VoteData};
 use aptos_crypto::hash::{TransactionAccumulatorHasher, ACCUMULATOR_PLACEHOLDER_HASH};
 use aptos_crypto_derive::{BCSCryptoHash, CryptoHasher};
 use aptos_types::{
-    block_info::BlockInfo,
     epoch_state::EpochState,
     proof::{accumulator::InMemoryTransactionAccumulator, AccumulatorExtensionProof},
 };
@@ -27,8 +26,6 @@ pub struct VoteProposal {
     next_epoch_state: Option<EpochState>,
     /// Represents whether the executed state id is dummy or not.
     decoupled_execution: bool,
-    /// BlockInfo for the above block
-    block_info: BlockInfo,
 }
 
 impl VoteProposal {
@@ -37,14 +34,12 @@ impl VoteProposal {
         block: Block,
         next_epoch_state: Option<EpochState>,
         decoupled_execution: bool,
-        block_info: BlockInfo,
     ) -> Self {
         Self {
             accumulator_extension_proof,
             block,
             next_epoch_state,
             decoupled_execution,
-            block_info,
         }
     }
 
@@ -56,10 +51,6 @@ impl VoteProposal {
 
     pub fn block(&self) -> &Block {
         &self.block
-    }
-
-    pub fn block_info(&self) -> &BlockInfo {
-        &self.block_info
     }
 
     pub fn next_epoch_state(&self) -> Option<&EpochState> {

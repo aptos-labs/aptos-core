@@ -962,14 +962,18 @@ impl RoundManager {
         }
     }
 
-    async fn broadcast_order_vote(&mut self, vote: &Vote) -> anyhow::Result<()> {
+    async fn broadcast_order_vote(
+        &mut self,
+        vote: &Vote,
+        qc: Arc<QuorumCert>,
+    ) -> anyhow::Result<()> {
         if let Some(proposed_block) = self.block_store.get_block(vote.vote_data().proposed().id()) {
             // Generate an order vote with ledger_info = proposed_block
-            let vote_proposal = proposed_block.vote_proposal();
+            let order_vote_proposal = proposed_block.order_vote_proposal(qc);
             let order_vote_result = self
                 .safety_rules
                 .lock()
-                .construct_and_sign_order_vote(&vote_proposal);
+                .construct_and_sign_order_vote(&order_vote_proposal);
             let order_vote = order_vote_result.context(format!(
                 "[RoundManager] SafetyRules Rejected {} for order vote",
                 proposed_block.block()
@@ -1083,7 +1087,7 @@ impl RoundManager {
                 if self.onchain_config.order_vote_enabled() {
                     if result.is_ok() {
                         info!("OrderVoteBrodcast");
-                        let _ = self.broadcast_order_vote(vote).await;
+                        let _ = self.broadcast_order_vote(vote, qc.clone()).await;
                     } else {
                         warn!("OrderVoteBrodcastFailed");
                     }

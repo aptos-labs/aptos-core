@@ -6,6 +6,7 @@ use crate::{ConsensusState, Error, SafetyRules, TSafetyRules};
 use aptos_consensus_types::{
     block_data::BlockData,
     order_vote::OrderVote,
+    order_vote_proposal::OrderVoteProposal,
     timeout_2chain::{TwoChainTimeout, TwoChainTimeoutCertificate},
     vote::Vote,
     vote_proposal::VoteProposal,
@@ -66,11 +67,11 @@ impl TSafetyRules for LocalClient {
 
     fn construct_and_sign_order_vote(
         &mut self,
-        vote_proposal: &VoteProposal,
+        order_vote_proposal: &OrderVoteProposal,
     ) -> Result<OrderVote, Error> {
         self.internal
             .write()
-            .construct_and_sign_order_vote(vote_proposal)
+            .construct_and_sign_order_vote(order_vote_proposal)
     }
 
     fn sign_commit_vote(

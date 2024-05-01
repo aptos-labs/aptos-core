@@ -5,6 +5,7 @@
 use crate::{
     block::Block,
     common::{Payload, Round},
+    order_vote_proposal::OrderVoteProposal,
     quorum_cert::QuorumCert,
     vote_proposal::VoteProposal,
 };
@@ -17,6 +18,7 @@ use aptos_types::{
 use once_cell::sync::OnceCell;
 use std::{
     fmt::{Debug, Display, Formatter},
+    sync::Arc,
     time::{Duration, Instant},
 };
 
@@ -160,7 +162,15 @@ impl PipelinedBlock {
             self.block.clone(),
             self.compute_result().epoch_state().clone(),
             true,
+        )
+    }
+
+    pub fn order_vote_proposal(&self, quorum_cert: Arc<QuorumCert>) -> OrderVoteProposal {
+        OrderVoteProposal::new(
+            self.block.clone(),
+            self.compute_result().epoch_state().clone(),
             self.block_info(),
+            quorum_cert,
         )
     }
 

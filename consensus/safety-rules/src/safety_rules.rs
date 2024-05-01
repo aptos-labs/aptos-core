@@ -14,6 +14,7 @@ use aptos_consensus_types::{
     block_data::BlockData,
     common::{Author, Round},
     order_vote::OrderVote,
+    order_vote_proposal::OrderVoteProposal,
     quorum_cert::QuorumCert,
     safety_data::SafetyData,
     timeout_2chain::{TwoChainTimeout, TwoChainTimeoutCertificate},
@@ -76,6 +77,29 @@ impl SafetyRules {
         vote_proposal
             .gen_vote_data()
             .map_err(|error| Error::InvalidAccumulatorExtension(error.to_string()))
+    }
+
+    pub(crate) fn verify_order_vote_proposal(
+        &mut self,
+        order_vote_proposal: &OrderVoteProposal,
+    ) -> Result<(), Error> {
+        let proposed_block = order_vote_proposal.block();
+        let safety_data = self.persistent_storage.safety_data()?;
+        self.verify_epoch(proposed_block.epoch(), &safety_data)?;
+
+        let qc = order_vote_proposal.quorum_cert();
+        self.verify_qc(qc)?;
+        assert!(qc.certified_block().round() == proposed_block.round());
+        assert!(qc.certified_block().id() == proposed_block.id());
+        assert!(qc.certified_block().epoch() == proposed_block.epoch());
+
+        proposed_block
+            .validate_signature(&self.epoch_state()?.verifier)
+            .map_err(|error| Error::InvalidProposal(error.to_string()))?;
+        proposed_block
+            .verify_well_formed()
+            .map_err(|error| Error::InvalidProposal(error.to_string()))?;
+        Ok(())
     }
 
     pub(crate) fn sign<T: Serialize + CryptoHash>(
@@ -433,9 +457,9 @@ impl TSafetyRules for SafetyRules {
 
     fn construct_and_sign_order_vote(
         &mut self,
-        vote_proposal: &VoteProposal,
+        order_vote_proposal: &OrderVoteProposal,
     ) -> Result<OrderVote, Error> {
-        let cb = || self.guarded_construct_and_sign_order_vote(vote_proposal);
+        let cb = || self.guarded_construct_and_sign_order_vote(order_vote_proposal);
         run_and_log(cb, |log| log, LogEntry::ConstructAndSignOrderVote)
     }
 

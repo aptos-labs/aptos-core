@@ -6,6 +6,7 @@ use crate::{error::Error, safety_rules::next_round, SafetyRules};
 use aptos_consensus_types::{
     block::Block,
     order_vote::OrderVote,
+    order_vote_proposal::OrderVoteProposal,
     safety_data::SafetyData,
     timeout_2chain::{TwoChainTimeout, TwoChainTimeoutCertificate},
     vote::Vote,
@@ -94,12 +95,12 @@ impl SafetyRules {
     // TODO: Are these safety rules exhaustive?
     pub(crate) fn guarded_construct_and_sign_order_vote(
         &mut self,
-        vote_proposal: &VoteProposal,
+        order_vote_proposal: &OrderVoteProposal,
     ) -> Result<OrderVote, Error> {
         // Exit early if we cannot sign
         self.signer()?;
-        self.verify_proposal(vote_proposal)?;
-        let proposed_block = vote_proposal.block();
+        self.verify_order_vote_proposal(order_vote_proposal)?;
+        let proposed_block = order_vote_proposal.block();
         let mut safety_data = self.persistent_storage.safety_data()?;
 
         // if already voted on this round, send back the previous vote
@@ -114,7 +115,8 @@ impl SafetyRules {
         )?;
         // Construct and sign order vote
         let author = self.signer()?.author();
-        let ledger_info = LedgerInfo::new(vote_proposal.block_info().clone(), HashValue::zero());
+        let ledger_info =
+            LedgerInfo::new(order_vote_proposal.block_info().clone(), HashValue::zero());
         let signature = self.sign(&ledger_info)?;
         let order_vote = OrderVote::new_with_signature(author, ledger_info.clone(), signature);
 

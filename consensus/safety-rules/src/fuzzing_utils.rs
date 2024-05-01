@@ -21,7 +21,6 @@ use aptos_crypto::{
     test_utils::TEST_SEED,
     traits::{SigningKey, Uniform},
 };
-use aptos_executor_types::StateComputeResult;
 use aptos_types::{
     account_address::AccountAddress,
     epoch_change::EpochChangeProof,
@@ -129,9 +128,7 @@ prop_compose! {
         block in arb_block(),
         next_epoch_state in arb_epoch_state(),
     ) -> VoteProposal {
-        // TODO: Is this right way to generate BlockInfo here?
-        let block_info = block.gen_block_info(StateComputeResult::new_dummy().root_hash(), StateComputeResult::new_dummy().version(), next_epoch_state.clone());
-        VoteProposal::new(accumulator_extension_proof, block, next_epoch_state, false, block_info)
+        VoteProposal::new(accumulator_extension_proof, block, next_epoch_state, false)
     }
 }
 
