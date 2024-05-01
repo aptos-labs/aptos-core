@@ -218,14 +218,15 @@ impl SafetyRules {
         round: Round,
         safety_data: &mut SafetyData,
     ) -> Result<(), Error> {
-        if round <= safety_data.last_order_voted_round {
-            return Err(Error::IncorrectLastOrderVotedRound(
+        safety_data
+            .last_order_voted_round
+            .filter(|&last_order_voted_round| round > last_order_voted_round)
+            .ok_or(Error::IncorrectLastOrderVotedRound(
                 round,
-                safety_data.last_order_voted_round,
-            ));
-        }
+                safety_data.last_order_voted_round.unwrap(),
+            ))?;
 
-        safety_data.last_order_voted_round = round;
+        safety_data.last_order_voted_round = Some(round);
         trace!(
             SafetyLogSchema::new(LogEntry::LastOrderVotedRound, LogEvent::Update)
                 .last_voted_round(safety_data.last_voted_round)
@@ -301,7 +302,7 @@ impl SafetyRules {
                     0,
                     None,
                     None,
-                    0,
+                    None,
                 ))?;
 
                 info!(SafetyLogSchema::new(LogEntry::Epoch, LogEvent::Update)
