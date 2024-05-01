@@ -5,16 +5,14 @@ module resource_account::bonding_curve_launchpad {
     use aptos_framework::fungible_asset::{Self, Metadata};
     use aptos_framework::primary_fungible_store;
     use aptos_framework::event;
+    use aptos_framework::aptos_account;
     use aptos_std::smart_table::{Self, SmartTable};
     use aptos_std::math128;
-    use aptos_std::string::{String, utf8};
+    use aptos_std::string::{String};
     use aptos_std::signer;
-    use aptos_std::aptos_account;
     use aptos_std::object::{Object};
     // Friend
     use resource_account::resource_signer_holder;
-    // DEBUG
-    use std::debug;
 
     const EFA_EXISTS_ALREADY: u64 = 10;
     const EFA_DOES_NOT_EXIST: u64 = 11;
@@ -61,6 +59,12 @@ module resource_account::bonding_curve_launchpad {
         gained: u128,
         swapper_address: address
     }
+    #[event]
+    struct LiquidityPairGraduated has store, drop {
+        fa_obj_address: address,
+        fa_obj: Object<Metadata>,
+        //! New DEX info...
+    }
 
     //---------------------------Structs---------------------------
     struct LaunchPad has key {
@@ -85,7 +89,7 @@ module resource_account::bonding_curve_launchpad {
         liquidity_pairs: SmartTable<Object<Metadata>, LiquidityPair>
     }
     struct LiquidityPair has store {
-        enabled: bool,
+        is_enabled: bool,
         fa_reserves: u128,
         apt_reserves: u128,
         k_constant: u256
@@ -139,7 +143,7 @@ module resource_account::bonding_curve_launchpad {
                 project_uri: project_uri
         };
         // * Create new FA and store FA owner obj on launchpad.
-        let fa_address = create_fa(account, fa_key, fa_description);
+        let fa_address = create_fa(fa_key, fa_description);
         let fa_metadata_obj = object::address_to_object(fa_address);
         register_liquidity_pair(account, fa_metadata_obj, fa_key, apt_initialPurchaseAmountIn, max_supply);
     }
@@ -156,9 +160,20 @@ module resource_account::bonding_curve_launchpad {
         let fa_metadata_obj:Object<Metadata> = object::address_to_object(fa_data.fa_obj_address);
         internal_swap_apt_to_fa(account, fa_smartTable, fa_metadata_obj, fa_key, fa_amountIn);
     }
+    public entry fun swap_fa_to_apt (account: &signer, name: string::String, symbol: string::String, apt_amountIn: u64) acquires LaunchPad, LiquidityPairSmartTable {
+        assert!(apt_amountIn > 0, ELIQUIDITY_PAIR_SWAP_AMOUNTIN_INVALID);
+        let fa_key = FAKey {
+            name,
+            symbol
+        };
+        let fa_smartTable = borrow_global_mut<LaunchPad>(@resource_account);
+        assert!(smart_table::contains(&mut fa_smartTable.key_to_fa_data, fa_key), EFA_DOES_NOT_EXIST);
+        let fa_data = smart_table::borrow_mut(&mut fa_smartTable.key_to_fa_data, fa_key);
+        let fa_metadata_obj:Object<Metadata> = object::address_to_object(fa_data.fa_obj_address);
+        internal_swap_fa_to_apt(account, fa_smartTable, fa_metadata_obj, fa_key, apt_amountIn);
+    }
 
     fun create_fa(
-        account: &signer,
         fa_key: FAKey,
         fa_description: FADescription
     ): address acquires LaunchPad {
@@ -168,7 +183,6 @@ module resource_account::bonding_curve_launchpad {
         let base_unit_max_supply: option::Option<u128> = option::some(fa_description.max_supply * math128::pow(10, (fa_description.decimals as u128)));
         let fa_obj_constructor_ref = &object::create_sticky_object(@resource_account); // FA object container. Need to store FA, somewhere, so object is it's home. FA obj is essentially the FA.
         // Creates FA, the primary store for the FA on the resource account defined by constructor, AND defines the max supply.
-        debug::print(&utf8(b"Yo?"));
         primary_fungible_store::create_primary_store_enabled_fungible_asset(
             fa_obj_constructor_ref,
             base_unit_max_supply,
@@ -230,7 +244,7 @@ module resource_account::bonding_curve_launchpad {
         //* Initial APT reserves are virtual liquidity.
         let k_constant: u256 = (fa_initialLiquidity as u256) * (INITIAL_VIRTUAL_LIQUIDITY as u256);
         let initial_liquidity_pair = LiquidityPair {
-            enabled: true,
+            is_enabled: true,
             fa_reserves: fa_initialLiquidity,
             apt_reserves: INITIAL_VIRTUAL_LIQUIDITY,
             k_constant: k_constant
@@ -257,7 +271,7 @@ module resource_account::bonding_curve_launchpad {
         let liquidity_pair_smartTable = borrow_global_mut<LiquidityPairSmartTable>(@resource_account);
         assert!(smart_table::contains(&mut liquidity_pair_smartTable.liquidity_pairs, fa_metadata), ELIQUIDITY_PAIR_DOES_NOT_EXIST);
         let liquidity_pair = smart_table::borrow_mut(&mut liquidity_pair_smartTable.liquidity_pairs, fa_metadata);
-        assert!(liquidity_pair.enabled, ELIQUIDITY_PAIR_DISABLED);
+        assert!(liquidity_pair.is_enabled, ELIQUIDITY_PAIR_DISABLED);
 
         //* amountIn might end up changing here, so we'll use the value returned.
         let swapper_address = signer::address_of(account);
@@ -273,7 +287,6 @@ module resource_account::bonding_curve_launchpad {
         let account_address = signer::address_of(account);
         primary_fungible_store::transfer_with_ref(&fa_data.controller.transfer_ref, swapper_address, @resource_account, fa_given);
         aptos_account::transfer(&resource_signer_holder::get_signer(), account_address, apt_gained);
-
 
         let old_fa_reserves = liquidity_pair.fa_reserves;
         let old_apt_reserves = liquidity_pair.apt_reserves;
@@ -298,7 +311,7 @@ module resource_account::bonding_curve_launchpad {
         let liquidity_pair_smartTable = borrow_global_mut<LiquidityPairSmartTable>(@resource_account);
         assert!(smart_table::contains(&mut liquidity_pair_smartTable.liquidity_pairs, fa_metadata), ELIQUIDITY_PAIR_DOES_NOT_EXIST);
         let liquidity_pair = smart_table::borrow_mut(&mut liquidity_pair_smartTable.liquidity_pairs, fa_metadata);
-        assert!(liquidity_pair.enabled, ELIQUIDITY_PAIR_DISABLED);
+        assert!(liquidity_pair.is_enabled, ELIQUIDITY_PAIR_DISABLED);
 
         //* amountIn might end up changing here, so we'll use the value returned.
         let swapper_address = signer::address_of(account);
@@ -339,10 +352,25 @@ module resource_account::bonding_curve_launchpad {
 
 
         if(apt_updated_reserves > APT_LIQUIDITY_THRESHOLD){
+            liquidity_pair.is_enabled = false;
+
             //! Offload onto permissionless DEX.
+            //! ...Move all APT and FA reserves to the DEX.
+
+            //! Burn any LP tokens received by the DEX.
             //! ...
 
-            //! Event for liquidity pair offloaded...
+            //! Unfreeze all accounts.
+            //! ...
+
+            //? Destroy refs?
+            //? ...
+
+            event::emit(LiquidityPairGraduated {
+                fa_obj_address: fa_data.fa_obj_address,
+                fa_obj: fa_metadata,
+                //! New DEX info...
+            });
         }
     }
 
@@ -358,7 +386,7 @@ module resource_account::bonding_curve_launchpad {
             return (amountIn, apt_gained, fa_reserves+(amountIn as u128), apt_reserves-(apt_gained as u128))
         }
         else {
-            let fa_gained: u64 = (((fa_reserves as u256) * (amountIn as u256))/((apt_reserves as u256)- (amountIn as u256)) as u64);
+            let fa_gained: u64 = (((fa_reserves as u256) * (amountIn as u256))/((apt_reserves as u256) - (amountIn as u256)) as u64);
             return (fa_gained, amountIn, fa_reserves-(fa_gained as u128), apt_reserves+(amountIn as u128))
         }
 
@@ -406,7 +434,6 @@ module resource_account::bonding_curve_launchpad {
             string::utf8(b"https://t4.ftcdn.net/jpg/03/12/95/13/360_F_312951336_8LxW7gBLHslTnpbOAwxFo5FpD2R5vGxu.jpg"),
             string::utf8(b"https://t4.ftcdn.net/jpg/03/12/95/13/360_F_312951336_8LxW7gBLHslTnpbOAwxFo5FpD2R5vGxu.jpg")
         );
-        debug::print(&utf8(b"PoggieWoggies"));
     }
 
 }

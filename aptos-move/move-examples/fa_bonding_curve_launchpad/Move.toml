@@ -5,12 +5,12 @@ authors = []
 
 [addresses]
 owner_addr = "0x922a028b0dbd8ff206074977ae4c5f9fb003ce384242b6253c67192cd2a45ee1"
-resource_account = "0xdf96b45fe494b02f998fc2d4014fb81d908f049b180122a1ff12778490308f56"
+resource_account = "0x90e62f59952b28fbea0ad3d49d705dad416b107a8b968a324b3bd2fda6a70fa8"
 memecoin_creator_addr = "0x922a028b0dbd8ff206074977ae4c5f9fb003ce384242b6253c67192cd2a45ee1"
 
 [dev-addresses]
 owner_addr = "0x922a028b0dbd8ff206074977ae4c5f9fb003ce384242b6253c67192cd2a45ee1"
-resource_account = "0xdf96b45fe494b02f998fc2d4014fb81d908f049b180122a1ff12778490308f56"
+resource_account = "0x90e62f59952b28fbea0ad3d49d705dad416b107a8b968a324b3bd2fda6a70fa8"
 memecoin_creator_addr = "0x922a028b0dbd8ff206074977ae4c5f9fb003ce384242b6253c67192cd2a45ee1"
 
 [dependencies.AptosFramework]
