@@ -201,12 +201,13 @@ impl<'env> Generator<'env> {
             .map(|id| self.new_loc_attr(id))
             .collect();
         let old_target_node_ids = self.target_attrs.insert(bytecode_attr, target_attrs);
-        debug_assert!(old_target_node_ids.is_none(), "duplicate insertion of target locations");
+        debug_assert!(old_target_node_ids.is_none(), "duplicate insertion of target attribute ids");
         let source_attrs = source_node_ids
             .into_iter()
             .map(|id| self.new_loc_attr(id))
             .collect();
-        self.src_attrs.insert(bytecode_attr, source_attrs);
+        let old_src_node_ids = self.src_attrs.insert(bytecode_attr, source_attrs);
+        debug_assert!(old_src_node_ids.is_none(), "duplicate insertion of source attribute ids");
         self.emit(bytecode)
     }
 
