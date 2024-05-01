@@ -4,12 +4,14 @@ version = "1.0.0"
 authors = []
 
 [addresses]
-bonding_curve_launchpad_addr = "_"
-memecoin_creator_addr = "_"
+owner_addr = "0x922a028b0dbd8ff206074977ae4c5f9fb003ce384242b6253c67192cd2a45ee1"
+resource_account = "0xdf96b45fe494b02f998fc2d4014fb81d908f049b180122a1ff12778490308f56"
+memecoin_creator_addr = "0x922a028b0dbd8ff206074977ae4c5f9fb003ce384242b6253c67192cd2a45ee1"
 
 [dev-addresses]
-bonding_curve_launchpad_addr = "0x2832"
-memecoin_creator_addr = "0x803"
+owner_addr = "0x922a028b0dbd8ff206074977ae4c5f9fb003ce384242b6253c67192cd2a45ee1"
+resource_account = "0xdf96b45fe494b02f998fc2d4014fb81d908f049b180122a1ff12778490308f56"
+memecoin_creator_addr = "0x922a028b0dbd8ff206074977ae4c5f9fb003ce384242b6253c67192cd2a45ee1"
 
 [dependencies.AptosFramework]
 git = "https://github.com/aptos-labs/aptos-core.git"
