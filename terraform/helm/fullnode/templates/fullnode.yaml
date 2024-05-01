@@ -19,6 +19,9 @@ spec:
       labels:
         {{- include "aptos-fullnode.selectorLabels" . | nindent 8 }}
         app.kubernetes.io/name: fullnode
+        {{- if $.Values.chain.name }}
+        chain_name: {{ $.Values.chain.name }}
+        {{- end}}
       annotations:
         prometheus.io/scrape: "true"
         prometheus.io/port: "9101"

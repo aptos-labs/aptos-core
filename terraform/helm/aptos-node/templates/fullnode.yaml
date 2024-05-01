@@ -96,6 +96,9 @@ spec:
         {{- include "aptos-validator.selectorLabels" $ | nindent 8 }}
         app.kubernetes.io/name: fullnode
         app.kubernetes.io/instance: fullnode-{{$i}}
+        {{- if $.Values.chain.name }}
+        chain_name: {{ $.Values.chain.name }}
+        {{- end}}
         group: {{ .name }}
       annotations:
         checksum/fullnode.yaml: {{ tpl ($.Files.Get "files/configs/fullnode.yaml") $ | sha256sum }}
