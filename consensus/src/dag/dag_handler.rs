@@ -45,6 +45,8 @@ pub(crate) struct NetworkHandler {
     new_round_event: tokio::sync::mpsc::UnboundedReceiver<Round>,
     verified_msg_processor: Arc<VerifiedMessageProcessor>,
     missing_parents_rx: tokio::sync::mpsc::UnboundedReceiver<Node>,
+    next_dag_tx: tokio::sync::mpsc::UnboundedSender<()>,
+    prev_dag_rx: tokio::sync::mpsc::UnboundedReceiver<()>,
 }
 
 impl NetworkHandler {
@@ -58,6 +60,8 @@ impl NetworkHandler {
         certified_node_fetch_waiter: FetchWaiter<CertifiedNode>,
         state_sync_trigger: StateSyncTrigger,
         new_round_event: tokio::sync::mpsc::UnboundedReceiver<Round>,
+        next_dag_tx: tokio::sync::mpsc::UnboundedSender<()>,
+        prev_dag_rx: tokio::sync::mpsc::UnboundedReceiver<()>,
     ) -> Self {
         let (missing_parents_tx, missing_parents_rx) = tokio::sync::mpsc::unbounded_channel();
         node_receiver.set_missing_parent_tx(missing_parents_tx);
@@ -79,6 +83,8 @@ impl NetworkHandler {
                 state_sync_trigger,
                 epoch_state,
             }),
+            next_dag_tx,
+            prev_dag_rx,
         }
     }
 
@@ -98,6 +104,8 @@ impl NetworkHandler {
             mut new_round_event,
             verified_msg_processor,
             mut missing_parents_rx,
+            mut next_dag_tx,
+            mut prev_dag_rx,
             ..
         } = self;
 
@@ -110,6 +118,8 @@ impl NetworkHandler {
         let node_receiver_clone = node_receiver.clone();
         let handle = tokio::spawn(async move {
             while let Some(new_round) = new_round_event.recv().await {
+                let _ = prev_dag_rx.recv().await;
+
                 let driver = dag_driver_clone.clone();
                 tokio::task::spawn_blocking(move || {
                     monitor!("dag_sort_peers", {
@@ -119,6 +129,7 @@ impl NetworkHandler {
                 monitor!("dag_on_new_round_event", {
                     dag_driver_clone.enter_new_round(new_round).await;
                 });
+                let _ = next_dag_tx.send(());
                 monitor!("dag_node_receiver_gc", {
                     node_receiver_clone.gc();
                 });

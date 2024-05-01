@@ -1,15 +1,17 @@
 // Copyright © Aptos Foundation
 // SPDX-License-Identifier: Apache-2.0
 
-use crate::dag::{DAGMessage, DAGRpcResult};
+use crate::dag::{
+    shoal_plus_plus::shoalpp_types::{BoltBCParms, BoltBCRet},
+    DAGMessage, DAGRpcResult,
+};
+use aptos_logger::debug;
 use aptos_reliable_broadcast::ReliableBroadcast;
 use async_trait::async_trait;
 use futures_channel::oneshot;
 use std::sync::Arc;
 use tokio::sync::mpsc::Receiver;
 use tokio_retry::strategy::ExponentialBackoff;
-use aptos_logger::debug;
-use crate::dag::shoal_plus_plus::shoalpp_types::{BoltBCParms, BoltBCRet};
 
 #[async_trait]
 pub trait BroadcastSync {
@@ -22,8 +24,14 @@ pub struct BroadcastNoSync {
 }
 
 impl BroadcastNoSync {
-    pub fn new(reliable_broadcast: Arc<ReliableBroadcast<DAGMessage, ExponentialBackoff, DAGRpcResult>>, receivers: Vec<Receiver<(oneshot::Sender<BoltBCRet>, BoltBCParms)>>,) -> Self {
-        Self { reliable_broadcast, receivers }
+    pub fn new(
+        reliable_broadcast: Arc<ReliableBroadcast<DAGMessage, ExponentialBackoff, DAGRpcResult>>,
+        receivers: Vec<Receiver<(oneshot::Sender<BoltBCRet>, BoltBCParms)>>,
+    ) -> Self {
+        Self {
+            reliable_broadcast,
+            receivers,
+        }
     }
 }
 
@@ -51,8 +59,14 @@ pub struct BoltBroadcastSync {
 }
 
 impl BoltBroadcastSync {
-    pub fn new(reliable_broadcast: Arc<ReliableBroadcast<DAGMessage, ExponentialBackoff, DAGRpcResult>>,  receivers: Vec<Receiver<(oneshot::Sender<BoltBCRet>, BoltBCParms)>>,) -> Self {
-        Self { reliable_broadcast, receivers, }
+    pub fn new(
+        reliable_broadcast: Arc<ReliableBroadcast<DAGMessage, ExponentialBackoff, DAGRpcResult>>,
+        receivers: Vec<Receiver<(oneshot::Sender<BoltBCRet>, BoltBCParms)>>,
+    ) -> Self {
+        Self {
+            reliable_broadcast,
+            receivers,
+        }
     }
 }
 
@@ -62,11 +76,15 @@ impl BroadcastSync for BoltBroadcastSync {
         assert_eq!(self.receivers.len(), 3);
         // TODO: think about synchronization after state sync.
 
-        for i in 0..=1 {
-            // TODO: think about the unwrap()
-            let (ret_tx, bolt_bc_parms) = self.receivers[i].recv().await.unwrap();
-            if let Err(_e) = ret_tx.send(bolt_bc_parms.broadcast(self.reliable_broadcast.clone())) {
-                // TODO: should we panic here?
+        loop {
+            for i in 0..3 {
+                // TODO: think about the unwrap()
+                let (ret_tx, bolt_bc_parms) = self.receivers[i].recv().await.unwrap();
+                if let Err(_e) =
+                    ret_tx.send(bolt_bc_parms.broadcast(self.reliable_broadcast.clone()))
+                {
+                    // TODO: should we panic here?
+                }
             }
         }
 

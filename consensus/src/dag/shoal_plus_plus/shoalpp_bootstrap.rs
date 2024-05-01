@@ -3,6 +3,7 @@
 
 use crate::{
     dag::{
+        self,
         adapter::{compute_initial_block_and_ledger_info, LedgerInfoProvider},
         shoal_plus_plus::{
             shoalpp_broadcast_sync::{BoltBroadcastSync, BroadcastSync},
@@ -38,7 +39,7 @@ use aptos_types::{
 use arc_swap::ArcSwapOption;
 use futures::executor::block_on;
 use futures_channel::{mpsc::UnboundedSender, oneshot};
-use std::{sync::Arc, time::Duration};
+use std::{collections::VecDeque, sync::Arc, time::Duration};
 use tokio::sync::mpsc::{channel, Receiver};
 use tokio_retry::strategy::ExponentialBackoff;
 
@@ -115,13 +116,26 @@ impl ShoalppBootstrapper {
         let mut receiver_vec = Vec::new();
         let mut receiver_ordered_nodes_vec = Vec::new();
 
+        let mut txs = VecDeque::new();
+        let mut rxs = VecDeque::new();
+        for _ in 1..=3 {
+            let (tx, rx) = tokio::sync::mpsc::unbounded_channel();
+            txs.push_back(tx);
+            rxs.push_back(rx);
+        }
+        txs.rotate_left(1);
+        rxs.rotate_right(1);
         for dag_id in 0..3 {
             let (order_nodes_tx, ordered_node_rx) = tokio::sync::mpsc::unbounded_channel();
             let (broadcast_sender, broadcast_receiver) = channel(100);
             receiver_vec.push(broadcast_receiver);
             receiver_ordered_nodes_vec.push(ordered_node_rx);
+
+            let tx = txs.pop_front().unwrap();
+            let rx = rxs.pop_front().unwrap();
+
             let dag_bootstrapper = DagBootstrapper::new(
-                dag_id,
+                dag_id as u8,
                 self_peer,
                 config.clone(),
                 onchain_config.clone(),
@@ -147,6 +161,8 @@ impl ShoalppBootstrapper {
                 broadcast_sender,
                 ledger_info_provider.clone(),
                 dag_store_vec[dag_id as usize].clone(),
+                tx,
+                rx,
             );
             dags.push(dag_bootstrapper);
         }

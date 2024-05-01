@@ -60,11 +60,11 @@ use aptos_types::{
     },
     validator_signer::ValidatorSigner,
 };
-use arc_swap::ArcSwapOption;
+use arc_swap::{access::Access, ArcSwapAny, ArcSwapOption};
 use async_trait::async_trait;
 use enum_dispatch::enum_dispatch;
 use futures_channel::oneshot;
-use std::{collections::HashMap, fmt, ops::Deref, sync::Arc, time::Duration};
+use std::{cell::RefCell, collections::HashMap, fmt, ops::Deref, sync::Arc, time::Duration};
 use tokio::{
     runtime::Handle,
     select,
@@ -352,6 +352,8 @@ pub struct DagBootstrapper {
     broadcast_sender: Sender<(oneshot::Sender<BoltBCRet>, BoltBCParms)>,
     ledger_info_provider: Arc<RwLock<LedgerInfoProvider>>,
     dag_store: Arc<ArcSwapOption<DagStore>>,
+    next_dag_tx: tokio::sync::mpsc::UnboundedSender<()>,
+    prev_dag_rx: Mutex<Option<tokio::sync::mpsc::UnboundedReceiver<()>>>,
 }
 
 impl DagBootstrapper {
@@ -384,6 +386,8 @@ impl DagBootstrapper {
         broadcast_sender: Sender<(oneshot::Sender<BoltBCRet>, BoltBCParms)>,
         ledger_info_provider: Arc<RwLock<LedgerInfoProvider>>,
         dag_store: Arc<ArcSwapOption<DagStore>>,
+        next_dag_tx: tokio::sync::mpsc::UnboundedSender<()>,
+        prev_dag_rx: tokio::sync::mpsc::UnboundedReceiver<()>,
     ) -> Self {
         info!("OnChainConfig: {:?}", onchain_config);
         Self {
@@ -413,6 +417,8 @@ impl DagBootstrapper {
             broadcast_sender,
             ledger_info_provider,
             dag_store,
+            next_dag_tx,
+            prev_dag_rx: Mutex::new(Some(prev_dag_rx)),
         }
     }
 
@@ -728,6 +734,8 @@ impl DagBootstrapper {
             certified_node_fetch_waiter,
             state_sync_trigger,
             new_round_rx,
+            self.next_dag_tx.clone(),
+            self.prev_dag_rx.lock().take().unwrap(),
         );
 
         (dag_handler, dag_fetcher)
@@ -831,6 +839,7 @@ pub(super) fn bootstrap_dag_for_test(
     );
     let peers_and_metadata = PeersAndMetadata::new(&[NetworkId::Validator]);
     let (ordered_nodes_tx, ordered_nodes_rx) = tokio::sync::mpsc::unbounded_channel();
+    let (tx, rx) = tokio::sync::mpsc::unbounded_channel();
     let bootstraper = DagBootstrapper::new(
         0, // TODO
         self_peer,
@@ -858,6 +867,8 @@ pub(super) fn bootstrap_dag_for_test(
         broadcast_sender,
         ledger_info_provider,
         dag_store,
+        tx,
+        rx,
     );
 
     let (_base_state, handler, fetch_service) = bootstraper.full_bootstrap(None);
