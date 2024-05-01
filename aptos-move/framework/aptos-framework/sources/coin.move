@@ -301,7 +301,10 @@ module aptos_framework::coin {
                 if (is_apt) {
                     object::create_sticky_object_at_address(@aptos_framework, @aptos_fungible_asset)
                 } else {
-                    object::create_sticky_object(coin_address<CoinType>())
+                    object::create_named_object(
+                        &create_signer::create_signer(@aptos_fungible_asset),
+                        *string::bytes(&type_info::type_name<CoinType>())
+                    )
                 };
             primary_fungible_store::create_primary_store_enabled_fungible_asset(
                 &metadata_object_cref,
