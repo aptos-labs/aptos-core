@@ -14,12 +14,12 @@ pub enum ConsensusAlgorithmConfig {
         main: ConsensusConfigV1,
         quorum_store_enabled: bool,
     },
+    DAG(DagConsensusConfigV1),
     JolteonV2 {
         main: ConsensusConfigV1,
         quorum_store_enabled: bool,
         order_vote_enabled: bool,
     },
-    DAG(DagConsensusConfigV1),
 }
 
 impl ConsensusAlgorithmConfig {
