@@ -623,10 +623,12 @@ impl<Req: TConsensusMsg + RBMessage + 'static, Res: TConsensusMsg + RBMessage + 
         timeout: Duration,
     ) -> anyhow::Result<Res> {
         let req_data = tokio::task::spawn_blocking(move || message.into_network_message()).await?;
-        let res = self
-            .send_rpc(receiver, req_data, timeout)
-            .await
-            .map_err(|e| anyhow!("invalid rpc response: {}", e))?;
+        let res = monitor!(
+            "send_rb_rpc",
+            self.send_rpc(receiver, req_data, timeout)
+                .await
+                .map_err(|e| anyhow!("invalid rpc response: {}", e))
+        )?;
         tokio::task::spawn_blocking(move || TConsensusMsg::from_network_message(res)).await?
     }
 }
