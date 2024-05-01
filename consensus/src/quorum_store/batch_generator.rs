@@ -295,6 +295,7 @@ impl BatchGenerator {
             .map_or(expiry_time_usecs, |batch_in_progress| {
                 expiry_time_usecs.max(batch_in_progress.expiry_time_usecs)
             });
+        // TODO: what if it already exists?
         self.batches_in_progress.insert(
             (author, batch_id),
             BatchInProgress::new(txns, updated_expiry_time_usecs),
@@ -384,6 +385,9 @@ impl BatchGenerator {
         batch_id: BatchId,
         txns: Vec<SignedTransaction>,
     ) {
+        if author == self.my_peer_id {
+            return;
+        }
         let expiry_time_usecs = aptos_infallible::duration_since_epoch().as_micros() as u64
             + self.config.remote_batch_expiry_gap_when_init_usecs;
         self.insert_batch(author, batch_id, txns, expiry_time_usecs);
