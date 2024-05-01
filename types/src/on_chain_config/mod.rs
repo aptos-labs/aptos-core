@@ -43,9 +43,9 @@ pub use self::{
     },
     commit_history::CommitHistoryResource,
     consensus_config::{
-        AnchorElectionMode, ConsensusAlgorithmConfig, ConsensusConfigV1, DagConsensusConfigV1,
-        LeaderReputationType, OnChainConsensusConfig, ProposerAndVoterConfig, ProposerElectionType,
-        ValidatorTxnConfig,
+        AnchorElectionMode, ConsensusAlgorithmConfig, ConsensusAlgorithmConfigV2,
+        ConsensusConfigV1, DagConsensusConfigV1, LeaderReputationType, OnChainConsensusConfig,
+        ProposerAndVoterConfig, ProposerElectionType, ValidatorTxnConfig,
     },
     execution_config::{
         BlockGasLimitType, ExecutionConfigV1, ExecutionConfigV2, ExecutionConfigV4,
