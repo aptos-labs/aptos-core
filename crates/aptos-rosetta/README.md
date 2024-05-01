@@ -49,7 +49,8 @@ Block hash is `<chain_id>:<block_height>` and not actually a hash.
 
 ### Constructing transactions
 
-More specifics can be found here: https://www.rosetta-api.org/docs/flow.html#construction-api
+More specifics can be found here: https://docs.cloud.coinbase.com/rosetta/docs/destination-tag-support#constructionpreprocessrequest
+
 
 All inputs to the API must be done in the `ConstructionPreprocessRequest`.  This allows you to set
 the sequence number, expiry time, gas parameters, and the public keys to sign the transaction.
