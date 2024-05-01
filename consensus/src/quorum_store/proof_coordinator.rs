@@ -255,6 +255,13 @@ impl ProofCoordinator {
     }
 
     fn update_counters_on_expire(state: &IncrementalProofState) {
+        // Count late votes separately
+        if !state.completed && !state.self_voted {
+            counters::BATCH_RECEIVED_LATE_REPLIES_COUNT
+                .inc_by(state.aggregated_signature.len() as u64);
+            return;
+        }
+
         counters::BATCH_RECEIVED_REPLIES_COUNT.observe(state.aggregated_signature.len() as f64);
         counters::BATCH_RECEIVED_REPLIES_VOTING_POWER.observe(state.aggregated_voting_power as f64);
         if !state.completed {
@@ -285,9 +292,8 @@ impl ProofCoordinator {
                     );
                 }
                 Self::update_counters_on_expire(&state);
-            } else if let Some(state) = self.committed_batches.remove(&signed_batch_info_info) {
-                Self::update_counters_on_expire(&state);
             }
+            self.committed_batches.remove(&signed_batch_info_info);
         }
         if self
             .batch_generator_cmd_tx
@@ -324,11 +330,20 @@ impl ProofCoordinator {
                                         let incremental_proof = existing_proof.get();
                                         if incremental_proof.completed {
                                             counters::BATCH_SUCCESSFUL_CREATION.observe(1.0);
-                                        } else {
-                                            warn!("QS: received commit notification for batch that did not complete: {}, self_voted: {}", digest, incremental_proof.self_voted);
                                         }
+                                        debug!(
+                                            LogSchema::new(LogEvent::ProofOfStoreCommit),
+                                            digest = digest,
+                                            batch_id = batch.batch_id().id,
+                                            proof_completed = incremental_proof.completed,
+                                        );
+
                                         let committed_proof = existing_proof.remove();
-                                        self.committed_batches.insert(batch, committed_proof);
+                                        if let Entry::Vacant(entry) = self.committed_batches.entry(batch.clone()) {
+                                            // Possibly a duplicate timeout, but that's fine
+                                            self.timeouts.add(batch.clone(), self.proof_timeout_ms);
+                                            entry.insert(committed_proof);
+                                        }
                                     }
                                 }
                             }
