@@ -130,6 +130,7 @@ pub struct BufferManager {
     previous_commit_time: Instant,
     reset_flag: Arc<AtomicBool>,
     bounded_executor: BoundedExecutor,
+    order_vote_enabled: bool,
 }
 
 impl BufferManager {
@@ -154,6 +155,7 @@ impl BufferManager {
         ongoing_tasks: Arc<AtomicU64>,
         reset_flag: Arc<AtomicBool>,
         executor: BoundedExecutor,
+        order_vote_enabled: bool,
     ) -> Self {
         let buffer = Buffer::<BufferItem>::new();
 
@@ -199,6 +201,7 @@ impl BufferManager {
             previous_commit_time: Instant::now(),
             reset_flag,
             bounded_executor: executor,
+            order_vote_enabled,
         }
     }
 
@@ -487,6 +490,7 @@ impl BufferManager {
             executed_blocks,
             &self.epoch_state.verifier,
             self.end_epoch_timestamp.get().cloned(),
+            self.order_vote_enabled,
         );
         let aggregated = new_item.is_aggregated();
         self.buffer.set(&current_cursor, new_item);

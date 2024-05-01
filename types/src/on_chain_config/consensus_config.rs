@@ -16,6 +16,7 @@ pub enum ConsensusAlgorithmConfig {
     Jolteon {
         main: ConsensusConfigV1,
         quorum_store_enabled: bool,
+        order_vote_enabled: bool,
     },
     DAG(DagConsensusConfigV1),
 }
@@ -25,6 +26,7 @@ impl ConsensusAlgorithmConfig {
         Self::Jolteon {
             main: ConsensusConfigV1::default(),
             quorum_store_enabled: true,
+            order_vote_enabled: false,
         }
     }
 
@@ -32,6 +34,7 @@ impl ConsensusAlgorithmConfig {
         Self::Jolteon {
             main: ConsensusConfigV1::default(),
             quorum_store_enabled: true,
+            order_vote_enabled: false,
         }
     }
 
@@ -39,9 +42,21 @@ impl ConsensusAlgorithmConfig {
         match self {
             ConsensusAlgorithmConfig::Jolteon {
                 quorum_store_enabled,
+                order_vote_enabled: _,
                 ..
             } => *quorum_store_enabled,
             ConsensusAlgorithmConfig::DAG(_) => true,
+        }
+    }
+
+    pub fn order_vote_enabled(&self) -> bool {
+        match self {
+            ConsensusAlgorithmConfig::Jolteon {
+                quorum_store_enabled: _,
+                order_vote_enabled,
+                ..
+            } => *order_vote_enabled,
+            ConsensusAlgorithmConfig::DAG(_) => false,
         }
     }
 
@@ -217,6 +232,14 @@ impl OnChainConsensusConfig {
         }
     }
 
+    pub fn order_vote_enabled(&self) -> bool {
+        match &self {
+            OnChainConsensusConfig::V1(_config) => false,
+            OnChainConsensusConfig::V2(_) => false,
+            OnChainConsensusConfig::V3 { alg, .. } => alg.order_vote_enabled(),
+        }
+    }
+
     pub fn is_dag_enabled(&self) -> bool {
         match self {
             OnChainConsensusConfig::V1(_) => false,
@@ -262,6 +285,7 @@ impl OnChainConsensusConfig {
                 alg: Jolteon {
                     main: config,
                     quorum_store_enabled: false,
+                    order_vote_enabled: false,
                 },
                 vtxn: ValidatorTxnConfig::default_enabled(),
             },
@@ -269,6 +293,7 @@ impl OnChainConsensusConfig {
                 alg: Jolteon {
                     main: config,
                     quorum_store_enabled: true,
+                    order_vote_enabled: false,
                 },
                 vtxn: ValidatorTxnConfig::default_enabled(),
             },

@@ -21,8 +21,19 @@ use futures::future::BoxFuture;
 use itertools::zip_eq;
 use tokio::time::Instant;
 
-fn generate_commit_ledger_info(commit_info: &BlockInfo) -> LedgerInfo {
-    LedgerInfo::new(commit_info.clone(), HashValue::zero())
+fn generate_commit_ledger_info(
+    commit_info: &BlockInfo,
+    ordered_proof: &LedgerInfoWithSignatures,
+    order_vote_enabled: bool,
+) -> LedgerInfo {
+    LedgerInfo::new(
+        commit_info.clone(),
+        if order_vote_enabled {
+            HashValue::zero()
+        } else {
+            ordered_proof.ledger_info().consensus_data_hash()
+        },
+    )
 }
 
 fn verify_signatures(
@@ -52,10 +63,11 @@ fn generate_executed_item_from_ordered(
     verified_signatures: PartialSignatures,
     callback: StateComputerCommitCallBackType,
     ordered_proof: LedgerInfoWithSignatures,
+    order_vote_enabled: bool,
 ) -> BufferItem {
     debug!("{} advance to executed from ordered", commit_info);
     let partial_commit_proof = LedgerInfoWithPartialSignatures::new(
-        generate_commit_ledger_info(&commit_info),
+        generate_commit_ledger_info(&commit_info, &ordered_proof, order_vote_enabled),
         verified_signatures,
     );
     BufferItem::Executed(Box::new(ExecutedItem {
@@ -148,6 +160,7 @@ impl BufferItem {
         executed_blocks: Vec<PipelinedBlock>,
         validator: &ValidatorVerifier,
         epoch_end_timestamp: Option<u64>,
+        order_vote_enabled: bool,
     ) -> Self {
         match self {
             Self::Ordered(ordered_item) => {
@@ -183,7 +196,11 @@ impl BufferItem {
                         callback,
                     }))
                 } else {
-                    let commit_ledger_info = generate_commit_ledger_info(&commit_info);
+                    let commit_ledger_info = generate_commit_ledger_info(
+                        &commit_info,
+                        &ordered_proof,
+                        order_vote_enabled,
+                    );
 
                     let verified_signatures =
                         verify_signatures(unverified_signatures, validator, &commit_ledger_info);
@@ -211,6 +228,7 @@ impl BufferItem {
                             verified_signatures,
                             callback,
                             ordered_proof,
+                            order_vote_enabled,
                         )
                     }
                 }
