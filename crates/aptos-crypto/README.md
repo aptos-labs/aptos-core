@@ -53,4 +53,4 @@ Before implementing a cryptographic primitive, be sure to read [`traits.rs`](src
 
 ## Changelog
 
- - This crate historically had support for (a different) BLS12-381, [EC-VRF](https://tools.ietf.org/id/draft-goldbe-vrf-01.html#rfc.section.5), and [SLIP-0010](https://github.com/satoshilabs/slips/blob/master/slip-0010.md), though were removed due to lack of use. The last git revision before the removal is 00301524.
+ - This crate historically had support for (a different) BLS12-381, [EC-VRF](https://datatracker.ietf.org/doc/draft-goldbe-vrf), and [SLIP-0010](https://github.com/satoshilabs/slips/blob/master/slip-0010.md), though were removed due to lack of use. The last git revision before the removal is 00301524.
