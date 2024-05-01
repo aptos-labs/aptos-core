@@ -652,6 +652,7 @@ impl<P: OnChainConfigProvider> EpochManager<P> {
             self.config
                 .max_blocks_per_sending_request(onchain_consensus_config.quorum_store_enabled()),
             self.payload_manager.clone(),
+            onchain_consensus_config.order_vote_enabled(),
         );
         tokio::spawn(recovery_manager.start(recovery_manager_rx, close_rx));
     }
@@ -813,6 +814,7 @@ impl<P: OnChainConfigProvider> EpochManager<P> {
             Arc::clone(&self.time_service),
             self.config.vote_back_pressure_limit,
             payload_manager,
+            onchain_consensus_config.order_vote_enabled(),
         ));
 
         info!(epoch = epoch, "Create ProposalGenerator");

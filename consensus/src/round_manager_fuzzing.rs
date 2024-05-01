@@ -91,6 +91,7 @@ fn build_empty_store(
         Arc::new(SimulatedTimeService::new()),
         10,
         Arc::from(PayloadManager::DirectMempool),
+        false,
     ))
 }
 

@@ -89,6 +89,7 @@ pub fn build_empty_tree() -> Arc<BlockStore> {
         Arc::new(SimulatedTimeService::new()),
         10,
         Arc::from(PayloadManager::DirectMempool),
+        false,
     ))
 }
 

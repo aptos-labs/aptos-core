@@ -278,6 +278,7 @@ impl NodeSetup {
             time_service.clone(),
             10,
             Arc::from(PayloadManager::DirectMempool),
+            false,
         ));
 
         let proposer_election = Self::create_proposer_election(proposers.clone());

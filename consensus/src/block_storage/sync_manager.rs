@@ -24,6 +24,7 @@ use aptos_consensus_types::{
     common::Author,
     quorum_cert::QuorumCert,
     sync_info::SyncInfo,
+    vote_data::VoteData,
     wrapped_ledger_info::WrappedLedgerInfo,
 };
 use aptos_crypto::HashValue;
@@ -122,7 +123,8 @@ impl BlockStore {
             _ => (),
         }
         if self.ordered_root().round() < qc.commit_info().round() {
-            self.send_for_execution(qc.ledger_info().clone()).await?;
+            self.send_for_execution(qc.into_wrapped_ledger_info())
+                .await?;
             if qc.ends_epoch() {
                 retriever
                     .network
@@ -143,8 +145,11 @@ impl BlockStore {
     ) -> anyhow::Result<()> {
         if self.ordered_root().round() < ledger_info_with_sig.ledger_info().round() {
             SUCCESSFUL_EXECUTED_WITH_ORDER_VOTE_QC.inc();
-            self.send_for_execution(ledger_info_with_sig.clone())
-                .await?;
+            self.send_for_execution(WrappedLedgerInfo::new(
+                VoteData::dummy(),
+                ledger_info_with_sig.clone(),
+            ))
+            .await?;
             if ledger_info_with_sig.ledger_info().ends_epoch() {
                 retriever
                     .network
@@ -219,6 +224,7 @@ impl BlockStore {
             self.storage.clone(),
             self.execution_client.clone(),
             self.payload_manager.clone(),
+            self.order_vote_enabled,
         )
         .await?
         .take();
@@ -227,8 +233,14 @@ impl BlockStore {
             committed_round = root.0.round(),
             block_id = root.0.id(),
         );
-        self.rebuild(root, root_metadata, blocks, quorum_certs)
-            .await;
+        self.rebuild(
+            root,
+            root_metadata,
+            blocks,
+            quorum_certs,
+            self.order_vote_enabled,
+        )
+        .await;
 
         if highest_commit_cert.ledger_info().ledger_info().ends_epoch() {
             retriever
@@ -250,6 +262,7 @@ impl BlockStore {
         storage: Arc<dyn PersistentLivenessStorage>,
         execution_client: Arc<dyn TExecutionClient>,
         payload_manager: Arc<PayloadManager>,
+        order_vote_enabled: bool,
     ) -> anyhow::Result<RecoveryData> {
         info!(
             LogSchema::new(LogEvent::StateSync).remote_peer(retriever.preferred_peer),
@@ -266,7 +279,7 @@ impl BlockStore {
         // although unlikely, we might wrap num_blocks around on a 32-bit machine
         assert!(num_blocks < std::usize::MAX as u64);
 
-        let blocks = retriever
+        let mut blocks = retriever
             .retrieve_block_for_qc(
                 highest_quorum_cert,
                 num_blocks,
@@ -298,43 +311,45 @@ impl BlockStore {
 
         // TODO: Make sure removing this code is okay
 
-        // check if highest_commit_cert comes from a fork
-        // if so, we need to fetch it's block as well, to have a proof of commit.
-        // if !blocks
-        //     .iter()
-        //     .any(|block| block.id() == highest_commit_cert.certified_block().id())
-        // {
-        //     info!(
-        //         "Found forked QC {}, fetching it as well",
-        //         highest_commit_cert
-        //     );
-        //     let mut additional_blocks = retriever
-        //         .retrieve_block_for_qc(
-        //             &QuorumCert::new(
-        //                 highest_commit_cert.vote_data().clone(),
-        //                 highest_commit_cert.ledger_info().clone(),
-        //             ),
-        //             1,
-        //             highest_commit_cert.certified_block().id(),
-        //         )
-        //         .await?;
+        if !order_vote_enabled {
+            // check if highest_commit_cert comes from a fork
+            // if so, we need to fetch it's block as well, to have a proof of commit.
+            if !blocks
+                .iter()
+                .any(|block| block.id() == highest_commit_cert.certified_block().id())
+            {
+                info!(
+                    "Found forked QC {}, fetching it as well",
+                    highest_commit_cert
+                );
+                let mut additional_blocks = retriever
+                    .retrieve_block_for_qc(
+                        &QuorumCert::new(
+                            highest_commit_cert.vote_data().clone(),
+                            highest_commit_cert.ledger_info().clone(),
+                        ),
+                        1,
+                        highest_commit_cert.certified_block().id(),
+                    )
+                    .await?;
 
-        //     assert_eq!(additional_blocks.len(), 1);
-        //     let block = additional_blocks.pop().expect("blocks are empty");
-        //     assert_eq!(
-        //         block.id(),
-        //         highest_commit_cert.certified_block().id(),
-        //         "Expecting in the retrieval response, for commit certificate fork, first block should be {}, but got {}",
-        //         highest_commit_cert.certified_block().id(),
-        //         block.id(),
-        //     );
+                assert_eq!(additional_blocks.len(), 1);
+                let block = additional_blocks.pop().expect("blocks are empty");
+                assert_eq!(
+                    block.id(),
+                    highest_commit_cert.certified_block().id(),
+                    "Expecting in the retrieval response, for commit certificate fork, first block should be {}, but got {}",
+                    highest_commit_cert.certified_block().id(),
+                    block.id(),
+                );
 
-        //     blocks.push(block);
-        //     quorum_certs.push(QuorumCert::new(
-        //         highest_commit_cert.vote_data().clone(),
-        //         highest_commit_cert.ledger_info().clone(),
-        //     ));
-        // }
+                blocks.push(block);
+                quorum_certs.push(QuorumCert::new(
+                    highest_commit_cert.vote_data().clone(),
+                    highest_commit_cert.ledger_info().clone(),
+                ));
+            }
+        }
 
         assert_eq!(blocks.len(), quorum_certs.len());
         for (i, block) in blocks.iter().enumerate() {
@@ -379,10 +394,11 @@ impl BlockStore {
         // we do not need to update block_tree.highest_commit_decision_ledger_info here
         // because the block_tree is going to rebuild itself.
 
-        let recovery_data = match storage.start(Some(highest_ordered_cert.clone())) {
-            LivenessStorageData::FullRecoveryData(recovery_data) => recovery_data,
-            _ => panic!("Failed to construct recovery data after fast forward sync"),
-        };
+        let recovery_data =
+            match storage.start(order_vote_enabled.then(|| highest_ordered_cert.clone())) {
+                LivenessStorageData::FullRecoveryData(recovery_data) => recovery_data,
+                _ => panic!("Failed to construct recovery data after fast forward sync"),
+            };
 
         Ok(recovery_data)
     }
