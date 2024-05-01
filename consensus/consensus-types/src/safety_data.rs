@@ -18,6 +18,7 @@ pub struct SafetyData {
     pub one_chain_round: u64,
     pub last_vote: Option<Vote>,
     pub last_order_vote: Option<OrderVote>,
+    pub last_order_voted_round: u64,
 }
 
 impl SafetyData {
@@ -28,6 +29,7 @@ impl SafetyData {
         one_chain_round: u64,
         last_vote: Option<Vote>,
         last_order_vote: Option<OrderVote>,
+        last_order_voted_round: u64,
     ) -> Self {
         Self {
             epoch,
@@ -36,6 +38,7 @@ impl SafetyData {
             one_chain_round,
             last_vote,
             last_order_vote,
+            last_order_voted_round,
         }
     }
 }
@@ -44,8 +47,8 @@ impl fmt::Display for SafetyData {
     fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
         write!(
             f,
-            "SafetyData: [epoch: {}, last_voted_round: {}, preferred_round: {}, one_chain_round: {}]",
-            self.epoch, self.last_voted_round, self.preferred_round, self.one_chain_round
+            "SafetyData: [epoch: {}, last_voted_round: {}, preferred_round: {}, one_chain_round: {}, last_order_voted_round: {}]",
+            self.epoch, self.last_voted_round, self.preferred_round, self.one_chain_round, self.last_order_voted_round,
         )
     }
 }

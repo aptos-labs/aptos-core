@@ -185,6 +185,28 @@ impl SafetyRules {
         Ok(())
     }
 
+    /// First order voting rule
+    pub(crate) fn verify_and_update_last_order_vote_round(
+        &self,
+        round: Round,
+        safety_data: &mut SafetyData,
+    ) -> Result<(), Error> {
+        if round <= safety_data.last_order_voted_round {
+            return Err(Error::IncorrectLastOrderVotedRound(
+                round,
+                safety_data.last_order_voted_round,
+            ));
+        }
+
+        safety_data.last_order_voted_round = round;
+        trace!(
+            SafetyLogSchema::new(LogEntry::LastOrderVotedRound, LogEvent::Update)
+                .last_voted_round(safety_data.last_voted_round)
+        );
+
+        Ok(())
+    }
+
     /// This verifies a QC has valid signatures.
     pub(crate) fn verify_qc(&self, qc: &QuorumCert) -> Result<(), Error> {
         let epoch_state = self.epoch_state()?;
@@ -252,6 +274,7 @@ impl SafetyRules {
                     0,
                     None,
                     None,
+                    0,
                 ))?;
 
                 info!(SafetyLogSchema::new(LogEntry::Epoch, LogEvent::Update)

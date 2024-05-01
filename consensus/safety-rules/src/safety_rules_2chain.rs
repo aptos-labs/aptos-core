@@ -108,7 +108,10 @@ impl SafetyRules {
                 return Ok(order_vote);
             }
         }
-
+        self.verify_and_update_last_order_vote_round(
+            proposed_block.block_data().round(),
+            &mut safety_data,
+        )?;
         // Construct and sign order vote
         let author = self.signer()?.author();
         let ledger_info = LedgerInfo::new(vote_proposal.block_info().clone(), HashValue::zero());
