@@ -2766,6 +2766,7 @@ async fn gather_metrics_one(ctx: &NetworkContext<'_>) {
 }
 
 async fn gather_metrics_to_file(url: Url, outpath: PathBuf) {
+    println!("haha");
     let client = reqwest::Client::new();
     match client.get(url).send().await {
         Ok(response) => {
