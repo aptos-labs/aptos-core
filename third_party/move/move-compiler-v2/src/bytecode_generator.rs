@@ -185,6 +185,22 @@ impl<'env> Generator<'env> {
         self.code.push(b)
     }
 
+    /// Insert attribute ids derived from `arg_node_ids` for the target or source (controlled by `for_target`)
+    /// temporaries of bytecode with attr id `bytecode_attr`.
+    /// Panic on duplicate insertion.
+    fn insert_arg_attrs(&mut self, bytecode_attr: AttrId, arg_node_ids: Vec<NodeId>, for_target: bool) {
+        let arg_attrs = arg_node_ids
+            .into_iter()
+            .map(|id| self.new_loc_attr(id))
+            .collect();
+        let old_node_ids = if for_target {
+            &mut self.target_attrs
+        } else {
+            &mut self.src_attrs
+        }.insert(bytecode_attr, arg_attrs);
+        debug_assert!(old_node_ids.is_none(), "duplicate insertion of attribute ids")
+    }
+
     /// Emit bytecode with attribute derived from `id`,
     /// and target and source attribute ids derived from `target_node_ids` and `source_node_ids`.
     fn emit_with(
@@ -196,18 +212,8 @@ impl<'env> Generator<'env> {
     ) {
         let bytecode_attr = self.new_loc_attr(id);
         let bytecode = mk(bytecode_attr);
-        let target_attrs = target_node_ids
-            .into_iter()
-            .map(|id| self.new_loc_attr(id))
-            .collect();
-        let old_target_node_ids = self.target_attrs.insert(bytecode_attr, target_attrs);
-        debug_assert!(old_target_node_ids.is_none(), "duplicate insertion of target attribute ids");
-        let source_attrs = source_node_ids
-            .into_iter()
-            .map(|id| self.new_loc_attr(id))
-            .collect();
-        let old_src_node_ids = self.src_attrs.insert(bytecode_attr, source_attrs);
-        debug_assert!(old_src_node_ids.is_none(), "duplicate insertion of source attribute ids");
+        self.insert_arg_attrs(bytecode_attr, target_node_ids, true);
+        self.insert_arg_attrs(bytecode_attr, source_node_ids, false);
         self.emit(bytecode)
     }
 
@@ -379,7 +385,7 @@ impl<'env> Generator<'env> {
                 self.gen_temporary(targets, target_node_ids, *id, *temp)
             },
             ExpData::Value(id, val) => self.gen_value(targets, target_node_ids, *id, val),
-            ExpData::LocalVar(id, name) => self.gen_local(targets, *id, *name),
+            ExpData::LocalVar(id, name) => self.gen_local(targets, target_node_ids, *id, *name),
             ExpData::Call(id, op, args) => self.gen_call(targets, target_node_ids, *id, op, args),
             ExpData::Sequence(_, exps) => {
                 for step in exps.iter().take(exps.len() - 1) {
@@ -623,12 +629,12 @@ impl<'env> Generator<'env> {
 // Locals
 
 impl<'env> Generator<'env> {
-    fn gen_local(&mut self, targets: Vec<TempIndex>, id: NodeId, name: Symbol) {
+    fn gen_local(&mut self, targets: Vec<TempIndex>, targets_node_ids: Vec<NodeId>, id: NodeId, name: Symbol) {
         let target = self.require_unary_target(id, targets);
         let attr = self.new_loc_attr(id);
         let temp = self.find_local(id, name);
 
-        self.target_attrs.insert(attr, vec![attr]);
+        self.insert_arg_attrs(attr, targets_node_ids, true);
         self.src_attrs.insert(attr, vec![attr]); // TODO: This is not correct, but we don't have a source location for locals
 
         self.emit(Bytecode::Assign(attr, target, temp, AssignKind::Inferred));
