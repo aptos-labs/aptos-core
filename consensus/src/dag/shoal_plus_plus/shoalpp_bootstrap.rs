@@ -123,8 +123,8 @@ impl ShoalppBootstrapper {
             txs.push_back(tx);
             rxs.push_back(rx);
         }
+        txs[0].send(());
         txs.rotate_left(1);
-        rxs.rotate_right(1);
         for dag_id in 0..3 {
             let (order_nodes_tx, ordered_node_rx) = tokio::sync::mpsc::unbounded_channel();
             let (broadcast_sender, broadcast_receiver) = channel(100);
