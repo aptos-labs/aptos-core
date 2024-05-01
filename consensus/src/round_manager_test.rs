@@ -66,7 +66,7 @@ use aptos_types::{
     jwks::QuorumCertifiedUpdate,
     ledger_info::LedgerInfo,
     on_chain_config::{
-        ConsensusAlgorithmConfigV2, ConsensusConfigV1, OnChainConsensusConfig,
+        ConsensusAlgorithmConfig, ConsensusConfigV1, OnChainConsensusConfig,
         OnChainJWKConsensusConfig, OnChainRandomnessConfig, ValidatorTxnConfig,
     },
     transaction::SignedTransaction,
@@ -2232,7 +2232,7 @@ fn no_vote_on_proposal_ext_when_receiving_limit_exceeded() {
     let runtime = consensus_runtime();
     let mut playground = NetworkPlayground::new(runtime.handle().clone());
 
-    let alg_config = ConsensusAlgorithmConfigV2::Jolteon {
+    let alg_config = ConsensusAlgorithmConfig::JolteonV2 {
         main: ConsensusConfigV1::default(),
         quorum_store_enabled: true,
         order_vote_enabled: false,
@@ -2254,7 +2254,7 @@ fn no_vote_on_proposal_ext_when_receiving_limit_exceeded() {
         runtime.handle().clone(),
         1,
         None,
-        Some(OnChainConsensusConfig::V4 {
+        Some(OnChainConsensusConfig::V3 {
             alg: alg_config,
             vtxn: vtxn_config,
         }),
