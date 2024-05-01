@@ -347,6 +347,13 @@ module aptos_framework::delegation_pool {
     }
 
     #[event]
+    struct AddStake has drop, store {
+        pool_address: address,
+        delegator_address: address,
+        amount_added: u64,
+        add_stake_fee: u64,
+    }
+
     struct AddStakeEvent has drop, store {
         pool_address: address,
         delegator_address: address,
@@ -355,6 +362,12 @@ module aptos_framework::delegation_pool {
     }
 
     #[event]
+    struct ReactivateStake has drop, store {
+        pool_address: address,
+        delegator_address: address,
+        amount_reactivated: u64,
+    }
+
     struct ReactivateStakeEvent has drop, store {
         pool_address: address,
         delegator_address: address,
@@ -362,6 +375,12 @@ module aptos_framework::delegation_pool {
     }
 
     #[event]
+    struct UnlockStake has drop, store {
+        pool_address: address,
+        delegator_address: address,
+        amount_unlocked: u64,
+    }
+
     struct UnlockStakeEvent has drop, store {
         pool_address: address,
         delegator_address: address,
@@ -369,6 +388,12 @@ module aptos_framework::delegation_pool {
     }
 
     #[event]
+    struct WithdrawStake has drop, store {
+        pool_address: address,
+        delegator_address: address,
+        amount_withdrawn: u64,
+    }
+
     struct WithdrawStakeEvent has drop, store {
         pool_address: address,
         delegator_address: address,
@@ -393,6 +418,14 @@ module aptos_framework::delegation_pool {
     }
 
     #[event]
+    struct Vote has drop, store {
+        voter: address,
+        proposal_id: u64,
+        delegation_pool: address,
+        num_votes: u64,
+        should_pass: bool,
+    }
+
     struct VoteEvent has drop, store {
         voter: address,
         proposal_id: u64,
@@ -402,6 +435,12 @@ module aptos_framework::delegation_pool {
     }
 
     #[event]
+    struct CreateProposal has drop, store {
+        proposal_id: u64,
+        voter: address,
+        delegation_pool: address,
+    }
+
     struct CreateProposalEvent has drop, store {
         proposal_id: u64,
         voter: address,
@@ -409,6 +448,12 @@ module aptos_framework::delegation_pool {
     }
 
     #[event]
+    struct DelegateVotingPower has drop, store {
+        pool_address: address,
+        delegator: address,
+        voter: address,
+    }
+
     struct DelegateVotingPowerEvent has drop, store {
         pool_address: address,
         delegator: address,
@@ -906,7 +951,7 @@ module aptos_framework::delegation_pool {
 
         if (features::module_event_migration_enabled()) {
             event::emit(
-                VoteEvent {
+                Vote {
                     voter: voter_address,
                     proposal_id,
                     delegation_pool: pool_address,
@@ -965,7 +1010,7 @@ module aptos_framework::delegation_pool {
 
         if (features::module_event_migration_enabled()) {
             event::emit(
-                CreateProposalEvent {
+                CreateProposal {
                     proposal_id,
                     voter: voter_addr,
                     delegation_pool: pool_address,
@@ -1373,7 +1418,7 @@ module aptos_framework::delegation_pool {
         };
 
         if (features::module_event_migration_enabled()) {
-            event::emit(DelegateVotingPowerEvent {
+            event::emit(DelegateVotingPower {
                 pool_address,
                 delegator: delegator_address,
                 voter: new_voter,
@@ -1508,7 +1553,7 @@ module aptos_framework::delegation_pool {
 
         if (features::module_event_migration_enabled()) {
             event::emit(
-                AddStakeEvent {
+                AddStake {
                     pool_address,
                     delegator_address,
                     amount_added: amount,
@@ -1572,7 +1617,7 @@ module aptos_framework::delegation_pool {
 
         if (features::module_event_migration_enabled()) {
             event::emit(
-                UnlockStakeEvent {
+                UnlockStake {
                     pool_address,
                     delegator_address,
                     amount_unlocked: amount,
@@ -1622,7 +1667,7 @@ module aptos_framework::delegation_pool {
 
         if (features::module_event_migration_enabled()) {
             event::emit(
-                ReactivateStakeEvent {
+                ReactivateStake {
                     pool_address,
                     delegator_address,
                     amount_reactivated: amount,
@@ -1707,7 +1752,7 @@ module aptos_framework::delegation_pool {
 
         if (features::module_event_migration_enabled()) {
             event::emit(
-                WithdrawStakeEvent {
+                WithdrawStake {
                     pool_address,
                     delegator_address,
                     amount_withdrawn: amount,
