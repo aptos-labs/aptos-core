@@ -47,6 +47,7 @@ pub(crate) struct NetworkHandler {
     missing_parents_rx: tokio::sync::mpsc::UnboundedReceiver<Node>,
     next_dag_tx: tokio::sync::mpsc::UnboundedSender<()>,
     prev_dag_rx: tokio::sync::mpsc::UnboundedReceiver<()>,
+    dag_id: u8,
 }
 
 impl NetworkHandler {
@@ -75,6 +76,7 @@ impl NetworkHandler {
             certified_node_fetch_waiter,
             new_round_event,
             missing_parents_rx,
+            dag_id,
             verified_msg_processor: Arc::new(VerifiedMessageProcessor {
                 dag_id,
                 node_receiver,
@@ -106,6 +108,7 @@ impl NetworkHandler {
             mut missing_parents_rx,
             mut next_dag_tx,
             mut prev_dag_rx,
+            dag_id,
             ..
         } = self;
 
@@ -118,8 +121,6 @@ impl NetworkHandler {
         let node_receiver_clone = node_receiver.clone();
         let handle = tokio::spawn(async move {
             while let Some(new_round) = new_round_event.recv().await {
-                let _ = prev_dag_rx.recv().await;
-
                 let driver = dag_driver_clone.clone();
                 tokio::task::spawn_blocking(move || {
                     monitor!("dag_sort_peers", {
@@ -127,9 +128,10 @@ impl NetworkHandler {
                     })
                 });
                 monitor!("dag_on_new_round_event", {
-                    dag_driver_clone.enter_new_round(new_round).await;
+                    dag_driver_clone
+                        .enter_new_round_ext(new_round, &mut prev_dag_rx, &mut next_dag_tx)
+                        .await;
                 });
-                let _ = next_dag_tx.send(());
                 monitor!("dag_node_receiver_gc", {
                     node_receiver_clone.gc();
                 });

@@ -51,7 +51,7 @@ use std::{
     sync::Arc,
     time::{Duration, Instant},
 };
-use tokio::sync::mpsc::Sender;
+use tokio::sync::mpsc::{Sender, UnboundedReceiver, UnboundedSender};
 use tokio_retry::strategy::ExponentialBackoff;
 
 pub(crate) struct DagDriver {
@@ -145,7 +145,9 @@ impl DagDriver {
         } else {
             // kick start a new round
             if !driver.dag.read().is_empty() {
-                block_on(driver.enter_new_round(highest_strong_links_round + 1));
+                let new_round = highest_strong_links_round + 1;
+                let _ = driver.round_state.set_current_round(new_round);
+                block_on(driver.enter_new_round(new_round));
             }
         }
         driver
@@ -257,13 +259,43 @@ impl DagDriver {
         )
     }
 
-    pub async fn enter_new_round(&self, new_round: Round) {
-        let start = Instant::now();
-
+    pub async fn enter_new_round_ext(
+        &self,
+        new_round: Round,
+        prev_dag_rx: &mut UnboundedReceiver<()>,
+        next_dag_tx: &mut UnboundedSender<()>,
+    ) {
         if let Err(e) = self.round_state.set_current_round(new_round) {
             debug!(error=?e, "cannot enter round");
             return;
         }
+
+        if new_round > 5 {
+            if tokio::time::timeout(Duration::from_millis(300), prev_dag_rx.recv())
+                .await
+                .is_err()
+            {
+                debug!(
+                    dag_id = self.dag_id,
+                    "{}: timeout waiting for prev dag", self.dag_id
+                );
+            } else {
+                tokio::time::sleep(Duration::from_millis(100)).await;
+            }
+            debug!(
+                dag_id = self.dag_id,
+                "{}, attempting starting new round {}", self.dag_id, new_round
+            );
+            defer!({
+                let _ = next_dag_tx.send(());
+            });
+        }
+
+        self.enter_new_round(new_round).await
+    }
+
+    pub async fn enter_new_round(&self, new_round: Round) {
+        let start = Instant::now();
 
         let (strong_links, sys_payload_filter, payload_filter) = {
             let dag_reader = self.dag.read();
