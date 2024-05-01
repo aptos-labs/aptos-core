@@ -42,6 +42,17 @@ impl DelayedFieldData {
         input: SignedU128,
         resolver: &dyn DelayedFieldResolver,
     ) -> PartialVMResult<bool> {
+        self.try_add_or_check_delta(id, max_value, input, resolver, true)
+    }
+
+    pub fn try_add_or_check_delta(
+        &mut self,
+        id: DelayedFieldID,
+        max_value: u128,
+        input: SignedU128,
+        resolver: &dyn DelayedFieldResolver,
+        apply_delta: bool,
+    ) -> PartialVMResult<bool> {
         // No need to record or check or try, if input value exceeds the bound.
         if input.abs() > max_value {
             return Ok(false);
@@ -55,7 +66,7 @@ impl DelayedFieldData {
                     &input,
                     max_value,
                 )?;
-                if result {
+                if result && apply_delta {
                     entry.insert(DelayedChange::Apply(DelayedApplyChange::AggregatorDelta {
                         delta: DeltaWithMax::new(input, max_value),
                     }));
@@ -68,7 +79,9 @@ impl DelayedFieldData {
                     DelayedChange::Create(DelayedFieldValue::Aggregator(value)) => {
                         match math.unsigned_add_delta(*value, &input) {
                             Ok(new_value) => {
-                                *value = new_value;
+                                if apply_delta {
+                                    *value = new_value;
+                                }
                                 Ok(true)
                             },
                             Err(_) => Ok(false),
@@ -83,7 +96,7 @@ impl DelayedFieldData {
                             &input,
                             previous_delta.max_value,
                         )?;
-                        if result {
+                        if result && apply_delta {
                             *previous_delta = expect_ok(DeltaWithMax::create_merged_delta(
                                 previous_delta,
                                 &DeltaWithMax::new(input, max_value),
