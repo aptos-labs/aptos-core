@@ -13,12 +13,10 @@ script {
         let framework_signer = &core_signer;
 
         let enabled_blob: vector<u64> = vector[
-            13,
+            48,
         ];
 
-        let disabled_blob: vector<u64> = vector[
-            43,
-        ];
+        let disabled_blob: vector<u64> = vector[];
 
         features::change_feature_flags_for_next_epoch(framework_signer, enabled_blob, disabled_blob);
         aptos_governance::reconfigure(framework_signer);
