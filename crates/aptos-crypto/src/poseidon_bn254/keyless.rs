@@ -1,17 +1,10 @@
 // Copyright © Aptos Foundation
 // SPDX-License-Identifier: Apache-2.0
 
-//! Implements the Poseidon hash function for BN-254, which hashes $\le$ 16 field elements and
-//! produces a single field element as output.
+//! Implements keyless-specific domain-separated hash functions from Poseidon scalar hashing.
+use crate::{poseidon_bn254, poseidon_bn254::MAX_NUM_INPUT_SCALARS};
 use anyhow::bail;
 use ark_ff::{BigInteger, PrimeField};
-use once_cell::sync::Lazy;
-// TODO(keyless): Figure out the right library for Poseidon.
-use poseidon_ark::Poseidon;
-
-/// The maximum number of input scalars that can be hashed using the Poseidon-BN254 hash function
-/// exposed in `hash_scalars`.
-pub const MAX_NUM_INPUT_SCALARS: usize = 16;
 
 /// A BN254 scalar is 254 bits which means it can only store up to 31 bytes of data. We could use a
 /// more complicated packing to take advantage of the unused 6 bits, but we do not since it allows
@@ -28,23 +21,7 @@ pub const BYTES_PACKED_PER_SCALAR: usize = 31;
 /// SNARK circuits would have to implement this more complicated packing).
 pub const MAX_NUM_INPUT_BYTES: usize = MAX_NUM_INPUT_SCALARS * BYTES_PACKED_PER_SCALAR;
 
-/// Apparently, creating this object is rather slow, so we make it a global.
-static HASHER: Lazy<Poseidon> = Lazy::new(Poseidon::new);
-
-/// Given an array of up to `MAX_NUM_INPUT_SCALARS` field elements (in the BN254 scalar field), hashes
-/// them using Poseidon-BN254 into a single field element.
-pub fn hash_scalars(inputs: Vec<ark_bn254::Fr>) -> anyhow::Result<ark_bn254::Fr> {
-    if inputs.is_empty() || inputs.len() > MAX_NUM_INPUT_SCALARS {
-        bail!(
-            "Poseidon-BN254 needs > 0 and <= 16 inputs, but was called with {} inputs",
-            inputs.len()
-        );
-    }
-
-    HASHER.hash(inputs).map_err(anyhow::Error::msg)
-}
-
-/// Given an string and `max_bytes`, it pads the byte array of the string with zeros up to size `max_bytes`,
+/// Given a string and `max_bytes`, it pads the byte array of the string with zeros up to size `max_bytes`,
 /// packs it to scalars, and returns the hash of the scalars.
 ///
 /// This function calls `pad_and_pack_bytes_to_scalars_no_len` safely as strings will not contain the zero byte except to terminate.
@@ -59,7 +36,7 @@ pub fn pad_and_hash_string(str: &str, max_bytes: usize) -> anyhow::Result<ark_bn
 ///
 /// If the last chunk is smaller than 31 bytes, so all remaining bytes in its associated field
 /// element are padded to zero due to the LE encoding.
-fn pack_bytes_to_scalars(bytes: &[u8]) -> anyhow::Result<Vec<ark_bn254::Fr>> {
+pub(crate) fn pack_bytes_to_scalars(bytes: &[u8]) -> anyhow::Result<Vec<ark_bn254::Fr>> {
     if bytes.len() > MAX_NUM_INPUT_BYTES {
         bail!(
             "Cannot hash more than {} bytes. Was given {} bytes.",
@@ -108,7 +85,7 @@ pub fn pad_and_pack_bytes_to_scalars_with_len(
 
 /// Given $n$ bytes, this function left pads bytes with 'max_bytes'- $n$ zeros and returns $k$ field elements that pack those bytes as tightly as
 /// possible, where $k$ is the ceiling of `max_bytes`/`BYTES_PACKED_PER_SCALAR`.
-fn pad_and_pack_bytes_to_scalars_no_len(
+pub(crate) fn pad_and_pack_bytes_to_scalars_no_len(
     bytes: &[u8],
     max_bytes: usize,
 ) -> anyhow::Result<Vec<ark_bn254::Fr>> {
@@ -145,7 +122,7 @@ fn pad_and_pack_bytes_to_scalars_no_len(
 #[allow(unused)]
 fn hash_bytes(bytes: &[u8]) -> anyhow::Result<ark_bn254::Fr> {
     let scalars = pack_bytes_to_scalars(bytes)?;
-    hash_scalars(scalars)
+    poseidon_bn254::hash_scalars(scalars)
 }
 
 /// Given `bytes`, if the length of `bytes` is less than `max_bytes`, pads `bytes` with zeros to length `max_bytes`.
@@ -158,7 +135,7 @@ fn hash_bytes(bytes: &[u8]) -> anyhow::Result<ark_bn254::Fr> {
 #[allow(unused)]
 fn pad_and_hash_bytes_no_len(bytes: &[u8], max_bytes: usize) -> anyhow::Result<ark_bn254::Fr> {
     let scalars = pad_and_pack_bytes_to_scalars_no_len(bytes, max_bytes)?;
-    hash_scalars(scalars)
+    poseidon_bn254::hash_scalars(scalars)
 }
 
 /// Given `bytes`, if the length of `bytes` is less than `max_bytes`, pads `bytes` with zeros to length `max_bytes`.
@@ -170,7 +147,7 @@ pub fn pad_and_hash_bytes_with_len(
     max_bytes: usize,
 ) -> anyhow::Result<ark_bn254::Fr> {
     let scalars = pad_and_pack_bytes_to_scalars_with_len(bytes, max_bytes)?;
-    hash_scalars(scalars)
+    poseidon_bn254::hash_scalars(scalars)
 }
 
 /// We often have to pad byte arrays with 0s, up to a maximum length.
@@ -217,45 +194,19 @@ pub fn fr_to_bytes_le(fr: &ark_bn254::Fr) -> [u8; 32] {
 
 #[cfg(test)]
 mod test {
-    use crate::{
-        poseidon_bn254,
-        poseidon_bn254::{
-            pack_bytes_to_scalars, BYTES_PACKED_PER_SCALAR, MAX_NUM_INPUT_BYTES,
-            MAX_NUM_INPUT_SCALARS,
-        },
+    use crate::poseidon_bn254::{
+        keyless,
+        keyless::{pack_bytes_to_scalars, BYTES_PACKED_PER_SCALAR, MAX_NUM_INPUT_BYTES},
+        MAX_NUM_INPUT_SCALARS,
     };
     use ark_ff::{BigInteger, One, PrimeField, Zero};
     use num_bigint::BigUint;
-    use std::str::FromStr;
-
-    #[test]
-    fn test_poseidon_bn254_poseidon_ark_vectors() {
-        let mut inputs = vec!["1", "2"]
-            .into_iter()
-            .map(|hex| ark_bn254::Fr::from_str(hex).unwrap())
-            .collect::<Vec<ark_bn254::Fr>>();
-
-        // From https://github.com/arnaucube/poseidon-ark/blob/6d2487aa1308d9d3860a2b724c485d73095c1c68/src/lib.rs#L170
-        let h = poseidon_bn254::hash_scalars(inputs.clone()).unwrap();
-        assert_eq!(
-            h.to_string(),
-            "7853200120776062878684798364095072458815029376092732009249414926327459813530"
-        );
-
-        // From the same place.
-        inputs.pop();
-        let h = poseidon_bn254::hash_scalars(inputs).unwrap();
-        assert_eq!(
-            h.to_string(),
-            "18586133768512220936620570745912940619677854269274689475585506675881198879027"
-        );
-    }
 
     #[test]
     fn test_poseidon_bn254_pad_and_hash_bytes() {
         let aud = "google";
         const LEN: usize = 248;
-        let aud_val_hash = poseidon_bn254::pad_and_hash_string(aud, LEN).unwrap();
+        let aud_val_hash = keyless::pad_and_hash_string(aud, LEN).unwrap();
         assert_eq!(
             aud_val_hash.to_string(),
             "4022319167392179362271493931675371567039199401695470709241660273812313544045"
@@ -267,8 +218,8 @@ mod test {
         let s1: [u8; 3] = [0, 0, 1];
         let s2: [u8; 4] = [0, 0, 1, 0];
         const MAX_BYTES: usize = 248;
-        let h1 = poseidon_bn254::pad_and_hash_bytes_with_len(&s1, MAX_BYTES).unwrap();
-        let h2 = poseidon_bn254::pad_and_hash_bytes_with_len(&s2, MAX_BYTES).unwrap();
+        let h1 = keyless::pad_and_hash_bytes_with_len(&s1, MAX_BYTES).unwrap();
+        let h2 = keyless::pad_and_hash_bytes_with_len(&s2, MAX_BYTES).unwrap();
 
         assert_ne!(h1, h2);
     }

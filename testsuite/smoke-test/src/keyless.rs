@@ -6,7 +6,7 @@ use aptos::test::CliTestFramework;
 use aptos_cached_packages::aptos_stdlib;
 use aptos_crypto::{
     ed25519::{Ed25519PrivateKey, Ed25519PublicKey},
-    poseidon_bn254::fr_to_bytes_le,
+    poseidon_bn254::keyless::fr_to_bytes_le,
     SigningKey, Uniform,
 };
 use aptos_forge::{AptosPublicInfo, LocalSwarm, NodeExt, Swarm, SwarmExt};

@@ -19,6 +19,17 @@ dependencies = [
 ]
 
 [[package]]
+name = "addchain"
+version = "0.2.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "3b2e69442aa5628ea6951fa33e24efe8313f4321a91bd729fc2f75bdfc858570"
+dependencies = [
+ "num-bigint 0.3.3",
+ "num-integer",
+ "num-traits",
+]
+
+[[package]]
 name = "addr2line"
 version = "0.21.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -229,7 +240,7 @@ dependencies = [
 
 [[package]]
 name = "aptos"
-version = "3.1.0"
+version = "3.2.0"
 dependencies = [
  "anyhow",
  "aptos-api-types",
@@ -980,11 +991,13 @@ dependencies = [
  "curve25519-dalek-ng",
  "digest 0.9.0",
  "ed25519-dalek 1.0.1",
+ "ff",
  "hex",
  "hkdf 0.10.0",
  "libsecp256k1",
  "merlin",
  "more-asserts",
+ "neptune",
  "num-bigint 0.3.3",
  "num-integer",
  "once_cell",
@@ -1007,6 +1020,7 @@ dependencies = [
  "thiserror",
  "tiny-keccak",
  "trybuild",
+ "typenum",
  "x25519-dalek",
 ]
 
@@ -2495,6 +2509,7 @@ dependencies = [
  "futures",
  "itertools 0.12.1",
  "maplit",
+ "num_cpus",
  "once_cell",
  "proptest",
  "rand 0.7.3",
@@ -3944,12 +3959,15 @@ dependencies = [
 name = "aptos-types"
 version = "0.0.3"
 dependencies = [
+ "ahash 0.8.11",
  "anyhow",
  "aptos-bitvec",
  "aptos-crypto",
  "aptos-crypto-derive",
  "aptos-dkg",
  "aptos-experimental-runtimes",
+ "aptos-infallible",
+ "aptos-proptest-helpers",
  "ark-bn254",
  "ark-ff",
  "ark-groth16",
@@ -3962,8 +3980,11 @@ dependencies = [
  "ciborium",
  "claims",
  "coset",
+ "criterion",
  "derivative",
  "fixed",
+ "fxhash",
+ "hashbrown 0.14.3",
  "hex",
  "itertools 0.12.1",
  "jsonwebtoken 8.3.0",
@@ -3981,6 +4002,7 @@ dependencies = [
  "passkey-types",
  "proptest",
  "proptest-derive",
+ "quick_cache",
  "rand 0.7.3",
  "rayon",
  "regex",
@@ -5065,6 +5087,30 @@ dependencies = [
 ]
 
 [[package]]
+name = "bellpepper"
+version = "0.4.1"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "9ae286c2cb403324ab644c7cc68dceb25fe52ca9429908a726d7ed272c1edf7b"
+dependencies = [
+ "bellpepper-core",
+ "byteorder",
+ "ff",
+]
+
+[[package]]
+name = "bellpepper-core"
+version = "0.4.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "1d8abb418570756396d722841b19edfec21d4e89e1cf8990610663040ecb1aea"
+dependencies = [
+ "blake2s_simd",
+ "byteorder",
+ "ff",
+ "serde",
+ "thiserror",
+]
+
+[[package]]
 name = "better_any"
 version = "0.1.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -5210,7 +5256,29 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "5d6d530bdd2d52966a6d03b7a964add7ae1a288d25214066fd4b600f0f796400"
 dependencies = [
  "arrayvec 0.4.12",
- "constant_time_eq",
+ "constant_time_eq 0.1.5",
+]
+
+[[package]]
+name = "blake2b_simd"
+version = "1.0.2"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "23285ad32269793932e830392f2fe2f83e26488fd3ec778883a93c8323735780"
+dependencies = [
+ "arrayref",
+ "arrayvec 0.7.4",
+ "constant_time_eq 0.3.0",
+]
+
+[[package]]
+name = "blake2s_simd"
+version = "1.0.2"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "94230421e395b9920d23df13ea5d77a20e1725331f90fbbf6df6040b33f756ae"
+dependencies = [
+ "arrayref",
+ "arrayvec 0.7.4",
+ "constant_time_eq 0.3.0",
 ]
 
 [[package]]
@@ -6008,6 +6076,12 @@ name = "constant_time_eq"
 version = "0.1.5"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "245097e9a4535ee1e3e3931fcfcd55a796a44c643e8596ff6566d68f09b87bbc"
+
+[[package]]
+name = "constant_time_eq"
+version = "0.3.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "f7144d30dcf0fafbce74250a3963025d8d52177934239851c917d29f1df280c2"
 
 [[package]]
 name = "convert_case"
@@ -7506,8 +7580,26 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "ded41244b729663b1e574f1b4fb731469f69f79c17667b5d776b16cda0479449"
 dependencies = [
  "bitvec 1.0.1",
+ "byteorder",
+ "ff_derive",
  "rand_core 0.6.4",
  "subtle",
+]
+
+[[package]]
+name = "ff_derive"
+version = "0.13.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "e9f54704be45ed286151c5e11531316eaef5b8f5af7d597b806fdb8af108d84a"
+dependencies = [
+ "addchain",
+ "cfg-if",
+ "num-bigint 0.3.3",
+ "num-integer",
+ "num-traits",
+ "proc-macro2",
+ "quote",
+ "syn 1.0.109",
 ]
 
 [[package]]
@@ -7886,6 +7978,15 @@ dependencies = [
  "move-core-types",
  "move-vm-types",
  "once_cell",
+]
+
+[[package]]
+name = "fxhash"
+version = "0.2.1"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "c31b6d751ae2c7f11320402d34e41349dd1016f8d5d45e48c4312bc8625af50c"
+dependencies = [
+ "byteorder",
 ]
 
 [[package]]
@@ -11033,6 +11134,25 @@ dependencies = [
 ]
 
 [[package]]
+name = "neptune"
+version = "13.0.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "06626c9ac04c894e9a23d061ba1309f28506cdc5fe64156d28a15fb57fc8e438"
+dependencies = [
+ "bellpepper",
+ "bellpepper-core",
+ "blake2s_simd",
+ "blstrs",
+ "byteorder",
+ "ff",
+ "generic-array 0.14.7",
+ "log",
+ "pasta_curves",
+ "serde",
+ "trait-set",
+]
+
+[[package]]
 name = "nested"
 version = "0.1.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -11707,6 +11827,23 @@ dependencies = [
  "sha2 0.10.8",
  "strum 0.25.0",
  "typeshare",
+]
+
+[[package]]
+name = "pasta_curves"
+version = "0.5.1"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "d3e57598f73cc7e1b2ac63c79c517b31a0877cd7c402cdcaa311b5208de7a095"
+dependencies = [
+ "blake2b_simd",
+ "ff",
+ "group",
+ "hex",
+ "lazy_static",
+ "rand 0.8.5",
+ "serde",
+ "static_assertions",
+ "subtle",
 ]
 
 [[package]]
@@ -12861,6 +12998,18 @@ checksum = "eff6510e86862b57b210fd8cbe8ed3f0d7d600b9c2863cd4549a2e033c66e956"
 dependencies = [
  "memchr",
  "serde",
+]
+
+[[package]]
+name = "quick_cache"
+version = "0.5.1"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "347e1a588d1de074eeb3c00eadff93db4db65aeb62aee852b1efd0949fe65b6c"
+dependencies = [
+ "ahash 0.8.11",
+ "equivalent",
+ "hashbrown 0.14.3",
+ "parking_lot 0.12.1",
 ]
 
 [[package]]
@@ -15725,6 +15874,17 @@ dependencies = [
  "tracing-core",
  "tracing-log",
  "tracing-serde",
+]
+
+[[package]]
+name = "trait-set"
+version = "0.3.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "b79e2e9c9ab44c6d7c20d5976961b47e8f49ac199154daa514b77cd1ab536625"
+dependencies = [
+ "proc-macro2",
+ "quote",
+ "syn 1.0.109",
 ]
 
 [[package]]

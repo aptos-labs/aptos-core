@@ -130,7 +130,7 @@ The following vulnerabilities are excluded from the rewards for this bug bounty 
 
 The following activities are prohibited by this bug bounty program:
 
-- Any testing with mainnet or public testnet contracts; all testing should be done on [private testnets](https://aptos.dev/nodes/local-testnet/local-testnet-index/).
+- Any testing with mainnet or public testnet contracts; all testing should be done on [private testnets](https://aptos.dev/nodes/localnet/).
 - Any testing with pricing oracles or third party smart contracts.
 - Attempting to phish or otherwise use social engineering attacks against contributors, employees, and/or customers.
 - Any testing with third-party systems and applications (e.g., browser extensions) as well as websites (e.g., SSO providers, advertising networks).
