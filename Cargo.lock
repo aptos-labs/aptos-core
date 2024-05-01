@@ -3959,12 +3959,15 @@ dependencies = [
 name = "aptos-types"
 version = "0.0.3"
 dependencies = [
+ "ahash 0.8.11",
  "anyhow",
  "aptos-bitvec",
  "aptos-crypto",
  "aptos-crypto-derive",
  "aptos-dkg",
  "aptos-experimental-runtimes",
+ "aptos-infallible",
+ "aptos-proptest-helpers",
  "ark-bn254",
  "ark-ff",
  "ark-groth16",
@@ -3980,6 +3983,8 @@ dependencies = [
  "criterion",
  "derivative",
  "fixed",
+ "fxhash",
+ "hashbrown 0.14.3",
  "hex",
  "itertools 0.12.1",
  "jsonwebtoken 8.3.0",
@@ -7973,6 +7978,15 @@ dependencies = [
  "move-core-types",
  "move-vm-types",
  "once_cell",
+]
+
+[[package]]
+name = "fxhash"
+version = "0.2.1"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "c31b6d751ae2c7f11320402d34e41349dd1016f8d5d45e48c4312bc8625af50c"
+dependencies = [
+ "byteorder",
 ]
 
 [[package]]

@@ -20,7 +20,7 @@ aptos-consensus-types = { workspace = true }
 aptos-crypto = { workspace = true }
 aptos-crypto-derive = { workspace = true }
 aptos-network = { workspace = true }
-aptos-types = { workspace = true }
+aptos-types = { workspace = true, features = ["fuzzing"] }
 bcs = { workspace = true }
 clap = { workspace = true }
 move-core-types = { workspace = true, features = ["fuzzing"] }
