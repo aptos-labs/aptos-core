@@ -72,15 +72,16 @@ impl ConsensusAlgorithmConfig {
 
     pub fn leader_reputation_exclude_round(&self) -> u64 {
         match self {
-            ConsensusAlgorithmConfig::Jolteon { main, .. } => main.exclude_round,
+            ConsensusAlgorithmConfig::Jolteon { main, .. }
+            | ConsensusAlgorithmConfig::JolteonV2 { main, .. } => main.exclude_round,
             _ => unimplemented!("method not supported"),
         }
     }
 
     pub fn max_failed_authors_to_store(&self) -> usize {
         match self {
-            ConsensusAlgorithmConfig::Jolteon { main, .. } => main.max_failed_authors_to_store,
-            ConsensusAlgorithmConfig::JolteonV2 { main, .. } => main.max_failed_authors_to_store,
+            ConsensusAlgorithmConfig::Jolteon { main, .. }
+            | ConsensusAlgorithmConfig::JolteonV2 { main, .. } => main.max_failed_authors_to_store,
             _ => unimplemented!("method not supported"),
         }
     }
