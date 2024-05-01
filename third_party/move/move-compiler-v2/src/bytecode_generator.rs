@@ -47,8 +47,8 @@ pub fn generate_bytecode(env: &GlobalEnv, fid: QualifiedId<FunId>) -> FunctionDa
         results: vec![],
         code: vec![],
         local_names: BTreeMap::new(),
-        target_locations: BTreeMap::new(),
-        src_locations: BTreeMap::new(),
+        target_attrs: BTreeMap::new(),
+        src_attrs: BTreeMap::new(),
     };
     let mut scope = BTreeMap::new();
     for Parameter(name, ty, _loc) in gen.func_env.get_parameters() {
@@ -95,8 +95,8 @@ pub fn generate_bytecode(env: &GlobalEnv, fid: QualifiedId<FunId>) -> FunctionDa
         results: _,
         code,
         local_names,
-        target_locations,
-        src_locations,
+        target_attrs: target_locations,
+        src_attrs: src_locations,
     } = gen;
     let BytecodeGeneratorContext {
         loop_unrolling,
@@ -154,9 +154,9 @@ struct Generator<'env> {
     /// Local names, as far as they have names
     local_names: BTreeMap<TempIndex, Symbol>,
     /// Maps the attribute id of a bytecode to the ids of the source temporaries.
-    src_locations: BTreeMap<AttrId, Vec<AttrId>>,
+    src_attrs: BTreeMap<AttrId, Vec<AttrId>>,
     /// Maps the attribute id of a bytecode to the ids of the target temporaries.
-    target_locations: BTreeMap<AttrId, Vec<AttrId>>,
+    target_attrs: BTreeMap<AttrId, Vec<AttrId>>,
 }
 
 type Scope = BTreeMap<Symbol, TempIndex>;
@@ -200,12 +200,13 @@ impl<'env> Generator<'env> {
             .into_iter()
             .map(|id| self.new_loc_attr(id))
             .collect();
-        self.target_locations.insert(bytecode_attr, target_attrs);
+        let old_target_node_ids = self.target_attrs.insert(bytecode_attr, target_attrs);
+        debug_assert!(old_target_node_ids.is_none(), "duplicate insertion of target locations");
         let source_attrs = source_node_ids
             .into_iter()
             .map(|id| self.new_loc_attr(id))
             .collect();
-        self.src_locations.insert(bytecode_attr, source_attrs);
+        self.src_attrs.insert(bytecode_attr, source_attrs);
         self.emit(bytecode)
     }
 
@@ -626,8 +627,8 @@ impl<'env> Generator<'env> {
         let attr = self.new_loc_attr(id);
         let temp = self.find_local(id, name);
 
-        self.target_locations.insert(attr, vec![attr]);
-        self.src_locations.insert(attr, vec![attr]); // TODO: This is not correct, but we don't have a source location for locals
+        self.target_attrs.insert(attr, vec![attr]);
+        self.src_attrs.insert(attr, vec![attr]); // TODO: This is not correct, but we don't have a source location for locals
 
         self.emit(Bytecode::Assign(attr, target, temp, AssignKind::Inferred));
     }
