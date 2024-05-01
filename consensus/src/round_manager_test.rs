@@ -2235,6 +2235,7 @@ fn no_vote_on_proposal_ext_when_receiving_limit_exceeded() {
     let alg_config = ConsensusAlgorithmConfig::Jolteon {
         main: ConsensusConfigV1::default(),
         quorum_store_enabled: true,
+        order_vote_enabled: false,
     };
     let vtxn_config = ValidatorTxnConfig::V1 {
         per_block_limit_txn_count: 5,
