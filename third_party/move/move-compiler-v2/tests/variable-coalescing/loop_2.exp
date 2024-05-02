@@ -218,14 +218,10 @@ B2:
 	15: MoveLoc[3](loc2: u64)
 	16: Add
 	17: StLoc[2](loc1: u64)
-	18: Branch(20)
+	18: Branch(4)
 B3:
-	19: Branch(21)
-B4:
-	20: Branch(4)
-B5:
-	21: MoveLoc[1](loc0: u64)
-	22: Ret
+	19: MoveLoc[1](loc0: u64)
+	20: Ret
 }
 }
 ============ bytecode verification succeeded ========

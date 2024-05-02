@@ -328,13 +328,9 @@ B2:
 	13: MoveLoc[1](Arg1: u64)
 	14: Add
 	15: StLoc[3](loc0: u64)
-	16: Branch(18)
+	16: Branch(2)
 B3:
-	17: Branch(19)
-B4:
-	18: Branch(2)
-B5:
-	19: Ret
+	17: Ret
 }
 public test2(Arg0: u64, Arg1: u64) /* def_idx: 1 */ {
 L2:	loc0: u64
@@ -353,13 +349,9 @@ B2:
 	9: MoveLoc[2](loc0: u64)
 	10: Add
 	11: StLoc[1](Arg1: u64)
-	12: Branch(14)
+	12: Branch(2)
 B3:
-	13: Branch(15)
-B4:
-	14: Branch(2)
-B5:
-	15: Ret
+	13: Ret
 }
 }
 ============ bytecode verification succeeded ========

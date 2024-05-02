@@ -130,18 +130,17 @@ foo(Arg0: bool, Arg1: u64): u64 /* def_idx: 0 */ {
 L2:	loc0: u64
 B0:
 	0: MoveLoc[0](Arg0: bool)
-	1: BrFalse(5)
+	1: BrFalse(4)
 B1:
 	2: LdU64(0)
 	3: StLoc[1](Arg1: u64)
-	4: Branch(5)
 B2:
-	5: LdU64(1)
-	6: StLoc[2](loc0: u64)
-	7: MoveLoc[1](Arg1: u64)
-	8: MoveLoc[2](loc0: u64)
-	9: Add
-	10: Ret
+	4: LdU64(1)
+	5: StLoc[2](loc0: u64)
+	6: MoveLoc[1](Arg1: u64)
+	7: MoveLoc[2](loc0: u64)
+	8: Add
+	9: Ret
 }
 }
 ============ bytecode verification succeeded ========
