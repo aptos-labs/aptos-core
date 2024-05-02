@@ -91,6 +91,7 @@ module stablecoin::usdk {
         object::address_to_object(usdk_address())
     }
 
+    /// Called as part of deployment to initialize the stablecoin.
     fun init_module(usdk_signer: &signer) {
         let constructor_ref = &object::create_named_object(usdk_signer, ASSET_SYMBOL);
         primary_fungible_store::create_primary_store_enabled_fungible_asset(
@@ -125,7 +126,9 @@ module stablecoin::usdk {
             blacklist: smart_table::new(),
         });
 
-        // Overrides
+        // Override the deposit and withdraw functions which mean overriding transfer.
+        // This ensures all transfer will call withdraw and deposit functions in this module and perform the necessary
+        // checks.
         let deposit = function_info::new_function_info(
             usdk_signer,
             string::utf8(b"usdk"),
@@ -136,7 +139,6 @@ module stablecoin::usdk {
             string::utf8(b"usdk"),
             string::utf8(b"withdraw"),
         );
-
         dispatchable_fungible_asset::register_dispatch_functions(
             constructor_ref,
             option::some(withdraw),
@@ -145,6 +147,8 @@ module stablecoin::usdk {
         );
     }
 
+    /// Allow a spender to transfer tokens from the owner's account given their signed approval.
+    /// Caller needs to provide the from account's scheme and public key which can be gotten via the Aptos SDK.
     public fun transfer_from(
         spender: &signer,
         proof: vector<u8>,
@@ -169,6 +173,7 @@ module stablecoin::usdk {
         primary_fungible_store::transfer_with_ref(transfer_ref, from, to, amount);
     }
 
+    /// Deposit function override to ensure that the account is not blacklisted and the stablecoin is not paused.
     public fun deposit<T: key>(
         store: Object<T>,
         fa: FungibleAsset,
@@ -179,6 +184,7 @@ module stablecoin::usdk {
         fungible_asset::deposit_with_ref(transfer_ref, store, fa);
     }
 
+    /// Withdraw function override to ensure that the account is not blacklisted and the stablecoin is not paused.
     public fun withdraw<T: key>(
         store: Object<T>,
         amount: u64,
@@ -189,6 +195,8 @@ module stablecoin::usdk {
         fungible_asset::withdraw_with_ref(transfer_ref, store, amount)
     }
 
+    /// Mint new tokens to the specified account. This checks that the caller is a minter, the stablecoin is not paused,
+    /// and the account is not blacklisted.
     public entry fun mint(minter: &signer, to: address, amount: u64) acquires Management, Roles, State {
         assert_is_minter(minter);
         assert_not_paused();
@@ -205,6 +213,7 @@ module stablecoin::usdk {
         });
     }
 
+    /// Burn tokens from the specified account. This checks that the caller is a minter and the stablecoin is not paused.
     public entry fun burn(minter: &signer, from: address, amount: u64) acquires Management, Roles, State {
         assert_is_minter(minter);
         assert_not_paused();
@@ -223,6 +232,7 @@ module stablecoin::usdk {
         });
     }
 
+    /// Pause or unpause the stablecoin. This checks that the caller is the pauser.
     public entry fun set_pause(pauser: &signer, paused: bool) acquires Roles, State {
         let roles = borrow_global<Roles>(usdk_address());
         assert!(signer::address_of(pauser) == roles.pauser, EUNAUTHORIZED);
@@ -235,6 +245,7 @@ module stablecoin::usdk {
         });
     }
 
+    /// Add an account to the blacklist. This checks that the caller is the blacklister.
     public entry fun blacklist(blacklister: &signer, account: address) acquires Management, Roles, State {
         assert_not_paused();
         let roles = borrow_global<Roles>(usdk_address());
@@ -251,6 +262,7 @@ module stablecoin::usdk {
         });
     }
 
+    /// Remove an account from the blacklist. This checks that the caller is the blacklister.
     public entry fun unblacklist(blacklister: &signer, account: address) acquires Management, Roles, State {
         assert_not_paused();
         let roles = borrow_global<Roles>(usdk_address());
@@ -267,6 +279,7 @@ module stablecoin::usdk {
         });
     }
 
+    /// Add a new minter. This checks that the caller is the master minter and the account is not already a minter.
     public entry fun add_minter(admin: &signer, minter: address) acquires Roles {
         let roles = borrow_global_mut<Roles>(usdk_address());
         assert!(signer::address_of(admin) == roles.master_minter, EUNAUTHORIZED);
