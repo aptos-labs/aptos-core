@@ -5,38 +5,61 @@
 //!
 //! Simplifies the control flow graph in the following ways:
 //! (Implemented by `ControlFlowGraphSimplifier`)
-//! - eliminates branch/jump to jump
-//!     L1: goto L2 (L1 != L2)
-//!     =>
-//!     (removed)
+//! 1. Eliminates branch or jump to jump:
+//!     Any empty block
+//!
+//!     L1: goto L2 where L1 != L2
+//!
+//!     is removed, and any block jumping to L1 will jump to L2 directly
 //!
 //!     goto L1
-//!     =>
+//!     => (the => here means the instruction above will be replaced by the instruction below)
 //!     goto L2
 //!
-//!     if ... goto L1 else ... / if ... goto ... else L1
+//!     if ... goto L1 else ...
 //!     =>
-//!     if ... goto L2 else ... / if ... goto ... else L2
-//! - removes edges where the source has only one successor and the target has only one predecessor
+//!     if ... goto L2 else ...
+//!
+//!     if ... goto ... else L1
+//!     =>
+//!     if ... goto ... else L2
+//!
+//! 2. Removes edges where the source has only one successor and the target has only one predecessor:
+//!     If there is block
 //!     BB1: xx
 //!          goto L2
-//!     // BB1 BB2 don't have to be consecutive
-//!     BB2: L2 (no other goto L2)
+//!     and block
+//!
+//!     BB2: L2
 //!          yy
-//!     =>
+//!
+//!     which has only one predecessor BB1.
+//!     Then we move BB2 to the end of BB1 so that BB1 becomes
+//!
 //!     BB1: xx
 //!          yy
-//! - removes all jumps to the next instruction:
+//!
+//!     and BB2 is removed.
+//! 3. Removes all jumps to the next instruction:
+//!     Whenever we have
+//!
 //!     goto L;
 //!     L;
-//!     =>
+//!
+//!     replace it by simply
+//!
 //!     L;
-//! - replaces branch to same target by jump
+//!
+//! 4. Replaces branch to same target by jump:
+//!     Whenever we have
+//!
 //!     if ... goto L else goto L
-//!     =>
+//!
+//!     replace it by simply
+//!
 //!     goto L
 //! (Implemented by `UnreachableCodeElimination`)
-//! - removes unreachable codes
+//! 5. removes unreachable codes
 //! (TODO: eliminate jump to branch)
 //!
 //! Side effects: remove all annotations.
