@@ -3,10 +3,12 @@ module 0xcafe::deflation_token_tests {
     use aptos_framework::function_info;
     use aptos_framework::fungible_asset::{Self, Metadata, TestToken};
     use aptos_framework::dispatchable_fungible_asset;
+    use aptos_framework::primary_fungible_store;
     use 0xcafe::deflation_token;
     use aptos_framework::object;
     use std::option;
     use std::string;
+    use std::signer;
 
     #[test(creator = @0xcafe, aaron = @0xface)]
     fun test_deflation_e2e_basic_flow(
@@ -280,4 +282,51 @@ module 0xcafe::deflation_token_tests {
         // Deposit would succeed
         dispatchable_fungible_asset::deposit(creator_store, fa);
     }
+
+    #[test(creator = @0xcafe, aaron = @0xface)]
+    fun test_basic_flow_primary_fa(
+        creator: &signer,
+        aaron: &signer,
+    ) {
+        let (creator_ref, token_object) = fungible_asset::create_test_token(creator);
+        let (mint_ref, transfer_ref, burn_ref) = primary_fungible_store::init_test_metadata_with_primary_store_enabled(&creator_ref);
+        let metadata = object::convert<TestToken, Metadata>(token_object);
+
+        deflation_token::initialize(creator, &creator_ref);
+        let creator_address = signer::address_of(creator);
+        let aaron_address = signer::address_of(aaron);
+        assert!(primary_fungible_store::balance(creator_address, metadata) == 0, 1);
+        assert!(primary_fungible_store::balance(aaron_address, metadata) == 0, 2);
+        primary_fungible_store::mint(&mint_ref, creator_address, 100);
+        primary_fungible_store::transfer(creator, metadata, aaron_address, 80);
+
+        assert!(primary_fungible_store::balance(creator_address, metadata) == 12, 3);
+        assert!(primary_fungible_store::balance(aaron_address, metadata) == 80, 4);
+
+        let fa = primary_fungible_store::withdraw(aaron, metadata, 10);
+        primary_fungible_store::deposit(creator_address, fa);
+        assert!(primary_fungible_store::balance(creator_address, metadata) == 22, 3);
+        assert!(primary_fungible_store::balance(aaron_address, metadata) == 69, 4);
+
+        primary_fungible_store::set_frozen_flag(&transfer_ref, aaron_address, true);
+        assert!(primary_fungible_store::is_frozen(aaron_address, metadata), 5);
+        let fa = primary_fungible_store::withdraw_with_ref(&transfer_ref, aaron_address, 30);
+
+        assert!(primary_fungible_store::balance(creator_address, metadata) == 22, 3);
+        assert!(primary_fungible_store::balance(aaron_address, metadata) == 39, 4);
+
+        primary_fungible_store::deposit_with_ref(&transfer_ref, aaron_address, fa);
+
+        assert!(primary_fungible_store::balance(aaron_address, metadata) == 69, 4);
+        primary_fungible_store::transfer_with_ref(&transfer_ref, aaron_address, creator_address, 20);
+
+        assert!(primary_fungible_store::balance(creator_address, metadata) == 42, 3);
+        assert!(primary_fungible_store::balance(aaron_address, metadata) == 49, 4);
+        primary_fungible_store::set_frozen_flag(&transfer_ref, aaron_address, false);
+        assert!(!primary_fungible_store::is_frozen(aaron_address, metadata), 6);
+
+        primary_fungible_store::burn(&burn_ref, aaron_address, 49);
+        assert!(primary_fungible_store::balance(aaron_address, metadata) == 0, 7);
+    }
+
 }
