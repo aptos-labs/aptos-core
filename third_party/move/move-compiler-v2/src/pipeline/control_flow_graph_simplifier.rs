@@ -130,7 +130,7 @@ impl ControlFlowGraphSimplifierTransformation {
         self.data.annotations.clear()
     }
 
-    /// Transforms `if _ goto L else goto L` to `goto L`
+    /// Transforms `if _ goto L else goto L` to `goto L`, which is the transformation 4 in the module doc
     fn eliminate_branch_to_same_target(&mut self) {
         let codes = std::mem::take(&mut self.data.code);
         self.data.code = codes
