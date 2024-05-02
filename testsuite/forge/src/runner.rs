@@ -294,8 +294,8 @@ impl ForgeConfig {
             }
 
             helm_values["validator"]["storage"]["size"] = "2048Gi".into();
-            helm_values["validator"]["resources"]["requests"]["ephemeral-storage"] = "20Gi".into();
-            helm_values["validator"]["resources"]["limits"]["ephemeral-storage"] = "20Gi".into();
+            helm_values["validator"]["resources"]["requests"]["ephemeral-storage"] = "30Gi".into();
+            helm_values["validator"]["resources"]["limits"]["ephemeral-storage"] = "30Gi".into();
             // validator resource overrides
             if let Some(cpu_cores) = validator_resource_override.cpu_cores {
                 helm_values["validator"]["resources"]["requests"]["cpu"] = cpu_cores.into();
