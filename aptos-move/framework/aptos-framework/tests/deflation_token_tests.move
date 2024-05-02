@@ -218,6 +218,51 @@ module 0xcafe::deflation_token_tests {
         );
     }
 
+    #[test(creator = @0xcafe, aaron = @0xface)]
+    #[expected_failure(major_status=1091, location = aptos_framework::function_info)]
+    fun test_register_bad_withdraw_non_exist(
+        creator: &signer,
+        aaron: &signer,
+    ) {
+        let (creator_ref, _) = fungible_asset::create_test_token(creator);
+
+        let withdraw = function_info::new_function_info(
+            aaron,
+            string::utf8(b"deflation_token"),
+            string::utf8(b"withdraw"),
+        );
+
+        // Change the deposit and withdraw function. Should give a type mismatch error.
+        dispatchable_fungible_asset::register_dispatch_functions(
+            &creator_ref,
+            option::some(withdraw),
+            option::none(),
+            option::none(),
+        );
+    }
+
+    #[test(creator = @0xcafe)]
+    #[expected_failure(abort_code=2, location = aptos_framework::function_info)]
+    fun test_register_bad_withdraw_non_exist_2(
+        creator: &signer,
+    ) {
+        let (creator_ref, _) = fungible_asset::create_test_token(creator);
+
+        let withdraw = function_info::new_function_info(
+            creator,
+            string::utf8(b"deflation_token"),
+            string::utf8(b"withdraw2"),
+        );
+
+        // Change the deposit and withdraw function. Should give a type mismatch error.
+        dispatchable_fungible_asset::register_dispatch_functions(
+            &creator_ref,
+            option::some(withdraw),
+            option::none(),
+            option::none(),
+        );
+    }
+
     #[test(creator = @0xcafe)]
     fun test_calling_overloadable_api_on_regular_fa(
         creator: &signer,

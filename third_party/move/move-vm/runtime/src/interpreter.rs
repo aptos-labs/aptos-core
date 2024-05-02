@@ -663,30 +663,37 @@ impl Interpreter {
                 let arena_id = traversal_context
                     .referenced_module_ids
                     .alloc(module_name.clone());
-                resolver
-                    .loader()
-                    .check_dependencies_and_charge_gas(
-                        module_store,
-                        data_store,
-                        gas_meter,
-                        &mut traversal_context.visited,
-                        traversal_context.referenced_modules,
-                        [(arena_id.address(), arena_id.name())],
-                    )
-                    .map_err(|err| {
-                        PartialVMError::new(err.major_status())
-                            .with_message(format!("Module {} failed to be charged", module_name))
-                    })?;
-                resolver
-                    .loader()
-                    .load_module(&module_name, data_store, module_store)
-                    .map_err(|_| {
-                        PartialVMError::new(StatusCode::FUNCTION_RESOLUTION_FAILURE)
-                            .with_message(format!("Module {} doesn't exist", module_name))
-                    })?;
+                if let Ok(true) = data_store.exists_module(&module_name) {
+                    resolver
+                        .loader()
+                        .check_dependencies_and_charge_gas(
+                            module_store,
+                            data_store,
+                            gas_meter,
+                            &mut traversal_context.visited,
+                            traversal_context.referenced_modules,
+                            [(arena_id.address(), arena_id.name())],
+                        )
+                        .map_err(|err| {
+                            PartialVMError::new(err.major_status()).with_message(format!(
+                                "Module {} failed to be charged",
+                                module_name
+                            ))
+                        })?;
+                    resolver
+                        .loader()
+                        .load_module(&module_name, data_store, module_store)
+                        .map_err(|_| {
+                            PartialVMError::new(StatusCode::FUNCTION_RESOLUTION_FAILURE)
+                                .with_message(format!("Module {} doesn't exist", module_name))
+                        })?;
 
-                current_frame.pc += 1; // advance past the Call instruction in the caller
-                Ok(())
+                    current_frame.pc += 1; // advance past the Call instruction in the caller
+                    Ok(())
+                } else {
+                    Err(PartialVMError::new(StatusCode::FUNCTION_RESOLUTION_FAILURE)
+                        .with_message(format!("Module {} doesn't exist", module_name)))
+                }
             },
         }
     }
