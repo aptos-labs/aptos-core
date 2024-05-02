@@ -21,6 +21,7 @@ module resource_account::bonding_curve_launchpad {
     const ELIQUIDITY_PAIR_DOES_NOT_EXIST: u64 = 101;
     const ELIQUIDITY_PAIR_DISABLED: u64 = 102;
     const ELIQUIDITY_PAIR_SWAP_AMOUNTIN_INVALID: u64 = 110;
+    const ELIQUIDITY_PAIR_SWAP_AMOUNTOUT_INSIGNIFICANT: u64 = 111;
 
     const INITIAL_NEW_FA_RESERVE: u128 = 803_000_000_000_000_000;
     const INITIAL_NEW_FA_RESERVE_u64: u64 = 803_000_000_000_000_000;
@@ -76,7 +77,6 @@ module resource_account::bonding_curve_launchpad {
     }
     struct FAData has key, store {
         controller: FAController,
-        description: FADescription,
         fa_obj_address: address, // Since we generate using sticky invocation, we can't reference using a symbol. Instead, just keep a mapping to the final address.
     }
     struct FAController has key, store {
@@ -84,7 +84,6 @@ module resource_account::bonding_curve_launchpad {
         burn_ref: fungible_asset::BurnRef,
         transfer_ref: fungible_asset::TransferRef
     }
-
     struct LiquidityPairSmartTable has key {
         liquidity_pairs: SmartTable<Object<Metadata>, LiquidityPair>
     }
@@ -95,15 +94,6 @@ module resource_account::bonding_curve_launchpad {
         k_constant: u256
     }
 
-    // ! Since this data is in our primary store, do I even need this?
-    struct FADescription has store, copy, drop {
-        name: string::String,
-        symbol: string::String,
-        max_supply: u128,
-        decimals: u8,
-        icon_uri: string::String,
-        project_uri: string::String
-    }
 
     //---------------------------Init---------------------------
     fun init_module(account: &signer) {
@@ -130,30 +120,16 @@ module resource_account::bonding_curve_launchpad {
         icon_uri: string::String,
         project_uri: string::String
     ) acquires LaunchPad, LiquidityPairSmartTable {
-        let fa_key = FAKey {
-            name,
-            symbol
-        };
-        let fa_description = FADescription {
-                name: name,
-                symbol: symbol,
-                max_supply: max_supply,
-                decimals: decimals,
-                icon_uri: icon_uri,
-                project_uri: project_uri
-        };
+        let fa_key = FAKey { name, symbol };
         // * Create new FA and store FA owner obj on launchpad.
-        let fa_address = create_fa(fa_key, fa_description);
+        let fa_address = create_fa(fa_key, name, symbol, max_supply, decimals, icon_uri, project_uri);
         let fa_metadata_obj = object::address_to_object(fa_address);
         register_liquidity_pair(account, fa_metadata_obj, fa_key, apt_initialPurchaseAmountIn, max_supply);
     }
 
     public entry fun swap_apt_to_fa (account: &signer, name: string::String, symbol: string::String, fa_amountIn: u64) acquires LaunchPad, LiquidityPairSmartTable {
         assert!(fa_amountIn > 0, ELIQUIDITY_PAIR_SWAP_AMOUNTIN_INVALID);
-        let fa_key = FAKey {
-            name,
-            symbol
-        };
+        let fa_key = FAKey { name, symbol };
         let fa_smartTable = borrow_global_mut<LaunchPad>(@resource_account);
         assert!(smart_table::contains(&mut fa_smartTable.key_to_fa_data, fa_key), EFA_DOES_NOT_EXIST);
         let fa_data = smart_table::borrow_mut(&mut fa_smartTable.key_to_fa_data, fa_key);
@@ -175,22 +151,27 @@ module resource_account::bonding_curve_launchpad {
 
     fun create_fa(
         fa_key: FAKey,
-        fa_description: FADescription
+        name: string::String,
+        symbol: string::String,
+        max_supply: u128,
+        decimals: u8,
+        icon_uri: string::String,
+        project_uri: string::String
     ): address acquires LaunchPad {
         let fa_smartTable = borrow_global_mut<LaunchPad>(@resource_account);
         assert!(!smart_table::contains(&mut fa_smartTable.key_to_fa_data, fa_key), EFA_EXISTS_ALREADY);
 
-        let base_unit_max_supply: option::Option<u128> = option::some(fa_description.max_supply * math128::pow(10, (fa_description.decimals as u128)));
+        let base_unit_max_supply: option::Option<u128> = option::some(max_supply * math128::pow(10, (decimals as u128)));
         let fa_obj_constructor_ref = &object::create_sticky_object(@resource_account); // FA object container. Need to store FA, somewhere, so object is it's home. FA obj is essentially the FA.
         // Creates FA, the primary store for the FA on the resource account defined by constructor, AND defines the max supply.
         primary_fungible_store::create_primary_store_enabled_fungible_asset(
             fa_obj_constructor_ref,
             base_unit_max_supply,
-            fa_description.name,
-            fa_description.symbol,
-            fa_description.decimals,
-            fa_description.icon_uri,
-            fa_description.project_uri
+            name,
+            symbol,
+            decimals,
+            icon_uri,
+            project_uri
         );
         // Ref's held by the contract.
         let mint_ref = fungible_asset::generate_mint_ref(fa_obj_constructor_ref);
@@ -208,7 +189,6 @@ module resource_account::bonding_curve_launchpad {
         };
         let fa_data = FAData {
             controller: fa_controller,
-            description: fa_description,
             fa_obj_address
         };
         smart_table::add(
@@ -218,12 +198,12 @@ module resource_account::bonding_curve_launchpad {
         );
 
         event::emit(FungibleAssetCreated {
-            name: fa_description.name,
-            symbol: fa_description.symbol,
+            name: name,
+            symbol: symbol,
             max_supply: INITIAL_NEW_FA_RESERVE,
-            decimals: fa_description.decimals,
-            icon_uri: fa_description.icon_uri,
-            project_uri: fa_description.project_uri
+            decimals: decimals,
+            icon_uri: icon_uri,
+            project_uri: project_uri
         });
 
         return fa_obj_address
@@ -374,31 +354,23 @@ module resource_account::bonding_curve_launchpad {
         }
     }
 
-
-
-    //**
-    //* fa_gained, apt_given, token0UpdatedReserves, token1UpdatedReserves
-    //* postive/negative relates to the pool, not the user swapping.
     #[view]
     public fun get_amount_out(fa_reserves: u128, apt_reserves: u128, supplied_fa_else_apt: bool, amountIn: u64): (u64, u64, u128, u128) {
         if (supplied_fa_else_apt) {
             let apt_gained: u64 = (((apt_reserves as u256)* (amountIn as u256)) / ((fa_reserves  as u256) + (amountIn as u256)) as u64);
+            assert!(apt_gained > 0, ELIQUIDITY_PAIR_SWAP_AMOUNTOUT_INSIGNIFICANT);
             return (amountIn, apt_gained, fa_reserves+(amountIn as u128), apt_reserves-(apt_gained as u128))
         }
         else {
             let fa_gained: u64 = (((fa_reserves as u256) * (amountIn as u256))/((apt_reserves as u256) - (amountIn as u256)) as u64);
+            assert!(fa_gained > 0, ELIQUIDITY_PAIR_SWAP_AMOUNTOUT_INSIGNIFICANT);
             return (fa_gained, amountIn, fa_reserves-(fa_gained as u128), apt_reserves+(amountIn as u128))
         }
 
     }
-
     #[view]
     public fun get_balance(name: String, symbol: String, user: address): u64 acquires LaunchPad{
-        let fa_key = FAKey {
-            name,
-            symbol
-        };
-
+        let fa_key = FAKey { name, symbol };
         let fa_smartTable = borrow_global<LaunchPad>(@resource_account);
         let fa_data = smart_table::borrow(&fa_smartTable.key_to_fa_data, fa_key);
         let fa_metadata_obj:Object<Metadata> = object::address_to_object(fa_data.fa_obj_address);
@@ -408,8 +380,6 @@ module resource_account::bonding_curve_launchpad {
 
 
     //---------------------------Tests---------------------------
-
-
     #[test(account = @resource_account, sender = @memecoin_creator_addr)]
     fun test_create_fa(account: &signer, sender: &signer) acquires LaunchPad, LiquidityPairSmartTable {
         init_module(account);

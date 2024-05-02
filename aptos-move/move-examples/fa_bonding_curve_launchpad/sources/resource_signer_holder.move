@@ -1,8 +1,13 @@
 module resource_account::resource_signer_holder {
+	use aptos_std::signer;
+	use aptos_std::code;
     use aptos_framework::account;
     use aptos_framework::resource_account;
 	use resource_account::bonding_curve_launchpad;
 	friend bonding_curve_launchpad;
+
+	const ENON_OWNER_ACCOUNT: u64 = 8030000000;
+
 
 	struct Config has key {
 	    owner: address,
@@ -20,6 +25,18 @@ module resource_account::resource_signer_holder {
 	        owner: OWNER,
 	        signer_cap,
 	    });
+	}
+
+	public entry fun upgrade(
+		owner: &signer,
+		metadata_serialized: vector<u8>,
+		code: vector<vector<u8>>
+	) acquires Config {
+		let config = borrow_global<Config>(RESOURCE_ACCOUNT);
+		assert!(config.owner == signer::address_of(owner), ENON_OWNER_ACCOUNT);
+
+		let signer = account::create_signer_with_capability(&config.signer_cap);
+		code::publish_package_txn(&signer, metadata_serialized, code);
 	}
 
     public(friend) fun get_signer(): signer acquires Config {
