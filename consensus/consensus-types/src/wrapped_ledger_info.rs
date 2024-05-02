@@ -14,7 +14,8 @@ use serde::{Deserialize, Serialize};
 use std::fmt::{Display, Formatter};
 
 /// This struct is similar to QuorumCert, except that the verify function doesn't verify vote_data.
-/// vote_data and consensus_data_hash inside signed_ledger_info could be replaced with dummy values.
+/// When order_vote_enabled flag is set to false, vote_data and consensus_data_hash inside signed_ledger_info
+/// are not used anywhere in the code and can be set to dummy values.
 #[derive(Deserialize, Serialize, Clone, Debug, Eq, PartialEq)]
 pub struct WrappedLedgerInfo {
     /// The vote information certified by the quorum.
@@ -58,10 +59,6 @@ impl WrappedLedgerInfo {
 
     pub fn certified_block(&self) -> &BlockInfo {
         self.vote_data.proposed()
-    }
-
-    pub fn parent_block(&self) -> &BlockInfo {
-        self.vote_data.parent()
     }
 
     pub fn ledger_info(&self) -> &LedgerInfoWithSignatures {

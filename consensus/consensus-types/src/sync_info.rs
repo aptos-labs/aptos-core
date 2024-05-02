@@ -125,8 +125,6 @@ impl SyncInfo {
 
     pub fn verify(&self, validator: &ValidatorVerifier) -> anyhow::Result<()> {
         let epoch = self.highest_quorum_cert.certified_block().epoch();
-        // TODO: Changing highest_ordered_cert().certified_block() to highest_ordered_cert().commit_info().
-        // Is this okay?
         ensure!(
             epoch == self.highest_ordered_cert().commit_info().epoch(),
             "Multi epoch in SyncInfo - HOC and HQC"

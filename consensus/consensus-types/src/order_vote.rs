@@ -4,12 +4,9 @@
 
 use crate::common::Author;
 use anyhow::Context;
-use aptos_crypto::{bls12381, CryptoMaterialError};
+use aptos_crypto::bls12381;
 use aptos_short_hex_str::AsShortHexStr;
-use aptos_types::{
-    ledger_info::LedgerInfo, validator_signer::ValidatorSigner,
-    validator_verifier::ValidatorVerifier,
-};
+use aptos_types::{ledger_info::LedgerInfo, validator_verifier::ValidatorVerifier};
 use serde::{Deserialize, Serialize};
 use std::fmt::{Debug, Display, Formatter};
 
@@ -42,19 +39,6 @@ impl Debug for OrderVote {
 }
 
 impl OrderVote {
-    pub fn new(
-        author: Author,
-        ledger_info: LedgerInfo,
-        validator_signer: &ValidatorSigner,
-    ) -> Result<Self, CryptoMaterialError> {
-        let signature = validator_signer.sign(&ledger_info)?;
-        Ok(Self {
-            author,
-            ledger_info,
-            signature,
-        })
-    }
-
     /// Generates a new Vote using a signature over the specified ledger_info
     pub fn new_with_signature(
         author: Author,
@@ -84,12 +68,7 @@ impl OrderVote {
         self.ledger_info.epoch()
     }
 
-    pub fn round_to_be_committed(&self) -> u64 {
-        self.ledger_info.round()
-    }
-
-    /// Verifies that the consensus data hash of LedgerInfo corresponds to the vote info,
-    /// and then verifies the signature.
+    /// Verifies the signature on LedgerInfo.
     pub fn verify(&self, validator: &ValidatorVerifier) -> anyhow::Result<()> {
         validator
             .verify(self.author(), &self.ledger_info, &self.signature)
