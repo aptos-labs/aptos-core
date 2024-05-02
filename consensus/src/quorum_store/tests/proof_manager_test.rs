@@ -119,7 +119,9 @@ async fn test_max_txns_from_block_to_execute() {
     // convert payload to v2 format and assert
     let max_txns_from_block_to_execute = 10;
     assert_payload_response(
-        payload.transform_to_quorum_store_v2(Some(max_txns_from_block_to_execute)),
+        payload
+            .transform_to_quorum_store_v2(Some(max_txns_from_block_to_execute))
+            .unwrap(),
         &vec![proof],
         Some(max_txns_from_block_to_execute),
     );

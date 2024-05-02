@@ -4,6 +4,7 @@
 use super::{
     dag_store::DagStore,
     observability::counters::{NUM_NODES_PER_BLOCK, NUM_ROUNDS_PER_BLOCK},
+    types::DagPayload,
     NodeMessage,
 };
 use crate::{
@@ -44,7 +45,6 @@ use async_trait::async_trait;
 use futures_channel::mpsc::UnboundedSender;
 use std::{
     collections::{BTreeMap, HashMap},
-    ops::Deref,
     sync::Arc,
     time::{Duration, Instant},
 };
@@ -146,11 +146,15 @@ impl OrderedNotifier for OrderedNotifierAdapter {
         let timestamp = anchor.metadata().timestamp();
         let author = *anchor.author();
         let mut validator_txns = vec![];
-        let mut payload = Payload::empty(!anchor.payload().is_direct());
+        let mut payload = if matches!(anchor.payload(), DagPayload::Decoupled(_)) {
+            Payload::empty_dag_payload()
+        } else {
+            Payload::empty(anchor.payload().is_in_quorum_store())
+        };
         let mut node_digests = vec![];
         for node in &ordered_nodes {
             validator_txns.extend(node.validator_txns().clone());
-            payload.extend(node.payload().deref().clone());
+            payload.extend(node.payload().clone().into());
             node_digests.push(node.digest());
         }
         let parent_block_id = self.parent_block_info.read().id();

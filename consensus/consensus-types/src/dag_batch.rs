@@ -5,9 +5,11 @@ use aptos_crypto::{
     HashValue,
 };
 use aptos_crypto_derive::CryptoHasher;
+use aptos_types::transaction::SignedTransaction;
 use core::fmt;
 use serde::{Deserialize, Serialize};
 use std::ops::Deref;
+use tokio::sync::oneshot;
 
 pub type BatchDigest = HashValue;
 
@@ -192,5 +194,87 @@ impl Deref for DagBatch {
 
     fn deref(&self) -> &Self::Target {
         &self.payload
+    }
+}
+
+#[derive(Deserialize, Serialize, Clone, Debug, PartialEq, Eq)]
+pub struct DAGPayloadBundle {
+    payload_infos: Vec<PayloadInfo>,
+}
+
+impl DAGPayloadBundle {
+    pub fn new_empty() -> Self {
+        Self {
+            payload_infos: Vec::new(),
+        }
+    }
+
+    pub fn len(&self) -> usize {
+        self.payload_infos.iter().map(|info| info.num_txns).sum()
+    }
+
+    pub fn is_empty(&self) -> bool {
+        self.len() == 0
+    }
+
+    pub fn extend(&mut self, other: DAGPayloadBundle) {
+        self.payload_infos.extend(other.payload_infos)
+    }
+
+    pub fn size(&self) -> usize {
+        self.payload_infos
+            .iter()
+            .map(|info| info.size_in_bytes)
+            .sum()
+    }
+
+    pub fn payload_infos(&self) -> &[PayloadInfo] {
+        &self.payload_infos
+    }
+}
+
+impl fmt::Display for DAGPayloadBundle {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        for info in &self.payload_infos {
+            write!(f, "{}, ", info.id())?;
+        }
+        Ok(())
+    }
+}
+
+impl From<PayloadInfo> for DAGPayloadBundle {
+    fn from(info: PayloadInfo) -> Self {
+        Self {
+            payload_infos: vec![info],
+        }
+    }
+}
+
+impl From<PayloadInfo> for Payload {
+    fn from(info: PayloadInfo) -> Self {
+        Self::DAG(info.into())
+    }
+}
+
+pub struct PayloadLinkMsg {
+    bundle: DAGPayloadBundle,
+    rx: oneshot::Sender<anyhow::Result<Vec<SignedTransaction>>>,
+}
+
+impl PayloadLinkMsg {
+    pub fn new(
+        bundle: DAGPayloadBundle,
+        rx: oneshot::Sender<anyhow::Result<Vec<SignedTransaction>>>,
+    ) -> Self {
+        Self { bundle, rx }
+    }
+
+    pub fn unwrap(
+        self,
+    ) -> (
+        DAGPayloadBundle,
+        oneshot::Sender<anyhow::Result<Vec<SignedTransaction>>>,
+    ) {
+        (self.bundle, self.rx)
     }
 }

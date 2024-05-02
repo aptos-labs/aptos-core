@@ -16,6 +16,7 @@ mod errors;
 mod health;
 mod observability;
 mod order_rule;
+mod payload;
 mod rb_handler;
 mod round_state;
 mod storage;
