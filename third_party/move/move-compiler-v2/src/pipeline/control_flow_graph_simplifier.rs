@@ -426,15 +426,7 @@ impl RemoveRedundantJump {
         Self(cfg_generator)
     }
 
-    /// Removes edges where the source has only one successor and the target has only one predecessor
-    ///     BB1: xx
-    ///          goto L2
-    ///     // BB1 BB2 don't have to be consecutive
-    ///     BB2: L2 (no other goto L2)
-    ///          yy
-    ///     =>
-    ///     BB1: xx
-    ///          yy
+    /// Performs the transformation 2 described in the module doc
     pub fn transform(&mut self) {
         for block in self.cfg.blocks() {
             // the later condition says that `block` is unreachable or has been removed
