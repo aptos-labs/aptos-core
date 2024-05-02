@@ -637,7 +637,7 @@ impl<P: OnChainConfigProvider> EpochManager<P> {
     ) {
         let (recovery_manager_tx, recovery_manager_rx) = aptos_channel::new(
             QueueStyle::LIFO,
-            1,
+            10,
             Some(&counters::ROUND_MANAGER_CHANNEL_MSGS),
         );
         self.round_manager_tx = Some(recovery_manager_tx);
@@ -839,13 +839,13 @@ impl<P: OnChainConfigProvider> EpochManager<P> {
         );
         let (round_manager_tx, round_manager_rx) = aptos_channel::new(
             QueueStyle::LIFO,
-            1,
+            10,
             Some(&counters::ROUND_MANAGER_CHANNEL_MSGS),
         );
 
         let (buffered_proposal_tx, buffered_proposal_rx) = aptos_channel::new(
             QueueStyle::KLAST,
-            5,
+            10,
             Some(&counters::ROUND_MANAGER_CHANNEL_MSGS),
         );
         self.round_manager_tx = Some(round_manager_tx.clone());

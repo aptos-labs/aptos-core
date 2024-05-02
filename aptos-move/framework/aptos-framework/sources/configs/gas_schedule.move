@@ -100,11 +100,15 @@ module aptos_framework::gas_schedule {
     }
 
     /// Only used in reconfigurations to apply the pending `GasScheduleV2`, if there is any.
-    public(friend) fun on_new_epoch() acquires GasScheduleV2 {
+    public(friend) fun on_new_epoch(framework: &signer) acquires GasScheduleV2 {
+        system_addresses::assert_aptos_framework(framework);
         if (config_buffer::does_exist<GasScheduleV2>()) {
-            let new_gas_schedule: GasScheduleV2 = config_buffer::extract<GasScheduleV2>();
-            let gas_schedule = borrow_global_mut<GasScheduleV2>(@aptos_framework);
-            *gas_schedule = new_gas_schedule;
+            let new_gas_schedule = config_buffer::extract<GasScheduleV2>();
+            if (exists<GasScheduleV2>(@aptos_framework)) {
+                *borrow_global_mut<GasScheduleV2>(@aptos_framework) = new_gas_schedule;
+            } else {
+                move_to(framework, new_gas_schedule);
+            }
         }
     }
 

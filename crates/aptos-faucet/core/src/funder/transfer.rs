@@ -285,7 +285,7 @@ impl FunderTrait for TransferFunder {
                 )
                 .await?;
             info!(
-                hash = txn.clone().committed_hash().to_hex_literal(),
+                hash = txn.committed_hash().to_hex_literal(),
                 address = receiver_address,
                 amount = amount,
                 event = "transaction_submitted"
