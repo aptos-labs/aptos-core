@@ -642,7 +642,7 @@ impl<'env> Generator<'env> {
         let temp = self.find_local(id, name);
 
         self.insert_arg_attrs(attr, targets_node_ids, true);
-        self.src_attrs.insert(attr, vec![attr]); // TODO: This is not correct, but we don't have a source location for locals
+        self.src_attrs.insert(attr, vec![attr]);
 
         self.emit(Bytecode::Assign(attr, target, temp, AssignKind::Inferred));
     }
