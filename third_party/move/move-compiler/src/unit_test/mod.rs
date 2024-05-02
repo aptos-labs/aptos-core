@@ -155,7 +155,9 @@ impl<'a> fmt::Display for ExpectedMoveErrorDisplay<'a> {
             write!(f, " with sub-status {code}")?
         };
         if let Some(msg) = msg {
-            write!(f, " with error message: \"{}\". Error", msg)?;
+            if status != &StatusCode::ABORTED {
+                write!(f, " with error message: \"{}\". Error", msg)?;
+            }
         }
         if status != &StatusCode::OUT_OF_GAS {
             write!(f, " originating")?;
