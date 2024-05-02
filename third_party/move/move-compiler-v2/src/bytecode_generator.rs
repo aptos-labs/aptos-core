@@ -188,7 +188,12 @@ impl<'env> Generator<'env> {
     /// Insert attribute ids derived from `arg_node_ids` for the target or source (controlled by `for_target`)
     /// temporaries of bytecode with attr id `bytecode_attr`.
     /// Panic on duplicate insertion.
-    fn insert_arg_attrs(&mut self, bytecode_attr: AttrId, arg_node_ids: Vec<NodeId>, for_target: bool) {
+    fn insert_arg_attrs(
+        &mut self,
+        bytecode_attr: AttrId,
+        arg_node_ids: Vec<NodeId>,
+        for_target: bool,
+    ) {
         let arg_attrs = arg_node_ids
             .into_iter()
             .map(|id| self.new_loc_attr(id))
@@ -197,8 +202,12 @@ impl<'env> Generator<'env> {
             &mut self.target_attrs
         } else {
             &mut self.src_attrs
-        }.insert(bytecode_attr, arg_attrs);
-        debug_assert!(old_node_ids.is_none(), "duplicate insertion of attribute ids")
+        }
+        .insert(bytecode_attr, arg_attrs);
+        debug_assert!(
+            old_node_ids.is_none(),
+            "duplicate insertion of attribute ids"
+        )
     }
 
     /// Emit bytecode with attribute derived from `id`,
@@ -636,7 +645,13 @@ impl<'env> Generator<'env> {
 // Locals
 
 impl<'env> Generator<'env> {
-    fn gen_local(&mut self, targets: Vec<TempIndex>, targets_node_ids: Vec<NodeId>, id: NodeId, name: Symbol) {
+    fn gen_local(
+        &mut self,
+        targets: Vec<TempIndex>,
+        targets_node_ids: Vec<NodeId>,
+        id: NodeId,
+        name: Symbol,
+    ) {
         let target = self.require_unary_target(id, targets);
         let attr = self.new_loc_attr(id);
         let temp = self.find_local(id, name);
