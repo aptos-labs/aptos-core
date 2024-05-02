@@ -243,7 +243,7 @@ impl OnChainConsensusConfig {
         match &self {
             OnChainConsensusConfig::V1(_config) => false,
             OnChainConsensusConfig::V2(_) => false,
-            OnChainConsensusConfig::V3 { .. } => false,
+            OnChainConsensusConfig::V3 { alg, .. } => alg.order_vote_enabled(),
         }
     }
 
