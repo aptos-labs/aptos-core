@@ -996,7 +996,7 @@ impl<'env> Generator<'env> {
         op: BytecodeOperation,
         args: &[Exp],
     ) {
-        let arg_temps = self.gen_arg_list(args, false);
+        let arg_temps = self.gen_arg_list(args);
         self.emit_with(
             id,
             targets_node_ids,
@@ -1072,7 +1072,7 @@ impl<'env> Generator<'env> {
             .map(|(e, t)| self.maybe_convert(e, &t))
             .collect::<Vec<_>>();
         let args_node_ids = args.iter().map(|e| e.node_id()).collect_vec();
-        let args = self.gen_arg_list(&args, true);
+        let args = self.gen_arg_list(&args);
         self.emit_with(id, targets_node_ids, args_node_ids, |attr| {
             Bytecode::Call(
                 attr,
@@ -1106,15 +1106,11 @@ impl<'env> Generator<'env> {
     }
 
     /// Generate the code for a list of arguments.
-    /// If `force_l2r_eval` is true, the arguments are forced to be evaluated in left-to-right order.
-    fn gen_arg_list(&mut self, exps: &[Exp], force_l2r_eval: bool) -> Vec<TempIndex> {
+    /// Note that the arguments are evaluated in left-to-right order.
+    fn gen_arg_list(&mut self, exps: &[Exp]) -> Vec<TempIndex> {
         // If all args are side-effect free, we don't need to force temporary generation
         // to get left-to-right evaluation.
-        let with_forced_temp = if exps.iter().all(is_definitely_pure) {
-            false
-        } else {
-            force_l2r_eval
-        };
+        let with_forced_temp = !exps.iter().all(is_definitely_pure);
         let len = exps.len();
         // Generate code with (potentially) forced creation of temporaries for all except last arg.
         let mut args = exps
