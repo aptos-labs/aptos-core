@@ -113,6 +113,10 @@ impl SafetyRules {
             proposed_block.block_data().round(),
             &mut safety_data,
         )?;
+
+        // Record 1-chain data
+        self.observe_qc(order_vote_proposal.quorum_cert(), &mut safety_data);
+
         // Construct and sign order vote
         let author = self.signer()?.author();
         let ledger_info =
