@@ -139,11 +139,9 @@ pub(crate) struct ProofCoordinator {
     peer_id: PeerId,
     proof_timeout_ms: usize,
     batch_info_to_proof: HashMap<BatchInfo, IncrementalProofState>,
-    batch_info_to_time: HashMap<BatchInfo, u64>,
     // to record the batch creation time
+    batch_info_to_time: HashMap<BatchInfo, u64>,
     timeouts: Timeouts<BatchInfo>,
-    // TODO: remove?
-    committed_batches: HashMap<BatchInfo, IncrementalProofState>,
     batch_reader: Arc<dyn BatchReader>,
     batch_generator_cmd_tx: tokio::sync::mpsc::Sender<BatchGeneratorCommand>,
     proof_cache: ProofCache,
@@ -166,7 +164,6 @@ impl ProofCoordinator {
             batch_info_to_proof: HashMap::new(),
             batch_info_to_time: HashMap::new(),
             timeouts: Timeouts::new(),
-            committed_batches: HashMap::new(),
             batch_reader,
             batch_generator_cmd_tx,
             proof_cache,
@@ -188,13 +185,6 @@ impl ProofCoordinator {
             .ok_or(SignedBatchInfoError::NotFound)?;
         if batch_author != signed_batch_info.author() {
             return Err(SignedBatchInfoError::WrongAuthor);
-        }
-        if self
-            .committed_batches
-            .get(signed_batch_info.batch_info())
-            .is_some()
-        {
-            return Err(SignedBatchInfoError::AlreadyCommitted);
         }
 
         self.timeouts.add(
@@ -246,11 +236,6 @@ impl ProofCoordinator {
                 counters::BATCH_TO_POS_DURATION.observe_duration(Duration::from_micros(duration));
                 return Ok(Some(proof));
             }
-        } else if let Some(value) = self
-            .committed_batches
-            .get_mut(signed_batch_info.batch_info())
-        {
-            value.add_signature(&signed_batch_info, validator_verifier)?;
         } else {
             return Err(SignedBatchInfoError::NotFound);
         }
@@ -296,11 +281,6 @@ impl ProofCoordinator {
                 }
                 Self::update_counters_on_expire(&state);
             }
-            if let Some(state) = self.committed_batches.remove(&signed_batch_info_info) {
-                if state.completed {
-                    Self::update_counters_on_expire(&state);
-                }
-            }
         }
         if self
             .batch_generator_cmd_tx
@@ -344,13 +324,6 @@ impl ProofCoordinator {
                                             batch_id = batch.batch_id().id,
                                             proof_completed = incremental_proof.completed,
                                         );
-
-                                        let committed_proof = existing_proof.remove();
-                                        if let Entry::Vacant(entry) = self.committed_batches.entry(batch.clone()) {
-                                            // Possibly a duplicate timeout, but that's fine
-                                            self.timeouts.add(batch.clone(), self.proof_timeout_ms);
-                                            entry.insert(committed_proof);
-                                        }
                                     }
                                 }
                             }
