@@ -124,7 +124,7 @@ pub static EXPERIMENTS: Lazy<BTreeMap<String, Experiment>> = Lazy::new(|| {
         Experiment {
             name: Experiment::OPTIMIZE.to_string(),
             description: "Turns on or off a group of optimizations".to_string(),
-            default: Given(false),
+            default: Given(true),
         },
         Experiment {
             name: Experiment::COPY_PROPAGATION.to_string(),
