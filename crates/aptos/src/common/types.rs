@@ -1061,15 +1061,13 @@ pub struct MovePackageDir {
     pub bytecode_version: Option<u32>,
 
     /// Specify the version of the compiler.
-    ///
-    /// Currently hidden until the official launch of Compiler V2
-    #[clap(long, hide = true, value_parser = clap::value_parser!(CompilerVersion))]
+    /// Currently, default to `v1`
+    #[clap(long, value_parser = clap::value_parser!(CompilerVersion))]
     pub compiler_version: Option<CompilerVersion>,
 
     /// Specify the language version to be supported.
-    ///
-    /// Currently hidden until the official launch of Compiler V2
-    #[clap(long, hide = true, value_parser = clap::value_parser!(LanguageVersion))]
+    /// Currently, default to `v1`
+    #[clap(long, value_parser = clap::value_parser!(LanguageVersion))]
     pub language_version: Option<LanguageVersion>,
 
     /// Do not complain about unknown attributes in Move code.
