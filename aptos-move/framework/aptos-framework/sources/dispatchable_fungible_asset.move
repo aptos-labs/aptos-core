@@ -21,8 +21,8 @@ module aptos_framework::dispatchable_fungible_asset {
 
     use std::error;
     use std::features;
-    use std::signer;
     use std::option::{Self, Option};
+    use std::signer;
 
     /// TransferRefStore doesn't exist on the fungible asset type.
     const ESTORE_NOT_FOUND: u64 = 1;
@@ -75,6 +75,11 @@ module aptos_framework::dispatchable_fungible_asset {
                 features::dispatchable_fungible_asset_enabled(),
                 error::aborted(ENOT_ACTIVATED)
             );
+            // ** IMPORTANT **
+            //
+            // For any changes in the access control logic here, make sure we duplicate them in
+            // fungible_asset::withdraw as that will be a separate entrypoint.
+            //
             fungible_asset::assert_not_frozen(store);
             assert!(object::owns(store, signer::address_of(owner)), error::permission_denied(ENOT_STORE_OWNER));
             let start_balance = fungible_asset::balance(store);
@@ -104,6 +109,11 @@ module aptos_framework::dispatchable_fungible_asset {
                 features::dispatchable_fungible_asset_enabled(),
                 error::aborted(ENOT_ACTIVATED)
             );
+            // ** IMPORTANT **
+            //
+            // For any changes in the access control logic here, make sure we duplicate them in
+            // fungible_asset::withdraw as that will be a separate entrypoint.
+            //
             fungible_asset::assert_not_frozen(store);
             let func = option::borrow(&func_opt);
             function_info::load_module_from_function(func);

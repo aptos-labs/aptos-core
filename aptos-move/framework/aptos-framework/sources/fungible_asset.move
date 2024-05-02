@@ -613,6 +613,11 @@ module aptos_framework::fungible_asset {
         store: Object<T>,
         amount: u64,
     ): FungibleAsset acquires FungibleStore, DispatchFunctionStore {
+        // ** IMPORTANT **
+        //
+        // For any changes in the access control logic here, make sure we duplicate them in
+        // dispatchable_fungible_asset::withdraw as that will be a separate entrypoint.
+        //
         assert!(object::owns(store, signer::address_of(owner)), error::permission_denied(ENOT_STORE_OWNER));
         assert!(store_exists(object::object_address(&store)), error::invalid_argument(ESTORE_IS_FROZEN));
         let fa_store = borrow_store_resource(&store);
@@ -626,6 +631,11 @@ module aptos_framework::fungible_asset {
 
     /// Deposit `amount` of the fungible asset to `store`.
     public fun deposit<T: key>(store: Object<T>, fa: FungibleAsset) acquires FungibleStore, DispatchFunctionStore {
+        // ** IMPORTANT **
+        //
+        // For any changes in the access control logic here, make sure we duplicate them in
+        // dispatchable_fungible_asset::withdraw as that will be a separate entrypoint.
+        //
         assert!(store_exists(object::object_address(&store)), error::permission_denied(ESTORE_IS_FROZEN));
         let fa_store = borrow_store_resource(&store);
         assert!(

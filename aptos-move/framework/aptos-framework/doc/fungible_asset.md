@@ -44,6 +44,7 @@ metadata object can be any object that equipped with <code><a href="fungible_ass
 -  [Function `balance`](#0x1_fungible_asset_balance)
 -  [Function `is_balance_at_least`](#0x1_fungible_asset_is_balance_at_least)
 -  [Function `is_frozen`](#0x1_fungible_asset_is_frozen)
+-  [Function `assert_not_frozen`](#0x1_fungible_asset_assert_not_frozen)
 -  [Function `is_dispatchable`](#0x1_fungible_asset_is_dispatchable)
 -  [Function `deposit_dispatch_function`](#0x1_fungible_asset_deposit_dispatch_function)
 -  [Function `has_deposit_dispatch_function`](#0x1_fungible_asset_has_deposit_dispatch_function)
@@ -849,7 +850,8 @@ Insufficient balance to withdraw or transfer.
 
 <a id="0x1_fungible_asset_EINVALID_DISPATCHABLE_OPERATIONS"></a>
 
-Invalid withdraw/deposit on dispatchable token.
+Invalid withdraw/deposit on dispatchable token. The specified token has a dispatchable function hook.
+Need to invoke dispatchable_fungible_asset::withdraw/deposit to perform transfer.
 
 
 <pre><code><b>const</b> <a href="fungible_asset.md#0x1_fungible_asset_EINVALID_DISPATCHABLE_OPERATIONS">EINVALID_DISPATCHABLE_OPERATIONS</a>: u64 = 28;
@@ -1690,6 +1692,31 @@ If the store has not been created, we default to returning false so deposits can
 
 <pre><code><b>public</b> <b>fun</b> <a href="fungible_asset.md#0x1_fungible_asset_is_frozen">is_frozen</a>&lt;T: key&gt;(store: Object&lt;T&gt;): bool <b>acquires</b> <a href="fungible_asset.md#0x1_fungible_asset_FungibleStore">FungibleStore</a> {
     <a href="fungible_asset.md#0x1_fungible_asset_store_exists">store_exists</a>(<a href="object.md#0x1_object_object_address">object::object_address</a>(&store)) && <a href="fungible_asset.md#0x1_fungible_asset_borrow_store_resource">borrow_store_resource</a>(&store).frozen
+}
+</code></pre>
+
+
+
+</details>
+
+<a id="0x1_fungible_asset_assert_not_frozen"></a>
+
+## Function `assert_not_frozen`
+
+Abort when a store is frozen.
+
+
+<pre><code><b>public</b> <b>fun</b> <a href="fungible_asset.md#0x1_fungible_asset_assert_not_frozen">assert_not_frozen</a>&lt;T: key&gt;(store: <a href="object.md#0x1_object_Object">object::Object</a>&lt;T&gt;)
+</code></pre>
+
+
+
+<details>
+<summary>Implementation</summary>
+
+
+<pre><code><b>public</b> <b>fun</b> <a href="fungible_asset.md#0x1_fungible_asset_assert_not_frozen">assert_not_frozen</a>&lt;T: key&gt;(store: Object&lt;T&gt;) <b>acquires</b> <a href="fungible_asset.md#0x1_fungible_asset_FungibleStore">FungibleStore</a> {
+    <b>assert</b>!(!<a href="fungible_asset.md#0x1_fungible_asset_is_frozen">is_frozen</a>(store), <a href="../../aptos-stdlib/../move-stdlib/doc/error.md#0x1_error_invalid_argument">error::invalid_argument</a>(<a href="fungible_asset.md#0x1_fungible_asset_ESTORE_IS_FROZEN">ESTORE_IS_FROZEN</a>));
 }
 </code></pre>
 
