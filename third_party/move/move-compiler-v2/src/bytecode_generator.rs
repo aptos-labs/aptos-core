@@ -1106,11 +1106,15 @@ impl<'env> Generator<'env> {
     }
 
     /// Generate the code for a list of arguments.
-    /// Note that the arguments are evaluated in left-to-right order.
-    fn gen_arg_list(&mut self, exps: &[Exp]) -> Vec<TempIndex> {
+    /// If `force_l2r_eval` is true, the arguments are forced to be evaluated in left-to-right order.
+    fn gen_arg_list(&mut self, exps: &[Exp], force_l2r_eval: bool) -> Vec<TempIndex> {
         // If all args are side-effect free, we don't need to force temporary generation
         // to get left-to-right evaluation.
-        let with_forced_temp = !exps.iter().all(is_definitely_pure);
+        let with_forced_temp = if exps.iter().all(is_definitely_pure) {
+            false
+        } else {
+            force_l2r_eval
+        };
         let len = exps.len();
         // Generate code with (potentially) forced creation of temporaries for all except last arg.
         let mut args = exps
@@ -1641,7 +1645,12 @@ impl<'env> Generator<'env> {
             .into_iter()
             .map(|p| p.0)
             .collect::<Vec<_>>();
-        let rhs_vars = rhs.free_vars_and_used_params(&param_symbols);
+        let mut rhs_vars = rhs
+            .used_temporaries_with_types(self.env())
+            .into_iter()
+            .map(|t| param_symbols[t.0])
+            .collect::<BTreeSet<_>>();
+        rhs_vars.append(&mut rhs.free_vars());
         lhs_vars.intersection(&rhs_vars).next().is_some()
     }
 }
