@@ -72,6 +72,7 @@ module aptos_framework::dispatchable_fungible_asset {
                 features::dispatchable_fungible_asset_enabled(),
                 error::aborted(ENOT_ACTIVATED)
             );
+            fungible_asset::assert_not_frozen(store);
             let start_balance = fungible_asset::balance(store);
             let func = option::borrow(&func_opt);
             function_info::load_module_from_function(func);
@@ -99,6 +100,7 @@ module aptos_framework::dispatchable_fungible_asset {
                 features::dispatchable_fungible_asset_enabled(),
                 error::aborted(ENOT_ACTIVATED)
             );
+            fungible_asset::assert_not_frozen(store);
             let func = option::borrow(&func_opt);
             function_info::load_module_from_function(func);
             dispatchable_deposit(

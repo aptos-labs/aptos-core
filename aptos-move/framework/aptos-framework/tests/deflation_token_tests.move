@@ -329,4 +329,38 @@ module 0xcafe::deflation_token_tests {
         assert!(primary_fungible_store::balance(aaron_address, metadata) == 0, 7);
     }
 
+    #[test(creator = @0xcafe, aaron = @0xface)]
+    #[expected_failure(abort_code = 0x50003, location = aptos_framework::fungible_asset)]
+    fun test_deflation_set_frozen(
+        creator: &signer,
+        aaron: &signer,
+    ) {
+        let (creator_ref, token_object) = fungible_asset::create_test_token(creator);
+        let (mint, transfer_ref, _) = fungible_asset::init_test_metadata(&creator_ref);
+        let metadata = object::convert<TestToken, Metadata>(token_object);
+
+        let creator_store = fungible_asset::create_test_store(creator, metadata);
+        let aaron_store = fungible_asset::create_test_store(aaron, metadata);
+
+        deflation_token::initialize(creator, &creator_ref);
+
+        assert!(fungible_asset::supply(metadata) == option::some(0), 1);
+        // Mint
+        let fa = fungible_asset::mint(&mint, 100);
+        assert!(fungible_asset::supply(metadata) == option::some(100), 2);
+        // Deposit
+        dispatchable_fungible_asset::deposit(creator_store, fa);
+        // Withdraw
+        let fa = dispatchable_fungible_asset::withdraw(creator, creator_store, 5);
+        assert!(fungible_asset::supply(metadata) == option::some(100), 3);
+        dispatchable_fungible_asset::deposit(aaron_store, fa);
+
+        assert!(fungible_asset::balance(creator_store) == 95, 42);
+        assert!(fungible_asset::balance(aaron_store) == 5, 42);
+
+        fungible_asset::set_frozen_flag(&transfer_ref, aaron_store, true);
+
+        let fa = dispatchable_fungible_asset::withdraw(creator, creator_store, 5);
+        dispatchable_fungible_asset::deposit(aaron_store, fa);
+    }
 }

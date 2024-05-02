@@ -475,6 +475,11 @@ module aptos_framework::fungible_asset {
         store_exists(object::object_address(&store)) && borrow_store_resource(&store).frozen
     }
 
+    /// Abort when a store is frozen.
+    public fun assert_not_frozen<T: key>(store: Object<T>) acquires FungibleStore {
+        assert!(!is_frozen(store), error::invalid_argument(ESTORE_IS_FROZEN));
+    }
+
     #[view]
     /// Return whether a fungible asset type is dispatchable.
     public fun is_dispatchable(store: Object<Metadata>): bool acquires FungibleStore {
