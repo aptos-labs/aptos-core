@@ -2229,17 +2229,10 @@ impl Loader {
             .map(|field_type| self.calculate_depth_of_type(field_type, module_store))
             .collect::<PartialVMResult<Vec<_>>>()?;
         let formula = DepthFormula::normalize(formulas);
-        let prev = self
-            .type_cache
+        self.type_cache
             .write()
             .depth_formula
             .insert(name.clone(), formula.clone());
-        if prev.is_some() {
-            return Err(
-                PartialVMError::new(StatusCode::UNKNOWN_INVARIANT_VIOLATION_ERROR)
-                    .with_message("Recursive type?".to_owned()),
-            );
-        }
         Ok(formula)
     }
 
