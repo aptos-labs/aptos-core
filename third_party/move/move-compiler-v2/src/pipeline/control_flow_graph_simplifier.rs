@@ -323,18 +323,7 @@ impl RemoveEmptyBlock {
         Self(generator)
     }
 
-    /// - Eliminates branch/jump to jump
-    ///     L1: goto L2 (L1 != L2)
-    ///     =>
-    ///     (removed)
-    ///
-    ///     goto L1
-    ///     =>
-    ///     goto L2
-    ///
-    ///     if ... goto L1 else ... / if ... goto ... else L1
-    ///     =>
-    ///     if ... goto L2 else ... / if ... goto ... else L2
+    /// Performas the transformation 1 described in the module doc
     pub fn transform(&mut self) {
         for block in self.cfg.blocks() {
             if self.is_empty_block(block) {
