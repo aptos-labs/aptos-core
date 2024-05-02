@@ -2,7 +2,7 @@ module resource_account::bonding_curve_launchpad {
     use std::string;
     use std::option;
     use aptos_framework::object::{Self};
-    use aptos_framework::fungible_asset::{Self, Metadata};
+    use aptos_framework::fungible_asset::{Self, FungibleAsset, Metadata};
     use aptos_framework::primary_fungible_store;
     use aptos_framework::event;
     use aptos_framework::aptos_account;
@@ -11,12 +11,16 @@ module resource_account::bonding_curve_launchpad {
     use aptos_std::string::{String};
     use aptos_std::signer;
     use aptos_std::object::{Object};
+    //! Dispatchable FA future standard
+    // use aptos_framework::dispatchable_fungible_asset;
+    // use aptos_framework::function_info;
     // Friend
     use resource_account::resource_signer_holder;
 
     const EFA_EXISTS_ALREADY: u64 = 10;
     const EFA_DOES_NOT_EXIST: u64 = 11;
     const EFA_PRIMARY_STORE_DOES_NOT_EXIST: u64 = 12;
+    const EFA_FROZEN: u64 = 13;
     const ELIQUIDITY_PAIR_EXISTS_ALREADY: u64 = 100;
     const ELIQUIDITY_PAIR_DOES_NOT_EXIST: u64 = 101;
     const ELIQUIDITY_PAIR_DISABLED: u64 = 102;
@@ -69,7 +73,7 @@ module resource_account::bonding_curve_launchpad {
 
     //---------------------------Structs---------------------------
     struct LaunchPad has key {
-        key_to_fa_data: SmartTable<FAKey, FAData>,
+        key_to_fa_data: SmartTable<FAKey, FAData>
     }
     struct FAKey has store, copy, drop {
         name: string::String,
@@ -89,6 +93,7 @@ module resource_account::bonding_curve_launchpad {
     }
     struct LiquidityPair has store {
         is_enabled: bool,
+        is_frozen: bool,
         fa_reserves: u128,
         apt_reserves: u128,
         k_constant: u256
@@ -178,6 +183,13 @@ module resource_account::bonding_curve_launchpad {
         let burn_ref = fungible_asset::generate_burn_ref(fa_obj_constructor_ref);
         let transfer_ref = fungible_asset::generate_transfer_ref(fa_obj_constructor_ref);
 
+        //! Needs testing against Dispatchable FA standard.
+        // let withdraw_limitations = function_info::new_function_info(
+        //     &resource_signer_holder::get_signer(),
+        //     string::utf8(b"controlled_token"),
+        //     string::utf8(b"withdraw")
+        // );
+
         let fa_obj_signer = object::generate_signer(fa_obj_constructor_ref);
         let fa_obj_address = signer::address_of(&fa_obj_signer);
         primary_fungible_store::mint(&mint_ref, @resource_account, INITIAL_NEW_FA_RESERVE_u64);
@@ -210,11 +222,23 @@ module resource_account::bonding_curve_launchpad {
     }
 
 
+    //! Needs testing against Dispatchable FA standard.
+    public fun withdraw<T: key>(
+        store: Object<T>,
+        amount: u64,
+        transfer_ref: &fungible_asset::TransferRef
+    ): FungibleAsset acquires LiquidityPairSmartTable {
+        let metadata = fungible_asset::transfer_ref_metadata(transfer_ref);
+        let liquidity_pair_smartTable = borrow_global_mut<LiquidityPairSmartTable>(@resource_account);
+        assert!(smart_table::contains(&mut liquidity_pair_smartTable.liquidity_pairs, metadata), ELIQUIDITY_PAIR_DOES_NOT_EXIST);
+        let liquidity_pair = smart_table::borrow_mut(&mut liquidity_pair_smartTable.liquidity_pairs, metadata);
+        assert!(!liquidity_pair.is_frozen, EFA_FROZEN); // If the pair is enabled, then FA is frozen. Vice versa applies.
+        fungible_asset::withdraw_with_ref(transfer_ref, store, amount)
+    }
 
 
     //---------------------------Liquidity Pair---------------------------
     //! Temporarily, x*y=k.
-    // Only callable from bonding_curve_launchpad Module. By the time we reach this, we'll already have the FAData.
     fun register_liquidity_pair(account: &signer, fa_metadata: Object<Metadata>, fa_key: FAKey, apt_initialPurchaseAmountIn: u64, fa_initialLiquidity: u128) acquires LaunchPad, LiquidityPairSmartTable {
         let fa_smartTable = borrow_global_mut<LaunchPad>(@resource_account);
         let fa_data = smart_table::borrow_mut(&mut fa_smartTable.key_to_fa_data, fa_key);
@@ -225,6 +249,7 @@ module resource_account::bonding_curve_launchpad {
         let k_constant: u256 = (fa_initialLiquidity as u256) * (INITIAL_VIRTUAL_LIQUIDITY as u256);
         let initial_liquidity_pair = LiquidityPair {
             is_enabled: true,
+            is_frozen: true,
             fa_reserves: fa_initialLiquidity,
             apt_reserves: INITIAL_VIRTUAL_LIQUIDITY,
             k_constant: k_constant
@@ -332,7 +357,6 @@ module resource_account::bonding_curve_launchpad {
 
 
         if(apt_updated_reserves > APT_LIQUIDITY_THRESHOLD){
-            liquidity_pair.is_enabled = false;
 
             //! Offload onto permissionless DEX.
             //! ...Move all APT and FA reserves to the DEX.
@@ -340,8 +364,8 @@ module resource_account::bonding_curve_launchpad {
             //! Burn any LP tokens received by the DEX.
             //! ...
 
-            //! Unfreeze all accounts.
-            //! ...
+            liquidity_pair.is_enabled = false;
+            liquidity_pair.is_frozen = false;
 
             //? Destroy refs?
             //? ...
