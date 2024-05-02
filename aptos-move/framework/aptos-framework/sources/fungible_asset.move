@@ -72,7 +72,8 @@ module aptos_framework::fungible_asset {
     const EDEPOSIT_FUNCTION_SIGNATURE_MISMATCH: u64 = 26;
     /// Provided derived_balance function type doesn't meet the signature requirement.
     const EDERIVED_BALANCE_FUNCTION_SIGNATURE_MISMATCH: u64 = 27;
-    /// Invalid withdraw/deposit on dispatchable token.
+    /// Invalid withdraw/deposit on dispatchable token. The specified token has a dispatchable function hook.
+    /// Need to invoke dispatchable_fungible_asset::withdraw/deposit to perform transfer.
     const EINVALID_DISPATCHABLE_OPERATIONS: u64 = 28;
     /// Trying to re-register dispatch hook on a fungible asset.
     const EALREADY_REGISTERED: u64 = 29;
