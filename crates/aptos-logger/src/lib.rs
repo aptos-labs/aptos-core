@@ -152,14 +152,11 @@ mod logger;
 mod macros;
 mod metadata;
 pub mod sample;
-pub mod telemetry_log_writer;
 pub mod tracing_adapter;
 
 mod security;
 
-pub use crate::aptos_logger::{
-    AptosData as Logger, AptosDataBuilder, LoggerFilterUpdater, Writer, CHANNEL_SIZE,
-};
+pub use crate::aptos_logger::{AptosData as Logger, AptosDataBuilder, Writer, CHANNEL_SIZE};
 pub use aptos_log_derive::Schema;
 pub use event::Event;
 pub use filter::{Filter, LevelFilter};
