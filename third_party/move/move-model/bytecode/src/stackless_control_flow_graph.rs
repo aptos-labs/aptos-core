@@ -32,16 +32,6 @@ pub enum BlockContent {
     Dummy,
 }
 
-impl BlockContent {
-    pub fn to_bytecodes<'a>(&self, bytecodes: &'a [Bytecode]) -> &'a [Bytecode] {
-        match self {
-            BlockContent::Basic { lower, upper } => &bytecodes[*lower as usize..=*upper as usize],
-            BlockContent::Dummy => &bytecodes[0..0],
-        }
-    }
-}
-
-#[derive(Default)]
 pub struct StacklessControlFlowGraph {
     entry_block_id: BlockId,
     blocks: Map<BlockId, Block>,
@@ -214,36 +204,12 @@ impl StacklessControlFlowGraph {
         &self.blocks[&block_id].successors
     }
 
-    pub fn successors_mut(&mut self, block_id: BlockId) -> &mut Vec<BlockId> {
-        &mut self.blocks.get_mut(&block_id).expect("block").successors
-    }
-
-    /// Removes the block
-    /// Cannot remove entry/exit block
-    pub fn remove_block(&mut self, block_to_remove: BlockId) {
-        debug_assert!(block_to_remove != self.entry_block());
-        debug_assert!(block_to_remove != self.exit_block());
+    /// Returns a map from a block to a vector of its successors
+    pub fn get_successors_map(&self) -> BTreeMap<BlockId, Vec<BlockId>> {
         self.blocks
-            .retain(|block_id, _| block_to_remove != *block_id);
-        for (_block_id, block) in self.blocks.iter_mut() {
-            block
-                .successors
-                .retain(|block_id| block_to_remove != *block_id);
-        }
-    }
-
-    /// Removes all blocks in `blocks`
-    /// Cannot remove entry/exit block
-    pub fn remove_blocks(&mut self, blocks_to_remove: &BTreeSet<BlockId>) {
-        debug_assert!(!blocks_to_remove.contains(&self.entry_block()));
-        debug_assert!(!blocks_to_remove.contains(&self.exit_block()));
-        self.blocks
-            .retain(|block_id, _| !blocks_to_remove.contains(block_id));
-        for (_block_id, block) in self.blocks.iter_mut() {
-            block
-                .successors
-                .retain(|block_id| !blocks_to_remove.contains(block_id));
-        }
+            .iter()
+            .map(|(block_id, block)| (*block_id, block.successors.clone()))
+            .collect()
     }
 
     pub fn content(&self, block_id: BlockId) -> &BlockContent {
@@ -252,12 +218,6 @@ impl StacklessControlFlowGraph {
 
     pub fn blocks(&self) -> Vec<BlockId> {
         self.blocks.keys().cloned().collect()
-    }
-
-    /// Iterates over all blocks in DFS order starting from the entry block
-    /// `visit_all`: whether to visit all blocks or just blocks reachable from the entry block
-    pub fn iter_dfs_left(&self, visit_all: bool) -> DFSLeft {
-        DFSLeft::new(self, visit_all)
     }
 
     pub fn entry_block(&self) -> BlockId {
@@ -307,8 +267,9 @@ impl StacklessControlFlowGraph {
 }
 
 /// Iterator over blocks of a control flow graph in DFS order
+/// (always choosing the left-most child to visit first).
 pub struct DFSLeft<'a> {
-    cfg: &'a StacklessControlFlowGraph,
+    successors: &'a BTreeMap<BlockId, Vec<BlockId>>,
     // blocks scheduled to visit
     to_visit: Vec<BlockId>,
     // blocks visited
@@ -318,16 +279,21 @@ pub struct DFSLeft<'a> {
 }
 
 impl<'a> DFSLeft<'a> {
-    /// Iterates over all blocks in DFS order (and always choosing the left-most child to visit) starting from the entry block
-    /// `visit_all`: whether to visit all blocks or just blocks reachable from the entry block
-    fn new(cfg: &'a StacklessControlFlowGraph, visit_all: bool) -> Self {
-        let to_visit = vec![cfg.entry_block()];
+    /// Create DFSLeft iterator starting from a specified start block
+    /// `successors`: should have all blocks as keys, even if they have no successors
+    /// `visit_all`: whether to visit all blocks or just blocks reachable from the start block
+    pub fn new(
+        successors: &'a BTreeMap<BlockId, Vec<BlockId>>,
+        start: BlockId,
+        visit_all: bool,
+    ) -> Self {
+        let to_visit = vec![start];
         Self {
-            cfg,
+            successors,
             to_visit,
             visited: BTreeSet::new(),
             unvisited: if visit_all {
-                Some(cfg.blocks.keys().cloned().collect())
+                Some(successors.keys().cloned().collect())
             } else {
                 None
             },
@@ -339,9 +305,7 @@ impl<'a> DFSLeft<'a> {
         if let Some(to_visit) = self.to_visit.pop() {
             Some(to_visit)
         } else if let Some(unvisited_blocks) = &mut self.unvisited {
-            let to_visit = *unvisited_blocks.first()?;
-            unvisited_blocks.remove(&to_visit);
-            Some(to_visit)
+            unvisited_blocks.pop_first()
         } else {
             return None;
         }
@@ -351,6 +315,9 @@ impl<'a> DFSLeft<'a> {
     fn get_next_unvisited(&mut self) -> Option<BlockId> {
         let next_to_visit = self.get_next_to_visit()?;
         if self.visited.contains(&next_to_visit) {
+            // we won't run into a infinite loop
+            // because eventually we will run out of scheduled blocks or unvisited blocks
+            // by calling `get_next_to_visit`
             self.get_next_unvisited()
         } else {
             Some(next_to_visit)
@@ -367,7 +334,13 @@ impl<'a> Iterator for DFSLeft<'a> {
         if let Some(unvisited) = &mut self.unvisited {
             unvisited.remove(&visiting);
         }
-        for suc_block in self.cfg.successors(visiting).iter().rev() {
+        for suc_block in self
+            .successors
+            .get(&visiting)
+            .expect("successors")
+            .iter()
+            .rev()
+        {
             self.to_visit.push(*suc_block);
         }
         Some(visiting)
