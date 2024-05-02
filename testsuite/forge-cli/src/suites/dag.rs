@@ -12,7 +12,7 @@ use aptos_forge::{
 };
 use aptos_sdk::types::on_chain_config::{
     BlockGasLimitType, ConsensusAlgorithmConfig, DagConsensusConfigV1, OnChainConsensusConfig,
-    OnChainExecutionConfig, TransactionShufflerType, ValidatorTxnConfig,
+    OnChainExecutionConfig, TransactionDeduperType, TransactionShufflerType, ValidatorTxnConfig,
 };
 use aptos_testcases::{
     consensus_reliability_tests::ChangingWorkingQuorumTest,
@@ -401,11 +401,8 @@ pub fn run_dag_consensus_only_realistic_env_max_tps() -> ForgeConfig {
                 }
                 OnChainExecutionConfig::V4(config_v4) => {
                     config_v4.block_gas_limit_type = BlockGasLimitType::NoLimit;
-                    config_v4.transaction_shuffler_type = TransactionShufflerType::Fairness {
-                        sender_conflict_window_size: 256,
-                        module_conflict_window_size: 2,
-                        entry_fun_conflict_window_size: 3,
-                    };
+                    config_v4.transaction_shuffler_type = TransactionShufflerType::NoShuffling;
+                    config_v4.transaction_deduper_type = TransactionDeduperType::NoDedup;
                 }
             }
             helm_values["chain"]["on_chain_execution_config"] =
