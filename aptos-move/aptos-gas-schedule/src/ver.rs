@@ -59,8 +59,8 @@
 pub const LATEST_GAS_FEATURE_VERSION: u64 = 17;
 
 #[allow(dead_code)]
-pub(crate) mod gas_feature_versions {
-    pub(crate) const RELEASE_V1_11: u64 = 16;
-    pub(crate) const RELEASE_V1_12: u64 = 17;
-    pub(crate) const RELEASE_V1_13: u64 = 18;
+pub mod gas_feature_versions {
+    pub const RELEASE_V1_11: u64 = 16;
+    pub const RELEASE_V1_12: u64 = 17;
+    pub const RELEASE_V1_13: u64 = 18;
 }
