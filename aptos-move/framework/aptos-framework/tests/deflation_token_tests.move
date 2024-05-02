@@ -363,4 +363,27 @@ module 0xcafe::deflation_token_tests {
         let fa = dispatchable_fungible_asset::withdraw(creator, creator_store, 5);
         dispatchable_fungible_asset::deposit(aaron_store, fa);
     }
+
+    #[test(creator = @0xcafe, aaron = @0xface)]
+    #[expected_failure(abort_code = 0x50005, location = aptos_framework::dispatchable_fungible_asset)]
+    fun test_deflation_wrong_withdraw(
+        creator: &signer,
+        aaron: &signer,
+    ) {
+        let (creator_ref, token_object) = fungible_asset::create_test_token(creator);
+        fungible_asset::init_test_metadata(&creator_ref);
+        let metadata = object::convert<TestToken, Metadata>(token_object);
+
+        let creator_store = fungible_asset::create_test_store(creator, metadata);
+        let aaron_store = fungible_asset::create_test_store(aaron, metadata);
+
+        deflation_token::initialize(creator, &creator_ref);
+
+        assert!(fungible_asset::supply(metadata) == option::some(0), 1);
+
+        // Withdraw
+        let fa = dispatchable_fungible_asset::withdraw(aaron, creator_store, 5);
+        assert!(fungible_asset::supply(metadata) == option::some(100), 3);
+        dispatchable_fungible_asset::deposit(aaron_store, fa);
+    }
 }

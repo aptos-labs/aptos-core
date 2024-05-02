@@ -21,6 +21,7 @@ module aptos_framework::dispatchable_fungible_asset {
 
     use std::error;
     use std::features;
+    use std::signer;
     use std::option::{Self, Option};
 
     /// TransferRefStore doesn't exist on the fungible asset type.
@@ -31,6 +32,8 @@ module aptos_framework::dispatchable_fungible_asset {
     const ENOT_ACTIVATED: u64 = 3;
     /// Dispatch target is not loaded.
     const ENOT_LOADED: u64 = 4;
+    /// Account is not the store's owner.
+    const ENOT_STORE_OWNER: u64 = 5;
 
     #[resource_group_member(group = aptos_framework::object::ObjectGroup)]
     struct TransferRefStore has key {
@@ -73,6 +76,7 @@ module aptos_framework::dispatchable_fungible_asset {
                 error::aborted(ENOT_ACTIVATED)
             );
             fungible_asset::assert_not_frozen(store);
+            assert!(object::owns(store, signer::address_of(owner)), error::permission_denied(ENOT_STORE_OWNER));
             let start_balance = fungible_asset::balance(store);
             let func = option::borrow(&func_opt);
             function_info::load_module_from_function(func);
