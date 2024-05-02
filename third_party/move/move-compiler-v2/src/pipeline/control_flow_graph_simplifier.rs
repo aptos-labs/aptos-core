@@ -69,7 +69,7 @@ use move_stackless_bytecode::{
     function_target::FunctionData,
     function_target_pipeline::{FunctionTargetProcessor, FunctionTargetsHolder},
     stackless_bytecode::{Bytecode, Label},
-    stackless_control_flow_graph::{BlockId, StacklessControlFlowGraph},
+    stackless_control_flow_graph::{BlockId, DFSLeft, StacklessControlFlowGraph},
 };
 use std::collections::BTreeMap;
 
@@ -114,6 +114,7 @@ impl ControlFlowGraphSimplifierTransformation {
 
     /// Does the first four transformations described in the module doc
     fn transform(&mut self) {
+        self.eliminate_branch_to_same_target();
         let mut elim_empty_blocks_transformer =
             RemoveEmptyBlock::new(std::mem::take(&mut self.cfg_code_generator));
         elim_empty_blocks_transformer.transform();
@@ -121,12 +122,12 @@ impl ControlFlowGraphSimplifierTransformation {
             RemoveRedundantJump::new(elim_empty_blocks_transformer.0);
         remove_redundant_jump_transformer.transform();
         self.data.code = remove_redundant_jump_transformer.0.gen_code(true);
-        self.eliminate_branch_to_same_target();
         // may introduce new empty blocks
         let mut elim_empty_blocks_transformer =
             RemoveEmptyBlock::new(ControlFlowGraphCodeGenerator::new(&self.data.code));
         elim_empty_blocks_transformer.transform();
         self.data.code = elim_empty_blocks_transformer.0.gen_code(true);
+        self.eliminate_branch_to_same_target();
         self.data.annotations.clear()
     }
 
@@ -148,10 +149,13 @@ impl ControlFlowGraphSimplifierTransformation {
 struct ControlFlowGraphCodeGenerator {
     /// The control flow graph.
     /// `BlockContent` is invalidated during transformations
-    cfg: StacklessControlFlowGraph,
+    entry_block: BlockId,
+    exit_block: BlockId,
     /// The code of each basic block under transformation.
     /// Entry/exit block is mapped to a empty vector.
     code_blocks: BTreeMap<BlockId, Vec<Bytecode>>,
+    /// Maps a basic block to its successors.
+    successors: BTreeMap<BlockId, Vec<BlockId>>,
     /// Maps a basic block to its predecessors.
     /// If `block_id` not in `pred_map`, the block either doesn't exist or doesn't have predecessors
     predecessors: BTreeMap<BlockId, Vec<BlockId>>,
@@ -168,17 +172,27 @@ impl ControlFlowGraphCodeGenerator {
             .collect();
         let pred_map = pred_map(&cfg);
         Self {
-            cfg,
+            entry_block: cfg.entry_block(),
+            exit_block: cfg.exit_block(),
             code_blocks,
+            successors: cfg.get_successors_map(),
             predecessors: pred_map,
         }
+    }
+
+    pub fn blocks(&self) -> Vec<BlockId> {
+        self.successors.keys().cloned().collect()
+    }
+
+    pub fn iter_dfs_left(&self, visit_all: bool) -> DFSLeft {
+        DFSLeft::new(&self.successors, self.entry_block, visit_all)
     }
 
     /// Generates code from the control flow graph
     /// `visit_all`: determines whether to generate code for unreachable blocks
     pub fn gen_code(self, visit_all: bool) -> Vec<Bytecode> {
         let mut generated = Vec::new();
-        let mut iter_dfs_left = self.cfg.iter_dfs_left(visit_all).peekable();
+        let mut iter_dfs_left = self.iter_dfs_left(visit_all).peekable();
         while let Some(block) = iter_dfs_left.next() {
             if self.is_trivial_block(block) {
                 continue;
@@ -227,13 +241,13 @@ impl ControlFlowGraphCodeGenerator {
     /// i.e., the block is followed by the next in the original code
     fn falls_to_next_block(codes: &[Bytecode]) -> bool {
         let last_instr = codes.last().expect("last instr");
-        !last_instr.is_branch()
+        !last_instr.is_always_branching()
     }
 
     /// Gets the only successor of `block`; panics if this is not the case.
     /// (May not panic in the release version due to the use of debug_assert)
     fn get_the_successor(&self, block: BlockId) -> BlockId {
-        let successors = self.cfg.successors(block);
+        let successors = self.successors.get(&block).expect("successors");
         debug_assert!(successors.len() == 1);
         *successors.first().expect("successor block")
     }
@@ -280,7 +294,23 @@ impl ControlFlowGraphCodeGenerator {
 
     /// Checks if the block is entry or exit block
     fn is_trivial_block(&self, block: BlockId) -> bool {
-        block == self.cfg.entry_block() || block == self.cfg.exit_block()
+            block == self.entry_block || block == self.exit_block
+        }
+
+        fn remove_block<F, G>(&mut self, block_to_remove: BlockId, pred_action: F, suc_action: G)
+        where F: FnOnce(&mut Self, BlockId, &[BlockId]) + Copy, G: FnOnce(&mut Self, BlockId, &[BlockId]) + Copy
+    {
+        let preds = self.predecessors.remove(&block_to_remove).expect("predecessors");
+        let succs = self.successors.remove(&block_to_remove).expect("successors");
+        for &pred in &preds {
+            // self.successors.get_mut(&pred).expect("successors").retain(|&s| s != block_to_remove);
+            pred_action(self, pred, &succs);
+        }
+        for &suc in &succs {
+            // self.predecessors.get_mut(&suc).expect("predecessors").retain(|&p| p != block_to_remove);
+            suc_action(self, suc, &preds);
+        }
+        self.code_blocks.remove(&block_to_remove);
     }
 }
 
@@ -325,7 +355,7 @@ impl RemoveEmptyBlock {
 
     /// Performas the transformation 1 described in the module doc
     pub fn transform(&mut self) {
-        for block in self.cfg.blocks() {
+        for block in self.blocks() {
             if self.is_empty_block(block) {
                 let suc_block = self.get_the_non_trivial_successor(block);
                 if suc_block != block {
@@ -346,45 +376,42 @@ impl RemoveEmptyBlock {
             )
     }
 
-    /// Removes the block from the control flow graph, and let any block jumpping to it
-    /// to jump to `redirect_to` directly
-    /// Requires: `block_to_remove` doesn't have itself as a successor. We don't remove `loop {}`.
     fn remove_empty_block(&mut self, block_to_remove: BlockId, redirect_to: BlockId) {
         debug_assert!(block_to_remove != redirect_to);
         debug_assert!(!self
-            .cfg
-            .successors(block_to_remove)
+            .successors
+            .get(&block_to_remove)
+            .expect("successors")
             .contains(&block_to_remove));
-        let maybe_preds = self.predecessors.remove(&block_to_remove);
-        if let Some(preds) = maybe_preds {
-            for pred in preds {
-                if pred != self.cfg.entry_block() {
-                    let from = self.get_block_label(block_to_remove).expect("label");
-                    let to = self.get_block_label(redirect_to).expect("label");
-                    let pred_codes = self.code_blocks.get_mut(&pred).expect("code block");
+        let from = self.get_block_label(block_to_remove).expect("label");
+        let to  = self.get_block_label(redirect_to).expect("label");
+        self.remove_block(block_to_remove,
+            |this, pred, _succs| {
+                // for all predecessors of `block_to_remove`, let them jump to `redirect_to` instead
+                if pred != this.entry_block {
+                    let pred_codes = this.code_blocks.get_mut(&pred).expect("code block");
                     Self::redirects_block(pred_codes, from, to);
                 }
-                // update successors of predecessors of `block_to_remove`
-                for suc_of_pred in self.cfg.successors_mut(pred) {
+                // update successors of pred
+                for suc_of_pred in this.successors.get_mut(&pred).expect("successors") {
                     if *suc_of_pred == block_to_remove {
                         *suc_of_pred = redirect_to;
                     }
                 }
                 // update predecessors of `redirect_to`
                 // add preds of `remove_block` to `redirect_to`
-                self.predecessors
+                this.predecessors
                     .get_mut(&redirect_to)
                     .expect("predecessors")
                     .push(pred);
-            }
-        }
+            },
+            |_this, _suc, _preds| {}
+        );
         // remove `block_to_remove`
         self.predecessors
             .get_mut(&redirect_to)
             .expect("predecessors")
             .retain(|pred| *pred != block_to_remove);
-        self.code_blocks.remove(&block_to_remove);
-        self.cfg.remove_block(block_to_remove);
     }
 
     /// Redirects a sequence of codes so that it jumps/branches to `to`
@@ -417,7 +444,7 @@ impl RemoveRedundantJump {
 
     /// Performs the transformation 2 described in the module doc
     pub fn transform(&mut self) {
-        for block in self.cfg.blocks() {
+        for block in self.blocks() {
             // the later condition says that `block` is unreachable or has been removed
             if self.is_trivial_block(block) || !self.predecessors.contains_key(&block) {
                 continue;
@@ -429,7 +456,7 @@ impl RemoveRedundantJump {
     /// Removes all redundant edges from `block`
     /// Requires: `block` still in the cfg, `block` is not entry/exit
     fn transform_edges_from(&mut self, block: BlockId) {
-        for suc in self.cfg.successors(block).clone() {
+        for suc in self.successors.get(&block).expect("successors").clone() {
             if !self.is_trivial_block(suc) && self.remove_jump_if_possible(block, suc) {
                 // successors of `block` changes
                 // consider L0: goto L1; L1: goto L2; L2: goto L3;
@@ -447,14 +474,14 @@ impl RemoveRedundantJump {
     fn can_remove_edge(&self, from: BlockId, to: BlockId) -> bool {
         debug_assert!(!self.is_trivial_block(from));
         debug_assert!(!self.is_trivial_block(to));
-        self.cfg.successors(from).len() == 1
+        self.successors.get(&from).expect("successors").len() == 1
             && self.predecessors.get(&to).map_or(0, |preds| preds.len()) == 1
     }
 
     /// If possible, append the code of block `to` to the back of block `from` and remove the `to` block
     /// Returns true if the edge is removed
     fn remove_jump_if_possible(&mut self, from: BlockId, to: BlockId) -> bool {
-        debug_assert!(self.cfg.successors(from).contains(&to));
+        debug_assert!(self.successors.get(&from).expect("successors").contains(&to));
         debug_assert!(!self.is_trivial_block(from));
         debug_assert!(!self.is_trivial_block(to));
         if from == to || !self.can_remove_edge(from, to) {
@@ -475,19 +502,23 @@ impl RemoveRedundantJump {
             from_codes.pop();
         }
         from_codes.append(&mut to_codes);
-        self.cfg.successors_mut(from).clear();
-        // for all successors of `to`, update their preds by substituting `to` to `from`
-        for suc_of_to in self.cfg.successors(to).clone() {
-            // successors of `from` becomes successors of `to`
-            self.cfg.successors_mut(from).push(suc_of_to);
-            for pred in self.predecessors.get_mut(&to).expect("predecessors") {
-                if *pred == to {
-                    *pred = from;
-                }
+
+        self.remove_block(to,
+            |this, pred, succs| {
+                debug_assert!(pred == from);
+                let succs_mut = this.successors.get_mut(&pred).expect("successors");
+                succs_mut.clear();
+                succs_mut.extend(succs);
+            },
+            |this, suc, _preds| {
+               for pred in this.predecessors.get_mut(&suc).expect("predecessors") {
+                   if *pred == to {
+                       *pred = from;
+                   }
+               }
             }
-        }
-        self.cfg.remove_block(to);
-        self.predecessors.remove(&to);
+        );
+
         true
     }
 }
@@ -499,11 +530,15 @@ impl_deref_mut!(RemoveRedundantJump);
 /// Computes the map from a blcok to its predecessors
 fn pred_map(cfg: &StacklessControlFlowGraph) -> BTreeMap<BlockId, Vec<BlockId>> {
     let mut pred_map = BTreeMap::new();
-    for block in cfg.blocks() {
-        for suc_block in cfg.successors(block) {
+    let blocks = cfg.blocks();
+    for block in &blocks {
+        for suc_block in cfg.successors(*block) {
             let preds: &mut Vec<BlockId> = pred_map.entry(*suc_block).or_default();
-            preds.push(block);
+            preds.push(*block);
         }
+    }
+    for block in &blocks {
+        pred_map.entry(*block).or_default();
     }
     pred_map
 }

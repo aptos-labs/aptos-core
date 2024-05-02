@@ -214,6 +214,14 @@ impl StacklessControlFlowGraph {
         &self.blocks[&block_id].successors
     }
 
+    /// Returns a map from a block to a vector of its successors
+    pub fn get_successors_map(&self) -> BTreeMap<BlockId, Vec<BlockId>> {
+        self.blocks
+            .iter()
+            .map(|(block_id, block)| (*block_id, block.successors.clone()))
+            .collect()
+    }
+
     pub fn successors_mut(&mut self, block_id: BlockId) -> &mut Vec<BlockId> {
         &mut self.blocks.get_mut(&block_id).expect("block").successors
     }
@@ -252,12 +260,6 @@ impl StacklessControlFlowGraph {
 
     pub fn blocks(&self) -> Vec<BlockId> {
         self.blocks.keys().cloned().collect()
-    }
-
-    /// Iterates over all blocks in DFS order starting from the entry block
-    /// `visit_all`: whether to visit all blocks or just blocks reachable from the entry block
-    pub fn iter_dfs_left(&self, visit_all: bool) -> DFSLeft {
-        DFSLeft::new(self, visit_all)
     }
 
     pub fn entry_block(&self) -> BlockId {
@@ -301,7 +303,7 @@ impl StacklessControlFlowGraph {
 
 /// Iterator over blocks of a control flow graph in DFS order
 pub struct DFSLeft<'a> {
-    cfg: &'a StacklessControlFlowGraph,
+    successors: &'a BTreeMap<BlockId, Vec<BlockId>>,
     // blocks scheduled to visit
     to_visit: Vec<BlockId>,
     // blocks visited
@@ -313,14 +315,14 @@ pub struct DFSLeft<'a> {
 impl<'a> DFSLeft<'a> {
     /// Iterates over all blocks in DFS order (and always choosing the left-most child to visit) starting from the entry block
     /// `visit_all`: whether to visit all blocks or just blocks reachable from the entry block
-    fn new(cfg: &'a StacklessControlFlowGraph, visit_all: bool) -> Self {
-        let to_visit = vec![cfg.entry_block()];
+    pub fn new(successors: &'a BTreeMap<BlockId, Vec<BlockId>>, start: BlockId, visit_all: bool) -> Self {
+        let to_visit = vec![start];
         Self {
-            cfg,
+            successors,
             to_visit,
             visited: BTreeSet::new(),
             unvisited: if visit_all {
-                Some(cfg.blocks.keys().cloned().collect())
+                Some(successors.keys().cloned().collect())
             } else {
                 None
             },
@@ -360,7 +362,7 @@ impl<'a> Iterator for DFSLeft<'a> {
         if let Some(unvisited) = &mut self.unvisited {
             unvisited.remove(&visiting);
         }
-        for suc_block in self.cfg.successors(visiting).iter().rev() {
+        for suc_block in self.successors.get(&visiting).expect("successors").iter().rev() {
             self.to_visit.push(*suc_block);
         }
         Some(visiting)

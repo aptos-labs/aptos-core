@@ -26,6 +26,7 @@ use crate::{
     },
     pipeline::{
         ability_processor::AbilityProcessor, avail_copies_analysis::AvailCopiesAnalysisProcessor,
+        control_flow_graph_simplifier::ControlFlowGraphSimplifier,
         copy_propagation::CopyPropagation, dead_store_elimination::DeadStoreElimination,
         exit_state_analysis::ExitStateAnalysisProcessor,
         livevar_analysis_processor::LiveVarAnalysisProcessor,
@@ -420,6 +421,10 @@ pub fn bytecode_pipeline(env: &GlobalEnv) -> FunctionTargetPipeline {
     if options.experiment_on(Experiment::DEAD_CODE_ELIMINATION) {
         pipeline.add_processor(Box::new(LiveVarAnalysisProcessor::new(true)));
         pipeline.add_processor(Box::new(DeadStoreElimination {}));
+    }
+
+    if options.experiment_on(Experiment::CFG_SIMPLIFICATION) {
+        pipeline.add_processor(Box::new(ControlFlowGraphSimplifier {}));
     }
 
     // Run live var analysis again because it could be invalidated by previous pipeline steps,
