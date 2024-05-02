@@ -383,6 +383,7 @@ module supra_framework::dora_committee {
             let node_address = vector::pop_back(&mut node_addresses_for_iteration);
             simple_map::upsert(&mut committee_store.node_to_committee_map, node_address, id);
         };
+        vector::reverse(&mut dora_node_info);
         let committee_info = CommitteeInfo {
             map: simple_map::new_from(node_addresses, dora_node_info),
             has_valid_dkg: false,
