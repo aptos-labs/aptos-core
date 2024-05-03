@@ -108,7 +108,10 @@ impl ExecutionPipeline {
         } = command;
 
         debug!("prepare_block received block {}.", block.id());
-        let input_txns = block_preparer.prepare_block(&block).await;
+        let input_txns = monitor!(
+            "block_preparer_prepare_block",
+            block_preparer.prepare_block(&block).await
+        );
         if let Err(e) = input_txns {
             result_tx.send(Err(e)).unwrap_or_else(|err| {
                 error!(
@@ -122,30 +125,35 @@ impl ExecutionPipeline {
         }
         let validator_txns = block.validator_txns().cloned().unwrap_or_default();
         let input_txns = input_txns.unwrap();
-        tokio::task::spawn_blocking(move || {
-            let txns_to_execute =
-                Block::combine_to_input_transactions(validator_txns, input_txns.clone(), metadata);
-            let sig_verified_txns: Vec<SignatureVerifiedTransaction> =
-                SIG_VERIFY_POOL.install(|| {
-                    let num_txns = txns_to_execute.len();
-                    txns_to_execute
-                        .into_par_iter()
-                        .with_min_len(optimal_min_len(num_txns, 32))
-                        .map(|t| t.into())
-                        .collect::<Vec<_>>()
-                });
-            execute_block_tx
-                .send(ExecuteBlockCommand {
-                    input_txns,
-                    block: (block.id(), sig_verified_txns).into(),
-                    parent_block_id,
-                    block_executor_onchain_config,
-                    result_tx,
-                })
-                .expect("Failed to send block to execution pipeline.");
-        })
-        .await
-        .expect("Failed to spawn_blocking.");
+        monitor!("prepare_block_spawn", {
+            tokio::task::spawn_blocking(move || {
+                let txns_to_execute = Block::combine_to_input_transactions(
+                    validator_txns,
+                    input_txns.clone(),
+                    metadata,
+                );
+                let sig_verified_txns: Vec<SignatureVerifiedTransaction> =
+                    SIG_VERIFY_POOL.install(|| {
+                        let num_txns = txns_to_execute.len();
+                        txns_to_execute
+                            .into_par_iter()
+                            .with_min_len(optimal_min_len(num_txns, 32))
+                            .map(|t| t.into())
+                            .collect::<Vec<_>>()
+                    });
+                execute_block_tx
+                    .send(ExecuteBlockCommand {
+                        input_txns,
+                        block: (block.id(), sig_verified_txns).into(),
+                        parent_block_id,
+                        block_executor_onchain_config,
+                        result_tx,
+                    })
+                    .expect("Failed to send block to execution pipeline.");
+            })
+            .await
+            .expect("Failed to spawn_blocking.");
+        });
     }
 
     async fn prepare_block_stage(
