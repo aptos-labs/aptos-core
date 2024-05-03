@@ -78,13 +78,14 @@ impl BlockExecutableTransaction for SignatureVerifiedTransaction {
 
 impl From<Transaction> for SignatureVerifiedTransaction {
     fn from(txn: Transaction) -> Self {
-        match txn {
-            Transaction::UserTransaction(txn) => match txn.verify_signature() {
-                Ok(_) => SignatureVerifiedTransaction::Valid(Transaction::UserTransaction(txn)),
-                Err(_) => SignatureVerifiedTransaction::Invalid(Transaction::UserTransaction(txn)),
-            },
-            _ => SignatureVerifiedTransaction::Valid(txn),
-        }
+        SignatureVerifiedTransaction::Valid(txn)
+        // match txn {
+        //     Transaction::UserTransaction(txn) => match txn.verify_signature() {
+        //         Ok(_) => SignatureVerifiedTransaction::Valid(Transaction::UserTransaction(txn)),
+        //         Err(_) => SignatureVerifiedTransaction::Invalid(Transaction::UserTransaction(txn)),
+        //     },
+        //     _ => SignatureVerifiedTransaction::Valid(txn),
+        // }
     }
 }
 
