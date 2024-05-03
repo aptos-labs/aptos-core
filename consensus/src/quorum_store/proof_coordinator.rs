@@ -317,6 +317,8 @@ impl ProofCoordinator {
                                         let incremental_proof = existing_proof.get();
                                         if incremental_proof.completed {
                                             counters::BATCH_SUCCESSFUL_CREATION.observe(1.0);
+                                        } else {
+                                            info!("QS: received commit notification for batch that did not complete: {}, self_voted: {}", digest, incremental_proof.self_voted);
                                         }
                                         debug!(
                                             LogSchema::new(LogEvent::ProofOfStoreCommit),
