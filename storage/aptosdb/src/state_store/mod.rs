@@ -383,7 +383,7 @@ impl StateStore {
                 &state_kv_db,
                 state_kv_commit_progress,
                 overall_commit_progress,
-                difference as usize,
+                std::cmp::max(difference as usize, 1), /* batch_size */
             )
             .expect("Failed to truncate state K/V db.");
         } else {
