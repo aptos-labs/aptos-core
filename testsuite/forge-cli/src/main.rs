@@ -604,9 +604,7 @@ fn get_land_blocking_test(
     test_cmd: &TestCommand,
 ) -> Option<ForgeConfig> {
     let test = match test_name {
-        "land_blocking" | "realistic_env_max_load" => {
-            realistic_env_max_load_test(duration, test_cmd, 7, 5)
-        },
+        "land_blocking" | "realistic_env_max_load" => realistic_env_graceful_overload(),
         "compat" => compat(),
         "framework_upgrade" => framework_upgrade(),
         _ => return None, // The test name does not match a land-blocking test
