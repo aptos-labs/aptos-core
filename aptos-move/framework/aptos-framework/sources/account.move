@@ -163,7 +163,7 @@ module aptos_framework::account {
     const EACCOUNT_ALREADY_USED: u64 = 16;
     /// Offerer address doesn't exist
     const EOFFERER_ADDRESS_DOES_NOT_EXIST: u64 = 17;
-    /// The specified rotation capablity offer does not exist at the specified offerer address
+    /// The specified rotation capability offer does not exist at the specified offerer address
     const ENO_SUCH_ROTATION_CAPABILITY_OFFER: u64 = 18;
     // The signer capability is not offered to any address
     const ENO_SIGNER_CAPABILITY_OFFERED: u64 = 19;
@@ -310,7 +310,7 @@ module aptos_framework::account {
     /// Here is an example attack if we don't ask for the second signature `cap_update_table`:
     /// Alice has rotated her account `addr_a` to `new_addr_a`. As a result, the following entry is created, to help Alice when recovering her wallet:
     /// `OriginatingAddress[new_addr_a]` -> `addr_a`
-    /// Alice has had bad day: her laptop blew up and she needs to reset her account on a new one.
+    /// Alice has had a bad day: her laptop blew up and she needs to reset her account on a new one.
     /// (Fortunately, she still has her secret key `new_sk_a` associated with her new address `new_addr_a`, so she can do this.)
     ///
     /// But Bob likes to mess with Alice.

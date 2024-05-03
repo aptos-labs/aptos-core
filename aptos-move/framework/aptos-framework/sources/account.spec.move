@@ -617,7 +617,7 @@ spec aptos_framework::account {
     }
 
     /// The Account existed under the signer.
-    /// The guid_creation_num of the ccount resource is up to MAX_U64.
+    /// The guid_creation_num of the account resource is up to MAX_U64.
     spec create_guid(account_signer: &signer): guid::GUID {
         let addr = signer::address_of(account_signer);
         include NewEventHandleAbortsIf {
