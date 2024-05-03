@@ -524,8 +524,8 @@ pub struct GlobalEnv {
     pub(crate) file_idx_to_id: BTreeMap<u16, FileId>,
     /// A set indicating whether a file id is a compilation target.
     pub(crate) file_id_is_target: BTreeSet<FileId>,
-    /// A set indicating whether a file id is a test target.
-    pub(crate) file_id_is_test_target: BTreeSet<FileId>,
+    /// A set indicating whether a file id is a test/analysis/prover target.
+    pub(crate) file_id_is_primary_target: BTreeSet<FileId>,
     /// A special constant location representing an unknown location.
     /// This uses a pseudo entry in `source_files` to be safely represented.
     pub(crate) unknown_loc: Loc,
@@ -616,7 +616,7 @@ impl GlobalEnv {
             file_id_to_idx,
             file_idx_to_id,
             file_id_is_target: BTreeSet::new(),
-            file_id_is_test_target: BTreeSet::new(),
+            file_id_is_primary_target: BTreeSet::new(),
             diags: RefCell::new(vec![]),
             symbol_pool: SymbolPool::new(),
             next_free_node_id: Default::default(),
@@ -775,7 +775,7 @@ impl GlobalEnv {
         file_name: &str,
         source: &str,
         is_target: bool,
-        is_test_target: bool,
+        is_primary_target: bool,
     ) -> FileId {
         // Check for address alias conflicts.
         self.stdlib_address =
@@ -787,12 +787,12 @@ impl GlobalEnv {
         );
         if let Some((_filename, file_id)) = self.file_hash_map.get(&file_hash) {
             // This is a duplicate source, make sure it is marked as a target
-            // and/or a test_target if any instance marks it as such.
+            // and/or a primary_target if any instance marks it as such.
             if is_target && !self.file_id_is_target.contains(file_id) {
                 self.file_id_is_target.insert(*file_id);
             }
-            if is_test_target && !self.file_id_is_test_target.contains(file_id) {
-                self.file_id_is_test_target.insert(*file_id);
+            if is_primary_target && !self.file_id_is_primary_target.contains(file_id) {
+                self.file_id_is_primary_target.insert(*file_id);
             }
             *file_id
         } else {
@@ -807,8 +807,8 @@ impl GlobalEnv {
             if is_target {
                 self.file_id_is_target.insert(file_id);
             }
-            if is_test_target {
-                self.file_id_is_test_target.insert(file_id);
+            if is_primary_target {
+                self.file_id_is_primary_target.insert(file_id);
             }
             file_id
         }
@@ -2624,10 +2624,10 @@ impl<'env> ModuleEnv<'env> {
         *self.env.everything_is_target.borrow() || self.env.file_id_is_target.contains(&file_id)
     }
 
-    /// Returns true of this module is a test target.
-    pub fn is_test_target(&self) -> bool {
+    /// Returns true of this module is a primary (test/analysis/prover) target.
+    pub fn is_primary_target(&self) -> bool {
         let file_id = self.data.loc.file_id;
-        self.env.file_id_is_test_target.contains(&file_id)
+        self.env.file_id_is_primary_target.contains(&file_id)
     }
 
     /// Returns the path to source file of this module.
