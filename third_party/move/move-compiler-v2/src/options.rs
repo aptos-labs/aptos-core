@@ -61,7 +61,7 @@ pub struct Options {
     pub experiment_cache: RefCell<BTreeMap<String, bool>>,
     /// Sources to compile (positional arg, therefore last)
     pub sources: Vec<String>,
-    /// Deps to compile but not treat as a test target.
+    /// Dependencies to compile but not treat as a test/docgen/warning/prover target.
     #[clap(skip)]
     pub sources_deps: Vec<String>,
     /// Show warnings about unused functions, fields, constants, etc.

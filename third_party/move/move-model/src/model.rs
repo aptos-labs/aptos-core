@@ -524,7 +524,7 @@ pub struct GlobalEnv {
     pub(crate) file_idx_to_id: BTreeMap<u16, FileId>,
     /// A set indicating whether a file id is a compilation target.
     pub(crate) file_id_is_target: BTreeSet<FileId>,
-    /// A set indicating whether a file id is a test/analysis/prover target.
+    /// A set indicating whether a file id is a test/docgen/warning/prover target.
     pub(crate) file_id_is_primary_target: BTreeSet<FileId>,
     /// A special constant location representing an unknown location.
     /// This uses a pseudo entry in `source_files` to be safely represented.
@@ -2624,7 +2624,7 @@ impl<'env> ModuleEnv<'env> {
         *self.env.everything_is_target.borrow() || self.env.file_id_is_target.contains(&file_id)
     }
 
-    /// Returns true of this module is a primary (test/analysis/prover) target.
+    /// Returns true of this module is a primary (test/docgen/warning/prover) target.
     pub fn is_primary_target(&self) -> bool {
         let file_id = self.data.loc.file_id;
         self.env.file_id_is_primary_target.contains(&file_id)

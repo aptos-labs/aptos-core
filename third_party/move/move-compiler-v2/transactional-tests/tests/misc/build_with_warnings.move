@@ -8,4 +8,5 @@ module 0x42::m {
         assert!(foo(3) == 2, 1);
     }
 }
+
 //# run 0x42::m::bar
