@@ -150,6 +150,28 @@ impl SafetyRules {
         updated
     }
 
+    pub(crate) fn observe_tc(
+        &self,
+        timeout: &TwoChainTimeout,
+        safety_data: &mut SafetyData,
+    ) -> bool {
+        let mut updated = false;
+        if safety_data
+            .highest_timeout_round
+            .map_or(true, |highest_timeout_round| {
+                timeout.round() > highest_timeout_round
+            })
+        {
+            safety_data.highest_timeout_round = Some(timeout.round());
+            trace!(
+                SafetyLogSchema::new(LogEntry::HighestTimeoutRound, LogEvent::Update)
+                    .highest_timeout_round(safety_data.highest_timeout_round.unwrap_or(0))
+            );
+            updated = true
+        }
+        updated
+    }
+
     /// Second voting rule
     fn verify_and_update_preferred_round(
         &mut self,
@@ -206,29 +228,6 @@ impl SafetyRules {
         safety_data.last_voted_round = round;
         trace!(
             SafetyLogSchema::new(LogEntry::LastVotedRound, LogEvent::Update)
-                .last_voted_round(safety_data.last_voted_round)
-        );
-
-        Ok(())
-    }
-
-    /// First order voting rule
-    pub(crate) fn verify_and_update_last_order_vote_round(
-        &self,
-        round: Round,
-        safety_data: &mut SafetyData,
-    ) -> Result<(), Error> {
-        safety_data
-            .last_order_voted_round
-            .filter(|&last_order_voted_round| round > last_order_voted_round)
-            .ok_or(Error::IncorrectLastOrderVotedRound(
-                round,
-                safety_data.last_order_voted_round.unwrap(),
-            ))?;
-
-        safety_data.last_order_voted_round = Some(round);
-        trace!(
-            SafetyLogSchema::new(LogEntry::LastOrderVotedRound, LogEvent::Update)
                 .last_voted_round(safety_data.last_voted_round)
         );
 

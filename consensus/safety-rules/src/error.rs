@@ -33,7 +33,7 @@ pub enum Error {
     InvalidQuorumCertificate(String),
     #[error("{0} is not set, SafetyRules is not initialized")]
     NotInitialized(String),
-    #[error("Does not satisfy order vote rule. Round {0}, Quorum round {1}")]
+    #[error("Does not satisfy order vote rule. Block Round {0}, Highest Timeout Round {1}")]
     NotSafeToOrderVote(u64, u64),
     #[error("Data not found in secure storage: {0}")]
     SecureStorageMissingDataError(String),

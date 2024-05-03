@@ -132,8 +132,8 @@ impl PersistentSafetyStorage {
         counters::set_state(counters::EPOCH, data.epoch as i64);
         counters::set_state(counters::LAST_VOTED_ROUND, data.last_voted_round as i64);
         counters::set_state(
-            counters::LAST_ORDER_VOTED_ROUND,
-            data.last_order_voted_round.unwrap_or(0) as i64,
+            counters::HIGHEST_TIMEOUT_ROUND,
+            data.highest_timeout_round.unwrap_or(0) as i64,
         );
         counters::set_state(counters::PREFERRED_ROUND, data.preferred_round as i64);
 

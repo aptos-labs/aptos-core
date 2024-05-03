@@ -41,6 +41,7 @@ impl SafetyRules {
         }
         if timeout.round() > safety_data.last_voted_round {
             self.verify_and_update_last_vote_round(timeout.round(), &mut safety_data)?;
+            self.observe_tc(timeout, &mut safety_data);
             self.persistent_storage.set_safety_data(safety_data)?;
         }
 
@@ -109,13 +110,10 @@ impl SafetyRules {
                 return Ok(order_vote);
             }
         }
-        self.verify_and_update_last_order_vote_round(
-            proposed_block.block_data().round(),
-            &mut safety_data,
-        )?;
-
         // Record 1-chain data
         self.observe_qc(order_vote_proposal.quorum_cert(), &mut safety_data);
+
+        self.safe_to_order_vote(proposed_block, &safety_data)?;
 
         // Construct and sign order vote
         let author = self.signer()?.author();
@@ -174,6 +172,18 @@ impl SafetyRules {
             Ok(())
         } else {
             Err(Error::NotSafeToVote(round, qc_round, tc_round, hqc_round))
+        }
+    }
+
+    fn safe_to_order_vote(&self, block: &Block, safety_data: &SafetyData) -> Result<(), Error> {
+        let round = block.round();
+        if round > safety_data.highest_timeout_round.unwrap_or(0) {
+            Ok(())
+        } else {
+            Err(Error::NotSafeToOrderVote(
+                round,
+                safety_data.highest_timeout_round.unwrap_or(0),
+            ))
         }
     }
 
