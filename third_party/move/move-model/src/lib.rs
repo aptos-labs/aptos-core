@@ -174,25 +174,19 @@ pub fn run_model_builder_with_options_and_compilation_flags<
     let (files, comments_and_compiler_res) =
         Compiler::from_package_paths(move_sources, deps, flags, known_attributes)
             .run::<PASS_PARSER>()?;
-    let mut recorded_sources: BTreeSet<String> = BTreeSet::new();
     let (comment_map, compiler) = match comments_and_compiler_res {
         Err(diags) => {
             // Add source files so that the env knows how to translate locations of parse errors
             let empty_alias = Rc::new(BTreeMap::new());
             for (fhash, (fname, fsrc)) in &files {
-                if !recorded_sources.contains(fname.as_str()) {
-                    recorded_sources.insert(fname.as_str().to_owned());
-                    env.add_source(
-                        *fhash,
-                        empty_alias.clone(),
-                        fname.as_str(),
-                        fsrc,
-                        /* is_target */ true,
-                        target_sources_names.contains(fname.as_str()),
-                    );
-                } else {
-                    eprintln!("double entry for {}", fname.as_str());
-                }
+                env.add_source(
+                    *fhash,
+                    empty_alias.clone(),
+                    fname.as_str(),
+                    fsrc,
+                    /* is_target */ true,
+                    target_sources_names.contains(fname.as_str()),
+                );
             }
             add_move_lang_diagnostics(&mut env, diags);
             return Ok(env);
@@ -230,11 +224,6 @@ pub fn run_model_builder_with_options_and_compilation_flags<
             is_target,
             target_sources_names.contains(fname.as_str()),
         );
-        if !recorded_sources.contains(fname.as_str()) {
-            recorded_sources.insert(fname.as_str().to_owned());
-        } else {
-            eprintln!("double entry for {}", fname.as_str());
-        }
     }
 
     // If a move file does not contain any definition, it will not appear in `parsed_prog`. Add them explicitly.
@@ -250,11 +239,6 @@ pub fn run_model_builder_with_options_and_compilation_flags<
                 is_target,
                 target_sources_names.contains(fname.as_str()),
             );
-            if !recorded_sources.contains(fname.as_str()) {
-                recorded_sources.insert(fname.as_str().to_owned());
-            } else {
-                eprintln!("double entry for {}", fname.as_str());
-            }
         }
     }
 

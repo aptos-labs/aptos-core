@@ -34,7 +34,7 @@ use move_command_line_common::{
     address::ParsedAddress,
     env::{get_move_compiler_block_v1_from_env, get_move_compiler_v2_from_env},
     files::verify_and_create_named_address_mapping,
-    testing::{EXP_EXT, EXP_EXT_V2};
+    testing::{EXP_EXT, EXP_EXT_V2},
 };
 use move_compiler::{self, shared::PackagePaths, FullyCompiledProgram};
 use move_core_types::{
@@ -1024,11 +1024,10 @@ pub fn run_aptos_test_with_config(
 ) -> Result<(), Box<dyn std::error::Error>> {
     let (suffix, config) =
         if get_move_compiler_v2_from_env() && !matches!(config, TestRunConfig::CompilerV2 { .. }) {
-            (Some(EXP_EXT_V2.to_owned()),
-             TestRunConfig::CompilerV2 {
-                 language_version: LanguageVersion::default(),
-                 v2_experiments: vec![],
-             })
+            (Some(EXP_EXT_V2.to_owned()), TestRunConfig::CompilerV2 {
+                language_version: LanguageVersion::default(),
+                v2_experiments: vec![],
+            })
         } else {
             (Some(EXP_EXT.to_owned()), config)
         };
