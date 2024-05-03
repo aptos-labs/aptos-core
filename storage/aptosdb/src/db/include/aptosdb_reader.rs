@@ -886,7 +886,7 @@ impl AptosDB {
     ) -> Result<TransactionWithProof> {
         self.error_if_ledger_pruned("Transaction", version)?;
 
-        let proof = self
+        let mut proof = self
             .ledger_db
             .transaction_info_db()
             .get_transaction_info_with_proof(
@@ -894,6 +894,11 @@ impl AptosDB {
                 ledger_version,
                 self.ledger_db.transaction_accumulator_db(),
             )?;
+
+        let aux_data_opt = self.get_transaction_auxiliary_data_by_version(version).ok();
+        proof.inject_auxiliary_error_data(aux_data_opt);
+
+
         let transaction = self.ledger_db.transaction_db().get_transaction(version)?;
 
         // If events were requested, also fetch those.
