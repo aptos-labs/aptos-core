@@ -11,6 +11,7 @@ module aptos_framework::transaction_validation {
     use aptos_framework::aptos_coin::AptosCoin;
     use aptos_framework::chain_id;
     use aptos_framework::coin;
+    use aptos_framework::primary_fungible_store;
     use aptos_framework::system_addresses;
     use aptos_framework::timestamp;
     use aptos_framework::transaction_fee;
@@ -151,14 +152,21 @@ module aptos_framework::transaction_validation {
         };
 
         let max_transaction_fee = txn_gas_price * txn_max_gas_units;
-        assert!(
-            coin::is_account_registered<AptosCoin>(gas_payer),
-            error::invalid_argument(PROLOGUE_ECANT_PAY_GAS_DEPOSIT),
-        );
-        assert!(
-            coin::is_balance_at_least<AptosCoin>(gas_payer, max_transaction_fee),
-            error::invalid_argument(PROLOGUE_ECANT_PAY_GAS_DEPOSIT)
-        );
+        if (features::operations_default_to_fa_apt_store()) {
+            assert!(
+                primary_fungible_store::is_apt_balance_at_least(gas_payer, max_transaction_fee),
+                error::invalid_argument(PROLOGUE_ECANT_PAY_GAS_DEPOSIT)
+            );
+        } else {
+            assert!(
+                coin::is_account_registered<AptosCoin>(gas_payer),
+                error::invalid_argument(PROLOGUE_ECANT_PAY_GAS_DEPOSIT),
+            );
+            assert!(
+                coin::is_balance_at_least<AptosCoin>(gas_payer, max_transaction_fee),
+                error::invalid_argument(PROLOGUE_ECANT_PAY_GAS_DEPOSIT)
+            );
+        }
     }
 
     fun script_prologue(
@@ -369,12 +377,20 @@ module aptos_framework::transaction_validation {
             error::out_of_range(EOUT_OF_GAS)
         );
         let transaction_fee_amount = txn_gas_price * gas_used;
+
         // it's important to maintain the error code consistent with vm
         // to do failed transaction cleanup.
-        assert!(
-            coin::is_balance_at_least<AptosCoin>(gas_payer, transaction_fee_amount),
-            error::out_of_range(PROLOGUE_ECANT_PAY_GAS_DEPOSIT),
-        );
+        if (features::operations_default_to_fa_apt_store()) {
+            assert!(
+                primary_fungible_store::is_apt_balance_at_least(gas_payer, transaction_fee_amount),
+                error::out_of_range(PROLOGUE_ECANT_PAY_GAS_DEPOSIT),
+            );
+        } else {
+            assert!(
+                coin::is_balance_at_least<AptosCoin>(gas_payer, transaction_fee_amount),
+                error::out_of_range(PROLOGUE_ECANT_PAY_GAS_DEPOSIT),
+            );
+        };
 
         let amount_to_burn = if (features::collect_and_distribute_gas_fees()) {
             // TODO(gas): We might want to distinguish the refundable part of the charge and burn it or track

@@ -530,6 +530,20 @@ module std::features {
         is_enabled(DISPATCHABLE_FUNGIBLE_ASSET)
     }
 
+    /// Lifetime: transient
+    const NEW_ACCOUNTS_DEFAULT_TO_FA_APT_STORE: u64 = 64;
+
+    public fun new_accounts_default_to_fa_apt_store_enabled(): bool acquires Features {
+        is_enabled(NEW_ACCOUNTS_DEFAULT_TO_FA_APT_STORE)
+    }
+
+    /// Lifetime: transient
+    const OPERATIONS_DEFAULT_TO_FA_APT_STORE: u64 = 65;
+
+    public fun operations_default_to_fa_apt_store(): bool acquires Features {
+        is_enabled(OPERATIONS_DEFAULT_TO_FA_APT_STORE)
+    }
+
     // ============================================================================================
     // Feature Flag Implementation
 
