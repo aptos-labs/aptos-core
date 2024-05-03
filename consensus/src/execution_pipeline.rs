@@ -32,7 +32,7 @@ use tokio::sync::{mpsc, oneshot};
 pub static SIG_VERIFY_POOL: Lazy<Arc<rayon::ThreadPool>> = Lazy::new(|| {
     Arc::new(
         rayon::ThreadPoolBuilder::new()
-            .num_threads(8) // More than 8 threads doesn't seem to help much
+            .num_threads(32) // More than 8 threads doesn't seem to help much
             .thread_name(|index| format!("signature-checker-{}", index))
             .build()
             .unwrap(),
