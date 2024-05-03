@@ -618,13 +618,13 @@ module aptos_framework::coin {
             (amount, 0)
         } else {
             let metadata = paired_metadata<CoinType>();
-            if (option::is_none(&metadata) || !primary_fungible_store::primary_store_exists(
+            if (option::is_some(&metadata) && primary_fungible_store::primary_store_exists(
                 account_addr,
                 option::destroy_some(metadata)
             ))
-                abort error::invalid_argument(EINSUFFICIENT_BALANCE)
-            else
                 (coin_balance, amount - coin_balance)
+            else
+                abort error::invalid_argument(EINSUFFICIENT_BALANCE)
         }
     }
 
@@ -660,7 +660,9 @@ module aptos_framework::coin {
             // In this case, if the account owns a frozen CoinStore and an unfrozen primary fungible store, this
             // function would convert and deposit the rest coin into the primary store and freeze it to make the
             // `frozen` semantic as consistent as possible.
-            fungible_asset::set_frozen_flag_internal(store, frozen);
+            if (frozen != fungible_asset::is_frozen(store)) {
+                fungible_asset::set_frozen_flag_internal(store, frozen);
+            }
         };
         if (!exists<MigrationFlag>(store_address)) {
             move_to(&create_signer::create_signer(store_address), MigrationFlag {});
