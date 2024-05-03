@@ -489,11 +489,14 @@ module aptos_framework::fungible_asset {
 
     /// Check whether the balance of a given store is >= `amount`.
     public(friend) fun is_address_balance_at_least(store_addr: address, amount: u64): bool acquires FungibleStore, ConcurrentFungibleBalance {
-        if (concurrent_fungible_balance_exists_inline(store_addr)) {
-            let balance_resource = borrow_global<ConcurrentFungibleBalance>(store_addr);
-            aggregator_v2::is_at_least(&balance_resource.balance, amount)
-        } else if (store_exists_inline(store_addr)) {
-            borrow_global<FungibleStore>(store_addr).balance >= amount
+        if (store_exists_inline(store_addr)) {
+            let store = borrow_global<FungibleStore>(store_addr);
+            if (store.balance == 0 && concurrent_fungible_balance_exists_inline(store_addr)) {
+                let balance_resource = borrow_global<ConcurrentFungibleBalance>(store_addr);
+                aggregator_v2::is_at_least(&balance_resource.balance, amount)
+            } else {
+                store.balance >= amount
+            }
         } else {
             amount == 0
         }
@@ -861,7 +864,7 @@ module aptos_framework::fungible_asset {
 
         assert!(metadata == store_metadata, error::invalid_argument(EFUNGIBLE_ASSET_AND_STORE_MISMATCH));
 
-        if (concurrent_fungible_balance_exists_inline(store_addr)) {
+        if (store.balance == 0 && concurrent_fungible_balance_exists_inline(store_addr)) {
             let balance_resource = borrow_global_mut<ConcurrentFungibleBalance>(store_addr);
             aggregator_v2::add(&mut balance_resource.balance, amount);
         } else {
@@ -884,7 +887,7 @@ module aptos_framework::fungible_asset {
         let store = borrow_global<FungibleStore>(store_addr);
         let metadata = store.metadata;
         if (amount != 0) {
-            if (concurrent_fungible_balance_exists_inline(store_addr)) {
+            if (store.balance == 0 && concurrent_fungible_balance_exists_inline(store_addr)) {
                 let balance_resource = borrow_global_mut<ConcurrentFungibleBalance>(store_addr);
                 assert!(
                     aggregator_v2::try_sub(&mut balance_resource.balance, amount),

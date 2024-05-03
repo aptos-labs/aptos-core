@@ -137,7 +137,7 @@ impl FeatureFlag {
             FeatureFlag::OBJECT_NATIVE_DERIVED_ADDRESS,
             FeatureFlag::DISPATCHABLE_FUNGIBLE_ASSET,
             FeatureFlag::CONCURRENT_FUNGIBLE_ASSETS,
-            FeatureFlag::MIGRATE_TO_CONCURRENT_FUNGIBLE_BALANCE,
+            // FeatureFlag::MIGRATE_TO_CONCURRENT_FUNGIBLE_BALANCE,
         ]
     }
 }
