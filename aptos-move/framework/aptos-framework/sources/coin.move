@@ -916,7 +916,7 @@ module aptos_framework::coin {
                 let fa = coin_to_fungible_asset(coin);
                 let metadata = fungible_asset::asset_metadata(&fa);
                 let store = primary_fungible_store::primary_store(account_addr, metadata);
-                fungible_asset::deposit_internal(store, fa);
+                fungible_asset::deposit_internal(object::object_address(&store), fa);
             } else {
                 abort error::not_found(ECOIN_STORE_NOT_PUBLISHED)
             }

@@ -613,7 +613,7 @@ module aptos_framework::fungible_asset {
             error::invalid_argument(EINVALID_DISPATCHABLE_OPERATIONS)
         );
         assert!(!fa_store.frozen, error::permission_denied(ESTORE_IS_FROZEN));
-        deposit_internal(store, fa);
+        deposit_internal(object::object_address(&store), fa);
     }
 
     /// Withdraw `amount` of the fungible asset from `store` by the owner.
@@ -630,7 +630,7 @@ module aptos_framework::fungible_asset {
     /// Deposit `amount` of the fungible asset to `store`.
     public(friend) fun deposit_non_dispatch<T: key>(store: Object<T>, fa: FungibleAsset) acquires FungibleStore {
         assert!(!is_frozen(store), error::permission_denied(ESTORE_IS_FROZEN));
-        deposit_internal(store, fa);
+        deposit_internal(object::object_address(&store), fa);
     }
 
     /// Mint the specified `amount` of the fungible asset.
@@ -742,7 +742,7 @@ module aptos_framework::fungible_asset {
             ref.metadata == fa.metadata,
             error::invalid_argument(ETRANSFER_REF_AND_FUNGIBLE_ASSET_MISMATCH)
         );
-        deposit_internal(store, fa);
+        deposit_internal(object::object_address(&store), fa);
     }
 
     /// Transfer `amount` of the fungible asset with `TransferRef` even it is frozen.
@@ -789,14 +789,15 @@ module aptos_framework::fungible_asset {
         assert!(amount == 0, error::invalid_argument(EAMOUNT_IS_NOT_ZERO));
     }
 
-    public(friend) fun deposit_internal<T: key>(store: Object<T>, fa: FungibleAsset) acquires FungibleStore {
+    public(friend) fun deposit_internal(store_addr: address, fa: FungibleAsset) acquires FungibleStore {
         let FungibleAsset { metadata, amount } = fa;
         if (amount == 0) return;
 
-        let store_metadata = store_metadata(store);
-        assert!(metadata == store_metadata, error::invalid_argument(EFUNGIBLE_ASSET_AND_STORE_MISMATCH));
-        let store_addr = object::object_address(&store);
+        assert!(exists<FungibleStore>(store_addr), error::not_found(EFUNGIBLE_STORE_EXISTENCE));
         let store = borrow_global_mut<FungibleStore>(store_addr);
+        let store_metadata = store.metadata;
+
+        assert!(metadata == store_metadata, error::invalid_argument(EFUNGIBLE_ASSET_AND_STORE_MISMATCH));
         store.balance = store.balance + amount;
 
         event::emit(Deposit { store: store_addr, amount });

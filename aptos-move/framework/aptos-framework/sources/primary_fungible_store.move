@@ -74,12 +74,12 @@ module aptos_framework::primary_fungible_store {
 
     inline fun apt_ensure_primary_store_exists(
         owner: address,
-    ): Object<FungibleStore> acquires DeriveRefPod {
+    ): address acquires DeriveRefPod {
         let store_addr = apt_store_address(owner);
         if (fungible_asset::store_exists(store_addr)) {
-            object::address_to_object<FungibleStore>(store_addr)
+            store_addr
         } else {
-            create_primary_store(owner, object::address_to_object<Metadata>(@aptos_fungible_asset))
+            object::object_address(&create_primary_store(owner, object::address_to_object<Metadata>(@aptos_fungible_asset)))
         }
     }
 
@@ -204,7 +204,7 @@ module aptos_framework::primary_fungible_store {
     public(friend) fun force_deposit(owner: address, fa: FungibleAsset) acquires DeriveRefPod {
         let metadata = fungible_asset::asset_metadata(&fa);
         let store = ensure_primary_store_exists(owner, metadata);
-        fungible_asset::deposit_internal(store, fa);
+        fungible_asset::deposit_internal(object::object_address(&store), fa);
     }
 
     /// Transfer `amount` of fungible asset from sender's primary store to receiver's primary store.
@@ -226,15 +226,16 @@ module aptos_framework::primary_fungible_store {
         recipient: address,
         amount: u64,
     ) acquires DeriveRefPod {
-        // let sender_store = apt_store_address(sender);
-        // let recipient_store = apt_store_address(recipient);
-
         let sender_store = apt_ensure_primary_store_exists(signer::address_of(sender));
         // Check if the sender store object has been burnt or not. If so, unburn it first.
         // may_be_unburn(sender, sender_store);
         let recipient_store = apt_ensure_primary_store_exists(recipient);
 
-        fungible_asset::transfer(sender, sender_store, recipient_store, amount);
+        // use internal APIs, as they skip:
+        // - owner, frozen and dispatchable checks
+        // as APT cannot be frozen or have dispatch, and PFS cannot be transfered
+        // (except burned, but instead of permanently unburning, we can just treat that user unburns, transfers, and then burns again)
+        fungible_asset::deposit_internal(recipient_store, fungible_asset::withdraw_internal(sender_store, amount));
     }
 
     /// Transfer `amount` of fungible asset from sender's primary store to receiver's primary store.
