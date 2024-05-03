@@ -9,7 +9,7 @@ error: post-condition does not hold
    =         category = <redacted>
    =         reason = <redacted>
    =     at ../move-stdlib/nursery/sources/errors.move:18: make
-   =         <redacted> = <redacted>
+   =         category = <redacted>
    =         result = <redacted>
    =     at ../move-stdlib/nursery/sources/errors.move:19: make
    =     at ../move-stdlib/nursery/sources/errors.move:26: make (spec)
@@ -28,7 +28,6 @@ error: post-condition does not hold
    =     at ../move-stdlib/sources/fixed_point32.move:69: divide_u64
    =     at ../move-stdlib/sources/fixed_point32.move:71: divide_u64
    =         <redacted> = <redacted>
-   =         quotient = <redacted>
    =     at ../move-stdlib/sources/fixed_point32.move:71: divide_u64
    =     at ../move-stdlib/sources/fixed_point32.move:74: divide_u64
    =     at ../move-stdlib/sources/fixed_point32.move:63: divide_u64
@@ -59,7 +58,6 @@ error: abort not covered by any of the `aborts_if` clauses
    =     at ../move-stdlib/sources/fixed_point32.move:69: divide_u64
    =     at ../move-stdlib/sources/fixed_point32.move:71: divide_u64
    =         <redacted> = <redacted>
-   =         quotient = <redacted>
    =     at ../move-stdlib/sources/fixed_point32.move:71: divide_u64
    =         ABORTED
 
@@ -77,7 +75,6 @@ error: function does not abort under this condition
    =     at ../move-stdlib/sources/fixed_point32.move:69: divide_u64
    =     at ../move-stdlib/sources/fixed_point32.move:71: divide_u64
    =         <redacted> = <redacted>
-   =         quotient = <redacted>
    =     at ../move-stdlib/sources/fixed_point32.move:71: divide_u64
    =     at ../move-stdlib/sources/fixed_point32.move:74: divide_u64
    =     at ../move-stdlib/sources/fixed_point32.move:63: divide_u64
@@ -99,7 +96,6 @@ error: post-condition does not hold
     =     at ../move-stdlib/sources/fixed_point32.move:202: create_from_u64
     =     at ../move-stdlib/sources/fixed_point32.move:203: create_from_u64
     =         <redacted> = <redacted>
-    =         value = <redacted>
     =     at ../move-stdlib/sources/fixed_point32.move:203: create_from_u64
     =     at ../move-stdlib/sources/fixed_point32.move:204: create_from_u64
     =     at ../move-stdlib/sources/fixed_point32.move:201: create_from_u64
@@ -134,12 +130,10 @@ error: post-condition does not hold
     =         <redacted> = <redacted>
     =     at ../move-stdlib/sources/fixed_point32.move:266: round
     =         <redacted> = <redacted>
-    =         floored_num = <redacted>
     =     at ../move-stdlib/sources/fixed_point32.move:267: round
     =         <redacted> = <redacted>
-    =         boundary = <redacted>
-    =     at ../move-stdlib/sources/fixed_point32.move:270: round
-    =         return = <redacted>
+    =     at ../move-stdlib/sources/fixed_point32.move:268: round
+    =         <redacted> = <redacted>
     =     at ../move-stdlib/sources/fixed_point32.move:267: round
     =         result = <redacted>
     =     at ../move-stdlib/sources/fixed_point32.move:272: round
@@ -166,6 +160,5 @@ error: abort not covered by any of the `aborts_if` clauses
     =         <redacted> = <redacted>
     =     at ../move-stdlib/sources/fixed_point32.move:266: round
     =         <redacted> = <redacted>
-    =         floored_num = <redacted>
     =     at ../move-stdlib/sources/fixed_point32.move:266: round
     =         ABORTED
