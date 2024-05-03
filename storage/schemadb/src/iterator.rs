@@ -2,7 +2,7 @@
 // SPDX-License-Identifier: Apache-2.0
 
 use crate::{
-    KeyCodec, Schema, SeekKeyCodec, ValueCodec, APTOS_SCHEMADB_ITER_BYTES,
+    IntoDbResult, KeyCodec, Schema, SeekKeyCodec, ValueCodec, APTOS_SCHEMADB_ITER_BYTES,
     APTOS_SCHEMADB_ITER_LATENCY_SECONDS, APTOS_SCHEMADB_SEEK_LATENCY_SECONDS,
 };
 use std::marker::PhantomData;
@@ -84,7 +84,7 @@ where
             .start_timer();
 
         if !self.db_iter.valid() {
-            self.db_iter.status()?;
+            self.db_iter.status().into_db_res()?;
             return Ok(None);
         }
 
