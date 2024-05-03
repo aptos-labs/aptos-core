@@ -6,7 +6,7 @@ All notable changes to the Aptos CLI will be captured in this file. This project
 
 ## [3.3.0] - 2024/05/03
 - **Breaking Change** Update View functions to use BCS for submission.  Allows for all arguments to be supported in view functions.  Note some input arguments that were previously inputted as strings may be handled differently.
-- Early preview beta release of the Move compiler v2 is now accessible through the CLI.
+- Early beta release of the Move compiler v2 is now accessible through the CLI. We now allow specifying the Move compiler version and the Move language version via the CLI.
 
 ## [3.2.0] - 2024/03/29
 - Renamed `run-local-testnet` to `run-localnet`. `run-local-testnet` is still supported for backwards compatibility.
