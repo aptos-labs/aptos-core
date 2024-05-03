@@ -138,7 +138,7 @@ TESTS = [
 
     RunGroupConfig(expected_tps=14500, key=RunGroupKey("coin-init-and-mint", module_working_set_size=1), included_in=Flow.CONTINUOUS),
     RunGroupConfig(expected_tps=11770, key=RunGroupKey("coin-init-and-mint", module_working_set_size=20), included_in=Flow.CONTINUOUS),
-    RunGroupConfig(expected_tps=1930, key=RunGroupKey("fungible-asset-mint", module_working_set_size=1), included_in=LAND_BLOCKING_AND_C),
+    RunGroupConfig(expected_tps=9800, key=RunGroupKey("fungible-asset-mint", module_working_set_size=1), included_in=LAND_BLOCKING_AND_C),
     RunGroupConfig(expected_tps=8800, key=RunGroupKey("fungible-asset-mint", module_working_set_size=20), included_in=Flow.CONTINUOUS),
 
     # RunGroupConfig(expected_tps=1000, key=RunGroupKey("token-v1ft-mint-and-store"), included_in=Flow(0)),

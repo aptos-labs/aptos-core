@@ -34,7 +34,7 @@ use aptos_types::{
     mempool_status::MempoolStatusCode,
     transaction::{
         EntryFunction, ExecutionStatus, MultisigTransactionPayload, RawTransaction,
-        RawTransactionWithData, SignedTransaction, TransactionPayload, TransactionStatus,
+        RawTransactionWithData, SignedTransaction, TransactionPayload,
     },
     vm_status::StatusCode,
     APTOS_COIN_TYPE,
@@ -1380,10 +1380,11 @@ impl TransactionsApi {
         let version = ledger_info.version();
 
         // Ensure that all known statuses return their values in the output (even if they aren't supposed to)
-        let exe_status = match output.status().clone() {
-            TransactionStatus::Keep(exec_status) => exec_status,
-            TransactionStatus::Discard(status) => ExecutionStatus::MiscellaneousError(Some(status)),
-            _ => ExecutionStatus::MiscellaneousError(None),
+        let exe_status = match vm_status.clone().keep_or_discard() {
+            Ok(kept_vm_status) => kept_vm_status.into(),
+            Err(discarded_vm_status) => {
+                ExecutionStatus::MiscellaneousError(Some(discarded_vm_status))
+            },
         };
 
         let stats_key = match txn.payload() {
