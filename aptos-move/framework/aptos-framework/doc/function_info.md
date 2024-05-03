@@ -3,7 +3,7 @@
 
 # Module `0x1::function_info`
 
-The <code><a href="../../aptos-stdlib/../move-stdlib/doc/string.md#0x1_string">string</a></code> module defines the <code>String</code> type which represents UTF8 encoded strings.
+The <code><a href="function_info.md#0x1_function_info">function_info</a></code> module defines the <code><a href="function_info.md#0x1_function_info_FunctionInfo">FunctionInfo</a></code> type which simulates a function pointer.
 
 
 -  [Struct `FunctionInfo`](#0x1_function_info_FunctionInfo)
@@ -186,6 +186,15 @@ dispatch_target also needs to be public so the type signature will remain unchan
 
 ## Function `load_function`
 
+Load up a function into VM's loader and charge for its dependencies
+
+It is **critical** to make sure that this function is invoked before <code>check_dispatch_type_compatibility</code>
+or performing any other dispatching logic to ensure:
+1. We properly charge gas for the function to dispatch.
+2. The function is loaded in the cache so that we can perform further type checking/dispatching logic.
+
+Calling <code>check_dispatch_type_compatibility_impl</code> or dispatch without loading up the module would yield an error
+if such module isn't accessed previously in the transaction.
 
 
 <pre><code><b>public</b>(<b>friend</b>) <b>fun</b> <a href="function_info.md#0x1_function_info_load_function">load_function</a>(f: &<a href="function_info.md#0x1_function_info_FunctionInfo">function_info::FunctionInfo</a>)

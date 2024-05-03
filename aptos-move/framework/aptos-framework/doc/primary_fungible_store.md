@@ -27,7 +27,7 @@ fungible asset to it. This emits an deposit event.
 -  [Function `primary_store_exists`](#0x1_primary_fungible_store_primary_store_exists)
 -  [Function `balance`](#0x1_primary_fungible_store_balance)
 -  [Function `apt_balance`](#0x1_primary_fungible_store_apt_balance)
--  [Function `burn_from_apt`](#0x1_primary_fungible_store_burn_from_apt)
+-  [Function `apt_burn_from`](#0x1_primary_fungible_store_apt_burn_from)
 -  [Function `is_frozen`](#0x1_primary_fungible_store_is_frozen)
 -  [Function `withdraw`](#0x1_primary_fungible_store_withdraw)
 -  [Function `deposit`](#0x1_primary_fungible_store_deposit)
@@ -338,13 +338,13 @@ Get the balance of <code><a href="account.md#0x1_account">account</a></code>'s p
 
 </details>
 
-<a id="0x1_primary_fungible_store_burn_from_apt"></a>
+<a id="0x1_primary_fungible_store_apt_burn_from"></a>
 
-## Function `burn_from_apt`
+## Function `apt_burn_from`
 
 
 
-<pre><code><b>public</b>(<b>friend</b>) <b>fun</b> <a href="primary_fungible_store.md#0x1_primary_fungible_store_burn_from_apt">burn_from_apt</a>(<a href="account.md#0x1_account">account</a>: <b>address</b>, amount: u64)
+<pre><code><b>public</b>(<b>friend</b>) <b>fun</b> <a href="primary_fungible_store.md#0x1_primary_fungible_store_apt_burn_from">apt_burn_from</a>(ref: &<a href="fungible_asset.md#0x1_fungible_asset_BurnRef">fungible_asset::BurnRef</a>, <a href="account.md#0x1_account">account</a>: <b>address</b>, amount: u64)
 </code></pre>
 
 
@@ -353,18 +353,16 @@ Get the balance of <code><a href="account.md#0x1_account">account</a></code>'s p
 <summary>Implementation</summary>
 
 
-<pre><code><b>public</b>(<b>friend</b>) <b>fun</b> <a href="primary_fungible_store.md#0x1_primary_fungible_store_burn_from_apt">burn_from_apt</a>(
+<pre><code><b>public</b>(<b>friend</b>) <b>fun</b> <a href="primary_fungible_store.md#0x1_primary_fungible_store_apt_burn_from">apt_burn_from</a>(
+    ref: &BurnRef,
     <a href="account.md#0x1_account">account</a>: <b>address</b>,
     amount: u64,
 ) {
     // Skip burning <b>if</b> amount is zero. This shouldn't <a href="../../aptos-stdlib/../move-stdlib/doc/error.md#0x1_error">error</a> out <b>as</b> it's called <b>as</b> part of transaction fee burning.
-    <b>if</b> (amount == 0) {
-        <b>return</b>
+    <b>if</b> (amount != 0) {
+        <b>let</b> store_addr = <a href="transaction_context.md#0x1_transaction_context_create_user_derived_object_address">transaction_context::create_user_derived_object_address</a>(<a href="account.md#0x1_account">account</a>, @aptos_fungible_asset);
+        <a href="fungible_asset.md#0x1_fungible_asset_burn">fungible_asset::burn</a>(ref, <a href="fungible_asset.md#0x1_fungible_asset_withdraw_internal">fungible_asset::withdraw_internal</a>(store_addr, amount))
     };
-
-    <b>let</b> store_addr = <a href="transaction_context.md#0x1_transaction_context_create_user_derived_object_address">transaction_context::create_user_derived_object_address</a>(<a href="account.md#0x1_account">account</a>, @aptos_fungible_asset);
-    <b>let</b> fa = <a href="fungible_asset.md#0x1_fungible_asset_withdraw_internal">fungible_asset::withdraw_internal</a>(store_addr, amount);
-    <a href="fungible_asset.md#0x1_fungible_asset_burn_internal">fungible_asset::burn_internal</a>(fa);
 }
 </code></pre>
 

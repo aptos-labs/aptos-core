@@ -7,6 +7,7 @@ This module provides an interface to burn or collect and redistribute transactio
 
 
 -  [Resource `AptosCoinCapabilities`](#0x1_transaction_fee_AptosCoinCapabilities)
+-  [Resource `AptosFABurnCapabilities`](#0x1_transaction_fee_AptosFABurnCapabilities)
 -  [Resource `AptosCoinMintCapability`](#0x1_transaction_fee_AptosCoinMintCapability)
 -  [Resource `CollectedFeesPerBlock`](#0x1_transaction_fee_CollectedFeesPerBlock)
 -  [Struct `FeeStatement`](#0x1_transaction_fee_FeeStatement)
@@ -46,6 +47,7 @@ This module provides an interface to burn or collect and redistribute transactio
 <b>use</b> <a href="coin.md#0x1_coin">0x1::coin</a>;
 <b>use</b> <a href="../../aptos-stdlib/../move-stdlib/doc/error.md#0x1_error">0x1::error</a>;
 <b>use</b> <a href="event.md#0x1_event">0x1::event</a>;
+<b>use</b> <a href="fungible_asset.md#0x1_fungible_asset">0x1::fungible_asset</a>;
 <b>use</b> <a href="../../aptos-stdlib/../move-stdlib/doc/option.md#0x1_option">0x1::option</a>;
 <b>use</b> <a href="primary_fungible_store.md#0x1_primary_fungible_store">0x1::primary_fungible_store</a>;
 <b>use</b> <a href="stake.md#0x1_stake">0x1::stake</a>;
@@ -73,6 +75,34 @@ Stores burn capability to burn the gas fees.
 <dl>
 <dt>
 <code>burn_cap: <a href="coin.md#0x1_coin_BurnCapability">coin::BurnCapability</a>&lt;<a href="aptos_coin.md#0x1_aptos_coin_AptosCoin">aptos_coin::AptosCoin</a>&gt;</code>
+</dt>
+<dd>
+
+</dd>
+</dl>
+
+
+</details>
+
+<a id="0x1_transaction_fee_AptosFABurnCapabilities"></a>
+
+## Resource `AptosFABurnCapabilities`
+
+Stores burn capability to burn the gas fees.
+
+
+<pre><code><b>struct</b> <a href="transaction_fee.md#0x1_transaction_fee_AptosFABurnCapabilities">AptosFABurnCapabilities</a> <b>has</b> key
+</code></pre>
+
+
+
+<details>
+<summary>Fields</summary>
+
+
+<dl>
+<dt>
+<code>burn_ref: <a href="fungible_asset.md#0x1_fungible_asset_BurnRef">fungible_asset::BurnRef</a></code>
 </dt>
 <dd>
 
@@ -516,8 +546,9 @@ Burn transaction fees in epilogue.
 <summary>Implementation</summary>
 
 
-<pre><code><b>public</b>(<b>friend</b>) <b>fun</b> <a href="transaction_fee.md#0x1_transaction_fee_burn_fee">burn_fee</a>(<a href="account.md#0x1_account">account</a>: <b>address</b>, fee: u64) {
-    <a href="primary_fungible_store.md#0x1_primary_fungible_store_burn_from_apt">primary_fungible_store::burn_from_apt</a>(<a href="account.md#0x1_account">account</a>, fee);
+<pre><code><b>public</b>(<b>friend</b>) <b>fun</b> <a href="transaction_fee.md#0x1_transaction_fee_burn_fee">burn_fee</a>(<a href="account.md#0x1_account">account</a>: <b>address</b>, fee: u64) <b>acquires</b> <a href="transaction_fee.md#0x1_transaction_fee_AptosFABurnCapabilities">AptosFABurnCapabilities</a> {
+    <b>let</b> burn_ref = &<b>borrow_global</b>&lt;<a href="transaction_fee.md#0x1_transaction_fee_AptosFABurnCapabilities">AptosFABurnCapabilities</a>&gt;(@aptos_framework).burn_ref;
+    <a href="primary_fungible_store.md#0x1_primary_fungible_store_apt_burn_from">primary_fungible_store::apt_burn_from</a>(burn_ref, <a href="account.md#0x1_account">account</a>, fee);
 }
 </code></pre>
 
@@ -601,7 +632,8 @@ Only called during genesis.
 
 <pre><code><b>public</b>(<b>friend</b>) <b>fun</b> <a href="transaction_fee.md#0x1_transaction_fee_store_aptos_coin_burn_cap">store_aptos_coin_burn_cap</a>(aptos_framework: &<a href="../../aptos-stdlib/../move-stdlib/doc/signer.md#0x1_signer">signer</a>, burn_cap: BurnCapability&lt;AptosCoin&gt;) {
     <a href="system_addresses.md#0x1_system_addresses_assert_aptos_framework">system_addresses::assert_aptos_framework</a>(aptos_framework);
-    <b>move_to</b>(aptos_framework, <a href="transaction_fee.md#0x1_transaction_fee_AptosCoinCapabilities">AptosCoinCapabilities</a> { burn_cap })
+    <b>let</b> burn_ref = <a href="coin.md#0x1_coin_convert_and_take_paired_burn_ref">coin::convert_and_take_paired_burn_ref</a>(burn_cap);
+    <b>move_to</b>(aptos_framework, <a href="transaction_fee.md#0x1_transaction_fee_AptosFABurnCapabilities">AptosFABurnCapabilities</a> { burn_ref });
 }
 </code></pre>
 

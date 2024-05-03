@@ -1186,6 +1186,16 @@ security of the testnet. This will NOT be enabled in Mainnet.
 
 
 
+<a id="0x1_stake_EALREADY_REGISTERED"></a>
+
+Account is already registered as a validator candidate.
+
+
+<pre><code><b>const</b> <a href="stake.md#0x1_stake_EALREADY_REGISTERED">EALREADY_REGISTERED</a>: u64 = 8;
+</code></pre>
+
+
+
 <a id="0x1_stake_MAX_REWARDS_RATE"></a>
 
 Limit the maximum value of <code>rewards_rate</code> in order to avoid any arithmetic overflow.
@@ -1202,16 +1212,6 @@ Account is already a validator or pending validator.
 
 
 <pre><code><b>const</b> <a href="stake.md#0x1_stake_EALREADY_ACTIVE_VALIDATOR">EALREADY_ACTIVE_VALIDATOR</a>: u64 = 4;
-</code></pre>
-
-
-
-<a id="0x1_stake_EALREADY_REGISTERED"></a>
-
-Account is already registered as a validator candidate.
-
-
-<pre><code><b>const</b> <a href="stake.md#0x1_stake_EALREADY_REGISTERED">EALREADY_REGISTERED</a>: u64 = 8;
 </code></pre>
 
 

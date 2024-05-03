@@ -122,18 +122,16 @@ module aptos_framework::primary_fungible_store {
         fungible_asset::balance_from_address(store_addr)
     }
 
-    public(friend) fun burn_from_apt(
+    public(friend) fun apt_burn_from(
+        ref: &BurnRef,
         account: address,
         amount: u64,
     ) {
         // Skip burning if amount is zero. This shouldn't error out as it's called as part of transaction fee burning.
-        if (amount == 0) {
-            return
+        if (amount != 0) {
+            let store_addr = transaction_context::create_user_derived_object_address(account, @aptos_fungible_asset);
+            fungible_asset::burn(ref, fungible_asset::withdraw_internal(store_addr, amount))
         };
-
-        let store_addr = transaction_context::create_user_derived_object_address(account, @aptos_fungible_asset);
-        let fa = fungible_asset::withdraw_internal(store_addr, amount);
-        fungible_asset::burn_internal(fa);
     }
 
     #[view]

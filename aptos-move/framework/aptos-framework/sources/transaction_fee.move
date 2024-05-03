@@ -8,6 +8,7 @@ module aptos_framework::transaction_fee {
     use std::option::{Self, Option};
     use aptos_framework::event;
     use aptos_framework::primary_fungible_store;
+    use aptos_framework::fungible_asset::BurnRef;
 
     friend aptos_framework::block;
     friend aptos_framework::genesis;
@@ -27,6 +28,11 @@ module aptos_framework::transaction_fee {
     /// Stores burn capability to burn the gas fees.
     struct AptosCoinCapabilities has key {
         burn_cap: BurnCapability<AptosCoin>,
+    }
+
+    /// Stores burn capability to burn the gas fees.
+    struct AptosFABurnCapabilities has key {
+        burn_ref: BurnRef,
     }
 
     /// Stores mint capability to mint the refunds.
@@ -198,8 +204,9 @@ module aptos_framework::transaction_fee {
     }
 
     /// Burn transaction fees in epilogue.
-    public(friend) fun burn_fee(account: address, fee: u64) {
-        primary_fungible_store::burn_from_apt(account, fee);
+    public(friend) fun burn_fee(account: address, fee: u64) acquires AptosFABurnCapabilities {
+        let burn_ref = &borrow_global<AptosFABurnCapabilities>(@aptos_framework).burn_ref;
+        primary_fungible_store::apt_burn_from(burn_ref, account, fee);
     }
 
     /// Mint refund in epilogue.
@@ -223,7 +230,8 @@ module aptos_framework::transaction_fee {
     /// Only called during genesis.
     public(friend) fun store_aptos_coin_burn_cap(aptos_framework: &signer, burn_cap: BurnCapability<AptosCoin>) {
         system_addresses::assert_aptos_framework(aptos_framework);
-        move_to(aptos_framework, AptosCoinCapabilities { burn_cap })
+        let burn_ref = coin::convert_and_take_paired_burn_ref(burn_cap);
+        move_to(aptos_framework, AptosFABurnCapabilities { burn_ref });
     }
 
     /// Only called during genesis.

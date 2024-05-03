@@ -22,13 +22,13 @@ See AIP-73 for further discussion
 -  [Function `register_dispatch_functions`](#0x1_dispatchable_fungible_asset_register_dispatch_functions)
 -  [Function `withdraw`](#0x1_dispatchable_fungible_asset_withdraw)
 -  [Function `deposit`](#0x1_dispatchable_fungible_asset_deposit)
--  [Function `derived_value`](#0x1_dispatchable_fungible_asset_derived_value)
+-  [Function `derived_balance`](#0x1_dispatchable_fungible_asset_derived_balance)
 -  [Function `borrow_transfer_ref`](#0x1_dispatchable_fungible_asset_borrow_transfer_ref)
 -  [Function `transfer_fixed_send`](#0x1_dispatchable_fungible_asset_transfer_fixed_send)
 -  [Function `transfer_fixed_receive`](#0x1_dispatchable_fungible_asset_transfer_fixed_receive)
 -  [Function `dispatchable_withdraw`](#0x1_dispatchable_fungible_asset_dispatchable_withdraw)
 -  [Function `dispatchable_deposit`](#0x1_dispatchable_fungible_asset_dispatchable_deposit)
--  [Function `dispatchable_derived_value`](#0x1_dispatchable_fungible_asset_dispatchable_derived_value)
+-  [Function `dispatchable_derived_balance`](#0x1_dispatchable_fungible_asset_dispatchable_derived_balance)
 -  [Specification](#@Specification_1)
 
 
@@ -95,6 +95,16 @@ Recipient is not getting the guaranteed value;
 
 
 
+<a id="0x1_dispatchable_fungible_asset_ENOT_LOADED"></a>
+
+Dispatch target is not loaded.
+
+
+<pre><code><b>const</b> <a href="dispatchable_fungible_asset.md#0x1_dispatchable_fungible_asset_ENOT_LOADED">ENOT_LOADED</a>: u64 = 4;
+</code></pre>
+
+
+
 <a id="0x1_dispatchable_fungible_asset_ESTORE_NOT_FOUND"></a>
 
 TransferRefStore doesn't exist on the fungible asset type.
@@ -111,7 +121,7 @@ TransferRefStore doesn't exist on the fungible asset type.
 
 
 
-<pre><code><b>public</b> <b>fun</b> <a href="dispatchable_fungible_asset.md#0x1_dispatchable_fungible_asset_register_dispatch_functions">register_dispatch_functions</a>(constructor_ref: &<a href="object.md#0x1_object_ConstructorRef">object::ConstructorRef</a>, withdraw_function: <a href="function_info.md#0x1_function_info_FunctionInfo">function_info::FunctionInfo</a>, deposit_function: <a href="function_info.md#0x1_function_info_FunctionInfo">function_info::FunctionInfo</a>, derived_value_function: <a href="function_info.md#0x1_function_info_FunctionInfo">function_info::FunctionInfo</a>)
+<pre><code><b>public</b> <b>fun</b> <a href="dispatchable_fungible_asset.md#0x1_dispatchable_fungible_asset_register_dispatch_functions">register_dispatch_functions</a>(constructor_ref: &<a href="object.md#0x1_object_ConstructorRef">object::ConstructorRef</a>, withdraw_function: <a href="function_info.md#0x1_function_info_FunctionInfo">function_info::FunctionInfo</a>, deposit_function: <a href="function_info.md#0x1_function_info_FunctionInfo">function_info::FunctionInfo</a>, derived_balance_function: <a href="function_info.md#0x1_function_info_FunctionInfo">function_info::FunctionInfo</a>)
 </code></pre>
 
 
@@ -124,13 +134,13 @@ TransferRefStore doesn't exist on the fungible asset type.
     constructor_ref: &ConstructorRef,
     withdraw_function: FunctionInfo,
     deposit_function: FunctionInfo,
-    derived_value_function: FunctionInfo,
+    derived_balance_function: FunctionInfo,
 ) {
     <a href="fungible_asset.md#0x1_fungible_asset_register_dispatch_functions">fungible_asset::register_dispatch_functions</a>(
         constructor_ref,
         withdraw_function,
         deposit_function,
-        derived_value_function,
+        derived_balance_function,
     );
     <b>let</b> store_obj = &<a href="object.md#0x1_object_generate_signer">object::generate_signer</a>(constructor_ref);
     <b>move_to</b>&lt;<a href="dispatchable_fungible_asset.md#0x1_dispatchable_fungible_asset_TransferRefStore">TransferRefStore</a>&gt;(
@@ -233,9 +243,9 @@ The semantics of deposit will be governed by the function specified in DispatchF
 
 </details>
 
-<a id="0x1_dispatchable_fungible_asset_derived_value"></a>
+<a id="0x1_dispatchable_fungible_asset_derived_balance"></a>
 
-## Function `derived_value`
+## Function `derived_balance`
 
 Get the derived value of store using the overloaded hook.
 
@@ -243,7 +253,7 @@ The semantics of value will be governed by the function specified in DispatchFun
 
 
 <pre><code>#[view]
-<b>public</b> <b>fun</b> <a href="dispatchable_fungible_asset.md#0x1_dispatchable_fungible_asset_derived_value">derived_value</a>&lt;T: key&gt;(store: <a href="object.md#0x1_object_Object">object::Object</a>&lt;T&gt;): u64
+<b>public</b> <b>fun</b> <a href="dispatchable_fungible_asset.md#0x1_dispatchable_fungible_asset_derived_balance">derived_balance</a>&lt;T: key&gt;(store: <a href="object.md#0x1_object_Object">object::Object</a>&lt;T&gt;): u64
 </code></pre>
 
 
@@ -252,15 +262,15 @@ The semantics of value will be governed by the function specified in DispatchFun
 <summary>Implementation</summary>
 
 
-<pre><code><b>public</b> <b>fun</b> <a href="dispatchable_fungible_asset.md#0x1_dispatchable_fungible_asset_derived_value">derived_value</a>&lt;T: key&gt;(store: Object&lt;T&gt;): u64 {
+<pre><code><b>public</b> <b>fun</b> <a href="dispatchable_fungible_asset.md#0x1_dispatchable_fungible_asset_derived_balance">derived_balance</a>&lt;T: key&gt;(store: Object&lt;T&gt;): u64 {
     <b>if</b> (<a href="fungible_asset.md#0x1_fungible_asset_is_dispatchable">fungible_asset::is_dispatchable</a>(store)) {
         <b>assert</b>!(
             <a href="../../aptos-stdlib/../move-stdlib/doc/features.md#0x1_features_dispatchable_fungible_asset_enabled">features::dispatchable_fungible_asset_enabled</a>(),
             <a href="../../aptos-stdlib/../move-stdlib/doc/error.md#0x1_error_aborted">error::aborted</a>(<a href="dispatchable_fungible_asset.md#0x1_dispatchable_fungible_asset_ENOT_ACTIVATED">ENOT_ACTIVATED</a>)
         );
-        <b>let</b> func = <a href="fungible_asset.md#0x1_fungible_asset_derived_value_dispatch_function">fungible_asset::derived_value_dispatch_function</a>(store);
+        <b>let</b> func = <a href="fungible_asset.md#0x1_fungible_asset_derived_balance_dispatch_function">fungible_asset::derived_balance_dispatch_function</a>(store);
         <a href="function_info.md#0x1_function_info_load_function">function_info::load_function</a>(&func);
-        <a href="dispatchable_fungible_asset.md#0x1_dispatchable_fungible_asset_dispatchable_derived_value">dispatchable_derived_value</a>(store, &func)
+        <a href="dispatchable_fungible_asset.md#0x1_dispatchable_fungible_asset_dispatchable_derived_balance">dispatchable_derived_balance</a>(store, &func)
     } <b>else</b> {
         <a href="fungible_asset.md#0x1_fungible_asset_balance">fungible_asset::balance</a>(store)
     }
@@ -428,13 +438,13 @@ A transfer with a fixed amount credited to the recipient
 
 </details>
 
-<a id="0x1_dispatchable_fungible_asset_dispatchable_derived_value"></a>
+<a id="0x1_dispatchable_fungible_asset_dispatchable_derived_balance"></a>
 
-## Function `dispatchable_derived_value`
+## Function `dispatchable_derived_balance`
 
 
 
-<pre><code><b>fun</b> <a href="dispatchable_fungible_asset.md#0x1_dispatchable_fungible_asset_dispatchable_derived_value">dispatchable_derived_value</a>&lt;T: key&gt;(store: <a href="object.md#0x1_object_Object">object::Object</a>&lt;T&gt;, function: &<a href="function_info.md#0x1_function_info_FunctionInfo">function_info::FunctionInfo</a>): u64
+<pre><code><b>fun</b> <a href="dispatchable_fungible_asset.md#0x1_dispatchable_fungible_asset_dispatchable_derived_balance">dispatchable_derived_balance</a>&lt;T: key&gt;(store: <a href="object.md#0x1_object_Object">object::Object</a>&lt;T&gt;, function: &<a href="function_info.md#0x1_function_info_FunctionInfo">function_info::FunctionInfo</a>): u64
 </code></pre>
 
 
@@ -443,7 +453,7 @@ A transfer with a fixed amount credited to the recipient
 <summary>Implementation</summary>
 
 
-<pre><code><b>native</b> <b>fun</b> <a href="dispatchable_fungible_asset.md#0x1_dispatchable_fungible_asset_dispatchable_derived_value">dispatchable_derived_value</a>&lt;T: key&gt;(
+<pre><code><b>native</b> <b>fun</b> <a href="dispatchable_fungible_asset.md#0x1_dispatchable_fungible_asset_dispatchable_derived_balance">dispatchable_derived_balance</a>&lt;T: key&gt;(
     store: Object&lt;T&gt;,
     function: &FunctionInfo,
 ): u64;

@@ -45,6 +45,7 @@ This module provides the foundation for typesafe Coins.
 -  [Function `return_paired_transfer_ref`](#0x1_coin_return_paired_transfer_ref)
 -  [Function `paired_burn_ref_exists`](#0x1_coin_paired_burn_ref_exists)
 -  [Function `get_paired_burn_ref`](#0x1_coin_get_paired_burn_ref)
+-  [Function `convert_and_take_paired_burn_ref`](#0x1_coin_convert_and_take_paired_burn_ref)
 -  [Function `return_paired_burn_ref`](#0x1_coin_return_paired_burn_ref)
 -  [Function `initialize_supply_config`](#0x1_coin_initialize_supply_config)
 -  [Function `allow_supply_upgrades`](#0x1_coin_allow_supply_upgrades)
@@ -1650,6 +1651,38 @@ Get the <code>BurnRef</code> of paired fungible asset of a coin type from <code>
     <b>let</b> burn_ref_opt = &<b>mut</b> <b>borrow_global_mut</b>&lt;<a href="coin.md#0x1_coin_PairedFungibleAssetRefs">PairedFungibleAssetRefs</a>&gt;(metadata_addr).burn_ref_opt;
     <b>assert</b>!(<a href="../../aptos-stdlib/../move-stdlib/doc/option.md#0x1_option_is_some">option::is_some</a>(burn_ref_opt), <a href="../../aptos-stdlib/../move-stdlib/doc/error.md#0x1_error_not_found">error::not_found</a>(<a href="coin.md#0x1_coin_EBURN_REF_NOT_FOUND">EBURN_REF_NOT_FOUND</a>));
     (<a href="../../aptos-stdlib/../move-stdlib/doc/option.md#0x1_option_extract">option::extract</a>(burn_ref_opt), <a href="coin.md#0x1_coin_BurnRefReceipt">BurnRefReceipt</a> { metadata })
+}
+</code></pre>
+
+
+
+</details>
+
+<a id="0x1_coin_convert_and_take_paired_burn_ref"></a>
+
+## Function `convert_and_take_paired_burn_ref`
+
+
+
+<pre><code><b>public</b> <b>fun</b> <a href="coin.md#0x1_coin_convert_and_take_paired_burn_ref">convert_and_take_paired_burn_ref</a>&lt;CoinType&gt;(burn_cap: <a href="coin.md#0x1_coin_BurnCapability">coin::BurnCapability</a>&lt;CoinType&gt;): <a href="fungible_asset.md#0x1_fungible_asset_BurnRef">fungible_asset::BurnRef</a>
+</code></pre>
+
+
+
+<details>
+<summary>Implementation</summary>
+
+
+<pre><code><b>public</b> <b>fun</b> <a href="coin.md#0x1_coin_convert_and_take_paired_burn_ref">convert_and_take_paired_burn_ref</a>&lt;CoinType&gt;(
+    burn_cap: <a href="coin.md#0x1_coin_BurnCapability">BurnCapability</a>&lt;CoinType&gt;
+): BurnRef <b>acquires</b> <a href="coin.md#0x1_coin_CoinConversionMap">CoinConversionMap</a>, <a href="coin.md#0x1_coin_PairedFungibleAssetRefs">PairedFungibleAssetRefs</a>, <a href="coin.md#0x1_coin_CoinInfo">CoinInfo</a> {
+    <a href="coin.md#0x1_coin_destroy_burn_cap">destroy_burn_cap</a>(burn_cap);
+    <b>let</b> metadata = <a href="coin.md#0x1_coin_ensure_paired_metadata">ensure_paired_metadata</a>&lt;CoinType&gt;();
+    <b>let</b> metadata_addr = object_address(&metadata);
+    <b>assert</b>!(<b>exists</b>&lt;<a href="coin.md#0x1_coin_PairedFungibleAssetRefs">PairedFungibleAssetRefs</a>&gt;(metadata_addr), <a href="../../aptos-stdlib/../move-stdlib/doc/error.md#0x1_error_internal">error::internal</a>(<a href="coin.md#0x1_coin_EPAIRED_FUNGIBLE_ASSET_REFS_NOT_FOUND">EPAIRED_FUNGIBLE_ASSET_REFS_NOT_FOUND</a>));
+    <b>let</b> burn_ref_opt = &<b>mut</b> <b>borrow_global_mut</b>&lt;<a href="coin.md#0x1_coin_PairedFungibleAssetRefs">PairedFungibleAssetRefs</a>&gt;(metadata_addr).burn_ref_opt;
+    <b>assert</b>!(<a href="../../aptos-stdlib/../move-stdlib/doc/option.md#0x1_option_is_some">option::is_some</a>(burn_ref_opt), <a href="../../aptos-stdlib/../move-stdlib/doc/error.md#0x1_error_not_found">error::not_found</a>(<a href="coin.md#0x1_coin_EBURN_REF_NOT_FOUND">EBURN_REF_NOT_FOUND</a>));
+    <a href="../../aptos-stdlib/../move-stdlib/doc/option.md#0x1_option_extract">option::extract</a>(burn_ref_opt)
 }
 </code></pre>
 
