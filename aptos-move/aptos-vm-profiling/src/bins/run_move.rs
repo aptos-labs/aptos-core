@@ -11,8 +11,7 @@ use move_binary_format::CompiledModule;
 use move_core_types::{account_address::AccountAddress, ident_str, identifier::Identifier};
 use move_ir_compiler::Compiler;
 use move_vm_runtime::{
-    module_traversal::*, move_vm::MoveVM, native_extensions::NativeContextExtensions,
-    native_functions::NativeFunction,
+    move_vm::MoveVM, native_extensions::NativeContextExtensions, native_functions::NativeFunction,
 };
 use move_vm_test_utils::InMemoryStorage;
 use move_vm_types::{
@@ -164,18 +163,11 @@ fn main() -> Result<()> {
     extensions.add(NativeTableContext::new([0; 32], &storage));
 
     let mut sess = vm.new_session_with_extensions(&storage, extensions);
-    let traversal_storage = TraversalStorage::new();
 
     let src = fs::read_to_string(&args[1])?;
     if let Ok(script_blob) = Compiler::new(test_modules.iter().collect()).into_script_blob(&src) {
         let args: Vec<Vec<u8>> = vec![];
-        sess.execute_script(
-            script_blob,
-            vec![],
-            args,
-            &mut UnmeteredGasMeter,
-            &mut TraversalContext::new(&traversal_storage),
-        )?;
+        sess.execute_script(script_blob, vec![], args, &mut UnmeteredGasMeter)?;
     } else {
         let module = Compiler::new(test_modules.iter().collect()).into_compiled_module(&src)?;
         let mut module_blob = vec![];
@@ -193,7 +185,6 @@ fn main() -> Result<()> {
             vec![],
             args,
             &mut UnmeteredGasMeter,
-            &mut TraversalContext::new(&traversal_storage),
         )?;
         println!("{:?}", res);
     }

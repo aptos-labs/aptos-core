@@ -22,10 +22,7 @@ use move_core_types::{
 };
 use move_resource_viewer::MoveValueAnnotator;
 use move_vm_runtime::{
-    config::VMConfig,
-    module_traversal::{TraversalContext, TraversalStorage},
-    move_vm::MoveVM,
-    native_extensions::NativeContextExtensions,
+    move_vm::MoveVM, native_extensions::NativeContextExtensions,
     native_functions::NativeFunctionTable,
 };
 use move_vm_test_utils::{
@@ -255,7 +252,6 @@ impl<'a, 'b, W: Write> TestOutput<'a, 'b, W> {
 }
 
 impl SharedTestingConfig {
-    #[allow(clippy::field_reassign_with_default)]
     fn execute_via_move_vm(
         &self,
         test_plan: &ModuleTestPlan,
@@ -267,10 +263,7 @@ impl SharedTestingConfig {
         VMResult<Vec<Vec<u8>>>,
         TestRunInfo,
     ) {
-        let mut config = VMConfig::default();
-        config.paranoid_type_checks = true;
-
-        let move_vm = MoveVM::new_with_config(self.native_function_table.clone(), config).unwrap();
+        let move_vm = MoveVM::new(self.native_function_table.clone()).unwrap();
         let extensions = extensions::new_extensions();
         let mut session =
             move_vm.new_session_with_extensions(&self.starting_storage_state, extensions);
@@ -278,14 +271,12 @@ impl SharedTestingConfig {
         // TODO: collect VM logs if the verbose flag (i.e, `self.verbose`) is set
 
         let now = Instant::now();
-        let storage = TraversalStorage::new();
         let serialized_return_values_result = session.execute_function_bypass_visibility(
             &test_plan.module_id,
             IdentStr::new(function_name).unwrap(),
             vec![], // no ty args, at least for now
             serialize_values(test_info.arguments.iter()),
             &mut gas_meter,
-            &mut TraversalContext::new(&storage),
         );
         let mut return_result = serialized_return_values_result.map(|res| {
             res.return_values

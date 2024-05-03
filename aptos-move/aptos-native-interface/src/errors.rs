@@ -2,11 +2,6 @@
 // SPDX-License-Identifier: Apache-2.0
 
 use move_binary_format::errors::PartialVMError;
-use move_core_types::{
-    gas_algebra::InternalGas, identifier::Identifier, language_storage::ModuleId,
-};
-use move_vm_types::{loaded_data::runtime_types::Type, values::Value};
-use smallvec::SmallVec;
 
 /// Saner representation of a native function error.
 #[allow(unused)]
@@ -28,27 +23,6 @@ pub enum SafeNativeError {
     /// Indicating that the native function ran into some internal errors that shall not normally
     /// be triggerable by user inputs.
     InvariantViolation(PartialVMError),
-
-    /// Indicating the native function will result in a switch in control flow.
-    ///
-    /// Please refer to the implementation in aptos_framework::natives::dispatchable_fungible_asset::native_dispatch
-    /// for reference implementation and avoid having an alternative implementation.
-    ///
-    /// It is important to make sure the args are in the exact same order as passed in from the native argument input
-    /// as the MoveVM relies on this ordering to perform paranoid mode stack transition.
-    FunctionDispatch {
-        cost: InternalGas,
-        module_name: ModuleId,
-        func_name: Identifier,
-        ty_args: Vec<Type>,
-        args: SmallVec<[Value; 1]>,
-    },
-
-    /// Load up a module and charge the module accordingly.
-    ///
-    /// It is critical to invoke this function before calling FunctionDispatch to make sure the module loading
-    /// is charged properly, otherwise it would be a potential gas issue.
-    LoadModule { module_name: ModuleId },
 }
 
 // Allows us to keep using the `?` operator on function calls that return `PartialVMResult` inside safe natives.

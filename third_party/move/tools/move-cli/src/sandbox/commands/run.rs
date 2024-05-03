@@ -21,10 +21,7 @@ use move_core_types::{
     value::MoveValue,
 };
 use move_package::compilation::compiled_package::CompiledPackage;
-use move_vm_runtime::{
-    module_traversal::{TraversalContext, TraversalStorage},
-    move_vm::MoveVM,
-};
+use move_vm_runtime::move_vm::MoveVM;
 use move_vm_test_utils::gas_schedule::CostTable;
 use std::{fs, path::Path};
 
@@ -95,8 +92,6 @@ move run` must be applied to a module inside `storage/`",
         })
         .chain(vm_args)
         .collect();
-
-    let storage = TraversalStorage::new();
     let res = match script_name_opt {
         Some(script_name) => {
             // script fun. parse module, extract script ID to pass to VM
@@ -108,7 +103,6 @@ move run` must be applied to a module inside `storage/`",
                 vm_type_args.clone(),
                 vm_args,
                 &mut gas_status,
-                &mut TraversalContext::new(&storage),
             )
         },
         None => session.execute_script(
@@ -116,7 +110,6 @@ move run` must be applied to a module inside `storage/`",
             vm_type_args.clone(),
             vm_args,
             &mut gas_status,
-            &mut TraversalContext::new(&storage),
         ),
     };
 

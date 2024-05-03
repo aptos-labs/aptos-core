@@ -18,7 +18,6 @@ use move_core_types::{
     vm_status::StatusCode,
 };
 use move_vm_runtime::{
-    module_traversal::*,
     move_vm::MoveVM,
     native_extensions::NativeContextExtensions,
     native_functions::NativeFunction,
@@ -199,7 +198,6 @@ impl<'r, 'l> AsyncSession<'r, 'l> {
 
         // Execute the initializer.
         let gas_before = gas_status.remaining_gas();
-        let traversal_storage = TraversalStorage::new();
         let result = self
             .vm_session
             .execute_function_bypass_visibility(
@@ -208,7 +206,6 @@ impl<'r, 'l> AsyncSession<'r, 'l> {
                 vec![],
                 Vec::<Vec<u8>>::new(),
                 gas_status,
-                &mut TraversalContext::new(&traversal_storage),
             )
             .and_then(|ret| Ok((ret, self.vm_session.finish_with_extensions()?)));
         let gas_used = gas_before.checked_sub(gas_status.remaining_gas()).unwrap();
@@ -297,17 +294,9 @@ impl<'r, 'l> AsyncSession<'r, 'l> {
 
         // Execute the handler.
         let gas_before = gas_status.remaining_gas();
-        let traversal_storage = TraversalStorage::new();
         let result = self
             .vm_session
-            .execute_function_bypass_visibility(
-                module_id,
-                handler_id,
-                vec![],
-                args,
-                gas_status,
-                &mut TraversalContext::new(&traversal_storage),
-            )
+            .execute_function_bypass_visibility(module_id, handler_id, vec![], args, gas_status)
             .and_then(|ret| Ok((ret, self.vm_session.finish_with_extensions()?)));
 
         let gas_used = gas_before.checked_sub(gas_status.remaining_gas()).unwrap();

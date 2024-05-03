@@ -113,7 +113,6 @@ pub enum FeatureFlag {
     CoinToFungibleAssetMigration,
     PrimaryAPTFungibleStoreAtUserAddress,
     ObjectNativeDerivedAddress,
-    DispatchableFungibleAsset,
 }
 
 fn generate_features_blob(writer: &CodeWriter, data: &[u64]) {
@@ -291,7 +290,6 @@ impl From<FeatureFlag> for AptosFeatureFlag {
             FeatureFlag::ObjectNativeDerivedAddress => {
                 AptosFeatureFlag::OBJECT_NATIVE_DERIVED_ADDRESS
             },
-            FeatureFlag::DispatchableFungibleAsset => AptosFeatureFlag::DISPATCHABLE_FUNGIBLE_ASSET,
         }
     }
 }
@@ -398,7 +396,6 @@ impl From<AptosFeatureFlag> for FeatureFlag {
             AptosFeatureFlag::OBJECT_NATIVE_DERIVED_ADDRESS => {
                 FeatureFlag::ObjectNativeDerivedAddress
             },
-            AptosFeatureFlag::DISPATCHABLE_FUNGIBLE_ASSET => FeatureFlag::DispatchableFungibleAsset,
         }
     }
 }

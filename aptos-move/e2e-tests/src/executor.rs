@@ -71,7 +71,6 @@ use move_core_types::{
     language_storage::{ModuleId, TypeTag},
     move_resource::MoveResource,
 };
-use move_vm_runtime::module_traversal::{TraversalContext, TraversalStorage};
 use move_vm_types::gas::UnmeteredGasMeter;
 use serde::Serialize;
 use std::{
@@ -921,7 +920,6 @@ impl FakeExecutor {
             };
 
             let start = Instant::now();
-            let storage = TraversalStorage::new();
             // Not sure how to create a common type for both. Box<dyn GasMeter> doesn't work for some reason.
             let result = match gas_meter_type {
                 GasMeterType::RegularGasMeter => session.execute_function_bypass_visibility(
@@ -930,7 +928,6 @@ impl FakeExecutor {
                     ty,
                     arg,
                     regular.as_mut().unwrap(),
-                    &mut TraversalContext::new(&storage),
                 ),
                 GasMeterType::UnmeteredGasMeter => session.execute_function_bypass_visibility(
                     module,
@@ -938,7 +935,6 @@ impl FakeExecutor {
                     ty,
                     arg,
                     unmetered.as_mut().unwrap(),
-                    &mut TraversalContext::new(&storage),
                 ),
             };
             let elapsed = start.elapsed();
@@ -1004,7 +1000,6 @@ impl FakeExecutor {
             let fun_name = Self::name(function_name);
             let should_error = fun_name.clone().into_string().ends_with(POSTFIX);
 
-            let storage = TraversalStorage::new();
             let result = session.execute_function_bypass_visibility(
                 module,
                 &fun_name,
@@ -1021,7 +1016,6 @@ impl FakeExecutor {
                     // coeff_buffer: BTreeMap::new(),
                     shared_buffer: Arc::clone(&a1),
                 }),
-                &mut TraversalContext::new(&storage),
             );
             if let Err(err) = result {
                 if !should_error {
@@ -1076,7 +1070,6 @@ impl FakeExecutor {
             )
             .unwrap();
             let mut session = vm.new_session(&resolver, SessionId::void(), None);
-            let storage = TraversalStorage::new();
             session
                 .execute_function_bypass_visibility(
                     module_id,
@@ -1084,7 +1077,6 @@ impl FakeExecutor {
                     type_params,
                     args,
                     &mut UnmeteredGasMeter,
-                    &mut TraversalContext::new(&storage),
                 )
                 .unwrap_or_else(|e| {
                     panic!(
@@ -1167,7 +1159,6 @@ impl FakeExecutor {
             &function,
             struct_constructors,
         )?;
-        let storage = TraversalStorage::new();
         session
             .execute_entry_function(
                 entry_fn.module(),
@@ -1175,7 +1166,6 @@ impl FakeExecutor {
                 entry_fn.ty_args().to_vec(),
                 args,
                 &mut gas_meter,
-                &mut TraversalContext::new(&storage),
             )
             .map_err(|e| e.into_vm_status())?;
 
@@ -1215,7 +1205,6 @@ impl FakeExecutor {
         )
         .unwrap();
         let mut session = vm.new_session(&resolver, SessionId::void(), None);
-        let storage = TraversalStorage::new();
         session
             .execute_function_bypass_visibility(
                 &Self::module(module_name),
@@ -1223,7 +1212,6 @@ impl FakeExecutor {
                 type_params,
                 args,
                 &mut UnmeteredGasMeter,
-                &mut TraversalContext::new(&storage),
             )
             .map_err(|e| e.into_vm_status())?;
 

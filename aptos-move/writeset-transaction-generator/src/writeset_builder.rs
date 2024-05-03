@@ -23,7 +23,6 @@ use move_core_types::{
     transaction_argument::convert_txn_args,
     value::{serialize_values, MoveValue},
 };
-use move_vm_runtime::module_traversal::{TraversalContext, TraversalStorage};
 use move_vm_types::gas::UnmeteredGasMeter;
 
 pub struct GenesisSession<'r, 'l>(SessionExt<'r, 'l>);
@@ -36,7 +35,6 @@ impl<'r, 'l> GenesisSession<'r, 'l> {
         ty_args: Vec<TypeTag>,
         args: Vec<Vec<u8>>,
     ) {
-        let traversal_storage = TraversalStorage::new();
         self.0
             .execute_function_bypass_visibility(
                 &ModuleId::new(
@@ -47,7 +45,6 @@ impl<'r, 'l> GenesisSession<'r, 'l> {
                 ty_args,
                 args,
                 &mut UnmeteredGasMeter,
-                &mut TraversalContext::new(&traversal_storage),
             )
             .unwrap_or_else(|e| {
                 panic!(
@@ -62,14 +59,12 @@ impl<'r, 'l> GenesisSession<'r, 'l> {
     pub fn exec_script(&mut self, sender: AccountAddress, script: &Script) {
         let mut temp = vec![sender.to_vec()];
         temp.extend(convert_txn_args(script.args()));
-        let traversal_storage = TraversalStorage::new();
         self.0
             .execute_script(
                 script.code().to_vec(),
                 script.ty_args().to_vec(),
                 temp,
                 &mut UnmeteredGasMeter,
-                &mut TraversalContext::new(&traversal_storage),
             )
             .unwrap()
     }

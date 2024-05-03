@@ -15,7 +15,7 @@ use move_core_types::{
     value::{serialize_values, MoveTypeLayout, MoveValue},
     vm_status::{StatusCode, StatusType},
 };
-use move_vm_runtime::{module_traversal::*, move_vm::MoveVM};
+use move_vm_runtime::move_vm::MoveVM;
 use move_vm_test_utils::{DeltaStorage, InMemoryStorage};
 use move_vm_types::gas::UnmeteredGasMeter;
 
@@ -96,13 +96,11 @@ fn test_malformed_resource() {
     let mut script_blob = vec![];
     s1.serialize(&mut script_blob).unwrap();
     let mut sess = vm.new_session(&storage);
-    let traversal_storage = TraversalStorage::new();
     sess.execute_script(
         script_blob,
         vec![],
         vec![MoveValue::Signer(TEST_ADDR).simple_serialize().unwrap()],
         &mut UnmeteredGasMeter,
-        &mut TraversalContext::new(&traversal_storage),
     )
     .map(|_| ())
     .unwrap();
@@ -121,7 +119,6 @@ fn test_malformed_resource() {
             vec![],
             vec![MoveValue::Signer(TEST_ADDR).simple_serialize().unwrap()],
             &mut UnmeteredGasMeter,
-            &mut TraversalContext::new(&traversal_storage),
         )
         .map(|_| ())
         .unwrap();
@@ -149,7 +146,6 @@ fn test_malformed_resource() {
                 vec![],
                 vec![MoveValue::Signer(TEST_ADDR).simple_serialize().unwrap()],
                 &mut UnmeteredGasMeter,
-                &mut TraversalContext::new(&traversal_storage),
             )
             .map(|_| ())
             .unwrap_err();
@@ -176,7 +172,6 @@ fn test_malformed_module() {
 
     let module_id = ModuleId::new(TEST_ADDR, Identifier::new("M").unwrap());
     let fun_name = Identifier::new("foo").unwrap();
-    let traversal_storage = TraversalStorage::new();
 
     // Publish M and call M::foo. No errors should be thrown.
     {
@@ -190,7 +185,6 @@ fn test_malformed_module() {
             vec![],
             Vec::<Vec<u8>>::new(),
             &mut UnmeteredGasMeter,
-            &mut TraversalContext::new(&traversal_storage),
         )
         .unwrap();
     }
@@ -217,7 +211,6 @@ fn test_malformed_module() {
                 vec![],
                 Vec::<Vec<u8>>::new(),
                 &mut UnmeteredGasMeter,
-                &mut TraversalContext::new(&traversal_storage),
             )
             .unwrap_err();
         assert_eq!(err.status_type(), StatusType::InvariantViolation);
@@ -239,7 +232,6 @@ fn test_unverifiable_module() {
 
     let module_id = ModuleId::new(TEST_ADDR, Identifier::new("M").unwrap());
     let fun_name = Identifier::new("foo").unwrap();
-    let traversal_storage = TraversalStorage::new();
 
     // Publish M and call M::foo to make sure it works.
     {
@@ -258,7 +250,6 @@ fn test_unverifiable_module() {
             vec![],
             Vec::<Vec<u8>>::new(),
             &mut UnmeteredGasMeter,
-            &mut TraversalContext::new(&traversal_storage),
         )
         .unwrap();
     }
@@ -284,7 +275,6 @@ fn test_unverifiable_module() {
                 vec![],
                 Vec::<Vec<u8>>::new(),
                 &mut UnmeteredGasMeter,
-                &mut TraversalContext::new(&traversal_storage),
             )
             .unwrap_err();
 
@@ -318,7 +308,6 @@ fn test_missing_module_dependency() {
 
     let module_id = ModuleId::new(TEST_ADDR, Identifier::new("N").unwrap());
     let fun_name = Identifier::new("bar").unwrap();
-    let traversal_storage = TraversalStorage::new();
 
     // Publish M and N and call N::bar. Everything should work.
     {
@@ -336,7 +325,6 @@ fn test_missing_module_dependency() {
             vec![],
             Vec::<Vec<u8>>::new(),
             &mut UnmeteredGasMeter,
-            &mut TraversalContext::new(&traversal_storage),
         )
         .unwrap();
     }
@@ -357,7 +345,6 @@ fn test_missing_module_dependency() {
                 vec![],
                 Vec::<Vec<u8>>::new(),
                 &mut UnmeteredGasMeter,
-                &mut TraversalContext::new(&traversal_storage),
             )
             .unwrap_err();
 
@@ -391,7 +378,6 @@ fn test_malformed_module_dependency() {
 
     let module_id = ModuleId::new(TEST_ADDR, Identifier::new("N").unwrap());
     let fun_name = Identifier::new("bar").unwrap();
-    let traversal_storage = TraversalStorage::new();
 
     // Publish M and N and call N::bar. Everything should work.
     {
@@ -409,7 +395,6 @@ fn test_malformed_module_dependency() {
             vec![],
             Vec::<Vec<u8>>::new(),
             &mut UnmeteredGasMeter,
-            &mut TraversalContext::new(&traversal_storage),
         )
         .unwrap();
     }
@@ -436,7 +421,6 @@ fn test_malformed_module_dependency() {
                 vec![],
                 Vec::<Vec<u8>>::new(),
                 &mut UnmeteredGasMeter,
-                &mut TraversalContext::new(&traversal_storage),
             )
             .unwrap_err();
 
@@ -468,7 +452,6 @@ fn test_unverifiable_module_dependency() {
 
     let module_id = ModuleId::new(TEST_ADDR, Identifier::new("N").unwrap());
     let fun_name = Identifier::new("bar").unwrap();
-    let traversal_storage = TraversalStorage::new();
 
     // Publish M and N and call N::bar. Everything should work.
     {
@@ -489,7 +472,6 @@ fn test_unverifiable_module_dependency() {
             vec![],
             Vec::<Vec<u8>>::new(),
             &mut UnmeteredGasMeter,
-            &mut TraversalContext::new(&traversal_storage),
         )
         .unwrap();
     }
@@ -516,7 +498,6 @@ fn test_unverifiable_module_dependency() {
                 vec![],
                 Vec::<Vec<u8>>::new(),
                 &mut UnmeteredGasMeter,
-                &mut TraversalContext::new(&traversal_storage),
             )
             .unwrap_err();
 
@@ -568,7 +549,6 @@ const LIST_OF_ERROR_CODES: &[StatusCode] = &[
 fn test_storage_returns_bogus_error_when_loading_module() {
     let module_id = ModuleId::new(TEST_ADDR, Identifier::new("N").unwrap());
     let fun_name = Identifier::new("bar").unwrap();
-    let traversal_storage = TraversalStorage::new();
 
     for error_code in LIST_OF_ERROR_CODES {
         let storage = BogusStorage {
@@ -584,7 +564,6 @@ fn test_storage_returns_bogus_error_when_loading_module() {
                 vec![],
                 Vec::<Vec<u8>>::new(),
                 &mut UnmeteredGasMeter,
-                &mut TraversalContext::new(&traversal_storage),
             )
             .unwrap_err();
 
@@ -637,7 +616,6 @@ fn test_storage_returns_bogus_error_when_loading_resource() {
     let m_id = m.self_id();
     let foo_name = Identifier::new("foo").unwrap();
     let bar_name = Identifier::new("bar").unwrap();
-    let traversal_storage = TraversalStorage::new();
 
     for error_code in LIST_OF_ERROR_CODES {
         let storage = BogusStorage {
@@ -658,7 +636,6 @@ fn test_storage_returns_bogus_error_when_loading_resource() {
             vec![],
             Vec::<Vec<u8>>::new(),
             &mut UnmeteredGasMeter,
-            &mut TraversalContext::new(&traversal_storage),
         )
         .unwrap();
 
@@ -669,7 +646,6 @@ fn test_storage_returns_bogus_error_when_loading_resource() {
                 vec![],
                 serialize_values(&vec![MoveValue::Signer(TEST_ADDR)]),
                 &mut UnmeteredGasMeter,
-                &mut TraversalContext::new(&traversal_storage),
             )
             .unwrap_err();
 

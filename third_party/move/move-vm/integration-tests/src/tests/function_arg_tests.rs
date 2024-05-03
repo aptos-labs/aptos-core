@@ -12,7 +12,7 @@ use move_core_types::{
     value::{MoveStruct, MoveValue},
     vm_status::StatusCode,
 };
-use move_vm_runtime::{module_traversal::*, move_vm::MoveVM};
+use move_vm_runtime::move_vm::MoveVM;
 use move_vm_test_utils::InMemoryStorage;
 use move_vm_types::gas::UnmeteredGasMeter;
 
@@ -63,7 +63,6 @@ fn run(
     let mut sess = vm.new_session(&storage);
 
     let fun_name = Identifier::new("foo").unwrap();
-    let traversal_storage = TraversalStorage::new();
 
     let args: Vec<_> = args
         .into_iter()
@@ -76,7 +75,6 @@ fn run(
         ty_args,
         args,
         &mut UnmeteredGasMeter,
-        &mut TraversalContext::new(&traversal_storage),
     )?;
 
     Ok(())
