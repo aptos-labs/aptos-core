@@ -1,5 +1,5 @@
 Move prover returns: exiting with verification errors
-error: verification out of resources/timeout (global timeout set to 40s)
+error: verification out of resources/timeout (global timeout set to 80s)
     ┌─ ../move-stdlib/sources/fixed_point32.move:264:5
     │
 264 │ ╭     public fun round(num: FixedPoint32): u64 {
