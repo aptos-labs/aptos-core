@@ -519,17 +519,6 @@ module std::features {
         is_enabled(OBJECT_NATIVE_DERIVED_ADDRESS)
     }
 
-    /// Whether the dispatchable fungible asset standard feature is enabled.
-    ///
-    /// Lifetime: transient
-    const DISPATCHABLE_FUNGIBLE_ASSET: u64 = 63;
-
-    public fun get_dispatchable_fungible_asset_feature(): u64 { DISPATCHABLE_FUNGIBLE_ASSET }
-
-    public fun dispatchable_fungible_asset_enabled(): bool acquires Features {
-        is_enabled(DISPATCHABLE_FUNGIBLE_ASSET)
-    }
-
     // ============================================================================================
     // Feature Flag Implementation
 

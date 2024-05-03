@@ -16,7 +16,7 @@ use move_core_types::{
     identifier::{IdentStr, Identifier},
     language_storage::ModuleId,
 };
-use move_vm_runtime::{config::VMConfig, module_traversal::*, move_vm::MoveVM};
+use move_vm_runtime::{config::VMConfig, move_vm::MoveVM};
 use move_vm_test_utils::InMemoryStorage;
 use move_vm_types::gas::UnmeteredGasMeter;
 use std::{path::PathBuf, sync::Arc, thread};
@@ -128,7 +128,6 @@ impl Adapter {
                 let data_store = self.store.clone();
                 children.push(thread::spawn(move || {
                     let mut session = vm.new_session(&data_store);
-                    let traversal_storage = TraversalStorage::new();
                     session
                         .execute_function_bypass_visibility(
                             &module_id,
@@ -136,7 +135,6 @@ impl Adapter {
                             vec![],
                             Vec::<Vec<u8>>::new(),
                             &mut UnmeteredGasMeter,
-                            &mut TraversalContext::new(&traversal_storage),
                         )
                         .unwrap_or_else(|_| {
                             panic!("Failure executing {:?}::{:?}", module_id, name)
@@ -151,7 +149,6 @@ impl Adapter {
 
     fn call_function(&self, module: &ModuleId, name: &IdentStr) {
         let mut session = self.vm.new_session(&self.store);
-        let traversal_storage = TraversalStorage::new();
         session
             .execute_function_bypass_visibility(
                 module,
@@ -159,7 +156,6 @@ impl Adapter {
                 vec![],
                 Vec::<Vec<u8>>::new(),
                 &mut UnmeteredGasMeter,
-                &mut TraversalContext::new(&traversal_storage),
             )
             .unwrap_or_else(|_| panic!("Failure executing {:?}::{:?}", module, name));
     }

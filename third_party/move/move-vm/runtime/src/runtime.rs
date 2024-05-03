@@ -7,7 +7,6 @@ use crate::{
     data_cache::TransactionDataCache,
     interpreter::Interpreter,
     loader::{Function, LoadedFunction, Loader, ModuleCache, ModuleStorage, ModuleStorageAdapter},
-    module_traversal::TraversalContext,
     native_extensions::NativeContextExtensions,
     native_functions::{NativeFunction, NativeFunctions},
     session::{LoadedFunctionInstantiation, SerializedReturnValues},
@@ -364,7 +363,6 @@ impl VMRuntime {
         data_store: &mut TransactionDataCache,
         module_store: &ModuleStorageAdapter,
         gas_meter: &mut impl GasMeter,
-        traversal_context: &mut TraversalContext,
         extensions: &mut NativeContextExtensions,
     ) -> VMResult<SerializedReturnValues> {
         let arg_types = param_types
@@ -396,7 +394,6 @@ impl VMRuntime {
             data_store,
             module_store,
             gas_meter,
-            traversal_context,
             extensions,
             &self.loader,
         )?;
@@ -438,7 +435,6 @@ impl VMRuntime {
         data_store: &mut TransactionDataCache,
         module_store: &ModuleStorageAdapter,
         gas_meter: &mut impl GasMeter,
-        traversal_context: &mut TraversalContext,
         extensions: &mut NativeContextExtensions,
         bypass_declared_entry_check: bool,
     ) -> VMResult<SerializedReturnValues> {
@@ -454,7 +450,6 @@ impl VMRuntime {
             data_store,
             module_store,
             gas_meter,
-            traversal_context,
             extensions,
             bypass_declared_entry_check,
         )
@@ -468,7 +463,6 @@ impl VMRuntime {
         data_store: &mut TransactionDataCache,
         module_store: &ModuleStorageAdapter,
         gas_meter: &mut impl GasMeter,
-        traversal_context: &mut TraversalContext,
         extensions: &mut NativeContextExtensions,
         bypass_declared_entry_check: bool,
     ) -> VMResult<SerializedReturnValues> {
@@ -518,7 +512,6 @@ impl VMRuntime {
             data_store,
             module_store,
             gas_meter,
-            traversal_context,
             extensions,
         )
     }
@@ -532,7 +525,6 @@ impl VMRuntime {
         data_store: &mut TransactionDataCache,
         module_store: &ModuleStorageAdapter,
         gas_meter: &mut impl GasMeter,
-        traversal_context: &mut TraversalContext,
         extensions: &mut NativeContextExtensions,
     ) -> VMResult<()> {
         // load the script, perform verification
@@ -556,7 +548,6 @@ impl VMRuntime {
             data_store,
             module_store,
             gas_meter,
-            traversal_context,
             extensions,
         )?;
         Ok(())

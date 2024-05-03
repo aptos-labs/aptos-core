@@ -16,5 +16,4 @@ mod native_tests;
 mod nested_loop_tests;
 mod regression_tests;
 mod return_value_tests;
-mod runtime_reentrancy_check_tests;
 mod vm_arguments_tests;

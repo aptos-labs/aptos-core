@@ -74,7 +74,6 @@ pub enum FeatureFlag {
     COIN_TO_FUNGIBLE_ASSET_MIGRATION = 60,
     PRIMARY_APT_FUNGIBLE_STORE_AT_USER_ADDRESS = 61,
     OBJECT_NATIVE_DERIVED_ADDRESS = 62,
-    DISPATCHABLE_FUNGIBLE_ASSET = 63,
 }
 
 impl FeatureFlag {
@@ -134,7 +133,6 @@ impl FeatureFlag {
             FeatureFlag::TRANSACTION_CONTEXT_EXTENSION,
             FeatureFlag::COIN_TO_FUNGIBLE_ASSET_MIGRATION,
             FeatureFlag::OBJECT_NATIVE_DERIVED_ADDRESS,
-            FeatureFlag::DISPATCHABLE_FUNGIBLE_ASSET,
         ]
     }
 }

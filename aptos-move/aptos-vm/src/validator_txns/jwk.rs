@@ -32,7 +32,6 @@ use move_core_types::{
     value::{serialize_values, MoveValue},
     vm_status::{AbortLocation, StatusCode, VMStatus},
 };
-use move_vm_runtime::module_traversal::{TraversalContext, TraversalStorage};
 use move_vm_types::gas::UnmeteredGasMeter;
 use std::collections::HashMap;
 
@@ -136,7 +135,6 @@ impl AptosVM {
             vec![observed].as_move_value(),
         ];
 
-        let module_storage = TraversalStorage::new();
         session
             .execute_function_bypass_visibility(
                 &JWKS_MODULE,
@@ -144,7 +142,6 @@ impl AptosVM {
                 vec![],
                 serialize_values(&args),
                 &mut gas_meter,
-                &mut TraversalContext::new(&module_storage),
             )
             .map_err(|e| {
                 expect_only_successful_execution(e, UPSERT_INTO_OBSERVED_JWKS.as_str(), log_context)
