@@ -41,7 +41,6 @@ fn verify_tracing_kvs() {
     let writer = VecWriter::default();
     let logs = writer.logs.clone();
     AptosData::builder()
-        .is_async(false)
         .tokio_console_port(None)
         .printer(Box::new(writer.write_to_stderr(false)))
         .build();

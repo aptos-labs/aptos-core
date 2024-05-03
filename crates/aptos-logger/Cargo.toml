@@ -17,12 +17,10 @@ rust-version = { workspace = true }
 [dependencies]
 aptos-infallible = { workspace = true }
 aptos-log-derive = { workspace = true }
-aptos-node-identity = { workspace = true }
 backtrace = { workspace = true }
 chrono = { workspace = true }
 console-subscriber = { workspace = true, optional = true }
 erased-serde = { workspace = true }
-futures = { workspace = true }
 hostname = { workspace = true }
 once_cell = { workspace = true }
 prometheus = { workspace = true }
@@ -30,7 +28,6 @@ serde = { workspace = true }
 serde_json = { workspace = true }
 strum = { workspace = true }
 strum_macros = { workspace = true }
-tokio = { workspace = true }
 tracing = { workspace = true }
 tracing-subscriber = { workspace = true }
 

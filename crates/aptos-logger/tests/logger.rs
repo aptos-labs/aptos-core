@@ -25,10 +25,7 @@ impl Writer for VecWriter {
 fn verify_end_to_end() {
     let writer = VecWriter::default();
     let logs = writer.logs.clone();
-    AptosData::builder()
-        .is_async(false)
-        .printer(Box::new(writer))
-        .build();
+    AptosData::builder().printer(Box::new(writer)).build();
 
     assert_eq!(logs.read().len(), 0);
     info!("Hello");
