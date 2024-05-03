@@ -207,6 +207,7 @@ pub struct AptosHandle {
     _peer_monitoring_service_runtime: Runtime,
     _state_sync_runtimes: StateSyncRuntimes,
     _telemetry_runtime: Option<Runtime>,
+    _indexer_db_runtime: Option<Runtime>,
 }
 
 /// Start an Aptos node
@@ -688,6 +689,7 @@ pub fn setup_environment_and_start_node(
         indexer_table_info_runtime,
         indexer_runtime,
         indexer_grpc_runtime,
+        internal_indexer_db_runtime,
     ) = services::bootstrap_api_and_indexer(&node_config, db_rw.clone(), chain_id)?;
 
     // Create mempool and get the consensus to mempool sender
@@ -774,6 +776,7 @@ pub fn setup_environment_and_start_node(
         _peer_monitoring_service_runtime: peer_monitoring_service_runtime,
         _state_sync_runtimes: state_sync_runtimes,
         _telemetry_runtime: telemetry_runtime,
+        _indexer_db_runtime: internal_indexer_db_runtime,
     })
 }
 

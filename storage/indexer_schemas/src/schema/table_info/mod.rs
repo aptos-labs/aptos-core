@@ -12,12 +12,12 @@
 use crate::schema::TABLE_INFO_CF_NAME;
 use anyhow::Result;
 use aptos_schemadb::{
-    define_schema,
+    define_pub_schema,
     schema::{KeyCodec, ValueCodec},
 };
 use aptos_types::state_store::table::{TableHandle, TableInfo};
 
-define_schema!(TableInfoSchema, TableHandle, TableInfo, TABLE_INFO_CF_NAME);
+define_pub_schema!(TableInfoSchema, TableHandle, TableInfo, TABLE_INFO_CF_NAME);
 
 impl KeyCodec<TableInfoSchema> for TableHandle {
     fn encode_key(&self) -> Result<Vec<u8>> {
