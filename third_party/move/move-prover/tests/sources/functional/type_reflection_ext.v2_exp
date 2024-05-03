@@ -1,0 +1,171 @@
+Move prover returns: exiting with verification errors
+error: post-condition does not hold
+   ┌─ ../move-stdlib/nursery/sources/errors.move:26:9
+   │
+26 │         ensures [concrete] result == category + (reason << 8) % (1 << 64);
+   │         ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+   │
+   =     at ../move-stdlib/nursery/sources/errors.move:17: make
+   =         category = <redacted>
+   =         reason = <redacted>
+   =     at ../move-stdlib/nursery/sources/errors.move:18: make
+   =         <redacted> = <redacted>
+   =         result = <redacted>
+   =     at ../move-stdlib/nursery/sources/errors.move:19: make
+   =     at ../move-stdlib/nursery/sources/errors.move:26: make (spec)
+
+error: post-condition does not hold
+   ┌─ ../move-stdlib/sources/fixed_point32.move:79:9
+   │
+79 │         ensures result == spec_divide_u64(val, divisor);
+   │         ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+   │
+   =     at ../move-stdlib/sources/fixed_point32.move:63: divide_u64
+   =         val = <redacted>
+   =         divisor = <redacted>
+   =     at ../move-stdlib/sources/fixed_point32.move:65: divide_u64
+   =     at ../move-stdlib/sources/fixed_point32.move:68: divide_u64
+   =     at ../move-stdlib/sources/fixed_point32.move:69: divide_u64
+   =     at ../move-stdlib/sources/fixed_point32.move:71: divide_u64
+   =         <redacted> = <redacted>
+   =         quotient = <redacted>
+   =     at ../move-stdlib/sources/fixed_point32.move:71: divide_u64
+   =     at ../move-stdlib/sources/fixed_point32.move:74: divide_u64
+   =     at ../move-stdlib/sources/fixed_point32.move:63: divide_u64
+   =         result = <redacted>
+   =     at ../move-stdlib/sources/fixed_point32.move:75: divide_u64
+   =     at ../move-stdlib/sources/fixed_point32.move:84
+   =     at ../move-stdlib/sources/fixed_point32.move:85
+   =     at ../move-stdlib/sources/fixed_point32.move:79: divide_u64 (spec)
+
+error: abort not covered by any of the `aborts_if` clauses
+   ┌─ ../move-stdlib/sources/fixed_point32.move:76:5
+   │
+71 │           assert!(quotient <= MAX_U64, EDIVISION);
+   │           ------ abort happened here with code 0x20002
+   ·
+76 │ ╭     spec divide_u64 {
+77 │ │         pragma opaque;
+78 │ │         include DivideAbortsIf;
+79 │ │         ensures result == spec_divide_u64(val, divisor);
+80 │ │     }
+   │ ╰─────^
+   │
+   =     at ../move-stdlib/sources/fixed_point32.move:63: divide_u64
+   =         val = <redacted>
+   =         divisor = <redacted>
+   =     at ../move-stdlib/sources/fixed_point32.move:65: divide_u64
+   =     at ../move-stdlib/sources/fixed_point32.move:68: divide_u64
+   =     at ../move-stdlib/sources/fixed_point32.move:69: divide_u64
+   =     at ../move-stdlib/sources/fixed_point32.move:71: divide_u64
+   =         <redacted> = <redacted>
+   =         quotient = <redacted>
+   =     at ../move-stdlib/sources/fixed_point32.move:71: divide_u64
+   =         ABORTED
+
+error: function does not abort under this condition
+   ┌─ ../move-stdlib/sources/fixed_point32.move:85:9
+   │
+85 │         aborts_if spec_divide_u64(val, divisor) > MAX_U64 with EDIVISION;
+   │         ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+   │
+   =     at ../move-stdlib/sources/fixed_point32.move:63: divide_u64
+   =         val = <redacted>
+   =         divisor = <redacted>
+   =     at ../move-stdlib/sources/fixed_point32.move:65: divide_u64
+   =     at ../move-stdlib/sources/fixed_point32.move:68: divide_u64
+   =     at ../move-stdlib/sources/fixed_point32.move:69: divide_u64
+   =     at ../move-stdlib/sources/fixed_point32.move:71: divide_u64
+   =         <redacted> = <redacted>
+   =         quotient = <redacted>
+   =     at ../move-stdlib/sources/fixed_point32.move:71: divide_u64
+   =     at ../move-stdlib/sources/fixed_point32.move:74: divide_u64
+   =     at ../move-stdlib/sources/fixed_point32.move:63: divide_u64
+   =         result = <redacted>
+   =     at ../move-stdlib/sources/fixed_point32.move:75: divide_u64
+   =     at ../move-stdlib/sources/fixed_point32.move:84
+   =     at ../move-stdlib/sources/fixed_point32.move:85
+
+error: post-condition does not hold
+    ┌─ ../move-stdlib/sources/fixed_point32.move:209:9
+    │
+209 │         ensures result == spec_create_from_u64(val);
+    │         ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+    │
+    =     at ../move-stdlib/sources/fixed_point32.move:201: create_from_u64
+    =     at ../move-stdlib/sources/fixed_point32.move:213
+    =     at ../move-stdlib/sources/fixed_point32.move:201: create_from_u64
+    =         val = <redacted>
+    =     at ../move-stdlib/sources/fixed_point32.move:202: create_from_u64
+    =     at ../move-stdlib/sources/fixed_point32.move:203: create_from_u64
+    =         <redacted> = <redacted>
+    =         value = <redacted>
+    =     at ../move-stdlib/sources/fixed_point32.move:203: create_from_u64
+    =     at ../move-stdlib/sources/fixed_point32.move:204: create_from_u64
+    =     at ../move-stdlib/sources/fixed_point32.move:201: create_from_u64
+    =         result = <redacted>
+    =     at ../move-stdlib/sources/fixed_point32.move:205: create_from_u64
+    =     at ../move-stdlib/sources/fixed_point32.move:214
+    =     at ../move-stdlib/sources/fixed_point32.move:209: create_from_u64 (spec)
+
+error: post-condition does not hold
+    ┌─ ../move-stdlib/sources/fixed_point32.move:227:9
+    │
+227 │         ensures result == spec_floor(num);
+    │         ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+    │
+    =     at ../move-stdlib/sources/fixed_point32.move:221: floor
+    =         num = <redacted>
+    =     at ../move-stdlib/sources/fixed_point32.move:222: floor
+    =         result = <redacted>
+    =     at ../move-stdlib/sources/fixed_point32.move:223: floor
+    =     at ../move-stdlib/sources/fixed_point32.move:226: floor (spec)
+    =     at ../move-stdlib/sources/fixed_point32.move:227: floor (spec)
+
+error: post-condition does not hold
+    ┌─ ../move-stdlib/sources/fixed_point32.move:277:9
+    │
+277 │         ensures result == spec_round(num);
+    │         ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+    │
+    =     at ../move-stdlib/sources/fixed_point32.move:264: round
+    =         num = <redacted>
+    =     at ../move-stdlib/sources/fixed_point32.move:265: round
+    =         <redacted> = <redacted>
+    =     at ../move-stdlib/sources/fixed_point32.move:266: round
+    =         <redacted> = <redacted>
+    =         floored_num = <redacted>
+    =     at ../move-stdlib/sources/fixed_point32.move:267: round
+    =         <redacted> = <redacted>
+    =         boundary = <redacted>
+    =     at ../move-stdlib/sources/fixed_point32.move:270: round
+    =         return = <redacted>
+    =     at ../move-stdlib/sources/fixed_point32.move:267: round
+    =         result = <redacted>
+    =     at ../move-stdlib/sources/fixed_point32.move:272: round
+    =     at ../move-stdlib/sources/fixed_point32.move:276: round (spec)
+    =     at ../move-stdlib/sources/fixed_point32.move:277: round (spec)
+
+error: abort not covered by any of the `aborts_if` clauses
+    ┌─ ../move-stdlib/sources/fixed_point32.move:273:5
+    │
+266 │           let boundary = floored_num + ((1 << 32) / 2);
+    │                          ----------------------------- abort happened here with execution failure
+    ·
+273 │ ╭     spec round {
+274 │ │         pragma opaque;
+275 │ │         pragma timeout = 120;
+276 │ │         aborts_if false;
+277 │ │         ensures result == spec_round(num);
+278 │ │     }
+    │ ╰─────^
+    │
+    =     at ../move-stdlib/sources/fixed_point32.move:264: round
+    =         num = <redacted>
+    =     at ../move-stdlib/sources/fixed_point32.move:265: round
+    =         <redacted> = <redacted>
+    =     at ../move-stdlib/sources/fixed_point32.move:266: round
+    =         <redacted> = <redacted>
+    =         floored_num = <redacted>
+    =     at ../move-stdlib/sources/fixed_point32.move:266: round
+    =         ABORTED
