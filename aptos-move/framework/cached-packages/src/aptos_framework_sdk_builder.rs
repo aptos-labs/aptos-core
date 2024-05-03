@@ -160,7 +160,6 @@ pub enum EntryFunctionCall {
         amounts: Vec<u64>,
     },
 
-    /// Basic account creation methods.
     AptosAccountCreateAccount {
         auth_key: AccountAddress,
     },
@@ -667,6 +666,11 @@ pub enum EntryFunctionCall {
         code: Vec<Vec<u8>>,
     },
 
+    PrimaryFungibleStoreAptTransfer {
+        recipient: AccountAddress,
+        amount: u64,
+    },
+
     /// Creates a new resource account and rotates the authentication key to either
     /// the optional auth key if it is non-empty (though auth keys are 32-bytes)
     /// or the source accounts current auth key.
@@ -892,6 +896,8 @@ pub enum EntryFunctionCall {
         operator: AccountAddress,
         new_voter: AccountAddress,
     },
+
+    TransactionFeeConvertToAptosFaBurnRef {},
 
     /// Used in on-chain governances to update the major version for the next epoch.
     /// Example usage:
@@ -1394,6 +1400,9 @@ impl EntryFunctionCall {
                 metadata_serialized,
                 code,
             } => object_code_deployment_publish(metadata_serialized, code),
+            PrimaryFungibleStoreAptTransfer { recipient, amount } => {
+                primary_fungible_store_apt_transfer(recipient, amount)
+            },
             ResourceAccountCreateResourceAccount {
                 seed,
                 optional_auth_key,
@@ -1538,6 +1547,9 @@ impl EntryFunctionCall {
                 operator,
                 new_voter,
             } => staking_proxy_set_voter(operator, new_voter),
+            TransactionFeeConvertToAptosFaBurnRef {} => {
+                transaction_fee_convert_to_aptos_fa_burn_ref()
+            },
             VersionSetForNextEpoch { major } => version_set_for_next_epoch(major),
             VersionSetVersion { major } => version_set_version(major),
             VestingAdminWithdraw { contract_address } => vesting_admin_withdraw(contract_address),
@@ -1905,7 +1917,6 @@ pub fn aptos_account_batch_transfer_coins(
     ))
 }
 
-/// Basic account creation methods.
 pub fn aptos_account_create_account(auth_key: AccountAddress) -> TransactionPayload {
     TransactionPayload::EntryFunction(EntryFunction::new(
         ModuleId::new(
@@ -3409,6 +3420,27 @@ pub fn object_code_deployment_publish(
     ))
 }
 
+pub fn primary_fungible_store_apt_transfer(
+    recipient: AccountAddress,
+    amount: u64,
+) -> TransactionPayload {
+    TransactionPayload::EntryFunction(EntryFunction::new(
+        ModuleId::new(
+            AccountAddress::new([
+                0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+                0, 0, 0, 1,
+            ]),
+            ident_str!("primary_fungible_store").to_owned(),
+        ),
+        ident_str!("apt_transfer").to_owned(),
+        vec![],
+        vec![
+            bcs::to_bytes(&recipient).unwrap(),
+            bcs::to_bytes(&amount).unwrap(),
+        ],
+    ))
+}
+
 /// Creates a new resource account and rotates the authentication key to either
 /// the optional auth key if it is non-empty (though auth keys are 32-bytes)
 /// or the source accounts current auth key.
@@ -4147,6 +4179,21 @@ pub fn staking_proxy_set_voter(
             bcs::to_bytes(&operator).unwrap(),
             bcs::to_bytes(&new_voter).unwrap(),
         ],
+    ))
+}
+
+pub fn transaction_fee_convert_to_aptos_fa_burn_ref() -> TransactionPayload {
+    TransactionPayload::EntryFunction(EntryFunction::new(
+        ModuleId::new(
+            AccountAddress::new([
+                0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+                0, 0, 0, 1,
+            ]),
+            ident_str!("transaction_fee").to_owned(),
+        ),
+        ident_str!("convert_to_aptos_fa_burn_ref").to_owned(),
+        vec![],
+        vec![],
     ))
 }
 
@@ -5554,6 +5601,19 @@ mod decoder {
         }
     }
 
+    pub fn primary_fungible_store_apt_transfer(
+        payload: &TransactionPayload,
+    ) -> Option<EntryFunctionCall> {
+        if let TransactionPayload::EntryFunction(script) = payload {
+            Some(EntryFunctionCall::PrimaryFungibleStoreAptTransfer {
+                recipient: bcs::from_bytes(script.args().get(0)?).ok()?,
+                amount: bcs::from_bytes(script.args().get(1)?).ok()?,
+            })
+        } else {
+            None
+        }
+    }
+
     pub fn resource_account_create_resource_account(
         payload: &TransactionPayload,
     ) -> Option<EntryFunctionCall> {
@@ -5988,6 +6048,16 @@ mod decoder {
                 operator: bcs::from_bytes(script.args().get(0)?).ok()?,
                 new_voter: bcs::from_bytes(script.args().get(1)?).ok()?,
             })
+        } else {
+            None
+        }
+    }
+
+    pub fn transaction_fee_convert_to_aptos_fa_burn_ref(
+        payload: &TransactionPayload,
+    ) -> Option<EntryFunctionCall> {
+        if let TransactionPayload::EntryFunction(_script) = payload {
+            Some(EntryFunctionCall::TransactionFeeConvertToAptosFaBurnRef {})
         } else {
             None
         }
@@ -6552,6 +6622,10 @@ static SCRIPT_FUNCTION_DECODER_MAP: once_cell::sync::Lazy<EntryFunctionDecoderMa
             Box::new(decoder::object_code_deployment_publish),
         );
         map.insert(
+            "primary_fungible_store_apt_transfer".to_string(),
+            Box::new(decoder::primary_fungible_store_apt_transfer),
+        );
+        map.insert(
             "resource_account_create_resource_account".to_string(),
             Box::new(decoder::resource_account_create_resource_account),
         );
@@ -6691,6 +6765,10 @@ static SCRIPT_FUNCTION_DECODER_MAP: once_cell::sync::Lazy<EntryFunctionDecoderMa
         map.insert(
             "staking_proxy_set_voter".to_string(),
             Box::new(decoder::staking_proxy_set_voter),
+        );
+        map.insert(
+            "transaction_fee_convert_to_aptos_fa_burn_ref".to_string(),
+            Box::new(decoder::transaction_fee_convert_to_aptos_fa_burn_ref),
         );
         map.insert(
             "version_set_for_next_epoch".to_string(),

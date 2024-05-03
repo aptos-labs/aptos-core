@@ -21,6 +21,9 @@ module aptos_framework::primary_fungible_store {
     use std::signer;
     use std::string::String;
 
+    friend aptos_framework::transaction_fee;
+    friend aptos_framework::transaction_validation;
+
     #[resource_group_member(group = aptos_framework::object::ObjectGroup)]
     /// A resource that holds the derive ref for the fungible asset metadata object. This is used to create primary
     /// stores for users with deterministic addresses so that users can easily deposit/withdraw/transfer fungible
@@ -61,10 +64,22 @@ module aptos_framework::primary_fungible_store {
         owner: address,
         metadata: Object<T>,
     ): Object<FungibleStore> acquires DeriveRefPod {
-        if (!primary_store_exists(owner, metadata)) {
-            create_primary_store(owner, metadata)
+        let store_addr = primary_store_address(owner, metadata);
+        if (fungible_asset::store_exists(store_addr)) {
+            object::address_to_object<FungibleStore>(store_addr)
         } else {
-            primary_store(owner, metadata)
+            create_primary_store(owner, metadata)
+        }
+    }
+
+    inline fun apt_ensure_primary_store_exists(
+        owner: address,
+    ): address acquires DeriveRefPod {
+        let store_addr = apt_store_address(owner);
+        if (fungible_asset::store_exists(store_addr)) {
+            store_addr
+        } else {
+            object::object_address(&create_primary_store(owner, object::address_to_object<Metadata>(@aptos_fungible_asset)))
         }
     }
 
@@ -132,6 +147,31 @@ module aptos_framework::primary_fungible_store {
         }
     }
 
+    inline fun apt_store_address(account: address): address {
+        if (features::primary_apt_fungible_store_at_user_address_enabled()) {
+            account
+        } else {
+            object::create_user_derived_object_address(account, @aptos_fungible_asset)
+        }
+    }
+
+    public(friend) fun is_apt_balance_at_least(account: address, amount: u64): bool {
+        let store_addr = apt_store_address(account);
+        fungible_asset::is_address_balance_at_least(store_addr, amount)
+    }
+
+    public(friend) fun apt_burn_from(
+        ref: &BurnRef,
+        account: address,
+        amount: u64,
+    ) {
+        // Skip burning if amount is zero. This shouldn't error out as it's called as part of transaction fee burning.
+        if (amount != 0) {
+            let store_addr = apt_store_address(account);
+            fungible_asset::address_burn_from(ref, store_addr, amount);
+        };
+    }
+
     #[view]
     /// Return whether the given account's primary store is frozen.
     public fun is_frozen<T: key>(account: address, metadata: Object<T>): bool {
@@ -161,7 +201,7 @@ module aptos_framework::primary_fungible_store {
     public(friend) fun force_deposit(owner: address, fa: FungibleAsset) acquires DeriveRefPod {
         let metadata = fungible_asset::asset_metadata(&fa);
         let store = ensure_primary_store_exists(owner, metadata);
-        fungible_asset::deposit_internal(store, fa);
+        fungible_asset::deposit_internal(object::object_address(&store), fa);
     }
 
     /// Transfer `amount` of fungible asset from sender's primary store to receiver's primary store.
@@ -176,6 +216,22 @@ module aptos_framework::primary_fungible_store {
         may_be_unburn(sender, sender_store);
         let recipient_store = ensure_primary_store_exists(recipient, metadata);
         dispatchable_fungible_asset::transfer(sender, sender_store, recipient_store, amount);
+    }
+
+    public entry fun apt_transfer(
+        sender: &signer,
+        recipient: address,
+        amount: u64,
+    ) acquires DeriveRefPod {
+        let sender_store = apt_ensure_primary_store_exists(signer::address_of(sender));
+        let recipient_store = apt_ensure_primary_store_exists(recipient);
+
+        // use internal APIs, as they skip:
+        // - owner, frozen and dispatchable checks
+        // as APT cannot be frozen or have dispatch, and PFS cannot be transfered
+        // (PFS could potentially be burned. regular transfer would permanently unburn the store.
+        // Ignoring the check here has the equivalent of unburning, transfers, and then burning again)
+        fungible_asset::deposit_internal(recipient_store, fungible_asset::withdraw_internal(sender_store, amount));
     }
 
     /// Transfer `amount` of fungible asset from sender's primary store to receiver's primary store.

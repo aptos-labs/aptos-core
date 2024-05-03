@@ -4,7 +4,10 @@ module aptos_framework::aptos_account {
     use aptos_framework::coin::{Self, Coin};
     use aptos_framework::create_signer::create_signer;
     use aptos_framework::event::{EventHandle, emit_event, emit};
+    use aptos_framework::primary_fungible_store;
+
     use std::error;
+    use std::features;
     use std::signer;
     use std::vector;
 
@@ -45,9 +48,15 @@ module aptos_framework::aptos_account {
     /// Basic account creation methods.
     ///////////////////////////////////////////////////////////////////////////
 
+    inline fun register_apt(account: &signer) {
+        coin::register<AptosCoin>(account);
+    }
+
     public entry fun create_account(auth_key: address) {
         let signer = account::create_account(auth_key);
-        coin::register<AptosCoin>(&signer);
+        if (!features::new_accounts_default_to_fa_apt_store_enabled()) {
+            register_apt(&signer);
+        }
     }
 
     /// Batch version of APT transfer.
@@ -70,12 +79,17 @@ module aptos_framework::aptos_account {
         if (!account::exists_at(to)) {
             create_account(to)
         };
-        // Resource accounts can be created without registering them to receive APT.
-        // This conveniently does the registration if necessary.
-        if (!coin::is_account_registered<AptosCoin>(to)) {
-            coin::register<AptosCoin>(&create_signer(to));
-        };
-        coin::transfer<AptosCoin>(source, to, amount)
+
+        if (features::operations_default_to_fa_apt_store()) {
+            primary_fungible_store::apt_transfer(source, to, amount)
+        } else {
+            // Resource accounts can be created without registering them to receive APT.
+            // This conveniently does the registration if necessary.
+            if (!coin::is_account_registered<AptosCoin>(to)) {
+                coin::register<AptosCoin>(&create_signer(to));
+            };
+            coin::transfer<AptosCoin>(source, to, amount)
+        }
     }
 
     /// Batch version of transfer_coins.

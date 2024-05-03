@@ -480,6 +480,20 @@ module aptos_framework::coin {
         (option::extract(burn_ref_opt), BurnRefReceipt { metadata })
     }
 
+    // Permanently convert to BurnRef, and take it from the pairing.
+    // (i.e. future calls to borrow/convert BurnRef will fail)
+    public fun convert_and_take_paired_burn_ref<CoinType>(
+        burn_cap: BurnCapability<CoinType>
+    ): BurnRef acquires CoinConversionMap, PairedFungibleAssetRefs {
+        destroy_burn_cap(burn_cap);
+        let metadata = assert_paired_metadata_exists<CoinType>();
+        let metadata_addr = object_address(&metadata);
+        assert!(exists<PairedFungibleAssetRefs>(metadata_addr), error::internal(EPAIRED_FUNGIBLE_ASSET_REFS_NOT_FOUND));
+        let burn_ref_opt = &mut borrow_global_mut<PairedFungibleAssetRefs>(metadata_addr).burn_ref_opt;
+        assert!(option::is_some(burn_ref_opt), error::not_found(EBURN_REF_NOT_FOUND));
+        option::extract(burn_ref_opt)
+    }
+
     /// Return the `BurnRef` with the hot potato receipt.
     public fun return_paired_burn_ref(
         burn_ref: BurnRef,
@@ -911,7 +925,7 @@ module aptos_framework::coin {
                 let fa = coin_to_fungible_asset(coin);
                 let metadata = fungible_asset::asset_metadata(&fa);
                 let store = primary_fungible_store::primary_store(account_addr, metadata);
-                fungible_asset::deposit_internal(store, fa);
+                fungible_asset::deposit_internal(object::object_address(&store), fa);
             } else {
                 abort error::not_found(ECOIN_STORE_NOT_PUBLISHED)
             }
