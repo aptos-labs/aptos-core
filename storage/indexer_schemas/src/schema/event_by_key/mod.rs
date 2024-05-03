@@ -4,37 +4,36 @@
 
 //! This module defines physical storage schema for an event index via which a ContractEvent (
 //! represented by a <txn_version, event_idx> tuple so that it can be fetched from `EventSchema`)
-//! can be found by <access_path, version, sequence_num> tuple.
+//! can be found by <access_path, sequence_num> tuple.
 //!
 //! ```text
-//! |<--------------key------------>|<-value->|
-//! | event_key | txn_ver | seq_num |   idx   |
+//! |<---------key------->|<----value---->|
+//! | event_key | seq_num | txn_ver | idx |
 //! ```
 
-use crate::schema::{ensure_slice_len_eq, EVENT_BY_VERSION_CF_NAME};
+use crate::{schema::EVENT_BY_KEY_CF_NAME, utils::ensure_slice_len_eq};
 use anyhow::Result;
 use aptos_schemadb::{
-    define_schema,
+    define_pub_schema,
     schema::{KeyCodec, ValueCodec},
 };
 use aptos_types::{event::EventKey, transaction::Version};
 use byteorder::{BigEndian, ReadBytesExt, WriteBytesExt};
 use std::mem::size_of;
 
-define_schema!(EventByVersionSchema, Key, Value, EVENT_BY_VERSION_CF_NAME);
+define_pub_schema!(EventByKeySchema, Key, Value, EVENT_BY_KEY_CF_NAME);
 
 type SeqNum = u64;
-type Key = (EventKey, Version, SeqNum);
+type Key = (EventKey, SeqNum);
 
 type Index = u64;
-type Value = Index;
+type Value = (Version, Index);
 
-impl KeyCodec<EventByVersionSchema> for Key {
+impl KeyCodec<EventByKeySchema> for Key {
     fn encode_key(&self) -> Result<Vec<u8>> {
-        let (ref event_key, version, seq_num) = *self;
+        let (ref event_key, seq_num) = *self;
 
         let mut encoded = event_key.to_bytes();
-        encoded.write_u64::<BigEndian>(version)?;
         encoded.write_u64::<BigEndian>(seq_num)?;
 
         Ok(encoded)
@@ -44,24 +43,32 @@ impl KeyCodec<EventByVersionSchema> for Key {
         ensure_slice_len_eq(data, size_of::<Self>())?;
 
         const EVENT_KEY_LEN: usize = size_of::<EventKey>();
-        const EVENT_KEY_AND_VER_LEN: usize = size_of::<(EventKey, Version)>();
         let event_key = bcs::from_bytes(&data[..EVENT_KEY_LEN])?;
-        let version = (&data[EVENT_KEY_LEN..]).read_u64::<BigEndian>()?;
-        let seq_num = (&data[EVENT_KEY_AND_VER_LEN..]).read_u64::<BigEndian>()?;
+        let seq_num = (&data[EVENT_KEY_LEN..]).read_u64::<BigEndian>()?;
 
-        Ok((event_key, version, seq_num))
+        Ok((event_key, seq_num))
     }
 }
 
-impl ValueCodec<EventByVersionSchema> for Value {
+impl ValueCodec<EventByKeySchema> for Value {
     fn encode_value(&self) -> Result<Vec<u8>> {
-        Ok(self.to_be_bytes().to_vec())
+        let (version, index) = *self;
+
+        let mut encoded = Vec::with_capacity(size_of::<Version>() + size_of::<Index>());
+        encoded.write_u64::<BigEndian>(version)?;
+        encoded.write_u64::<BigEndian>(index)?;
+
+        Ok(encoded)
     }
 
-    fn decode_value(mut data: &[u8]) -> Result<Self> {
+    fn decode_value(data: &[u8]) -> Result<Self> {
         ensure_slice_len_eq(data, size_of::<Self>())?;
 
-        Ok(data.read_u64::<BigEndian>()?)
+        const VERSION_SIZE: usize = size_of::<Version>();
+        let version = (&data[..VERSION_SIZE]).read_u64::<BigEndian>()?;
+        let index = (&data[VERSION_SIZE..]).read_u64::<BigEndian>()?;
+
+        Ok((version, index))
     }
 }
 

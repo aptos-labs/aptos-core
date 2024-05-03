@@ -13,6 +13,14 @@ proptest! {
     ) {
         assert_encode_decode::<IndexerMetadataSchema>(&tag, &metadata);
     }
+
+    #[test]
+    fn test_encode_decode_internal_indexer_metadata(
+        key in any::<MetadataKey>(),
+        metadata in any::<MetadataValue>(),
+    ) {
+        assert_encode_decode::<InternalIndexerMetadataSchema>(&key, &metadata);
+    }
 }
 
 test_no_panic_decoding!(IndexerMetadataSchema);
