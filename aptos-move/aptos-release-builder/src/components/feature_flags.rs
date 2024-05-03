@@ -114,6 +114,7 @@ pub enum FeatureFlag {
     PrimaryAPTFungibleStoreAtUserAddress,
     ObjectNativeDerivedAddress,
     DispatchableFungibleAsset,
+    ConcurrentFungibleBalance,
     MigrateToConcurrentFungibleBalance,
 }
 
@@ -293,6 +294,7 @@ impl From<FeatureFlag> for AptosFeatureFlag {
                 AptosFeatureFlag::OBJECT_NATIVE_DERIVED_ADDRESS
             },
             FeatureFlag::DispatchableFungibleAsset => AptosFeatureFlag::DISPATCHABLE_FUNGIBLE_ASSET,
+            FeatureFlag::ConcurrentFungibleBalance => AptosFeatureFlag::CONCURRENT_FUNGIBLE_BALANCE,
             FeatureFlag::MigrateToConcurrentFungibleBalance => {
                 AptosFeatureFlag::MIGRATE_TO_CONCURRENT_FUNGIBLE_BALANCE
             },
@@ -403,6 +405,7 @@ impl From<AptosFeatureFlag> for FeatureFlag {
                 FeatureFlag::ObjectNativeDerivedAddress
             },
             AptosFeatureFlag::DISPATCHABLE_FUNGIBLE_ASSET => FeatureFlag::DispatchableFungibleAsset,
+            AptosFeatureFlag::CONCURRENT_FUNGIBLE_BALANCE => FeatureFlag::ConcurrentFungibleBalance,
             AptosFeatureFlag::MIGRATE_TO_CONCURRENT_FUNGIBLE_BALANCE => {
                 FeatureFlag::MigrateToConcurrentFungibleBalance
             },

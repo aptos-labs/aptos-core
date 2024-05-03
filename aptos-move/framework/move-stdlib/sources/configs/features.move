@@ -529,16 +529,26 @@ module std::features {
     public fun dispatchable_fungible_asset_enabled(): bool acquires Features {
         is_enabled(DISPATCHABLE_FUNGIBLE_ASSET)
     }
-    
-    /// Whether enable Fungible Asset creation
+
+    /// Whether enable concurent Fungible Balance
     /// to create higher throughput concurrent variants.
     /// Lifetime: transient
-    const MIGRATE_TO_CONCURRENT_FUNGIBLE_BALANCE: u64 = 64;
+    const CONCURRENT_FUNGIBLE_BALANCE: u64 = 64;
+
+    public fun concurrent_fungible_balance_enabled(): bool acquires Features {
+        // concurrent fungible balance cannot be used if aggregator v2 api is not enabled.
+        is_enabled(CONCURRENT_FUNGIBLE_BALANCE) && aggregator_v2_api_enabled()
+    }
+
+    /// Whether to default new Fungible Stores and migrate existing ones
+    /// to the concurrent variant.
+    /// Lifetime: transient
+    const MIGRATE_TO_CONCURRENT_FUNGIBLE_BALANCE: u64 = 65;
 
     public fun get_migrate_to_concurrent_fungible_balance_feature(): u64 { MIGRATE_TO_CONCURRENT_FUNGIBLE_BALANCE }
 
     public fun migrate_to_concurrent_fungible_balance_enabled(): bool acquires Features {
-        // concurrent fungible assets cannot be used if aggregator v2 api is not enabled.
+        // concurrent fungible balance cannot be used if aggregator v2 api is not enabled.
         is_enabled(MIGRATE_TO_CONCURRENT_FUNGIBLE_BALANCE) && aggregator_v2_api_enabled()
     }
 

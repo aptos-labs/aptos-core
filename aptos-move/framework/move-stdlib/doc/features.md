@@ -118,6 +118,7 @@ return true.
 -  [Function `object_native_derived_address_enabled`](#0x1_features_object_native_derived_address_enabled)
 -  [Function `get_dispatchable_fungible_asset_feature`](#0x1_features_get_dispatchable_fungible_asset_feature)
 -  [Function `dispatchable_fungible_asset_enabled`](#0x1_features_dispatchable_fungible_asset_enabled)
+-  [Function `concurrent_fungible_balance_enabled`](#0x1_features_concurrent_fungible_balance_enabled)
 -  [Function `get_migrate_to_concurrent_fungible_balance_feature`](#0x1_features_get_migrate_to_concurrent_fungible_balance_feature)
 -  [Function `migrate_to_concurrent_fungible_balance_enabled`](#0x1_features_migrate_to_concurrent_fungible_balance_enabled)
 -  [Function `change_feature_flags`](#0x1_features_change_feature_flags)
@@ -378,6 +379,18 @@ Lifetime: transient
 
 
 
+<a id="0x1_features_CONCURRENT_FUNGIBLE_BALANCE"></a>
+
+Whether enable concurent Fungible Balance
+to create higher throughput concurrent variants.
+Lifetime: transient
+
+
+<pre><code><b>const</b> <a href="features.md#0x1_features_CONCURRENT_FUNGIBLE_BALANCE">CONCURRENT_FUNGIBLE_BALANCE</a>: u64 = 64;
+</code></pre>
+
+
+
 <a id="0x1_features_CONCURRENT_TOKEN_V2"></a>
 
 Whether enable TokenV2 collection creation and Fungible Asset creation
@@ -573,12 +586,12 @@ Whether checking the maximum object nesting is enabled.
 
 <a id="0x1_features_MIGRATE_TO_CONCURRENT_FUNGIBLE_BALANCE"></a>
 
-Whether enable Fungible Asset creation
-to create higher throughput concurrent variants.
+Whether to default new Fungible Stores and migrate existing ones
+to the concurrent variant.
 Lifetime: transient
 
 
-<pre><code><b>const</b> <a href="features.md#0x1_features_MIGRATE_TO_CONCURRENT_FUNGIBLE_BALANCE">MIGRATE_TO_CONCURRENT_FUNGIBLE_BALANCE</a>: u64 = 64;
+<pre><code><b>const</b> <a href="features.md#0x1_features_MIGRATE_TO_CONCURRENT_FUNGIBLE_BALANCE">MIGRATE_TO_CONCURRENT_FUNGIBLE_BALANCE</a>: u64 = 65;
 </code></pre>
 
 
@@ -2855,6 +2868,31 @@ Lifetime: transient
 
 </details>
 
+<a id="0x1_features_concurrent_fungible_balance_enabled"></a>
+
+## Function `concurrent_fungible_balance_enabled`
+
+
+
+<pre><code><b>public</b> <b>fun</b> <a href="features.md#0x1_features_concurrent_fungible_balance_enabled">concurrent_fungible_balance_enabled</a>(): bool
+</code></pre>
+
+
+
+<details>
+<summary>Implementation</summary>
+
+
+<pre><code><b>public</b> <b>fun</b> <a href="features.md#0x1_features_concurrent_fungible_balance_enabled">concurrent_fungible_balance_enabled</a>(): bool <b>acquires</b> <a href="features.md#0x1_features_Features">Features</a> {
+    // concurrent fungible balance cannot be used <b>if</b> aggregator v2 api is not enabled.
+    <a href="features.md#0x1_features_is_enabled">is_enabled</a>(<a href="features.md#0x1_features_CONCURRENT_FUNGIBLE_BALANCE">CONCURRENT_FUNGIBLE_BALANCE</a>) && <a href="features.md#0x1_features_aggregator_v2_api_enabled">aggregator_v2_api_enabled</a>()
+}
+</code></pre>
+
+
+
+</details>
+
 <a id="0x1_features_get_migrate_to_concurrent_fungible_balance_feature"></a>
 
 ## Function `get_migrate_to_concurrent_fungible_balance_feature`
@@ -2893,7 +2931,7 @@ Lifetime: transient
 
 
 <pre><code><b>public</b> <b>fun</b> <a href="features.md#0x1_features_migrate_to_concurrent_fungible_balance_enabled">migrate_to_concurrent_fungible_balance_enabled</a>(): bool <b>acquires</b> <a href="features.md#0x1_features_Features">Features</a> {
-    // concurrent fungible assets cannot be used <b>if</b> aggregator v2 api is not enabled.
+    // concurrent fungible balance cannot be used <b>if</b> aggregator v2 api is not enabled.
     <a href="features.md#0x1_features_is_enabled">is_enabled</a>(<a href="features.md#0x1_features_MIGRATE_TO_CONCURRENT_FUNGIBLE_BALANCE">MIGRATE_TO_CONCURRENT_FUNGIBLE_BALANCE</a>) && <a href="features.md#0x1_features_aggregator_v2_api_enabled">aggregator_v2_api_enabled</a>()
 }
 </code></pre>
