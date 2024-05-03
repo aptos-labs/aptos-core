@@ -468,6 +468,7 @@ impl PrecompiledFilesModules {
 static PRECOMPILED_MOVE_STDLIB_V2: Lazy<PrecompiledFilesModules> = Lazy::new(|| {
     let options = move_compiler_v2::Options {
         sources: move_stdlib::move_stdlib_files(),
+        sources_deps: vec![],
         dependencies: vec![],
         named_address_mapping: move_stdlib::move_stdlib_named_addresses_strings(),
         known_attributes: KnownAttribute::get_all_attribute_names().clone(),

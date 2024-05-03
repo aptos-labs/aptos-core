@@ -1,4 +1,16 @@
 Move prover returns: exiting with verification errors
+error: verification out of resources/timeout (global timeout set to 40s)
+    ┌─ ../move-stdlib/sources/fixed_point32.move:264:5
+    │
+264 │ ╭     public fun round(num: FixedPoint32): u64 {
+265 │ │         let floored_num = floor(num) << 32;
+266 │ │         let boundary = floored_num + ((1 << 32) / 2);
+267 │ │         if (num.value < boundary) {
+    · │
+271 │ │         }
+272 │ │     }
+    │ ╰─────^
+
 error: data invariant does not hold
   ┌─ tests/sources/functional/mut_ref.move:8:14
   │

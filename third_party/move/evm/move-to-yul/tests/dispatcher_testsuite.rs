@@ -73,6 +73,7 @@ fn compile_yul_to_bytecode_bytes(filename: &str) -> Result<Vec<u8>> {
             paths: vec![contract_path(filename).to_string_lossy().to_string()],
             named_address_map: named_address_map.clone(),
         }],
+        vec![],
         vec![PackagePaths {
             name: None,
             paths: deps,

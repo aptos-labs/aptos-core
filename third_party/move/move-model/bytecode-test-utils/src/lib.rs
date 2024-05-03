@@ -27,12 +27,16 @@ pub fn test_runner(
     path: &Path,
     pipeline_opt: Option<FunctionTargetPipeline>,
 ) -> anyhow::Result<()> {
-    let mut sources = extract_test_directives(path, "// dep:")?;
-    sources.push(path.to_string_lossy().to_string());
+    let dep_sources = extract_test_directives(path, "// dep:")?;
     let mut env: GlobalEnv = run_model_builder_with_options(
         vec![PackagePaths {
             name: None,
-            paths: sources,
+            paths: vec![path.to_string_lossy().to_string()],
+            named_address_map: move_stdlib::move_stdlib_named_addresses(),
+        }],
+        vec![PackagePaths {
+            name: None,
+            paths: dep_sources,
             named_address_map: move_stdlib::move_stdlib_named_addresses(),
         }],
         vec![],

@@ -3,7 +3,10 @@ Found 2 modules
 Publishing a new module 0000000000000000000000000000000000000000000000000000000000000003::A (wrote 155 bytes)
 Publishing a new module 0000000000000000000000000000000000000000000000000000000000000003::B (wrote 166 bytes)
 Wrote 321 bytes of module ID's and code
+double entry for p1/sources/CyclicFriendsPart1.move
 Command `-p p2 sandbox publish --bundle --override-ordering A --override-ordering C -v`:
 Found 3 modules
 Invalid multi-module publishing: VMError with status INVALID_FRIEND_DECL_WITH_MODULES_IN_DEPENDENCIES at location Module ModuleId { address: 0000000000000000000000000000000000000000000000000000000000000003, name: Identifier("C") } and message At least one module, 0000000000000000000000000000000000000000000000000000000000000003::A, appears in both the dependency set and the friend set
 Publishing failed with unexpected error INVALID_FRIEND_DECL_WITH_MODULES_IN_DEPENDENCIES
+double entry for p2/sources/CyclicFriendsPart2.move
+double entry for p2/sources/CyclicFriendsPart2.move

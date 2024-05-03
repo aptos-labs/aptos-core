@@ -61,6 +61,9 @@ pub struct Options {
     pub experiment_cache: RefCell<BTreeMap<String, bool>>,
     /// Sources to compile (positional arg, therefore last)
     pub sources: Vec<String>,
+    /// Deps to compile but not treat as a test target.
+    #[clap(skip)]
+    pub sources_deps: Vec<String>,
     /// Show warnings about unused functions, fields, constants, etc.
     /// Note that the current value of this constant is "Wunused"
     #[clap(long = cli::WARN_UNUSED_FLAG, default_value="false")]
