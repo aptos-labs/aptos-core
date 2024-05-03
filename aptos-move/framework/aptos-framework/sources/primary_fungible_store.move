@@ -64,10 +64,22 @@ module aptos_framework::primary_fungible_store {
         owner: address,
         metadata: Object<T>,
     ): Object<FungibleStore> acquires DeriveRefPod {
-        if (!primary_store_exists(owner, metadata)) {
-            create_primary_store(owner, metadata)
+        let store_addr = primary_store_address(owner, metadata);
+        if (fungible_asset::store_exists(store_addr)) {
+            object::address_to_object<FungibleStore>(store_addr)
         } else {
-            primary_store(owner, metadata)
+            create_primary_store(owner, metadata)
+        }
+    }
+
+    inline fun apt_ensure_primary_store_exists(
+        owner: address,
+    ): Object<FungibleStore> acquires DeriveRefPod {
+        let store_addr = apt_store_address(owner);
+        if (fungible_asset::store_exists(store_addr)) {
+            object::address_to_object<FungibleStore>(store_addr)
+        } else {
+            create_primary_store(owner, object::address_to_object<Metadata>(@aptos_fungible_asset))
         }
     }
 
@@ -150,15 +162,16 @@ module aptos_framework::primary_fungible_store {
 
     // convert AptosCoinCapabilities.burn_cap into BurnRef
     public(friend) fun apt_burn_from(
+        ref: &BurnRef,
         account: address,
         amount: u64,
     ) {
         // Skip burning if amount is zero. This shouldn't error out as it's called as part of transaction fee burning.
         if (amount != 0) {
-            // TODO: use fungible_asset::burn_from
             let store_addr = apt_store_address(account);
-            let fa = fungible_asset::withdraw_internal(store_addr, amount);
-            fungible_asset::burn_internal(fa);
+            fungible_asset::address_burn_from(ref, store_addr, amount);
+            // let fa = fungible_asset::withdraw_internal(store_addr, amount);
+            // fungible_asset::burn_internal(fa);
         };
     }
 
@@ -216,11 +229,10 @@ module aptos_framework::primary_fungible_store {
         // let sender_store = apt_store_address(sender);
         // let recipient_store = apt_store_address(recipient);
 
-        let metadata = object::address_to_object<Metadata>(@aptos_fungible_asset);
-        let sender_store = ensure_primary_store_exists(signer::address_of(sender), metadata);
+        let sender_store = apt_ensure_primary_store_exists(signer::address_of(sender));
         // Check if the sender store object has been burnt or not. If so, unburn it first.
-        may_be_unburn(sender, sender_store);
-        let recipient_store = ensure_primary_store_exists(recipient, metadata);
+        // may_be_unburn(sender, sender_store);
+        let recipient_store = apt_ensure_primary_store_exists(recipient);
 
         fungible_asset::transfer(sender, sender_store, recipient_store, amount);
     }

@@ -707,8 +707,16 @@ module aptos_framework::fungible_asset {
         store: Object<T>,
         amount: u64
     ) acquires FungibleStore, Supply, ConcurrentSupply {
-        assert!(ref.metadata == store_metadata(store), error::invalid_argument(EBURN_REF_AND_STORE_MISMATCH));
+        // assert!(ref.metadata == store_metadata(store), error::invalid_argument(EBURN_REF_AND_STORE_MISMATCH));
         burn(ref, withdraw_internal(object::object_address(&store), amount));
+    }
+
+    public(friend) fun address_burn_from(
+        ref: &BurnRef,
+        store_addr: address,
+        amount: u64
+    ) acquires FungibleStore, Supply, ConcurrentSupply {
+        burn(ref, withdraw_internal(store_addr, amount));
     }
 
     /// Withdraw `amount` of the fungible asset from the `store` ignoring `frozen`.

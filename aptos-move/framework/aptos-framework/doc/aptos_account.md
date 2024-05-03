@@ -9,7 +9,6 @@
 -  [Struct `DirectCoinTransferConfigUpdatedEvent`](#0x1_aptos_account_DirectCoinTransferConfigUpdatedEvent)
 -  [Struct `DirectCoinTransferConfigUpdated`](#0x1_aptos_account_DirectCoinTransferConfigUpdated)
 -  [Constants](#@Constants_0)
--  [Function `register_apt`](#0x1_aptos_account_register_apt)
 -  [Function `create_account`](#0x1_aptos_account_create_account)
 -  [Function `batch_transfer`](#0x1_aptos_account_batch_transfer)
 -  [Function `transfer`](#0x1_aptos_account_transfer)
@@ -201,36 +200,11 @@ The lengths of the recipients and amounts lists don't match.
 
 
 
-<a id="0x1_aptos_account_register_apt"></a>
-
-## Function `register_apt`
-
-Basic account creation methods.
-
-
-<pre><code><b>fun</b> <a href="aptos_account.md#0x1_aptos_account_register_apt">register_apt</a>(<a href="account.md#0x1_account">account</a>: &<a href="../../aptos-stdlib/../move-stdlib/doc/signer.md#0x1_signer">signer</a>)
-</code></pre>
-
-
-
-<details>
-<summary>Implementation</summary>
-
-
-<pre><code>inline <b>fun</b> <a href="aptos_account.md#0x1_aptos_account_register_apt">register_apt</a>(<a href="account.md#0x1_account">account</a>: &<a href="../../aptos-stdlib/../move-stdlib/doc/signer.md#0x1_signer">signer</a>) {
-    <a href="coin.md#0x1_coin_register">coin::register</a>&lt;AptosCoin&gt;(<a href="account.md#0x1_account">account</a>);
-    <a href="coin.md#0x1_coin_migrate_to_fungible_store">coin::migrate_to_fungible_store</a>&lt;AptosCoin&gt;(<a href="account.md#0x1_account">account</a>);
-}
-</code></pre>
-
-
-
-</details>
-
 <a id="0x1_aptos_account_create_account"></a>
 
 ## Function `create_account`
 
+Basic account creation methods.
 
 
 <pre><code><b>public</b> entry <b>fun</b> <a href="aptos_account.md#0x1_aptos_account_create_account">create_account</a>(auth_key: <b>address</b>)
@@ -244,7 +218,7 @@ Basic account creation methods.
 
 <pre><code><b>public</b> entry <b>fun</b> <a href="aptos_account.md#0x1_aptos_account_create_account">create_account</a>(auth_key: <b>address</b>) {
     <b>let</b> <a href="../../aptos-stdlib/../move-stdlib/doc/signer.md#0x1_signer">signer</a> = <a href="account.md#0x1_account_create_account">account::create_account</a>(auth_key);
-    <a href="aptos_account.md#0x1_aptos_account_register_apt">register_apt</a>(&<a href="../../aptos-stdlib/../move-stdlib/doc/signer.md#0x1_signer">signer</a>);
+    // register_apt(&<a href="../../aptos-stdlib/../move-stdlib/doc/signer.md#0x1_signer">signer</a>);
 }
 </code></pre>
 

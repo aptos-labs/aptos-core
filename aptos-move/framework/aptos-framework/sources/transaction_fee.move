@@ -4,9 +4,11 @@ module aptos_framework::transaction_fee {
     use aptos_framework::aptos_coin::AptosCoin;
     use aptos_framework::stake;
     use aptos_framework::primary_fungible_store;
+    use aptos_framework::fungible_asset::BurnRef;
     use aptos_framework::system_addresses;
     use std::error;
     use std::option::{Self, Option};
+    use std::signer;
     use aptos_framework::event;
 
     friend aptos_framework::block;
@@ -27,6 +29,11 @@ module aptos_framework::transaction_fee {
     /// Stores burn capability to burn the gas fees.
     struct AptosCoinCapabilities has key {
         burn_cap: BurnCapability<AptosCoin>,
+    }
+
+    /// Stores burn capability to burn the gas fees.
+    struct AptosFABurnCapabilities has key {
+        burn_ref: BurnRef,
     }
 
     /// Stores mint capability to mint the refunds.
@@ -198,9 +205,9 @@ module aptos_framework::transaction_fee {
     }
 
     /// Burn transaction fees in epilogue.
-    public(friend) fun burn_fee(account: address, fee: u64) {
-        // convert AptosCoinCapabilities.burn_cap into BurnRef
-        primary_fungible_store::apt_burn_from(account, fee);
+    public(friend) fun burn_fee(account: address, fee: u64) acquires AptosFABurnCapabilities {
+        let burn_ref = &borrow_global<AptosFABurnCapabilities>(@aptos_framework).burn_ref;
+        primary_fungible_store::apt_burn_from(burn_ref, account, fee);
     }
 
     /// Mint refund in epilogue.
@@ -224,7 +231,20 @@ module aptos_framework::transaction_fee {
     /// Only called during genesis.
     public(friend) fun store_aptos_coin_burn_cap(aptos_framework: &signer, burn_cap: BurnCapability<AptosCoin>) {
         system_addresses::assert_aptos_framework(aptos_framework);
-        move_to(aptos_framework, AptosCoinCapabilities { burn_cap })
+
+        // move_to(aptos_framework, AptosCoinCapabilities { burn_cap })
+
+        let burn_ref = coin::convert_to_paired_burn_ref(burn_cap);
+        move_to(aptos_framework, AptosFABurnCapabilities { burn_ref });
+    }
+
+    public entry fun convert_to_aptos_fa_burn_ref(aptos_framework: &signer) acquires AptosCoinCapabilities {
+        system_addresses::assert_aptos_framework(aptos_framework);
+        let AptosCoinCapabilities {
+            burn_cap,
+        } = move_from<AptosCoinCapabilities>(signer::address_of(aptos_framework));
+        let burn_ref = coin::convert_to_paired_burn_ref(burn_cap);
+        move_to(aptos_framework, AptosFABurnCapabilities { burn_ref });
     }
 
     /// Only called during genesis.

@@ -193,10 +193,9 @@ impl P2PTransactionGenerator {
                     AccountAddress::ONE,
                     ident_str!("primary_fungible_store").to_owned(),
                 ),
-                ident_str!("transfer").to_owned(),
-                vec![TypeTag::from_str("0x1::fungible_asset::Metadata").unwrap()],
+                ident_str!("apt_transfer").to_owned(),
+                vec![],
                 vec![
-                    bcs::to_bytes(&AccountAddress::TEN).unwrap(),
                     bcs::to_bytes(to).unwrap(),
                     bcs::to_bytes(&num_coins).unwrap(),
                 ],

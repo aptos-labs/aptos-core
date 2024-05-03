@@ -47,14 +47,14 @@ module aptos_framework::aptos_account {
     /// Basic account creation methods.
     ///////////////////////////////////////////////////////////////////////////
 
-    inline fun register_apt(account: &signer) {
-        coin::register<AptosCoin>(account);
-        coin::migrate_to_fungible_store<AptosCoin>(account);
-    }
+    // inline fun register_apt(account: &signer) {
+    //     coin::register<AptosCoin>(account);
+    //     coin::migrate_to_fungible_store<AptosCoin>(account);
+    // }
 
     public entry fun create_account(auth_key: address) {
         let signer = account::create_account(auth_key);
-        register_apt(&signer);
+        // register_apt(&signer);
     }
 
     /// Batch version of APT transfer.
