@@ -855,6 +855,19 @@ impl ExpData {
         vars
     }
 
+    /// Returns the free local variables and the used parameters in this expression.
+    /// Requires that we pass `param_symbols`: an ordered list of all parameter symbols
+    /// in the function containing this expression.
+    pub fn free_vars_and_used_params(&self, param_symbols: &[Symbol]) -> BTreeSet<Symbol> {
+        let mut result = self
+            .used_temporaries()
+            .into_iter()
+            .map(|t| param_symbols[t])
+            .collect::<BTreeSet<_>>();
+        result.append(&mut self.free_vars());
+        result
+    }
+
     /// Returns the used memory of this expression.
     pub fn used_memory(
         &self,
@@ -924,7 +937,7 @@ impl ExpData {
         temps
     }
 
-    /// Returns the temporaries used in this spec block.
+    /// Returns the temporaries used in this expression.
     pub fn used_temporaries(&self) -> BTreeSet<TempIndex> {
         let mut temps = BTreeSet::new();
         let mut visitor = |e: &ExpData| {
@@ -2332,15 +2345,16 @@ impl Operation {
         use Operation::*;
         matches!(
             self,
-            Tuple
-                | Index
-                | Slice
-                | Range
-                | Implies
-                | Iff
-                | Identical
-                | Add
-                | Sub
+            Tuple | Index | Slice | Range | Implies | Iff | Identical | Not | Cast | Len | Vector
+        ) || self.is_binop()
+    }
+
+    /// Determines whether this is a binary operator
+    pub fn is_binop(&self) -> bool {
+        use Operation::*;
+        matches!(
+            self,
+            Add | Sub
                 | Mul
                 | Mod
                 | Div
@@ -2357,10 +2371,6 @@ impl Operation {
                 | Gt
                 | Le
                 | Ge
-                | Not
-                | Cast
-                | Len
-                | Vector
         )
     }
 
@@ -2476,6 +2486,33 @@ impl Operation {
     /// currently to equality which can be used on `(T, T)`, `(T, &T)`, etc.
     pub fn allows_ref_param_for_value(&self) -> bool {
         matches!(self, Operation::Eq | Operation::Neq)
+    }
+
+    /// Get the string representation, if this is a binary operator.
+    /// Returns `None` for non-binary operators.
+    pub fn to_string_if_binop(&self) -> Option<&'static str> {
+        use Operation::*;
+        match self {
+            Add => Some("+"),
+            Sub => Some("-"),
+            Mul => Some("*"),
+            Mod => Some("%"),
+            Div => Some("/"),
+            BitOr => Some("|"),
+            BitAnd => Some("&"),
+            Xor => Some("^"),
+            Shl => Some("<<"),
+            Shr => Some(">>"),
+            And => Some("&&"),
+            Or => Some("||"),
+            Eq => Some("=="),
+            Neq => Some("!="),
+            Lt => Some("<"),
+            Gt => Some(">"),
+            Le => Some("<="),
+            Ge => Some(">="),
+            _ => None,
+        }
     }
 }
 
