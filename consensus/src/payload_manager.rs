@@ -13,8 +13,9 @@ use aptos_consensus_types::{
 use aptos_crypto::HashValue;
 use aptos_executor_types::{ExecutorError::DataNotFound, *};
 use aptos_logger::prelude::*;
-use aptos_types::transaction::SignedTransaction;
+use aptos_types::transaction::{SignedTransaction, Transaction};
 use futures::channel::mpsc::Sender;
+use rayon::iter::{IndexedParallelIterator, IntoParallelRefIterator, ParallelIterator};
 use std::sync::Arc;
 use tokio::sync::oneshot;
 
@@ -238,9 +239,13 @@ impl PayloadManager {
         }
 
         match (self, payload) {
-            (PayloadManager::DirectMempool, Payload::DirectMempool(txns)) => {
-                Ok((txns.clone(), None))
-            },
+            (PayloadManager::DirectMempool, Payload::DirectMempool(txns)) => Ok((
+                txns.par_iter()
+                    .with_min_len(500)
+                    .map(|t| t.clone())
+                    .collect::<Vec<_>>(),
+                None,
+            )),
             (
                 PayloadManager::InQuorumStore(batch_reader, _),
                 Payload::InQuorumStore(proof_with_data),

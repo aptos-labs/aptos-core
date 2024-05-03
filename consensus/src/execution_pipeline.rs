@@ -126,7 +126,8 @@ impl ExecutionPipeline {
             let txns_to_execute =
                 Block::combine_to_input_transactions(validator_txns, input_txns.clone(), metadata);
             let sig_verified_txns: Vec<SignatureVerifiedTransaction> = txns_to_execute
-                .into_iter()
+                .into_par_iter()
+                .with_min_len(500)
                 .map(|t| t.into())
                 .collect::<Vec<_>>();
             execute_block_tx
