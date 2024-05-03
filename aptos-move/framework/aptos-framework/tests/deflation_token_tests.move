@@ -24,6 +24,7 @@ module 0xcafe::deflation_token_tests {
 
         deflation_token::initialize(creator, &creator_ref);
 
+        assert!(fungible_asset::is_store_dispatchable(creator_store), 1);
         assert!(fungible_asset::supply(metadata) == option::some(0), 1);
         // Mint
         let fa = fungible_asset::mint(&mint, 100);
@@ -365,7 +366,7 @@ module 0xcafe::deflation_token_tests {
     }
 
     #[test(creator = @0xcafe, aaron = @0xface)]
-    #[expected_failure(abort_code = 0x50005, location = aptos_framework::dispatchable_fungible_asset)]
+    #[expected_failure(abort_code = 0x50008, location = aptos_framework::fungible_asset)]
     fun test_deflation_wrong_withdraw(
         creator: &signer,
         aaron: &signer,

@@ -22,7 +22,6 @@ module aptos_framework::dispatchable_fungible_asset {
     use std::error;
     use std::features;
     use std::option::{Self, Option};
-    use std::signer;
 
     /// TransferRefStore doesn't exist on the fungible asset type.
     const ESTORE_NOT_FOUND: u64 = 1;
@@ -32,8 +31,6 @@ module aptos_framework::dispatchable_fungible_asset {
     const ENOT_ACTIVATED: u64 = 3;
     /// Dispatch target is not loaded.
     const ENOT_LOADED: u64 = 4;
-    /// Account is not the store's owner.
-    const ENOT_STORE_OWNER: u64 = 5;
 
     #[resource_group_member(group = aptos_framework::object::ObjectGroup)]
     struct TransferRefStore has key {
@@ -69,19 +66,13 @@ module aptos_framework::dispatchable_fungible_asset {
         store: Object<T>,
         amount: u64,
     ): FungibleAsset acquires TransferRefStore {
+        fungible_asset::withdraw_sanity_check(owner, store, false);
         let func_opt = fungible_asset::withdraw_dispatch_function(store);
         if (option::is_some(&func_opt)) {
             assert!(
                 features::dispatchable_fungible_asset_enabled(),
                 error::aborted(ENOT_ACTIVATED)
             );
-            // ** IMPORTANT **
-            //
-            // For any changes in the access control logic here, make sure we duplicate them in
-            // fungible_asset::withdraw as that will be a separate entrypoint.
-            //
-            fungible_asset::assert_not_frozen(store);
-            assert!(object::owns(store, signer::address_of(owner)), error::permission_denied(ENOT_STORE_OWNER));
             let start_balance = fungible_asset::balance(store);
             let func = option::borrow(&func_opt);
             function_info::load_module_from_function(func);
@@ -95,7 +86,7 @@ module aptos_framework::dispatchable_fungible_asset {
             assert!(amount <= start_balance - end_balance, error::aborted(EAMOUNT_MISMATCH));
             fa
         } else {
-            fungible_asset::withdraw_non_dispatch(owner, store, amount)
+            fungible_asset::withdraw_internal(object::object_address(&store), amount)
         }
     }
 
@@ -103,18 +94,13 @@ module aptos_framework::dispatchable_fungible_asset {
     ///
     /// The semantics of deposit will be governed by the function specified in DispatchFunctionStore.
     public fun deposit<T: key>(store: Object<T>, fa: FungibleAsset) acquires TransferRefStore {
+        fungible_asset::deposit_sanity_check(store, false);
         let func_opt = fungible_asset::deposit_dispatch_function(store);
         if (option::is_some(&func_opt)) {
             assert!(
                 features::dispatchable_fungible_asset_enabled(),
                 error::aborted(ENOT_ACTIVATED)
             );
-            // ** IMPORTANT **
-            //
-            // For any changes in the access control logic here, make sure we duplicate them in
-            // fungible_asset::withdraw as that will be a separate entrypoint.
-            //
-            fungible_asset::assert_not_frozen(store);
             let func = option::borrow(&func_opt);
             function_info::load_module_from_function(func);
             dispatchable_deposit(
@@ -124,7 +110,7 @@ module aptos_framework::dispatchable_fungible_asset {
                 func
             )
         } else {
-            fungible_asset::deposit_non_dispatch(store, fa)
+            fungible_asset::deposit_internal(store, fa)
         }
     }
 

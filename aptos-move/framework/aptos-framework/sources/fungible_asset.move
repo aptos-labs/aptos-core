@@ -475,14 +475,9 @@ module aptos_framework::fungible_asset {
         store_exists(object::object_address(&store)) && borrow_store_resource(&store).frozen
     }
 
-    /// Abort when a store is frozen.
-    public fun assert_not_frozen<T: key>(store: Object<T>) acquires FungibleStore {
-        assert!(!is_frozen(store), error::invalid_argument(ESTORE_IS_FROZEN));
-    }
-
     #[view]
     /// Return whether a fungible asset type is dispatchable.
-    public fun is_dispatchable(store: Object<Metadata>): bool acquires FungibleStore {
+    public fun is_store_dispatchable<T: key>(store: Object<T>): bool acquires FungibleStore {
         let fa_store = borrow_store_resource(&store);
         let metadata_addr = object::object_address(&fa_store.metadata);
         exists<DispatchFunctionStore>(metadata_addr)
@@ -613,53 +608,41 @@ module aptos_framework::fungible_asset {
         store: Object<T>,
         amount: u64,
     ): FungibleAsset acquires FungibleStore, DispatchFunctionStore {
-        // ** IMPORTANT **
-        //
-        // For any changes in the access control logic here, make sure we duplicate them in
-        // dispatchable_fungible_asset::withdraw as that will be a separate entrypoint.
-        //
+        withdraw_sanity_check(owner, store, true);
+        withdraw_internal(object::object_address(&store), amount)
+    }
+
+    /// Check the permission for withdraw operation.
+    public(friend) fun withdraw_sanity_check<T: key>(
+        owner: &signer,
+        store: Object<T>,
+        abort_on_dispatch: bool,
+    ) acquires FungibleStore, DispatchFunctionStore {
         assert!(object::owns(store, signer::address_of(owner)), error::permission_denied(ENOT_STORE_OWNER));
-        assert!(store_exists(object::object_address(&store)), error::invalid_argument(ESTORE_IS_FROZEN));
         let fa_store = borrow_store_resource(&store);
         assert!(
-            !has_withdraw_dispatch_function(fa_store.metadata),
+            !abort_on_dispatch || !has_withdraw_dispatch_function(fa_store.metadata),
             error::invalid_argument(EINVALID_DISPATCHABLE_OPERATIONS)
         );
-        assert!(!fa_store.frozen, error::invalid_argument(ESTORE_IS_FROZEN));
-        withdraw_internal(object::object_address(&store), amount)
+        assert!(!fa_store.frozen, error::permission_denied(ESTORE_IS_FROZEN));
+    }
+
+    /// Deposit `amount` of the fungible asset to `store`.
+    public fun deposit_sanity_check<T: key>(
+        store: Object<T>,
+        abort_on_dispatch: bool
+    ) acquires FungibleStore, DispatchFunctionStore {
+        let fa_store = borrow_store_resource(&store);
+        assert!(
+            !abort_on_dispatch || !has_deposit_dispatch_function(fa_store.metadata),
+            error::invalid_argument(EINVALID_DISPATCHABLE_OPERATIONS)
+        );
+        assert!(!fa_store.frozen, error::permission_denied(ESTORE_IS_FROZEN));
     }
 
     /// Deposit `amount` of the fungible asset to `store`.
     public fun deposit<T: key>(store: Object<T>, fa: FungibleAsset) acquires FungibleStore, DispatchFunctionStore {
-        // ** IMPORTANT **
-        //
-        // For any changes in the access control logic here, make sure we duplicate them in
-        // dispatchable_fungible_asset::withdraw as that will be a separate entrypoint.
-        //
-        assert!(store_exists(object::object_address(&store)), error::permission_denied(ESTORE_IS_FROZEN));
-        let fa_store = borrow_store_resource(&store);
-        assert!(
-            !has_deposit_dispatch_function(fa_store.metadata),
-            error::invalid_argument(EINVALID_DISPATCHABLE_OPERATIONS)
-        );
-        assert!(!fa_store.frozen, error::permission_denied(ESTORE_IS_FROZEN));
-        deposit_internal(store, fa);
-    }
-
-    /// Withdraw `amount` of the fungible asset from `store` by the owner.
-    public(friend) fun withdraw_non_dispatch<T: key>(
-        owner: &signer,
-        store: Object<T>,
-        amount: u64,
-    ): FungibleAsset acquires FungibleStore {
-        assert!(object::owns(store, signer::address_of(owner)), error::permission_denied(ENOT_STORE_OWNER));
-        assert!(!is_frozen(store), error::permission_denied(ESTORE_IS_FROZEN));
-        withdraw_internal(object::object_address(&store), amount)
-    }
-
-    /// Deposit `amount` of the fungible asset to `store`.
-    public(friend) fun deposit_non_dispatch<T: key>(store: Object<T>, fa: FungibleAsset) acquires FungibleStore {
-        assert!(!is_frozen(store), error::permission_denied(ESTORE_IS_FROZEN));
+        deposit_sanity_check(store, true);
         deposit_internal(store, fa);
     }
 
