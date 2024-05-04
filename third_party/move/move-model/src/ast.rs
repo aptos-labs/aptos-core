@@ -2706,10 +2706,14 @@ impl ModuleName {
         self.1
     }
 
+    pub fn pseudo_script_name_builder(base: &str, index: usize) -> String {
+        format!("{}_{}", base, index)
+    }
+
     /// Return the pseudo module name used for scripts, incorporating the `index`.
     /// Our compiler infrastructure uses `MAX_ADDRESS` for pseudo modules created from scripts.
     pub fn pseudo_script_name(pool: &SymbolPool, index: usize) -> ModuleName {
-        let name = pool.make(format!("{}_{}", SCRIPT_MODULE_NAME, index).as_str());
+        let name = pool.make(Self::pseudo_script_name_builder(SCRIPT_MODULE_NAME, index).as_str());
         ModuleName(Address::Numerical(AccountAddress::MAX_ADDRESS), name)
     }
 
