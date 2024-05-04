@@ -27,6 +27,7 @@ mod network_config;
 mod node_config;
 mod node_config_loader;
 mod node_startup_config;
+mod observer_config;
 mod override_node_config;
 mod peer_monitoring_config;
 mod persistable_config;

@@ -160,6 +160,10 @@ pub fn run_checker(options: Options) -> anyhow::Result<GlobalEnv> {
             sources: options.sources.clone(),
             address_map: addrs.clone(),
         },
+        PackageInfo {
+            sources: options.sources_deps.clone(),
+            address_map: addrs.clone(),
+        },
         vec![PackageInfo {
             sources: options.dependencies.clone(),
             address_map: addrs.clone(),
