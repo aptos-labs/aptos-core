@@ -2,7 +2,7 @@
 // SPDX-License-Identifier: Apache-2.0
 
 use anyhow::{bail, ensure, Context};
-use aptos_crypto::{bls12381, CryptoMaterialError, HashValue};
+use aptos_crypto::{ed25519, CryptoMaterialError, HashValue};
 use aptos_crypto_derive::{BCSCryptoHash, CryptoHasher};
 use aptos_types::{
     aggregate_signature::AggregateSignature, validator_signer::ValidatorSigner,
@@ -191,7 +191,7 @@ impl SignedBatchInfoMsg {
 pub struct SignedBatchInfo {
     info: BatchInfo,
     signer: PeerId,
-    signature: bls12381::Signature,
+    signature: ed25519::Signature,
 }
 
 impl SignedBatchInfo {
@@ -237,7 +237,7 @@ impl SignedBatchInfo {
         Ok(validator.verify(self.signer, &self.info, &self.signature)?)
     }
 
-    pub fn signature(self) -> bls12381::Signature {
+    pub fn signature(self) -> ed25519::Signature {
         self.signature
     }
 

@@ -209,17 +209,6 @@ impl CliCommand<()> for SetValidatorConfiguration {
             )));
         };
 
-        let consensus_proof_of_possession = if let Some(consensus_proof_of_possession) =
-            operator_identity.consensus_proof_of_possession
-        {
-            consensus_proof_of_possession
-        } else {
-            return Err(CliError::CommandArgumentError(format!(
-                "Failed to read consensus proof of possession from public identity file {}",
-                operator_keys_file.display()
-            )));
-        };
-
         // Only add the public key if there is a full node
         let full_node_network_public_key = if self.full_node_host.is_some() {
             operator_identity.full_node_network_public_key
@@ -232,7 +221,6 @@ impl CliCommand<()> for SetValidatorConfiguration {
             operator_account_address: operator_identity.account_address.into(),
             operator_account_public_key: operator_identity.account_public_key.clone(),
             consensus_public_key,
-            consensus_proof_of_possession,
             validator_network_public_key,
             validator_host: self.validator_host,
             full_node_network_public_key,

@@ -8,7 +8,7 @@ mod genesis_context;
 
 use crate::genesis_context::GenesisStateView;
 use aptos_crypto::{
-    bls12381,
+    ed25519,
     ed25519::{Ed25519PrivateKey, Ed25519PublicKey},
     HashValue, PrivateKey, Uniform,
 };
@@ -798,10 +798,8 @@ pub struct Validator {
     /// Amount to stake for consensus. Also the intial amount minted to the owner account.
     pub stake_amount: u64,
 
-    /// bls12381 public key used to sign consensus messages.
+    /// ed25519 public key used to sign consensus messages.
     pub consensus_pubkey: Vec<u8>,
-    /// Proof of Possession of the consensus pubkey.
-    pub proof_of_possession: Vec<u8>,
     /// `NetworkAddress` for the validator.
     pub network_addresses: Vec<u8>,
     /// `NetworkAddress` for the validator's full node.
@@ -810,7 +808,7 @@ pub struct Validator {
 
 pub struct TestValidator {
     pub key: Ed25519PrivateKey,
-    pub consensus_key: bls12381::PrivateKey,
+    pub consensus_key: ed25519::PrivateKey,
     pub data: Validator,
 }
 
@@ -826,11 +824,8 @@ impl TestValidator {
         let key = Ed25519PrivateKey::generate(rng);
         let auth_key = AuthenticationKey::ed25519(&key.public_key());
         let owner_address = auth_key.account_address();
-        let consensus_key = bls12381::PrivateKey::generate(rng);
+        let consensus_key = ed25519::PrivateKey::generate(rng);
         let consensus_pubkey = consensus_key.public_key().to_bytes().to_vec();
-        let proof_of_possession = bls12381::ProofOfPossession::create(&consensus_key)
-            .to_bytes()
-            .to_vec();
         let network_address = [0u8; 0].to_vec();
         let full_node_network_address = [0u8; 0].to_vec();
 
@@ -842,7 +837,6 @@ impl TestValidator {
         let data = Validator {
             owner_address,
             consensus_pubkey,
-            proof_of_possession,
             operator_address: owner_address,
             voter_address: owner_address,
             network_addresses: network_address,

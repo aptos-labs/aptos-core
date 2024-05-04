@@ -2,7 +2,7 @@
 
 use crate::dkg::{DKGSessionMetadata, DKGTrait};
 use anyhow::{anyhow, ensure};
-use aptos_crypto::{bls12381, Uniform};
+use aptos_crypto::{ed25519, Uniform};
 use rand::{CryptoRng, Rng, RngCore};
 use serde::{Deserialize, Serialize};
 use std::collections::{BTreeMap, BTreeSet};
@@ -13,11 +13,11 @@ use std::collections::{BTreeMap, BTreeSet};
 pub struct DummyDKG {}
 
 impl DKGTrait for DummyDKG {
-    type DealerPrivateKey = bls12381::PrivateKey;
+    type DealerPrivateKey = ed25519::PrivateKey;
     type DealtSecret = DummySecret;
     type DealtSecretShare = DummySecret;
     type InputSecret = DummySecret;
-    type NewValidatorDecryptKey = bls12381::PrivateKey;
+    type NewValidatorDecryptKey = ed25519::PrivateKey;
     type PublicParams = DKGSessionMetadata;
     type Transcript = DummyDKGTranscript;
 
@@ -110,7 +110,7 @@ impl DKGTrait for DummyDKG {
     }
 
     fn generate_predictable_input_secret_for_testing(
-        dealer_sk: &bls12381::PrivateKey,
+        dealer_sk: &ed25519::PrivateKey,
     ) -> DummySecret {
         let bytes_8: [u8; 8] = dealer_sk.to_bytes()[0..8].try_into().unwrap();
         DummySecret {

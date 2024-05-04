@@ -25,7 +25,7 @@ use aptos_backup_cli::{
     utils::GlobalRestoreOpt,
 };
 use aptos_cached_packages::aptos_stdlib;
-use aptos_crypto::{bls12381, bls12381::PublicKey, x25519, ValidCryptoMaterialStringExt};
+use aptos_crypto::{ed25519, ed25519::PublicKey, x25519, ValidCryptoMaterialStringExt};
 use aptos_genesis::config::{HostAndPort, OperatorConfiguration};
 use aptos_logger::Level;
 use aptos_network_checker::args::{
@@ -135,22 +135,16 @@ impl OperatorConfigFileArgs {
 pub struct ValidatorConsensusKeyArgs {
     /// Hex encoded Consensus public key
     ///
-    /// The key should be a BLS12-381 public key
-    #[clap(long, value_parser = bls12381::PublicKey::from_encoded_string)]
-    pub(crate) consensus_public_key: Option<bls12381::PublicKey>,
-
-    /// Hex encoded Consensus proof of possession
-    ///
-    /// The key should be a BLS12-381 proof of possession
-    #[clap(long, value_parser = bls12381::ProofOfPossession::from_encoded_string)]
-    pub(crate) proof_of_possession: Option<bls12381::ProofOfPossession>,
+    /// The key should be an ed25519 public key
+    #[clap(long, value_parser = ed25519::PublicKey::from_encoded_string)]
+    pub(crate) consensus_public_key: Option<ed25519::PublicKey>,
 }
 
 impl ValidatorConsensusKeyArgs {
     fn get_consensus_public_key<'a>(
         &'a self,
         operator_config: &'a Option<OperatorConfiguration>,
-    ) -> CliTypedResult<&'a bls12381::PublicKey> {
+    ) -> CliTypedResult<&'a ed25519::PublicKey> {
         let consensus_public_key = if let Some(ref consensus_public_key) = self.consensus_public_key
         {
             consensus_public_key
@@ -162,22 +156,6 @@ impl ValidatorConsensusKeyArgs {
             ));
         };
         Ok(consensus_public_key)
-    }
-
-    fn get_consensus_proof_of_possession<'a>(
-        &'a self,
-        operator_config: &'a Option<OperatorConfiguration>,
-    ) -> CliTypedResult<&'a bls12381::ProofOfPossession> {
-        let proof_of_possession = if let Some(ref proof_of_possession) = self.proof_of_possession {
-            proof_of_possession
-        } else if let Some(ref operator_config) = operator_config {
-            &operator_config.consensus_proof_of_possession
-        } else {
-            return Err(CliError::CommandArgumentError(
-                "Must provide either --operator-config-file or --proof-of-possession".to_string(),
-            ));
-        };
-        Ok(proof_of_possession)
     }
 }
 
@@ -612,9 +590,6 @@ impl CliCommand<TransactionSummary> for InitializeValidator {
         let consensus_public_key = self
             .validator_consensus_key_args
             .get_consensus_public_key(&operator_config)?;
-        let consensus_proof_of_possession = self
-            .validator_consensus_key_args
-            .get_consensus_proof_of_possession(&operator_config)?;
         let (
             validator_network_public_key,
             full_node_network_public_key,
@@ -640,7 +615,6 @@ impl CliCommand<TransactionSummary> for InitializeValidator {
         self.txn_options
             .submit_transaction(aptos_stdlib::stake_initialize_validator(
                 consensus_public_key.to_bytes().to_vec(),
-                consensus_proof_of_possession.to_bytes().to_vec(),
                 // BCS encode, so that we can hide the original type
                 bcs::to_bytes(&validator_network_addresses)?,
                 bcs::to_bytes(&full_node_network_addresses)?,
@@ -1072,14 +1046,10 @@ impl CliCommand<TransactionSummary> for UpdateConsensusKey {
         let consensus_public_key = self
             .validator_consensus_key_args
             .get_consensus_public_key(&operator_config)?;
-        let consensus_proof_of_possession = self
-            .validator_consensus_key_args
-            .get_consensus_proof_of_possession(&operator_config)?;
         self.txn_options
             .submit_transaction(aptos_stdlib::stake_rotate_consensus_key(
                 address,
                 consensus_public_key.to_bytes().to_vec(),
-                consensus_proof_of_possession.to_bytes().to_vec(),
             ))
             .await
             .map(|inner| inner.into())

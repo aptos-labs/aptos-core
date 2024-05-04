@@ -5,7 +5,7 @@ use crate::{
     utils::HasMultiExp,
 };
 use anyhow::bail;
-use aptos_crypto::bls12381;
+use aptos_crypto::ed25519;
 use aptos_crypto_derive::{BCSCryptoHash, CryptoHasher};
 use blstrs::Scalar;
 use group::Group;
@@ -22,13 +22,13 @@ pub struct Contribution<Gr, A> {
     pub aux: A,
 }
 
-pub type SoK<Gr> = (Player, Gr, bls12381::Signature, schnorr::PoK<Gr>);
+pub type SoK<Gr> = (Player, Gr, ed25519::Signature, schnorr::PoK<Gr>);
 
 pub fn batch_verify_soks<Gr, A>(
     soks: &[SoK<Gr>],
     pk_base: &Gr,
     pk: &Gr,
-    spks: &Vec<bls12381::PublicKey>,
+    spks: &Vec<ed25519::PublicKey>,
     aux: &Vec<A>,
     tau: &Scalar,
 ) -> anyhow::Result<()>
@@ -91,11 +91,11 @@ where
     let pks = spks
         .iter()
         .map(|pk| pk)
-        .collect::<Vec<&bls12381::PublicKey>>();
-    let sig = bls12381::Signature::aggregate(
+        .collect::<Vec<&ed25519::PublicKey>>();
+    let sig = ed25519::Signature::aggregate(
         soks.iter()
             .map(|(_, _, sig, _)| sig.clone())
-            .collect::<Vec<bls12381::Signature>>(),
+            .collect::<Vec<ed25519::Signature>>(),
     )?;
 
     sig.verify_aggregate(&msgs_refs[..], &pks[..])?;

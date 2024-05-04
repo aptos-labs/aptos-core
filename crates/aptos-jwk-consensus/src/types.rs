@@ -1,6 +1,6 @@
 // Copyright © Aptos Foundation
 
-use aptos_crypto::bls12381::Signature;
+use aptos_crypto::ed25519::Signature;
 use aptos_enum_conversion_derive::EnumConversion;
 use aptos_reliable_broadcast::RBMessage;
 use aptos_types::{

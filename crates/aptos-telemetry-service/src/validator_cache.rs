@@ -178,7 +178,7 @@ impl PeerSetCacheUpdater {
 mod tests {
     use super::PeerSetCacheUpdater;
     use aptos_crypto::{
-        bls12381::{PrivateKey, PublicKey},
+        ed25519::{PrivateKey, PublicKey},
         test_utils::KeyPair,
         Uniform,
     };

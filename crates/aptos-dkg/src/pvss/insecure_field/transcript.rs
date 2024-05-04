@@ -14,7 +14,7 @@ use crate::{
     },
 };
 use anyhow::bail;
-use aptos_crypto::{bls12381, CryptoMaterialError, ValidCryptoMaterial};
+use aptos_crypto::{ed25519, CryptoMaterialError, ValidCryptoMaterial};
 use aptos_crypto_derive::{BCSCryptoHash, CryptoHasher};
 use blstrs::{G2Projective, Scalar};
 use rand::thread_rng;
@@ -61,8 +61,8 @@ impl traits::Transcript for Transcript {
     type InputSecret = pvss::input_secret::InputSecret;
     type PublicParameters = das::PublicParameters;
     type SecretSharingConfig = ThresholdConfig;
-    type SigningPubKey = bls12381::PublicKey;
-    type SigningSecretKey = bls12381::PrivateKey;
+    type SigningPubKey = ed25519::PublicKey;
+    type SigningSecretKey = ed25519::PrivateKey;
 
     fn scheme_name() -> String {
         "insecure_field_pvss".to_string()

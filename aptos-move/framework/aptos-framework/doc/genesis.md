@@ -198,12 +198,6 @@
 
 </dd>
 <dt>
-<code>proof_of_possession: <a href="../../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u8&gt;</code>
-</dt>
-<dd>
-
-</dd>
-<dt>
 <code>network_addresses: <a href="../../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u8&gt;</code>
 </dt>
 <dd>
@@ -779,7 +773,6 @@ encoded in a single BCS byte array.
         operator,
         pool_address,
         validator.consensus_pubkey,
-        validator.proof_of_possession,
     );
     <a href="stake.md#0x1_stake_update_network_and_fullnode_addresses">stake::update_network_and_fullnode_addresses</a>(
         operator,

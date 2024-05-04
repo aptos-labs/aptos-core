@@ -46,7 +46,7 @@ use crate::{
 };
 use aptos_config::config::Peer;
 use aptos_crypto::{
-    bls12381,
+    ed25519,
     ed25519::{Ed25519PrivateKey, Ed25519PublicKey},
     x25519, PrivateKey,
 };
@@ -372,8 +372,7 @@ impl CliTestFramework {
     pub async fn initialize_validator(
         &self,
         index: usize,
-        consensus_public_key: bls12381::PublicKey,
-        proof_of_possession: bls12381::ProofOfPossession,
+        consensus_public_key: ed25519::PublicKey,
         validator_host: HostAndPort,
         validator_network_public_key: x25519::PublicKey,
     ) -> CliTypedResult<TransactionSummary> {
@@ -384,7 +383,6 @@ impl CliTestFramework {
             },
             validator_consensus_key_args: ValidatorConsensusKeyArgs {
                 consensus_public_key: Some(consensus_public_key),
-                proof_of_possession: Some(proof_of_possession),
             },
             validator_network_addresses_args: ValidatorNetworkAddressesArgs {
                 validator_host: Some(validator_host),
@@ -515,8 +513,7 @@ impl CliTestFramework {
         &self,
         operator_index: usize,
         pool_index: Option<usize>,
-        consensus_public_key: bls12381::PublicKey,
-        proof_of_possession: bls12381::ProofOfPossession,
+        consensus_public_key: ed25519::PublicKey,
     ) -> CliTypedResult<TransactionSummary> {
         UpdateConsensusKey {
             txn_options: self.transaction_options(operator_index, None),
@@ -526,7 +523,6 @@ impl CliTestFramework {
             },
             validator_consensus_key_args: ValidatorConsensusKeyArgs {
                 consensus_public_key: Some(consensus_public_key),
-                proof_of_possession: Some(proof_of_possession),
             },
         }
         .execute()

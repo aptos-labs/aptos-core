@@ -1023,9 +1023,9 @@ module aptos_framework::aptos_governance {
         vector::push_back(&mut active_validators, signer::address_of(proposer));
         vector::push_back(&mut active_validators, signer::address_of(yes_voter));
         vector::push_back(&mut active_validators, signer::address_of(no_voter));
-        let (_sk_1, pk_1, _pop_1) = stake::generate_identity();
-        let (_sk_2, pk_2, _pop_2) = stake::generate_identity();
-        let (_sk_3, pk_3, _pop_3) = stake::generate_identity();
+        let (_sk_1, pk_1) = stake::generate_identity();
+        let (_sk_2, pk_2) = stake::generate_identity();
+        let (_sk_3, pk_3) = stake::generate_identity();
         let pks = vector[pk_1, pk_2, pk_3];
         stake::create_validator_set(aptos_framework, active_validators, pks);
 
@@ -1081,14 +1081,14 @@ module aptos_framework::aptos_governance {
         coin::register<AptosCoin>(no_voter);
         coin::deposit(signer::address_of(no_voter), stake::mint_coins(10));
 
-        let (_sk_1, pk_1, pop_1) = stake::generate_identity();
-        let (_sk_2, pk_2, pop_2) = stake::generate_identity();
-        let (_sk_3, pk_3, pop_3) = stake::generate_identity();
-        stake::initialize_test_validator(&pk_2, &pop_2, yes_voter, 20, true, false);
-        stake::initialize_test_validator(&pk_3, &pop_3, no_voter, 10, true, false);
+        let (_sk_1, pk_1) = stake::generate_identity();
+        let (_sk_2, pk_2) = stake::generate_identity();
+        let (_sk_3, pk_3) = stake::generate_identity();
+        stake::initialize_test_validator(&pk_2, yes_voter, 20, true, false);
+        stake::initialize_test_validator(&pk_3, no_voter, 10, true, false);
         stake::end_epoch();
         timestamp::fast_forward_seconds(1440);
-        stake::initialize_test_validator(&pk_1, &pop_1, proposer, 100, true, false);
+        stake::initialize_test_validator(&pk_1, proposer, 100, true, false);
         stake::end_epoch();
     }
 

@@ -636,7 +636,6 @@ pub enum EntryFunctionCall {
     /// Initialize the validator account and give ownership to the signing account.
     StakeInitializeValidator {
         consensus_pubkey: Vec<u8>,
-        proof_of_possession: Vec<u8>,
         network_addresses: Vec<u8>,
         fullnode_addresses: Vec<u8>,
     },
@@ -665,7 +664,6 @@ pub enum EntryFunctionCall {
     StakeRotateConsensusKey {
         pool_address: AccountAddress,
         new_consensus_pubkey: Vec<u8>,
-        proof_of_possession: Vec<u8>,
     },
 
     /// Allows an owner to change the delegated voter of the stake pool.
@@ -1291,25 +1289,18 @@ impl EntryFunctionCall {
             } => stake_initialize_stake_owner(initial_stake_amount, operator, voter),
             StakeInitializeValidator {
                 consensus_pubkey,
-                proof_of_possession,
                 network_addresses,
                 fullnode_addresses,
-            } => stake_initialize_validator(
-                consensus_pubkey,
-                proof_of_possession,
-                network_addresses,
-                fullnode_addresses,
-            ),
+            } => {
+                stake_initialize_validator(consensus_pubkey, network_addresses, fullnode_addresses)
+            },
             StakeJoinValidatorSet { pool_address } => stake_join_validator_set(pool_address),
             StakeLeaveValidatorSet { pool_address } => stake_leave_validator_set(pool_address),
             StakeReactivateStake { amount } => stake_reactivate_stake(amount),
             StakeRotateConsensusKey {
                 pool_address,
                 new_consensus_pubkey,
-                proof_of_possession,
-            } => {
-                stake_rotate_consensus_key(pool_address, new_consensus_pubkey, proof_of_possession)
-            },
+            } => stake_rotate_consensus_key(pool_address, new_consensus_pubkey),
             StakeSetDelegatedVoter { new_voter } => stake_set_delegated_voter(new_voter),
             StakeSetOperator { new_operator } => stake_set_operator(new_operator),
             StakeUnlock { amount } => stake_unlock(amount),
@@ -3146,7 +3137,6 @@ pub fn stake_initialize_stake_owner(
 /// Initialize the validator account and give ownership to the signing account.
 pub fn stake_initialize_validator(
     consensus_pubkey: Vec<u8>,
-    proof_of_possession: Vec<u8>,
     network_addresses: Vec<u8>,
     fullnode_addresses: Vec<u8>,
 ) -> TransactionPayload {
@@ -3162,7 +3152,6 @@ pub fn stake_initialize_validator(
         vec![],
         vec![
             bcs::to_bytes(&consensus_pubkey).unwrap(),
-            bcs::to_bytes(&proof_of_possession).unwrap(),
             bcs::to_bytes(&network_addresses).unwrap(),
             bcs::to_bytes(&fullnode_addresses).unwrap(),
         ],
@@ -3226,7 +3215,6 @@ pub fn stake_reactivate_stake(amount: u64) -> TransactionPayload {
 pub fn stake_rotate_consensus_key(
     pool_address: AccountAddress,
     new_consensus_pubkey: Vec<u8>,
-    proof_of_possession: Vec<u8>,
 ) -> TransactionPayload {
     TransactionPayload::EntryFunction(EntryFunction::new(
         ModuleId::new(
@@ -3241,7 +3229,6 @@ pub fn stake_rotate_consensus_key(
         vec![
             bcs::to_bytes(&pool_address).unwrap(),
             bcs::to_bytes(&new_consensus_pubkey).unwrap(),
-            bcs::to_bytes(&proof_of_possession).unwrap(),
         ],
     ))
 }
@@ -5047,9 +5034,8 @@ mod decoder {
         if let TransactionPayload::EntryFunction(script) = payload {
             Some(EntryFunctionCall::StakeInitializeValidator {
                 consensus_pubkey: bcs::from_bytes(script.args().get(0)?).ok()?,
-                proof_of_possession: bcs::from_bytes(script.args().get(1)?).ok()?,
-                network_addresses: bcs::from_bytes(script.args().get(2)?).ok()?,
-                fullnode_addresses: bcs::from_bytes(script.args().get(3)?).ok()?,
+                network_addresses: bcs::from_bytes(script.args().get(1)?).ok()?,
+                fullnode_addresses: bcs::from_bytes(script.args().get(2)?).ok()?,
             })
         } else {
             None
@@ -5091,7 +5077,6 @@ mod decoder {
             Some(EntryFunctionCall::StakeRotateConsensusKey {
                 pool_address: bcs::from_bytes(script.args().get(0)?).ok()?,
                 new_consensus_pubkey: bcs::from_bytes(script.args().get(1)?).ok()?,
-                proof_of_possession: bcs::from_bytes(script.args().get(2)?).ok()?,
             })
         } else {
             None

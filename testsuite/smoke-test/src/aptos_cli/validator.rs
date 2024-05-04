@@ -16,7 +16,7 @@ use aptos::{
 };
 use aptos_bitvec::BitVec;
 use aptos_cached_packages::aptos_stdlib;
-use aptos_crypto::{bls12381, ed25519::Ed25519PrivateKey, x25519, ValidCryptoMaterialStringExt};
+use aptos_crypto::{ed25519, ed25519::Ed25519PrivateKey, x25519, ValidCryptoMaterialStringExt};
 use aptos_forge::{reconfig, wait_for_all_nodes_to_catchup, LocalSwarm, NodeExt, Swarm, SwarmExt};
 use aptos_genesis::config::HostAndPort;
 use aptos_keygen::KeyGen;
@@ -574,7 +574,6 @@ async fn test_large_total_stake() {
     cli.initialize_validator(
         validator_cli_index,
         keys.consensus_public_key(),
-        keys.consensus_proof_of_possession(),
         HostAndPort {
             host: dns_name("0.0.0.0"),
             port: 1234,
@@ -969,7 +968,6 @@ async fn test_register_and_update_validator() {
     cli.initialize_validator(
         validator_cli_index,
         keys.consensus_public_key(),
-        keys.consensus_proof_of_possession(),
         HostAndPort {
             host: dns_name("0.0.0.0"),
             port,
@@ -1079,7 +1077,6 @@ async fn test_join_and_leave_validator() {
         cli.initialize_validator(
             validator_cli_index,
             keys.consensus_public_key(),
-            keys.consensus_proof_of_possession(),
             HostAndPort {
                 host: dns_name("0.0.0.0"),
                 port,
@@ -1335,7 +1332,6 @@ async fn test_owner_create_and_delegate_flow() {
             operator_cli_index,
             Some(owner_cli_index),
             operator_keys.consensus_public_key(),
-            operator_keys.consensus_proof_of_possession(),
         )
         .await
         .unwrap(),
@@ -1444,7 +1440,7 @@ fn dns_name(addr: &str) -> DnsName {
 pub struct ValidatorNodeKeys {
     account_private_key: Ed25519PrivateKey,
     network_private_key: x25519::PrivateKey,
-    consensus_private_key: bls12381::PrivateKey,
+    consensus_private_key: ed25519::PrivateKey,
 }
 
 impl ValidatorNodeKeys {
@@ -1452,7 +1448,7 @@ impl ValidatorNodeKeys {
         Self {
             account_private_key: keygen.generate_ed25519_private_key(),
             network_private_key: keygen.generate_x25519_private_key().unwrap(),
-            consensus_private_key: keygen.generate_bls12381_private_key(),
+            consensus_private_key: keygen.generate_ed25519_private_key(),
         }
     }
 
@@ -1460,12 +1456,8 @@ impl ValidatorNodeKeys {
         self.network_private_key.public_key()
     }
 
-    pub fn consensus_public_key(&self) -> bls12381::PublicKey {
-        bls12381::PublicKey::from(&self.consensus_private_key)
-    }
-
-    pub fn consensus_proof_of_possession(&self) -> bls12381::ProofOfPossession {
-        bls12381::ProofOfPossession::create(&self.consensus_private_key)
+    pub fn consensus_public_key(&self) -> ed25519::PublicKey {
+        ed25519::PublicKey::from(&self.consensus_private_key)
     }
 }
 

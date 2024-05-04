@@ -2,7 +2,7 @@
 // SPDX-License-Identifier: Apache-2.0
 
 use aptos_bitvec::BitVec;
-use aptos_crypto::bls12381;
+use aptos_crypto::ed25519;
 use aptos_crypto_derive::{BCSCryptoHash, CryptoHasher};
 use move_core_types::account_address::AccountAddress;
 use serde::{Deserialize, Serialize};
@@ -15,13 +15,13 @@ use std::collections::BTreeMap;
 #[derive(Clone, Debug, Eq, PartialEq, Serialize, Deserialize, CryptoHasher, BCSCryptoHash)]
 pub struct AggregateSignature {
     validator_bitmask: BitVec,
-    sig: Option<bls12381::Signature>,
+    sig: Option<ed25519::Signature>,
 }
 
 impl AggregateSignature {
     pub fn new(
         validator_bitmask: BitVec,
-        aggregated_signature: Option<bls12381::Signature>,
+        aggregated_signature: Option<ed25519::Signature>,
     ) -> Self {
         Self {
             validator_bitmask,
@@ -61,7 +61,7 @@ impl AggregateSignature {
         self.validator_bitmask.count_ones() as usize
     }
 
-    pub fn sig(&self) -> &Option<bls12381::Signature> {
+    pub fn sig(&self) -> &Option<ed25519::Signature> {
         &self.sig
     }
 }
@@ -70,11 +70,11 @@ impl AggregateSignature {
 /// from different validators. It is only kept in memory and never sent through the network.
 #[derive(Clone, Debug, Deserialize, Eq, PartialEq)]
 pub struct PartialSignatures {
-    signatures: BTreeMap<AccountAddress, bls12381::Signature>,
+    signatures: BTreeMap<AccountAddress, ed25519::Signature>,
 }
 
 impl PartialSignatures {
-    pub fn new(signatures: BTreeMap<AccountAddress, bls12381::Signature>) -> Self {
+    pub fn new(signatures: BTreeMap<AccountAddress, ed25519::Signature>) -> Self {
         Self { signatures }
     }
 
@@ -90,11 +90,11 @@ impl PartialSignatures {
         self.signatures.remove(&validator);
     }
 
-    pub fn add_signature(&mut self, validator: AccountAddress, signature: bls12381::Signature) {
+    pub fn add_signature(&mut self, validator: AccountAddress, signature: ed25519::Signature) {
         self.signatures.entry(validator).or_insert(signature);
     }
 
-    pub fn signatures(&self) -> &BTreeMap<AccountAddress, bls12381::Signature> {
+    pub fn signatures(&self) -> &BTreeMap<AccountAddress, ed25519::Signature> {
         &self.signatures
     }
 

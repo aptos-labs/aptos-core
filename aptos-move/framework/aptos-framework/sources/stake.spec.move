@@ -104,15 +104,13 @@ spec aptos_framework::stake {
     spec initialize_validator(
         account: &signer,
         consensus_pubkey: vector<u8>,
-        proof_of_possession: vector<u8>,
         network_addresses: vector<u8>,
         fullnode_addresses: vector<u8>,
     ){
-        let pubkey_from_pop = bls12381::spec_public_key_from_bytes_with_pop(
+        let is_public_key_validated = ed25519::spec_public_key_validate_internal(
             consensus_pubkey,
-            proof_of_possession_from_bytes(proof_of_possession)
         );
-        aborts_if !option::spec_is_some(pubkey_from_pop);
+        aborts_if !is_public_key_validated;
         let addr = signer::address_of(account);
         let post_addr = signer::address_of(account);
         let allowed = global<AllowedValidators>(@aptos_framework);
@@ -357,18 +355,16 @@ spec aptos_framework::stake {
         operator: &signer,
         pool_address: address,
         new_consensus_pubkey: vector<u8>,
-        proof_of_possession: vector<u8>,
     ) {
         let pre_stake_pool = global<StakePool>(pool_address);
         let post validator_info = global<ValidatorConfig>(pool_address);
         aborts_if !exists<StakePool>(pool_address);
         aborts_if signer::address_of(operator) != pre_stake_pool.operator_address;
         aborts_if !exists<ValidatorConfig>(pool_address);
-        let pubkey_from_pop = bls12381::spec_public_key_from_bytes_with_pop(
+        let is_public_key_validated = ed25519::spec_public_key_validate_internal(
             new_consensus_pubkey,
-            proof_of_possession_from_bytes(proof_of_possession)
         );
-        aborts_if !option::spec_is_some(pubkey_from_pop);
+        aborts_if !is_public_key_validated;
         modifies global<ValidatorConfig>(pool_address);
         include StakedValueNochange;
 

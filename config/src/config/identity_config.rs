@@ -3,7 +3,7 @@
 
 use crate::{config::SecureBackend, keys::ConfigKey};
 use aptos_crypto::{
-    bls12381,
+    ed25519,
     ed25519::Ed25519PrivateKey,
     x25519::{self, PRIVATE_KEY_SIZE},
     ValidCryptoMaterial,
@@ -29,7 +29,7 @@ pub struct IdentityBlob {
     pub account_private_key: Option<Ed25519PrivateKey>,
     /// Optional consensus key. Only used for validators
     #[serde(skip_serializing_if = "Option::is_none")]
-    pub consensus_private_key: Option<bls12381::PrivateKey>,
+    pub consensus_private_key: Option<ed25519::PrivateKey>,
     /// Network private key. Peer id is derived from this if account address is not present
     pub network_private_key: x25519::PrivateKey,
 }

@@ -11,7 +11,7 @@ use crate::{
     vote_data::VoteData,
 };
 use aptos_crypto::{
-    bls12381,
+    ed25519,
     ed25519::Ed25519PrivateKey,
     hash::{CryptoHash, HashValue},
     PrivateKey, Uniform,
@@ -155,7 +155,7 @@ prop_compose! {
 /// vector
 fn block_forest_from_keys(
     depth: u32,
-    key_pairs: Vec<bls12381::PrivateKey>,
+    key_pairs: Vec<ed25519::PrivateKey>,
 ) -> impl Strategy<Value = LinearizedBlockForest> {
     let leaf = leaf_strategy().prop_map(|block| vec![block]);
     // Note that having `expected_branch_size` of 1 seems to generate significantly larger trees
@@ -170,7 +170,7 @@ fn block_forest_from_keys(
 pub fn block_forest_and_its_keys(
     quorum_size: usize,
     depth: u32,
-) -> impl Strategy<Value = (Vec<bls12381::PrivateKey>, LinearizedBlockForest)> {
+) -> impl Strategy<Value = (Vec<ed25519::PrivateKey>, LinearizedBlockForest)> {
     proptest::collection::vec(proptests::arb_signing_key(), quorum_size).prop_flat_map(
         move |private_key| {
             (

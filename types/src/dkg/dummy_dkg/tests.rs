@@ -7,15 +7,15 @@ use crate::{
     },
     validator_verifier::{ValidatorConsensusInfo, ValidatorConsensusInfoMoveStruct},
 };
-use aptos_crypto::{bls12381, Uniform};
+use aptos_crypto::{ed25519, Uniform};
 use move_core_types::account_address::AccountAddress;
 use rand::thread_rng;
 
 struct DealerState {
     addr: AccountAddress,
     voting_power: u64,
-    sk: bls12381::PrivateKey,
-    pk: bls12381::PublicKey,
+    sk: ed25519::PrivateKey,
+    pk: ed25519::PublicKey,
     input_secret: DummySecret,
     transcript: Option<DummyDKGTranscript>,
 }
@@ -33,8 +33,8 @@ impl DealerState {
 struct NewValidatorState {
     addr: AccountAddress,
     voting_power: u64,
-    sk: bls12381::PrivateKey,
-    pk: bls12381::PublicKey,
+    sk: ed25519::PrivateKey,
+    pk: ed25519::PublicKey,
     secret_share: Option<DummySecret>,
 }
 
@@ -55,8 +55,8 @@ fn test_dummy_dkg_correctness() {
     // Initialize the current validator states. Also prepare their DKG input secrets.
     let mut dealer_states: Vec<DealerState> = (0..3)
         .map(|_| {
-            let sk = bls12381::PrivateKey::generate_for_testing();
-            let pk = bls12381::PublicKey::from(&sk);
+            let sk = ed25519::PrivateKey::generate_for_testing();
+            let pk = ed25519::PublicKey::from(&sk);
             let input_secret = DummySecret::generate_for_testing();
             DealerState {
                 addr: AccountAddress::random(),
@@ -76,8 +76,8 @@ fn test_dummy_dkg_correctness() {
     // Initialize the next validator states.
     let mut new_validator_states: Vec<NewValidatorState> = (0..4)
         .map(|_| {
-            let sk = bls12381::PrivateKey::generate_for_testing();
-            let pk = bls12381::PublicKey::from(&sk);
+            let sk = ed25519::PrivateKey::generate_for_testing();
+            let pk = ed25519::PublicKey::from(&sk);
             NewValidatorState {
                 addr: AccountAddress::random(),
                 voting_power: 2,

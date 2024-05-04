@@ -3,7 +3,7 @@
 // SPDX-License-Identifier: Apache-2.0
 
 use crate::network_address::NetworkAddress;
-use aptos_crypto::bls12381;
+use aptos_crypto::ed25519;
 use move_core_types::{
     ident_str,
     identifier::IdentStr,
@@ -35,7 +35,7 @@ impl MoveResource for ValidatorOperatorConfigResource {}
 #[derive(Clone, Debug, Eq, PartialEq, Deserialize, Serialize)]
 #[cfg_attr(any(test, feature = "fuzzing"), derive(Arbitrary))]
 pub struct ValidatorConfig {
-    pub consensus_public_key: bls12381::PublicKey,
+    pub consensus_public_key: ed25519::PublicKey,
     /// This is an bcs serialized `Vec<NetworkAddress>`
     pub validator_network_addresses: Vec<u8>,
     /// This is an bcs serialized `Vec<NetworkAddress>`
@@ -45,7 +45,7 @@ pub struct ValidatorConfig {
 
 impl ValidatorConfig {
     pub fn new(
-        consensus_public_key: bls12381::PublicKey,
+        consensus_public_key: ed25519::PublicKey,
         validator_network_addresses: Vec<u8>,
         fullnode_network_addresses: Vec<u8>,
         validator_index: u64,
