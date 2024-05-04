@@ -593,8 +593,109 @@ module aptos_framework::fungible_asset {
         to: Object<T>,
         amount: u64,
     ) acquires FungibleStore, DispatchFunctionStore, ConcurrentFungibleBalance {
-        let fa = withdraw(sender, from, amount);
-        deposit(to, fa);
+
+        // Verify from store existence, ownership, and frozen status.
+        let from_store_addr = object::object_address(&from);
+        assert!(
+            exists<FungibleStore>(from_store_addr),
+            error::not_found(EFUNGIBLE_STORE_EXISTENCE)
+        );
+        let from_store_ref_mut = borrow_global_mut<FungibleStore>(from_store_addr);
+        assert!(
+            object::owns(from, signer::address_of(sender)),
+            error::permission_denied(ENOT_STORE_OWNER)
+        );
+        if (from_store_ref_mut.frozen) abort error::permission_denied(ESTORE_IS_FROZEN);
+        let metadata = from_store_ref_mut.metadata;
+        let metadata_addr = object::object_address(&metadata);
+
+        // Verify there is neither a deposit nor a withdraw dispatch function.
+        if (
+            metadata_addr != @aptos_fungible_asset &&
+            exists<DispatchFunctionStore>(metadata_addr)
+        ) {
+            assert!(
+                (
+                    option::is_none(
+                        &borrow_global<DispatchFunctionStore>(metadata_addr).deposit_function
+                    ) &&
+                    option::is_none(
+                        &borrow_global<DispatchFunctionStore>(metadata_addr).withdraw_function
+                    )
+                ),
+                error::invalid_argument(EINVALID_DISPATCHABLE_OPERATIONS)
+            );
+        };
+
+        // Atomically withdraw and deposit, without intermediary FA resource.
+        if (amount > 0) {
+            let migrate = features::migrate_to_concurrent_fungible_balance_enabled();
+
+            // Withdraw.
+            if (exists<ConcurrentFungibleBalance>(from_store_addr)) {
+                assert!(
+                    aggregator_v2::try_sub(
+                        &mut borrow_global_mut<ConcurrentFungibleBalance>(from_store_addr).balance,
+                        amount
+                    ),
+                    error::invalid_argument(EINSUFFICIENT_BALANCE)
+                );
+            } else {
+                let balance = from_store_ref_mut.balance;
+                assert!(balance >= amount, error::invalid_argument(EINSUFFICIENT_BALANCE));
+                if (migrate) {
+                    move_to(
+                        &create_signer::create_signer(from_store_addr),
+                        ConcurrentFungibleBalance {
+                            balance: aggregator_v2::create_unbounded_aggregator_with_value(
+                                balance - amount
+                            )
+                        }
+                    );
+                    from_store_ref_mut.balance = 0;
+                } else {
+                    from_store_ref_mut.balance = balance - amount;
+                }
+            };
+            event::emit<Withdraw>(Withdraw { store: from_store_addr, amount });
+
+            // Verify to store existence, frozen status, and metadata match.
+            let to_store_addr = object::object_address(&to);
+            assert!(
+                exists<FungibleStore>(to_store_addr),
+                error::not_found(EFUNGIBLE_STORE_EXISTENCE)
+            );
+            let to_store_ref_mut = borrow_global_mut<FungibleStore>(to_store_addr);
+            if (to_store_ref_mut.frozen) abort error::permission_denied(ESTORE_IS_FROZEN);
+            assert!(
+                metadata == to_store_ref_mut.metadata,
+                error::invalid_argument(EFUNGIBLE_ASSET_AND_STORE_MISMATCH),
+            );
+
+            // Deposit.
+            if (exists<ConcurrentFungibleBalance>(to_store_addr)) {
+                aggregator_v2::add(
+                    &mut borrow_global_mut<ConcurrentFungibleBalance>(to_store_addr).balance,
+                    amount
+                );
+            } else {
+                if (migrate) {
+                    move_to(
+                        &create_signer::create_signer(to_store_addr),
+                        ConcurrentFungibleBalance {
+                            balance: aggregator_v2::create_unbounded_aggregator_with_value(
+                                to_store_ref_mut.balance + amount
+                            )
+                        }
+                    );
+                    to_store_ref_mut.balance = 0;
+                } else {
+                    to_store_ref_mut.balance = to_store_ref_mut.balance + amount;
+                }
+            };
+            event::emit(Deposit { store: to_store_addr, amount });
+        }
+
     }
 
     /// Allow an object to hold a store for fungible assets.
@@ -651,27 +752,119 @@ module aptos_framework::fungible_asset {
         store: Object<T>,
         amount: u64,
     ): FungibleAsset acquires FungibleStore, DispatchFunctionStore, ConcurrentFungibleBalance {
-        assert!(object::owns(store, signer::address_of(owner)), error::permission_denied(ENOT_STORE_OWNER));
-        assert!(store_exists_inline(object::object_address(&store)), error::invalid_argument(ESTORE_IS_FROZEN));
-        let fa_store = borrow_store_resource(&store);
+
+        // Verify store existence, ownership, frozen status, and withdraw dispatch function.
+        let store_addr = object::object_address(&store);
+        assert!(exists<FungibleStore>(store_addr), error::not_found(EFUNGIBLE_STORE_EXISTENCE));
+        let fa_store_ref_mut = borrow_global_mut<FungibleStore>(store_addr);
         assert!(
-            !has_withdraw_dispatch_function(fa_store.metadata),
-            error::invalid_argument(EINVALID_DISPATCHABLE_OPERATIONS)
+            object::owns(store, signer::address_of(owner)),
+            error::permission_denied(ENOT_STORE_OWNER)
         );
-        assert!(!fa_store.frozen, error::invalid_argument(ESTORE_IS_FROZEN));
-        withdraw_internal(object::object_address(&store), amount)
+        if (fa_store_ref_mut.frozen) abort error::permission_denied(ESTORE_IS_FROZEN);
+        let metadata_addr = object::object_address(&fa_store_ref_mut.metadata);
+        if (
+            metadata_addr != @aptos_fungible_asset &&
+            exists<DispatchFunctionStore>(metadata_addr)
+        ) {
+            assert!(
+                option::is_none(
+                    &borrow_global<DispatchFunctionStore>(metadata_addr).withdraw_function
+                ),
+                error::invalid_argument(EINVALID_DISPATCHABLE_OPERATIONS)
+            );
+        };
+
+        // Withdraw.
+        if (amount > 0) {
+
+            if (exists<ConcurrentFungibleBalance>(store_addr)) {
+                assert!(
+                    aggregator_v2::try_sub(
+                        &mut borrow_global_mut<ConcurrentFungibleBalance>(store_addr).balance,
+                        amount
+                    ),
+                    error::invalid_argument(EINSUFFICIENT_BALANCE)
+                );
+            } else {
+                let balance = fa_store_ref_mut.balance;
+                assert!(balance >= amount, error::invalid_argument(EINSUFFICIENT_BALANCE));
+                if (features::migrate_to_concurrent_fungible_balance_enabled()) {
+                    move_to(
+                        &create_signer::create_signer(store_addr),
+                        ConcurrentFungibleBalance {
+                            balance: aggregator_v2::create_unbounded_aggregator_with_value(
+                                balance - amount
+                            )
+                        }
+                    );
+                    fa_store_ref_mut.balance = 0;
+                } else {
+                    fa_store_ref_mut.balance = balance - amount;
+                }
+            };
+
+            event::emit<Withdraw>(Withdraw { store: store_addr, amount });
+        };
+
+        FungibleAsset { metadata: fa_store_ref_mut.metadata, amount }
+
     }
 
     /// Deposit `amount` of the fungible asset to `store`.
     public fun deposit<T: key>(store: Object<T>, fa: FungibleAsset) acquires FungibleStore, DispatchFunctionStore, ConcurrentFungibleBalance {
-        assert!(store_exists_inline(object::object_address(&store)), error::permission_denied(ESTORE_IS_FROZEN));
-        let fa_store = borrow_store_resource(&store);
+
+        // Declare local variables.
+        let store_addr = object::object_address(&store);
+        let FungibleAsset { metadata, amount } = fa;
+        let metadata_addr = object::object_address(&metadata);
+
+        // Verify store exists, is not frozen, has no deposit dispatch function, and that the asset
+        // metadata matches that of the store.
+        assert!(exists<FungibleStore>(store_addr), error::not_found(EFUNGIBLE_STORE_EXISTENCE));
+        let fa_store_ref_mut = borrow_global_mut<FungibleStore>(store_addr);
+        if (fa_store_ref_mut.frozen) abort error::permission_denied(ESTORE_IS_FROZEN);
+        if (
+            metadata_addr != @aptos_fungible_asset &&
+            exists<DispatchFunctionStore>(metadata_addr)
+        ) {
+            assert!(
+                option::is_none(
+                    &borrow_global<DispatchFunctionStore>(metadata_addr).deposit_function
+                ),
+                error::invalid_argument(EINVALID_DISPATCHABLE_OPERATIONS)
+            );
+        };
         assert!(
-            !has_deposit_dispatch_function(fa_store.metadata),
-            error::invalid_argument(EINVALID_DISPATCHABLE_OPERATIONS)
+            metadata == fa_store_ref_mut.metadata,
+            error::invalid_argument(EFUNGIBLE_ASSET_AND_STORE_MISMATCH),
         );
-        assert!(!fa_store.frozen, error::permission_denied(ESTORE_IS_FROZEN));
-        deposit_internal(store, fa);
+
+        // Deposit.
+        if (amount > 0) {
+            if (exists<ConcurrentFungibleBalance>(store_addr)) {
+                aggregator_v2::add(
+                    &mut borrow_global_mut<ConcurrentFungibleBalance>(store_addr).balance,
+                    amount
+                );
+            } else {
+                if (features::migrate_to_concurrent_fungible_balance_enabled()) {
+                    move_to(
+                        &create_signer::create_signer(store_addr),
+                        ConcurrentFungibleBalance {
+                            balance: aggregator_v2::create_unbounded_aggregator_with_value(
+                                fa_store_ref_mut.balance + amount
+                            )
+                        }
+                    );
+                    fa_store_ref_mut.balance = 0;
+                } else {
+                    fa_store_ref_mut.balance = fa_store_ref_mut.balance + amount;
+                }
+            };
+
+            event::emit(Deposit { store: store_addr, amount });
+        }
     }
 
     /// Withdraw `amount` of the fungible asset from `store` by the owner.
@@ -990,7 +1183,7 @@ module aptos_framework::fungible_asset {
                 aggregator_v2::create_unbounded_aggregator_with_value(current)
             }
             else {
-                aggregator_v2::create_aggregator_with_value(option::extract(&mut maximum), current)
+                aggregator_v2::create_aggregator_with_value(current, option::extract(&mut maximum))
             },
         };
         move_to(&metadata_object_signer, supply);
@@ -1011,7 +1204,7 @@ module aptos_framework::fungible_asset {
         fungible_store_address: address,
     ) acquires FungibleStore {
         if (exists<ConcurrentFungibleBalance>(fungible_store_address)) {
-            return;
+            return
         };
         let store = borrow_global_mut<FungibleStore>(fungible_store_address);
         let balance = aggregator_v2::create_unbounded_aggregator_with_value(store.balance);
@@ -1217,8 +1410,11 @@ module aptos_framework::fungible_asset {
 
     #[test(fx = @aptos_framework, creator = @0xcafe)]
     fun test_fungible_asset_upgrade(fx: &signer, creator: &signer) acquires Supply, ConcurrentSupply, FungibleStore, ConcurrentFungibleBalance {
-        let feature = features::get_concurrent_fungible_assets_feature();
-        features::change_feature_flags(fx, vector[], vector[feature]);
+        let features = vector[
+            features::get_concurrent_fungible_assets_feature(),
+            features::get_migrate_to_concurrent_fungible_balance_feature(),
+        ];
+        features::change_feature_flags_for_testing(fx, vector[], features);
 
         let (creator_ref, token_object) = create_test_token(creator);
         let (mint_ref, transfer_ref, _burn) = init_test_metadata(&creator_ref);
@@ -1234,7 +1430,7 @@ module aptos_framework::fungible_asset {
 
         deposit_with_ref(&transfer_ref, creator_store, fa);
 
-        features::change_feature_flags(fx, vector[feature], vector[]);
+        features::change_feature_flags_for_testing(fx, features, vector[]);
 
         let extend_ref = object::generate_extend_ref(&creator_ref);
         // manual conversion of supply
