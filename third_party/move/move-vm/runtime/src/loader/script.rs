@@ -140,6 +140,7 @@ impl Script {
             index: FunctionDefinitionIndex(0),
             code,
             type_parameters,
+            is_entry: false,
             native,
             def_is_native,
             def_is_friend_or_private: false,

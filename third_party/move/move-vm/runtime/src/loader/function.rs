@@ -38,6 +38,7 @@ pub struct Function {
     pub(crate) index: FunctionDefinitionIndex,
     pub(crate) code: Vec<Bytecode>,
     pub type_parameters: Vec<AbilitySet>,
+    pub is_entry: bool,
     // TODO: Make `native` and `def_is_native` become an enum.
     pub(crate) native: Option<NativeFunction>,
     pub(crate) def_is_native: bool,
@@ -82,6 +83,7 @@ impl Function {
             Visibility::Friend | Visibility::Private => true,
             Visibility::Public => false,
         };
+
         let (native, def_is_native) = if def.is_native() {
             (
                 natives.resolve(
@@ -123,6 +125,7 @@ impl Function {
             file_format_version: module.version(),
             index,
             code,
+            is_entry: def.is_entry,
             type_parameters,
             native,
             def_is_native,
