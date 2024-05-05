@@ -115,7 +115,7 @@ fn native_check_dispatch_type_compatibility_impl(
         rhs.type_parameters == lhs.type_parameters
             && rhs.return_types == lhs.return_types
             && lhs.parameter_types[0..lhs.parameter_types.len() - 1] == rhs.parameter_types
-            && !rhs.def_is_friend_or_private
+            && !rhs.is_friend_or_private()
             && lhs_id != rhs_id
     )])
 }

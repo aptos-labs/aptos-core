@@ -42,7 +42,7 @@ pub struct Function {
     // TODO: Make `native` and `def_is_native` become an enum.
     pub(crate) native: Option<NativeFunction>,
     pub(crate) def_is_native: bool,
-    pub def_is_friend_or_private: bool,
+    pub(crate) is_friend_or_private: bool,
     pub(crate) scope: Scope,
     pub(crate) name: Identifier,
     pub return_types: Vec<Type>,
@@ -55,7 +55,7 @@ pub struct Function {
 // the internal implementation.
 pub struct LoadedFunction {
     pub(crate) module: Arc<Module>,
-    pub(crate) function: Arc<Function>,
+    pub function: Arc<Function>,
 }
 
 impl std::fmt::Debug for Function {
@@ -79,7 +79,7 @@ impl Function {
         let handle = module.function_handle_at(def.function);
         let name = module.identifier_at(handle.name).to_owned();
         let module_id = module.self_id();
-        let def_is_friend_or_private = match def.visibility {
+        let is_friend_or_private = match def.visibility {
             Visibility::Friend | Visibility::Private => true,
             Visibility::Public => false,
         };
@@ -129,7 +129,7 @@ impl Function {
             type_parameters,
             native,
             def_is_native,
-            def_is_friend_or_private,
+            is_friend_or_private,
             scope,
             name,
             local_types,
@@ -226,8 +226,8 @@ impl Function {
         self.def_is_native
     }
 
-    pub(crate) fn is_friend_or_private(&self) -> bool {
-        self.def_is_friend_or_private
+    pub fn is_friend_or_private(&self) -> bool {
+        self.is_friend_or_private
     }
 
     pub(crate) fn get_native(&self) -> PartialVMResult<&UnboxedNativeFunction> {

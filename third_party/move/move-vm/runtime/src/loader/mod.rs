@@ -585,8 +585,8 @@ impl Loader {
         ty_args: &[TypeTag],
         data_store: &mut TransactionDataCache,
         module_store: &ModuleStorageAdapter,
-    ) -> VMResult<(Arc<Module>, Arc<Function>, LoadedFunctionInstantiation)> {
-        let (module, func, parameters, return_) = self.load_function_without_type_args(
+    ) -> VMResult<(LoadedFunction, LoadedFunctionInstantiation)> {
+        let (module, function, parameters, return_) = self.load_function_without_type_args(
             module_id,
             function_name,
             data_store,
@@ -606,7 +606,7 @@ impl Loader {
             })?;
 
         // verify type arguments
-        self.verify_ty_args(func.type_parameters(), &type_arguments)
+        self.verify_ty_args(function.type_parameters(), &type_arguments)
             .map_err(|e| e.finish(Location::Module(module_id.clone())))?;
 
         let loaded = LoadedFunctionInstantiation {
@@ -614,7 +614,7 @@ impl Loader {
             parameters,
             return_,
         };
-        Ok((module, func, loaded))
+        Ok((LoadedFunction { module, function }, loaded))
     }
 
     // Entry point for module publishing (`MoveVM::publish_module_bundle`).

@@ -143,7 +143,7 @@ impl Script {
             is_entry: false,
             native,
             def_is_native,
-            def_is_friend_or_private: false,
+            is_friend_or_private: false,
             scope,
             name,
             return_types: return_tys.clone(),

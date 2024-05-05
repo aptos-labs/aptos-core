@@ -102,10 +102,14 @@ move run` must be applied to a module inside `storage/`",
             // script fun. parse module, extract script ID to pass to VM
             let module = CompiledModule::deserialize(&bytecode)
                 .map_err(|e| anyhow!("Error deserializing module: {:?}", e))?;
-            session.execute_entry_function(
+            let (func, instantiation) = session.load_function(
                 &module.self_id(),
                 IdentStr::new(script_name)?,
-                vm_type_args.clone(),
+                &vm_type_args,
+            )?;
+            session.execute_entry_function(
+                func,
+                instantiation,
                 vm_args,
                 &mut gas_status,
                 &mut TraversalContext::new(&storage),

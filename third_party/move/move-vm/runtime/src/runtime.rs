@@ -23,7 +23,7 @@ use move_bytecode_verifier::script_signature;
 use move_core_types::{
     account_address::AccountAddress,
     identifier::{IdentStr, Identifier},
-    language_storage::{ModuleId, TypeTag},
+    language_storage::TypeTag,
     value::MoveTypeLayout,
     vm_status::StatusCode,
 };
@@ -429,37 +429,6 @@ impl VMRuntime {
         })
     }
 
-    pub(crate) fn execute_function(
-        &self,
-        module: &ModuleId,
-        function_name: &IdentStr,
-        ty_args: Vec<TypeTag>,
-        serialized_args: Vec<impl Borrow<[u8]>>,
-        data_store: &mut TransactionDataCache,
-        module_store: &ModuleStorageAdapter,
-        gas_meter: &mut impl GasMeter,
-        traversal_context: &mut TraversalContext,
-        extensions: &mut NativeContextExtensions,
-        bypass_declared_entry_check: bool,
-    ) -> VMResult<SerializedReturnValues> {
-        // load the function
-        let (module, function, instantiation) =
-            self.loader
-                .load_function(module, function_name, &ty_args, data_store, module_store)?;
-
-        self.execute_function_instantiation(
-            LoadedFunction { module, function },
-            instantiation,
-            serialized_args,
-            data_store,
-            module_store,
-            gas_meter,
-            traversal_context,
-            extensions,
-            bypass_declared_entry_check,
-        )
-    }
-
     pub(crate) fn execute_function_instantiation(
         &self,
         func: LoadedFunction,
@@ -470,7 +439,6 @@ impl VMRuntime {
         gas_meter: &mut impl GasMeter,
         traversal_context: &mut TraversalContext,
         extensions: &mut NativeContextExtensions,
-        bypass_declared_entry_check: bool,
     ) -> VMResult<SerializedReturnValues> {
         // load the function
         let LoadedFunctionInstantiation {
@@ -479,33 +447,12 @@ impl VMRuntime {
             return_,
         } = function_instantiation;
 
-        use move_binary_format::{binary_views::BinaryIndexedView, file_format::SignatureIndex};
-        fn check_is_entry(
-            _resolver: &BinaryIndexedView,
-            is_entry: bool,
-            _parameters_idx: SignatureIndex,
-            _return_idx: Option<SignatureIndex>,
-        ) -> PartialVMResult<()> {
-            if is_entry {
-                Ok(())
-            } else {
-                Err(PartialVMError::new(
-                    StatusCode::EXECUTE_ENTRY_FUNCTION_CALLED_ON_NON_ENTRY_FUNCTION,
-                ))
-            }
-        }
-        let additional_signature_checks = if bypass_declared_entry_check {
-            move_bytecode_verifier::no_additional_script_signature_checks
-        } else {
-            check_is_entry
-        };
-
         let LoadedFunction { module, function } = func;
 
         script_signature::verify_module_function_signature_by_name(
             module.module(),
             IdentStr::new(function.as_ref().name()).expect(""),
-            additional_signature_checks,
+            move_bytecode_verifier::no_additional_script_signature_checks,
         )?;
 
         // execute the function

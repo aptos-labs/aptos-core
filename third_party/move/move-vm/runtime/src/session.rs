@@ -23,6 +23,7 @@ use move_core_types::{
     identifier::IdentStr,
     language_storage::{ModuleId, TypeTag},
     value::MoveTypeLayout,
+    vm_status::StatusCode,
 };
 use move_vm_types::{
     gas::GasMeter,
@@ -77,25 +78,28 @@ impl<'r, 'l> Session<'r, 'l> {
     /// one shall not proceed with effect generation.
     pub fn execute_entry_function(
         &mut self,
-        module: &ModuleId,
-        function_name: &IdentStr,
-        ty_args: Vec<TypeTag>,
+        func: LoadedFunction,
+        instantiation: LoadedFunctionInstantiation,
         args: Vec<impl Borrow<[u8]>>,
         gas_meter: &mut impl GasMeter,
         traversal_context: &mut TraversalContext,
     ) -> VMResult<()> {
-        let bypass_declared_entry_check = false;
-        self.move_vm.runtime.execute_function(
-            module,
-            function_name,
-            ty_args,
+        if func.function.is_entry {
+            return Err(PartialVMError::new(
+                StatusCode::EXECUTE_ENTRY_FUNCTION_CALLED_ON_NON_ENTRY_FUNCTION,
+            )
+            .finish(Location::Module(func.module.module.self_id())));
+        }
+
+        self.move_vm.runtime.execute_function_instantiation(
+            func,
+            instantiation,
             args,
             &mut self.data_cache,
             &self.module_store,
             gas_meter,
             traversal_context,
             &mut self.native_extensions,
-            bypass_declared_entry_check,
         )?;
         Ok(())
     }
@@ -110,18 +114,22 @@ impl<'r, 'l> Session<'r, 'l> {
         gas_meter: &mut impl GasMeter,
         traversal_context: &mut TraversalContext,
     ) -> VMResult<SerializedReturnValues> {
-        let bypass_declared_entry_check = true;
-        self.move_vm.runtime.execute_function(
+        let (func, instantiation) = self.move_vm.runtime.loader().load_function(
             module,
             function_name,
-            ty_args,
+            &ty_args,
+            &mut self.data_cache,
+            &self.module_store,
+        )?;
+        self.move_vm.runtime.execute_function_instantiation(
+            func,
+            instantiation,
             args,
             &mut self.data_cache,
             &self.module_store,
             gas_meter,
             traversal_context,
             &mut self.native_extensions,
-            bypass_declared_entry_check,
         )
     }
 
@@ -142,7 +150,6 @@ impl<'r, 'l> Session<'r, 'l> {
             gas_meter,
             traversal_context,
             &mut self.native_extensions,
-            true,
         )
     }
 
@@ -359,24 +366,6 @@ impl<'r, 'l> Session<'r, 'l> {
         Ok(instantiation)
     }
 
-    /// Note: Cannot return a `Function` struct here due to its `pub(crate)` visibility.
-    pub fn load_function_and_is_friend_or_private_def(
-        &mut self,
-        module_id: &ModuleId,
-        function_name: &IdentStr,
-        type_arguments: &[TypeTag],
-    ) -> VMResult<(LoadedFunctionInstantiation, bool)> {
-        let (_, func, instantiation) = self.move_vm.runtime.loader().load_function(
-            module_id,
-            function_name,
-            type_arguments,
-            &mut self.data_cache,
-            &self.module_store,
-        )?;
-
-        Ok((instantiation, func.is_friend_or_private()))
-    }
-
     /// Load a module, a function, and all of its types into cache
     pub fn load_function_with_type_arg_inference(
         &mut self,
@@ -404,15 +393,14 @@ impl<'r, 'l> Session<'r, 'l> {
         module_id: &ModuleId,
         function_name: &IdentStr,
         type_arguments: &[TypeTag],
-    ) -> VMResult<LoadedFunctionInstantiation> {
-        let (_, _, instantiation) = self.move_vm.runtime.loader().load_function(
+    ) -> VMResult<(LoadedFunction, LoadedFunctionInstantiation)> {
+        self.move_vm.runtime.loader().load_function(
             module_id,
             function_name,
             type_arguments,
             &mut self.data_cache,
             &self.module_store,
-        )?;
-        Ok(instantiation)
+        )
     }
 
     pub fn load_type(&mut self, type_tag: &TypeTag) -> VMResult<Type> {
