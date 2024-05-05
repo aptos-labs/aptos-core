@@ -279,10 +279,6 @@ impl<'r> TransactionDataCache<'r> {
         ))
     }
 
-    pub(crate) fn load_module(&self, module_id: &ModuleId) -> PartialVMResult<Bytes> {
-        load_module_impl(self.remote, &self.account_map, module_id)
-    }
-
     pub(crate) fn load_compiled_script_to_cache(
         &mut self,
         script_blob: &[u8],

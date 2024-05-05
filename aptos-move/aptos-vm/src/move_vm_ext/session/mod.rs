@@ -46,7 +46,7 @@ pub type BytesWithResourceLayout = (Bytes, Option<Arc<MoveTypeLayout>>);
 
 pub struct SessionExt<'r, 'l> {
     inner: Session<'r, 'l>,
-    remote: &'r dyn AptosMoveResolver,
+    pub remote: &'r dyn AptosMoveResolver,
     is_storage_slot_metadata_enabled: bool,
 }
 
