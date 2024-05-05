@@ -16,7 +16,6 @@ use move_binary_format::{
     access::ModuleAccess,
     compatibility::Compatibility,
     errors::{verification_error, Location, PartialVMError, PartialVMResult, VMResult},
-    file_format::LocalIndex,
     normalized, CompiledModule, IndexKind,
 };
 use move_bytecode_verifier::script_signature;
@@ -372,15 +371,7 @@ impl VMRuntime {
             .map(|ty| ty.subst(&ty_args))
             .collect::<PartialVMResult<Vec<_>>>()
             .map_err(|err| err.finish(Location::Undefined))?;
-        let mut_ref_args = arg_types
-            .iter()
-            .enumerate()
-            .filter_map(|(idx, ty)| match ty {
-                Type::MutableReference(inner) => Some((idx, inner.clone())),
-                _ => None,
-            })
-            .collect::<Vec<_>>();
-        let (mut dummy_locals, deserialized_args) = self
+        let (dummy_locals, deserialized_args) = self
             .deserialize_args(module_store, arg_types, serialized_args)
             .map_err(|e| e.finish(Location::Undefined))?;
         let return_types = return_types
@@ -404,27 +395,11 @@ impl VMRuntime {
         let serialized_return_values = self
             .serialize_return_values(module_store, &return_types, return_values)
             .map_err(|e| e.finish(Location::Undefined))?;
-        let serialized_mut_ref_outputs = mut_ref_args
-            .into_iter()
-            .map(|(idx, ty)| {
-                // serialize return values first in the case that a value points into this local
-                let local_val = dummy_locals.move_loc(
-                    idx,
-                    self.loader
-                        .vm_config()
-                        .enable_invariant_violation_check_in_swap_loc,
-                )?;
-                let (bytes, layout) = self.serialize_return_value(module_store, &ty, local_val)?;
-                Ok((idx as LocalIndex, bytes, layout))
-            })
-            .collect::<PartialVMResult<_>>()
-            .map_err(|e| e.finish(Location::Undefined))?;
 
         // locals should not be dropped until all return values are serialized
         std::mem::drop(dummy_locals);
 
         Ok(SerializedReturnValues {
-            mutable_reference_outputs: serialized_mut_ref_outputs,
             return_values: serialized_return_values,
         })
     }
@@ -451,7 +426,7 @@ impl VMRuntime {
 
         script_signature::verify_module_function_signature_by_name(
             module.module(),
-            IdentStr::new(function.as_ref().name()).expect(""),
+            IdentStr::new(function.as_ref().name()).unwrap(),
             move_bytecode_verifier::no_additional_script_signature_checks,
         )?;
 

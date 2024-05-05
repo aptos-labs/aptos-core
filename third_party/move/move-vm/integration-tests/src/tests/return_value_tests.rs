@@ -61,10 +61,7 @@ fn run(
         .collect();
     let traversal_storage = TraversalStorage::new();
 
-    let SerializedReturnValues {
-        return_values,
-        mutable_reference_outputs: _,
-    } = sess.execute_function_bypass_visibility(
+    let SerializedReturnValues { return_values } = sess.execute_function_bypass_visibility(
         &module_id,
         &fun_name,
         ty_args,

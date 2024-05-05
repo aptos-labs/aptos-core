@@ -569,31 +569,8 @@ fn disassembler_for_view(view: BinaryIndexedView) -> Disassembler {
 }
 
 fn display_return_values(return_values: SerializedReturnValues) -> Option<String> {
-    let SerializedReturnValues {
-        mutable_reference_outputs,
-        return_values,
-    } = return_values;
+    let SerializedReturnValues { return_values } = return_values;
     let mut output = vec![];
-    if !mutable_reference_outputs.is_empty() {
-        let values = mutable_reference_outputs
-            .iter()
-            .map(|(idx, bytes, layout)| {
-                let value =
-                    move_vm_types::values::Value::simple_deserialize(bytes, layout).unwrap();
-                (idx, value)
-            })
-            .collect::<Vec<_>>();
-        let printed = values
-            .iter()
-            .map(|(idx, v)| {
-                let mut buf = String::new();
-                move_vm_types::values::debug::print_value(&mut buf, v).unwrap();
-                format!("local#{}: {}", idx, buf)
-            })
-            .collect::<Vec<_>>()
-            .join(", ");
-        output.push(format!("mutable inputs after call: {}", printed))
-    };
     if !return_values.is_empty() {
         let values = return_values
             .iter()

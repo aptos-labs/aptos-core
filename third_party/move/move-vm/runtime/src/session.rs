@@ -11,11 +11,7 @@ use crate::{
     native_extensions::NativeContextExtensions,
 };
 use bytes::Bytes;
-use move_binary_format::{
-    compatibility::Compatibility,
-    errors::*,
-    file_format::{AbilitySet, LocalIndex},
-};
+use move_binary_format::{compatibility::Compatibility, errors::*, file_format::AbilitySet};
 use move_core_types::{
     account_address::AccountAddress,
     effects::{ChangeSet, Changes},
@@ -43,9 +39,6 @@ pub struct Session<'r, 'l> {
 /// Simple struct is designed just to convey meaning behind serialized values
 #[derive(Debug)]
 pub struct SerializedReturnValues {
-    /// The value of any arguments that were mutably borrowed.
-    /// Non-mut borrowed values are not included
-    pub mutable_reference_outputs: Vec<(LocalIndex, Vec<u8>, MoveTypeLayout)>,
     /// The return values from the function
     pub return_values: Vec<(Vec<u8>, MoveTypeLayout)>,
 }

@@ -217,10 +217,7 @@ impl<'r, 'l> AsyncSession<'r, 'l> {
         // changeset.
         match result {
             Ok((
-                SerializedReturnValues {
-                    mutable_reference_outputs: _,
-                    mut return_values,
-                },
+                SerializedReturnValues { mut return_values },
                 (mut change_set, mut native_extensions),
             )) => {
                 if return_values.len() != 1 {
@@ -316,24 +313,21 @@ impl<'r, 'l> AsyncSession<'r, 'l> {
         // into the changeset.
         match result {
             Ok((
-                SerializedReturnValues {
-                    mut mutable_reference_outputs,
-                    return_values: _,
-                },
+                SerializedReturnValues { mut return_values },
                 (mut change_set, mut native_extensions),
             )) => {
-                if mutable_reference_outputs.len() > 1 {
+                if return_values.len() > 1 {
                     Err(async_extension_error(format!(
                         "inconsistent handler `{}`",
                         handler_id
                     )))
                 } else {
-                    if !mutable_reference_outputs.is_empty() {
+                    if !return_values.is_empty() {
                         publish_actor_state(
                             &mut change_set,
                             actor_addr,
                             actor.state_tag.clone(),
-                            mutable_reference_outputs.remove(0).1,
+                            return_values.remove(0).0,
                             true,
                         )
                         .map_err(partial_vm_error_to_async)?;
