@@ -703,6 +703,19 @@ impl<'a> FunctionGenerator<'a> {
             U256(n) => self.emit(FF::Bytecode::LdU256(
                 move_core_types::u256::U256::from_le_bytes(&n.to_le_bytes()),
             )),
+            Vector(vec) if vec.is_empty() => {
+                let fun_ctx = ctx.fun_ctx;
+                let elem_type = if let Type::Vector(el) = fun_ctx.fun.get_local_type(*dest) {
+                    el.as_ref().clone()
+                } else {
+                    fun_ctx.internal_error("expected vector type");
+                    Type::new_prim(PrimitiveType::Bool)
+                };
+                let sign = self
+                    .gen
+                    .signature(&fun_ctx.module, &fun_ctx.loc, vec![elem_type]);
+                self.emit(FF::Bytecode::VecPack(sign, 0u64));
+            },
             _ => {
                 let cons = self.gen.constant_index(
                     &ctx.fun_ctx.module,

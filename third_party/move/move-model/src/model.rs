@@ -855,8 +855,10 @@ impl GlobalEnv {
     fn add_backtrace(msg: &str, _is_bug: bool) -> String {
         // Note that you need both MOVE_COMPILER_BACKTRACE=1 and RUST_BACKTRACE=1 for this to
         // actually generate a backtrace.
-        static DUMP_BACKTRACE: Lazy<bool> =
-            Lazy::new(|| read_bool_env_var(cli::MOVE_COMPILER_BACKTRACE_ENV_VAR));
+        static DUMP_BACKTRACE: Lazy<bool> = Lazy::new(|| {
+            read_bool_env_var(cli::MOVE_COMPILER_BACKTRACE_ENV_VAR)
+                | read_bool_env_var(cli::MVC_BACKTRACE_ENV_VAR)
+        });
         if *DUMP_BACKTRACE {
             let bt = Backtrace::capture();
             if BacktraceStatus::Captured == bt.status() {
