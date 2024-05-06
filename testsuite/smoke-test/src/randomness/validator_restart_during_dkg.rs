@@ -1,4 +1,5 @@
 // Copyright © Aptos Foundation
+// SPDX-License-Identifier: Apache-2.0
 
 use crate::{
     randomness::{
@@ -9,10 +10,7 @@ use crate::{
 use aptos_forge::{NodeExt, SwarmExt};
 use aptos_logger::{debug, info};
 use aptos_rest_client::Client;
-use aptos_types::{
-    dkg::DKGState,
-    on_chain_config::{FeatureFlag, Features},
-};
+use aptos_types::{dkg::DKGState, on_chain_config::OnChainRandomnessConfig};
 use futures::future::join_all;
 use std::{sync::Arc, time::Duration};
 
@@ -32,13 +30,9 @@ async fn validator_restart_during_dkg() {
         .with_init_genesis_config(Arc::new(|conf| {
             conf.epoch_duration_secs = 30;
 
-            // Ensure vtxn is enabled.
+            // Ensure randomness is enabled.
             conf.consensus_config.enable_validator_txns();
-
-            // Ensure randomness flag is set.
-            let mut features = Features::default();
-            features.enable(FeatureFlag::RECONFIGURE_WITH_DKG);
-            conf.initial_features_override = Some(features);
+            conf.randomness_config_override = Some(OnChainRandomnessConfig::default_enabled());
         }))
         .build()
         .await;

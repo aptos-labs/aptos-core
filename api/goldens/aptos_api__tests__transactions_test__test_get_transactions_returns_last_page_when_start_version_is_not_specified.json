@@ -131,6 +131,24 @@
     "events": [
       {
         "guid": {
+          "creation_number": "0",
+          "account_address": "0x0"
+        },
+        "sequence_number": "0",
+        "type": "0x1::block::NewBlock",
+        "data": {
+          "epoch": "1",
+          "failed_proposer_indices": [],
+          "hash": "",
+          "height": "13",
+          "previous_block_votes_bitvec": "0x00",
+          "proposer": "0x66b22b7465af92a9dc8d07d2878716d9dffbbb280830a7d8cf80334b5da812ef",
+          "round": "1",
+          "time_microseconds": "6500000"
+        }
+      },
+      {
+        "guid": {
           "creation_number": "3",
           "account_address": "0x1"
         },
@@ -325,7 +343,7 @@
         "type": "0x1::transaction_fee::FeeStatement",
         "data": {
           "execution_gas_units": "4",
-          "io_gas_units": "1",
+          "io_gas_units": "2",
           "storage_fee_octas": "0",
           "storage_fee_refund_octas": "0",
           "total_charge_gas_units": "5"
@@ -465,6 +483,24 @@
     "epoch": "1",
     "round": "1",
     "events": [
+      {
+        "guid": {
+          "creation_number": "0",
+          "account_address": "0x0"
+        },
+        "sequence_number": "0",
+        "type": "0x1::block::NewBlock",
+        "data": {
+          "epoch": "1",
+          "failed_proposer_indices": [],
+          "hash": "",
+          "height": "14",
+          "previous_block_votes_bitvec": "0x00",
+          "proposer": "0x66b22b7465af92a9dc8d07d2878716d9dffbbb280830a7d8cf80334b5da812ef",
+          "round": "1",
+          "time_microseconds": "7000000"
+        }
+      },
       {
         "guid": {
           "creation_number": "3",
@@ -661,7 +697,7 @@
         "type": "0x1::transaction_fee::FeeStatement",
         "data": {
           "execution_gas_units": "4",
-          "io_gas_units": "1",
+          "io_gas_units": "2",
           "storage_fee_octas": "0",
           "storage_fee_refund_octas": "0",
           "total_charge_gas_units": "5"
@@ -801,6 +837,24 @@
     "epoch": "1",
     "round": "1",
     "events": [
+      {
+        "guid": {
+          "creation_number": "0",
+          "account_address": "0x0"
+        },
+        "sequence_number": "0",
+        "type": "0x1::block::NewBlock",
+        "data": {
+          "epoch": "1",
+          "failed_proposer_indices": [],
+          "hash": "",
+          "height": "15",
+          "previous_block_votes_bitvec": "0x00",
+          "proposer": "0x66b22b7465af92a9dc8d07d2878716d9dffbbb280830a7d8cf80334b5da812ef",
+          "round": "1",
+          "time_microseconds": "7500000"
+        }
+      },
       {
         "guid": {
           "creation_number": "3",
@@ -997,7 +1051,7 @@
         "type": "0x1::transaction_fee::FeeStatement",
         "data": {
           "execution_gas_units": "4",
-          "io_gas_units": "1",
+          "io_gas_units": "2",
           "storage_fee_octas": "0",
           "storage_fee_refund_octas": "0",
           "total_charge_gas_units": "5"
@@ -1137,6 +1191,24 @@
     "epoch": "1",
     "round": "1",
     "events": [
+      {
+        "guid": {
+          "creation_number": "0",
+          "account_address": "0x0"
+        },
+        "sequence_number": "0",
+        "type": "0x1::block::NewBlock",
+        "data": {
+          "epoch": "1",
+          "failed_proposer_indices": [],
+          "hash": "",
+          "height": "16",
+          "previous_block_votes_bitvec": "0x00",
+          "proposer": "0x66b22b7465af92a9dc8d07d2878716d9dffbbb280830a7d8cf80334b5da812ef",
+          "round": "1",
+          "time_microseconds": "8000000"
+        }
+      },
       {
         "guid": {
           "creation_number": "3",
@@ -1333,7 +1405,7 @@
         "type": "0x1::transaction_fee::FeeStatement",
         "data": {
           "execution_gas_units": "4",
-          "io_gas_units": "1",
+          "io_gas_units": "2",
           "storage_fee_octas": "0",
           "storage_fee_refund_octas": "0",
           "total_charge_gas_units": "5"
@@ -1473,6 +1545,24 @@
     "epoch": "1",
     "round": "1",
     "events": [
+      {
+        "guid": {
+          "creation_number": "0",
+          "account_address": "0x0"
+        },
+        "sequence_number": "0",
+        "type": "0x1::block::NewBlock",
+        "data": {
+          "epoch": "1",
+          "failed_proposer_indices": [],
+          "hash": "",
+          "height": "17",
+          "previous_block_votes_bitvec": "0x00",
+          "proposer": "0x66b22b7465af92a9dc8d07d2878716d9dffbbb280830a7d8cf80334b5da812ef",
+          "round": "1",
+          "time_microseconds": "8500000"
+        }
+      },
       {
         "guid": {
           "creation_number": "3",
@@ -1669,7 +1759,7 @@
         "type": "0x1::transaction_fee::FeeStatement",
         "data": {
           "execution_gas_units": "4",
-          "io_gas_units": "1",
+          "io_gas_units": "2",
           "storage_fee_octas": "0",
           "storage_fee_refund_octas": "0",
           "total_charge_gas_units": "5"
@@ -1809,6 +1899,24 @@
     "epoch": "1",
     "round": "1",
     "events": [
+      {
+        "guid": {
+          "creation_number": "0",
+          "account_address": "0x0"
+        },
+        "sequence_number": "0",
+        "type": "0x1::block::NewBlock",
+        "data": {
+          "epoch": "1",
+          "failed_proposer_indices": [],
+          "hash": "",
+          "height": "18",
+          "previous_block_votes_bitvec": "0x00",
+          "proposer": "0x66b22b7465af92a9dc8d07d2878716d9dffbbb280830a7d8cf80334b5da812ef",
+          "round": "1",
+          "time_microseconds": "9000000"
+        }
+      },
       {
         "guid": {
           "creation_number": "3",
@@ -2005,7 +2113,7 @@
         "type": "0x1::transaction_fee::FeeStatement",
         "data": {
           "execution_gas_units": "4",
-          "io_gas_units": "1",
+          "io_gas_units": "2",
           "storage_fee_octas": "0",
           "storage_fee_refund_octas": "0",
           "total_charge_gas_units": "5"
@@ -2145,6 +2253,24 @@
     "epoch": "1",
     "round": "1",
     "events": [
+      {
+        "guid": {
+          "creation_number": "0",
+          "account_address": "0x0"
+        },
+        "sequence_number": "0",
+        "type": "0x1::block::NewBlock",
+        "data": {
+          "epoch": "1",
+          "failed_proposer_indices": [],
+          "hash": "",
+          "height": "19",
+          "previous_block_votes_bitvec": "0x00",
+          "proposer": "0x66b22b7465af92a9dc8d07d2878716d9dffbbb280830a7d8cf80334b5da812ef",
+          "round": "1",
+          "time_microseconds": "9500000"
+        }
+      },
       {
         "guid": {
           "creation_number": "3",
@@ -2341,7 +2467,7 @@
         "type": "0x1::transaction_fee::FeeStatement",
         "data": {
           "execution_gas_units": "4",
-          "io_gas_units": "1",
+          "io_gas_units": "2",
           "storage_fee_octas": "0",
           "storage_fee_refund_octas": "0",
           "total_charge_gas_units": "5"
@@ -2481,6 +2607,24 @@
     "epoch": "1",
     "round": "1",
     "events": [
+      {
+        "guid": {
+          "creation_number": "0",
+          "account_address": "0x0"
+        },
+        "sequence_number": "0",
+        "type": "0x1::block::NewBlock",
+        "data": {
+          "epoch": "1",
+          "failed_proposer_indices": [],
+          "hash": "",
+          "height": "20",
+          "previous_block_votes_bitvec": "0x00",
+          "proposer": "0x66b22b7465af92a9dc8d07d2878716d9dffbbb280830a7d8cf80334b5da812ef",
+          "round": "1",
+          "time_microseconds": "10000000"
+        }
+      },
       {
         "guid": {
           "creation_number": "3",
@@ -2677,7 +2821,7 @@
         "type": "0x1::transaction_fee::FeeStatement",
         "data": {
           "execution_gas_units": "4",
-          "io_gas_units": "1",
+          "io_gas_units": "2",
           "storage_fee_octas": "0",
           "storage_fee_refund_octas": "0",
           "total_charge_gas_units": "5"

@@ -111,7 +111,6 @@ impl MempoolProxy {
             max_items,
             max_bytes,
             true,
-            true,
             exclude_transactions,
             callback,
         );
@@ -142,7 +141,7 @@ impl MempoolProxy {
 }
 
 #[derive(PartialEq, Eq, Hash, Clone)]
-struct BatchKey {
+pub struct BatchKey {
     author: PeerId,
     batch_id: BatchId,
 }
@@ -157,7 +156,7 @@ impl BatchKey {
 }
 
 #[derive(PartialEq, Eq, Clone, Hash)]
-struct BatchSortKey {
+pub struct BatchSortKey {
     batch_key: BatchKey,
     gas_bucket_start: u64,
 }
@@ -277,13 +276,16 @@ impl ProofQueue {
 
     // gets excluded and iterates over the vector returning non excluded or expired entries.
     // return the vector of pulled PoS, and the size of the remaining PoS
+    // The flag in the second return argument is true iff the entire proof queue is fully utilized
+    // when pulling the proofs. If any proof from proof queue cannot be included due to size limits,
+    // this flag is set false.
     pub(crate) fn pull_proofs(
         &mut self,
         excluded_batches: &HashSet<BatchInfo>,
         max_txns: u64,
         max_bytes: u64,
         return_non_full: bool,
-    ) -> Vec<ProofOfStore> {
+    ) -> (Vec<ProofOfStore>, bool) {
         let mut ret = vec![];
         let mut cur_bytes = 0;
         let mut cur_txns = 0;
@@ -346,9 +348,9 @@ impl ProofQueue {
             counters::EXCLUDED_TXNS_WHEN_PULL.observe(excluded_txns as f64);
             // Stable sort, so the order of proofs within an author will not change.
             ret.sort_by_key(|proof| Reverse(proof.gas_bucket_start()));
-            ret
+            (ret, !full)
         } else {
-            Vec::new()
+            (Vec::new(), !full)
         }
     }
 

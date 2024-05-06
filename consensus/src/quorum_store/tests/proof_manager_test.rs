@@ -1,7 +1,9 @@
 // Copyright © Aptos Foundation
 // SPDX-License-Identifier: Apache-2.0
 
-use crate::quorum_store::proof_manager::ProofManager;
+use crate::quorum_store::{
+    proof_manager::ProofManager, tests::batch_store_test::batch_store_for_test,
+};
 use aptos_consensus_types::{
     common::{Payload, PayloadFilter},
     proof_of_store::{BatchId, BatchInfo, ProofOfStore},
@@ -13,7 +15,8 @@ use futures::channel::oneshot;
 use std::collections::HashSet;
 
 fn create_proof_manager() -> ProofManager {
-    ProofManager::new(PeerId::random(), 10, 10)
+    let batch_store = batch_store_for_test(5 * 1024 * 1024);
+    ProofManager::new(PeerId::random(), 10, 10, batch_store, true)
 }
 
 fn create_proof(author: PeerId, expiration: u64, batch_sequence: u64) -> ProofOfStore {
@@ -53,6 +56,8 @@ async fn get_proposal(
     let req = GetPayloadCommand::GetPayloadRequest(
         max_txns,
         1000000,
+        max_txns / 2,
+        100000,
         true,
         PayloadFilter::InQuorumStore(filter_set),
         callback_tx,
@@ -81,6 +86,14 @@ fn assert_payload_response(
             }
             assert_eq!(proofs.max_txns_to_execute, max_txns_from_block_to_execute);
         },
+        Payload::QuorumStoreInlineHybrid(_inline_batches, proofs, max_txns_to_execute) => {
+            assert_eq!(proofs.proofs.len(), expected.len());
+            for proof in proofs.proofs {
+                assert!(expected.contains(&proof));
+            }
+            assert_eq!(max_txns_to_execute, max_txns_from_block_to_execute);
+        },
+        // TODO: Check how to update this for Payload::QuorumStoreInlineHybrid
         _ => panic!("Unexpected variant"),
     }
 }

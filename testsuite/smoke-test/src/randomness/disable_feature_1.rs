@@ -1,16 +1,18 @@
 // Copyright © Aptos Foundation
+// SPDX-License-Identifier: Apache-2.0
 
 use crate::{
-    randomness::{decrypt_key_map, get_on_chain_resource, verify_dkg_transcript},
+    randomness::{
+        decrypt_key_map, get_on_chain_resource, script_to_update_consensus_config,
+        verify_dkg_transcript,
+    },
     smoke_test_environment::SwarmBuilder,
     utils::get_current_consensus_config,
 };
 use aptos_forge::{Node, Swarm, SwarmExt};
 use aptos_logger::{debug, info};
 use aptos_types::{
-    dkg::DKGState,
-    on_chain_config::{FeatureFlag, Features},
-    randomness::PerBlockRandomness,
+    dkg::DKGState, on_chain_config::OnChainRandomnessConfig, randomness::PerBlockRandomness,
 };
 use std::{sync::Arc, time::Duration};
 
@@ -26,13 +28,9 @@ async fn disable_feature_1() {
             conf.epoch_duration_secs = epoch_duration_secs;
             conf.allow_new_validators = true;
 
-            // Ensure vtxn is enabled.
+            // Ensure randomness is enabled.
             conf.consensus_config.enable_validator_txns();
-
-            // Ensure randomness flag is set.
-            let mut features = Features::default();
-            features.enable(FeatureFlag::RECONFIGURE_WITH_DKG);
-            conf.initial_features_override = Some(features);
+            conf.randomness_config_override = Some(OnChainRandomnessConfig::default_enabled());
         }))
         .build_with_cli(0)
         .await;
@@ -54,22 +52,7 @@ async fn disable_feature_1() {
     let mut config = get_current_consensus_config(&client).await;
     assert!(config.is_vtxn_enabled());
     config.disable_validator_txns();
-    let config_bytes = bcs::to_bytes(&config).unwrap();
-    let disable_vtxn_script = format!(
-        r#"
-script {{
-    use aptos_framework::aptos_governance;
-    use aptos_framework::consensus_config;
-    fun main(core_resources: &signer) {{
-        let framework_signer = aptos_governance::get_signer_testnet_only(core_resources, @0000000000000000000000000000000000000000000000000000000000000001);
-        let config_bytes = vector{:?};
-        consensus_config::set_for_next_epoch(&framework_signer, config_bytes);
-        aptos_governance::reconfigure(&framework_signer);
-    }}
-}}
-"#,
-        config_bytes
-    );
+    let disable_vtxn_script = script_to_update_consensus_config(&config);
     debug!("disable_vtxn_script={}", disable_vtxn_script);
     let txn_summary = cli
         .run_script(root_idx, disable_vtxn_script.as_str())

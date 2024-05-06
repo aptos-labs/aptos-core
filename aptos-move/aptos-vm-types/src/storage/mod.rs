@@ -6,8 +6,8 @@ use crate::storage::{
 };
 use aptos_gas_schedule::{AptosGasParameters, InitialGasSchedule, LATEST_GAS_FEATURE_VERSION};
 use aptos_types::{
-    access_path::AccessPath,
     on_chain_config::{ConfigStorage, Features},
+    state_store::state_key::StateKey,
 };
 use bytes::Bytes;
 use std::fmt::Debug;
@@ -79,7 +79,7 @@ impl StorageGasParameters {
 struct DummyConfigStorage;
 
 impl ConfigStorage for DummyConfigStorage {
-    fn fetch_config(&self, _access_path: AccessPath) -> Option<Bytes> {
+    fn fetch_config_bytes(&self, _state_key: &StateKey) -> Option<Bytes> {
         unreachable!("Not supposed to be called from latest() / tests.")
     }
 }

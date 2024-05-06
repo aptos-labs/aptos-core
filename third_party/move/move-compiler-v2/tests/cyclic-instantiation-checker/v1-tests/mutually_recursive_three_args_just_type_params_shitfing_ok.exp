@@ -1,0 +1,12 @@
+// -- Model dump before bytecode pipeline
+module 0x8675309::M {
+    private fun f<T1,T2,T3>() {
+        M::g<T2, T3, T1>()
+    }
+    private fun g<T1,T2,T3>() {
+        M::h<T1, T2, T3>()
+    }
+    private fun h<T1,T2,T3>() {
+        M::f<T1, T2, T3>()
+    }
+} // end 0x8675309::M

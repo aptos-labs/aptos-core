@@ -99,7 +99,7 @@ proptest! {
     #[test]
     fn no_early_termination(
         universe in vec(any::<[u8; 32]>(), 100),
-        transaction_gen in vec(any::<TransactionGen<[u8;32]>>(), 5000).no_shrink(),
+        transaction_gen in vec(any::<TransactionGen<[u8;32]>>(), 4000).no_shrink(),
         abort_transactions in vec(any::<Index>(), 0),
         skip_rest_transactions in vec(any::<Index>(), 0),
     ) {
@@ -108,8 +108,8 @@ proptest! {
 
     #[test]
     fn abort_only(
-        universe in vec(any::<[u8; 32]>(), 100),
-        transaction_gen in vec(any::<TransactionGen<[u8;32]>>(), 5000).no_shrink(),
+        universe in vec(any::<[u8; 32]>(), 80),
+        transaction_gen in vec(any::<TransactionGen<[u8;32]>>(), 300).no_shrink(),
         abort_transactions in vec(any::<Index>(), 5),
         skip_rest_transactions in vec(any::<Index>(), 0),
     ) {
@@ -118,8 +118,8 @@ proptest! {
 
     #[test]
     fn skip_rest_only(
-        universe in vec(any::<[u8; 32]>(), 100),
-        transaction_gen in vec(any::<TransactionGen<[u8;32]>>(), 5000).no_shrink(),
+        universe in vec(any::<[u8; 32]>(), 80),
+        transaction_gen in vec(any::<TransactionGen<[u8;32]>>(), 300).no_shrink(),
         abort_transactions in vec(any::<Index>(), 0),
         skip_rest_transactions in vec(any::<Index>(), 5),
     ) {

@@ -3,6 +3,7 @@
 // SPDX-License-Identifier: Apache-2.0
 
 use crate::{
+    consensus_observer::{network::ObserverMessage, publisher::Publisher},
     counters,
     error::StateSyncError,
     network::{IncomingCommitRequest, IncomingRandGenRequest, NetworkSender},
@@ -28,7 +29,10 @@ use anyhow::Result;
 use aptos_bounded_executor::BoundedExecutor;
 use aptos_channels::{aptos_channel, message_queues::QueueStyle};
 use aptos_config::config::ConsensusConfig;
-use aptos_consensus_types::{common::Author, pipelined_block::PipelinedBlock};
+use aptos_consensus_types::{
+    common::{Author, Round},
+    pipelined_block::PipelinedBlock,
+};
 use aptos_executor_types::ExecutorResult;
 use aptos_infallible::RwLock;
 use aptos_logger::prelude::*;
@@ -37,7 +41,7 @@ use aptos_safety_rules::safety_rules_manager::load_consensus_key_from_secure_sto
 use aptos_types::{
     epoch_state::EpochState,
     ledger_info::LedgerInfoWithSignatures,
-    on_chain_config::{FeatureFlag, Features, OnChainConsensusConfig, OnChainExecutionConfig},
+    on_chain_config::{OnChainConsensusConfig, OnChainExecutionConfig, OnChainRandomnessConfig},
     validator_signer::ValidatorSigner,
 };
 use fail::fail_point;
@@ -59,9 +63,11 @@ pub trait TExecutionClient: Send + Sync {
         payload_manager: Arc<PayloadManager>,
         onchain_consensus_config: &OnChainConsensusConfig,
         onchain_execution_config: &OnChainExecutionConfig,
-        features: &Features,
+        onchain_randomness_config: &OnChainRandomnessConfig,
         rand_config: Option<RandConfig>,
+        fast_rand_config: Option<RandConfig>,
         rand_msg_rx: aptos_channel::Receiver<AccountAddress, IncomingRandGenRequest>,
+        highest_ordered_round: Round,
     );
 
     /// This is needed for some DAG tests. Clean this up as a TODO.
@@ -142,6 +148,7 @@ pub struct ExecutionProxyClient {
     // channels to buffer manager
     handle: Arc<RwLock<BufferManagerHandle>>,
     rand_storage: Arc<dyn RandStorage<AugmentedData>>,
+    observer_network: Option<NetworkClient<ObserverMessage>>,
 }
 
 impl ExecutionProxyClient {
@@ -153,6 +160,7 @@ impl ExecutionProxyClient {
         network_sender: ConsensusNetworkClient<NetworkClient<ConsensusMsg>>,
         bounded_executor: BoundedExecutor,
         rand_storage: Arc<dyn RandStorage<AugmentedData>>,
+        observer_network: Option<NetworkClient<ObserverMessage>>,
     ) -> Self {
         Self {
             consensus_config,
@@ -163,6 +171,7 @@ impl ExecutionProxyClient {
             bounded_executor,
             handle: Arc::new(RwLock::new(BufferManagerHandle::new())),
             rand_storage,
+            observer_network,
         }
     }
 
@@ -171,7 +180,10 @@ impl ExecutionProxyClient {
         commit_signer_provider: Arc<dyn CommitSignerProvider>,
         epoch_state: Arc<EpochState>,
         rand_config: Option<RandConfig>,
+        fast_rand_config: Option<RandConfig>,
         rand_msg_rx: aptos_channel::Receiver<AccountAddress, IncomingRandGenRequest>,
+        highest_ordered_round: Round,
+        publisher: Option<Publisher>,
     ) {
         let network_sender = NetworkSender::new(
             self.author,
@@ -205,10 +217,12 @@ impl ExecutionProxyClient {
                     epoch_state.clone(),
                     signer,
                     rand_config,
+                    fast_rand_config,
                     rand_ready_block_tx,
                     Arc::new(network_sender.clone()),
                     self.rand_storage.clone(),
                     self.bounded_executor.clone(),
+                    &self.consensus_config.rand_rb_config,
                 );
 
                 tokio::spawn(rand_manager.start(
@@ -216,6 +230,7 @@ impl ExecutionProxyClient {
                     rand_msg_rx,
                     reset_rand_manager_rx,
                     self.bounded_executor.clone(),
+                    highest_ordered_round,
                 ));
 
                 (
@@ -252,6 +267,7 @@ impl ExecutionProxyClient {
             reset_buffer_manager_rx,
             epoch_state,
             self.bounded_executor.clone(),
+            publisher,
         );
 
         tokio::spawn(execution_schedule_phase.start());
@@ -271,15 +287,20 @@ impl TExecutionClient for ExecutionProxyClient {
         payload_manager: Arc<PayloadManager>,
         onchain_consensus_config: &OnChainConsensusConfig,
         onchain_execution_config: &OnChainExecutionConfig,
-        features: &Features,
+        onchain_randomness_config: &OnChainRandomnessConfig,
         rand_config: Option<RandConfig>,
+        fast_rand_config: Option<RandConfig>,
         rand_msg_rx: aptos_channel::Receiver<AccountAddress, IncomingRandGenRequest>,
+        highest_ordered_round: Round,
     ) {
         let maybe_rand_msg_tx = self.spawn_decoupled_execution(
             commit_signer_provider,
             epoch_state.clone(),
             rand_config,
+            fast_rand_config,
             rand_msg_rx,
+            highest_ordered_round,
+            self.observer_network.clone().map(Publisher::new),
         );
 
         let transaction_shuffler =
@@ -289,7 +310,7 @@ impl TExecutionClient for ExecutionProxyClient {
         let transaction_deduper =
             create_transaction_deduper(onchain_execution_config.transaction_deduper_type());
         let randomness_enabled = onchain_consensus_config.is_vtxn_enabled()
-            && features.is_enabled(FeatureFlag::RECONFIGURE_WITH_DKG);
+            && onchain_randomness_config.randomness_enabled();
         self.execution_proxy.new_epoch(
             &epoch_state,
             payload_manager,
@@ -448,9 +469,11 @@ impl TExecutionClient for DummyExecutionClient {
         _payload_manager: Arc<PayloadManager>,
         _onchain_consensus_config: &OnChainConsensusConfig,
         _onchain_execution_config: &OnChainExecutionConfig,
-        _features: &Features,
+        _onchain_randomness_config: &OnChainRandomnessConfig,
         _rand_config: Option<RandConfig>,
+        _fast_rand_config: Option<RandConfig>,
         _rand_msg_rx: aptos_channel::Receiver<AccountAddress, IncomingRandGenRequest>,
+        _highest_ordered_round: Round,
     ) {
     }
 

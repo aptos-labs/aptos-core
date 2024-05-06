@@ -12,29 +12,21 @@ edition = "2021"
 [dependencies]
 abstract-domain-derive = { path = "./abstract_domain_derive" }
 move-binary-format = { path = "../../move-binary-format" }
-move-borrow-graph = { path = "../../move-borrow-graph" }
-move-bytecode-verifier = { path = "../../move-bytecode-verifier" }
-move-command-line-common = { path = "../../move-command-line-common" }
-move-compiler = { path = "../../move-compiler" }
 move-core-types = { path = "../../move-core/types" }
-move-ir-to-bytecode = { path = "../../move-ir-compiler/move-ir-to-bytecode" }
 move-model = { path = ".." }
 
-codespan = "0.11.1"
-codespan-reporting = { version = "0.11.1", features = ["serde", "serialization"] }
-ethnum = "1.0.4"
+codespan-reporting = { workspace = true, features = ["serde", "serialization"] }
+ethnum = { workspace = true }
 im = "15.0.0"
-itertools = "0.10.0"
-log = "0.4.14"
-num = "0.4.0"
-once_cell = "1.7.2"
-paste = "1.0.5"
-petgraph = "0.5.1"
-serde = { version = "1.0.124", features = ["derive"] }
+itertools = { workspace = true }
+log = { workspace = true }
+num = { workspace = true }
+paste = { workspace = true }
+petgraph = { workspace = true }
 
 [dev-dependencies]
-anyhow = "1.0.52"
-datatest-stable = "0.1.1"
+anyhow = { workspace = true }
+datatest-stable = { workspace = true }
 move-stackless-bytecode-test-utils = { path = "../bytecode-test-utils" }
 
 [features]

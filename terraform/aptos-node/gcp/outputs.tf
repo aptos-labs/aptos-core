@@ -2,6 +2,10 @@ output "helm_release_name" {
   value = helm_release.validator.name
 }
 
+output "gke_cluster_name" {
+  value = google_container_cluster.aptos.name
+}
+
 output "gke_cluster_endpoint" {
   value = google_container_cluster.aptos.endpoint
 }

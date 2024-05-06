@@ -1,0 +1,21 @@
+
+Diagnostics:
+error: type `signer` is missing required ability `store`
+  ┌─ tests/ability-check/v1-signer/address_arg_is_not_signer.move:5:27
+  │
+5 │     struct R has key { s: signer }
+  │                           ^^^^^^
+  │
+  = required by declaration of field `s`
+
+error: the function takes 2 arguments but 1 were provided
+   ┌─ tests/ability-check/v1-signer/address_arg_is_not_signer.move:14:9
+   │
+14 │         0x2::M::store_signer(s)
+   │         ^^^^^^^^^^^^^^^^^^^^^^^
+
+error: the function takes 2 arguments but 1 were provided
+   ┌─ tests/ability-check/v1-signer/address_arg_is_not_signer.move:21:9
+   │
+21 │         0x2::M::store_signer(s2)
+   │         ^^^^^^^^^^^^^^^^^^^^^^^^

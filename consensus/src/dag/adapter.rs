@@ -36,7 +36,7 @@ use aptos_types::{
     epoch_change::EpochChangeProof,
     epoch_state::EpochState,
     ledger_info::{LedgerInfo, LedgerInfoWithSignatures},
-    on_chain_config::{CommitHistoryResource, OnChainConfig},
+    on_chain_config::CommitHistoryResource,
     state_store::state_key::StateKey,
 };
 use async_trait::async_trait;
@@ -100,6 +100,7 @@ pub(super) struct OrderedNotifierAdapter {
     epoch_state: Arc<EpochState>,
     ledger_info_provider: Arc<RwLock<LedgerInfoProvider>>,
     block_ordered_ts: Arc<RwLock<BTreeMap<Round, Instant>>>,
+    allow_batches_without_pos_in_proposal: bool,
 }
 
 impl OrderedNotifierAdapter {
@@ -109,6 +110,7 @@ impl OrderedNotifierAdapter {
         epoch_state: Arc<EpochState>,
         parent_block_info: BlockInfo,
         ledger_info_provider: Arc<RwLock<LedgerInfoProvider>>,
+        allow_batches_without_pos_in_proposal: bool,
     ) -> Self {
         Self {
             executor_channel,
@@ -117,6 +119,7 @@ impl OrderedNotifierAdapter {
             epoch_state,
             ledger_info_provider,
             block_ordered_ts: Arc::new(RwLock::new(BTreeMap::new())),
+            allow_batches_without_pos_in_proposal,
         }
     }
 
@@ -144,11 +147,14 @@ impl OrderedNotifier for OrderedNotifierAdapter {
         let timestamp = anchor.metadata().timestamp();
         let author = *anchor.author();
         let mut validator_txns = vec![];
-        let mut payload = Payload::empty(!anchor.payload().is_direct());
+        let mut payload = Payload::empty(
+            !anchor.payload().is_direct(),
+            self.allow_batches_without_pos_in_proposal,
+        );
         let mut node_digests = vec![];
         for node in &ordered_nodes {
             validator_txns.extend(node.validator_txns().clone());
-            payload.extend(node.payload().clone());
+            payload = payload.extend(node.payload().clone());
             node_digests.push(node.digest());
         }
         let parent_block_id = self.parent_block_info.read().id();
@@ -322,7 +328,7 @@ impl StorageAdapter {
         Ok(bcs::from_bytes(
             self.aptos_db
                 .get_state_value_by_version(
-                    &StateKey::access_path(CommitHistoryResource::access_path().unwrap()),
+                    &StateKey::on_chain_config::<CommitHistoryResource>()?,
                     latest_version,
                 )?
                 .ok_or_else(|| format_err!("Resource doesn't exist"))?
@@ -382,7 +388,7 @@ impl DAGStorage for StorageAdapter {
             let new_block_event = bcs::from_bytes::<NewBlockEvent>(
                 self.aptos_db
                     .get_state_value_by_version(
-                        &StateKey::table_item(*handle, bcs::to_bytes(&idx).unwrap()),
+                        &StateKey::table_item(handle, &bcs::to_bytes(&idx).unwrap()),
                         version,
                     )?
                     .ok_or_else(|| format_err!("Table item doesn't exist"))?

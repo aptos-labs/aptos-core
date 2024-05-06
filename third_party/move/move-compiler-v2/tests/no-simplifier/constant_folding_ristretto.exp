@@ -1,0 +1,20 @@
+// -- Model dump before bytecode pipeline
+module 0xcafe::Ristretto {
+    public fun test() {
+        {
+          let non_canonical_highbit: vector<u8> = Vector<u8>(0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 128);
+          {
+            let non_canonical_highbit_hex: vector<u8> = [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 128];
+            if Eq<vector<u8>>(non_canonical_highbit, non_canonical_highbit_hex) {
+              Tuple()
+            } else {
+              Abort(1)
+            };
+            Tuple()
+          }
+        }
+    }
+} // end 0xcafe::Ristretto
+
+
+============ bytecode verification succeeded ========

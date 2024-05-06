@@ -1,4 +1,5 @@
 // Copyright © Aptos Foundation
+// SPDX-License-Identifier: Apache-2.0
 
 use crate::{
     jwks::{rsa::RSA_JWK, unsupported::UnsupportedJWK},
@@ -36,6 +37,12 @@ impl Debug for JWKMoveStruct {
 impl AsMoveValue for JWKMoveStruct {
     fn as_move_value(&self) -> MoveValue {
         MoveValue::Struct(MoveStruct::Runtime(vec![self.variant.as_move_value()]))
+    }
+}
+
+impl From<RSA_JWK> for JWKMoveStruct {
+    fn from(rsa_jwk: RSA_JWK) -> Self {
+        JWKMoveStruct::from(JWK::RSA(rsa_jwk))
     }
 }
 
@@ -96,12 +103,12 @@ impl TryFrom<&JWKMoveStruct> for JWK {
         match value.variant.type_name.as_str() {
             RSA_JWK::MOVE_TYPE_NAME => {
                 let rsa_jwk =
-                    MoveAny::unpack(RSA_JWK::MOVE_TYPE_NAME, value.variant.clone()).unwrap();
+                    MoveAny::unpack(RSA_JWK::MOVE_TYPE_NAME, value.variant.clone()).map_err(|e|anyhow!("converting from jwk move struct to jwk failed with move any to rsa unpacking error: {e}"))?;
                 Ok(Self::RSA(rsa_jwk))
             },
             UnsupportedJWK::MOVE_TYPE_NAME => {
                 let unsupported_jwk =
-                    MoveAny::unpack(UnsupportedJWK::MOVE_TYPE_NAME, value.variant.clone()).unwrap();
+                    MoveAny::unpack(UnsupportedJWK::MOVE_TYPE_NAME, value.variant.clone()).map_err(|e|anyhow!("converting from jwk move struct to jwk failed with move any to unsupported unpacking error: {e}"))?;
                 Ok(Self::Unsupported(unsupported_jwk))
             },
             _ => Err(anyhow!(

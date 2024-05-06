@@ -49,6 +49,7 @@ const FULLNODE_CONFIG_MAP_KEY: &str = "fullnode.yaml";
 // the path where the genesis is mounted in the validator
 const GENESIS_CONFIG_VOLUME_NAME: &str = "genesis-config";
 const GENESIS_CONFIG_VOLUME_PATH: &str = "/opt/aptos/genesis";
+const GENESIS_CONFIG_WRITABLE_VOLUME_NAME: &str = "writable-genesis";
 
 // the path where the config file is mounted in the fullnode
 const APTOS_CONFIG_VOLUME_NAME: &str = "aptos-config";
@@ -186,7 +187,7 @@ fn create_fullnode_container(
             },
             VolumeMount {
                 mount_path: GENESIS_CONFIG_VOLUME_PATH.to_string(),
-                name: GENESIS_CONFIG_VOLUME_NAME.to_string(),
+                name: GENESIS_CONFIG_WRITABLE_VOLUME_NAME.to_string(),
                 ..VolumeMount::default()
             },
         ]),
@@ -215,6 +216,11 @@ fn create_fullnode_volumes(
                 name: Some(fullnode_node_config_config_map_name),
                 ..ConfigMapVolumeSource::default()
             }),
+            ..Volume::default()
+        },
+        Volume {
+            name: GENESIS_CONFIG_WRITABLE_VOLUME_NAME.to_string(),
+            empty_dir: Some(Default::default()),
             ..Volume::default()
         },
     ]
@@ -597,7 +603,7 @@ mod tests {
                                 },
                                 VolumeMount {
                                     mount_path: GENESIS_CONFIG_VOLUME_PATH.to_string(),
-                                    name: GENESIS_CONFIG_VOLUME_NAME.to_string(),
+                                    name: GENESIS_CONFIG_WRITABLE_VOLUME_NAME.to_string(),
                                     ..VolumeMount::default()
                                 },
                             ]),

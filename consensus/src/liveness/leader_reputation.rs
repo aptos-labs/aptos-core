@@ -136,23 +136,33 @@ impl AptosDBBackend {
 
         if result.len() < self.window_size && !hit_end {
             error!(
-                "We are not fetching far enough in history, we filtered from {} to {}, but asked for {}",
+                "We are not fetching far enough in history, we filtered from {} to {}, but asked for {}. Target ({}, {}), received from {:?} to {:?}.",
                 events.len(),
                 result.len(),
-                self.window_size
+                self.window_size,
+                target_epoch,
+                target_round,
+                events.last().map_or((0, 0), |e| (e.event.epoch(), e.event.round())),
+                events.first().map_or((0, 0), |e| (e.event.epoch(), e.event.round())),
             );
         }
-        let root_hash = self
-            .aptos_db
-            .get_accumulator_root_hash(max_version)
-            .unwrap_or_else(|_| {
-                error!(
-                    "We couldn't fetch accumulator hash for the {} version, for {} epoch, {} round",
-                    max_version, target_epoch, target_round,
-                );
-                HashValue::zero()
-            });
-        (result, root_hash)
+
+        if result.is_empty() {
+            warn!("No events in the requested window could be found");
+            (result, HashValue::zero())
+        } else {
+            let root_hash = self
+                .aptos_db
+                .get_accumulator_root_hash(max_version)
+                .unwrap_or_else(|_| {
+                    error!(
+                        "We couldn't fetch accumulator hash for the {} version, for {} epoch, {} round",
+                        max_version, target_epoch, target_round,
+                    );
+                    HashValue::zero()
+                });
+            (result, root_hash)
+        }
     }
 }
 

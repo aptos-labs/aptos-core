@@ -7,6 +7,7 @@
 use crate::{
     ast::ModuleName,
     builder::{model_builder::ModelBuilder, module_builder::BytecodeModule},
+    metadata::LanguageVersion,
     model::{FunId, GlobalEnv, Loc, ModuleId, StructId},
     options::ModelBuilderOptions,
 };
@@ -30,7 +31,7 @@ use move_compiler::{
     diagnostics::{codes::Severity, Diagnostics},
     expansion::ast::{self as E, ModuleIdent, ModuleIdent_},
     naming::ast as N,
-    parser::ast::{self as P, ModuleName as ParserModuleName},
+    parser::ast::{self as P, CallKind, ModuleName as ParserModuleName},
     shared::{
         parse_named_address, unique_map::UniqueMap, CompilationEnv, Identifier as IdentifierTrait,
         NumericalAddress, PackagePaths,
@@ -53,9 +54,11 @@ pub mod constant_folder;
 pub mod exp_generator;
 pub mod exp_rewriter;
 pub mod intrinsics;
+pub mod metadata;
 pub mod model;
 pub mod options;
 pub mod pragmas;
+pub mod pureness_checker;
 pub mod spec_translator;
 pub mod symbol;
 pub mod ty;
@@ -78,9 +81,12 @@ pub struct PackageInfo {
 /// a new type checker.
 pub fn run_model_builder_in_compiler_mode(
     source: PackageInfo,
+    source_deps: PackageInfo,
     deps: Vec<PackageInfo>,
     skip_attribute_checks: bool,
     known_attributes: &BTreeSet<String>,
+    language_version: LanguageVersion,
+    compile_test_code: bool,
 ) -> anyhow::Result<GlobalEnv> {
     let to_package_paths = |PackageInfo {
                                 sources,
@@ -92,12 +98,16 @@ pub fn run_model_builder_in_compiler_mode(
     };
     run_model_builder_with_options_and_compilation_flags(
         vec![to_package_paths(source)],
+        vec![to_package_paths(source_deps)],
         deps.into_iter().map(to_package_paths).collect(),
         ModelBuilderOptions {
             compile_via_model: true,
+            language_version,
             ..ModelBuilderOptions::default()
         },
-        Flags::model_compilation().set_skip_attribute_checks(skip_attribute_checks),
+        Flags::model_compilation()
+            .set_skip_attribute_checks(skip_attribute_checks)
+            .set_keep_testing_functions(compile_test_code),
         known_attributes,
     )
 }
@@ -111,6 +121,7 @@ pub fn run_model_builder_with_options<
     NamedAddress: Into<MoveSymbol> + Clone,
 >(
     move_sources: Vec<PackagePaths<Paths, NamedAddress>>,
+    move_deps: Vec<PackagePaths<Paths, NamedAddress>>,
     deps: Vec<PackagePaths<Paths, NamedAddress>>,
     options: ModelBuilderOptions,
     skip_attribute_checks: bool,
@@ -120,6 +131,7 @@ pub fn run_model_builder_with_options<
     flags = flags.set_skip_attribute_checks(skip_attribute_checks);
     run_model_builder_with_options_and_compilation_flags(
         move_sources,
+        move_deps,
         deps,
         options,
         flags,
@@ -132,16 +144,32 @@ pub fn run_model_builder_with_options_and_compilation_flags<
     Paths: Into<MoveSymbol> + Clone,
     NamedAddress: Into<MoveSymbol> + Clone,
 >(
-    move_sources: Vec<PackagePaths<Paths, NamedAddress>>,
+    move_sources_targets: Vec<PackagePaths<Paths, NamedAddress>>,
+    move_sources_deps: Vec<PackagePaths<Paths, NamedAddress>>,
     deps: Vec<PackagePaths<Paths, NamedAddress>>,
     options: ModelBuilderOptions,
     flags: Flags,
     known_attributes: &BTreeSet<String>,
 ) -> anyhow::Result<GlobalEnv> {
     let mut env = GlobalEnv::new();
+    env.set_language_version(options.language_version);
     let compile_via_model = options.compile_via_model;
     env.set_extension(options);
 
+    let move_sources = move_sources_targets
+        .iter()
+        .chain(move_sources_deps.iter())
+        .cloned()
+        .collect();
+    let target_sources_names: BTreeSet<String> = move_sources_targets
+        .iter()
+        .flat_map(|pack| pack.paths.iter())
+        .map(|sym| {
+            <Paths as Into<MoveSymbol>>::into(sym.clone())
+                .as_str()
+                .to_owned()
+        })
+        .collect();
     // Step 1: parse the program to get comments and a separation of targets and dependencies.
     let (files, comments_and_compiler_res) =
         Compiler::from_package_paths(move_sources, deps, flags, known_attributes)
@@ -156,7 +184,8 @@ pub fn run_model_builder_with_options_and_compilation_flags<
                     empty_alias.clone(),
                     fname.as_str(),
                     fsrc,
-                    /* is_dep */ false,
+                    /* is_target */ true,
+                    target_sources_names.contains(fname.as_str()),
                 );
             }
             add_move_lang_diagnostics(&mut env, diags);
@@ -180,27 +209,35 @@ pub fn run_model_builder_with_options_and_compilation_flags<
     {
         let fhash = member.def.file_hash();
         let (fname, fsrc) = files.get(&fhash).unwrap();
-        let is_dep = dep_files.contains(&fhash);
+        let is_target = !dep_files.contains(&fhash);
         let aliases = parsed_prog
             .named_address_maps
             .get(member.named_address_map)
             .iter()
             .map(|(symbol, addr)| (env.symbol_pool().make(symbol.as_str()), *addr))
             .collect();
-        env.add_source(fhash, Rc::new(aliases), fname.as_str(), fsrc, is_dep);
+        env.add_source(
+            fhash,
+            Rc::new(aliases),
+            fname.as_str(),
+            fsrc,
+            is_target,
+            target_sources_names.contains(fname.as_str()),
+        );
     }
 
     // If a move file does not contain any definition, it will not appear in `parsed_prog`. Add them explicitly.
     for fhash in files.keys().sorted() {
         if env.get_file_id(*fhash).is_none() {
             let (fname, fsrc) = files.get(fhash).unwrap();
-            let is_dep = dep_files.contains(fhash);
+            let is_target = !dep_files.contains(fhash);
             env.add_source(
                 *fhash,
                 Rc::new(BTreeMap::new()),
                 fname.as_str(),
                 fsrc,
-                is_dep,
+                is_target,
+                target_sources_names.contains(fname.as_str()),
             );
         }
     }
@@ -274,7 +311,12 @@ pub fn run_model_builder_with_options_and_compilation_flags<
     let mut expansion_ast = {
         let E::Program { modules, scripts } = expansion_ast;
         let modules = modules.filter_map(|mident, mut mdef| {
-            visited_modules.contains(&mident.value).then(|| {
+            // Always need to include the vector module because it can be implicitly used.
+            // TODO(#12492): we can remove this once this bug is fixed
+            let is_vector = mident.value.address.into_addr_bytes().into_inner()
+                == AccountAddress::ONE
+                && mident.value.module.0.value.as_str() == "vector";
+            (is_vector || visited_modules.contains(&mident.value)).then(|| {
                 mdef.is_source_module = true;
                 mdef
             })
@@ -385,20 +427,15 @@ fn run_move_checker(env: &mut GlobalEnv, program: E::Program) {
         let module_def = expansion_script_to_module(script_def);
         module_translator.translate(loc, module_def, None);
     }
+
+    // Populate GlobalEnv with model-level information
+    builder.populate_env();
+
+    // After all specs have been processed, warn about any unused schemas.
+    builder.warn_unused_schemas();
+
     // Perform any remaining friend-declaration checks and update friend module id information.
     check_and_update_friend_info(builder);
-    // Compute information derived from AST (currently callgraph)
-    for module in env.module_data.iter_mut() {
-        for fun_data in module.function_data.values_mut() {
-            fun_data.called_funs = Some(
-                fun_data
-                    .def
-                    .as_ref()
-                    .map(|e| e.called_funs())
-                    .unwrap_or_default(),
-            )
-        }
-    }
 }
 
 /// Checks if any friend declarations are invalid because:
@@ -522,7 +559,7 @@ pub fn add_move_lang_diagnostics(env: &mut GlobalEnv, diags: Diagnostics) {
 }
 
 #[allow(deprecated)]
-fn script_into_module(compiled_script: CompiledScript) -> CompiledModule {
+pub fn script_into_module(compiled_script: CompiledScript, name: &str) -> CompiledModule {
     let mut script = compiled_script;
 
     // Add the "<SELF>" identifier if it isn't present.
@@ -532,14 +569,14 @@ fn script_into_module(compiled_script: CompiledScript) -> CompiledModule {
     let self_ident_idx = match script
         .identifiers
         .iter()
-        .position(|ident| ident.as_ident_str() == self_module_name())
+        .position(|ident| ident.as_ident_str().as_str() == name)
     {
         Some(idx) => IdentifierIndex::new(idx as u16),
         None => {
             let idx = IdentifierIndex::new(script.identifiers.len() as u16);
             script
                 .identifiers
-                .push(Identifier::new(self_module_name().to_string()).unwrap());
+                .push(Identifier::new(name.to_string()).unwrap());
             idx
         },
     };
@@ -700,7 +737,7 @@ fn run_spec_checker(env: &mut GlobalEnv, units: Vec<AnnotatedCompiledUnit>, mut 
                     .unwrap();
 
                 let expanded_module = expansion_script_to_module(expanded_script);
-                let module = script_into_module(script.script);
+                let module = script_into_module(script.script, self_module_name().as_str());
                 modules.push((
                     ident,
                     expanded_module,
@@ -1046,7 +1083,11 @@ fn downgrade_exp_inlining_to_expansion(exp: &T::Exp) -> E::Exp {
                 .collect();
             Exp_::Call(
                 sp(name.loc(), access),
-                *is_macro,
+                if *is_macro {
+                    CallKind::Macro
+                } else {
+                    CallKind::Regular
+                },
                 if rewritten_ty_args.is_empty() {
                     None
                 } else {
@@ -1064,7 +1105,7 @@ fn downgrade_exp_inlining_to_expansion(exp: &T::Exp) -> E::Exp {
             };
             Exp_::Call(
                 sp(target.loc(), access),
-                false,
+                CallKind::Regular,
                 None,
                 sp(exp.exp.loc, rewritten_arguments),
             )
@@ -1081,7 +1122,7 @@ fn downgrade_exp_inlining_to_expansion(exp: &T::Exp) -> E::Exp {
             };
             Exp_::Call(
                 sp(builtin.loc, access),
-                false,
+                CallKind::Regular,
                 None,
                 sp(exp.exp.loc, rewritten_arguments),
             )

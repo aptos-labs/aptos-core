@@ -80,4 +80,4 @@ fn test_abigen(path: &Path, mut options: Options, suffix: &str) -> anyhow::Resul
     Ok(())
 }
 
-datatest_stable::harness!(test_runner, "tests/sources", r".*\.move",);
+datatest_stable::harness!(test_runner, "tests/sources", r".*\.move$",);

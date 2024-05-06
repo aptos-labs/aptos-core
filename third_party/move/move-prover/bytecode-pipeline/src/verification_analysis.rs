@@ -349,6 +349,14 @@ impl FunctionTargetProcessor for VerificationAnalysisProcessor {
 impl VerificationAnalysisProcessor {
     /// Check whether the function falls within the verification scope given in the options
     fn is_within_verification_scope(fun_env: &FunctionEnv) -> bool {
+        if fun_env.is_test_only()
+            || fun_env.is_intrinsic()
+            || fun_env.is_native()
+            || fun_env.is_inline()
+        {
+            // do not verify any of these function types
+            return false;
+        }
         let env = fun_env.module_env.env;
         let options = ProverOptions::get(env);
         match &options.verify_scope {
@@ -585,7 +593,7 @@ impl VerificationAnalysisProcessor {
                     let adapter =
                         TypeUnificationAdapter::new_vec(&fun_mem.inst, &inv_mem.inst, true, true);
                     let rel = adapter.unify(
-                        &NoUnificationContext,
+                        &mut NoUnificationContext,
                         Variance::SpecVariance,
                         /* shallow_subst */ false,
                     );
@@ -640,7 +648,7 @@ impl VerificationAnalysisProcessor {
         // - `I` is not relevant to the caller and we should not instrument `I` in the caller.
         // This information will be consumed in the invariant instrumentation phase later.
 
-        // Step 1: remove suspended invariants from the the relevance set. These suspended
+        // Step 1: remove suspended invariants from the relevance set. These suspended
         // invariants themselves forms a relevance set which will be considered as directly
         // accessed/modified in all callers of this function.
         let mut pruned = BTreeMap::new();

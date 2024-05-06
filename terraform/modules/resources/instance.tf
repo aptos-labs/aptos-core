@@ -6,7 +6,7 @@ variable "instance_type" {
   default     = ""
 
   validation {
-    condition     = can(regex("^(e2|n2d|t2d)-standard-(4|8|16|32|48|60)$", var.instance_type))
+    condition     = can(regex("^(c2|e2|n2d|t2d)-standard-(4|8|16|32|48|60)$", var.instance_type))
     error_message = "Unknown machine type"
   }
 }
@@ -17,7 +17,7 @@ variable "utility_instance_type" {
   default     = "e2-standard-8"
 
   validation {
-    condition     = can(regex("^(e2|n2d|t2d)-standard-(4|8|16|32|48|60)$", var.utility_instance_type))
+    condition     = can(regex("^(c2|e2|n2d|t2d)-standard-(4|8|16|32|48|60)$", var.utility_instance_type))
     error_message = "Unknown machine type"
   }
 }
@@ -40,14 +40,15 @@ locals {
   machine_family         = split("-", var.instance_type)[0]
   utility_machine_family = split("-", var.utility_instance_type)[0]
   machine_shapes = {
+    "c2-standard-60"  = { cores = 60, memory = 240 }
     "t2d-standard-8"  = { cores = 8, memory = 32 }
     "t2d-standard-16" = { cores = 16, memory = 64 }
     "t2d-standard-32" = { cores = 32, memory = 128 }
     "t2d-standard-48" = { cores = 48, memory = 192 }
     "t2d-standard-60" = { cores = 60, memory = 240 }
   }
-  # leave 1 core for the system
-  available_cores = local.machine_shapes[var.instance_type].cores - 1
+  # leave 2 cores for the system
+  available_cores = local.machine_shapes[var.instance_type].cores - 2
   # leave 4 GB for the system
   available_memory = local.machine_shapes[var.instance_type].memory - 4
 

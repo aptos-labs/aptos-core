@@ -258,6 +258,8 @@ pub fn fetch_mainnet_genesis_info(git_options: GitOptions) -> CliTypedResult<Mai
             execution_config: OnChainExecutionConfig::default_for_genesis(),
             gas_schedule: default_gas_schedule(),
             initial_features_override: None,
+            randomness_config_override: None,
+            jwk_consensus_config_override: None,
         },
     )?)
 }
@@ -299,6 +301,8 @@ pub fn fetch_genesis_info(git_options: GitOptions) -> CliTypedResult<GenesisInfo
             execution_config: layout.on_chain_execution_config,
             gas_schedule: default_gas_schedule(),
             initial_features_override: None,
+            randomness_config_override: None,
+            jwk_consensus_config_override: layout.jwk_consensus_config_override.clone(),
         },
     )?)
 }

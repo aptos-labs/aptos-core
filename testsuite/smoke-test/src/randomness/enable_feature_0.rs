@@ -1,20 +1,21 @@
 // Copyright © Aptos Foundation
+// SPDX-License-Identifier: Apache-2.0
 
 use crate::{
-    randomness::{decrypt_key_map, get_on_chain_resource, verify_dkg_transcript},
+    randomness::{
+        decrypt_key_map, get_on_chain_resource, script_to_enable_main_logic,
+        script_to_update_consensus_config, verify_dkg_transcript,
+    },
     smoke_test_environment::SwarmBuilder,
     utils::get_current_consensus_config,
 };
 use aptos_forge::{Node, Swarm, SwarmExt};
 use aptos_logger::{debug, info};
-use aptos_types::{
-    dkg::DKGState,
-    on_chain_config::{FeatureFlag, Features},
-};
+use aptos_types::{dkg::DKGState, on_chain_config::OnChainRandomnessConfig};
 use std::{sync::Arc, time::Duration};
 
 /// Enable on-chain randomness in the following steps.
-/// - Enable feature `RECONFIGURE_WITH_DKG` in epoch `e`.
+/// - Enable randomness main logic in epoch `e`.
 /// - Enable validator transactions in consensus config in epoch `e + 1`.
 #[tokio::test]
 async fn enable_feature_0() {
@@ -28,13 +29,9 @@ async fn enable_feature_0() {
             conf.epoch_duration_secs = epoch_duration_secs;
             conf.allow_new_validators = true;
 
-            // start with vtxn disabled.
+            // start with vtxn disabled and randomness off.
             conf.consensus_config.disable_validator_txns();
-
-            // start with dkg disabled.
-            let mut features = Features::default();
-            features.disable(FeatureFlag::RECONFIGURE_WITH_DKG);
-            conf.initial_features_override = Some(features);
+            conf.randomness_config_override = Some(OnChainRandomnessConfig::default_disabled());
         }))
         .build_with_cli(0)
         .await;
@@ -52,20 +49,11 @@ async fn enable_feature_0() {
         .await
         .expect("Waited too long for epoch 3.");
 
-    info!("Now in epoch 3. Enabling feature RECONFIGURE_WITH_DKG.");
-    let enable_dkg_script = r#"
-script {
-    use aptos_framework::aptos_governance;
-    fun main(core_resources: &signer) {
-        let framework_signer = aptos_governance::get_signer_testnet_only(core_resources, @0000000000000000000000000000000000000000000000000000000000000001);
-        let dkg_feature_id: u64 = std::features::get_reconfigure_with_dkg_feature();
-        aptos_governance::toggle_features(&framework_signer, vector[dkg_feature_id], vector[]);
-    }
-}
-"#;
+    info!("Now in epoch 3. Enabling randomness main logic.");
+    let enable_dkg_script = script_to_enable_main_logic();
 
     let txn_summary = cli
-        .run_script(root_idx, enable_dkg_script)
+        .run_script(root_idx, enable_dkg_script.as_str())
         .await
         .expect("Txn execution error.");
     debug!("enabling_dkg_summary={:?}", txn_summary);
@@ -78,22 +66,7 @@ script {
     info!("Now in epoch 4. Enabling validator transactions.");
     let mut config = get_current_consensus_config(&client).await;
     config.enable_validator_txns();
-    let config_bytes = bcs::to_bytes(&config).unwrap();
-    let enable_vtxn_script = format!(
-        r#"
-script {{
-    use aptos_framework::aptos_governance;
-    use aptos_framework::consensus_config;
-    fun main(core_resources: &signer) {{
-        let framework_signer = aptos_governance::get_signer_testnet_only(core_resources, @0000000000000000000000000000000000000000000000000000000000000001);
-        let config_bytes = vector{:?};
-        consensus_config::set_for_next_epoch(&framework_signer, config_bytes);
-        aptos_governance::reconfigure(&framework_signer);
-    }}
-}}
-"#,
-        config_bytes
-    );
+    let enable_vtxn_script = script_to_update_consensus_config(&config);
     debug!("enable_vtxn_script={}", enable_vtxn_script);
     let txn_summary = cli
         .run_script(root_idx, enable_vtxn_script.as_str())

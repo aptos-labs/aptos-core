@@ -3,20 +3,20 @@
 // SPDX-License-Identifier: Apache-2.0
 
 use crate::{AptosValidatorInterface, FilterCondition};
-use anyhow::{bail, ensure, Result};
+use anyhow::{ensure, Result};
 use aptos_config::config::{
     RocksdbConfigs, StorageDirPaths, BUFFERED_STATE_TARGET_ITEMS,
     DEFAULT_MAX_NUM_NODES_PER_LRU_CACHE_SHARD, NO_OP_STORAGE_PRUNER_CONFIG,
 };
 use aptos_db::AptosDB;
 use aptos_framework::natives::code::PackageMetadata;
-use aptos_storage_interface::{AptosDbError, DbReader, MAX_REQUEST_LIMIT};
+use aptos_storage_interface::DbReader;
 use aptos_types::{
     account_address::AccountAddress,
-    account_state::AccountState,
-    state_store::{state_key::StateKey, state_key_prefix::StateKeyPrefix, state_value::StateValue},
+    state_store::{state_key::StateKey, state_value::StateValue},
     transaction::{Transaction, TransactionInfo, Version},
 };
+use move_core_types::language_storage::ModuleId;
 use std::{collections::HashMap, path::Path, sync::Arc};
 
 pub struct DBDebuggerInterface(Arc<dyn DbReader>);
@@ -40,29 +40,6 @@ impl DBDebuggerInterface {
 
 #[async_trait::async_trait]
 impl AptosValidatorInterface for DBDebuggerInterface {
-    async fn get_account_state_by_version(
-        &self,
-        account: AccountAddress,
-        version: Version,
-    ) -> Result<Option<AccountState>> {
-        let key_prefix = StateKeyPrefix::from(account);
-        let mut iter = self
-            .0
-            .get_prefixed_state_value_iterator(&key_prefix, None, version)?;
-        let kvs = iter
-            .by_ref()
-            .take(MAX_REQUEST_LIMIT as usize)
-            .collect::<Result<_, AptosDbError>>()
-            .map_err(Into::<anyhow::Error>::into)?;
-        if iter.next().is_some() {
-            bail!(
-                "Too many state items under state key prefix {:?}.",
-                key_prefix
-            );
-        }
-        AccountState::from_access_paths_and_values(account, &kvs)
-    }
-
     async fn get_state_value_by_version(
         &self,
         state_key: &StateKey,
@@ -95,6 +72,14 @@ impl AptosValidatorInterface for DBDebuggerInterface {
         _start: Version,
         _limit: u64,
         _filter_condition: FilterCondition,
+        _package_cache: &mut HashMap<
+            ModuleId,
+            (
+                AccountAddress,
+                String,
+                HashMap<(AccountAddress, String), PackageMetadata>,
+            ),
+        >,
     ) -> Result<
         Vec<(
             u64,

@@ -214,6 +214,11 @@ EphemeralPublicKey:
         STRUCT:
           - public_key:
               TYPENAME: Ed25519PublicKey
+    1:
+      Secp256r1Ecdsa:
+        STRUCT:
+          - public_key:
+              TYPENAME: Secp256r1EcdsaPublicKey
 EphemeralSignature:
   ENUM:
     0:
@@ -355,13 +360,6 @@ QuorumCertifiedUpdate:
     - multi_sig:
         TYPENAME: AggregateSignature
 RandMetadata:
-  STRUCT:
-    - metadata_to_sign:
-        TYPENAME: RandMetadataToSign
-    - block_id:
-        TYPENAME: HashValue
-    - timestamp: U64
-RandMetadataToSign:
   STRUCT:
     - epoch: U64
     - round: U64

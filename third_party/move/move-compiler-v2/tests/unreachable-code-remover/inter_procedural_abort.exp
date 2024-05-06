@@ -15,15 +15,13 @@ fun m::test(): u64 {
      var $t1: u64
      var $t2: u64
      var $t3: u64
-     var $t4: u64
   0: m::always_abort()
-  1: $t2 := 0
-  2: $t1 := infer($t2)
-  3: $t4 := 1
-  4: $t3 := +($t1, $t4)
-  5: $t1 := infer($t3)
-  6: $t0 := infer($t1)
-  7: return $t0
+  1: $t1 := 0
+  2: $t3 := 1
+  3: $t2 := +($t1, $t3)
+  4: $t1 := infer($t2)
+  5: $t0 := infer($t1)
+  6: return $t0
 }
 
 ============ after UnreachableCodeProcessor: ================
@@ -46,23 +44,20 @@ fun m::test(): u64 {
      var $t1: u64
      var $t2: u64
      var $t3: u64
-     var $t4: u64
      # maybe
   0: m::always_abort()
      # maybe
-  1: $t2 := 0
+  1: $t1 := 0
      # maybe
-  2: $t1 := infer($t2)
+  2: $t3 := 1
      # maybe
-  3: $t4 := 1
+  3: $t2 := +($t1, $t3)
      # maybe
-  4: $t3 := +($t1, $t4)
+  4: $t1 := move($t2)
      # maybe
-  5: $t1 := infer($t3)
+  5: $t0 := move($t1)
      # maybe
-  6: $t0 := infer($t1)
-     # maybe
-  7: return $t0
+  6: return $t0
 }
 
 ============ after UnreachableCodeRemover: ================
@@ -81,13 +76,14 @@ fun m::test(): u64 {
      var $t1: u64
      var $t2: u64
      var $t3: u64
-     var $t4: u64
   0: m::always_abort()
-  1: $t2 := 0
-  2: $t1 := infer($t2)
-  3: $t4 := 1
-  4: $t3 := +($t1, $t4)
-  5: $t1 := infer($t3)
-  6: $t0 := infer($t1)
-  7: return $t0
+  1: $t1 := 0
+  2: $t3 := 1
+  3: $t2 := +($t1, $t3)
+  4: $t1 := move($t2)
+  5: $t0 := move($t1)
+  6: return $t0
 }
+
+
+============ bytecode verification succeeded ========

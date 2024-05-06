@@ -1,4 +1,4 @@
-// ---- Model Dump
+// -- Model dump before bytecode pipeline
 module <SELF>_0 {
     private fun main() {
         loop {
@@ -8,5 +8,4 @@ module <SELF>_0 {
           Tuple()
         }
     }
-    spec fun $main();
 } // end <SELF>_0

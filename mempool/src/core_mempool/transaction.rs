@@ -8,7 +8,7 @@ use aptos_types::{account_address::AccountAddress, transaction::SignedTransactio
 use serde::{Deserialize, Serialize};
 use std::{
     mem::size_of,
-    sync::{atomic::AtomicU8, Arc},
+    sync::{atomic::AtomicUsize, Arc},
     time::{Duration, SystemTime},
 };
 
@@ -60,7 +60,7 @@ impl MempoolTransaction {
     }
 
     pub(crate) fn get_committed_hash(&self) -> HashValue {
-        self.txn.clone().committed_hash()
+        self.txn.committed_hash()
     }
 
     pub(crate) fn get_estimated_bytes(&self) -> usize {
@@ -111,8 +111,10 @@ pub enum SubmittedBy {
 #[derive(Debug, Clone)]
 pub struct InsertionInfo {
     pub insertion_time: SystemTime,
+    pub ready_time: SystemTime,
+    pub park_time: Option<SystemTime>,
     pub submitted_by: SubmittedBy,
-    pub consensus_pulled_counter: Arc<AtomicU8>,
+    pub consensus_pulled_counter: Arc<AtomicUsize>,
 }
 
 impl InsertionInfo {
@@ -130,8 +132,10 @@ impl InsertionInfo {
         };
         Self {
             insertion_time,
+            ready_time: insertion_time,
+            park_time: None,
             submitted_by,
-            consensus_pulled_counter: Arc::new(AtomicU8::new(0)),
+            consensus_pulled_counter: Arc::new(AtomicUsize::new(0)),
         }
     }
 

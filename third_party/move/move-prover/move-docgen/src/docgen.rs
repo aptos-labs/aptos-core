@@ -697,14 +697,19 @@ impl<'env> Docgen<'env> {
         if !self.options.specs_inlined {
             self.gen_spec_section(module_env, &spec_block_map);
         } else {
-            match spec_block_map.get(&SpecBlockTarget::Module) {
+            match spec_block_map.get(&SpecBlockTarget::Module(module_env.get_id())) {
                 Some(blocks) if !blocks.is_empty() => {
                     self.section_header(
                         "Module Specification",
                         &self.label_for_section("Module Specification"),
                     );
                     self.increment_section_nest();
-                    self.gen_spec_blocks(module_env, "", &SpecBlockTarget::Module, &spec_block_map);
+                    self.gen_spec_blocks(
+                        module_env,
+                        "",
+                        &SpecBlockTarget::Module(module_env.get_id()),
+                        &spec_block_map,
+                    );
                     self.decrement_section_nest();
                 },
                 _ => {},
@@ -756,8 +761,10 @@ impl<'env> Docgen<'env> {
                     let value = self.convert_to_anchor(parts[1].trim());
                     row_data[index] = value;
                     current_key = Some(index);
+                    continue;
                 }
-            } else if let Some(key_index) = current_key {
+            }
+            if let Some(key_index) = current_key {
                 row_data[key_index].push(' ');
                 row_data[key_index].push_str(&self.convert_to_anchor(trimmed_line));
             }
@@ -1445,12 +1452,12 @@ impl<'env> Docgen<'env> {
     /// are associated with the context they appear in.
     fn organize_spec_blocks(&self, module_env: &'env ModuleEnv<'env>) -> SpecBlockMap<'env> {
         let mut result = BTreeMap::new();
-        let mut current_target = SpecBlockTarget::Module;
+        let mut current_target = SpecBlockTarget::Module(module_env.get_id());
         let mut last_block_end: Option<ByteIndex> = None;
         for block in module_env.get_spec_block_infos() {
             let may_merge_with_current = match &block.target {
                 SpecBlockTarget::Schema(..) => true,
-                SpecBlockTarget::Module
+                SpecBlockTarget::Module(_)
                     if !block.member_locs.is_empty() || !self.is_single_liner(&block.loc) =>
                 {
                     // This is a bit of a hack: if spec module is on a single line,
@@ -1511,7 +1518,12 @@ impl<'env> Docgen<'env> {
         let section_label = self.label_for_section("Specification");
         self.section_header("Specification", &section_label);
         self.increment_section_nest();
-        self.gen_spec_blocks(module_env, "", &SpecBlockTarget::Module, spec_block_map);
+        self.gen_spec_blocks(
+            module_env,
+            "",
+            &SpecBlockTarget::Module(module_env.get_id()),
+            spec_block_map,
+        );
         for struct_env in module_env
             .get_structs()
             .filter(|s| !s.is_test_only())

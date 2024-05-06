@@ -4,10 +4,13 @@
 //! This module defines all the gas parameters for transactions, along with their initial values
 //! in the genesis and a mapping between the Rust representation and the on-chain gas schedule.
 
-use crate::gas_schedule::VMGasParameters;
+use crate::{
+    gas_schedule::VMGasParameters,
+    ver::gas_feature_versions::{RELEASE_V1_11, RELEASE_V1_12},
+};
 use aptos_gas_algebra::{
     AbstractValueSize, Fee, FeePerByte, FeePerGasUnit, FeePerSlot, Gas, GasExpression,
-    GasScalingFactor, GasUnit, NumSlots,
+    GasScalingFactor, GasUnit, NumModules, NumSlots,
 };
 use move_core_types::gas_algebra::{
     InternalGas, InternalGasPerArg, InternalGasPerByte, InternalGasUnit, NumBytes, ToUnitWithParams,
@@ -22,6 +25,7 @@ crate::gas_schedule::macros::define_gas_parameters!(
     [
         // The flat minimum amount of gas required for any transaction.
         // Charged at the start of execution.
+        // It is variable to charge more for more expensive authenticators, e.g., keyless
         [
             min_transaction_gas_units: InternalGas,
             "min_transaction_gas_units",
@@ -117,6 +121,16 @@ crate::gas_schedule::macros::define_gas_parameters!(
             { 0..=9 => "write_data.per_byte_in_val" },
             10_000
         ],
+        [
+            storage_io_per_event_byte_write: InternalGasPerByte,
+            { RELEASE_V1_11.. => "storage_io_per_event_byte_write" },
+            89,
+        ],
+        [
+            storage_io_per_transaction_byte_write: InternalGasPerByte,
+            { RELEASE_V1_11.. => "storage_io_per_transaction_byte_write" },
+            89,
+        ],
         [memory_quota: AbstractValueSize, { 1.. => "memory_quota" }, 10_000_000],
         [
             legacy_free_write_bytes_quota: NumBytes,
@@ -200,6 +214,31 @@ crate::gas_schedule::macros::define_gas_parameters!(
             { 7.. => "max_storage_fee" },
             2_0000_0000, // 2 APT
         ],
+        [
+            dependency_per_module: InternalGas,
+            { 15.. => "dependency_per_module" },
+            74460,
+        ],
+        [
+            dependency_per_byte: InternalGasPerByte,
+            { 15.. => "dependency_per_byte" },
+            42,
+        ],
+        [
+            max_num_dependencies: NumModules,
+            { 15.. => "max_num_dependencies" },
+            512,
+        ],
+        [
+            max_total_dependency_size: NumBytes,
+            { 15.. => "max_total_dependency_size" },
+            1024 * 1024 * 12 / 10, // 1.2 MB
+        ],
+        [
+            keyless_base_cost: InternalGas,
+            { RELEASE_V1_12.. => "keyless.base" },
+            414_000_000,
+        ]
     ]
 );
 

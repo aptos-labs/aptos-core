@@ -1,0 +1,71 @@
+// -- Model dump before env processor pipeline:
+module 0xcafe::m {
+    struct S {
+        x: u64,
+    }
+    private fun map(x: u64,f: |u64|u64): u64 {
+        (f)(x)
+    }
+    private fun assigns_local(x: u64,c: u64): u64 {
+        {
+          let z: u64 = 1;
+          m::map(x, |y: u64| z: u64 = 2;
+          Add<u64>(y, c))
+        }
+    }
+    private fun assigns_param(x: u64,c: u64): u64 {
+        m::map(x, |y: u64| x: u64 = 2;
+        Add<u64>(y, c))
+    }
+    private fun borrows_local(x: u64): u64 {
+        {
+          let z: u64 = 1;
+          m::map(x, |y: u64| {
+            let r: &mut u64 = Borrow(Mutable)(z);
+            Add<u64>(y, Deref(r))
+          })
+        }
+    }
+    private fun borrows_param(x: u64,c: u64): u64 {
+        m::map(x, |y: u64| {
+          let r: &mut u64 = Borrow(Mutable)(c);
+          Add<u64>(y, Deref(r))
+        })
+    }
+    private fun immutable_borrow_ok(x: u64): u64 {
+        {
+          let z: u64 = 1;
+          m::map(x, |y: u64| {
+            let r: &u64 = Borrow(Immutable)(z);
+            Add<u64>(y, Deref(r))
+          })
+        }
+    }
+} // end 0xcafe::m
+
+
+
+Diagnostics:
+error: captured variable `x` cannot be modified inside of a lambda
+   ┌─ tests/lambda-lifting/modify.move:14:13
+   │
+14 │             x = 2;
+   │             ^
+
+error: captured variable `c` cannot be modified inside of a lambda
+   ┌─ tests/lambda-lifting/modify.move:21:26
+   │
+21 │             let r = &mut c;
+   │                          ^
+
+error: captured variable `z` cannot be modified inside of a lambda
+   ┌─ tests/lambda-lifting/modify.move:29:13
+   │
+29 │             z = 2;
+   │             ^
+
+error: captured variable `z` cannot be modified inside of a lambda
+   ┌─ tests/lambda-lifting/modify.move:37:26
+   │
+37 │             let r = &mut z;
+   │                          ^

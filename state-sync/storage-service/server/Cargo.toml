@@ -14,7 +14,6 @@ rust-version = { workspace = true }
 
 [dependencies]
 anyhow = { workspace = true }
-aptos-bounded-executor = { workspace = true }
 aptos-channels = { workspace = true }
 aptos-config = { workspace = true }
 aptos-infallible = { workspace = true }

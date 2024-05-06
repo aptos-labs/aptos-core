@@ -9,32 +9,26 @@ spec aptos_framework::dkg {
         use std::signer;
         let aptos_framework_addr = signer::address_of(aptos_framework);
         aborts_if aptos_framework_addr != @aptos_framework;
-        aborts_if exists<DKGState>(@aptos_framework);
     }
 
     spec start(
         dealer_epoch: u64,
+        randomness_config: RandomnessConfig,
         dealer_validator_set: vector<ValidatorConsensusInfo>,
         target_validator_set: vector<ValidatorConsensusInfo>,
     ) {
-        use std::option;
         aborts_if !exists<DKGState>(@aptos_framework);
-        aborts_if option::is_some(global<DKGState>(@aptos_framework).in_progress);
         aborts_if !exists<timestamp::CurrentTimeMicroseconds>(@aptos_framework);
     }
 
     spec finish(transcript: vector<u8>) {
         use std::option;
-        aborts_if !exists<DKGState>(@aptos_framework);
-        aborts_if option::is_none(global<DKGState>(@aptos_framework).in_progress);
-    }
-
-    spec in_progress(): bool {
+        requires exists<DKGState>(@aptos_framework);
+        requires option::is_some(global<DKGState>(@aptos_framework).in_progress);
         aborts_if false;
-        ensures result == spec_in_progress();
     }
 
-    spec fun spec_in_progress(): bool {
+    spec fun has_incomplete_session(): bool {
         if (exists<DKGState>(@aptos_framework)) {
             option::spec_is_some(global<DKGState>(@aptos_framework).in_progress)
         } else {
@@ -42,4 +36,13 @@ spec aptos_framework::dkg {
         }
     }
 
+    spec try_clear_incomplete_session(fx: &signer) {
+        use std::signer;
+        let addr = signer::address_of(fx);
+        aborts_if addr != @aptos_framework;
+    }
+
+    spec incomplete_session(): Option<DKGSessionState> {
+        aborts_if false;
+    }
 }

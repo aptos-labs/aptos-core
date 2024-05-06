@@ -8,7 +8,14 @@
 ///   - Changing how gas is calculated in any way
 ///
 /// Change log:
+/// - V17
+///   - Gas for keyless
+/// - V16
+///   - IO Gas for the transaction itself and events in the transaction output
+/// - V15
+///   - Gas & limits for dependencies
 /// - V14
+///   - Gas for type creation
 ///   - Storage Fee: Make state bytes refundable and remove the per slot free quota, gated by flag REFUNDABLE_BYTES
 /// - V13
 ///   (skipped due to testnet mis-operation)
@@ -26,7 +33,7 @@
 /// - V8
 ///   - Added BLS12-381 operations.
 /// - V7
-///   - Native support for exists<T>
+///   - Native support for `exists<T>`
 ///   - New formulae for storage fees based on fixed APT costs
 ///   - Lower gas price (other than the newly introduced storage fees) by upping the scaling factor
 /// - V6
@@ -49,4 +56,11 @@
 ///       global operations.
 /// - V1
 ///   - TBA
-pub const LATEST_GAS_FEATURE_VERSION: u64 = 14;
+pub const LATEST_GAS_FEATURE_VERSION: u64 = 17;
+
+#[allow(dead_code)]
+pub mod gas_feature_versions {
+    pub const RELEASE_V1_11: u64 = 16;
+    pub const RELEASE_V1_12: u64 = 17;
+    pub const RELEASE_V1_13: u64 = 18;
+}

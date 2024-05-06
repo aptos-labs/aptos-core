@@ -4,143 +4,123 @@
 fun <SELF>_0::check() {
      var $t0: bool
      var $t1: u64
-     var $t2: u64
+     var $t2: bool
      var $t3: u64
      var $t4: bool
-     var $t5: vector<u8>
-     var $t6: vector<u8>
+     var $t5: u64
+     var $t6: &u64
      var $t7: u64
-     var $t8: bool
+     var $t8: u64
      var $t9: u64
-     var $t10: &u64
-     var $t11: u64
-     var $t12: u64
-     var $t13: u64
-     var $t14: bool
-     var $t15: vector<u8>
-     var $t16: &vector<u8>
-     var $t17: vector<u8>
-     var $t18: vector<u8>
-     var $t19: u64
-     var $t20: &mut u64
-     var $t21: &mut u64
-     var $t22: u64
+     var $t10: bool
+     var $t11: vector<u8>
+     var $t12: &vector<u8>
+     var $t13: vector<u8>
+     var $t14: vector<u8>
+     var $t15: u64
+     var $t16: &mut u64
+     var $t17: u64
+     var $t18: u64
+     var $t19: &mut vector<u8>
+     var $t20: vector<u8>
+     var $t21: vector<u8>
+     var $t22: bool
      var $t23: u64
-     var $t24: &mut vector<u8>
-     var $t25: &mut vector<u8>
-     var $t26: vector<u8>
+     var $t24: u64
+     var $t25: u64
+     var $t26: bool
      var $t27: vector<u8>
-     var $t28: bool
+     var $t28: vector<u8>
      var $t29: u64
-     var $t30: u64
+     var $t30: bool
      var $t31: u64
      var $t32: bool
-     var $t33: vector<u8>
-     var $t34: vector<u8>
-     var $t35: u64
-     var $t36: bool
-     var $t37: u64
-     var $t38: u64
-     var $t39: u64
-     var $t40: bool
-     var $t41: vector<u8>
-     var $t42: vector<u8>
-     var $t43: u64
-  0: $t1 := 0
-  1: $t2 := 0
-  2: $t0 := ==($t1, $t2)
-  3: if ($t0) goto 4 else goto 6
-  4: label L0
-  5: goto 9
-  6: label L1
-  7: $t3 := 42
-  8: abort($t3)
-  9: label L2
- 10: $t5 := [104, 101, 108, 108, 111]
- 11: $t6 := [104, 101, 108, 108, 111]
- 12: $t4 := ==($t5, $t6)
- 13: if ($t4) goto 14 else goto 16
- 14: label L3
- 15: goto 19
- 16: label L4
- 17: $t7 := 42
- 18: abort($t7)
- 19: label L5
- 20: $t11 := 0
- 21: $t10 := borrow_local($t11)
- 22: $t9 := read_ref($t10)
- 23: $t12 := 0
- 24: $t8 := ==($t9, $t12)
- 25: if ($t8) goto 26 else goto 28
- 26: label L6
- 27: goto 31
- 28: label L7
- 29: $t13 := 42
- 30: abort($t13)
- 31: label L8
- 32: $t17 := [104, 101, 108, 108, 111]
- 33: $t16 := borrow_local($t17)
- 34: $t15 := read_ref($t16)
- 35: $t18 := [104, 101, 108, 108, 111]
- 36: $t14 := ==($t15, $t18)
- 37: if ($t14) goto 38 else goto 40
- 38: label L9
- 39: goto 43
- 40: label L10
- 41: $t19 := 42
- 42: abort($t19)
- 43: label L11
- 44: $t22 := 0
- 45: $t21 := borrow_local($t22)
- 46: $t20 := infer($t21)
- 47: $t23 := 1
- 48: write_ref($t20, $t23)
- 49: $t26 := [104, 101, 108, 108, 111]
- 50: $t25 := borrow_local($t26)
- 51: $t24 := infer($t25)
- 52: $t27 := [98, 121, 101]
- 53: write_ref($t24, $t27)
- 54: $t29 := read_ref($t20)
- 55: $t30 := 1
- 56: $t28 := ==($t29, $t30)
- 57: if ($t28) goto 58 else goto 60
- 58: label L12
- 59: goto 63
- 60: label L13
- 61: $t31 := 42
- 62: abort($t31)
- 63: label L14
- 64: $t33 := read_ref($t24)
- 65: $t34 := [98, 121, 101]
- 66: $t32 := ==($t33, $t34)
- 67: if ($t32) goto 68 else goto 70
- 68: label L15
- 69: goto 73
- 70: label L16
- 71: $t35 := 42
- 72: abort($t35)
- 73: label L17
- 74: $t37 := 0
- 75: $t38 := 0
- 76: $t36 := ==($t37, $t38)
- 77: if ($t36) goto 78 else goto 80
- 78: label L18
+     var $t33: u64
+  0: $t0 := true
+  1: if ($t0) goto 2 else goto 4
+  2: label L0
+  3: goto 7
+  4: label L1
+  5: $t1 := 42
+  6: abort($t1)
+  7: label L2
+  8: $t2 := true
+  9: if ($t2) goto 10 else goto 12
+ 10: label L3
+ 11: goto 15
+ 12: label L4
+ 13: $t3 := 42
+ 14: abort($t3)
+ 15: label L5
+ 16: $t7 := 0
+ 17: $t6 := borrow_local($t7)
+ 18: $t5 := read_ref($t6)
+ 19: $t8 := 0
+ 20: $t4 := ==($t5, $t8)
+ 21: if ($t4) goto 22 else goto 24
+ 22: label L6
+ 23: goto 27
+ 24: label L7
+ 25: $t9 := 42
+ 26: abort($t9)
+ 27: label L8
+ 28: $t13 := [104, 101, 108, 108, 111]
+ 29: $t12 := borrow_local($t13)
+ 30: $t11 := read_ref($t12)
+ 31: $t14 := [104, 101, 108, 108, 111]
+ 32: $t10 := ==($t11, $t14)
+ 33: if ($t10) goto 34 else goto 36
+ 34: label L9
+ 35: goto 39
+ 36: label L10
+ 37: $t15 := 42
+ 38: abort($t15)
+ 39: label L11
+ 40: $t17 := 0
+ 41: $t16 := borrow_local($t17)
+ 42: $t18 := 1
+ 43: write_ref($t16, $t18)
+ 44: $t20 := [104, 101, 108, 108, 111]
+ 45: $t19 := borrow_local($t20)
+ 46: $t21 := [98, 121, 101]
+ 47: write_ref($t19, $t21)
+ 48: $t23 := read_ref($t16)
+ 49: $t24 := 1
+ 50: $t22 := ==($t23, $t24)
+ 51: if ($t22) goto 52 else goto 54
+ 52: label L12
+ 53: goto 57
+ 54: label L13
+ 55: $t25 := 42
+ 56: abort($t25)
+ 57: label L14
+ 58: $t27 := read_ref($t19)
+ 59: $t28 := [98, 121, 101]
+ 60: $t26 := ==($t27, $t28)
+ 61: if ($t26) goto 62 else goto 64
+ 62: label L15
+ 63: goto 67
+ 64: label L16
+ 65: $t29 := 42
+ 66: abort($t29)
+ 67: label L17
+ 68: $t30 := true
+ 69: if ($t30) goto 70 else goto 72
+ 70: label L18
+ 71: goto 75
+ 72: label L19
+ 73: $t31 := 42
+ 74: abort($t31)
+ 75: label L20
+ 76: $t32 := true
+ 77: if ($t32) goto 78 else goto 80
+ 78: label L21
  79: goto 83
- 80: label L19
- 81: $t39 := 42
- 82: abort($t39)
- 83: label L20
- 84: $t41 := [104, 101, 108, 108, 111]
- 85: $t42 := [104, 101, 108, 108, 111]
- 86: $t40 := ==($t41, $t42)
- 87: if ($t40) goto 88 else goto 90
- 88: label L21
- 89: goto 93
- 90: label L22
- 91: $t43 := 42
- 92: abort($t43)
- 93: label L23
- 94: return ()
+ 80: label L22
+ 81: $t33 := 42
+ 82: abort($t33)
+ 83: label L23
+ 84: return ()
 }
 
 ============ after LiveVarAnalysisProcessor: ================
@@ -149,238 +129,208 @@ fun <SELF>_0::check() {
 fun <SELF>_0::check() {
      var $t0: bool
      var $t1: u64
-     var $t2: u64
+     var $t2: bool
      var $t3: u64
      var $t4: bool
-     var $t5: vector<u8>
-     var $t6: vector<u8>
+     var $t5: u64
+     var $t6: &u64
      var $t7: u64
-     var $t8: bool
+     var $t8: u64
      var $t9: u64
-     var $t10: &u64
-     var $t11: u64
-     var $t12: u64
-     var $t13: u64
-     var $t14: bool
-     var $t15: vector<u8>
-     var $t16: &vector<u8>
-     var $t17: vector<u8>
-     var $t18: vector<u8>
-     var $t19: u64
-     var $t20: &mut u64
-     var $t21: &mut u64
-     var $t22: u64
+     var $t10: bool
+     var $t11: vector<u8>
+     var $t12: &vector<u8>
+     var $t13: vector<u8>
+     var $t14: vector<u8>
+     var $t15: u64
+     var $t16: &mut u64
+     var $t17: u64
+     var $t18: u64
+     var $t19: &mut vector<u8>
+     var $t20: vector<u8>
+     var $t21: vector<u8>
+     var $t22: bool
      var $t23: u64
-     var $t24: &mut vector<u8>
-     var $t25: &mut vector<u8>
-     var $t26: vector<u8>
+     var $t24: u64
+     var $t25: u64
+     var $t26: bool
      var $t27: vector<u8>
-     var $t28: bool
+     var $t28: vector<u8>
      var $t29: u64
-     var $t30: u64
+     var $t30: bool
      var $t31: u64
      var $t32: bool
-     var $t33: vector<u8>
-     var $t34: vector<u8>
-     var $t35: u64
-     var $t36: bool
-     var $t37: u64
-     var $t38: u64
-     var $t39: u64
-     var $t40: bool
-     var $t41: vector<u8>
-     var $t42: vector<u8>
-     var $t43: u64
+     var $t33: u64
      # live vars:
-  0: $t1 := 0
-     # live vars: $t1
-  1: $t2 := 0
-     # live vars: $t1, $t2
-  2: $t0 := ==($t1, $t2)
+  0: $t0 := true
      # live vars: $t0
-  3: if ($t0) goto 4 else goto 6
+  1: if ($t0) goto 2 else goto 4
      # live vars:
-  4: label L0
+  2: label L0
      # live vars:
-  5: goto 9
+  3: goto 7
      # live vars:
-  6: label L1
+  4: label L1
      # live vars:
-  7: $t3 := 42
+  5: $t1 := 42
+     # live vars: $t1
+  6: abort($t1)
+     # live vars:
+  7: label L2
+     # live vars:
+  8: $t2 := true
+     # live vars: $t2
+  9: if ($t2) goto 10 else goto 12
+     # live vars:
+ 10: label L3
+     # live vars:
+ 11: goto 15
+     # live vars:
+ 12: label L4
+     # live vars:
+ 13: $t3 := 42
      # live vars: $t3
-  8: abort($t3)
+ 14: abort($t3)
      # live vars:
-  9: label L2
+ 15: label L5
      # live vars:
- 10: $t5 := [104, 101, 108, 108, 111]
-     # live vars: $t5
- 11: $t6 := [104, 101, 108, 108, 111]
-     # live vars: $t5, $t6
- 12: $t4 := ==($t5, $t6)
-     # live vars: $t4
- 13: if ($t4) goto 14 else goto 16
-     # live vars:
- 14: label L3
-     # live vars:
- 15: goto 19
-     # live vars:
- 16: label L4
-     # live vars:
- 17: $t7 := 42
+ 16: $t7 := 0
      # live vars: $t7
- 18: abort($t7)
+ 17: $t6 := borrow_local($t7)
+     # live vars: $t6
+ 18: $t5 := read_ref($t6)
+     # live vars: $t5
+ 19: $t8 := 0
+     # live vars: $t5, $t8
+ 20: $t4 := ==($t5, $t8)
+     # live vars: $t4
+ 21: if ($t4) goto 22 else goto 24
      # live vars:
- 19: label L5
+ 22: label L6
      # live vars:
- 20: $t11 := 0
-     # live vars: $t11
- 21: $t10 := borrow_local($t11)
-     # live vars: $t10
- 22: $t9 := read_ref($t10)
+ 23: goto 27
+     # live vars:
+ 24: label L7
+     # live vars:
+ 25: $t9 := 42
      # live vars: $t9
- 23: $t12 := 0
-     # live vars: $t9, $t12
- 24: $t8 := ==($t9, $t12)
-     # live vars: $t8
- 25: if ($t8) goto 26 else goto 28
+ 26: abort($t9)
      # live vars:
- 26: label L6
+ 27: label L8
      # live vars:
- 27: goto 31
-     # live vars:
- 28: label L7
-     # live vars:
- 29: $t13 := 42
+ 28: $t13 := [104, 101, 108, 108, 111]
      # live vars: $t13
- 30: abort($t13)
+ 29: $t12 := borrow_local($t13)
+     # live vars: $t12
+ 30: $t11 := read_ref($t12)
+     # live vars: $t11
+ 31: $t14 := [104, 101, 108, 108, 111]
+     # live vars: $t11, $t14
+ 32: $t10 := ==($t11, $t14)
+     # live vars: $t10
+ 33: if ($t10) goto 34 else goto 36
      # live vars:
- 31: label L8
+ 34: label L9
      # live vars:
- 32: $t17 := [104, 101, 108, 108, 111]
-     # live vars: $t17
- 33: $t16 := borrow_local($t17)
-     # live vars: $t16
- 34: $t15 := read_ref($t16)
+ 35: goto 39
+     # live vars:
+ 36: label L10
+     # live vars:
+ 37: $t15 := 42
      # live vars: $t15
- 35: $t18 := [104, 101, 108, 108, 111]
-     # live vars: $t15, $t18
- 36: $t14 := ==($t15, $t18)
-     # live vars: $t14
- 37: if ($t14) goto 38 else goto 40
+ 38: abort($t15)
      # live vars:
- 38: label L9
+ 39: label L11
      # live vars:
- 39: goto 43
-     # live vars:
- 40: label L10
-     # live vars:
- 41: $t19 := 42
+ 40: $t17 := 0
+     # live vars: $t17
+ 41: $t16 := borrow_local($t17)
+     # live vars: $t16
+ 42: $t18 := 1
+     # live vars: $t16, $t18
+ 43: write_ref($t16, $t18)
+     # live vars: $t16
+ 44: $t20 := [104, 101, 108, 108, 111]
+     # live vars: $t16, $t20
+ 45: $t19 := borrow_local($t20)
+     # live vars: $t16, $t19
+ 46: $t21 := [98, 121, 101]
+     # live vars: $t16, $t19, $t21
+ 47: write_ref($t19, $t21)
+     # live vars: $t16, $t19
+ 48: $t23 := read_ref($t16)
+     # live vars: $t19, $t23
+ 49: $t24 := 1
+     # live vars: $t19, $t23, $t24
+ 50: $t22 := ==($t23, $t24)
+     # live vars: $t19, $t22
+ 51: if ($t22) goto 52 else goto 54
      # live vars: $t19
- 42: abort($t19)
+ 52: label L12
+     # live vars: $t19
+ 53: goto 57
+     # live vars: $t19
+ 54: label L13
      # live vars:
- 43: label L11
+ 55: $t25 := 42
+     # live vars: $t25
+ 56: abort($t25)
+     # live vars: $t19
+ 57: label L14
+     # live vars: $t19
+ 58: $t27 := read_ref($t19)
+     # live vars: $t27
+ 59: $t28 := [98, 121, 101]
+     # live vars: $t27, $t28
+ 60: $t26 := ==($t27, $t28)
+     # live vars: $t26
+ 61: if ($t26) goto 62 else goto 64
      # live vars:
- 44: $t22 := 0
-     # live vars: $t22
- 45: $t21 := borrow_local($t22)
-     # live vars: $t21
- 46: $t20 := infer($t21)
-     # live vars: $t20
- 47: $t23 := 1
-     # live vars: $t20, $t23
- 48: write_ref($t20, $t23)
-     # live vars: $t20
- 49: $t26 := [104, 101, 108, 108, 111]
-     # live vars: $t20, $t26
- 50: $t25 := borrow_local($t26)
-     # live vars: $t20, $t25
- 51: $t24 := infer($t25)
-     # live vars: $t20, $t24
- 52: $t27 := [98, 121, 101]
-     # live vars: $t20, $t24, $t27
- 53: write_ref($t24, $t27)
-     # live vars: $t20, $t24
- 54: $t29 := read_ref($t20)
-     # live vars: $t24, $t29
- 55: $t30 := 1
-     # live vars: $t24, $t29, $t30
- 56: $t28 := ==($t29, $t30)
-     # live vars: $t24, $t28
- 57: if ($t28) goto 58 else goto 60
-     # live vars: $t24
- 58: label L12
-     # live vars: $t24
- 59: goto 63
-     # live vars: $t24
- 60: label L13
+ 62: label L15
      # live vars:
- 61: $t31 := 42
+ 63: goto 67
+     # live vars:
+ 64: label L16
+     # live vars:
+ 65: $t29 := 42
+     # live vars: $t29
+ 66: abort($t29)
+     # live vars:
+ 67: label L17
+     # live vars:
+ 68: $t30 := true
+     # live vars: $t30
+ 69: if ($t30) goto 70 else goto 72
+     # live vars:
+ 70: label L18
+     # live vars:
+ 71: goto 75
+     # live vars:
+ 72: label L19
+     # live vars:
+ 73: $t31 := 42
      # live vars: $t31
- 62: abort($t31)
-     # live vars: $t24
- 63: label L14
-     # live vars: $t24
- 64: $t33 := read_ref($t24)
-     # live vars: $t33
- 65: $t34 := [98, 121, 101]
-     # live vars: $t33, $t34
- 66: $t32 := ==($t33, $t34)
+ 74: abort($t31)
+     # live vars:
+ 75: label L20
+     # live vars:
+ 76: $t32 := true
      # live vars: $t32
- 67: if ($t32) goto 68 else goto 70
+ 77: if ($t32) goto 78 else goto 80
      # live vars:
- 68: label L15
-     # live vars:
- 69: goto 73
-     # live vars:
- 70: label L16
-     # live vars:
- 71: $t35 := 42
-     # live vars: $t35
- 72: abort($t35)
-     # live vars:
- 73: label L17
-     # live vars:
- 74: $t37 := 0
-     # live vars: $t37
- 75: $t38 := 0
-     # live vars: $t37, $t38
- 76: $t36 := ==($t37, $t38)
-     # live vars: $t36
- 77: if ($t36) goto 78 else goto 80
-     # live vars:
- 78: label L18
+ 78: label L21
      # live vars:
  79: goto 83
      # live vars:
- 80: label L19
+ 80: label L22
      # live vars:
- 81: $t39 := 42
-     # live vars: $t39
- 82: abort($t39)
+ 81: $t33 := 42
+     # live vars: $t33
+ 82: abort($t33)
      # live vars:
- 83: label L20
+ 83: label L23
      # live vars:
- 84: $t41 := [104, 101, 108, 108, 111]
-     # live vars: $t41
- 85: $t42 := [104, 101, 108, 108, 111]
-     # live vars: $t41, $t42
- 86: $t40 := ==($t41, $t42)
-     # live vars: $t40
- 87: if ($t40) goto 88 else goto 90
-     # live vars:
- 88: label L21
-     # live vars:
- 89: goto 93
-     # live vars:
- 90: label L22
-     # live vars:
- 91: $t43 := 42
-     # live vars: $t43
- 92: abort($t43)
-     # live vars:
- 93: label L23
-     # live vars:
- 94: return ()
+ 84: return ()
 }
 
 ============ after ReferenceSafetyProcessor: ================
@@ -389,618 +339,548 @@ fun <SELF>_0::check() {
 fun <SELF>_0::check() {
      var $t0: bool
      var $t1: u64
-     var $t2: u64
+     var $t2: bool
      var $t3: u64
      var $t4: bool
-     var $t5: vector<u8>
-     var $t6: vector<u8>
+     var $t5: u64
+     var $t6: &u64
      var $t7: u64
-     var $t8: bool
+     var $t8: u64
      var $t9: u64
-     var $t10: &u64
-     var $t11: u64
-     var $t12: u64
-     var $t13: u64
-     var $t14: bool
-     var $t15: vector<u8>
-     var $t16: &vector<u8>
-     var $t17: vector<u8>
-     var $t18: vector<u8>
-     var $t19: u64
-     var $t20: &mut u64
-     var $t21: &mut u64
-     var $t22: u64
+     var $t10: bool
+     var $t11: vector<u8>
+     var $t12: &vector<u8>
+     var $t13: vector<u8>
+     var $t14: vector<u8>
+     var $t15: u64
+     var $t16: &mut u64
+     var $t17: u64
+     var $t18: u64
+     var $t19: &mut vector<u8>
+     var $t20: vector<u8>
+     var $t21: vector<u8>
+     var $t22: bool
      var $t23: u64
-     var $t24: &mut vector<u8>
-     var $t25: &mut vector<u8>
-     var $t26: vector<u8>
+     var $t24: u64
+     var $t25: u64
+     var $t26: bool
      var $t27: vector<u8>
-     var $t28: bool
+     var $t28: vector<u8>
      var $t29: u64
-     var $t30: u64
+     var $t30: bool
      var $t31: u64
      var $t32: bool
-     var $t33: vector<u8>
-     var $t34: vector<u8>
-     var $t35: u64
-     var $t36: bool
-     var $t37: u64
-     var $t38: u64
-     var $t39: u64
-     var $t40: bool
-     var $t41: vector<u8>
-     var $t42: vector<u8>
-     var $t43: u64
+     var $t33: u64
      # live vars:
      # graph: {}
      # locals: {}
      # globals: {}
      #
-  0: $t1 := 0
-     # live vars: $t1
-     # graph: {}
-     # locals: {}
-     # globals: {}
-     #
-  1: $t2 := 0
-     # live vars: $t1, $t2
-     # graph: {}
-     # locals: {}
-     # globals: {}
-     #
-  2: $t0 := ==($t1, $t2)
+  0: $t0 := true
      # live vars: $t0
      # graph: {}
      # locals: {}
      # globals: {}
      #
-  3: if ($t0) goto 4 else goto 6
+  1: if ($t0) goto 2 else goto 4
      # live vars:
      # graph: {}
      # locals: {}
      # globals: {}
      #
-  4: label L0
+  2: label L0
      # live vars:
      # graph: {}
      # locals: {}
      # globals: {}
      #
-  5: goto 9
+  3: goto 7
      # live vars:
      # graph: {}
      # locals: {}
      # globals: {}
      #
-  6: label L1
+  4: label L1
      # live vars:
      # graph: {}
      # locals: {}
      # globals: {}
      #
-  7: $t3 := 42
+  5: $t1 := 42
+     # live vars: $t1
+     # graph: {}
+     # locals: {}
+     # globals: {}
+     #
+  6: abort($t1)
+     # live vars:
+     # graph: {}
+     # locals: {}
+     # globals: {}
+     #
+  7: label L2
+     # live vars:
+     # graph: {}
+     # locals: {}
+     # globals: {}
+     #
+  8: $t2 := true
+     # live vars: $t2
+     # graph: {}
+     # locals: {}
+     # globals: {}
+     #
+  9: if ($t2) goto 10 else goto 12
+     # live vars:
+     # graph: {}
+     # locals: {}
+     # globals: {}
+     #
+ 10: label L3
+     # live vars:
+     # graph: {}
+     # locals: {}
+     # globals: {}
+     #
+ 11: goto 15
+     # live vars:
+     # graph: {}
+     # locals: {}
+     # globals: {}
+     #
+ 12: label L4
+     # live vars:
+     # graph: {}
+     # locals: {}
+     # globals: {}
+     #
+ 13: $t3 := 42
      # live vars: $t3
      # graph: {}
      # locals: {}
      # globals: {}
      #
-  8: abort($t3)
+ 14: abort($t3)
      # live vars:
      # graph: {}
      # locals: {}
      # globals: {}
      #
-  9: label L2
+ 15: label L5
      # live vars:
      # graph: {}
      # locals: {}
      # globals: {}
      #
- 10: $t5 := [104, 101, 108, 108, 111]
-     # live vars: $t5
-     # graph: {}
-     # locals: {}
-     # globals: {}
-     #
- 11: $t6 := [104, 101, 108, 108, 111]
-     # live vars: $t5, $t6
-     # graph: {}
-     # locals: {}
-     # globals: {}
-     #
- 12: $t4 := ==($t5, $t6)
-     # live vars: $t4
-     # graph: {}
-     # locals: {}
-     # globals: {}
-     #
- 13: if ($t4) goto 14 else goto 16
-     # live vars:
-     # graph: {}
-     # locals: {}
-     # globals: {}
-     #
- 14: label L3
-     # live vars:
-     # graph: {}
-     # locals: {}
-     # globals: {}
-     #
- 15: goto 19
-     # live vars:
-     # graph: {}
-     # locals: {}
-     # globals: {}
-     #
- 16: label L4
-     # live vars:
-     # graph: {}
-     # locals: {}
-     # globals: {}
-     #
- 17: $t7 := 42
+ 16: $t7 := 0
      # live vars: $t7
      # graph: {}
      # locals: {}
      # globals: {}
      #
- 18: abort($t7)
+ 17: $t6 := borrow_local($t7)
+     # live vars: $t6
+     # graph: {@1100=local($t7)[borrow(false) -> @1101],@1101=derived[]}
+     # locals: {$t6=@1101,$t7=@1100}
+     # globals: {}
+     #
+ 18: $t5 := read_ref($t6)
+     # live vars: $t5
+     # graph: {@1100=local($t7)[]}
+     # locals: {$t7=@1100}
+     # globals: {}
+     #
+ 19: $t8 := 0
+     # live vars: $t5, $t8
+     # graph: {@1100=local($t7)[]}
+     # locals: {$t7=@1100}
+     # globals: {}
+     #
+ 20: $t4 := ==($t5, $t8)
+     # live vars: $t4
+     # graph: {@1100=local($t7)[]}
+     # locals: {$t7=@1100}
+     # globals: {}
+     #
+ 21: if ($t4) goto 22 else goto 24
      # live vars:
-     # graph: {}
-     # locals: {}
+     # graph: {@1100=local($t7)[]}
+     # locals: {$t7=@1100}
      # globals: {}
      #
- 19: label L5
+ 22: label L6
      # live vars:
-     # graph: {}
-     # locals: {}
+     # graph: {@1100=local($t7)[]}
+     # locals: {$t7=@1100}
      # globals: {}
      #
- 20: $t11 := 0
-     # live vars: $t11
-     # graph: {}
-     # locals: {}
+ 23: goto 27
+     # live vars:
+     # graph: {@1100=local($t7)[]}
+     # locals: {$t7=@1100}
      # globals: {}
      #
- 21: $t10 := borrow_local($t11)
-     # live vars: $t10
-     # graph: {@1500=local($t11)[borrow(false) -> @1501],@1501=derived[]}
-     # locals: {$t10=@1501,$t11=@1500}
+ 24: label L7
+     # live vars:
+     # graph: {@1100=local($t7)[]}
+     # locals: {$t7=@1100}
      # globals: {}
      #
- 22: $t9 := read_ref($t10)
+ 25: $t9 := 42
      # live vars: $t9
-     # graph: {@1500=local($t11)[]}
-     # locals: {$t11=@1500}
+     # graph: {@1100=local($t7)[]}
+     # locals: {$t7=@1100}
      # globals: {}
      #
- 23: $t12 := 0
-     # live vars: $t9, $t12
-     # graph: {@1500=local($t11)[]}
-     # locals: {$t11=@1500}
-     # globals: {}
-     #
- 24: $t8 := ==($t9, $t12)
-     # live vars: $t8
-     # graph: {@1500=local($t11)[]}
-     # locals: {$t11=@1500}
-     # globals: {}
-     #
- 25: if ($t8) goto 26 else goto 28
+ 26: abort($t9)
      # live vars:
-     # graph: {@1500=local($t11)[]}
-     # locals: {$t11=@1500}
+     # graph: {@1100=local($t7)[]}
+     # locals: {$t7=@1100}
      # globals: {}
      #
- 26: label L6
+ 27: label L8
      # live vars:
-     # graph: {@1500=local($t11)[]}
-     # locals: {$t11=@1500}
+     # graph: {@1100=local($t7)[]}
+     # locals: {$t7=@1100}
      # globals: {}
      #
- 27: goto 31
-     # live vars:
-     # graph: {@1500=local($t11)[]}
-     # locals: {$t11=@1500}
-     # globals: {}
-     #
- 28: label L7
-     # live vars:
-     # graph: {@1500=local($t11)[]}
-     # locals: {$t11=@1500}
-     # globals: {}
-     #
- 29: $t13 := 42
+ 28: $t13 := [104, 101, 108, 108, 111]
      # live vars: $t13
-     # graph: {@1500=local($t11)[]}
-     # locals: {$t11=@1500}
+     # graph: {@1100=local($t7)[]}
+     # locals: {$t7=@1100}
      # globals: {}
      #
- 30: abort($t13)
+ 29: $t12 := borrow_local($t13)
+     # live vars: $t12
+     # graph: {@1100=local($t7)[],@1D00=local($t13)[borrow(false) -> @1D01],@1D01=derived[]}
+     # locals: {$t7=@1100,$t12=@1D01,$t13=@1D00}
+     # globals: {}
+     #
+ 30: $t11 := read_ref($t12)
+     # live vars: $t11
+     # graph: {@1100=local($t7)[],@1D00=local($t13)[]}
+     # locals: {$t7=@1100,$t13=@1D00}
+     # globals: {}
+     #
+ 31: $t14 := [104, 101, 108, 108, 111]
+     # live vars: $t11, $t14
+     # graph: {@1100=local($t7)[],@1D00=local($t13)[]}
+     # locals: {$t7=@1100,$t13=@1D00}
+     # globals: {}
+     #
+ 32: $t10 := ==($t11, $t14)
+     # live vars: $t10
+     # graph: {@1100=local($t7)[],@1D00=local($t13)[]}
+     # locals: {$t7=@1100,$t13=@1D00}
+     # globals: {}
+     #
+ 33: if ($t10) goto 34 else goto 36
      # live vars:
-     # graph: {@1500=local($t11)[]}
-     # locals: {$t11=@1500}
+     # graph: {@1100=local($t7)[],@1D00=local($t13)[]}
+     # locals: {$t7=@1100,$t13=@1D00}
      # globals: {}
      #
- 31: label L8
+ 34: label L9
      # live vars:
-     # graph: {@1500=local($t11)[]}
-     # locals: {$t11=@1500}
+     # graph: {@1100=local($t7)[],@1D00=local($t13)[]}
+     # locals: {$t7=@1100,$t13=@1D00}
      # globals: {}
      #
- 32: $t17 := [104, 101, 108, 108, 111]
-     # live vars: $t17
-     # graph: {@1500=local($t11)[]}
-     # locals: {$t11=@1500}
+ 35: goto 39
+     # live vars:
+     # graph: {@1100=local($t7)[],@1D00=local($t13)[]}
+     # locals: {$t7=@1100,$t13=@1D00}
      # globals: {}
      #
- 33: $t16 := borrow_local($t17)
-     # live vars: $t16
-     # graph: {@1500=local($t11)[],@2100=local($t17)[borrow(false) -> @2101],@2101=derived[]}
-     # locals: {$t11=@1500,$t16=@2101,$t17=@2100}
+ 36: label L10
+     # live vars:
+     # graph: {@1100=local($t7)[],@1D00=local($t13)[]}
+     # locals: {$t7=@1100,$t13=@1D00}
      # globals: {}
      #
- 34: $t15 := read_ref($t16)
+ 37: $t15 := 42
      # live vars: $t15
-     # graph: {@1500=local($t11)[],@2100=local($t17)[]}
-     # locals: {$t11=@1500,$t17=@2100}
+     # graph: {@1100=local($t7)[],@1D00=local($t13)[]}
+     # locals: {$t7=@1100,$t13=@1D00}
      # globals: {}
      #
- 35: $t18 := [104, 101, 108, 108, 111]
-     # live vars: $t15, $t18
-     # graph: {@1500=local($t11)[],@2100=local($t17)[]}
-     # locals: {$t11=@1500,$t17=@2100}
-     # globals: {}
-     #
- 36: $t14 := ==($t15, $t18)
-     # live vars: $t14
-     # graph: {@1500=local($t11)[],@2100=local($t17)[]}
-     # locals: {$t11=@1500,$t17=@2100}
-     # globals: {}
-     #
- 37: if ($t14) goto 38 else goto 40
+ 38: abort($t15)
      # live vars:
-     # graph: {@1500=local($t11)[],@2100=local($t17)[]}
-     # locals: {$t11=@1500,$t17=@2100}
+     # graph: {@1100=local($t7)[],@1D00=local($t13)[]}
+     # locals: {$t7=@1100,$t13=@1D00}
      # globals: {}
      #
- 38: label L9
+ 39: label L11
      # live vars:
-     # graph: {@1500=local($t11)[],@2100=local($t17)[]}
-     # locals: {$t11=@1500,$t17=@2100}
+     # graph: {@1100=local($t7)[],@1D00=local($t13)[]}
+     # locals: {$t7=@1100,$t13=@1D00}
      # globals: {}
      #
- 39: goto 43
-     # live vars:
-     # graph: {@1500=local($t11)[],@2100=local($t17)[]}
-     # locals: {$t11=@1500,$t17=@2100}
+ 40: $t17 := 0
+     # live vars: $t17
+     # graph: {@1100=local($t7)[],@1D00=local($t13)[]}
+     # locals: {$t7=@1100,$t13=@1D00}
      # globals: {}
      #
- 40: label L10
-     # live vars:
-     # graph: {@1500=local($t11)[],@2100=local($t17)[]}
-     # locals: {$t11=@1500,$t17=@2100}
+ 41: $t16 := borrow_local($t17)
+     # live vars: $t16
+     # graph: {@1100=local($t7)[],@1D00=local($t13)[],@2900=local($t17)[borrow(true) -> @2901],@2901=derived[]}
+     # locals: {$t7=@1100,$t13=@1D00,$t16=@2901,$t17=@2900}
      # globals: {}
      #
- 41: $t19 := 42
+ 42: $t18 := 1
+     # live vars: $t16, $t18
+     # graph: {@1100=local($t7)[],@1D00=local($t13)[],@2900=local($t17)[borrow(true) -> @2901],@2901=derived[]}
+     # locals: {$t7=@1100,$t13=@1D00,$t16=@2901,$t17=@2900}
+     # globals: {}
+     #
+ 43: write_ref($t16, $t18)
+     # live vars: $t16
+     # graph: {@1100=local($t7)[],@1D00=local($t13)[],@2900=local($t17)[borrow(true) -> @2901],@2901=derived[]}
+     # locals: {$t7=@1100,$t13=@1D00,$t16=@2901,$t17=@2900}
+     # globals: {}
+     #
+ 44: $t20 := [104, 101, 108, 108, 111]
+     # live vars: $t16, $t20
+     # graph: {@1100=local($t7)[],@1D00=local($t13)[],@2900=local($t17)[borrow(true) -> @2901],@2901=derived[]}
+     # locals: {$t7=@1100,$t13=@1D00,$t16=@2901,$t17=@2900}
+     # globals: {}
+     #
+ 45: $t19 := borrow_local($t20)
+     # live vars: $t16, $t19
+     # graph: {@1100=local($t7)[],@1D00=local($t13)[],@2900=local($t17)[borrow(true) -> @2901],@2901=derived[],@2D00=local($t20)[borrow(true) -> @2D01],@2D01=derived[]}
+     # locals: {$t7=@1100,$t13=@1D00,$t16=@2901,$t17=@2900,$t19=@2D01,$t20=@2D00}
+     # globals: {}
+     #
+ 46: $t21 := [98, 121, 101]
+     # live vars: $t16, $t19, $t21
+     # graph: {@1100=local($t7)[],@1D00=local($t13)[],@2900=local($t17)[borrow(true) -> @2901],@2901=derived[],@2D00=local($t20)[borrow(true) -> @2D01],@2D01=derived[]}
+     # locals: {$t7=@1100,$t13=@1D00,$t16=@2901,$t17=@2900,$t19=@2D01,$t20=@2D00}
+     # globals: {}
+     #
+ 47: write_ref($t19, $t21)
+     # live vars: $t16, $t19
+     # graph: {@1100=local($t7)[],@1D00=local($t13)[],@2900=local($t17)[borrow(true) -> @2901],@2901=derived[],@2D00=local($t20)[borrow(true) -> @2D01],@2D01=derived[]}
+     # locals: {$t7=@1100,$t13=@1D00,$t16=@2901,$t17=@2900,$t19=@2D01,$t20=@2D00}
+     # globals: {}
+     #
+ 48: $t23 := read_ref($t16)
+     # live vars: $t19, $t23
+     # graph: {@1100=local($t7)[],@1D00=local($t13)[],@2900=local($t17)[],@2D00=local($t20)[borrow(true) -> @2D01],@2D01=derived[]}
+     # locals: {$t7=@1100,$t13=@1D00,$t17=@2900,$t19=@2D01,$t20=@2D00}
+     # globals: {}
+     #
+ 49: $t24 := 1
+     # live vars: $t19, $t23, $t24
+     # graph: {@1100=local($t7)[],@1D00=local($t13)[],@2900=local($t17)[],@2D00=local($t20)[borrow(true) -> @2D01],@2D01=derived[]}
+     # locals: {$t7=@1100,$t13=@1D00,$t17=@2900,$t19=@2D01,$t20=@2D00}
+     # globals: {}
+     #
+ 50: $t22 := ==($t23, $t24)
+     # live vars: $t19, $t22
+     # graph: {@1100=local($t7)[],@1D00=local($t13)[],@2900=local($t17)[],@2D00=local($t20)[borrow(true) -> @2D01],@2D01=derived[]}
+     # locals: {$t7=@1100,$t13=@1D00,$t17=@2900,$t19=@2D01,$t20=@2D00}
+     # globals: {}
+     #
+ 51: if ($t22) goto 52 else goto 54
      # live vars: $t19
-     # graph: {@1500=local($t11)[],@2100=local($t17)[]}
-     # locals: {$t11=@1500,$t17=@2100}
+     # graph: {@1100=local($t7)[],@1D00=local($t13)[],@2900=local($t17)[],@2D00=local($t20)[borrow(true) -> @2D01],@2D01=derived[]}
+     # locals: {$t7=@1100,$t13=@1D00,$t17=@2900,$t19=@2D01,$t20=@2D00}
      # globals: {}
      #
- 42: abort($t19)
+ 52: label L12
+     # live vars: $t19
+     # graph: {@1100=local($t7)[],@1D00=local($t13)[],@2900=local($t17)[],@2D00=local($t20)[borrow(true) -> @2D01],@2D01=derived[]}
+     # locals: {$t7=@1100,$t13=@1D00,$t17=@2900,$t19=@2D01,$t20=@2D00}
+     # globals: {}
+     #
+ 53: goto 57
+     # live vars: $t19
+     # graph: {@1100=local($t7)[],@1D00=local($t13)[],@2900=local($t17)[],@2D00=local($t20)[borrow(true) -> @2D01],@2D01=derived[]}
+     # locals: {$t7=@1100,$t13=@1D00,$t17=@2900,$t19=@2D01,$t20=@2D00}
+     # globals: {}
+     #
+ 54: label L13
      # live vars:
-     # graph: {@1500=local($t11)[],@2100=local($t17)[]}
-     # locals: {$t11=@1500,$t17=@2100}
+     # graph: {@1100=local($t7)[],@1D00=local($t13)[],@2900=local($t17)[],@2D00=local($t20)[]}
+     # locals: {$t7=@1100,$t13=@1D00,$t17=@2900,$t20=@2D00}
      # globals: {}
      #
- 43: label L11
+ 55: $t25 := 42
+     # live vars: $t25
+     # graph: {@1100=local($t7)[],@1D00=local($t13)[],@2900=local($t17)[],@2D00=local($t20)[]}
+     # locals: {$t7=@1100,$t13=@1D00,$t17=@2900,$t20=@2D00}
+     # globals: {}
+     #
+ 56: abort($t25)
+     # live vars: $t19
+     # graph: {@1100=local($t7)[],@1D00=local($t13)[],@2900=local($t17)[],@2D00=local($t20)[borrow(true) -> @2D01],@2D01=derived[]}
+     # locals: {$t7=@1100,$t13=@1D00,$t17=@2900,$t19=@2D01,$t20=@2D00}
+     # globals: {}
+     #
+ 57: label L14
+     # live vars: $t19
+     # graph: {@1100=local($t7)[],@1D00=local($t13)[],@2900=local($t17)[],@2D00=local($t20)[borrow(true) -> @2D01],@2D01=derived[]}
+     # locals: {$t7=@1100,$t13=@1D00,$t17=@2900,$t19=@2D01,$t20=@2D00}
+     # globals: {}
+     #
+ 58: $t27 := read_ref($t19)
+     # live vars: $t27
+     # graph: {@1100=local($t7)[],@1D00=local($t13)[],@2900=local($t17)[],@2D00=local($t20)[]}
+     # locals: {$t7=@1100,$t13=@1D00,$t17=@2900,$t20=@2D00}
+     # globals: {}
+     #
+ 59: $t28 := [98, 121, 101]
+     # live vars: $t27, $t28
+     # graph: {@1100=local($t7)[],@1D00=local($t13)[],@2900=local($t17)[],@2D00=local($t20)[]}
+     # locals: {$t7=@1100,$t13=@1D00,$t17=@2900,$t20=@2D00}
+     # globals: {}
+     #
+ 60: $t26 := ==($t27, $t28)
+     # live vars: $t26
+     # graph: {@1100=local($t7)[],@1D00=local($t13)[],@2900=local($t17)[],@2D00=local($t20)[]}
+     # locals: {$t7=@1100,$t13=@1D00,$t17=@2900,$t20=@2D00}
+     # globals: {}
+     #
+ 61: if ($t26) goto 62 else goto 64
      # live vars:
-     # graph: {@1500=local($t11)[],@2100=local($t17)[]}
-     # locals: {$t11=@1500,$t17=@2100}
+     # graph: {@1100=local($t7)[],@1D00=local($t13)[],@2900=local($t17)[],@2D00=local($t20)[]}
+     # locals: {$t7=@1100,$t13=@1D00,$t17=@2900,$t20=@2D00}
      # globals: {}
      #
- 44: $t22 := 0
-     # live vars: $t22
-     # graph: {@1500=local($t11)[],@2100=local($t17)[]}
-     # locals: {$t11=@1500,$t17=@2100}
-     # globals: {}
-     #
- 45: $t21 := borrow_local($t22)
-     # live vars: $t21
-     # graph: {@1500=local($t11)[],@2100=local($t17)[],@2D00=local($t22)[borrow(true) -> @2D01],@2D01=derived[]}
-     # locals: {$t11=@1500,$t17=@2100,$t21=@2D01,$t22=@2D00}
-     # globals: {}
-     #
- 46: $t20 := infer($t21)
-     # live vars: $t20
-     # graph: {@1500=local($t11)[],@2100=local($t17)[],@2D00=local($t22)[borrow(true) -> @2D01],@2D01=derived[]}
-     # locals: {$t11=@1500,$t17=@2100,$t20=@2D01,$t22=@2D00}
-     # globals: {}
-     #
- 47: $t23 := 1
-     # live vars: $t20, $t23
-     # graph: {@1500=local($t11)[],@2100=local($t17)[],@2D00=local($t22)[borrow(true) -> @2D01],@2D01=derived[]}
-     # locals: {$t11=@1500,$t17=@2100,$t20=@2D01,$t22=@2D00}
-     # globals: {}
-     #
- 48: write_ref($t20, $t23)
-     # live vars: $t20
-     # graph: {@1500=local($t11)[],@2100=local($t17)[],@2D00=local($t22)[borrow(true) -> @2D01],@2D01=derived[]}
-     # locals: {$t11=@1500,$t17=@2100,$t20=@2D01,$t22=@2D00}
-     # globals: {}
-     #
- 49: $t26 := [104, 101, 108, 108, 111]
-     # live vars: $t20, $t26
-     # graph: {@1500=local($t11)[],@2100=local($t17)[],@2D00=local($t22)[borrow(true) -> @2D01],@2D01=derived[]}
-     # locals: {$t11=@1500,$t17=@2100,$t20=@2D01,$t22=@2D00}
-     # globals: {}
-     #
- 50: $t25 := borrow_local($t26)
-     # live vars: $t20, $t25
-     # graph: {@1500=local($t11)[],@2100=local($t17)[],@2D00=local($t22)[borrow(true) -> @2D01],@2D01=derived[],@3200=local($t26)[borrow(true) -> @3201],@3201=derived[]}
-     # locals: {$t11=@1500,$t17=@2100,$t20=@2D01,$t22=@2D00,$t25=@3201,$t26=@3200}
-     # globals: {}
-     #
- 51: $t24 := infer($t25)
-     # live vars: $t20, $t24
-     # graph: {@1500=local($t11)[],@2100=local($t17)[],@2D00=local($t22)[borrow(true) -> @2D01],@2D01=derived[],@3200=local($t26)[borrow(true) -> @3201],@3201=derived[]}
-     # locals: {$t11=@1500,$t17=@2100,$t20=@2D01,$t22=@2D00,$t24=@3201,$t26=@3200}
-     # globals: {}
-     #
- 52: $t27 := [98, 121, 101]
-     # live vars: $t20, $t24, $t27
-     # graph: {@1500=local($t11)[],@2100=local($t17)[],@2D00=local($t22)[borrow(true) -> @2D01],@2D01=derived[],@3200=local($t26)[borrow(true) -> @3201],@3201=derived[]}
-     # locals: {$t11=@1500,$t17=@2100,$t20=@2D01,$t22=@2D00,$t24=@3201,$t26=@3200}
-     # globals: {}
-     #
- 53: write_ref($t24, $t27)
-     # live vars: $t20, $t24
-     # graph: {@1500=local($t11)[],@2100=local($t17)[],@2D00=local($t22)[borrow(true) -> @2D01],@2D01=derived[],@3200=local($t26)[borrow(true) -> @3201],@3201=derived[]}
-     # locals: {$t11=@1500,$t17=@2100,$t20=@2D01,$t22=@2D00,$t24=@3201,$t26=@3200}
-     # globals: {}
-     #
- 54: $t29 := read_ref($t20)
-     # live vars: $t24, $t29
-     # graph: {@1500=local($t11)[],@2100=local($t17)[],@2D00=local($t22)[],@3200=local($t26)[borrow(true) -> @3201],@3201=derived[]}
-     # locals: {$t11=@1500,$t17=@2100,$t22=@2D00,$t24=@3201,$t26=@3200}
-     # globals: {}
-     #
- 55: $t30 := 1
-     # live vars: $t24, $t29, $t30
-     # graph: {@1500=local($t11)[],@2100=local($t17)[],@2D00=local($t22)[],@3200=local($t26)[borrow(true) -> @3201],@3201=derived[]}
-     # locals: {$t11=@1500,$t17=@2100,$t22=@2D00,$t24=@3201,$t26=@3200}
-     # globals: {}
-     #
- 56: $t28 := ==($t29, $t30)
-     # live vars: $t24, $t28
-     # graph: {@1500=local($t11)[],@2100=local($t17)[],@2D00=local($t22)[],@3200=local($t26)[borrow(true) -> @3201],@3201=derived[]}
-     # locals: {$t11=@1500,$t17=@2100,$t22=@2D00,$t24=@3201,$t26=@3200}
-     # globals: {}
-     #
- 57: if ($t28) goto 58 else goto 60
-     # live vars: $t24
-     # graph: {@1500=local($t11)[],@2100=local($t17)[],@2D00=local($t22)[],@3200=local($t26)[borrow(true) -> @3201],@3201=derived[]}
-     # locals: {$t11=@1500,$t17=@2100,$t22=@2D00,$t24=@3201,$t26=@3200}
-     # globals: {}
-     #
- 58: label L12
-     # live vars: $t24
-     # graph: {@1500=local($t11)[],@2100=local($t17)[],@2D00=local($t22)[],@3200=local($t26)[borrow(true) -> @3201],@3201=derived[]}
-     # locals: {$t11=@1500,$t17=@2100,$t22=@2D00,$t24=@3201,$t26=@3200}
-     # globals: {}
-     #
- 59: goto 63
-     # live vars: $t24
-     # graph: {@1500=local($t11)[],@2100=local($t17)[],@2D00=local($t22)[],@3200=local($t26)[borrow(true) -> @3201],@3201=derived[]}
-     # locals: {$t11=@1500,$t17=@2100,$t22=@2D00,$t24=@3201,$t26=@3200}
-     # globals: {}
-     #
- 60: label L13
+ 62: label L15
      # live vars:
-     # graph: {@1500=local($t11)[],@2100=local($t17)[],@2D00=local($t22)[],@3200=local($t26)[]}
-     # locals: {$t11=@1500,$t17=@2100,$t22=@2D00,$t26=@3200}
+     # graph: {@1100=local($t7)[],@1D00=local($t13)[],@2900=local($t17)[],@2D00=local($t20)[]}
+     # locals: {$t7=@1100,$t13=@1D00,$t17=@2900,$t20=@2D00}
      # globals: {}
      #
- 61: $t31 := 42
+ 63: goto 67
+     # live vars:
+     # graph: {@1100=local($t7)[],@1D00=local($t13)[],@2900=local($t17)[],@2D00=local($t20)[]}
+     # locals: {$t7=@1100,$t13=@1D00,$t17=@2900,$t20=@2D00}
+     # globals: {}
+     #
+ 64: label L16
+     # live vars:
+     # graph: {@1100=local($t7)[],@1D00=local($t13)[],@2900=local($t17)[],@2D00=local($t20)[]}
+     # locals: {$t7=@1100,$t13=@1D00,$t17=@2900,$t20=@2D00}
+     # globals: {}
+     #
+ 65: $t29 := 42
+     # live vars: $t29
+     # graph: {@1100=local($t7)[],@1D00=local($t13)[],@2900=local($t17)[],@2D00=local($t20)[]}
+     # locals: {$t7=@1100,$t13=@1D00,$t17=@2900,$t20=@2D00}
+     # globals: {}
+     #
+ 66: abort($t29)
+     # live vars:
+     # graph: {@1100=local($t7)[],@1D00=local($t13)[],@2900=local($t17)[],@2D00=local($t20)[]}
+     # locals: {$t7=@1100,$t13=@1D00,$t17=@2900,$t20=@2D00}
+     # globals: {}
+     #
+ 67: label L17
+     # live vars:
+     # graph: {@1100=local($t7)[],@1D00=local($t13)[],@2900=local($t17)[],@2D00=local($t20)[]}
+     # locals: {$t7=@1100,$t13=@1D00,$t17=@2900,$t20=@2D00}
+     # globals: {}
+     #
+ 68: $t30 := true
+     # live vars: $t30
+     # graph: {@1100=local($t7)[],@1D00=local($t13)[],@2900=local($t17)[],@2D00=local($t20)[]}
+     # locals: {$t7=@1100,$t13=@1D00,$t17=@2900,$t20=@2D00}
+     # globals: {}
+     #
+ 69: if ($t30) goto 70 else goto 72
+     # live vars:
+     # graph: {@1100=local($t7)[],@1D00=local($t13)[],@2900=local($t17)[],@2D00=local($t20)[]}
+     # locals: {$t7=@1100,$t13=@1D00,$t17=@2900,$t20=@2D00}
+     # globals: {}
+     #
+ 70: label L18
+     # live vars:
+     # graph: {@1100=local($t7)[],@1D00=local($t13)[],@2900=local($t17)[],@2D00=local($t20)[]}
+     # locals: {$t7=@1100,$t13=@1D00,$t17=@2900,$t20=@2D00}
+     # globals: {}
+     #
+ 71: goto 75
+     # live vars:
+     # graph: {@1100=local($t7)[],@1D00=local($t13)[],@2900=local($t17)[],@2D00=local($t20)[]}
+     # locals: {$t7=@1100,$t13=@1D00,$t17=@2900,$t20=@2D00}
+     # globals: {}
+     #
+ 72: label L19
+     # live vars:
+     # graph: {@1100=local($t7)[],@1D00=local($t13)[],@2900=local($t17)[],@2D00=local($t20)[]}
+     # locals: {$t7=@1100,$t13=@1D00,$t17=@2900,$t20=@2D00}
+     # globals: {}
+     #
+ 73: $t31 := 42
      # live vars: $t31
-     # graph: {@1500=local($t11)[],@2100=local($t17)[],@2D00=local($t22)[],@3200=local($t26)[]}
-     # locals: {$t11=@1500,$t17=@2100,$t22=@2D00,$t26=@3200}
+     # graph: {@1100=local($t7)[],@1D00=local($t13)[],@2900=local($t17)[],@2D00=local($t20)[]}
+     # locals: {$t7=@1100,$t13=@1D00,$t17=@2900,$t20=@2D00}
      # globals: {}
      #
- 62: abort($t31)
-     # live vars: $t24
-     # graph: {@1500=local($t11)[],@2100=local($t17)[],@2D00=local($t22)[],@3200=local($t26)[borrow(true) -> @3201],@3201=derived[]}
-     # locals: {$t11=@1500,$t17=@2100,$t22=@2D00,$t24=@3201,$t26=@3200}
+ 74: abort($t31)
+     # live vars:
+     # graph: {@1100=local($t7)[],@1D00=local($t13)[],@2900=local($t17)[],@2D00=local($t20)[]}
+     # locals: {$t7=@1100,$t13=@1D00,$t17=@2900,$t20=@2D00}
      # globals: {}
      #
- 63: label L14
-     # live vars: $t24
-     # graph: {@1500=local($t11)[],@2100=local($t17)[],@2D00=local($t22)[],@3200=local($t26)[borrow(true) -> @3201],@3201=derived[]}
-     # locals: {$t11=@1500,$t17=@2100,$t22=@2D00,$t24=@3201,$t26=@3200}
+ 75: label L20
+     # live vars:
+     # graph: {@1100=local($t7)[],@1D00=local($t13)[],@2900=local($t17)[],@2D00=local($t20)[]}
+     # locals: {$t7=@1100,$t13=@1D00,$t17=@2900,$t20=@2D00}
      # globals: {}
      #
- 64: $t33 := read_ref($t24)
-     # live vars: $t33
-     # graph: {@1500=local($t11)[],@2100=local($t17)[],@2D00=local($t22)[],@3200=local($t26)[]}
-     # locals: {$t11=@1500,$t17=@2100,$t22=@2D00,$t26=@3200}
-     # globals: {}
-     #
- 65: $t34 := [98, 121, 101]
-     # live vars: $t33, $t34
-     # graph: {@1500=local($t11)[],@2100=local($t17)[],@2D00=local($t22)[],@3200=local($t26)[]}
-     # locals: {$t11=@1500,$t17=@2100,$t22=@2D00,$t26=@3200}
-     # globals: {}
-     #
- 66: $t32 := ==($t33, $t34)
+ 76: $t32 := true
      # live vars: $t32
-     # graph: {@1500=local($t11)[],@2100=local($t17)[],@2D00=local($t22)[],@3200=local($t26)[]}
-     # locals: {$t11=@1500,$t17=@2100,$t22=@2D00,$t26=@3200}
+     # graph: {@1100=local($t7)[],@1D00=local($t13)[],@2900=local($t17)[],@2D00=local($t20)[]}
+     # locals: {$t7=@1100,$t13=@1D00,$t17=@2900,$t20=@2D00}
      # globals: {}
      #
- 67: if ($t32) goto 68 else goto 70
+ 77: if ($t32) goto 78 else goto 80
      # live vars:
-     # graph: {@1500=local($t11)[],@2100=local($t17)[],@2D00=local($t22)[],@3200=local($t26)[]}
-     # locals: {$t11=@1500,$t17=@2100,$t22=@2D00,$t26=@3200}
+     # graph: {@1100=local($t7)[],@1D00=local($t13)[],@2900=local($t17)[],@2D00=local($t20)[]}
+     # locals: {$t7=@1100,$t13=@1D00,$t17=@2900,$t20=@2D00}
      # globals: {}
      #
- 68: label L15
+ 78: label L21
      # live vars:
-     # graph: {@1500=local($t11)[],@2100=local($t17)[],@2D00=local($t22)[],@3200=local($t26)[]}
-     # locals: {$t11=@1500,$t17=@2100,$t22=@2D00,$t26=@3200}
-     # globals: {}
-     #
- 69: goto 73
-     # live vars:
-     # graph: {@1500=local($t11)[],@2100=local($t17)[],@2D00=local($t22)[],@3200=local($t26)[]}
-     # locals: {$t11=@1500,$t17=@2100,$t22=@2D00,$t26=@3200}
-     # globals: {}
-     #
- 70: label L16
-     # live vars:
-     # graph: {@1500=local($t11)[],@2100=local($t17)[],@2D00=local($t22)[],@3200=local($t26)[]}
-     # locals: {$t11=@1500,$t17=@2100,$t22=@2D00,$t26=@3200}
-     # globals: {}
-     #
- 71: $t35 := 42
-     # live vars: $t35
-     # graph: {@1500=local($t11)[],@2100=local($t17)[],@2D00=local($t22)[],@3200=local($t26)[]}
-     # locals: {$t11=@1500,$t17=@2100,$t22=@2D00,$t26=@3200}
-     # globals: {}
-     #
- 72: abort($t35)
-     # live vars:
-     # graph: {@1500=local($t11)[],@2100=local($t17)[],@2D00=local($t22)[],@3200=local($t26)[]}
-     # locals: {$t11=@1500,$t17=@2100,$t22=@2D00,$t26=@3200}
-     # globals: {}
-     #
- 73: label L17
-     # live vars:
-     # graph: {@1500=local($t11)[],@2100=local($t17)[],@2D00=local($t22)[],@3200=local($t26)[]}
-     # locals: {$t11=@1500,$t17=@2100,$t22=@2D00,$t26=@3200}
-     # globals: {}
-     #
- 74: $t37 := 0
-     # live vars: $t37
-     # graph: {@1500=local($t11)[],@2100=local($t17)[],@2D00=local($t22)[],@3200=local($t26)[]}
-     # locals: {$t11=@1500,$t17=@2100,$t22=@2D00,$t26=@3200}
-     # globals: {}
-     #
- 75: $t38 := 0
-     # live vars: $t37, $t38
-     # graph: {@1500=local($t11)[],@2100=local($t17)[],@2D00=local($t22)[],@3200=local($t26)[]}
-     # locals: {$t11=@1500,$t17=@2100,$t22=@2D00,$t26=@3200}
-     # globals: {}
-     #
- 76: $t36 := ==($t37, $t38)
-     # live vars: $t36
-     # graph: {@1500=local($t11)[],@2100=local($t17)[],@2D00=local($t22)[],@3200=local($t26)[]}
-     # locals: {$t11=@1500,$t17=@2100,$t22=@2D00,$t26=@3200}
-     # globals: {}
-     #
- 77: if ($t36) goto 78 else goto 80
-     # live vars:
-     # graph: {@1500=local($t11)[],@2100=local($t17)[],@2D00=local($t22)[],@3200=local($t26)[]}
-     # locals: {$t11=@1500,$t17=@2100,$t22=@2D00,$t26=@3200}
-     # globals: {}
-     #
- 78: label L18
-     # live vars:
-     # graph: {@1500=local($t11)[],@2100=local($t17)[],@2D00=local($t22)[],@3200=local($t26)[]}
-     # locals: {$t11=@1500,$t17=@2100,$t22=@2D00,$t26=@3200}
+     # graph: {@1100=local($t7)[],@1D00=local($t13)[],@2900=local($t17)[],@2D00=local($t20)[]}
+     # locals: {$t7=@1100,$t13=@1D00,$t17=@2900,$t20=@2D00}
      # globals: {}
      #
  79: goto 83
      # live vars:
-     # graph: {@1500=local($t11)[],@2100=local($t17)[],@2D00=local($t22)[],@3200=local($t26)[]}
-     # locals: {$t11=@1500,$t17=@2100,$t22=@2D00,$t26=@3200}
+     # graph: {@1100=local($t7)[],@1D00=local($t13)[],@2900=local($t17)[],@2D00=local($t20)[]}
+     # locals: {$t7=@1100,$t13=@1D00,$t17=@2900,$t20=@2D00}
      # globals: {}
      #
- 80: label L19
+ 80: label L22
      # live vars:
-     # graph: {@1500=local($t11)[],@2100=local($t17)[],@2D00=local($t22)[],@3200=local($t26)[]}
-     # locals: {$t11=@1500,$t17=@2100,$t22=@2D00,$t26=@3200}
+     # graph: {@1100=local($t7)[],@1D00=local($t13)[],@2900=local($t17)[],@2D00=local($t20)[]}
+     # locals: {$t7=@1100,$t13=@1D00,$t17=@2900,$t20=@2D00}
      # globals: {}
      #
- 81: $t39 := 42
-     # live vars: $t39
-     # graph: {@1500=local($t11)[],@2100=local($t17)[],@2D00=local($t22)[],@3200=local($t26)[]}
-     # locals: {$t11=@1500,$t17=@2100,$t22=@2D00,$t26=@3200}
+ 81: $t33 := 42
+     # live vars: $t33
+     # graph: {@1100=local($t7)[],@1D00=local($t13)[],@2900=local($t17)[],@2D00=local($t20)[]}
+     # locals: {$t7=@1100,$t13=@1D00,$t17=@2900,$t20=@2D00}
      # globals: {}
      #
- 82: abort($t39)
+ 82: abort($t33)
      # live vars:
-     # graph: {@1500=local($t11)[],@2100=local($t17)[],@2D00=local($t22)[],@3200=local($t26)[]}
-     # locals: {$t11=@1500,$t17=@2100,$t22=@2D00,$t26=@3200}
+     # graph: {@1100=local($t7)[],@1D00=local($t13)[],@2900=local($t17)[],@2D00=local($t20)[]}
+     # locals: {$t7=@1100,$t13=@1D00,$t17=@2900,$t20=@2D00}
      # globals: {}
      #
- 83: label L20
+ 83: label L23
      # live vars:
-     # graph: {@1500=local($t11)[],@2100=local($t17)[],@2D00=local($t22)[],@3200=local($t26)[]}
-     # locals: {$t11=@1500,$t17=@2100,$t22=@2D00,$t26=@3200}
+     # graph: {@1100=local($t7)[],@1D00=local($t13)[],@2900=local($t17)[],@2D00=local($t20)[]}
+     # locals: {$t7=@1100,$t13=@1D00,$t17=@2900,$t20=@2D00}
      # globals: {}
      #
- 84: $t41 := [104, 101, 108, 108, 111]
-     # live vars: $t41
-     # graph: {@1500=local($t11)[],@2100=local($t17)[],@2D00=local($t22)[],@3200=local($t26)[]}
-     # locals: {$t11=@1500,$t17=@2100,$t22=@2D00,$t26=@3200}
-     # globals: {}
-     #
- 85: $t42 := [104, 101, 108, 108, 111]
-     # live vars: $t41, $t42
-     # graph: {@1500=local($t11)[],@2100=local($t17)[],@2D00=local($t22)[],@3200=local($t26)[]}
-     # locals: {$t11=@1500,$t17=@2100,$t22=@2D00,$t26=@3200}
-     # globals: {}
-     #
- 86: $t40 := ==($t41, $t42)
-     # live vars: $t40
-     # graph: {@1500=local($t11)[],@2100=local($t17)[],@2D00=local($t22)[],@3200=local($t26)[]}
-     # locals: {$t11=@1500,$t17=@2100,$t22=@2D00,$t26=@3200}
-     # globals: {}
-     #
- 87: if ($t40) goto 88 else goto 90
-     # live vars:
-     # graph: {@1500=local($t11)[],@2100=local($t17)[],@2D00=local($t22)[],@3200=local($t26)[]}
-     # locals: {$t11=@1500,$t17=@2100,$t22=@2D00,$t26=@3200}
-     # globals: {}
-     #
- 88: label L21
-     # live vars:
-     # graph: {@1500=local($t11)[],@2100=local($t17)[],@2D00=local($t22)[],@3200=local($t26)[]}
-     # locals: {$t11=@1500,$t17=@2100,$t22=@2D00,$t26=@3200}
-     # globals: {}
-     #
- 89: goto 93
-     # live vars:
-     # graph: {@1500=local($t11)[],@2100=local($t17)[],@2D00=local($t22)[],@3200=local($t26)[]}
-     # locals: {$t11=@1500,$t17=@2100,$t22=@2D00,$t26=@3200}
-     # globals: {}
-     #
- 90: label L22
-     # live vars:
-     # graph: {@1500=local($t11)[],@2100=local($t17)[],@2D00=local($t22)[],@3200=local($t26)[]}
-     # locals: {$t11=@1500,$t17=@2100,$t22=@2D00,$t26=@3200}
-     # globals: {}
-     #
- 91: $t43 := 42
-     # live vars: $t43
-     # graph: {@1500=local($t11)[],@2100=local($t17)[],@2D00=local($t22)[],@3200=local($t26)[]}
-     # locals: {$t11=@1500,$t17=@2100,$t22=@2D00,$t26=@3200}
-     # globals: {}
-     #
- 92: abort($t43)
-     # live vars:
-     # graph: {@1500=local($t11)[],@2100=local($t17)[],@2D00=local($t22)[],@3200=local($t26)[]}
-     # locals: {$t11=@1500,$t17=@2100,$t22=@2D00,$t26=@3200}
-     # globals: {}
-     #
- 93: label L23
-     # live vars:
-     # graph: {@1500=local($t11)[],@2100=local($t17)[],@2D00=local($t22)[],@3200=local($t26)[]}
-     # locals: {$t11=@1500,$t17=@2100,$t22=@2D00,$t26=@3200}
-     # globals: {}
-     #
- 94: return ()
+ 84: return ()
 }
 
 ============ after AbortAnalysisProcessor: ================
@@ -1009,713 +889,633 @@ fun <SELF>_0::check() {
 fun <SELF>_0::check() {
      var $t0: bool
      var $t1: u64
-     var $t2: u64
+     var $t2: bool
      var $t3: u64
      var $t4: bool
-     var $t5: vector<u8>
-     var $t6: vector<u8>
+     var $t5: u64
+     var $t6: &u64
      var $t7: u64
-     var $t8: bool
+     var $t8: u64
      var $t9: u64
-     var $t10: &u64
-     var $t11: u64
-     var $t12: u64
-     var $t13: u64
-     var $t14: bool
-     var $t15: vector<u8>
-     var $t16: &vector<u8>
-     var $t17: vector<u8>
-     var $t18: vector<u8>
-     var $t19: u64
-     var $t20: &mut u64
-     var $t21: &mut u64
-     var $t22: u64
+     var $t10: bool
+     var $t11: vector<u8>
+     var $t12: &vector<u8>
+     var $t13: vector<u8>
+     var $t14: vector<u8>
+     var $t15: u64
+     var $t16: &mut u64
+     var $t17: u64
+     var $t18: u64
+     var $t19: &mut vector<u8>
+     var $t20: vector<u8>
+     var $t21: vector<u8>
+     var $t22: bool
      var $t23: u64
-     var $t24: &mut vector<u8>
-     var $t25: &mut vector<u8>
-     var $t26: vector<u8>
+     var $t24: u64
+     var $t25: u64
+     var $t26: bool
      var $t27: vector<u8>
-     var $t28: bool
+     var $t28: vector<u8>
      var $t29: u64
-     var $t30: u64
+     var $t30: bool
      var $t31: u64
      var $t32: bool
-     var $t33: vector<u8>
-     var $t34: vector<u8>
-     var $t35: u64
-     var $t36: bool
-     var $t37: u64
-     var $t38: u64
-     var $t39: u64
-     var $t40: bool
-     var $t41: vector<u8>
-     var $t42: vector<u8>
-     var $t43: u64
+     var $t33: u64
      # abort state: {returns,aborts}
      # live vars:
      # graph: {}
      # locals: {}
      # globals: {}
      #
-  0: $t1 := 0
-     # abort state: {returns,aborts}
-     # live vars: $t1
-     # graph: {}
-     # locals: {}
-     # globals: {}
-     #
-  1: $t2 := 0
-     # abort state: {returns,aborts}
-     # live vars: $t1, $t2
-     # graph: {}
-     # locals: {}
-     # globals: {}
-     #
-  2: $t0 := ==($t1, $t2)
+  0: $t0 := true
      # abort state: {returns,aborts}
      # live vars: $t0
      # graph: {}
      # locals: {}
      # globals: {}
      #
-  3: if ($t0) goto 4 else goto 6
+  1: if ($t0) goto 2 else goto 4
      # abort state: {returns,aborts}
      # live vars:
      # graph: {}
      # locals: {}
      # globals: {}
      #
-  4: label L0
+  2: label L0
      # abort state: {returns,aborts}
      # live vars:
      # graph: {}
      # locals: {}
      # globals: {}
      #
-  5: goto 9
+  3: goto 7
      # abort state: {aborts}
      # live vars:
      # graph: {}
      # locals: {}
      # globals: {}
      #
-  6: label L1
+  4: label L1
      # abort state: {aborts}
      # live vars:
      # graph: {}
      # locals: {}
      # globals: {}
      #
-  7: $t3 := 42
+  5: $t1 := 42
+     # abort state: {aborts}
+     # live vars: $t1
+     # graph: {}
+     # locals: {}
+     # globals: {}
+     #
+  6: abort($t1)
+     # abort state: {returns,aborts}
+     # live vars:
+     # graph: {}
+     # locals: {}
+     # globals: {}
+     #
+  7: label L2
+     # abort state: {returns,aborts}
+     # live vars:
+     # graph: {}
+     # locals: {}
+     # globals: {}
+     #
+  8: $t2 := true
+     # abort state: {returns,aborts}
+     # live vars: $t2
+     # graph: {}
+     # locals: {}
+     # globals: {}
+     #
+  9: if ($t2) goto 10 else goto 12
+     # abort state: {returns,aborts}
+     # live vars:
+     # graph: {}
+     # locals: {}
+     # globals: {}
+     #
+ 10: label L3
+     # abort state: {returns,aborts}
+     # live vars:
+     # graph: {}
+     # locals: {}
+     # globals: {}
+     #
+ 11: goto 15
+     # abort state: {aborts}
+     # live vars:
+     # graph: {}
+     # locals: {}
+     # globals: {}
+     #
+ 12: label L4
+     # abort state: {aborts}
+     # live vars:
+     # graph: {}
+     # locals: {}
+     # globals: {}
+     #
+ 13: $t3 := 42
      # abort state: {aborts}
      # live vars: $t3
      # graph: {}
      # locals: {}
      # globals: {}
      #
-  8: abort($t3)
+ 14: abort($t3)
      # abort state: {returns,aborts}
      # live vars:
      # graph: {}
      # locals: {}
      # globals: {}
      #
-  9: label L2
+ 15: label L5
      # abort state: {returns,aborts}
      # live vars:
      # graph: {}
      # locals: {}
      # globals: {}
      #
- 10: $t5 := [104, 101, 108, 108, 111]
+ 16: $t7 := 0
      # abort state: {returns,aborts}
-     # live vars: $t5
-     # graph: {}
-     # locals: {}
-     # globals: {}
-     #
- 11: $t6 := [104, 101, 108, 108, 111]
-     # abort state: {returns,aborts}
-     # live vars: $t5, $t6
-     # graph: {}
-     # locals: {}
-     # globals: {}
-     #
- 12: $t4 := ==($t5, $t6)
-     # abort state: {returns,aborts}
-     # live vars: $t4
-     # graph: {}
-     # locals: {}
-     # globals: {}
-     #
- 13: if ($t4) goto 14 else goto 16
-     # abort state: {returns,aborts}
-     # live vars:
-     # graph: {}
-     # locals: {}
-     # globals: {}
-     #
- 14: label L3
-     # abort state: {returns,aborts}
-     # live vars:
-     # graph: {}
-     # locals: {}
-     # globals: {}
-     #
- 15: goto 19
-     # abort state: {aborts}
-     # live vars:
-     # graph: {}
-     # locals: {}
-     # globals: {}
-     #
- 16: label L4
-     # abort state: {aborts}
-     # live vars:
-     # graph: {}
-     # locals: {}
-     # globals: {}
-     #
- 17: $t7 := 42
-     # abort state: {aborts}
      # live vars: $t7
      # graph: {}
      # locals: {}
      # globals: {}
      #
- 18: abort($t7)
+ 17: $t6 := borrow_local($t7)
      # abort state: {returns,aborts}
-     # live vars:
-     # graph: {}
-     # locals: {}
+     # live vars: $t6
+     # graph: {@1100=local($t7)[borrow(false) -> @1101],@1101=derived[]}
+     # locals: {$t6=@1101,$t7=@1100}
      # globals: {}
      #
- 19: label L5
+ 18: $t5 := read_ref($t6)
      # abort state: {returns,aborts}
-     # live vars:
-     # graph: {}
-     # locals: {}
+     # live vars: $t5
+     # graph: {@1100=local($t7)[]}
+     # locals: {$t7=@1100}
      # globals: {}
      #
- 20: $t11 := 0
+ 19: $t8 := 0
+     # abort state: {returns,aborts}
+     # live vars: $t5, $t8
+     # graph: {@1100=local($t7)[]}
+     # locals: {$t7=@1100}
+     # globals: {}
+     #
+ 20: $t4 := ==($t5, $t8)
+     # abort state: {returns,aborts}
+     # live vars: $t4
+     # graph: {@1100=local($t7)[]}
+     # locals: {$t7=@1100}
+     # globals: {}
+     #
+ 21: if ($t4) goto 22 else goto 24
+     # abort state: {returns,aborts}
+     # live vars:
+     # graph: {@1100=local($t7)[]}
+     # locals: {$t7=@1100}
+     # globals: {}
+     #
+ 22: label L6
+     # abort state: {returns,aborts}
+     # live vars:
+     # graph: {@1100=local($t7)[]}
+     # locals: {$t7=@1100}
+     # globals: {}
+     #
+ 23: goto 27
+     # abort state: {aborts}
+     # live vars:
+     # graph: {@1100=local($t7)[]}
+     # locals: {$t7=@1100}
+     # globals: {}
+     #
+ 24: label L7
+     # abort state: {aborts}
+     # live vars:
+     # graph: {@1100=local($t7)[]}
+     # locals: {$t7=@1100}
+     # globals: {}
+     #
+ 25: $t9 := 42
+     # abort state: {aborts}
+     # live vars: $t9
+     # graph: {@1100=local($t7)[]}
+     # locals: {$t7=@1100}
+     # globals: {}
+     #
+ 26: abort($t9)
+     # abort state: {returns,aborts}
+     # live vars:
+     # graph: {@1100=local($t7)[]}
+     # locals: {$t7=@1100}
+     # globals: {}
+     #
+ 27: label L8
+     # abort state: {returns,aborts}
+     # live vars:
+     # graph: {@1100=local($t7)[]}
+     # locals: {$t7=@1100}
+     # globals: {}
+     #
+ 28: $t13 := [104, 101, 108, 108, 111]
+     # abort state: {returns,aborts}
+     # live vars: $t13
+     # graph: {@1100=local($t7)[]}
+     # locals: {$t7=@1100}
+     # globals: {}
+     #
+ 29: $t12 := borrow_local($t13)
+     # abort state: {returns,aborts}
+     # live vars: $t12
+     # graph: {@1100=local($t7)[],@1D00=local($t13)[borrow(false) -> @1D01],@1D01=derived[]}
+     # locals: {$t7=@1100,$t12=@1D01,$t13=@1D00}
+     # globals: {}
+     #
+ 30: $t11 := read_ref($t12)
      # abort state: {returns,aborts}
      # live vars: $t11
-     # graph: {}
-     # locals: {}
+     # graph: {@1100=local($t7)[],@1D00=local($t13)[]}
+     # locals: {$t7=@1100,$t13=@1D00}
      # globals: {}
      #
- 21: $t10 := borrow_local($t11)
+ 31: $t14 := [104, 101, 108, 108, 111]
+     # abort state: {returns,aborts}
+     # live vars: $t11, $t14
+     # graph: {@1100=local($t7)[],@1D00=local($t13)[]}
+     # locals: {$t7=@1100,$t13=@1D00}
+     # globals: {}
+     #
+ 32: $t10 := ==($t11, $t14)
      # abort state: {returns,aborts}
      # live vars: $t10
-     # graph: {@1500=local($t11)[borrow(false) -> @1501],@1501=derived[]}
-     # locals: {$t10=@1501,$t11=@1500}
+     # graph: {@1100=local($t7)[],@1D00=local($t13)[]}
+     # locals: {$t7=@1100,$t13=@1D00}
      # globals: {}
      #
- 22: $t9 := read_ref($t10)
-     # abort state: {returns,aborts}
-     # live vars: $t9
-     # graph: {@1500=local($t11)[]}
-     # locals: {$t11=@1500}
-     # globals: {}
-     #
- 23: $t12 := 0
-     # abort state: {returns,aborts}
-     # live vars: $t9, $t12
-     # graph: {@1500=local($t11)[]}
-     # locals: {$t11=@1500}
-     # globals: {}
-     #
- 24: $t8 := ==($t9, $t12)
-     # abort state: {returns,aborts}
-     # live vars: $t8
-     # graph: {@1500=local($t11)[]}
-     # locals: {$t11=@1500}
-     # globals: {}
-     #
- 25: if ($t8) goto 26 else goto 28
+ 33: if ($t10) goto 34 else goto 36
      # abort state: {returns,aborts}
      # live vars:
-     # graph: {@1500=local($t11)[]}
-     # locals: {$t11=@1500}
+     # graph: {@1100=local($t7)[],@1D00=local($t13)[]}
+     # locals: {$t7=@1100,$t13=@1D00}
      # globals: {}
      #
- 26: label L6
+ 34: label L9
      # abort state: {returns,aborts}
      # live vars:
-     # graph: {@1500=local($t11)[]}
-     # locals: {$t11=@1500}
+     # graph: {@1100=local($t7)[],@1D00=local($t13)[]}
+     # locals: {$t7=@1100,$t13=@1D00}
      # globals: {}
      #
- 27: goto 31
+ 35: goto 39
      # abort state: {aborts}
      # live vars:
-     # graph: {@1500=local($t11)[]}
-     # locals: {$t11=@1500}
+     # graph: {@1100=local($t7)[],@1D00=local($t13)[]}
+     # locals: {$t7=@1100,$t13=@1D00}
      # globals: {}
      #
- 28: label L7
+ 36: label L10
      # abort state: {aborts}
      # live vars:
-     # graph: {@1500=local($t11)[]}
-     # locals: {$t11=@1500}
+     # graph: {@1100=local($t7)[],@1D00=local($t13)[]}
+     # locals: {$t7=@1100,$t13=@1D00}
      # globals: {}
      #
- 29: $t13 := 42
+ 37: $t15 := 42
      # abort state: {aborts}
-     # live vars: $t13
-     # graph: {@1500=local($t11)[]}
-     # locals: {$t11=@1500}
+     # live vars: $t15
+     # graph: {@1100=local($t7)[],@1D00=local($t13)[]}
+     # locals: {$t7=@1100,$t13=@1D00}
      # globals: {}
      #
- 30: abort($t13)
+ 38: abort($t15)
      # abort state: {returns,aborts}
      # live vars:
-     # graph: {@1500=local($t11)[]}
-     # locals: {$t11=@1500}
+     # graph: {@1100=local($t7)[],@1D00=local($t13)[]}
+     # locals: {$t7=@1100,$t13=@1D00}
      # globals: {}
      #
- 31: label L8
+ 39: label L11
      # abort state: {returns,aborts}
      # live vars:
-     # graph: {@1500=local($t11)[]}
-     # locals: {$t11=@1500}
+     # graph: {@1100=local($t7)[],@1D00=local($t13)[]}
+     # locals: {$t7=@1100,$t13=@1D00}
      # globals: {}
      #
- 32: $t17 := [104, 101, 108, 108, 111]
+ 40: $t17 := 0
      # abort state: {returns,aborts}
      # live vars: $t17
-     # graph: {@1500=local($t11)[]}
-     # locals: {$t11=@1500}
+     # graph: {@1100=local($t7)[],@1D00=local($t13)[]}
+     # locals: {$t7=@1100,$t13=@1D00}
      # globals: {}
      #
- 33: $t16 := borrow_local($t17)
+ 41: $t16 := borrow_local($t17)
      # abort state: {returns,aborts}
      # live vars: $t16
-     # graph: {@1500=local($t11)[],@2100=local($t17)[borrow(false) -> @2101],@2101=derived[]}
-     # locals: {$t11=@1500,$t16=@2101,$t17=@2100}
+     # graph: {@1100=local($t7)[],@1D00=local($t13)[],@2900=local($t17)[borrow(true) -> @2901],@2901=derived[]}
+     # locals: {$t7=@1100,$t13=@1D00,$t16=@2901,$t17=@2900}
      # globals: {}
      #
- 34: $t15 := read_ref($t16)
+ 42: $t18 := 1
      # abort state: {returns,aborts}
-     # live vars: $t15
-     # graph: {@1500=local($t11)[],@2100=local($t17)[]}
-     # locals: {$t11=@1500,$t17=@2100}
+     # live vars: $t16, $t18
+     # graph: {@1100=local($t7)[],@1D00=local($t13)[],@2900=local($t17)[borrow(true) -> @2901],@2901=derived[]}
+     # locals: {$t7=@1100,$t13=@1D00,$t16=@2901,$t17=@2900}
      # globals: {}
      #
- 35: $t18 := [104, 101, 108, 108, 111]
+ 43: write_ref($t16, $t18)
      # abort state: {returns,aborts}
-     # live vars: $t15, $t18
-     # graph: {@1500=local($t11)[],@2100=local($t17)[]}
-     # locals: {$t11=@1500,$t17=@2100}
+     # live vars: $t16
+     # graph: {@1100=local($t7)[],@1D00=local($t13)[],@2900=local($t17)[borrow(true) -> @2901],@2901=derived[]}
+     # locals: {$t7=@1100,$t13=@1D00,$t16=@2901,$t17=@2900}
      # globals: {}
      #
- 36: $t14 := ==($t15, $t18)
+ 44: $t20 := [104, 101, 108, 108, 111]
      # abort state: {returns,aborts}
-     # live vars: $t14
-     # graph: {@1500=local($t11)[],@2100=local($t17)[]}
-     # locals: {$t11=@1500,$t17=@2100}
+     # live vars: $t16, $t20
+     # graph: {@1100=local($t7)[],@1D00=local($t13)[],@2900=local($t17)[borrow(true) -> @2901],@2901=derived[]}
+     # locals: {$t7=@1100,$t13=@1D00,$t16=@2901,$t17=@2900}
      # globals: {}
      #
- 37: if ($t14) goto 38 else goto 40
+ 45: $t19 := borrow_local($t20)
      # abort state: {returns,aborts}
-     # live vars:
-     # graph: {@1500=local($t11)[],@2100=local($t17)[]}
-     # locals: {$t11=@1500,$t17=@2100}
+     # live vars: $t16, $t19
+     # graph: {@1100=local($t7)[],@1D00=local($t13)[],@2900=local($t17)[borrow(true) -> @2901],@2901=derived[],@2D00=local($t20)[borrow(true) -> @2D01],@2D01=derived[]}
+     # locals: {$t7=@1100,$t13=@1D00,$t16=@2901,$t17=@2900,$t19=@2D01,$t20=@2D00}
      # globals: {}
      #
- 38: label L9
+ 46: $t21 := [98, 121, 101]
      # abort state: {returns,aborts}
-     # live vars:
-     # graph: {@1500=local($t11)[],@2100=local($t17)[]}
-     # locals: {$t11=@1500,$t17=@2100}
+     # live vars: $t16, $t19, $t21
+     # graph: {@1100=local($t7)[],@1D00=local($t13)[],@2900=local($t17)[borrow(true) -> @2901],@2901=derived[],@2D00=local($t20)[borrow(true) -> @2D01],@2D01=derived[]}
+     # locals: {$t7=@1100,$t13=@1D00,$t16=@2901,$t17=@2900,$t19=@2D01,$t20=@2D00}
      # globals: {}
      #
- 39: goto 43
-     # abort state: {aborts}
-     # live vars:
-     # graph: {@1500=local($t11)[],@2100=local($t17)[]}
-     # locals: {$t11=@1500,$t17=@2100}
+ 47: write_ref($t19, $t21)
+     # abort state: {returns,aborts}
+     # live vars: $t16, $t19
+     # graph: {@1100=local($t7)[],@1D00=local($t13)[],@2900=local($t17)[borrow(true) -> @2901],@2901=derived[],@2D00=local($t20)[borrow(true) -> @2D01],@2D01=derived[]}
+     # locals: {$t7=@1100,$t13=@1D00,$t16=@2901,$t17=@2900,$t19=@2D01,$t20=@2D00}
      # globals: {}
      #
- 40: label L10
-     # abort state: {aborts}
-     # live vars:
-     # graph: {@1500=local($t11)[],@2100=local($t17)[]}
-     # locals: {$t11=@1500,$t17=@2100}
+ 48: $t23 := read_ref($t16)
+     # abort state: {returns,aborts}
+     # live vars: $t19, $t23
+     # graph: {@1100=local($t7)[],@1D00=local($t13)[],@2900=local($t17)[],@2D00=local($t20)[borrow(true) -> @2D01],@2D01=derived[]}
+     # locals: {$t7=@1100,$t13=@1D00,$t17=@2900,$t19=@2D01,$t20=@2D00}
      # globals: {}
      #
- 41: $t19 := 42
+ 49: $t24 := 1
+     # abort state: {returns,aborts}
+     # live vars: $t19, $t23, $t24
+     # graph: {@1100=local($t7)[],@1D00=local($t13)[],@2900=local($t17)[],@2D00=local($t20)[borrow(true) -> @2D01],@2D01=derived[]}
+     # locals: {$t7=@1100,$t13=@1D00,$t17=@2900,$t19=@2D01,$t20=@2D00}
+     # globals: {}
+     #
+ 50: $t22 := ==($t23, $t24)
+     # abort state: {returns,aborts}
+     # live vars: $t19, $t22
+     # graph: {@1100=local($t7)[],@1D00=local($t13)[],@2900=local($t17)[],@2D00=local($t20)[borrow(true) -> @2D01],@2D01=derived[]}
+     # locals: {$t7=@1100,$t13=@1D00,$t17=@2900,$t19=@2D01,$t20=@2D00}
+     # globals: {}
+     #
+ 51: if ($t22) goto 52 else goto 54
+     # abort state: {returns,aborts}
+     # live vars: $t19
+     # graph: {@1100=local($t7)[],@1D00=local($t13)[],@2900=local($t17)[],@2D00=local($t20)[borrow(true) -> @2D01],@2D01=derived[]}
+     # locals: {$t7=@1100,$t13=@1D00,$t17=@2900,$t19=@2D01,$t20=@2D00}
+     # globals: {}
+     #
+ 52: label L12
+     # abort state: {returns,aborts}
+     # live vars: $t19
+     # graph: {@1100=local($t7)[],@1D00=local($t13)[],@2900=local($t17)[],@2D00=local($t20)[borrow(true) -> @2D01],@2D01=derived[]}
+     # locals: {$t7=@1100,$t13=@1D00,$t17=@2900,$t19=@2D01,$t20=@2D00}
+     # globals: {}
+     #
+ 53: goto 57
      # abort state: {aborts}
      # live vars: $t19
-     # graph: {@1500=local($t11)[],@2100=local($t17)[]}
-     # locals: {$t11=@1500,$t17=@2100}
+     # graph: {@1100=local($t7)[],@1D00=local($t13)[],@2900=local($t17)[],@2D00=local($t20)[borrow(true) -> @2D01],@2D01=derived[]}
+     # locals: {$t7=@1100,$t13=@1D00,$t17=@2900,$t19=@2D01,$t20=@2D00}
      # globals: {}
      #
- 42: abort($t19)
-     # abort state: {returns,aborts}
-     # live vars:
-     # graph: {@1500=local($t11)[],@2100=local($t17)[]}
-     # locals: {$t11=@1500,$t17=@2100}
-     # globals: {}
-     #
- 43: label L11
-     # abort state: {returns,aborts}
-     # live vars:
-     # graph: {@1500=local($t11)[],@2100=local($t17)[]}
-     # locals: {$t11=@1500,$t17=@2100}
-     # globals: {}
-     #
- 44: $t22 := 0
-     # abort state: {returns,aborts}
-     # live vars: $t22
-     # graph: {@1500=local($t11)[],@2100=local($t17)[]}
-     # locals: {$t11=@1500,$t17=@2100}
-     # globals: {}
-     #
- 45: $t21 := borrow_local($t22)
-     # abort state: {returns,aborts}
-     # live vars: $t21
-     # graph: {@1500=local($t11)[],@2100=local($t17)[],@2D00=local($t22)[borrow(true) -> @2D01],@2D01=derived[]}
-     # locals: {$t11=@1500,$t17=@2100,$t21=@2D01,$t22=@2D00}
-     # globals: {}
-     #
- 46: $t20 := infer($t21)
-     # abort state: {returns,aborts}
-     # live vars: $t20
-     # graph: {@1500=local($t11)[],@2100=local($t17)[],@2D00=local($t22)[borrow(true) -> @2D01],@2D01=derived[]}
-     # locals: {$t11=@1500,$t17=@2100,$t20=@2D01,$t22=@2D00}
-     # globals: {}
-     #
- 47: $t23 := 1
-     # abort state: {returns,aborts}
-     # live vars: $t20, $t23
-     # graph: {@1500=local($t11)[],@2100=local($t17)[],@2D00=local($t22)[borrow(true) -> @2D01],@2D01=derived[]}
-     # locals: {$t11=@1500,$t17=@2100,$t20=@2D01,$t22=@2D00}
-     # globals: {}
-     #
- 48: write_ref($t20, $t23)
-     # abort state: {returns,aborts}
-     # live vars: $t20
-     # graph: {@1500=local($t11)[],@2100=local($t17)[],@2D00=local($t22)[borrow(true) -> @2D01],@2D01=derived[]}
-     # locals: {$t11=@1500,$t17=@2100,$t20=@2D01,$t22=@2D00}
-     # globals: {}
-     #
- 49: $t26 := [104, 101, 108, 108, 111]
-     # abort state: {returns,aborts}
-     # live vars: $t20, $t26
-     # graph: {@1500=local($t11)[],@2100=local($t17)[],@2D00=local($t22)[borrow(true) -> @2D01],@2D01=derived[]}
-     # locals: {$t11=@1500,$t17=@2100,$t20=@2D01,$t22=@2D00}
-     # globals: {}
-     #
- 50: $t25 := borrow_local($t26)
-     # abort state: {returns,aborts}
-     # live vars: $t20, $t25
-     # graph: {@1500=local($t11)[],@2100=local($t17)[],@2D00=local($t22)[borrow(true) -> @2D01],@2D01=derived[],@3200=local($t26)[borrow(true) -> @3201],@3201=derived[]}
-     # locals: {$t11=@1500,$t17=@2100,$t20=@2D01,$t22=@2D00,$t25=@3201,$t26=@3200}
-     # globals: {}
-     #
- 51: $t24 := infer($t25)
-     # abort state: {returns,aborts}
-     # live vars: $t20, $t24
-     # graph: {@1500=local($t11)[],@2100=local($t17)[],@2D00=local($t22)[borrow(true) -> @2D01],@2D01=derived[],@3200=local($t26)[borrow(true) -> @3201],@3201=derived[]}
-     # locals: {$t11=@1500,$t17=@2100,$t20=@2D01,$t22=@2D00,$t24=@3201,$t26=@3200}
-     # globals: {}
-     #
- 52: $t27 := [98, 121, 101]
-     # abort state: {returns,aborts}
-     # live vars: $t20, $t24, $t27
-     # graph: {@1500=local($t11)[],@2100=local($t17)[],@2D00=local($t22)[borrow(true) -> @2D01],@2D01=derived[],@3200=local($t26)[borrow(true) -> @3201],@3201=derived[]}
-     # locals: {$t11=@1500,$t17=@2100,$t20=@2D01,$t22=@2D00,$t24=@3201,$t26=@3200}
-     # globals: {}
-     #
- 53: write_ref($t24, $t27)
-     # abort state: {returns,aborts}
-     # live vars: $t20, $t24
-     # graph: {@1500=local($t11)[],@2100=local($t17)[],@2D00=local($t22)[borrow(true) -> @2D01],@2D01=derived[],@3200=local($t26)[borrow(true) -> @3201],@3201=derived[]}
-     # locals: {$t11=@1500,$t17=@2100,$t20=@2D01,$t22=@2D00,$t24=@3201,$t26=@3200}
-     # globals: {}
-     #
- 54: $t29 := read_ref($t20)
-     # abort state: {returns,aborts}
-     # live vars: $t24, $t29
-     # graph: {@1500=local($t11)[],@2100=local($t17)[],@2D00=local($t22)[],@3200=local($t26)[borrow(true) -> @3201],@3201=derived[]}
-     # locals: {$t11=@1500,$t17=@2100,$t22=@2D00,$t24=@3201,$t26=@3200}
-     # globals: {}
-     #
- 55: $t30 := 1
-     # abort state: {returns,aborts}
-     # live vars: $t24, $t29, $t30
-     # graph: {@1500=local($t11)[],@2100=local($t17)[],@2D00=local($t22)[],@3200=local($t26)[borrow(true) -> @3201],@3201=derived[]}
-     # locals: {$t11=@1500,$t17=@2100,$t22=@2D00,$t24=@3201,$t26=@3200}
-     # globals: {}
-     #
- 56: $t28 := ==($t29, $t30)
-     # abort state: {returns,aborts}
-     # live vars: $t24, $t28
-     # graph: {@1500=local($t11)[],@2100=local($t17)[],@2D00=local($t22)[],@3200=local($t26)[borrow(true) -> @3201],@3201=derived[]}
-     # locals: {$t11=@1500,$t17=@2100,$t22=@2D00,$t24=@3201,$t26=@3200}
-     # globals: {}
-     #
- 57: if ($t28) goto 58 else goto 60
-     # abort state: {returns,aborts}
-     # live vars: $t24
-     # graph: {@1500=local($t11)[],@2100=local($t17)[],@2D00=local($t22)[],@3200=local($t26)[borrow(true) -> @3201],@3201=derived[]}
-     # locals: {$t11=@1500,$t17=@2100,$t22=@2D00,$t24=@3201,$t26=@3200}
-     # globals: {}
-     #
- 58: label L12
-     # abort state: {returns,aborts}
-     # live vars: $t24
-     # graph: {@1500=local($t11)[],@2100=local($t17)[],@2D00=local($t22)[],@3200=local($t26)[borrow(true) -> @3201],@3201=derived[]}
-     # locals: {$t11=@1500,$t17=@2100,$t22=@2D00,$t24=@3201,$t26=@3200}
-     # globals: {}
-     #
- 59: goto 63
-     # abort state: {aborts}
-     # live vars: $t24
-     # graph: {@1500=local($t11)[],@2100=local($t17)[],@2D00=local($t22)[],@3200=local($t26)[borrow(true) -> @3201],@3201=derived[]}
-     # locals: {$t11=@1500,$t17=@2100,$t22=@2D00,$t24=@3201,$t26=@3200}
-     # globals: {}
-     #
- 60: label L13
+ 54: label L13
      # abort state: {aborts}
      # live vars:
-     # graph: {@1500=local($t11)[],@2100=local($t17)[],@2D00=local($t22)[],@3200=local($t26)[]}
-     # locals: {$t11=@1500,$t17=@2100,$t22=@2D00,$t26=@3200}
+     # graph: {@1100=local($t7)[],@1D00=local($t13)[],@2900=local($t17)[],@2D00=local($t20)[]}
+     # locals: {$t7=@1100,$t13=@1D00,$t17=@2900,$t20=@2D00}
      # globals: {}
      #
- 61: $t31 := 42
+ 55: $t25 := 42
+     # abort state: {aborts}
+     # live vars: $t25
+     # graph: {@1100=local($t7)[],@1D00=local($t13)[],@2900=local($t17)[],@2D00=local($t20)[]}
+     # locals: {$t7=@1100,$t13=@1D00,$t17=@2900,$t20=@2D00}
+     # globals: {}
+     #
+ 56: abort($t25)
+     # abort state: {returns,aborts}
+     # live vars: $t19
+     # graph: {@1100=local($t7)[],@1D00=local($t13)[],@2900=local($t17)[],@2D00=local($t20)[borrow(true) -> @2D01],@2D01=derived[]}
+     # locals: {$t7=@1100,$t13=@1D00,$t17=@2900,$t19=@2D01,$t20=@2D00}
+     # globals: {}
+     #
+ 57: label L14
+     # abort state: {returns,aborts}
+     # live vars: $t19
+     # graph: {@1100=local($t7)[],@1D00=local($t13)[],@2900=local($t17)[],@2D00=local($t20)[borrow(true) -> @2D01],@2D01=derived[]}
+     # locals: {$t7=@1100,$t13=@1D00,$t17=@2900,$t19=@2D01,$t20=@2D00}
+     # globals: {}
+     #
+ 58: $t27 := read_ref($t19)
+     # abort state: {returns,aborts}
+     # live vars: $t27
+     # graph: {@1100=local($t7)[],@1D00=local($t13)[],@2900=local($t17)[],@2D00=local($t20)[]}
+     # locals: {$t7=@1100,$t13=@1D00,$t17=@2900,$t20=@2D00}
+     # globals: {}
+     #
+ 59: $t28 := [98, 121, 101]
+     # abort state: {returns,aborts}
+     # live vars: $t27, $t28
+     # graph: {@1100=local($t7)[],@1D00=local($t13)[],@2900=local($t17)[],@2D00=local($t20)[]}
+     # locals: {$t7=@1100,$t13=@1D00,$t17=@2900,$t20=@2D00}
+     # globals: {}
+     #
+ 60: $t26 := ==($t27, $t28)
+     # abort state: {returns,aborts}
+     # live vars: $t26
+     # graph: {@1100=local($t7)[],@1D00=local($t13)[],@2900=local($t17)[],@2D00=local($t20)[]}
+     # locals: {$t7=@1100,$t13=@1D00,$t17=@2900,$t20=@2D00}
+     # globals: {}
+     #
+ 61: if ($t26) goto 62 else goto 64
+     # abort state: {returns,aborts}
+     # live vars:
+     # graph: {@1100=local($t7)[],@1D00=local($t13)[],@2900=local($t17)[],@2D00=local($t20)[]}
+     # locals: {$t7=@1100,$t13=@1D00,$t17=@2900,$t20=@2D00}
+     # globals: {}
+     #
+ 62: label L15
+     # abort state: {returns,aborts}
+     # live vars:
+     # graph: {@1100=local($t7)[],@1D00=local($t13)[],@2900=local($t17)[],@2D00=local($t20)[]}
+     # locals: {$t7=@1100,$t13=@1D00,$t17=@2900,$t20=@2D00}
+     # globals: {}
+     #
+ 63: goto 67
+     # abort state: {aborts}
+     # live vars:
+     # graph: {@1100=local($t7)[],@1D00=local($t13)[],@2900=local($t17)[],@2D00=local($t20)[]}
+     # locals: {$t7=@1100,$t13=@1D00,$t17=@2900,$t20=@2D00}
+     # globals: {}
+     #
+ 64: label L16
+     # abort state: {aborts}
+     # live vars:
+     # graph: {@1100=local($t7)[],@1D00=local($t13)[],@2900=local($t17)[],@2D00=local($t20)[]}
+     # locals: {$t7=@1100,$t13=@1D00,$t17=@2900,$t20=@2D00}
+     # globals: {}
+     #
+ 65: $t29 := 42
+     # abort state: {aborts}
+     # live vars: $t29
+     # graph: {@1100=local($t7)[],@1D00=local($t13)[],@2900=local($t17)[],@2D00=local($t20)[]}
+     # locals: {$t7=@1100,$t13=@1D00,$t17=@2900,$t20=@2D00}
+     # globals: {}
+     #
+ 66: abort($t29)
+     # abort state: {returns,aborts}
+     # live vars:
+     # graph: {@1100=local($t7)[],@1D00=local($t13)[],@2900=local($t17)[],@2D00=local($t20)[]}
+     # locals: {$t7=@1100,$t13=@1D00,$t17=@2900,$t20=@2D00}
+     # globals: {}
+     #
+ 67: label L17
+     # abort state: {returns,aborts}
+     # live vars:
+     # graph: {@1100=local($t7)[],@1D00=local($t13)[],@2900=local($t17)[],@2D00=local($t20)[]}
+     # locals: {$t7=@1100,$t13=@1D00,$t17=@2900,$t20=@2D00}
+     # globals: {}
+     #
+ 68: $t30 := true
+     # abort state: {returns,aborts}
+     # live vars: $t30
+     # graph: {@1100=local($t7)[],@1D00=local($t13)[],@2900=local($t17)[],@2D00=local($t20)[]}
+     # locals: {$t7=@1100,$t13=@1D00,$t17=@2900,$t20=@2D00}
+     # globals: {}
+     #
+ 69: if ($t30) goto 70 else goto 72
+     # abort state: {returns,aborts}
+     # live vars:
+     # graph: {@1100=local($t7)[],@1D00=local($t13)[],@2900=local($t17)[],@2D00=local($t20)[]}
+     # locals: {$t7=@1100,$t13=@1D00,$t17=@2900,$t20=@2D00}
+     # globals: {}
+     #
+ 70: label L18
+     # abort state: {returns,aborts}
+     # live vars:
+     # graph: {@1100=local($t7)[],@1D00=local($t13)[],@2900=local($t17)[],@2D00=local($t20)[]}
+     # locals: {$t7=@1100,$t13=@1D00,$t17=@2900,$t20=@2D00}
+     # globals: {}
+     #
+ 71: goto 75
+     # abort state: {aborts}
+     # live vars:
+     # graph: {@1100=local($t7)[],@1D00=local($t13)[],@2900=local($t17)[],@2D00=local($t20)[]}
+     # locals: {$t7=@1100,$t13=@1D00,$t17=@2900,$t20=@2D00}
+     # globals: {}
+     #
+ 72: label L19
+     # abort state: {aborts}
+     # live vars:
+     # graph: {@1100=local($t7)[],@1D00=local($t13)[],@2900=local($t17)[],@2D00=local($t20)[]}
+     # locals: {$t7=@1100,$t13=@1D00,$t17=@2900,$t20=@2D00}
+     # globals: {}
+     #
+ 73: $t31 := 42
      # abort state: {aborts}
      # live vars: $t31
-     # graph: {@1500=local($t11)[],@2100=local($t17)[],@2D00=local($t22)[],@3200=local($t26)[]}
-     # locals: {$t11=@1500,$t17=@2100,$t22=@2D00,$t26=@3200}
+     # graph: {@1100=local($t7)[],@1D00=local($t13)[],@2900=local($t17)[],@2D00=local($t20)[]}
+     # locals: {$t7=@1100,$t13=@1D00,$t17=@2900,$t20=@2D00}
      # globals: {}
      #
- 62: abort($t31)
+ 74: abort($t31)
      # abort state: {returns,aborts}
-     # live vars: $t24
-     # graph: {@1500=local($t11)[],@2100=local($t17)[],@2D00=local($t22)[],@3200=local($t26)[borrow(true) -> @3201],@3201=derived[]}
-     # locals: {$t11=@1500,$t17=@2100,$t22=@2D00,$t24=@3201,$t26=@3200}
+     # live vars:
+     # graph: {@1100=local($t7)[],@1D00=local($t13)[],@2900=local($t17)[],@2D00=local($t20)[]}
+     # locals: {$t7=@1100,$t13=@1D00,$t17=@2900,$t20=@2D00}
      # globals: {}
      #
- 63: label L14
+ 75: label L20
      # abort state: {returns,aborts}
-     # live vars: $t24
-     # graph: {@1500=local($t11)[],@2100=local($t17)[],@2D00=local($t22)[],@3200=local($t26)[borrow(true) -> @3201],@3201=derived[]}
-     # locals: {$t11=@1500,$t17=@2100,$t22=@2D00,$t24=@3201,$t26=@3200}
+     # live vars:
+     # graph: {@1100=local($t7)[],@1D00=local($t13)[],@2900=local($t17)[],@2D00=local($t20)[]}
+     # locals: {$t7=@1100,$t13=@1D00,$t17=@2900,$t20=@2D00}
      # globals: {}
      #
- 64: $t33 := read_ref($t24)
-     # abort state: {returns,aborts}
-     # live vars: $t33
-     # graph: {@1500=local($t11)[],@2100=local($t17)[],@2D00=local($t22)[],@3200=local($t26)[]}
-     # locals: {$t11=@1500,$t17=@2100,$t22=@2D00,$t26=@3200}
-     # globals: {}
-     #
- 65: $t34 := [98, 121, 101]
-     # abort state: {returns,aborts}
-     # live vars: $t33, $t34
-     # graph: {@1500=local($t11)[],@2100=local($t17)[],@2D00=local($t22)[],@3200=local($t26)[]}
-     # locals: {$t11=@1500,$t17=@2100,$t22=@2D00,$t26=@3200}
-     # globals: {}
-     #
- 66: $t32 := ==($t33, $t34)
+ 76: $t32 := true
      # abort state: {returns,aborts}
      # live vars: $t32
-     # graph: {@1500=local($t11)[],@2100=local($t17)[],@2D00=local($t22)[],@3200=local($t26)[]}
-     # locals: {$t11=@1500,$t17=@2100,$t22=@2D00,$t26=@3200}
+     # graph: {@1100=local($t7)[],@1D00=local($t13)[],@2900=local($t17)[],@2D00=local($t20)[]}
+     # locals: {$t7=@1100,$t13=@1D00,$t17=@2900,$t20=@2D00}
      # globals: {}
      #
- 67: if ($t32) goto 68 else goto 70
-     # abort state: {returns,aborts}
+ 77: if ($t32) goto 78 else goto 80
+     # abort state: {returns}
      # live vars:
-     # graph: {@1500=local($t11)[],@2100=local($t17)[],@2D00=local($t22)[],@3200=local($t26)[]}
-     # locals: {$t11=@1500,$t17=@2100,$t22=@2D00,$t26=@3200}
+     # graph: {@1100=local($t7)[],@1D00=local($t13)[],@2900=local($t17)[],@2D00=local($t20)[]}
+     # locals: {$t7=@1100,$t13=@1D00,$t17=@2900,$t20=@2D00}
      # globals: {}
      #
- 68: label L15
-     # abort state: {returns,aborts}
+ 78: label L21
+     # abort state: {returns}
      # live vars:
-     # graph: {@1500=local($t11)[],@2100=local($t17)[],@2D00=local($t22)[],@3200=local($t26)[]}
-     # locals: {$t11=@1500,$t17=@2100,$t22=@2D00,$t26=@3200}
-     # globals: {}
-     #
- 69: goto 73
-     # abort state: {aborts}
-     # live vars:
-     # graph: {@1500=local($t11)[],@2100=local($t17)[],@2D00=local($t22)[],@3200=local($t26)[]}
-     # locals: {$t11=@1500,$t17=@2100,$t22=@2D00,$t26=@3200}
-     # globals: {}
-     #
- 70: label L16
-     # abort state: {aborts}
-     # live vars:
-     # graph: {@1500=local($t11)[],@2100=local($t17)[],@2D00=local($t22)[],@3200=local($t26)[]}
-     # locals: {$t11=@1500,$t17=@2100,$t22=@2D00,$t26=@3200}
-     # globals: {}
-     #
- 71: $t35 := 42
-     # abort state: {aborts}
-     # live vars: $t35
-     # graph: {@1500=local($t11)[],@2100=local($t17)[],@2D00=local($t22)[],@3200=local($t26)[]}
-     # locals: {$t11=@1500,$t17=@2100,$t22=@2D00,$t26=@3200}
-     # globals: {}
-     #
- 72: abort($t35)
-     # abort state: {returns,aborts}
-     # live vars:
-     # graph: {@1500=local($t11)[],@2100=local($t17)[],@2D00=local($t22)[],@3200=local($t26)[]}
-     # locals: {$t11=@1500,$t17=@2100,$t22=@2D00,$t26=@3200}
-     # globals: {}
-     #
- 73: label L17
-     # abort state: {returns,aborts}
-     # live vars:
-     # graph: {@1500=local($t11)[],@2100=local($t17)[],@2D00=local($t22)[],@3200=local($t26)[]}
-     # locals: {$t11=@1500,$t17=@2100,$t22=@2D00,$t26=@3200}
-     # globals: {}
-     #
- 74: $t37 := 0
-     # abort state: {returns,aborts}
-     # live vars: $t37
-     # graph: {@1500=local($t11)[],@2100=local($t17)[],@2D00=local($t22)[],@3200=local($t26)[]}
-     # locals: {$t11=@1500,$t17=@2100,$t22=@2D00,$t26=@3200}
-     # globals: {}
-     #
- 75: $t38 := 0
-     # abort state: {returns,aborts}
-     # live vars: $t37, $t38
-     # graph: {@1500=local($t11)[],@2100=local($t17)[],@2D00=local($t22)[],@3200=local($t26)[]}
-     # locals: {$t11=@1500,$t17=@2100,$t22=@2D00,$t26=@3200}
-     # globals: {}
-     #
- 76: $t36 := ==($t37, $t38)
-     # abort state: {returns,aborts}
-     # live vars: $t36
-     # graph: {@1500=local($t11)[],@2100=local($t17)[],@2D00=local($t22)[],@3200=local($t26)[]}
-     # locals: {$t11=@1500,$t17=@2100,$t22=@2D00,$t26=@3200}
-     # globals: {}
-     #
- 77: if ($t36) goto 78 else goto 80
-     # abort state: {returns,aborts}
-     # live vars:
-     # graph: {@1500=local($t11)[],@2100=local($t17)[],@2D00=local($t22)[],@3200=local($t26)[]}
-     # locals: {$t11=@1500,$t17=@2100,$t22=@2D00,$t26=@3200}
-     # globals: {}
-     #
- 78: label L18
-     # abort state: {returns,aborts}
-     # live vars:
-     # graph: {@1500=local($t11)[],@2100=local($t17)[],@2D00=local($t22)[],@3200=local($t26)[]}
-     # locals: {$t11=@1500,$t17=@2100,$t22=@2D00,$t26=@3200}
+     # graph: {@1100=local($t7)[],@1D00=local($t13)[],@2900=local($t17)[],@2D00=local($t20)[]}
+     # locals: {$t7=@1100,$t13=@1D00,$t17=@2900,$t20=@2D00}
      # globals: {}
      #
  79: goto 83
      # abort state: {aborts}
      # live vars:
-     # graph: {@1500=local($t11)[],@2100=local($t17)[],@2D00=local($t22)[],@3200=local($t26)[]}
-     # locals: {$t11=@1500,$t17=@2100,$t22=@2D00,$t26=@3200}
+     # graph: {@1100=local($t7)[],@1D00=local($t13)[],@2900=local($t17)[],@2D00=local($t20)[]}
+     # locals: {$t7=@1100,$t13=@1D00,$t17=@2900,$t20=@2D00}
      # globals: {}
      #
- 80: label L19
+ 80: label L22
      # abort state: {aborts}
      # live vars:
-     # graph: {@1500=local($t11)[],@2100=local($t17)[],@2D00=local($t22)[],@3200=local($t26)[]}
-     # locals: {$t11=@1500,$t17=@2100,$t22=@2D00,$t26=@3200}
+     # graph: {@1100=local($t7)[],@1D00=local($t13)[],@2900=local($t17)[],@2D00=local($t20)[]}
+     # locals: {$t7=@1100,$t13=@1D00,$t17=@2900,$t20=@2D00}
      # globals: {}
      #
- 81: $t39 := 42
+ 81: $t33 := 42
      # abort state: {aborts}
-     # live vars: $t39
-     # graph: {@1500=local($t11)[],@2100=local($t17)[],@2D00=local($t22)[],@3200=local($t26)[]}
-     # locals: {$t11=@1500,$t17=@2100,$t22=@2D00,$t26=@3200}
+     # live vars: $t33
+     # graph: {@1100=local($t7)[],@1D00=local($t13)[],@2900=local($t17)[],@2D00=local($t20)[]}
+     # locals: {$t7=@1100,$t13=@1D00,$t17=@2900,$t20=@2D00}
      # globals: {}
      #
- 82: abort($t39)
-     # abort state: {returns,aborts}
-     # live vars:
-     # graph: {@1500=local($t11)[],@2100=local($t17)[],@2D00=local($t22)[],@3200=local($t26)[]}
-     # locals: {$t11=@1500,$t17=@2100,$t22=@2D00,$t26=@3200}
-     # globals: {}
-     #
- 83: label L20
-     # abort state: {returns,aborts}
-     # live vars:
-     # graph: {@1500=local($t11)[],@2100=local($t17)[],@2D00=local($t22)[],@3200=local($t26)[]}
-     # locals: {$t11=@1500,$t17=@2100,$t22=@2D00,$t26=@3200}
-     # globals: {}
-     #
- 84: $t41 := [104, 101, 108, 108, 111]
-     # abort state: {returns,aborts}
-     # live vars: $t41
-     # graph: {@1500=local($t11)[],@2100=local($t17)[],@2D00=local($t22)[],@3200=local($t26)[]}
-     # locals: {$t11=@1500,$t17=@2100,$t22=@2D00,$t26=@3200}
-     # globals: {}
-     #
- 85: $t42 := [104, 101, 108, 108, 111]
-     # abort state: {returns,aborts}
-     # live vars: $t41, $t42
-     # graph: {@1500=local($t11)[],@2100=local($t17)[],@2D00=local($t22)[],@3200=local($t26)[]}
-     # locals: {$t11=@1500,$t17=@2100,$t22=@2D00,$t26=@3200}
-     # globals: {}
-     #
- 86: $t40 := ==($t41, $t42)
-     # abort state: {returns,aborts}
-     # live vars: $t40
-     # graph: {@1500=local($t11)[],@2100=local($t17)[],@2D00=local($t22)[],@3200=local($t26)[]}
-     # locals: {$t11=@1500,$t17=@2100,$t22=@2D00,$t26=@3200}
-     # globals: {}
-     #
- 87: if ($t40) goto 88 else goto 90
+ 82: abort($t33)
      # abort state: {returns}
      # live vars:
-     # graph: {@1500=local($t11)[],@2100=local($t17)[],@2D00=local($t22)[],@3200=local($t26)[]}
-     # locals: {$t11=@1500,$t17=@2100,$t22=@2D00,$t26=@3200}
+     # graph: {@1100=local($t7)[],@1D00=local($t13)[],@2900=local($t17)[],@2D00=local($t20)[]}
+     # locals: {$t7=@1100,$t13=@1D00,$t17=@2900,$t20=@2D00}
      # globals: {}
      #
- 88: label L21
+ 83: label L23
      # abort state: {returns}
      # live vars:
-     # graph: {@1500=local($t11)[],@2100=local($t17)[],@2D00=local($t22)[],@3200=local($t26)[]}
-     # locals: {$t11=@1500,$t17=@2100,$t22=@2D00,$t26=@3200}
+     # graph: {@1100=local($t7)[],@1D00=local($t13)[],@2900=local($t17)[],@2D00=local($t20)[]}
+     # locals: {$t7=@1100,$t13=@1D00,$t17=@2900,$t20=@2D00}
      # globals: {}
      #
- 89: goto 93
-     # abort state: {aborts}
-     # live vars:
-     # graph: {@1500=local($t11)[],@2100=local($t17)[],@2D00=local($t22)[],@3200=local($t26)[]}
-     # locals: {$t11=@1500,$t17=@2100,$t22=@2D00,$t26=@3200}
-     # globals: {}
-     #
- 90: label L22
-     # abort state: {aborts}
-     # live vars:
-     # graph: {@1500=local($t11)[],@2100=local($t17)[],@2D00=local($t22)[],@3200=local($t26)[]}
-     # locals: {$t11=@1500,$t17=@2100,$t22=@2D00,$t26=@3200}
-     # globals: {}
-     #
- 91: $t43 := 42
-     # abort state: {aborts}
-     # live vars: $t43
-     # graph: {@1500=local($t11)[],@2100=local($t17)[],@2D00=local($t22)[],@3200=local($t26)[]}
-     # locals: {$t11=@1500,$t17=@2100,$t22=@2D00,$t26=@3200}
-     # globals: {}
-     #
- 92: abort($t43)
-     # abort state: {returns}
-     # live vars:
-     # graph: {@1500=local($t11)[],@2100=local($t17)[],@2D00=local($t22)[],@3200=local($t26)[]}
-     # locals: {$t11=@1500,$t17=@2100,$t22=@2D00,$t26=@3200}
-     # globals: {}
-     #
- 93: label L23
-     # abort state: {returns}
-     # live vars:
-     # graph: {@1500=local($t11)[],@2100=local($t17)[],@2D00=local($t22)[],@3200=local($t26)[]}
-     # locals: {$t11=@1500,$t17=@2100,$t22=@2D00,$t26=@3200}
-     # globals: {}
-     #
- 94: return ()
+ 84: return ()
 }
 
 ============ after AbilityProcessor: ================
@@ -1724,142 +1524,122 @@ fun <SELF>_0::check() {
 fun <SELF>_0::check() {
      var $t0: bool
      var $t1: u64
-     var $t2: u64
+     var $t2: bool
      var $t3: u64
      var $t4: bool
-     var $t5: vector<u8>
-     var $t6: vector<u8>
+     var $t5: u64
+     var $t6: &u64
      var $t7: u64
-     var $t8: bool
+     var $t8: u64
      var $t9: u64
-     var $t10: &u64
-     var $t11: u64
-     var $t12: u64
-     var $t13: u64
-     var $t14: bool
-     var $t15: vector<u8>
-     var $t16: &vector<u8>
-     var $t17: vector<u8>
-     var $t18: vector<u8>
-     var $t19: u64
-     var $t20: &mut u64
-     var $t21: &mut u64
-     var $t22: u64
+     var $t10: bool
+     var $t11: vector<u8>
+     var $t12: &vector<u8>
+     var $t13: vector<u8>
+     var $t14: vector<u8>
+     var $t15: u64
+     var $t16: &mut u64
+     var $t17: u64
+     var $t18: u64
+     var $t19: &mut vector<u8>
+     var $t20: vector<u8>
+     var $t21: vector<u8>
+     var $t22: bool
      var $t23: u64
-     var $t24: &mut vector<u8>
-     var $t25: &mut vector<u8>
-     var $t26: vector<u8>
+     var $t24: u64
+     var $t25: u64
+     var $t26: bool
      var $t27: vector<u8>
-     var $t28: bool
+     var $t28: vector<u8>
      var $t29: u64
-     var $t30: u64
+     var $t30: bool
      var $t31: u64
      var $t32: bool
-     var $t33: vector<u8>
-     var $t34: vector<u8>
-     var $t35: u64
-     var $t36: bool
-     var $t37: u64
-     var $t38: u64
-     var $t39: u64
-     var $t40: bool
-     var $t41: vector<u8>
-     var $t42: vector<u8>
-     var $t43: u64
-  0: $t1 := 0
-  1: $t2 := 0
-  2: $t0 := ==($t1, $t2)
-  3: if ($t0) goto 4 else goto 6
-  4: label L0
-  5: goto 9
-  6: label L1
-  7: $t3 := 42
-  8: abort($t3)
-  9: label L2
- 10: $t5 := [104, 101, 108, 108, 111]
- 11: $t6 := [104, 101, 108, 108, 111]
- 12: $t4 := ==($t5, $t6)
- 13: if ($t4) goto 14 else goto 16
- 14: label L3
- 15: goto 19
- 16: label L4
- 17: $t7 := 42
- 18: abort($t7)
- 19: label L5
- 20: $t11 := 0
- 21: $t10 := borrow_local($t11)
- 22: $t9 := read_ref($t10)
- 23: $t12 := 0
- 24: $t8 := ==($t9, $t12)
- 25: if ($t8) goto 26 else goto 28
- 26: label L6
- 27: goto 31
- 28: label L7
- 29: $t13 := 42
- 30: abort($t13)
- 31: label L8
- 32: $t17 := [104, 101, 108, 108, 111]
- 33: $t16 := borrow_local($t17)
- 34: $t15 := read_ref($t16)
- 35: $t18 := [104, 101, 108, 108, 111]
- 36: $t14 := ==($t15, $t18)
- 37: if ($t14) goto 38 else goto 40
- 38: label L9
- 39: goto 43
- 40: label L10
- 41: $t19 := 42
- 42: abort($t19)
- 43: label L11
- 44: $t22 := 0
- 45: $t21 := borrow_local($t22)
- 46: $t20 := move($t21)
- 47: $t23 := 1
- 48: write_ref($t20, $t23)
- 49: $t26 := [104, 101, 108, 108, 111]
- 50: $t25 := borrow_local($t26)
- 51: $t24 := move($t25)
- 52: $t27 := [98, 121, 101]
- 53: write_ref($t24, $t27)
- 54: $t29 := read_ref($t20)
- 55: $t30 := 1
- 56: $t28 := ==($t29, $t30)
- 57: if ($t28) goto 58 else goto 60
- 58: label L12
- 59: goto 64
- 60: label L13
- 61: drop($t24)
- 62: $t31 := 42
- 63: abort($t31)
- 64: label L14
- 65: $t33 := read_ref($t24)
- 66: $t34 := [98, 121, 101]
- 67: $t32 := ==($t33, $t34)
- 68: if ($t32) goto 69 else goto 71
- 69: label L15
- 70: goto 74
- 71: label L16
- 72: $t35 := 42
- 73: abort($t35)
- 74: label L17
- 75: $t37 := 0
- 76: $t38 := 0
- 77: $t36 := ==($t37, $t38)
- 78: if ($t36) goto 79 else goto 81
- 79: label L18
+     var $t33: u64
+  0: $t0 := true
+  1: if ($t0) goto 2 else goto 4
+  2: label L0
+  3: goto 7
+  4: label L1
+  5: $t1 := 42
+  6: abort($t1)
+  7: label L2
+  8: $t2 := true
+  9: if ($t2) goto 10 else goto 12
+ 10: label L3
+ 11: goto 15
+ 12: label L4
+ 13: $t3 := 42
+ 14: abort($t3)
+ 15: label L5
+ 16: $t7 := 0
+ 17: $t6 := borrow_local($t7)
+ 18: $t5 := read_ref($t6)
+ 19: $t8 := 0
+ 20: $t4 := ==($t5, $t8)
+ 21: if ($t4) goto 22 else goto 24
+ 22: label L6
+ 23: goto 27
+ 24: label L7
+ 25: $t9 := 42
+ 26: abort($t9)
+ 27: label L8
+ 28: $t13 := [104, 101, 108, 108, 111]
+ 29: $t12 := borrow_local($t13)
+ 30: $t11 := read_ref($t12)
+ 31: $t14 := [104, 101, 108, 108, 111]
+ 32: $t10 := ==($t11, $t14)
+ 33: if ($t10) goto 34 else goto 36
+ 34: label L9
+ 35: goto 39
+ 36: label L10
+ 37: $t15 := 42
+ 38: abort($t15)
+ 39: label L11
+ 40: $t17 := 0
+ 41: $t16 := borrow_local($t17)
+ 42: $t18 := 1
+ 43: write_ref($t16, $t18)
+ 44: $t20 := [104, 101, 108, 108, 111]
+ 45: $t19 := borrow_local($t20)
+ 46: $t21 := [98, 121, 101]
+ 47: write_ref($t19, $t21)
+ 48: $t23 := read_ref($t16)
+ 49: $t24 := 1
+ 50: $t22 := ==($t23, $t24)
+ 51: if ($t22) goto 52 else goto 54
+ 52: label L12
+ 53: goto 58
+ 54: label L13
+ 55: drop($t19)
+ 56: $t25 := 42
+ 57: abort($t25)
+ 58: label L14
+ 59: $t27 := read_ref($t19)
+ 60: $t28 := [98, 121, 101]
+ 61: $t26 := ==($t27, $t28)
+ 62: if ($t26) goto 63 else goto 65
+ 63: label L15
+ 64: goto 68
+ 65: label L16
+ 66: $t29 := 42
+ 67: abort($t29)
+ 68: label L17
+ 69: $t30 := true
+ 70: if ($t30) goto 71 else goto 73
+ 71: label L18
+ 72: goto 76
+ 73: label L19
+ 74: $t31 := 42
+ 75: abort($t31)
+ 76: label L20
+ 77: $t32 := true
+ 78: if ($t32) goto 79 else goto 81
+ 79: label L21
  80: goto 84
- 81: label L19
- 82: $t39 := 42
- 83: abort($t39)
- 84: label L20
- 85: $t41 := [104, 101, 108, 108, 111]
- 86: $t42 := [104, 101, 108, 108, 111]
- 87: $t40 := ==($t41, $t42)
- 88: if ($t40) goto 89 else goto 91
- 89: label L21
- 90: goto 94
- 91: label L22
- 92: $t43 := 42
- 93: abort($t43)
- 94: label L23
- 95: return ()
+ 81: label L22
+ 82: $t33 := 42
+ 83: abort($t33)
+ 84: label L23
+ 85: return ()
 }

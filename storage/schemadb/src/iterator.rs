@@ -2,7 +2,7 @@
 // SPDX-License-Identifier: Apache-2.0
 
 use crate::{
-    KeyCodec, Schema, SeekKeyCodec, ValueCodec, APTOS_SCHEMADB_ITER_BYTES,
+    IntoDbResult, KeyCodec, Schema, SeekKeyCodec, ValueCodec, APTOS_SCHEMADB_ITER_BYTES,
     APTOS_SCHEMADB_ITER_LATENCY_SECONDS, APTOS_SCHEMADB_SEEK_LATENCY_SECONDS,
 };
 use std::marker::PhantomData;
@@ -84,7 +84,7 @@ where
             .start_timer();
 
         if !self.db_iter.valid() {
-            self.db_iter.status()?;
+            self.db_iter.status().into_db_res()?;
             return Ok(None);
         }
 
@@ -94,15 +94,15 @@ where
             .with_label_values(&[S::COLUMN_FAMILY_NAME])
             .observe((raw_key.len() + raw_value.len()) as f64);
 
-        let key = <S::Key as KeyCodec<S>>::decode_key(raw_key)?;
-        let value = <S::Value as ValueCodec<S>>::decode_value(raw_value)?;
+        let key = <S::Key as KeyCodec<S>>::decode_key(raw_key);
+        let value = <S::Value as ValueCodec<S>>::decode_value(raw_value);
 
         match self.direction {
             ScanDirection::Forward => self.db_iter.next(),
             ScanDirection::Backward => self.db_iter.prev(),
         }
 
-        Ok(Some((key, value)))
+        Ok(Some((key?, value?)))
     }
 }
 

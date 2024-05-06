@@ -459,6 +459,11 @@ EphemeralPublicKey:
         STRUCT:
           - public_key:
               TYPENAME: Ed25519PublicKey
+    1:
+      Secp256r1Ecdsa:
+        STRUCT:
+          - public_key:
+              TYPENAME: Secp256r1EcdsaPublicKey
 EphemeralSignature:
   ENUM:
     0:
@@ -625,6 +630,16 @@ Payload:
       InQuorumStoreWithLimit:
         NEWTYPE:
           TYPENAME: ProofWithDataWithTxnLimit
+    3:
+      QuorumStoreInlineHybrid:
+        TUPLE:
+          - SEQ:
+              TUPLE:
+                - TYPENAME: BatchInfo
+                - SEQ:
+                    TYPENAME: SignedTransaction
+          - TYPENAME: ProofWithData
+          - OPTION: U64
 Pepper:
   NEWTYPESTRUCT:
     TUPLEARRAY:
@@ -701,13 +716,6 @@ RandGenMessage:
     - epoch: U64
     - data: BYTES
 RandMetadata:
-  STRUCT:
-    - metadata_to_sign:
-        TYPENAME: RandMetadataToSign
-    - block_id:
-        TYPENAME: HashValue
-    - timestamp: U64
-RandMetadataToSign:
   STRUCT:
     - epoch: U64
     - round: U64

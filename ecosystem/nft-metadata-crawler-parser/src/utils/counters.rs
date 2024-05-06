@@ -1,4 +1,5 @@
 // Copyright © Aptos Foundation
+// SPDX-License-Identifier: Apache-2.0
 
 use aptos_metrics_core::{
     register_int_counter, register_int_counter_vec, IntCounter, IntCounterVec,

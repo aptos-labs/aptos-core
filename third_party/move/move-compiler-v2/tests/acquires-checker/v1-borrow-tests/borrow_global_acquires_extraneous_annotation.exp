@@ -1,0 +1,7 @@
+
+Diagnostics:
+error: unnecessary acquires annotation
+  ┌─ tests/acquires-checker/v1-borrow-tests/borrow_global_acquires_extraneous_annotation.move:4:32
+  │
+4 │     public fun test() acquires T1 {
+  │                                ^^^

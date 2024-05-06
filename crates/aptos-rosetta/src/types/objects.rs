@@ -33,7 +33,7 @@ use aptos_types::{
     event::EventKey,
     fee_statement::FeeStatement,
     stake_pool::{SetOperatorEvent, StakePool},
-    state_store::state_key::{StateKey, StateKeyInner},
+    state_store::state_key::{inner::StateKeyInner, StateKey},
     transaction::{EntryFunction, TransactionPayload},
     write_set::{WriteOp, WriteSet},
 };
@@ -891,7 +891,7 @@ impl Transaction {
                 txn.events,
             ),
             StateCheckpoint(_) => (TransactionType::StateCheckpoint, None, txn.info, vec![]),
-            ValidatorTransaction(_) => todo!(),
+            ValidatorTransaction(_) => (TransactionType::Validator, None, txn.info, txn.events),
         };
 
         // Operations must be sequential and operation index must always be in the same order

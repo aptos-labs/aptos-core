@@ -18,13 +18,14 @@ use crate::{
 use anyhow::{bail, ensure, format_err, Context as AnyhowContext, Result};
 use aptos_crypto::{hash::CryptoHash, HashValue};
 use aptos_db_indexer::table_info_reader::TableInfoReader;
+use aptos_logger::{sample, sample::SampleRate};
 use aptos_storage_interface::DbReader;
 use aptos_types::{
     access_path::{AccessPath, Path},
     chain_id::ChainId,
     contract_event::{ContractEvent, EventWithVersion},
     state_store::{
-        state_key::{StateKey, StateKeyInner},
+        state_key::{inner::StateKeyInner, StateKey},
         table::{TableHandle, TableInfo},
     },
     transaction::{
@@ -42,13 +43,14 @@ use move_core_types::{
     resolver::ModuleResolver,
     value::{MoveStructLayout, MoveTypeLayout},
 };
-use move_resource_viewer::MoveValueAnnotator;
+use move_resource_viewer::{Limiter, MoveValueAnnotator};
 use serde_json::Value;
 use std::{
     convert::{TryFrom, TryInto},
     iter::IntoIterator,
     rc::Rc,
     sync::Arc,
+    time::Duration,
 };
 
 const OBJECT_MODULE: &IdentStr = ident_str!("object");
@@ -81,8 +83,13 @@ impl<'a, R: ModuleResolver + ?Sized> MoveConverter<'a, R> {
         &self,
         data: impl Iterator<Item = (StructTag, &'b [u8])>,
     ) -> Result<Vec<MoveResource>> {
-        data.map(|(typ, bytes)| self.try_into_resource(&typ, bytes))
-            .collect()
+        let mut limiter = Limiter::default();
+        data.map(|(typ, bytes)| {
+            self.inner
+                .view_resource_with_limit(&typ, bytes, &mut limiter)?
+                .try_into()
+        })
+        .collect()
     }
 
     pub fn try_into_resource(&self, typ: &StructTag, bytes: &'_ [u8]) -> Result<MoveResource> {
@@ -312,13 +319,13 @@ impl<'a, R: ModuleResolver + ?Sized> MoveConverter<'a, R> {
         op: WriteOp,
     ) -> Result<Vec<WriteSetChange>> {
         let hash = state_key.hash().to_hex_literal();
-        let state_key = state_key.into_inner();
+        let state_key = state_key.inner();
         match state_key {
             StateKeyInner::AccessPath(access_path) => {
                 self.try_access_path_into_write_set_changes(hash, access_path, op)
             },
             StateKeyInner::TableItem { handle, key } => {
-                vec![self.try_table_item_into_write_set_change(hash, handle, key, op)]
+                vec![self.try_table_item_into_write_set_change(hash, *handle, key.to_owned(), op)]
                     .into_iter()
                     .collect()
             },
@@ -332,7 +339,7 @@ impl<'a, R: ModuleResolver + ?Sized> MoveConverter<'a, R> {
     pub fn try_access_path_into_write_set_changes(
         &self,
         state_key_hash: String,
-        access_path: AccessPath,
+        access_path: &AccessPath,
         op: WriteOp,
     ) -> Result<Vec<WriteSetChange>> {
         let ret = match op.bytes() {
@@ -425,10 +432,7 @@ impl<'a, R: ModuleResolver + ?Sized> MoveConverter<'a, R> {
         let table_info = match self.get_table_info(handle)? {
             Some(ti) => ti,
             None => {
-                aptos_logger::warn!(
-                    "Table info not found for handle {:?}, can't decode table item. OK for simulation",
-                    handle
-                );
+                log_missing_table_info(handle);
                 return Ok(None); // if table item not found return None anyway to avoid crash
             },
         };
@@ -452,10 +456,7 @@ impl<'a, R: ModuleResolver + ?Sized> MoveConverter<'a, R> {
         let table_info = match self.get_table_info(handle)? {
             Some(ti) => ti,
             None => {
-                aptos_logger::warn!(
-                    "Table info not found for handle {:?}, can't decode table item. OK for simulation",
-                    handle
-                );
+                log_missing_table_info(handle);
                 return Ok(None); // if table item not found return None anyway to avoid crash
             },
         };
@@ -927,6 +928,16 @@ impl<'a, R: ModuleResolver + ?Sized> MoveConverter<'a, R> {
     }
 }
 
+fn log_missing_table_info(handle: TableHandle) {
+    sample!(
+        SampleRate::Duration(Duration::from_secs(1)),
+        aptos_logger::debug!(
+            "Table info not found for handle {:?}, can't decode table item. OK for simulation",
+            handle
+        )
+    );
+}
+
 impl<'a, R: ModuleResolver + ?Sized> ExplainVMStatus for MoveConverter<'a, R> {
     fn get_module_bytecode(&self, module_id: &ModuleId) -> Result<Rc<dyn Bytecode>> {
         self.inner
@@ -980,14 +991,29 @@ pub trait ExplainVMStatus {
 
     fn explain_vm_status(&self, status: &ExecutionStatus) -> String {
         match status {
-            ExecutionStatus::MoveAbort { location, code, info } => match &location {
-                AbortLocation::Module(_) => {
-                    info.as_ref().map(|i| {
-                        format!("Move abort in {}: {}({:#x}): {}", abort_location_to_str(location), i.reason_name, code, i.description)
-                    }).unwrap_or_else(|| {
-                        format!("Move abort in {}: {:#x}", abort_location_to_str(location), code)
+            ExecutionStatus::MoveAbort {
+                location,
+                code,
+                info,
+            } => match &location {
+                AbortLocation::Module(_) => info
+                    .as_ref()
+                    .map(|i| {
+                        format!(
+                            "Move abort in {}: {}({:#x}): {}",
+                            abort_location_to_str(location),
+                            i.reason_name,
+                            code,
+                            i.description
+                        )
                     })
-                }
+                    .unwrap_or_else(|| {
+                        format!(
+                            "Move abort in {}: {:#x}",
+                            abort_location_to_str(location),
+                            code
+                        )
+                    }),
                 AbortLocation::Script => format!("Move abort: code {:#x}", code),
             },
             ExecutionStatus::Success => "Executed successfully".to_owned(),
@@ -998,24 +1024,27 @@ pub trait ExplainVMStatus {
                 code_offset,
             } => {
                 let func_name = match location {
-                    AbortLocation::Module(module_id) => self.explain_function_index(module_id, function)
+                    AbortLocation::Module(module_id) => self
+                        .explain_function_index(module_id, function)
                         .map(|name| format!("{}::{}", abort_location_to_str(location), name))
-                        .unwrap_or_else(|_| format!("{}::<#{} function>", abort_location_to_str(location), function)),
+                        .unwrap_or_else(|_| {
+                            format!(
+                                "{}::<#{} function>",
+                                abort_location_to_str(location),
+                                function
+                            )
+                        }),
                     AbortLocation::Script => "script".to_owned(),
                 };
                 format!(
                     "Execution failed in {} at code offset {}",
                     func_name, code_offset
                 )
-            }
-            ExecutionStatus::MiscellaneousError(code) => {
-                code.map_or(
-                    "Move bytecode deserialization / verification failed, including entry function not found or invalid arguments".to_owned(),
-                    |e| format!(
-                        "Transaction Executed and Committed with Error {:#?}", e
-                    ),
-                )
-            }
+            },
+            ExecutionStatus::MiscellaneousError(code) => code.map_or(
+                "Execution failed with miscellaneous error and no status code".to_owned(),
+                |e| format!("{:#?}", e),
+            ),
         }
     }
 

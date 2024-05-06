@@ -6,6 +6,7 @@ use crate::{
     config::VMConfig,
     data_cache::TransactionDataCache,
     loader::{LoadedFunction, ModuleStorageAdapter},
+    module_traversal::TraversalContext,
     move_vm::MoveVM,
     native_extensions::NativeContextExtensions,
 };
@@ -81,7 +82,8 @@ impl<'r, 'l> Session<'r, 'l> {
         ty_args: Vec<TypeTag>,
         args: Vec<impl Borrow<[u8]>>,
         gas_meter: &mut impl GasMeter,
-    ) -> VMResult<SerializedReturnValues> {
+        traversal_context: &mut TraversalContext,
+    ) -> VMResult<()> {
         let bypass_declared_entry_check = false;
         self.move_vm.runtime.execute_function(
             module,
@@ -91,9 +93,11 @@ impl<'r, 'l> Session<'r, 'l> {
             &mut self.data_cache,
             &self.module_store,
             gas_meter,
+            traversal_context,
             &mut self.native_extensions,
             bypass_declared_entry_check,
-        )
+        )?;
+        Ok(())
     }
 
     /// Similar to execute_entry_function, but it bypasses visibility checks
@@ -104,6 +108,7 @@ impl<'r, 'l> Session<'r, 'l> {
         ty_args: Vec<TypeTag>,
         args: Vec<impl Borrow<[u8]>>,
         gas_meter: &mut impl GasMeter,
+        traversal_context: &mut TraversalContext,
     ) -> VMResult<SerializedReturnValues> {
         let bypass_declared_entry_check = true;
         self.move_vm.runtime.execute_function(
@@ -114,6 +119,7 @@ impl<'r, 'l> Session<'r, 'l> {
             &mut self.data_cache,
             &self.module_store,
             gas_meter,
+            traversal_context,
             &mut self.native_extensions,
             bypass_declared_entry_check,
         )
@@ -125,6 +131,7 @@ impl<'r, 'l> Session<'r, 'l> {
         instantiation: LoadedFunctionInstantiation,
         args: Vec<impl Borrow<[u8]>>,
         gas_meter: &mut impl GasMeter,
+        traversal_context: &mut TraversalContext,
     ) -> VMResult<SerializedReturnValues> {
         self.move_vm.runtime.execute_function_instantiation(
             func,
@@ -133,6 +140,7 @@ impl<'r, 'l> Session<'r, 'l> {
             &mut self.data_cache,
             &self.module_store,
             gas_meter,
+            traversal_context,
             &mut self.native_extensions,
             true,
         )
@@ -160,7 +168,8 @@ impl<'r, 'l> Session<'r, 'l> {
         ty_args: Vec<TypeTag>,
         args: Vec<impl Borrow<[u8]>>,
         gas_meter: &mut impl GasMeter,
-    ) -> VMResult<SerializedReturnValues> {
+        traversal_context: &mut TraversalContext,
+    ) -> VMResult<()> {
         self.move_vm.runtime.execute_script(
             script,
             ty_args,
@@ -168,6 +177,7 @@ impl<'r, 'l> Session<'r, 'l> {
             &mut self.data_cache,
             &self.module_store,
             gas_meter,
+            traversal_context,
             &mut self.native_extensions,
         )
     }
@@ -336,40 +346,40 @@ impl<'r, 'l> Session<'r, 'l> {
 
     /// Load a script and all of its types into cache
     pub fn load_script(
-        &self,
+        &mut self,
         script: impl Borrow<[u8]>,
         ty_args: Vec<TypeTag>,
     ) -> VMResult<LoadedFunctionInstantiation> {
         let (_, instantiation) = self.move_vm.runtime.loader().load_script(
             script.borrow(),
             &ty_args,
-            &self.data_cache,
+            &mut self.data_cache,
             &self.module_store,
         )?;
         Ok(instantiation)
     }
 
     /// Note: Cannot return a `Function` struct here due to its `pub(crate)` visibility.
-    pub fn load_function_def_is_friend_or_private(
-        &self,
+    pub fn load_function_and_is_friend_or_private_def(
+        &mut self,
         module_id: &ModuleId,
         function_name: &IdentStr,
         type_arguments: &[TypeTag],
-    ) -> VMResult<bool> {
-        let (_, func, _) = self.move_vm.runtime.loader().load_function(
+    ) -> VMResult<(LoadedFunctionInstantiation, bool)> {
+        let (_, func, instantiation) = self.move_vm.runtime.loader().load_function(
             module_id,
             function_name,
             type_arguments,
-            &self.data_cache,
+            &mut self.data_cache,
             &self.module_store,
         )?;
 
-        Ok(func.is_friend_or_private())
+        Ok((instantiation, func.is_friend_or_private()))
     }
 
     /// Load a module, a function, and all of its types into cache
     pub fn load_function_with_type_arg_inference(
-        &self,
+        &mut self,
         module_id: &ModuleId,
         function_name: &IdentStr,
         expected_return_type: &Type,
@@ -382,7 +392,7 @@ impl<'r, 'l> Session<'r, 'l> {
                 module_id,
                 function_name,
                 expected_return_type,
-                &self.data_cache,
+                &mut self.data_cache,
                 &self.module_store,
             )?;
         Ok((func, instantiation))
@@ -390,7 +400,7 @@ impl<'r, 'l> Session<'r, 'l> {
 
     /// Load a module, a function, and all of its types into cache
     pub fn load_function(
-        &self,
+        &mut self,
         module_id: &ModuleId,
         function_name: &IdentStr,
         type_arguments: &[TypeTag],
@@ -399,32 +409,35 @@ impl<'r, 'l> Session<'r, 'l> {
             module_id,
             function_name,
             type_arguments,
-            &self.data_cache,
+            &mut self.data_cache,
             &self.module_store,
         )?;
         Ok(instantiation)
     }
 
-    pub fn load_type(&self, type_tag: &TypeTag) -> VMResult<Type> {
+    pub fn load_type(&mut self, type_tag: &TypeTag) -> VMResult<Type> {
         self.move_vm
             .runtime
             .loader()
-            .load_type(type_tag, &self.data_cache, &self.module_store)
+            .load_type(type_tag, &mut self.data_cache, &self.module_store)
     }
 
-    pub fn get_type_layout(&self, type_tag: &TypeTag) -> VMResult<MoveTypeLayout> {
+    pub fn get_type_layout(&mut self, type_tag: &TypeTag) -> VMResult<MoveTypeLayout> {
         self.move_vm.runtime.loader().get_type_layout(
             type_tag,
-            &self.data_cache,
+            &mut self.data_cache,
             &self.module_store,
         )
     }
 
-    pub fn get_fully_annotated_type_layout(&self, type_tag: &TypeTag) -> VMResult<MoveTypeLayout> {
+    pub fn get_fully_annotated_type_layout(
+        &mut self,
+        type_tag: &TypeTag,
+    ) -> VMResult<MoveTypeLayout> {
         self.move_vm
             .runtime
             .loader()
-            .get_fully_annotated_type_layout(type_tag, &self.data_cache, &self.module_store)
+            .get_fully_annotated_type_layout(type_tag, &mut self.data_cache, &self.module_store)
     }
 
     pub fn get_type_tag(&self, ty: &Type) -> VMResult<TypeTag> {
@@ -463,6 +476,68 @@ impl<'r, 'l> Session<'r, 'l> {
         self.module_store
             .get_struct_type_by_identifier(&name.name, &name.module)
             .ok()
+    }
+
+    pub fn check_dependencies_and_charge_gas<'a, I>(
+        &mut self,
+        gas_meter: &mut impl GasMeter,
+        traversal_context: &mut TraversalContext<'a>,
+        ids: I,
+    ) -> VMResult<()>
+    where
+        I: IntoIterator<Item = (&'a AccountAddress, &'a IdentStr)>,
+        I::IntoIter: DoubleEndedIterator,
+    {
+        self.move_vm
+            .runtime
+            .loader()
+            .check_dependencies_and_charge_gas(
+                &self.module_store,
+                &mut self.data_cache,
+                gas_meter,
+                &mut traversal_context.visited,
+                traversal_context.referenced_modules,
+                ids,
+            )
+    }
+
+    pub fn check_dependencies_and_charge_gas_non_recursive_optional<'a, I>(
+        &mut self,
+        gas_meter: &mut impl GasMeter,
+        traversal_context: &mut TraversalContext<'a>,
+        ids: I,
+    ) -> VMResult<()>
+    where
+        I: IntoIterator<Item = (&'a AccountAddress, &'a IdentStr)>,
+    {
+        self.move_vm
+            .runtime
+            .loader()
+            .check_dependencies_and_charge_gas_non_recursive_optional(
+                &self.module_store,
+                &mut self.data_cache,
+                gas_meter,
+                &mut traversal_context.visited,
+                ids,
+            )
+    }
+
+    pub fn check_script_dependencies_and_check_gas(
+        &mut self,
+        gas_meter: &mut impl GasMeter,
+        traversal_context: &mut TraversalContext,
+        script: impl Borrow<[u8]>,
+    ) -> VMResult<()> {
+        self.move_vm
+            .runtime
+            .loader()
+            .check_script_dependencies_and_check_gas(
+                &self.module_store,
+                &mut self.data_cache,
+                gas_meter,
+                traversal_context,
+                script.borrow(),
+            )
     }
 }
 

@@ -16,11 +16,17 @@ module aptos_framework::config_buffer {
     use aptos_std::simple_map;
     use aptos_std::simple_map::SimpleMap;
     use aptos_std::type_info;
+    use aptos_framework::system_addresses;
 
     friend aptos_framework::consensus_config;
     friend aptos_framework::execution_config;
     friend aptos_framework::gas_schedule;
     friend aptos_framework::jwks;
+    friend aptos_framework::jwk_consensus_config;
+    friend aptos_framework::keyless_account;
+    friend aptos_framework::randomness_api_v0_config;
+    friend aptos_framework::randomness_config;
+    friend aptos_framework::randomness_config_seqnum;
     friend aptos_framework::version;
 
     /// Config buffer operations failed with permission denied.
@@ -31,9 +37,12 @@ module aptos_framework::config_buffer {
     }
 
     public fun initialize(aptos_framework: &signer) {
-        move_to(aptos_framework, PendingConfigs {
-            configs: simple_map::new(),
-        })
+        system_addresses::assert_aptos_framework(aptos_framework);
+        if (!exists<PendingConfigs>(@aptos_framework)) {
+            move_to(aptos_framework, PendingConfigs {
+                configs: simple_map::new(),
+            })
+        }
     }
 
     /// Check whether there is a pending config payload for `T`.

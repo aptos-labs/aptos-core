@@ -38,7 +38,7 @@ Security holds under the same proof-of-stake assumption that secures the Aptos n
 -  [Function `safe_add_mod`](#0x1_randomness_safe_add_mod)
 -  [Function `safe_add_mod_for_verification`](#0x1_randomness_safe_add_mod_for_verification)
 -  [Function `fetch_and_increment_txn_counter`](#0x1_randomness_fetch_and_increment_txn_counter)
--  [Function `is_safe_call`](#0x1_randomness_is_safe_call)
+-  [Function `is_unbiasable`](#0x1_randomness_is_unbiasable)
 -  [Specification](#@Specification_1)
     -  [Function `initialize`](#@Specification_1_initialize)
     -  [Function `on_new_block`](#@Specification_1_on_new_block)
@@ -49,13 +49,14 @@ Security holds under the same proof-of-stake assumption that secures the Aptos n
     -  [Function `u64_integer`](#@Specification_1_u64_integer)
     -  [Function `u128_integer`](#@Specification_1_u128_integer)
     -  [Function `u256_integer`](#@Specification_1_u256_integer)
+    -  [Function `u256_integer_internal`](#@Specification_1_u256_integer_internal)
     -  [Function `u8_range`](#@Specification_1_u8_range)
     -  [Function `u64_range`](#@Specification_1_u64_range)
     -  [Function `u256_range`](#@Specification_1_u256_range)
     -  [Function `permutation`](#@Specification_1_permutation)
     -  [Function `safe_add_mod_for_verification`](#@Specification_1_safe_add_mod_for_verification)
     -  [Function `fetch_and_increment_txn_counter`](#@Specification_1_fetch_and_increment_txn_counter)
-    -  [Function `is_safe_call`](#@Specification_1_is_safe_call)
+    -  [Function `is_unbiasable`](#@Specification_1_is_unbiasable)
 
 
 <pre><code><b>use</b> <a href="event.md#0x1_event">0x1::event</a>;
@@ -188,12 +189,13 @@ Event emitted every time a public randomness API in this module is called.
 
 
 
-<a id="0x1_randomness_E_API_USE_SUSCEPTIBLE_TO_TEST_AND_ABORT"></a>
+<a id="0x1_randomness_E_API_USE_IS_BIASIBLE"></a>
 
-Randomness APIs calls must originate from a private entry function. Otherwise, test-and-abort attacks are possible.
+Randomness APIs calls must originate from a private entry function with
+<code>#[<a href="randomness.md#0x1_randomness">randomness</a>]</code> annotation. Otherwise, malicious users can bias randomness result.
 
 
-<pre><code><b>const</b> <a href="randomness.md#0x1_randomness_E_API_USE_SUSCEPTIBLE_TO_TEST_AND_ABORT">E_API_USE_SUSCEPTIBLE_TO_TEST_AND_ABORT</a>: u64 = 1;
+<pre><code><b>const</b> <a href="randomness.md#0x1_randomness_E_API_USE_IS_BIASIBLE">E_API_USE_IS_BIASIBLE</a>: u64 = 1;
 </code></pre>
 
 
@@ -217,11 +219,13 @@ Must be called in tests to initialize the <code><a href="randomness.md#0x1_rando
 
 <pre><code><b>public</b> <b>fun</b> <a href="randomness.md#0x1_randomness_initialize">initialize</a>(framework: &<a href="../../aptos-stdlib/../move-stdlib/doc/signer.md#0x1_signer">signer</a>) {
     <a href="system_addresses.md#0x1_system_addresses_assert_aptos_framework">system_addresses::assert_aptos_framework</a>(framework);
-    <b>move_to</b>(framework, <a href="randomness.md#0x1_randomness_PerBlockRandomness">PerBlockRandomness</a> {
-        epoch: 0,
-        round: 0,
-        seed: <a href="../../aptos-stdlib/../move-stdlib/doc/option.md#0x1_option_none">option::none</a>(),
-    });
+    <b>if</b> (!<b>exists</b>&lt;<a href="randomness.md#0x1_randomness_PerBlockRandomness">PerBlockRandomness</a>&gt;(@aptos_framework)) {
+        <b>move_to</b>(framework, <a href="randomness.md#0x1_randomness_PerBlockRandomness">PerBlockRandomness</a> {
+            epoch: 0,
+            round: 0,
+            seed: <a href="../../aptos-stdlib/../move-stdlib/doc/option.md#0x1_option_none">option::none</a>(),
+        });
+    }
 }
 </code></pre>
 
@@ -278,7 +282,7 @@ of the hash function).
 
 
 <pre><code><b>fun</b> <a href="randomness.md#0x1_randomness_next_32_bytes">next_32_bytes</a>(): <a href="../../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u8&gt; <b>acquires</b> <a href="randomness.md#0x1_randomness_PerBlockRandomness">PerBlockRandomness</a> {
-    <b>assert</b>!(<a href="randomness.md#0x1_randomness_is_safe_call">is_safe_call</a>(), <a href="randomness.md#0x1_randomness_E_API_USE_SUSCEPTIBLE_TO_TEST_AND_ABORT">E_API_USE_SUSCEPTIBLE_TO_TEST_AND_ABORT</a>);
+    <b>assert</b>!(<a href="randomness.md#0x1_randomness_is_unbiasable">is_unbiasable</a>(), <a href="randomness.md#0x1_randomness_E_API_USE_IS_BIASIBLE">E_API_USE_IS_BIASIBLE</a>);
 
     <b>let</b> input = <a href="randomness.md#0x1_randomness_DST">DST</a>;
     <b>let</b> <a href="randomness.md#0x1_randomness">randomness</a> = <b>borrow_global</b>&lt;<a href="randomness.md#0x1_randomness_PerBlockRandomness">PerBlockRandomness</a>&gt;(@aptos_framework);
@@ -491,11 +495,6 @@ Generates an u128 uniformly at random.
     <b>let</b> i = 0;
     <b>let</b> ret: u128 = 0;
     <b>while</b> (i &lt; 16) {
-        <b>spec</b> {
-            // TODO: Prove these <b>with</b> proper <b>loop</b> invaraints.
-            <b>assume</b> ret * 256 + 255 &lt;= <a href="randomness.md#0x1_randomness_MAX_U256">MAX_U256</a>;
-            <b>assume</b> len(raw) &gt; 0;
-        };
         ret = ret * 256 + (<a href="../../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector_pop_back">vector::pop_back</a>(&<b>mut</b> raw) <b>as</b> u128);
         i = i + 1;
     };
@@ -557,11 +556,6 @@ Generates a u256 uniformly at random.
     <b>let</b> i = 0;
     <b>let</b> ret: u256 = 0;
     <b>while</b> (i &lt; 32) {
-        <b>spec</b> {
-            // TODO: Prove these <b>with</b> proper <b>loop</b> invaraints.
-            <b>assume</b> ret * 256 + 255 &lt;= <a href="randomness.md#0x1_randomness_MAX_U256">MAX_U256</a>;
-            <b>assume</b> len(raw) &gt; 0;
-        };
         ret = ret * 256 + (<a href="../../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector_pop_back">vector::pop_back</a>(&<b>mut</b> raw) <b>as</b> u256);
         i = i + 1;
     };
@@ -946,6 +940,7 @@ Compute <code>(a + b) % m</code>, assuming <code>m &gt;= 1, 0 &lt;= a &lt; m, 0&
 ## Function `fetch_and_increment_txn_counter`
 
 Fetches and increments a transaction-specific 32-byte randomness-related counter.
+Aborts with <code>E_API_USE_SUSCEPTIBLE_TO_TEST_AND_ABORT</code> if randomness is not unbiasable.
 
 
 <pre><code><b>fun</b> <a href="randomness.md#0x1_randomness_fetch_and_increment_txn_counter">fetch_and_increment_txn_counter</a>(): <a href="../../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u8&gt;
@@ -964,16 +959,17 @@ Fetches and increments a transaction-specific 32-byte randomness-related counter
 
 </details>
 
-<a id="0x1_randomness_is_safe_call"></a>
+<a id="0x1_randomness_is_unbiasable"></a>
 
-## Function `is_safe_call`
+## Function `is_unbiasable`
 
-Called in each randomness generation function to ensure certain safety invariants.
-1. Ensure that the TXN that led to the call of this function had a private (or friend) entry function as its TXN payload.
-2. TBA
+Called in each randomness generation function to ensure certain safety invariants, namely:
+1. The transaction that led to the call of this function had a private (or friend) entry
+function as its payload.
+2. The entry function had <code>#[<a href="randomness.md#0x1_randomness">randomness</a>]</code> annotation.
 
 
-<pre><code><b>fun</b> <a href="randomness.md#0x1_randomness_is_safe_call">is_safe_call</a>(): bool
+<pre><code><b>fun</b> <a href="randomness.md#0x1_randomness_is_unbiasable">is_unbiasable</a>(): bool
 </code></pre>
 
 
@@ -982,7 +978,7 @@ Called in each randomness generation function to ensure certain safety invariant
 <summary>Implementation</summary>
 
 
-<pre><code><b>native</b> <b>fun</b> <a href="randomness.md#0x1_randomness_is_safe_call">is_safe_call</a>(): bool;
+<pre><code><b>native</b> <b>fun</b> <a href="randomness.md#0x1_randomness_is_unbiasable">is_unbiasable</a>(): bool;
 </code></pre>
 
 
@@ -1016,8 +1012,6 @@ Called in each randomness generation function to ensure certain safety invariant
 
 <pre><code><b>let</b> framework_addr = <a href="../../aptos-stdlib/../move-stdlib/doc/signer.md#0x1_signer_address_of">signer::address_of</a>(framework);
 <b>aborts_if</b> framework_addr != @aptos_framework;
-<b>aborts_if</b> <b>exists</b>&lt;<a href="randomness.md#0x1_randomness_PerBlockRandomness">PerBlockRandomness</a>&gt;(framework_addr);
-<b>ensures</b> <b>global</b>&lt;<a href="randomness.md#0x1_randomness_PerBlockRandomness">PerBlockRandomness</a>&gt;(framework_addr).seed == <a href="../../aptos-stdlib/../move-stdlib/doc/option.md#0x1_option_spec_none">option::spec_none</a>&lt;<a href="../../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u8&gt;&gt;();
 </code></pre>
 
 
@@ -1071,7 +1065,7 @@ Called in each randomness generation function to ensure certain safety invariant
 <pre><code><b>schema</b> <a href="randomness.md#0x1_randomness_NextBlobAbortsIf">NextBlobAbortsIf</a> {
     <b>let</b> <a href="randomness.md#0x1_randomness">randomness</a> = <b>global</b>&lt;<a href="randomness.md#0x1_randomness_PerBlockRandomness">PerBlockRandomness</a>&gt;(@aptos_framework);
     <b>aborts_if</b> <a href="../../aptos-stdlib/../move-stdlib/doc/option.md#0x1_option_spec_is_none">option::spec_is_none</a>(<a href="randomness.md#0x1_randomness">randomness</a>.seed);
-    <b>aborts_if</b> !<a href="randomness.md#0x1_randomness_spec_is_safe_call">spec_is_safe_call</a>();
+    <b>aborts_if</b> !<a href="randomness.md#0x1_randomness_spec_is_unbiasable">spec_is_unbiasable</a>();
     <b>aborts_if</b> !<b>exists</b>&lt;<a href="randomness.md#0x1_randomness_PerBlockRandomness">PerBlockRandomness</a>&gt;(@aptos_framework);
 }
 </code></pre>
@@ -1173,9 +1167,27 @@ Called in each randomness generation function to ensure certain safety invariant
 
 
 
-<pre><code><b>pragma</b> unroll = 32;
+<pre><code><b>pragma</b> verify_duration_estimate = 300;
+<b>pragma</b> unroll = 32;
 <b>include</b> <a href="randomness.md#0x1_randomness_NextBlobAbortsIf">NextBlobAbortsIf</a>;
 <b>ensures</b> [abstract] result == <a href="randomness.md#0x1_randomness_spec_u256_integer">spec_u256_integer</a>();
+</code></pre>
+
+
+
+<a id="@Specification_1_u256_integer_internal"></a>
+
+### Function `u256_integer_internal`
+
+
+<pre><code><b>fun</b> <a href="randomness.md#0x1_randomness_u256_integer_internal">u256_integer_internal</a>(): u256
+</code></pre>
+
+
+
+
+<pre><code><b>pragma</b> unroll = 32;
+<b>include</b> <a href="randomness.md#0x1_randomness_NextBlobAbortsIf">NextBlobAbortsIf</a>;
 </code></pre>
 
 
@@ -1220,7 +1232,8 @@ Called in each randomness generation function to ensure certain safety invariant
 
 
 
-<pre><code><b>include</b> <a href="randomness.md#0x1_randomness_NextBlobAbortsIf">NextBlobAbortsIf</a>;
+<pre><code><b>pragma</b> verify_duration_estimate = 120;
+<b>include</b> <a href="randomness.md#0x1_randomness_NextBlobAbortsIf">NextBlobAbortsIf</a>;
 <b>aborts_if</b> min_incl &gt;= max_excl;
 <b>ensures</b> result &gt;= min_incl && result &lt; max_excl;
 </code></pre>
@@ -1323,12 +1336,12 @@ Called in each randomness generation function to ensure certain safety invariant
 
 
 
-<a id="@Specification_1_is_safe_call"></a>
+<a id="@Specification_1_is_unbiasable"></a>
 
-### Function `is_safe_call`
+### Function `is_unbiasable`
 
 
-<pre><code><b>fun</b> <a href="randomness.md#0x1_randomness_is_safe_call">is_safe_call</a>(): bool
+<pre><code><b>fun</b> <a href="randomness.md#0x1_randomness_is_unbiasable">is_unbiasable</a>(): bool
 </code></pre>
 
 
@@ -1336,16 +1349,16 @@ Called in each randomness generation function to ensure certain safety invariant
 
 <pre><code><b>pragma</b> opaque;
 <b>aborts_if</b> [abstract] <b>false</b>;
-<b>ensures</b> [abstract] result == <a href="randomness.md#0x1_randomness_spec_is_safe_call">spec_is_safe_call</a>();
+<b>ensures</b> [abstract] result == <a href="randomness.md#0x1_randomness_spec_is_unbiasable">spec_is_unbiasable</a>();
 </code></pre>
 
 
 
 
-<a id="0x1_randomness_spec_is_safe_call"></a>
+<a id="0x1_randomness_spec_is_unbiasable"></a>
 
 
-<pre><code><b>fun</b> <a href="randomness.md#0x1_randomness_spec_is_safe_call">spec_is_safe_call</a>(): bool;
+<pre><code><b>fun</b> <a href="randomness.md#0x1_randomness_spec_is_unbiasable">spec_is_unbiasable</a>(): bool;
 </code></pre>
 
 

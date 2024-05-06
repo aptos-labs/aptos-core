@@ -91,6 +91,7 @@ members = [
     "crates/aptos-rosetta-cli",
     "crates/aptos-runtimes",
     "crates/aptos-speculative-state-helper",
+    "crates/aptos-system-utils",
     "crates/aptos-telemetry",
     "crates/aptos-telemetry-service",
     "crates/aptos-temppath",
@@ -113,10 +114,10 @@ members = [
     "devtools/aptos-cargo-cli",
     "dkg",
     "ecosystem/indexer-grpc/indexer-grpc-cache-worker",
-    "ecosystem/indexer-grpc/indexer-grpc-data-access",
     "ecosystem/indexer-grpc/indexer-grpc-data-service",
     "ecosystem/indexer-grpc/indexer-grpc-file-store",
     "ecosystem/indexer-grpc/indexer-grpc-fullnode",
+    "ecosystem/indexer-grpc/indexer-grpc-in-memory-cache-benchmark",
     "ecosystem/indexer-grpc/indexer-grpc-integration-tests",
     "ecosystem/indexer-grpc/indexer-grpc-server-framework",
     "ecosystem/indexer-grpc/indexer-grpc-table-info",
@@ -132,7 +133,10 @@ members = [
     "execution/executor-types",
     "experimental/execution/ptx-executor",
     "experimental/runtimes",
-    "keyless/pepper/common", "keyless/pepper/example-client-rust", "keyless/pepper/service",
+    "experimental/storage/layered-map",
+    "keyless/pepper/common",
+    "keyless/pepper/example-client-rust",
+    "keyless/pepper/service",
     "mempool",
     "network/benchmark",
     "network/builder",
@@ -181,11 +185,11 @@ members = [
     "testsuite/module-publish",
     "testsuite/smoke-test",
     "testsuite/testcases",
-
+    "third_party/move/evm/exec-utils",
+    "third_party/move/evm/extract-ethereum-abi",
     # third_party/move
     "third_party/move/extensions/async/move-async-vm",
     "third_party/move/extensions/move-table-extension",
-    "third_party/move/move-analyzer",
     "third_party/move/move-binary-format",
     "third_party/move/move-binary-format/serializer-tests",
     "third_party/move/move-borrow-graph",
@@ -238,6 +242,7 @@ members = [
     "third_party/move/tools/move-package",
     "third_party/move/tools/move-resource-viewer",
     "third_party/move/tools/move-unit-test",
+    "tools/calc-dep-sizes",
     "types",
     "vm-validator",
 ]
@@ -319,6 +324,7 @@ aptos-enum-conversion-derive = { path = "crates/aptos-enum-conversion-derive" }
 aptos-executor-service = { path = "execution/executor-service" }
 aptos-executor-test-helpers = { path = "execution/executor-test-helpers" }
 aptos-executor-types = { path = "execution/executor-types" }
+aptos-experimental-layered-map = { path = "experimental/storage/layered-map" }
 aptos-experimental-ptx-executor = { path = "experimental/execution/ptx-executor" }
 aptos-experimental-runtimes = { path = "experimental/runtimes" }
 aptos-faucet-cli = { path = "crates/aptos-faucet/cli" }
@@ -343,9 +349,9 @@ aptos-id-generator = { path = "crates/aptos-id-generator" }
 aptos-indexer = { path = "crates/indexer" }
 aptos-indexer-grpc-cache-worker = { path = "ecosystem/indexer-grpc/indexer-grpc-cache-worker" }
 aptos-indexer-grpc-data-service = { path = "ecosystem/indexer-grpc/indexer-grpc-data-service" }
-aptos-indexer-grpc-data-access = { path = "ecosystem/indexer-grpc/indexer-grpc-data-access" }
 aptos-indexer-grpc-file-store = { path = "ecosystem/indexer-grpc/indexer-grpc-file-store" }
 aptos-indexer-grpc-fullnode = { path = "ecosystem/indexer-grpc/indexer-grpc-fullnode" }
+aptos-indexer-grpc-in-memory-cache-benchmark = { path = "ecosystem/indexer-grpc/indexer-grpc-in-memory-cache-benchmark" }
 aptos-indexer-grpc-table-info = { path = "ecosystem/indexer-grpc/indexer-grpc-table-info" }
 aptos-indexer-grpc-utils = { path = "ecosystem/indexer-grpc/indexer-grpc-utils" }
 aptos-indexer-grpc-server-framework = { path = "ecosystem/indexer-grpc/indexer-grpc-server-framework" }
@@ -416,6 +422,7 @@ aptos-storage-service-client = { path = "state-sync/storage-service/client" }
 aptos-storage-service-notifications = { path = "state-sync/inter-component/storage-service-notifications" }
 aptos-storage-service-types = { path = "state-sync/storage-service/types" }
 aptos-storage-service-server = { path = "state-sync/storage-service/server" }
+aptos-system-utils = { path = "crates/aptos-system-utils" }
 aptos-telemetry = { path = "crates/aptos-telemetry" }
 aptos-telemetry-service = { path = "crates/aptos-telemetry-service" }
 aptos-temppath = { path = "crates/aptos-temppath" }
@@ -442,11 +449,15 @@ aptos-cargo-cli = { path = "devtools/aptos-cargo-cli" }
 
 # External crate dependencies.
 # Please do not add any test features here: they should be declared by the individual crate.
+aes-gcm = "0.10.3"
+ahash = "0.8.11"
+atty = "0.2.14"
 nalgebra = "0.32"
 float-cmp = "0.9.0"
 again = "0.1.2"
 anyhow = "1.0.71"
 anstyle = "1.0.1"
+arbitrary = { version = "1.3.2", features = ["derive"] }
 arc-swap = "1.6.0"
 arr_macro = "0.2.1"
 ark-bls12-381 = "0.4.0"
@@ -484,19 +495,22 @@ bollard = "0.15"
 bulletproofs = { version = "4.0.0" }
 byteorder = "1.4.3"
 bytes = { version = "1.4.0", features = ["serde"] }
+camino = { version = "1.1.6" }
 chrono = { version = "0.4.19", features = ["clock", "serde"] }
 cfg_block = "0.1.1"
 cfg-if = "1.0.0"
 ciborium = "0.2"
 claims = "0.7"
-clap = { version = "4.3.9", features = ["derive", "unstable-styles"] }
+clap = { version = "4.3.9", features = ["derive", "env", "unstable-styles"] }
 clap-verbosity-flag = "2.1.1"
 clap_complete = "4.4.1"
 cloud-storage = { version = "0.11.1", features = [
     "global-client",
     "rustls-tls",
 ], default-features = false }
+codespan = "0.11.1"
 codespan-reporting = "0.11.1"
+colored = "2.0.0"
 concurrent-queue = "2.2.0"
 console-subscriber = "0.1.8"
 const_format = "0.2.26"
@@ -506,20 +520,26 @@ criterion = "0.3.5"
 criterion-cpu-time = "0.1.0"
 crossbeam = "0.8.1"
 crossbeam-channel = "0.5.4"
+crossterm = "0.26.1"
 csv = "1.2.1"
 curve25519-dalek = "3"
 curve25519-dalek-ng = "4"
-dashmap = "5.2.0"
+dashmap = { version = "5.5.3", features = ["inline"] }
 datatest-stable = "0.1.1"
 debug-ignore = { version = "1.0.3", features = ["serde"] }
 derivative = "2.2.0"
 determinator = "0.12.0"
+derive_more = "0.99.11"
 diesel = "2.1"
-diesel-async = { version = "0.4", features = ["postgres", "tokio"] }
+# Use the crate version once this feature gets released on crates.io:
+# https://github.com/weiznich/diesel_async/commit/e165e8c96a6c540ebde2d6d7c52df5c5620a4bf1
+diesel-async = { git = "https://github.com/weiznich/diesel_async.git", rev = "d02798c67065d763154d7272dd0c09b39757d0f2", features = ["async-connection-wrapper", "postgres", "bb8", "tokio"] }
 diesel_migrations = { version = "2.1.0", features = ["postgres"] }
+difference = "2.0.0"
 digest = "0.9.0"
 dir-diff = "0.3.2"
 dirs = "5.0.1"
+dirs-next = "2.0.0"
 dunce = "1.0.4"
 ed25519-dalek = { version = "1.0.1", features = ["std", "serde"] }
 ed25519-dalek-bip32 = "0.2.0"
@@ -527,16 +547,24 @@ either = "1.6.1"
 enum_dispatch = "0.3.12"
 env_logger = "0.10.0"
 erased-serde = "0.3.13"
+ethabi = "18.0.0"
+ethnum = "1.5.0"
 event-listener = "2.5.3"
+evm = { version = "0.33.1", features = ["tracing"] }
+evm-runtime = { version = "0.33.0", features = ["tracing"] }
 fail = "0.5.0"
-ff = "0.13"
+ff = { version = "0.13", features = ["derive"] }
 field_count = "0.1.1"
+file_diff = "1.0.0"
 fixed = "1.25.1"
 flate2 = "1.0.24"
+flexi_logger = "0.27.4"
 futures = "0.3.29"
 futures-channel = "0.3.29"
 futures-core = "0.3.29"
 futures-util = "0.3.29"
+fxhash = "0.2.1"
+getrandom = "0.2.2"
 gcp-bigquery-client = "0.13.0"
 get_if_addrs = "0.5.3"
 git2 = "0.16.1"
@@ -544,10 +572,12 @@ glob = "0.3.0"
 goldenfile = "1.5.2"
 google-cloud-storage = "0.13.0"
 group = "0.13"
-guppy = "0.17.0"
+guppy = "0.17.5"
 handlebars = "4.2.2"
+hashbrown = "0.14.3"
 heck = "0.4.1"
 hex = { version = "0.4.3", features = ["serde"] }
+hex-literal = "0.3.4"
 hkdf = "0.10.0"
 hostname = "0.3.1"
 http = "0.2.9"
@@ -555,12 +585,14 @@ httpmock = "0.6.8"
 hyper = { version = "0.14.18", features = ["full"] }
 hyper-tls = "0.5.0"
 image = "0.24.5"
+indexmap = "1.9.3"
 include_dir = { version = "0.7.2", features = ["glob"] }
 indicatif = "0.15.0"
 indoc = "1.0.6"
 inferno = "0.11.14"
+internment = { version = "0.5.0", features = ["arc"] }
 ipnet = "2.5.0"
-itertools = "0.10.3"
+itertools = "0.12"
 jemallocator = { version = "0.5.0", features = [
     "profiling",
     "unprefixed_malloc_on_supported_platforms",
@@ -578,13 +610,17 @@ lru = "0.7.5"
 lz4 = "1.24.0"
 maplit = "1.0.2"
 merlin = "3"
+memory-stats = "1.0.0"
 mime = "0.3.16"
 mini-moka = { version = "0.10.3", features = ["sync"] }
 mirai-annotations = "1.12.0"
 mockall = "0.11.4"
 more-asserts = "0.3.0"
+named-lock = "0.2.0"
 native-tls = "0.2.10"
+neptune = { version = "13.0.0", default_features = false }
 ntest = "0.9.0"
+num = "0.4.0"
 num-bigint = { version = "0.3.2", features = ["rand"] }
 num_cpus = "1.13.1"
 num-derive = "0.3.3"
@@ -596,22 +632,28 @@ ordered-float = "3.9.1"
 ouroboros = "0.15.6"
 owo-colors = "3.5.0"
 p256 = { version = "0.13.2" }
+prettydiff = "0.6.2"
+primitive-types = { version = "0.10" }
 signature = "2.1.0"
 sec1 = "0.7.0"
 pairing = "0.23"
 parking_lot = "0.12.0"
 paste = "1.0.7"
+pathsearch = "0.2.0"
 passkey-authenticator = { version = "0.2.0", features = ["testable"] }
 passkey-client = { version = "0.2.0" }
 passkey-types = { version = "0.2.0" }
 pbjson = "0.5.1"
 percent-encoding = "2.1.0"
+petgraph = "0.5.1"
 pin-project = "1.0.10"
+plotters = { version = "0.3.5", default-features = false }
 poem = { version = "=1.3.59", features = ["anyhow", "rustls"] }
 poem-openapi = { version = "=2.0.11", features = ["swagger-ui", "url"] }
 poem-openapi-derive = "=2.0.11"
 poseidon-ark = { git = "https://github.com/arnaucube/poseidon-ark.git", rev = "6d2487aa1308d9d3860a2b724c485d73095c1c68" }
 pprof = { version = "0.11", features = ["flamegraph", "protobuf-codec"] }
+pretty = "0.10.0"
 pretty_assertions = "1.2.1"
 procfs = "0.14.1"
 proc-macro2 = "1.0.38"
@@ -624,6 +666,7 @@ proptest-derive = "0.4.0"
 prost = { version = "0.12.3", features = ["no-recursion-limit"] }
 prost-types = "0.12.3"
 quanta = "0.10.1"
+quick_cache = "0.5.1"
 quote = "1.0.18"
 rand = "0.7.3"
 rand_core = "0.5.1"
@@ -635,6 +678,7 @@ redis = { version = "0.22.3", features = [
     "connection-manager",
 ] }
 redis-test = { version = "0.1.1", features = ["aio"] }
+ref-cast = "1.0.6"
 regex = "1.9.3"
 reqwest = { version = "0.11.11", features = [
     "blocking",
@@ -658,6 +702,7 @@ sha2 = "0.9.3"
 sha256 = "1.4.0"
 sha2_0_10_6 = { package = "sha2", version = "0.10.6" }
 sha3 = "0.9.1"
+shell-words = "1.0.0"
 siphasher = "0.3.10"
 serde = { version = "1.0.193", features = ["derive", "rc"] }
 serde-big-array = "0.5.1"
@@ -674,6 +719,8 @@ serde-reflection = { git = "https://github.com/aptos-labs/serde-reflection", rev
 serde_with = "3.4.0"
 serde_yaml = "0.8.24"
 shadow-rs = "0.16.2"
+simplelog = "0.9.0"
+smallbitvec = "2.5.1"
 smallvec = "1.8.0"
 static_assertions = "1.1.0"
 stats_alloc = "0.1.8"
@@ -684,6 +731,7 @@ syn = { version = "1.0.92", features = ["derive", "extra-traits"] }
 sysinfo = "0.28.4"
 tar = "0.4.40"
 tempfile = "3.3.0"
+tera = "1.16.0"
 termcolor = "1.1.2"
 test-case = "3.1.0"
 textwrap = "0.15.0"
@@ -693,6 +741,7 @@ thread_local = "1.1.7"
 time = { version = "0.3.24", features = ["serde"] }
 tiny-bip39 = "0.8.2"
 tiny-keccak = { version = "2.0.2", features = ["keccak", "sha3"] }
+toml_edit = "0.14.3"
 tracing = "0.1.37"
 tracing-subscriber = { version = "0.3.17", features = ["json", "env-filter"] }
 trybuild = "1.0.80"
@@ -705,25 +754,34 @@ tokio-stream = { version = "0.1.14", features = ["fs"] }
 tokio-test = "0.4.1"
 tokio-util = { version = "0.7.2", features = ["compat", "codec"] }
 toml = "0.7.4"
-tonic = { version = "0.10.2", features = [
+tonic = { version = "0.11.0", features = [
     "tls-roots",
     "transport",
     "prost",
     "gzip",
     "codegen",
+    "zstd",
 ] }
-tonic-reflection = "0.10.2"
+tonic-reflection = "0.11.0"
+triomphe = "0.1.9"
+tui = "0.19.0"
+typed-arena = "2.0.2"
+typenum = "1.17.0"
+uint = "0.9.4"
 ureq = { version = "1.5.4", features = [
     "json",
     "native-tls",
 ], default_features = false }
 url = { version = "2.4.0", features = ["serde"] }
 uuid = { version = "1.0.0", features = ["v4", "serde"] }
+variant_count = "1.1.0"
 walkdir = "2.3.3"
 warp = { version = "0.3.5", features = ["tls"] }
 warp-reverse-proxy = "1.0.0"
 which = "4.2.5"
+whoami = "1.5.0"
 x25519-dalek = "1.2.0"
+z3tracer = "0.8.0"
 
 # MOVE DEPENDENCIES
 move-abigen = { path = "third_party/move/move-prover/move-abigen" }
@@ -788,7 +846,7 @@ codegen-units = 1
 
 [profile.ci]
 inherits = "release"
-debug = true
+debug = "line-tables-only"
 overflow-checks = true
 debug-assertions = true
 

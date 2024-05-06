@@ -1,4 +1,5 @@
 // Copyright © Aptos Foundation
+// SPDX-License-Identifier: Apache-2.0
 
 use crate::{
     jwks::{
@@ -6,14 +7,21 @@ use crate::{
             request_handler::{MindChangingServer, StaticContentServer},
             DummyProvider,
         },
-        get_patched_jwks, put_provider_on_chain,
+        get_patched_jwks, update_jwk_consensus_config,
     },
     smoke_test_environment::SwarmBuilder,
 };
 use aptos_forge::{NodeExt, Swarm, SwarmExt};
 use aptos_logger::{debug, info};
-use aptos_types::jwks::{
-    jwk::JWK, unsupported::UnsupportedJWK, AllProvidersJWKs, OIDCProvider, ProviderJWKs,
+use aptos_types::{
+    jwks::{
+        jwk::{JWKMoveStruct, JWK},
+        rsa::RSA_JWK,
+        unsupported::UnsupportedJWK,
+        AllProvidersJWKs, ProviderJWKs,
+    },
+    keyless::test_utils::get_sample_iss,
+    on_chain_config::{JWKConsensusConfigV1, OIDCProvider, OnChainJWKConsensusConfig},
 };
 use std::{sync::Arc, time::Duration};
 use tokio::time::sleep;
@@ -44,12 +52,12 @@ async fn jwk_consensus_provider_change_mind() {
         .await
         .expect("Epoch 2 taking too long to arrive!");
 
-    info!("Initially the provider set is empty. So should be the ObservedJWKs.");
+    info!("Initially the provider set is empty. The JWK map should have the secure test jwk added via a patch at genesis.");
 
     sleep(Duration::from_secs(10)).await;
     let patched_jwks = get_patched_jwks(&client).await;
     debug!("patched_jwks={:?}", patched_jwks);
-    assert!(patched_jwks.jwks.entries.is_empty());
+    assert!(patched_jwks.jwks.entries.len() == 1);
 
     info!("Adding some providers.");
     let (provider_alice, provider_bob) =
@@ -62,17 +70,20 @@ async fn jwk_consensus_provider_change_mind() {
         r#"{"keys": ["BOB_JWK_V0_1"]}"#.as_bytes().to_vec(),
         2,
     ))));
-    let providers = vec![
-        OIDCProvider {
-            name: b"https://alice.io".to_vec(),
-            config_url: provider_alice.open_id_config_url().into_bytes(),
-        },
-        OIDCProvider {
-            name: b"https://bob.dev".to_vec(),
-            config_url: provider_bob.open_id_config_url().into_bytes(),
-        },
-    ];
-    let txn_summary = put_provider_on_chain(cli, root_idx, providers).await;
+    let config = OnChainJWKConsensusConfig::V1(JWKConsensusConfigV1 {
+        oidc_providers: vec![
+            OIDCProvider {
+                name: "https://alice.io".to_string(),
+                config_url: provider_alice.open_id_config_url(),
+            },
+            OIDCProvider {
+                name: "https://bob.dev".to_string(),
+                config_url: provider_bob.open_id_config_url(),
+            },
+        ],
+    });
+
+    let txn_summary = update_jwk_consensus_config(cli, root_idx, &config).await;
     debug!("txn_summary={:?}", txn_summary);
 
     info!("Waiting for an on-chain update. 30 secs should be enough.");
@@ -97,6 +108,11 @@ async fn jwk_consensus_provider_change_mind() {
                         "\"BOB_JWK_V0_1\""
                     ))
                     .into()],
+                },
+                ProviderJWKs {
+                    issuer: get_sample_iss().into_bytes(),
+                    version: 0,
+                    jwks: vec![JWKMoveStruct::from(RSA_JWK::secure_test_jwk())],
                 },
             ]
         },

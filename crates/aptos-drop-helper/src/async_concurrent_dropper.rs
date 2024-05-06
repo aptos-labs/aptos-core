@@ -14,12 +14,12 @@ use threadpool::ThreadPool;
 ///
 /// Be aware that there is a bounded number of concurrent drops, as a result:
 ///   1. when it's "out of capacity", `schedule_drop` will block until a slot to be available.
-///   2. if the `Drop` implementation tries to lock things, there can be a potential dead lock due
+///   2. if the `Drop` implementation tries to lock things, there can be a potential deadlock due
 ///      to another thing being waiting for a slot to be available.
 pub struct AsyncConcurrentDropper {
     name: &'static str,
     num_tasks_tracker: Arc<NumTasksTracker>,
-    /// use dedicated threadpool to minimize the possibility of dead lock
+    /// use dedicated thread pool to minimize the possibility of deadlock
     thread_pool: ThreadPool,
 }
 

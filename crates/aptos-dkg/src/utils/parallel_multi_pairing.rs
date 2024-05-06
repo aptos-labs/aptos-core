@@ -1,4 +1,5 @@
 // Copyright © Aptos Foundation
+// SPDX-License-Identifier: Apache-2.0
 
 use blst::blst_fp12;
 use blstrs::{Fp12, G1Affine, G2Affine, Gt};

@@ -7,8 +7,7 @@ use crate::{
         tracing::{observe_block, BlockStage},
         BlockReader, BlockRetriever, BlockStore,
     },
-    counters,
-    counters::{PROPOSED_VTXN_BYTES, PROPOSED_VTXN_COUNT},
+    counters::{self, PROPOSED_VTXN_BYTES, PROPOSED_VTXN_COUNT},
     error::{error_kind, VerifyError},
     liveness::{
         proposal_generator::ProposalGenerator,
@@ -24,6 +23,7 @@ use crate::{
     pending_votes::VoteReceptionResult,
     persistent_liveness_storage::PersistentLivenessStorage,
     quorum_store::types::BatchMsg,
+    rand::rand_gen::types::{FastShare, RandConfig, Share, TShare},
     util::is_vtxn_expected,
 };
 use anyhow::{bail, ensure, Context};
@@ -34,7 +34,7 @@ use aptos_consensus_types::{
     block_data::BlockType,
     common::{Author, Round},
     delayed_qc_msg::DelayedQcMsg,
-    proof_of_store::{ProofOfStoreMsg, SignedBatchInfoMsg},
+    proof_of_store::{ProofCache, ProofOfStoreMsg, SignedBatchInfoMsg},
     proposal_msg::ProposalMsg,
     quorum_cert::QuorumCert,
     sync_info::SyncInfo,
@@ -49,7 +49,11 @@ use aptos_safety_rules::ConsensusState;
 use aptos_safety_rules::TSafetyRules;
 use aptos_types::{
     epoch_state::EpochState,
-    on_chain_config::{Features, OnChainConsensusConfig, ValidatorTxnConfig},
+    on_chain_config::{
+        OnChainConsensusConfig, OnChainJWKConsensusConfig, OnChainRandomnessConfig,
+        ValidatorTxnConfig,
+    },
+    randomness::RandMetadata,
     validator_verifier::ValidatorVerifier,
     PeerId,
 };
@@ -80,6 +84,7 @@ impl UnverifiedEvent {
         self,
         peer_id: PeerId,
         validator: &ValidatorVerifier,
+        proof_cache: &ProofCache,
         quorum_store_enabled: bool,
         self_message: bool,
         max_num_batches: usize,
@@ -90,7 +95,7 @@ impl UnverifiedEvent {
             //TODO: no need to sign and verify the proposal
             UnverifiedEvent::ProposalMsg(p) => {
                 if !self_message {
-                    p.verify(validator, quorum_store_enabled)?;
+                    p.verify(validator, proof_cache, quorum_store_enabled)?;
                     counters::VERIFY_MSG
                         .with_label_values(&["proposal"])
                         .observe(start_time.elapsed().as_secs_f64());
@@ -133,7 +138,7 @@ impl UnverifiedEvent {
             },
             UnverifiedEvent::ProofOfStoreMsg(p) => {
                 if !self_message {
-                    p.verify(max_num_batches, validator)?;
+                    p.verify(max_num_batches, validator, proof_cache)?;
                     counters::VERIFY_MSG
                         .with_label_values(&["proof_of_store"])
                         .observe(start_time.elapsed().as_secs_f64());
@@ -211,11 +216,13 @@ pub struct RoundManager {
     vtxn_config: ValidatorTxnConfig,
     buffered_proposal_tx: aptos_channel::Sender<Author, VerifiedEvent>,
     local_config: ConsensusConfig,
-    features: Features,
-    broadcast_vote: bool,
+    randomness_config: OnChainRandomnessConfig,
+    jwk_consensus_config: OnChainJWKConsensusConfig,
+    fast_rand_config: Option<RandConfig>,
 }
 
 impl RoundManager {
+    #[allow(clippy::too_many_arguments)]
     pub fn new(
         epoch_state: Arc<EpochState>,
         block_store: Arc<BlockStore>,
@@ -228,8 +235,9 @@ impl RoundManager {
         onchain_config: OnChainConsensusConfig,
         buffered_proposal_tx: aptos_channel::Sender<Author, VerifiedEvent>,
         local_config: ConsensusConfig,
-        features: Features,
-        broadcast_vote: bool,
+        randomness_config: OnChainRandomnessConfig,
+        jwk_consensus_config: OnChainJWKConsensusConfig,
+        fast_rand_config: Option<RandConfig>,
     ) -> Self {
         // when decoupled execution is false,
         // the counter is still static.
@@ -254,8 +262,9 @@ impl RoundManager {
             vtxn_config,
             buffered_proposal_tx,
             local_config,
-            features,
-            broadcast_vote,
+            randomness_config,
+            jwk_consensus_config,
+            fast_rand_config,
         }
     }
 
@@ -676,7 +685,7 @@ impl RoundManager {
         if let Some(vtxns) = proposal.validator_txns() {
             for vtxn in vtxns {
                 ensure!(
-                    is_vtxn_expected(&self.features, vtxn),
+                    is_vtxn_expected(&self.randomness_config, &self.jwk_consensus_config, vtxn),
                     "unexpected validator txn: {:?}",
                     vtxn.topic()
                 );
@@ -834,7 +843,24 @@ impl RoundManager {
         self.round_state.record_vote(vote.clone());
         let vote_msg = VoteMsg::new(vote.clone(), self.block_store.sync_info());
 
-        if self.broadcast_vote {
+        // generate and multicast randomness share for the fast path
+        if let Some(fast_config) = &self.fast_rand_config {
+            let ledger_info = vote.ledger_info();
+            if !ledger_info.is_dummy() {
+                let metadata = RandMetadata {
+                    epoch: ledger_info.epoch(),
+                    round: ledger_info.round(),
+                };
+                let self_share = Share::generate(fast_config, metadata);
+                let fast_share = FastShare::new(self_share);
+                info!(LogSchema::new(LogEvent::BroadcastRandShareFastPath)
+                    .epoch(fast_share.epoch())
+                    .round(fast_share.round()));
+                self.network.broadcast_fast_share(fast_share).await;
+            }
+        }
+
+        if self.local_config.broadcast_vote {
             info!(self.new_log(LogEvent::Vote), "{}", vote);
             self.network.broadcast_vote(vote_msg).await;
         } else {
@@ -928,7 +954,7 @@ impl RoundManager {
     async fn process_vote(&mut self, vote: &Vote) -> anyhow::Result<()> {
         let round = vote.vote_data().proposed().round();
 
-        info!(
+        debug!(
             self.new_log(LogEvent::ReceiveVote)
                 .remote_peer(vote.author()),
             vote = %vote,
@@ -939,7 +965,7 @@ impl RoundManager {
             is_timeout = vote.is_timeout(),
         );
 
-        if !self.broadcast_vote && !vote.is_timeout() {
+        if !self.local_config.broadcast_vote && !vote.is_timeout() {
             // Unlike timeout votes regular votes are sent to the leaders of the next round only.
             let next_round = round + 1;
             ensure!(
@@ -1110,6 +1136,11 @@ impl RoundManager {
                         }
                     };
                     proposals.sort_by_key(get_round);
+                    // If the first proposal is not for the next round, we only process the last proposal.
+                    // to avoid going through block retrieval of many garbage collected rounds.
+                    if self.round_state.current_round() + 1 < get_round(&proposals[0]) {
+                        proposals = vec![proposals.pop().unwrap()];
+                    }
                     for proposal in proposals {
                         let result = match proposal {
                             VerifiedEvent::ProposalMsg(proposal_msg) => {

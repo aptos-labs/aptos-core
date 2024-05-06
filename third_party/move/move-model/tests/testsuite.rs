@@ -18,6 +18,7 @@ fn test_runner(path: &Path, options: ModelBuilderOptions) -> datatest_stable::Re
     let env = run_model_builder_with_options(
         targets,
         vec![],
+        vec![],
         options,
         false,
         KnownAttribute::get_all_attribute_names(),
@@ -45,4 +46,4 @@ fn runner(path: &Path) -> datatest_stable::Result<()> {
     }
 }
 
-datatest_stable::harness!(runner, "tests/sources", r".*\.move");
+datatest_stable::harness!(runner, "tests/sources", r".*\.move$");

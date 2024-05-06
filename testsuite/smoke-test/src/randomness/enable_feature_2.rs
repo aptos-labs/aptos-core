@@ -1,4 +1,5 @@
 // Copyright © Aptos Foundation
+// SPDX-License-Identifier: Apache-2.0
 
 use crate::{
     randomness::{decrypt_key_map, get_on_chain_resource, verify_dkg_transcript},
@@ -7,13 +8,10 @@ use crate::{
 };
 use aptos_forge::{Node, Swarm, SwarmExt};
 use aptos_logger::{debug, info};
-use aptos_types::{
-    dkg::DKGState,
-    on_chain_config::{FeatureFlag, Features},
-};
+use aptos_types::{dkg::DKGState, on_chain_config::OnChainRandomnessConfig};
 use std::{sync::Arc, time::Duration};
 
-/// Enable on-chain randomness by enabling validator transactions and feature `RECONFIGURE_WITH_DKG` simultaneously.
+/// Enable on-chain randomness by enabling validator transactions and randomness main logic.
 #[tokio::test]
 async fn enable_feature_2() {
     let epoch_duration_secs = 20;
@@ -26,13 +24,9 @@ async fn enable_feature_2() {
             conf.epoch_duration_secs = epoch_duration_secs;
             conf.allow_new_validators = true;
 
-            // start with vtxn disabled.
+            // start with vtxn disabled and randomness off.
             conf.consensus_config.disable_validator_txns();
-
-            // start with dkg disabled.
-            let mut features = Features::default();
-            features.disable(FeatureFlag::RECONFIGURE_WITH_DKG);
-            conf.initial_features_override = Some(features);
+            conf.randomness_config_override = Some(OnChainRandomnessConfig::default_disabled());
         }))
         .build_with_cli(0)
         .await;
@@ -50,7 +44,7 @@ async fn enable_feature_2() {
         .await
         .expect("Waited too long for epoch 3.");
 
-    info!("Now in epoch 3. Enabling features.");
+    info!("Now in epoch 3. Enabling all the dependencies at the same time.");
     let mut config = get_current_consensus_config(&client).await;
     config.enable_validator_txns();
     let config_bytes = bcs::to_bytes(&config).unwrap();
@@ -59,13 +53,18 @@ async fn enable_feature_2() {
 script {{
     use aptos_framework::aptos_governance;
     use aptos_framework::consensus_config;
-    use std::features;
+    use aptos_framework::randomness_config;
+    use aptos_std::fixed_point64;
+
     fun main(core_resources: &signer) {{
-        let framework_signer = aptos_governance::get_signer_testnet_only(core_resources, @0000000000000000000000000000000000000000000000000000000000000001);
-        let config_bytes = vector{:?};
-        consensus_config::set_for_next_epoch(&framework_signer, config_bytes);
-        let dkg_feature_id: u64 = features::get_reconfigure_with_dkg_feature();
-        features::change_feature_flags_for_next_epoch(&framework_signer, vector[dkg_feature_id], vector[]);
+        let framework_signer = aptos_governance::get_signer_testnet_only(core_resources, @0x1);
+        let consensus_config_bytes = vector{:?};
+        consensus_config::set_for_next_epoch(&framework_signer, consensus_config_bytes);
+        let randomness_config = randomness_config::new_v1(
+            fixed_point64::create_from_rational(1, 2),
+            fixed_point64::create_from_rational(2, 3)
+        );
+        randomness_config::set_for_next_epoch(&framework_signer, randomness_config);
         aptos_governance::reconfigure(&framework_signer);
     }}
 }}
@@ -105,7 +104,7 @@ script {{
     let dkg_session = get_on_chain_resource::<DKGState>(&client)
         .await
         .last_completed
-        .expect("dkg result for epoch 6 should be present");
+        .expect("dkg result for epoch 5 should be present");
     assert_eq!(5, dkg_session.target_epoch());
     assert!(verify_dkg_transcript(&dkg_session, &decrypt_key_map).is_ok());
 }

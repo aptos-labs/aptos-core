@@ -1,0 +1,9 @@
+
+Diagnostics:
+error: tuple type `(u64, S)` is not allowed as a local variable type
+   ┌─ tests/checking/abilities/tuple_invalid.move:12:13
+   │
+12 │         let x = tuple(x);
+   │             ^
+   │
+   = required by declaration of local `x`
