@@ -5,6 +5,8 @@ module resource_account::bonding_curve_launchpad {
     use aptos_framework::fungible_asset::{Self, FungibleAsset, Metadata};
     use aptos_framework::primary_fungible_store;
     use aptos_framework::event;
+    use aptos_framework::coin;
+    use aptos_framework::aptos_coin::{Self, AptosCoin};
     use aptos_framework::aptos_account;
     use aptos_std::smart_table::{Self, SmartTable};
     use aptos_std::math128;
@@ -13,6 +15,7 @@ module resource_account::bonding_curve_launchpad {
     use aptos_std::object::{Object};
     use aptos_framework::dispatchable_fungible_asset;
     use aptos_framework::function_info;
+    use std::debug; //! Debug
     // Friend
     use resource_account::resource_signer_holder;
 
@@ -288,6 +291,7 @@ module resource_account::bonding_curve_launchpad {
         primary_fungible_store::transfer_with_ref(&fa_data.controller.transfer_ref, swapper_address, @resource_account, fa_given);
         aptos_account::transfer(&resource_signer_holder::get_signer(), account_address, apt_gained);
 
+
         let old_fa_reserves = liquidity_pair.fa_reserves;
         let old_apt_reserves = liquidity_pair.apt_reserves;
         liquidity_pair.fa_reserves = fa_updated_reserves;
@@ -419,5 +423,6 @@ module resource_account::bonding_curve_launchpad {
         move_to(deployer, fa_smartTable);
         move_to(deployer, liquidity_pair_table);
     }
+
 
 }

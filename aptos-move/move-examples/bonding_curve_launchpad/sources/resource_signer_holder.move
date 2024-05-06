@@ -11,7 +11,7 @@ module resource_account::resource_signer_holder {
 
 	struct Config has key {
 	    owner: address,
-	    signer_cap: account::SignerCapability,
+	    signer_cap: account::SignerCapability
 	}
 
 	const OWNER: address = @owner_addr;
@@ -23,7 +23,7 @@ module resource_account::resource_signer_holder {
 	    let signer_cap = resource_account::retrieve_resource_account_cap(resource_account, OWNER);
 	    move_to(resource_account, Config {
 	        owner: OWNER,
-	        signer_cap,
+	        signer_cap
 	    });
 	}
 
@@ -43,14 +43,18 @@ module resource_account::resource_signer_holder {
         let signer_cap = &borrow_global<Config>(RESOURCE_ACCOUNT).signer_cap;
         account::create_signer_with_capability(signer_cap)
     }
+	public(friend) fun get_owner(): address acquires Config {
+		let owner = borrow_global<Config>(RESOURCE_ACCOUNT).owner;
+        owner
+	}
 
 	//---------------------------Tests---------------------------
     #[test_only]
     public fun initialize_for_test(deployer: &signer){
-		let (coin_wrapper_signer, signer_cap) = account::create_resource_account(deployer, b"TEST");
+	    // let signer_cap = resource_account::retrieve_resource_account_cap(deployer, OWNER);
 	    move_to(deployer, Config {
 	        owner: OWNER,
-	        signer_cap,
+	        signer_cap: account::create_test_signer_cap(signer::address_of(deployer)),
 	    });
     }
 
