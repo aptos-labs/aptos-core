@@ -254,7 +254,7 @@ impl ControlFlowGraphCodeGenerator {
         !last_instr.is_always_branching()
     }
 
-    /// Gets the only successor of `block`; panics if this is not the case.
+    /// Gets the only successor of `block`; panics if there is no successors.
     /// (May not panic in the release version due to the use of debug_assert)
     fn get_the_successor(&self, block: BlockId) -> BlockId {
         let successors = self.successors.get(&block).expect("successors");
