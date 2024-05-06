@@ -77,7 +77,7 @@ impl<'r, 'l> Session<'r, 'l> {
         gas_meter: &mut impl GasMeter,
         traversal_context: &mut TraversalContext,
     ) -> VMResult<()> {
-        if func.function.is_entry {
+        if !func.function.is_entry {
             return Err(PartialVMError::new(
                 StatusCode::EXECUTE_ENTRY_FUNCTION_CALLED_ON_NON_ENTRY_FUNCTION,
             )
