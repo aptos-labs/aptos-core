@@ -125,8 +125,12 @@ impl BatchGenerator {
         author: PeerId,
         batch_id: BatchId,
         txns: Vec<SignedTransaction>,
-        expiry_time: u64,
+        expiry_time_usecs: u64,
     ) {
+        if self.batches_in_progress.contains_key(&(author, batch_id)) {
+            return;
+        }
+
         let txns_in_progress: Vec<_> = txns
             .par_iter()
             .with_min_len(optimal_min_len(txns.len(), 32))
@@ -142,7 +146,28 @@ impl BatchGenerator {
             })
             .collect();
 
-        self.insert_batch_in_progress(author, batch_id, txns_in_progress, expiry_time);
+        let mut txns = vec![];
+        for (summary, info) in txns_in_progress {
+            let txn_info = self
+                .txns_in_progress_sorted
+                .entry(summary)
+                .or_insert_with(|| TransactionInProgress::new(info.gas_unit_price));
+            txn_info.increment();
+            txn_info.gas_unit_price = info.gas_unit_price.max(txn_info.gas_unit_price);
+            txns.push(summary);
+        }
+        let updated_expiry_time_usecs = self
+            .batches_in_progress
+            .get(&(author, batch_id))
+            .map_or(expiry_time_usecs, |batch_in_progress| {
+                expiry_time_usecs.max(batch_in_progress.expiry_time_usecs)
+            });
+        self.batches_in_progress.insert(
+            (author, batch_id),
+            BatchInProgress::new(txns, updated_expiry_time_usecs),
+        );
+        self.batch_expirations
+            .add_item((author, batch_id), updated_expiry_time_usecs);
     }
 
     fn create_new_batch(
@@ -272,38 +297,6 @@ impl BatchGenerator {
         batches
     }
 
-    fn insert_batch_in_progress(
-        &mut self,
-        author: PeerId,
-        batch_id: BatchId,
-        txns_in_progress: Vec<(TransactionSummary, TransactionInProgress)>,
-        expiry_time_usecs: u64,
-    ) {
-        let mut txns = vec![];
-        for (summary, info) in txns_in_progress {
-            let txn_info = self
-                .txns_in_progress_sorted
-                .entry(summary)
-                .or_insert_with(|| TransactionInProgress::new(info.gas_unit_price));
-            txn_info.increment();
-            txn_info.gas_unit_price = info.gas_unit_price.max(txn_info.gas_unit_price);
-            txns.push(summary);
-        }
-        let updated_expiry_time_usecs = self
-            .batches_in_progress
-            .get(&(author, batch_id))
-            .map_or(expiry_time_usecs, |batch_in_progress| {
-                expiry_time_usecs.max(batch_in_progress.expiry_time_usecs)
-            });
-        // TODO: what if it already exists?
-        self.batches_in_progress.insert(
-            (author, batch_id),
-            BatchInProgress::new(txns, updated_expiry_time_usecs),
-        );
-        self.batch_expirations
-            .add_item((author, batch_id), updated_expiry_time_usecs);
-    }
-
     fn remove_batch_in_progress(&mut self, author: PeerId, batch_id: BatchId) -> bool {
         let removed = self.batches_in_progress.remove(&(author, batch_id));
         match removed {
@@ -385,9 +378,6 @@ impl BatchGenerator {
         batch_id: BatchId,
         txns: Vec<SignedTransaction>,
     ) {
-        if author == self.my_peer_id {
-            return;
-        }
         let expiry_time_usecs = aptos_infallible::duration_since_epoch().as_micros() as u64
             + self.config.remote_batch_expiry_gap_when_init_usecs;
         self.insert_batch(author, batch_id, txns, expiry_time_usecs);
