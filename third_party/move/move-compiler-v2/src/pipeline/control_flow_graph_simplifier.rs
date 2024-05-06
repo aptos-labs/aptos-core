@@ -116,7 +116,7 @@ impl ControlFlowGraphSimplifierTransformation {
     fn transform(&mut self) {
         self.eliminate_branch_to_same_target();
         let mut elim_empty_blocks_transformer =
-            RemoveEmptyBlock::new(std::mem::take(&mut self.cfg_code_generator));
+            RemoveEmptyBlockTransformer::new(std::mem::take(&mut self.cfg_code_generator));
         elim_empty_blocks_transformer.transform();
         let mut remove_redundant_jump_transformer =
             RemoveRedundantJump::new(elim_empty_blocks_transformer.0);
@@ -124,7 +124,7 @@ impl ControlFlowGraphSimplifierTransformation {
         self.data.code = remove_redundant_jump_transformer.0.gen_code(true);
         // may introduce new empty blocks
         let mut elim_empty_blocks_transformer =
-            RemoveEmptyBlock::new(ControlFlowGraphCodeGenerator::new(&self.data.code));
+            RemoveEmptyBlockTransformer::new(ControlFlowGraphCodeGenerator::new(&self.data.code));
         elim_empty_blocks_transformer.transform();
         self.data.code = elim_empty_blocks_transformer.0.gen_code(true);
         self.eliminate_branch_to_same_target();
@@ -314,7 +314,7 @@ impl ControlFlowGraphCodeGenerator {
     }
 }
 
-struct RemoveEmptyBlock(ControlFlowGraphCodeGenerator);
+struct RemoveEmptyBlockTransformer(ControlFlowGraphCodeGenerator);
 
 /// `impl_deref!(Wrapper, WrappedType);` implements `Deref` trait for a wrapper struct with one field
 /// `struct Wrapper(WrappedType);` where the `deref` method simply returns a reference to the wrapped value.
@@ -343,11 +343,11 @@ macro_rules! impl_deref_mut {
     };
 }
 
-impl_deref!(RemoveEmptyBlock, ControlFlowGraphCodeGenerator);
+impl_deref!(RemoveEmptyBlockTransformer, ControlFlowGraphCodeGenerator);
 
-impl_deref_mut!(RemoveEmptyBlock);
+impl_deref_mut!(RemoveEmptyBlockTransformer);
 
-impl RemoveEmptyBlock {
+impl RemoveEmptyBlockTransformer {
     /// Wrapper
     pub fn new(generator: ControlFlowGraphCodeGenerator) -> Self {
         Self(generator)
