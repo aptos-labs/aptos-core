@@ -316,37 +316,6 @@ impl ControlFlowGraphCodeGenerator {
 
 struct RemoveEmptyBlockTransformer(ControlFlowGraphCodeGenerator);
 
-/// `impl_deref!(Wrapper, WrappedType);` implements `Deref` trait for a wrapper struct with one field
-/// `struct Wrapper(WrappedType);` where the `deref` method simply returns a reference to the wrapped value.
-macro_rules! impl_deref {
-    ($struct_name:ident, $target_type:ty) => {
-        impl std::ops::Deref for $struct_name {
-            type Target = $target_type;
-
-            fn deref(&self) -> &Self::Target {
-                &self.0
-            }
-        }
-    };
-}
-
-/// `impl_deref!(Wrapper)` implements `DerefMut` trait for a wrapper struct with one field,
-/// where the `deref_mut` method simply returns a mutable reference to the wrapped value.
-/// Note that `Wrapper` should've implemented `Deref`, which is a supertrait of `DerefMut`.
-macro_rules! impl_deref_mut {
-    ($struct_name:ident) => {
-        impl std::ops::DerefMut for $struct_name {
-            fn deref_mut(&mut self) -> &mut Self::Target {
-                &mut self.0
-            }
-        }
-    };
-}
-
-impl_deref!(RemoveEmptyBlockTransformer, ControlFlowGraphCodeGenerator);
-
-impl_deref_mut!(RemoveEmptyBlockTransformer);
-
 impl RemoveEmptyBlockTransformer {
     /// Wrapper
     pub fn new(generator: ControlFlowGraphCodeGenerator) -> Self {
@@ -355,9 +324,9 @@ impl RemoveEmptyBlockTransformer {
 
     /// Performas the transformation 1 described in the module doc
     pub fn transform(&mut self) {
-        for block in self.blocks() {
+        for block in self.0.blocks() {
             if self.is_empty_block(block) {
-                let suc_block = self.get_the_non_trivial_successor(block);
+                let suc_block = self.0.get_the_non_trivial_successor(block);
                 if suc_block != block {
                     self.remove_empty_block(block, suc_block);
                 }
@@ -367,7 +336,7 @@ impl RemoveEmptyBlockTransformer {
 
     /// Checks if the given block is empty; i.e., only a label and a jump
     fn is_empty_block(&self, block_id: BlockId) -> bool {
-        let block_instrs = self.block_instrs(block_id);
+        let block_instrs = self.0.block_instrs(block_id);
         block_instrs.len() == 2
             && matches!(block_instrs[0], Bytecode::Label(..))
             && matches!(
@@ -379,13 +348,14 @@ impl RemoveEmptyBlockTransformer {
     fn remove_empty_block(&mut self, block_to_remove: BlockId, redirect_to: BlockId) {
         debug_assert!(block_to_remove != redirect_to);
         debug_assert!(!self
+            .0
             .successors
             .get(&block_to_remove)
             .expect("successors")
             .contains(&block_to_remove));
-        let from = self.get_block_label(block_to_remove).expect("label");
-        let to  = self.get_block_label(redirect_to).expect("label");
-        self.remove_block(block_to_remove,
+        let from = self.0.get_block_label(block_to_remove).expect("label");
+        let to  = self.0.get_block_label(redirect_to).expect("label");
+        self.0.remove_block(block_to_remove,
             |this, pred, _succs| {
                 // for all predecessors of `block_to_remove`, let them jump to `redirect_to` instead
                 if pred != this.entry_block {
@@ -408,7 +378,8 @@ impl RemoveEmptyBlockTransformer {
             |_this, _suc, _preds| {}
         );
         // remove `block_to_remove`
-        self.predecessors
+        self.0.
+            predecessors
             .get_mut(&redirect_to)
             .expect("predecessors")
             .retain(|pred| *pred != block_to_remove);
@@ -444,9 +415,9 @@ impl RemoveRedundantJump {
 
     /// Performs the transformation 2 described in the module doc
     pub fn transform(&mut self) {
-        for block in self.blocks() {
+        for block in self.0.blocks() {
             // the later condition says that `block` is unreachable or has been removed
-            if self.is_trivial_block(block) || !self.predecessors.contains_key(&block) {
+            if self.0.is_trivial_block(block) || !self.0.predecessors.contains_key(&block) {
                 continue;
             }
             self.transform_edges_from(block)
@@ -456,8 +427,8 @@ impl RemoveRedundantJump {
     /// Removes all redundant edges from `block`
     /// Requires: `block` still in the cfg, `block` is not entry/exit
     fn transform_edges_from(&mut self, block: BlockId) {
-        for suc in self.successors.get(&block).expect("successors").clone() {
-            if !self.is_trivial_block(suc) && self.remove_jump_if_possible(block, suc) {
+        for suc in self.0.successors.get(&block).expect("successors").clone() {
+            if !self.0.is_trivial_block(suc) && self.remove_jump_if_possible(block, suc) {
                 // successors of `block` changes
                 // consider L0: goto L1; L1: goto L2; L2: goto L3;
                 // suc L0: L1
@@ -472,29 +443,29 @@ impl RemoveRedundantJump {
 
     /// An edge can be removed if `from` has only one successor, and `to` has only one predecessor
     fn can_remove_edge(&self, from: BlockId, to: BlockId) -> bool {
-        debug_assert!(!self.is_trivial_block(from));
-        debug_assert!(!self.is_trivial_block(to));
-        self.successors.get(&from).expect("successors").len() == 1
-            && self.predecessors.get(&to).map_or(0, |preds| preds.len()) == 1
+        debug_assert!(!self.0.is_trivial_block(from));
+        debug_assert!(!self.0.is_trivial_block(to));
+        self.0.successors.get(&from).expect("successors").len() == 1
+            && self.0.predecessors.get(&to).map_or(0, |preds| preds.len()) == 1
     }
 
     /// If possible, append the code of block `to` to the back of block `from` and remove the `to` block
     /// Returns true if the edge is removed
     fn remove_jump_if_possible(&mut self, from: BlockId, to: BlockId) -> bool {
-        debug_assert!(self.successors.get(&from).expect("successors").contains(&to));
-        debug_assert!(!self.is_trivial_block(from));
-        debug_assert!(!self.is_trivial_block(to));
+        debug_assert!(self.0.successors.get(&from).expect("successors").contains(&to));
+        debug_assert!(!self.0.is_trivial_block(from));
+        debug_assert!(!self.0.is_trivial_block(to));
         if from == to || !self.can_remove_edge(from, to) {
             return false;
         }
-        let mut to_codes = self.code_blocks.remove(&to).expect("codes");
+        let mut to_codes = self.0.code_blocks.remove(&to).expect("codes");
         if matches!(
             to_codes.first().expect("first instruction"),
             Bytecode::Label(..)
         ) {
             to_codes.remove(0);
         }
-        let from_codes = self.code_blocks.get_mut(&from).expect("codes");
+        let from_codes = self.0.code_blocks.get_mut(&from).expect("codes");
         if matches!(
             from_codes.last().expect("last instruction"),
             Bytecode::Jump(..)
@@ -503,7 +474,7 @@ impl RemoveRedundantJump {
         }
         from_codes.append(&mut to_codes);
 
-        self.remove_block(to,
+        self.0.remove_block(to,
             |this, pred, succs| {
                 debug_assert!(pred == from);
                 let succs_mut = this.successors.get_mut(&pred).expect("successors");
@@ -522,10 +493,6 @@ impl RemoveRedundantJump {
         true
     }
 }
-
-impl_deref!(RemoveRedundantJump, ControlFlowGraphCodeGenerator);
-
-impl_deref_mut!(RemoveRedundantJump);
 
 /// Computes the map from a blcok to its predecessors
 fn pred_map(cfg: &StacklessControlFlowGraph) -> BTreeMap<BlockId, Vec<BlockId>> {
