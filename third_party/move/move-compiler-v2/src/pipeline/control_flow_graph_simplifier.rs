@@ -115,15 +115,15 @@ impl ControlFlowGraphSimplifierTransformation {
         self.eliminate_branch_to_same_target();
         let cfg_code_generator = ControlFlowGraphCodeGenerator::new(std::mem::take(&mut self.data.code));
         let mut elim_empty_blocks_transformer =
-            RemoveEmptyBlockTransformer::new(cfg_code_generator);
+            EmptyBlockRemover::new(cfg_code_generator);
         elim_empty_blocks_transformer.transform();
         let mut remove_redundant_jump_transformer =
-            RemoveRedundantJump::new(elim_empty_blocks_transformer.0);
+            RedundantJumpRemover::new(elim_empty_blocks_transformer.0);
         remove_redundant_jump_transformer.transform();
         self.data.code = remove_redundant_jump_transformer.0.gen_code(true);
         // may introduce new empty blocks
         let mut elim_empty_blocks_transformer =
-            RemoveEmptyBlockTransformer::new(ControlFlowGraphCodeGenerator::new(std::mem::take(&mut self.data.code)));
+            EmptyBlockRemover::new(ControlFlowGraphCodeGenerator::new(std::mem::take(&mut self.data.code)));
         elim_empty_blocks_transformer.transform();
         self.data.code = elim_empty_blocks_transformer.0.gen_code(true);
         self.eliminate_branch_to_same_target();
@@ -332,9 +332,9 @@ impl ControlFlowGraphCodeGenerator {
     }
 }
 
-struct RemoveEmptyBlockTransformer(ControlFlowGraphCodeGenerator);
+struct EmptyBlockRemover(ControlFlowGraphCodeGenerator);
 
-impl RemoveEmptyBlockTransformer {
+impl EmptyBlockRemover {
     /// Wrapper
     pub fn new(generator: ControlFlowGraphCodeGenerator) -> Self {
         Self(generator)
@@ -424,9 +424,9 @@ impl RemoveEmptyBlockTransformer {
 }
 
 /// Transformation state
-struct RemoveRedundantJump(pub ControlFlowGraphCodeGenerator);
+struct RedundantJumpRemover(pub ControlFlowGraphCodeGenerator);
 
-impl RemoveRedundantJump {
+impl RedundantJumpRemover {
     /// Wrapper
     pub fn new(cfg_generator: ControlFlowGraphCodeGenerator) -> Self {
         Self(cfg_generator)
