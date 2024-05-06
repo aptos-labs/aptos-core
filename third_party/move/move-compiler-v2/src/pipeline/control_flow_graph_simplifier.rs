@@ -161,7 +161,6 @@ struct ControlFlowGraphCodeGenerator {
 }
 
 impl ControlFlowGraphCodeGenerator {
-    // TODO: take `Vec<Bytecode>` instead to avoid copying
     pub fn new(mut code: Vec<Bytecode>) -> Self {
         let cfg = StacklessControlFlowGraph::new_forward(&code);
         let mut code_blocks = BTreeMap::new();
