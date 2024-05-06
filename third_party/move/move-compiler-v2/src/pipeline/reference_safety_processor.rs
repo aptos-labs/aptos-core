@@ -1005,6 +1005,26 @@ impl<'env, 'state> LifetimeAnalysisStep<'env, 'state> {
         }
     }
 
+    /// Release all references that are not alive after this program point
+    /// from temp_to_label_map if `dests` do not contain any references
+    /// This function should be called before `check_write_local`
+    fn release_before_write_local(&mut self, dests: &[TempIndex]) {
+        let alive_temps = self.alive.after_set();
+        if !dests.iter().any(|temp| self.is_ref(*temp)) {
+            for temp in self
+                .state
+                .temp_to_label_map
+                .keys()
+                .cloned()
+                .collect::<Vec<_>>()
+            {
+                if !alive_temps.contains(&temp) && self.is_ref(temp) {
+                    self.state.release_ref(temp)
+                }
+            }
+        }
+    }
+
     /// Check whether a local can be written. This is only allowed if no borrowed references exist.
     fn check_write_local(&self, local: TempIndex) {
         if self.is_ref(local) {
@@ -1433,6 +1453,7 @@ impl<'env, 'state> LifetimeAnalysisStep<'env, 'state> {
             }
         } else {
             self.check_read_local(src, mode);
+            self.release_before_write_local(&[dest]);
             self.check_write_local(dest);
         }
     }
@@ -1486,19 +1507,25 @@ impl<'env, 'state> LifetimeAnalysisStep<'env, 'state> {
         );
     }
 
-    /// Process a function call. For now we implement standard Move semantics, where every
-    /// output reference is a child of all input references. Here would be the point where to
-    // evaluate lifetime modifiers in future language versions.
+    /// Process a function call. For now we implement standard Move semantics, where
+    /// 1) every output immutable reference is a child of all input references;
+    /// 2) every output mutable reference is a child of all input mutable references,
+    /// because mutable references cannot be derived from immutable references.
+    /// Here would be the point where to
+    /// evaluate lifetime modifiers in future language versions.
     fn call_operation(&mut self, oper: Operation, dests: &[TempIndex], srcs: &[TempIndex]) {
         // Check validness of arguments
         for src in srcs {
             self.check_read_local(*src, ReadMode::Argument);
         }
         // Next check whether we can assign to the destinations.
+        self.release_before_write_local(dests);
         for dest in dests {
             self.check_write_local(*dest)
         }
-        // Now draw edges from all reference sources to all reference destinations.
+        // Now draw edges
+        // 1) from all reference sources to all immutable reference destinations.
+        // 2) from all mutable reference sources to all mutable reference destinations.
         let dest_labels = dests
             .iter()
             .filter(|d| self.ty(**d).is_reference())
@@ -1515,6 +1542,11 @@ impl<'env, 'state> LifetimeAnalysisStep<'env, 'state> {
                 for (i, src) in srcs.iter().enumerate() {
                     let src_ty = self.ty(*src);
                     if src_ty.is_reference() {
+                        // dest does not rely on src if
+                        // dest is a mutable reference while src is not
+                        if dest_ty.is_mutable_reference() && !src_ty.is_mutable_reference() {
+                            continue;
+                        }
                         let label = self.state.make_temp(
                             *src,
                             self.code_offset,
@@ -1678,6 +1710,7 @@ impl<'env, 'state> LifetimeAnalysisStep<'env, 'state> {
     /// Process a MoveFrom instruction.
     fn move_from(&mut self, dest: TempIndex, resource: &QualifiedInstId<StructId>, src: TempIndex) {
         self.check_read_local(src, ReadMode::Argument);
+        self.release_before_write_local(&[dest]);
         self.check_write_local(dest);
         if let Some(label) = self.state.label_for_global_with_children(resource) {
             self.error_with_hints(
@@ -1736,6 +1769,7 @@ impl<'env, 'state> LifetimeAnalysisStep<'env, 'state> {
     /// Process a ReadRef instruction.
     fn read_ref(&mut self, dest: TempIndex, src: TempIndex) {
         debug_assert!(self.is_ref(src));
+        self.release_before_write_local(&[dest]);
         self.check_write_local(dest);
         self.check_read_local(src, ReadMode::Argument);
     }

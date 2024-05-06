@@ -272,6 +272,18 @@ pub enum EntryFunctionCall {
         code: Vec<Vec<u8>>,
     },
 
+    CoinCreateCoinConversionMap {},
+
+    /// Create APT pairing by passing `AptosCoin`.
+    CoinCreatePairing {
+        coin_type: TypeTag,
+    },
+
+    /// Voluntarily migrate to fungible store for `CoinType` if not yet.
+    CoinMigrateToFungibleStore {
+        coin_type: TypeTag,
+    },
+
     /// Transfers `amount` of coins `CoinType` from `from` to `to`.
     CoinTransfer {
         coin_type: TypeTag,
@@ -321,7 +333,7 @@ pub enum EntryFunctionCall {
     DelegationPoolEnableDelegatorsAllowlisting {},
 
     /// Enable partial governance voting on a stake pool. The voter of this stake pool will be managed by this module.
-    /// THe existing voter will be replaced. The function is permissionless.
+    /// The existing voter will be replaced. The function is permissionless.
     DelegationPoolEnablePartialGovernanceVoting {
         pool_address: AccountAddress,
     },
@@ -352,7 +364,7 @@ pub enum EntryFunctionCall {
     },
 
     /// Allows an operator to change its beneficiary. Any existing unpaid commission rewards will be paid to the new
-    /// beneficiary. To ensures payment to the current beneficiary, one should first call `synchronize_delegation_pool`
+    /// beneficiary. To ensure payment to the current beneficiary, one should first call `synchronize_delegation_pool`
     /// before switching the beneficiary. An operator can set one beneficiary for delegation pools, not a separate
     /// one for each pool.
     DelegationPoolSetBeneficiaryForOperator {
@@ -1125,6 +1137,9 @@ impl EntryFunctionCall {
                 metadata_serialized,
                 code,
             } => code_publish_package_txn(metadata_serialized, code),
+            CoinCreateCoinConversionMap {} => coin_create_coin_conversion_map(),
+            CoinCreatePairing { coin_type } => coin_create_pairing(coin_type),
+            CoinMigrateToFungibleStore { coin_type } => coin_migrate_to_fungible_store(coin_type),
             CoinTransfer {
                 coin_type,
                 to,
@@ -2222,6 +2237,53 @@ pub fn code_publish_package_txn(
     ))
 }
 
+pub fn coin_create_coin_conversion_map() -> TransactionPayload {
+    TransactionPayload::EntryFunction(EntryFunction::new(
+        ModuleId::new(
+            AccountAddress::new([
+                0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+                0, 0, 0, 1,
+            ]),
+            ident_str!("coin").to_owned(),
+        ),
+        ident_str!("create_coin_conversion_map").to_owned(),
+        vec![],
+        vec![],
+    ))
+}
+
+/// Create APT pairing by passing `AptosCoin`.
+pub fn coin_create_pairing(coin_type: TypeTag) -> TransactionPayload {
+    TransactionPayload::EntryFunction(EntryFunction::new(
+        ModuleId::new(
+            AccountAddress::new([
+                0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+                0, 0, 0, 1,
+            ]),
+            ident_str!("coin").to_owned(),
+        ),
+        ident_str!("create_pairing").to_owned(),
+        vec![coin_type],
+        vec![],
+    ))
+}
+
+/// Voluntarily migrate to fungible store for `CoinType` if not yet.
+pub fn coin_migrate_to_fungible_store(coin_type: TypeTag) -> TransactionPayload {
+    TransactionPayload::EntryFunction(EntryFunction::new(
+        ModuleId::new(
+            AccountAddress::new([
+                0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+                0, 0, 0, 1,
+            ]),
+            ident_str!("coin").to_owned(),
+        ),
+        ident_str!("migrate_to_fungible_store").to_owned(),
+        vec![coin_type],
+        vec![],
+    ))
+}
+
 /// Transfers `amount` of coins `CoinType` from `from` to `to`.
 pub fn coin_transfer(coin_type: TypeTag, to: AccountAddress, amount: u64) -> TransactionPayload {
     TransactionPayload::EntryFunction(EntryFunction::new(
@@ -2378,7 +2440,7 @@ pub fn delegation_pool_enable_delegators_allowlisting() -> TransactionPayload {
 }
 
 /// Enable partial governance voting on a stake pool. The voter of this stake pool will be managed by this module.
-/// THe existing voter will be replaced. The function is permissionless.
+/// The existing voter will be replaced. The function is permissionless.
 pub fn delegation_pool_enable_partial_governance_voting(
     pool_address: AccountAddress,
 ) -> TransactionPayload {
@@ -2478,7 +2540,7 @@ pub fn delegation_pool_remove_delegator_from_allowlist(
 }
 
 /// Allows an operator to change its beneficiary. Any existing unpaid commission rewards will be paid to the new
-/// beneficiary. To ensures payment to the current beneficiary, one should first call `synchronize_delegation_pool`
+/// beneficiary. To ensure payment to the current beneficiary, one should first call `synchronize_delegation_pool`
 /// before switching the beneficiary. An operator can set one beneficiary for delegation pools, not a separate
 /// one for each pool.
 pub fn delegation_pool_set_beneficiary_for_operator(
@@ -4798,6 +4860,38 @@ mod decoder {
         }
     }
 
+    pub fn coin_create_coin_conversion_map(
+        payload: &TransactionPayload,
+    ) -> Option<EntryFunctionCall> {
+        if let TransactionPayload::EntryFunction(_script) = payload {
+            Some(EntryFunctionCall::CoinCreateCoinConversionMap {})
+        } else {
+            None
+        }
+    }
+
+    pub fn coin_create_pairing(payload: &TransactionPayload) -> Option<EntryFunctionCall> {
+        if let TransactionPayload::EntryFunction(script) = payload {
+            Some(EntryFunctionCall::CoinCreatePairing {
+                coin_type: script.ty_args().get(0)?.clone(),
+            })
+        } else {
+            None
+        }
+    }
+
+    pub fn coin_migrate_to_fungible_store(
+        payload: &TransactionPayload,
+    ) -> Option<EntryFunctionCall> {
+        if let TransactionPayload::EntryFunction(script) = payload {
+            Some(EntryFunctionCall::CoinMigrateToFungibleStore {
+                coin_type: script.ty_args().get(0)?.clone(),
+            })
+        } else {
+            None
+        }
+    }
+
     pub fn coin_transfer(payload: &TransactionPayload) -> Option<EntryFunctionCall> {
         if let TransactionPayload::EntryFunction(script) = payload {
             Some(EntryFunctionCall::CoinTransfer {
@@ -6240,6 +6334,18 @@ static SCRIPT_FUNCTION_DECODER_MAP: once_cell::sync::Lazy<EntryFunctionDecoderMa
         map.insert(
             "code_publish_package_txn".to_string(),
             Box::new(decoder::code_publish_package_txn),
+        );
+        map.insert(
+            "coin_create_coin_conversion_map".to_string(),
+            Box::new(decoder::coin_create_coin_conversion_map),
+        );
+        map.insert(
+            "coin_create_pairing".to_string(),
+            Box::new(decoder::coin_create_pairing),
+        );
+        map.insert(
+            "coin_migrate_to_fungible_store".to_string(),
+            Box::new(decoder::coin_migrate_to_fungible_store),
         );
         map.insert(
             "coin_transfer".to_string(),

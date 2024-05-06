@@ -35,12 +35,12 @@ def test_init(run_helper: RunHelper, test_name=None):
     if not account_info:
         raise TestError("Failed to read account info from newly created config file")
 
-    # Confirm with the local testnet that it was created.
+    # Confirm with the localnet that it was created.
     try:
         run_helper.api_client.account(account_info.account_address)
     except Exception as e:
         raise TestError(
-            f"Failed to query local testnet for account {account_info.account_address}"
+            f"Failed to query localnet for account {account_info.account_address}"
         ) from e
 
 

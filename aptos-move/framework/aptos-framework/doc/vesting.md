@@ -3397,7 +3397,7 @@ This address should be deterministic for the same admin and vesting contract cre
 <td>2</td>
 <td>The vesting pool should not exceed a maximum of 30 shareholders.</td>
 <td>Medium</td>
-<td>The maximum number of shareholders a vesting pool can support is stored as a constant in</td>
+<td>The maximum number of shareholders a vesting pool can support is stored as a constant in MAXIMUM_SHAREHOLDERS which is passed to the pool_u64::create function.</td>
 <td>Formally verified via a <a href="#high-level-spec-2">global invariant</a>.</td>
 </tr>
 
@@ -3413,7 +3413,7 @@ This address should be deterministic for the same admin and vesting contract cre
 <td>4</td>
 <td>The shareholders should be able to start vesting only after the vesting cliff and the first vesting period have transpired.</td>
 <td>High</td>
-<td>The end of the vesting cliff is stored under VestingContract.vesting_schedule.start_timestamp_secs. period.</td>
+<td>The end of the vesting cliff is stored under VestingContract.vesting_schedule.start_timestamp_secs. The vest function always checks that timestamp::now_seconds is greater or equal to the end of the vesting cliff period.</td>
 <td>Audited the check for the end of vesting cliff: <a href="https://github.com/aptos-labs/aptos-core/blob/main/aptos-move/framework/aptos-framework/sources/vesting.move#L566">vest</a> module.</td>
 </tr>
 
@@ -3429,7 +3429,7 @@ This address should be deterministic for the same admin and vesting contract cre
 <td>6</td>
 <td>A new vesting schedule should not be allowed to start vesting in the past or to supply an empty schedule or for the period duration to be zero.</td>
 <td>High</td>
-<td>The create_vesting_schedule function ensures that the length of the schedule vector is greater than 0, that the period duration is greater than 0 and that the start_timestamp_secs is greater or equal to</td>
+<td>The create_vesting_schedule function ensures that the length of the schedule vector is greater than 0, that the period duration is greater than 0 and that the start_timestamp_secs is greater or equal to timestamp::now_seconds.</td>
 <td>Formally verified via <a href="#high-level-req-6">create_vesting_schedule</a>.</td>
 </tr>
 
@@ -3485,7 +3485,8 @@ This address should be deterministic for the same admin and vesting contract cre
 <pre><code><b>pragma</b> verify = <b>true</b>;
 <b>pragma</b> aborts_if_is_strict;
 // This enforces <a id="high-level-spec-2" href="#high-level-req">high-level requirement 2</a>:
-<b>invariant</b> <b>forall</b> pool: Pool: len(pool.shareholders) &lt;= <a href="vesting.md#0x1_vesting_MAXIMUM_SHAREHOLDERS">MAXIMUM_SHAREHOLDERS</a>;
+<b>invariant</b> <b>forall</b> a: <b>address</b> <b>where</b> <b>exists</b>&lt;<a href="vesting.md#0x1_vesting_VestingContract">VestingContract</a>&gt;(a):
+    <b>global</b>&lt;<a href="vesting.md#0x1_vesting_VestingContract">VestingContract</a>&gt;(a).grant_pool.shareholders_limit &lt;= <a href="vesting.md#0x1_vesting_MAXIMUM_SHAREHOLDERS">MAXIMUM_SHAREHOLDERS</a>;
 </code></pre>
 
 
@@ -3931,19 +3932,6 @@ This address should be deterministic for the same admin and vesting contract cre
 
 
 
-
-<a id="0x1_vesting_PreconditionAbortsIf"></a>
-
-
-<pre><code><b>schema</b> <a href="vesting.md#0x1_vesting_PreconditionAbortsIf">PreconditionAbortsIf</a> {
-    contract_addresses: <a href="../../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;<b>address</b>&gt;;
-    <b>requires</b> <b>forall</b> i in 0..len(contract_addresses): <a href="../../aptos-stdlib/doc/simple_map.md#0x1_simple_map_spec_get">simple_map::spec_get</a>(<b>global</b>&lt;<a href="staking_contract.md#0x1_staking_contract_Store">staking_contract::Store</a>&gt;(contract_addresses[i]).staking_contracts, <b>global</b>&lt;<a href="vesting.md#0x1_vesting_VestingContract">VestingContract</a>&gt;(contract_addresses[i]).staking.operator).commission_percentage &gt;= 0
-        && <a href="../../aptos-stdlib/doc/simple_map.md#0x1_simple_map_spec_get">simple_map::spec_get</a>(<b>global</b>&lt;<a href="staking_contract.md#0x1_staking_contract_Store">staking_contract::Store</a>&gt;(contract_addresses[i]).staking_contracts, <b>global</b>&lt;<a href="vesting.md#0x1_vesting_VestingContract">VestingContract</a>&gt;(contract_addresses[i]).staking.operator).commission_percentage &lt;= 100;
-}
-</code></pre>
-
-
-
 <a id="@Specification_1_distribute"></a>
 
 ### Function `distribute`
@@ -4088,7 +4076,8 @@ This address should be deterministic for the same admin and vesting contract cre
 
 
 
-<pre><code><b>include</b> <a href="vesting.md#0x1_vesting_VerifyAdminAbortsIf">VerifyAdminAbortsIf</a>;
+<pre><code><b>pragma</b> verify_duration_estimate = 300;
+<b>include</b> <a href="vesting.md#0x1_vesting_VerifyAdminAbortsIf">VerifyAdminAbortsIf</a>;
 <b>let</b> vesting_contract = <b>global</b>&lt;<a href="vesting.md#0x1_vesting_VestingContract">VestingContract</a>&gt;(contract_address);
 <b>let</b> operator = vesting_contract.staking.operator;
 <b>let</b> staker = vesting_contract.signer_cap.<a href="account.md#0x1_account">account</a>;
@@ -4108,7 +4097,8 @@ This address should be deterministic for the same admin and vesting contract cre
 
 
 
-<pre><code><b>aborts_if</b> !<b>exists</b>&lt;<a href="vesting.md#0x1_vesting_VestingContract">VestingContract</a>&gt;(contract_address);
+<pre><code><b>pragma</b> verify_duration_estimate = 300;
+<b>aborts_if</b> !<b>exists</b>&lt;<a href="vesting.md#0x1_vesting_VestingContract">VestingContract</a>&gt;(contract_address);
 <b>let</b> vesting_contract = <b>global</b>&lt;<a href="vesting.md#0x1_vesting_VestingContract">VestingContract</a>&gt;(contract_address);
 <b>aborts_if</b> <a href="../../aptos-stdlib/../move-stdlib/doc/signer.md#0x1_signer_address_of">signer::address_of</a>(admin) != vesting_contract.admin;
 <b>let</b> operator = vesting_contract.staking.operator;
@@ -4134,8 +4124,10 @@ This address should be deterministic for the same admin and vesting contract cre
 
 
 
-<pre><code><b>aborts_if</b> !<a href="account.md#0x1_account_exists_at">account::exists_at</a>(new_beneficiary);
-<b>aborts_if</b> !<a href="coin.md#0x1_coin_is_account_registered">coin::is_account_registered</a>&lt;AptosCoin&gt;(new_beneficiary);
+<pre><code><b>pragma</b> verify_duration_estimate = 300;
+<b>pragma</b> aborts_if_is_partial;
+<b>aborts_if</b> !<a href="account.md#0x1_account_exists_at">account::exists_at</a>(new_beneficiary);
+<b>aborts_if</b> !<a href="coin.md#0x1_coin_spec_is_account_registered">coin::spec_is_account_registered</a>&lt;AptosCoin&gt;(new_beneficiary);
 <b>include</b> <a href="vesting.md#0x1_vesting_VerifyAdminAbortsIf">VerifyAdminAbortsIf</a>;
 <b>let</b> <b>post</b> vesting_contract = <b>global</b>&lt;<a href="vesting.md#0x1_vesting_VestingContract">VestingContract</a>&gt;(contract_address);
 <b>ensures</b> <a href="../../aptos-stdlib/doc/simple_map.md#0x1_simple_map_spec_contains_key">simple_map::spec_contains_key</a>(vesting_contract.beneficiaries,shareholder);

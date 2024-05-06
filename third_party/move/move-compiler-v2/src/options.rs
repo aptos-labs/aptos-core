@@ -2,7 +2,7 @@
 // Parts of the project are originally copyright © Meta Platforms, Inc.
 // SPDX-License-Identifier: Apache-2.0
 
-use crate::{experiments, DefaultValue, EXPERIMENTS};
+use crate::experiments::{DefaultValue, EXPERIMENTS};
 use clap::Parser;
 use codespan_reporting::diagnostic::Severity;
 use itertools::Itertools;
@@ -61,6 +61,9 @@ pub struct Options {
     pub experiment_cache: RefCell<BTreeMap<String, bool>>,
     /// Sources to compile (positional arg, therefore last)
     pub sources: Vec<String>,
+    /// Dependencies to compile but not treat as a test/docgen/warning/prover target.
+    #[clap(skip)]
+    pub sources_deps: Vec<String>,
     /// Show warnings about unused functions, fields, constants, etc.
     /// Note that the current value of this constant is "Wunused"
     #[clap(long = cli::WARN_UNUSED_FLAG, default_value="false")]
@@ -90,7 +93,7 @@ impl Options {
     pub fn set_experiment(self, name: impl AsRef<str>, on: bool) -> Self {
         let name = name.as_ref().to_string();
         assert!(
-            experiments::EXPERIMENTS.contains_key(&name),
+            EXPERIMENTS.contains_key(&name),
             "experiment `{}` not declared",
             name
         );
@@ -122,7 +125,7 @@ impl Options {
         if let Some(on) = self.experiment_cache.borrow().get(name).cloned() {
             return on;
         }
-        if let Some(exp) = experiments::EXPERIMENTS.get(&name.to_string()) {
+        if let Some(exp) = EXPERIMENTS.get(&name.to_string()) {
             // First we look at experiments provided via the command line, second
             // via the env var, and last we take the configured default.
             let on = if let Some(on) = find_experiment(&self.experiments, name) {

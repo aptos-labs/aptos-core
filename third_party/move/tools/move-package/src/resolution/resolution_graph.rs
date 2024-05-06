@@ -957,7 +957,7 @@ fn confirm_git_available() -> Result<()> {
                 );
             } else {
                 bail!(
-                    "Unexpected error occured when checking for presence of `git`: {:#}",
+                    "Unexpected error occurred when checking for presence of `git`: {:#}",
                     e
                 );
             }

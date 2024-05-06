@@ -3,7 +3,7 @@
 
 # Module `0x1::object`
 
-This defines the Move object model with the the following properties:
+This defines the Move object model with the following properties:
 - Simplified storage interface that supports a heterogeneous collection of resources to be
 stored together. This enables data types to share a common core data layer (e.g., tokens),
 while having richer extensions (e.g., concert ticket, sword).
@@ -39,6 +39,7 @@ make it so that a reference to a global object can be returned from a function.
 -  [Function `is_object`](#0x1_object_is_object)
 -  [Function `object_exists`](#0x1_object_object_exists)
 -  [Function `create_object_address`](#0x1_object_create_object_address)
+-  [Function `create_user_derived_object_address_impl`](#0x1_object_create_user_derived_object_address_impl)
 -  [Function `create_user_derived_object_address`](#0x1_object_create_user_derived_object_address)
 -  [Function `create_guid_object_address`](#0x1_object_create_guid_object_address)
 -  [Function `exists_at`](#0x1_object_exists_at)
@@ -48,6 +49,7 @@ make it so that a reference to a global object can be returned from a function.
 -  [Function `create_user_derived_object`](#0x1_object_create_user_derived_object)
 -  [Function `create_object`](#0x1_object_create_object)
 -  [Function `create_sticky_object`](#0x1_object_create_sticky_object)
+-  [Function `create_sticky_object_at_address`](#0x1_object_create_sticky_object_at_address)
 -  [Function `create_object_from_account`](#0x1_object_create_object_from_account)
 -  [Function `create_object_from_object`](#0x1_object_create_object_from_object)
 -  [Function `create_object_from_guid`](#0x1_object_create_object_from_guid)
@@ -88,6 +90,7 @@ make it so that a reference to a global object can be returned from a function.
     -  [Module-level Specification](#module-level-spec)
     -  [Function `address_to_object`](#@Specification_1_address_to_object)
     -  [Function `create_object_address`](#@Specification_1_create_object_address)
+    -  [Function `create_user_derived_object_address_impl`](#@Specification_1_create_user_derived_object_address_impl)
     -  [Function `create_user_derived_object_address`](#@Specification_1_create_user_derived_object_address)
     -  [Function `create_guid_object_address`](#@Specification_1_create_guid_object_address)
     -  [Function `exists_at`](#@Specification_1_exists_at)
@@ -97,6 +100,7 @@ make it so that a reference to a global object can be returned from a function.
     -  [Function `create_user_derived_object`](#@Specification_1_create_user_derived_object)
     -  [Function `create_object`](#@Specification_1_create_object)
     -  [Function `create_sticky_object`](#@Specification_1_create_sticky_object)
+    -  [Function `create_sticky_object_at_address`](#@Specification_1_create_sticky_object_at_address)
     -  [Function `create_object_from_account`](#@Specification_1_create_object_from_account)
     -  [Function `create_object_from_object`](#@Specification_1_create_object_from_object)
     -  [Function `create_object_from_guid`](#@Specification_1_create_object_from_guid)
@@ -844,6 +848,28 @@ Derives an object address from source material: sha3_256([creator address | seed
 
 </details>
 
+<a id="0x1_object_create_user_derived_object_address_impl"></a>
+
+## Function `create_user_derived_object_address_impl`
+
+
+
+<pre><code><b>fun</b> <a href="object.md#0x1_object_create_user_derived_object_address_impl">create_user_derived_object_address_impl</a>(source: <b>address</b>, derive_from: <b>address</b>): <b>address</b>
+</code></pre>
+
+
+
+<details>
+<summary>Implementation</summary>
+
+
+<pre><code><b>native</b> <b>fun</b> <a href="object.md#0x1_object_create_user_derived_object_address_impl">create_user_derived_object_address_impl</a>(source: <b>address</b>, derive_from: <b>address</b>): <b>address</b>;
+</code></pre>
+
+
+
+</details>
+
 <a id="0x1_object_create_user_derived_object_address"></a>
 
 ## Function `create_user_derived_object_address`
@@ -861,10 +887,14 @@ Derives an object address from the source address and an object: sha3_256([sourc
 
 
 <pre><code><b>public</b> <b>fun</b> <a href="object.md#0x1_object_create_user_derived_object_address">create_user_derived_object_address</a>(source: <b>address</b>, derive_from: <b>address</b>): <b>address</b> {
-    <b>let</b> bytes = <a href="../../aptos-stdlib/../move-stdlib/doc/bcs.md#0x1_bcs_to_bytes">bcs::to_bytes</a>(&source);
-    <a href="../../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector_append">vector::append</a>(&<b>mut</b> bytes, <a href="../../aptos-stdlib/../move-stdlib/doc/bcs.md#0x1_bcs_to_bytes">bcs::to_bytes</a>(&derive_from));
-    <a href="../../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector_push_back">vector::push_back</a>(&<b>mut</b> bytes, <a href="object.md#0x1_object_OBJECT_DERIVED_SCHEME">OBJECT_DERIVED_SCHEME</a>);
-    <a href="../../aptos-stdlib/doc/from_bcs.md#0x1_from_bcs_to_address">from_bcs::to_address</a>(<a href="../../aptos-stdlib/../move-stdlib/doc/hash.md#0x1_hash_sha3_256">hash::sha3_256</a>(bytes))
+    <b>if</b> (std::features::object_native_derived_address_enabled()) {
+        <a href="object.md#0x1_object_create_user_derived_object_address_impl">create_user_derived_object_address_impl</a>(source, derive_from)
+    } <b>else</b> {
+        <b>let</b> bytes = <a href="../../aptos-stdlib/../move-stdlib/doc/bcs.md#0x1_bcs_to_bytes">bcs::to_bytes</a>(&source);
+        <a href="../../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector_append">vector::append</a>(&<b>mut</b> bytes, <a href="../../aptos-stdlib/../move-stdlib/doc/bcs.md#0x1_bcs_to_bytes">bcs::to_bytes</a>(&derive_from));
+        <a href="../../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector_push_back">vector::push_back</a>(&<b>mut</b> bytes, <a href="object.md#0x1_object_OBJECT_DERIVED_SCHEME">OBJECT_DERIVED_SCHEME</a>);
+        <a href="../../aptos-stdlib/doc/from_bcs.md#0x1_from_bcs_to_address">from_bcs::to_address</a>(<a href="../../aptos-stdlib/../move-stdlib/doc/hash.md#0x1_hash_sha3_256">hash::sha3_256</a>(bytes))
+    }
 }
 </code></pre>
 
@@ -1075,6 +1105,34 @@ Same as <code>create_object</code> except the object to be created will be undel
 <pre><code><b>public</b> <b>fun</b> <a href="object.md#0x1_object_create_sticky_object">create_sticky_object</a>(owner_address: <b>address</b>): <a href="object.md#0x1_object_ConstructorRef">ConstructorRef</a> {
     <b>let</b> unique_address = <a href="transaction_context.md#0x1_transaction_context_generate_auid_address">transaction_context::generate_auid_address</a>();
     <a href="object.md#0x1_object_create_object_internal">create_object_internal</a>(owner_address, unique_address, <b>false</b>)
+}
+</code></pre>
+
+
+
+</details>
+
+<a id="0x1_object_create_sticky_object_at_address"></a>
+
+## Function `create_sticky_object_at_address`
+
+Create a sticky object at a specific address. Only used by aptos_framework::coin.
+
+
+<pre><code><b>public</b>(<b>friend</b>) <b>fun</b> <a href="object.md#0x1_object_create_sticky_object_at_address">create_sticky_object_at_address</a>(owner_address: <b>address</b>, object_address: <b>address</b>): <a href="object.md#0x1_object_ConstructorRef">object::ConstructorRef</a>
+</code></pre>
+
+
+
+<details>
+<summary>Implementation</summary>
+
+
+<pre><code><b>public</b>(<b>friend</b>) <b>fun</b> <a href="object.md#0x1_object_create_sticky_object_at_address">create_sticky_object_at_address</a>(
+    owner_address: <b>address</b>,
+    object_address: <b>address</b>,
+): <a href="object.md#0x1_object_ConstructorRef">ConstructorRef</a> {
+    <a href="object.md#0x1_object_create_object_internal">create_object_internal</a>(owner_address, object_address, <b>false</b>)
 }
 </code></pre>
 
@@ -1843,13 +1901,15 @@ hierarchy.
 <pre><code>inline <b>fun</b> <a href="object.md#0x1_object_transfer_raw_inner">transfer_raw_inner</a>(<a href="object.md#0x1_object">object</a>: <b>address</b>, <b>to</b>: <b>address</b>) <b>acquires</b> <a href="object.md#0x1_object_ObjectCore">ObjectCore</a> {
     <b>let</b> object_core = <b>borrow_global_mut</b>&lt;<a href="object.md#0x1_object_ObjectCore">ObjectCore</a>&gt;(<a href="object.md#0x1_object">object</a>);
     <b>if</b> (object_core.owner != <b>to</b>) {
-        <a href="event.md#0x1_event_emit">event::emit</a>(
-            <a href="object.md#0x1_object_Transfer">Transfer</a> {
-                <a href="object.md#0x1_object">object</a>,
-                from: object_core.owner,
-                <b>to</b>,
-            },
-        );
+        <b>if</b> (std::features::module_event_migration_enabled()) {
+            <a href="event.md#0x1_event_emit">event::emit</a>(
+                <a href="object.md#0x1_object_Transfer">Transfer</a> {
+                    <a href="object.md#0x1_object">object</a>,
+                    from: object_core.owner,
+                    <b>to</b>,
+                },
+            );
+        };
         <a href="event.md#0x1_event_emit_event">event::emit_event</a>(
             &<b>mut</b> object_core.transfer_events,
             <a href="object.md#0x1_object_TransferEvent">TransferEvent</a> {
@@ -2278,6 +2338,32 @@ Return true if the provided address has indirect or direct ownership of the prov
 
 
 
+
+<a id="0x1_object_spec_create_user_derived_object_address_impl"></a>
+
+
+<pre><code><b>fun</b> <a href="object.md#0x1_object_spec_create_user_derived_object_address_impl">spec_create_user_derived_object_address_impl</a>(source: <b>address</b>, derive_from: <b>address</b>): <b>address</b>;
+</code></pre>
+
+
+
+<a id="@Specification_1_create_user_derived_object_address_impl"></a>
+
+### Function `create_user_derived_object_address_impl`
+
+
+<pre><code><b>fun</b> <a href="object.md#0x1_object_create_user_derived_object_address_impl">create_user_derived_object_address_impl</a>(source: <b>address</b>, derive_from: <b>address</b>): <b>address</b>
+</code></pre>
+
+
+
+
+<pre><code><b>pragma</b> opaque;
+<b>ensures</b> [abstract] result == <a href="object.md#0x1_object_spec_create_user_derived_object_address_impl">spec_create_user_derived_object_address_impl</a>(source, derive_from);
+</code></pre>
+
+
+
 <a id="@Specification_1_create_user_derived_object_address"></a>
 
 ### Function `create_user_derived_object_address`
@@ -2499,6 +2585,22 @@ Return true if the provided address has indirect or direct ownership of the prov
     }
 };
 <b>ensures</b> result == <a href="object.md#0x1_object_ConstructorRef">ConstructorRef</a> { self: unique_address, can_delete: <b>false</b> };
+</code></pre>
+
+
+
+<a id="@Specification_1_create_sticky_object_at_address"></a>
+
+### Function `create_sticky_object_at_address`
+
+
+<pre><code><b>public</b>(<b>friend</b>) <b>fun</b> <a href="object.md#0x1_object_create_sticky_object_at_address">create_sticky_object_at_address</a>(owner_address: <b>address</b>, object_address: <b>address</b>): <a href="object.md#0x1_object_ConstructorRef">object::ConstructorRef</a>
+</code></pre>
+
+
+
+
+<pre><code><b>pragma</b> verify = <b>false</b>;
 </code></pre>
 
 

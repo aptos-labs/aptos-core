@@ -6,3 +6,6 @@ module 0xc0ffee::dummy2 {
         1
     }
 } // end 0xc0ffee::dummy2
+
+
+============ bytecode verification succeeded ========

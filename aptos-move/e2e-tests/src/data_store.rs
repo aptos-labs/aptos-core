@@ -6,7 +6,6 @@
 
 use crate::account::AccountData;
 use aptos_types::{
-    access_path::AccessPath,
     account_config::CoinInfoResource,
     state_store::{
         errors::StateviewError, in_memory_state_view::InMemoryStateView, state_key::StateKey,
@@ -106,7 +105,7 @@ impl FakeDataStore {
     /// Adds CoinInfo to this data store.
     pub fn add_coin_info(&mut self) {
         let coin_info = CoinInfoResource::random(u128::MAX);
-        let write_set = coin_info.to_writeset().expect("access path in test");
+        let write_set = coin_info.to_writeset(0).expect("access path in test");
         self.add_write_set(&write_set)
     }
 
@@ -114,9 +113,8 @@ impl FakeDataStore {
     ///
     /// Does not do any sort of verification on the module.
     pub fn add_module(&mut self, module_id: &ModuleId, blob: Vec<u8>) {
-        let access_path = AccessPath::from(module_id);
         self.set(
-            StateKey::access_path(access_path),
+            StateKey::module_id(module_id),
             StateValue::new_legacy(blob.into()),
         );
     }

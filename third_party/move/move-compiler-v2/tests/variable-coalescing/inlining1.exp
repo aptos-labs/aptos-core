@@ -5,10 +5,12 @@ public fun Test::test(): u64 {
      var $t0: u64
      var $t1: u64
      var $t2: u64
+     var $t3: u64
   0: $t2 := 10
   1: $t1 := infer($t2)
-  2: $t0 := 3
-  3: return $t0
+  2: $t3 := infer($t1)
+  3: $t0 := 3
+  4: return $t0
 }
 
 ============ after DeadStoreElimination: ================
@@ -18,6 +20,7 @@ public fun Test::test(): u64 {
      var $t0: u64
      var $t1: u64 [unused]
      var $t2: u64 [unused]
+     var $t3: u64 [unused]
   0: $t0 := 3
   1: return $t0
 }
@@ -29,6 +32,7 @@ public fun Test::test(): u64 {
      var $t0: u64
      var $t1: u64 [unused]
      var $t2: u64 [unused]
+     var $t3: u64 [unused]
      # live vars:
      # events: b:$t0
   0: $t0 := 3
@@ -44,6 +48,7 @@ public fun Test::test(): u64 {
      var $t0: u64
      var $t1: u64 [unused]
      var $t2: u64 [unused]
+     var $t3: u64 [unused]
   0: $t0 := 3
   1: return $t0
 }
@@ -55,6 +60,7 @@ public fun Test::test(): u64 {
      var $t0: u64
      var $t1: u64 [unused]
      var $t2: u64 [unused]
+     var $t3: u64 [unused]
   0: $t0 := 3
   1: return $t0
 }

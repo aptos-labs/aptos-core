@@ -26,3 +26,6 @@ module 0x42::Test {
         }
     }
 } // end 0x42::Test
+
+
+============ bytecode verification succeeded ========

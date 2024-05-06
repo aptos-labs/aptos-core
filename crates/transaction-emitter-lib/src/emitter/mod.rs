@@ -460,7 +460,7 @@ impl EmitJobRequest {
                 };
 
                 info!(
-                    " Transaction emitter targetting {} TPS, expecting {} TPS",
+                    " Transaction emitter targeting {} TPS, expecting {} TPS",
                     tps,
                     num_accounts * transactions_per_account / wait_seconds as usize
                 );

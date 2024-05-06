@@ -1395,6 +1395,15 @@ impl<'a> Resolver<'a> {
         self.module_store.function_at(&func_inst.handle)
     }
 
+    pub(crate) fn function_from_name(
+        &self,
+        module_id: &ModuleId,
+        func_name: &IdentStr,
+    ) -> PartialVMResult<Arc<Function>> {
+        self.module_store
+            .resolve_function_by_name(func_name, module_id)
+    }
+
     pub(crate) fn instantiate_generic_function(
         &self,
         gas_meter: Option<&mut impl GasMeter>,
@@ -1741,7 +1750,7 @@ impl TypeCache {
 /// Maximal depth of a value in terms of type depth.
 pub const VALUE_DEPTH_MAX: u64 = 128;
 
-/// Maximal nodes which are allowed when converting to layout. This includes the the types of
+/// Maximal nodes which are allowed when converting to layout. This includes the types of
 /// fields for struct types.
 const MAX_TYPE_TO_LAYOUT_NODES: u64 = 256;
 
@@ -2225,10 +2234,22 @@ impl Loader {
             .write()
             .depth_formula
             .insert(name.clone(), formula.clone());
-        if prev.is_some() {
+        if let Some(f) = prev {
+            // TODO: If the VM is not shared across threads, this error means that there is a
+            //       recursive type. But in case it is shared, the current implementation is not
+            //       correct because some other thread can cache depth formula before we reach
+            //       this line, and result in an invariant violation. We need to ensure correct
+            //       behavior, e.g., make the cache available per thread.
             return Err(
-                PartialVMError::new(StatusCode::UNKNOWN_INVARIANT_VIOLATION_ERROR)
-                    .with_message("Recursive type?".to_owned()),
+                PartialVMError::new(StatusCode::UNKNOWN_INVARIANT_VIOLATION_ERROR).with_message(
+                    format!(
+                        "Depth formula for struct '{}' and formula {:?} (struct type: {:?}) is already cached: {:?}",
+                        name,
+                        formula,
+                        struct_type.as_ref(),
+                        f
+                    ),
+                ),
             );
         }
         Ok(formula)

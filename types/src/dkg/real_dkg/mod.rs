@@ -2,7 +2,10 @@
 // SPDX-License-Identifier: Apache-2.0
 
 use crate::{
-    dkg::{real_dkg::rounding::DKGRounding, DKGSessionMetadata, DKGTrait},
+    dkg::{
+        real_dkg::rounding::DKGRounding, DKGSessionMetadata, DKGTrait, MayHaveRoundingSummary,
+        RoundingSummary,
+    },
     on_chain_config::OnChainRandomnessConfig,
     validator_verifier::{ValidatorConsensusInfo, ValidatorVerifier},
 };
@@ -19,7 +22,7 @@ use fixed::types::U64F64;
 use num_traits::Zero;
 use rand::{CryptoRng, RngCore};
 use serde::{Deserialize, Serialize};
-use std::collections::BTreeSet;
+use std::{collections::BTreeSet, time::Instant};
 
 pub mod rounding;
 
@@ -28,7 +31,7 @@ pub type DkgPP = <WTrx as Transcript>::PublicParameters;
 pub type SSConfig = <WTrx as Transcript>::SecretSharingConfig;
 pub type EncPK = <WTrx as Transcript>::EncryptPubKey;
 
-#[derive(Deserialize, Serialize, Clone, Debug, PartialEq, Eq)]
+#[derive(Deserialize, Serialize, Clone, Debug)]
 pub struct DKGPvssConfig {
     pub epoch: u64,
     // weighted config for randomness generation
@@ -39,6 +42,27 @@ pub struct DKGPvssConfig {
     pub pp: DkgPP,
     // DKG encryption public keys
     pub eks: Vec<EncPK>,
+    // Some metrics for caller to consume.
+    #[serde(skip)]
+    pub rounding_summary: RoundingSummary,
+}
+
+impl PartialEq for DKGPvssConfig {
+    fn eq(&self, other: &Self) -> bool {
+        (
+            self.epoch,
+            &self.wconfig,
+            &self.fast_wconfig,
+            &self.pp,
+            &self.eks,
+        ) == (
+            other.epoch,
+            &other.wconfig,
+            &other.fast_wconfig,
+            &other.pp,
+            &other.eks,
+        )
+    }
 }
 
 impl DKGPvssConfig {
@@ -48,6 +72,7 @@ impl DKGPvssConfig {
         fast_wconfig: Option<SSConfig>,
         pp: DkgPP,
         eks: Vec<EncPK>,
+        rounding_summary: RoundingSummary,
     ) -> Self {
         Self {
             epoch,
@@ -55,6 +80,7 @@ impl DKGPvssConfig {
             fast_wconfig,
             pp,
             eks,
+            rounding_summary,
         }
     }
 }
@@ -67,18 +93,20 @@ pub fn build_dkg_pvss_config(
     next_validators: &[ValidatorConsensusInfo],
 ) -> DKGPvssConfig {
     let validator_stakes: Vec<u64> = next_validators.iter().map(|vi| vi.voting_power).collect();
-    let dkg_rounding = DKGRounding::new(
+    let timer = Instant::now();
+    let DKGRounding {
+        profile,
+        wconfig,
+        fast_wconfig,
+        rounding_error,
+        rounding_method,
+    } = DKGRounding::new(
         &validator_stakes,
         secrecy_threshold,
         reconstruct_threshold,
         maybe_fast_path_secrecy_threshold,
     );
-
-    println!(
-        "[Randomness] rounding: epoch {} starts, profile = {:?}",
-        cur_epoch, dkg_rounding.profile
-    );
-
+    let rounding_time = timer.elapsed();
     let validator_consensus_keys: Vec<bls12381::PublicKey> = next_validators
         .iter()
         .map(|vi| vi.public_key.clone())
@@ -91,12 +119,20 @@ pub fn build_dkg_pvss_config(
 
     let pp = DkgPP::default_with_bls_base();
 
+    let rounding_summary = RoundingSummary {
+        method: rounding_method,
+        output: profile,
+        exec_time: rounding_time,
+        error: rounding_error,
+    };
+
     DKGPvssConfig::new(
         cur_epoch,
-        dkg_rounding.wconfig,
-        dkg_rounding.fast_wconfig,
+        wconfig,
+        fast_wconfig,
         pp,
         consensus_keys,
+        rounding_summary,
     )
 }
 
@@ -108,6 +144,12 @@ pub struct RealDKGPublicParams {
     pub session_metadata: DKGSessionMetadata,
     pub pvss_config: DKGPvssConfig,
     pub verifier: ValidatorVerifier,
+}
+
+impl MayHaveRoundingSummary for RealDKGPublicParams {
+    fn rounding_summary(&self) -> Option<&RoundingSummary> {
+        Some(&self.pvss_config.rounding_summary)
+    }
 }
 
 #[derive(Deserialize, Serialize, Clone, Debug)]

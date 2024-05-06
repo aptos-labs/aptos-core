@@ -120,6 +120,8 @@ pub struct StateSyncDriverConfig {
     pub max_stream_wait_time_ms: u64,
     /// The version lag we'll tolerate before snapshot syncing
     pub num_versions_to_skip_snapshot_sync: u64,
+    /// Whether consensus observer mode is enabled
+    pub observer_enabled: bool,
 }
 
 /// The default state sync driver config will be the one that gets (and keeps)
@@ -140,6 +142,7 @@ impl Default for StateSyncDriverConfig {
             max_pending_mempool_notifications: 100,
             max_stream_wait_time_ms: 5000,
             num_versions_to_skip_snapshot_sync: 100_000_000, // At 5k TPS, this allows a node to fail for about 6 hours.
+            observer_enabled: false,
         }
     }
 }
@@ -362,7 +365,7 @@ impl Default for AptosDataMultiFetchConfig {
             enable_multi_fetch: true,
             additional_requests_per_peer_bucket: 1,
             min_peers_for_multi_fetch: 2,
-            max_peers_for_multi_fetch: 5,
+            max_peers_for_multi_fetch: 3,
             multi_fetch_peer_bucket_size: 10,
         }
     }
@@ -396,6 +399,8 @@ pub struct AptosDataClientConfig {
     pub data_poller_config: AptosDataPollerConfig,
     /// The aptos data multi-fetch config for the data client
     pub data_multi_fetch_config: AptosDataMultiFetchConfig,
+    /// Whether or not to ignore peers with low peer scores
+    pub ignore_low_score_peers: bool,
     /// The aptos latency filtering config for the data client
     pub latency_filtering_config: AptosLatencyFilteringConfig,
     /// The interval (milliseconds) at which to refresh the latency monitor
@@ -431,6 +436,7 @@ impl Default for AptosDataClientConfig {
         Self {
             data_poller_config: AptosDataPollerConfig::default(),
             data_multi_fetch_config: AptosDataMultiFetchConfig::default(),
+            ignore_low_score_peers: true,
             latency_filtering_config: AptosLatencyFilteringConfig::default(),
             latency_monitor_loop_interval_ms: 100,
             max_epoch_chunk_size: MAX_EPOCH_CHUNK_SIZE,

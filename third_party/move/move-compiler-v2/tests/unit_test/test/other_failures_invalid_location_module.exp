@@ -5,3 +5,6 @@ error: unbound module
   │
 6 │     #[expected_failure(arithmetic_error, location=0x2::m)]
   │                                                   ^^^^^^ Unbound module '0x2::m'
+
+
+============ bytecode verification succeeded ========
