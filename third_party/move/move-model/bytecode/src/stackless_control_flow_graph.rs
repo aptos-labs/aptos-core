@@ -32,15 +32,6 @@ pub enum BlockContent {
     Dummy,
 }
 
-impl BlockContent {
-    pub fn to_bytecodes<'a>(&self, bytecodes: &'a [Bytecode]) -> &'a [Bytecode] {
-        match self {
-            BlockContent::Basic { lower, upper } => &bytecodes[*lower as usize..=*upper as usize],
-            BlockContent::Dummy => &bytecodes[0..0],
-        }
-    }
-}
-
 #[derive(Default)]
 pub struct StacklessControlFlowGraph {
     entry_block_id: BlockId,

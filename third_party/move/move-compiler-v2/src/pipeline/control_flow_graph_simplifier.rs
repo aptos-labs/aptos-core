@@ -64,12 +64,13 @@
 //!
 //! Side effects: remove all annotations.
 
+use itertools::Itertools;
 use move_model::model::FunctionEnv;
 use move_stackless_bytecode::{
     function_target::FunctionData,
     function_target_pipeline::{FunctionTargetProcessor, FunctionTargetsHolder},
     stackless_bytecode::{Bytecode, Label},
-    stackless_control_flow_graph::{BlockId, DFSLeft, StacklessControlFlowGraph},
+    stackless_control_flow_graph::{BlockContent, BlockId, DFSLeft, StacklessControlFlowGraph},
 };
 use std::collections::BTreeMap;
 
@@ -100,23 +101,21 @@ impl FunctionTargetProcessor for ControlFlowGraphSimplifier {
 /// State of the transformation
 struct ControlFlowGraphSimplifierTransformation {
     data: FunctionData,
-    cfg_code_generator: ControlFlowGraphCodeGenerator,
 }
 
 impl ControlFlowGraphSimplifierTransformation {
     pub fn new(data: FunctionData) -> Self {
-        let cfg_code_generator = ControlFlowGraphCodeGenerator::new(&data.code);
         Self {
             data,
-            cfg_code_generator,
         }
     }
 
     /// Does the first four transformations described in the module doc
     fn transform(&mut self) {
         self.eliminate_branch_to_same_target();
+        let cfg_code_generator = ControlFlowGraphCodeGenerator::new(std::mem::take(&mut self.data.code));
         let mut elim_empty_blocks_transformer =
-            RemoveEmptyBlockTransformer::new(std::mem::take(&mut self.cfg_code_generator));
+            RemoveEmptyBlockTransformer::new(cfg_code_generator);
         elim_empty_blocks_transformer.transform();
         let mut remove_redundant_jump_transformer =
             RemoveRedundantJump::new(elim_empty_blocks_transformer.0);
@@ -124,7 +123,7 @@ impl ControlFlowGraphSimplifierTransformation {
         self.data.code = remove_redundant_jump_transformer.0.gen_code(true);
         // may introduce new empty blocks
         let mut elim_empty_blocks_transformer =
-            RemoveEmptyBlockTransformer::new(ControlFlowGraphCodeGenerator::new(&self.data.code));
+            RemoveEmptyBlockTransformer::new(ControlFlowGraphCodeGenerator::new(std::mem::take(&mut self.data.code)));
         elim_empty_blocks_transformer.transform();
         self.data.code = elim_empty_blocks_transformer.0.gen_code(true);
         self.eliminate_branch_to_same_target();
@@ -163,13 +162,24 @@ struct ControlFlowGraphCodeGenerator {
 
 impl ControlFlowGraphCodeGenerator {
     // TODO: take `Vec<Bytecode>` instead to avoid copying
-    pub fn new(codes: &[Bytecode]) -> Self {
-        let cfg = StacklessControlFlowGraph::new_forward(codes);
-        let code_blocks = cfg
+    pub fn new(mut code: Vec<Bytecode>) -> Self {
+        let cfg = StacklessControlFlowGraph::new_forward(&code);
+        let mut code_blocks = BTreeMap::new();
+        // traverse the blocks in decreasing order of its start code index
+        for (block_id, lower, upper) in cfg
             .blocks()
             .into_iter()
-            .map(|block| (block, cfg.content(block).to_bytecodes(codes).to_vec()))
-            .collect();
+            .filter_map(|block_id| match cfg.content(block_id) {
+                BlockContent::Basic { lower, upper } => Some((block_id, *lower, *upper)),
+                BlockContent::Dummy => None,
+            })
+            .sorted_by_key(|x| x.2)
+            .rev() {
+                let block_code = code.drain(lower as usize..=upper as usize).collect_vec();
+                code_blocks.insert(block_id, block_code);
+        }
+        code_blocks.insert(cfg.entry_block(), Vec::new());
+        code_blocks.insert(cfg.exit_block(), Vec::new());
         let pred_map = pred_map(&cfg);
         Self {
             entry_block: cfg.entry_block(),
@@ -294,14 +304,22 @@ impl ControlFlowGraphCodeGenerator {
 
     /// Checks if the block is entry or exit block
     fn is_trivial_block(&self, block: BlockId) -> bool {
-            block == self.entry_block || block == self.exit_block
-        }
+        block == self.entry_block || block == self.exit_block
+    }
 
-        fn remove_block<F, G>(&mut self, block_to_remove: BlockId, pred_action: F, succ_action: G)
-        where F: FnOnce(&mut Self, BlockId, &[BlockId]) + Copy, G: FnOnce(&mut Self, BlockId, &[BlockId]) + Copy
+    fn remove_block<F, G>(&mut self, block_to_remove: BlockId, pred_action: F, succ_action: G)
+    where
+        F: FnOnce(&mut Self, BlockId, &[BlockId]) + Copy,
+        G: FnOnce(&mut Self, BlockId, &[BlockId]) + Copy,
     {
-        let preds = self.predecessors.remove(&block_to_remove).expect("predecessors");
-        let succs = self.successors.remove(&block_to_remove).expect("successors");
+        let preds = self
+            .predecessors
+            .remove(&block_to_remove)
+            .expect("predecessors");
+        let succs = self
+            .successors
+            .remove(&block_to_remove)
+            .expect("successors");
         for &pred in &preds {
             // self.successors.get_mut(&pred).expect("successors").retain(|&s| s != block_to_remove);
             pred_action(self, pred, &succs);
@@ -354,8 +372,9 @@ impl RemoveEmptyBlockTransformer {
             .expect("successors")
             .contains(&block_to_remove));
         let from = self.0.get_block_label(block_to_remove).expect("label");
-        let to  = self.0.get_block_label(redirect_to).expect("label");
-        self.0.remove_block(block_to_remove,
+        let to = self.0.get_block_label(redirect_to).expect("label");
+        self.0.remove_block(
+            block_to_remove,
             |this, pred, _succs| {
                 // for all predecessors of `block_to_remove`, let them jump to `redirect_to` instead
                 if pred != this.entry_block {
@@ -375,11 +394,11 @@ impl RemoveEmptyBlockTransformer {
                     .expect("predecessors")
                     .push(pred);
             },
-            |_this, _suc, _preds| {}
+            |_this, _suc, _preds| {},
         );
         // remove `block_to_remove`
-        self.0.
-            predecessors
+        self.0
+            .predecessors
             .get_mut(&redirect_to)
             .expect("predecessors")
             .retain(|pred| *pred != block_to_remove);
@@ -452,7 +471,12 @@ impl RemoveRedundantJump {
     /// If possible, append the code of block `to` to the back of block `from` and remove the `to` block
     /// Returns true if the edge is removed
     fn remove_jump_if_possible(&mut self, from: BlockId, to: BlockId) -> bool {
-        debug_assert!(self.0.successors.get(&from).expect("successors").contains(&to));
+        debug_assert!(self
+            .0
+            .successors
+            .get(&from)
+            .expect("successors")
+            .contains(&to));
         debug_assert!(!self.0.is_trivial_block(from));
         debug_assert!(!self.0.is_trivial_block(to));
         if from == to || !self.can_remove_edge(from, to) {
@@ -474,7 +498,8 @@ impl RemoveRedundantJump {
         }
         from_codes.append(&mut to_codes);
 
-        self.0.remove_block(to,
+        self.0.remove_block(
+            to,
             |this, pred, succs| {
                 debug_assert!(pred == from);
                 let succs_mut = this.successors.get_mut(&pred).expect("successors");
@@ -482,12 +507,12 @@ impl RemoveRedundantJump {
                 succs_mut.extend(succs);
             },
             |this, suc, _preds| {
-               for pred in this.predecessors.get_mut(&suc).expect("predecessors") {
-                   if *pred == to {
-                       *pred = from;
-                   }
-               }
-            }
+                for pred in this.predecessors.get_mut(&suc).expect("predecessors") {
+                    if *pred == to {
+                        *pred = from;
+                    }
+                }
+            },
         );
 
         true
