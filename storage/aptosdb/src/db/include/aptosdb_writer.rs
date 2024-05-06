@@ -218,7 +218,7 @@ impl DbWriter for AptosDB {
             &DbMetadataValue::Version(version_to_revert - 1),
         )?;
         self.ledger_db.metadata_db().write_schemas(ledger_batch)?;
-        
+
         // Revert the overall commit progress
         let ledger_batch = SchemaBatch::new();
         ledger_batch.put::<DbMetadataSchema>(
@@ -276,11 +276,8 @@ impl DbWriter for AptosDB {
             .revert_state_kv_and_ledger_metadata(version_to_revert)?;
 
         // Get the epoch of the version_to_revert
-        let target_epoch = self
-            .ledger_db
-            .metadata_db()
-            .get_epoch(version_to_revert)?;
-            
+        let target_epoch = self.ledger_db.metadata_db().get_epoch(version_to_revert)?;
+
         // Set the epoch to the target epoch
         ledger_info_with_sigs
             .ledger_info()
@@ -288,14 +285,14 @@ impl DbWriter for AptosDB {
             .to_owned()
             .set_epoch(target_epoch);
 
-        //Set the Version 
+        //Set the Version
         ledger_info_with_sigs
             .ledger_info()
             .to_owned()
             .set_version(version_to_revert - 1);
 
         // Update the latest ledger info if provided
-        self.commit_ledger_info(
+        self.commit_reversion_ledger_info(
             version_to_revert - 1,
             new_root_hash,
             Some(&ledger_info_with_sigs),
@@ -647,6 +644,39 @@ impl AptosDB {
     }
 
     fn commit_ledger_info(
+        &self,
+        last_version: Version,
+        new_root_hash: HashValue,
+        ledger_info_with_sigs: Option<&LedgerInfoWithSignatures>,
+    ) -> Result<()> {
+        let _timer = OTHER_TIMERS_SECONDS
+            .with_label_values(&["commit_ledger_info"])
+            .start_timer();
+
+        let ledger_batch = SchemaBatch::new();
+
+        // If expected ledger info is provided, verify result root hash and save the ledger info.
+        if let Some(x) = ledger_info_with_sigs {
+            let expected_root_hash = x.ledger_info().transaction_accumulator_hash();
+            ensure!(
+                new_root_hash == expected_root_hash,
+                "Root hash calculated doesn't match expected. {:?} vs {:?}",
+                new_root_hash,
+                expected_root_hash,
+            );
+            self.ledger_db
+                .metadata_db()
+                .put_ledger_info(x, &ledger_batch)?;
+        }
+
+        ledger_batch.put::<DbMetadataSchema>(
+            &DbMetadataKey::OverallCommitProgress,
+            &DbMetadataValue::Version(last_version),
+        )?;
+        self.ledger_db.metadata_db().write_schemas(ledger_batch)
+    }
+
+    fn commit_reversion_ledger_info(
         &self,
         last_version: Version,
         new_root_hash: HashValue,
