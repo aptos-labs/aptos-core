@@ -194,7 +194,8 @@ impl ControlFlowGraphCodeGenerator {
         self.successors.keys().cloned().collect()
     }
 
-    pub fn iter_dfs_left(&self, visit_all: bool) -> DFSLeft {
+    /// Iterate over the blocks in DFS order
+    pub fn iter_dfs_left(&self, visit_all: bool) -> impl Iterator<Item = BlockId> + '_ {
         DFSLeft::new(&self.successors, self.entry_block, visit_all)
     }
 
