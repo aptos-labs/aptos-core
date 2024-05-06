@@ -222,10 +222,6 @@ impl StacklessControlFlowGraph {
             .collect()
     }
 
-    pub fn successors_mut(&mut self, block_id: BlockId) -> &mut Vec<BlockId> {
-        &mut self.blocks.get_mut(&block_id).expect("block").successors
-    }
-
     /// Removes the block
     /// Cannot remove entry/exit block
     pub fn remove_block(&mut self, block_to_remove: BlockId) {
