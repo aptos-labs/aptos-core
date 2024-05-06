@@ -731,7 +731,11 @@ function install_libdw {
 function install_libudev-dev {
   # Need to install libudev-dev for linux
   if [[ "$(uname)" == "Linux" && "$PACKAGE_MANAGER" != "pacman" ]]; then
-    install_pkg libudev-dev "$PACKAGE_MANAGER"
+    if [[ "$PACKAGE_MANAGER" == "dnf" || "$PACKAGE_MANAGER" == "yum" ]]; then
+      install_pkg libudev-devel "$PACKAGE_MANAGER" # Fedora
+    else
+      install_pkg libudev-dev "$PACKAGE_MANAGER"
+    fi
   fi
 }
 
