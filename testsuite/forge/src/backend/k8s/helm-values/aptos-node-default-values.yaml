@@ -2,7 +2,7 @@ validator:
   enableNetworkPolicy: false
   # Add debug here to enable debug logs
   # rust_log: debug,hyper=off
-  rust_log: hyper=off
+  rust_log: info,hyper=off
   # force enable the telemetry service to try to send telemetry
   force_enable_telemetry: true
 
