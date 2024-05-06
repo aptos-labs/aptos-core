@@ -130,6 +130,7 @@ impl ModelBuilder {
         match self.model_config.compiler_version {
             CompilerVersion::V1 => run_model_builder_with_options(
                 all_targets,
+                vec![],
                 all_deps,
                 ModelBuilderOptions::default(),
                 skip_attribute_checks,

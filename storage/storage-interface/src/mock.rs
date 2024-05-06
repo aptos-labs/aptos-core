@@ -8,7 +8,7 @@ use crate::{errors::AptosDbError, DbReader, DbWriter, Result};
 use aptos_types::{
     proof::SparseMerkleProofExt,
     state_store::{
-        state_key::{StateKey, StateKeyInner},
+        state_key::{inner::StateKeyInner, StateKey},
         state_value::StateValue,
     },
     transaction::Version,

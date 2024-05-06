@@ -593,7 +593,7 @@ fn k8s_test_suite() -> ForgeConfig {
         .add_aptos_test(TransferCoins)
         .add_admin_test(GetMetadata)
         .add_network_test(EmitTransaction)
-        .add_network_test(SimpleValidatorUpgrade)
+        .add_network_test(FrameworkUpgrade)
         .add_network_test(PerformanceBenchmark)
 }
 
@@ -604,8 +604,9 @@ fn get_land_blocking_test(
     test_cmd: &TestCommand,
 ) -> Option<ForgeConfig> {
     let test = match test_name {
-        "land_blocking" => land_blocking_test_suite(duration), // TODO: remove land_blocking, superseded by below
-        "realistic_env_max_load" => realistic_env_max_load_test(duration, test_cmd, 7, 5),
+        "land_blocking" | "realistic_env_max_load" => {
+            realistic_env_max_load_test(duration, test_cmd, 7, 5)
+        },
         "compat" => compat(),
         "framework_upgrade" => framework_upgrade(),
         _ => return None, // The test name does not match a land-blocking test
@@ -663,9 +664,14 @@ fn get_pfn_test(test_name: &str, duration: Duration) -> Option<ForgeConfig> {
         "pfn_const_tps" => pfn_const_tps(duration, false, false, true),
         "pfn_const_tps_with_network_chaos" => pfn_const_tps(duration, false, true, false),
         "pfn_const_tps_with_realistic_env" => pfn_const_tps(duration, true, true, false),
-        "pfn_performance" => pfn_performance(duration, false, false, true),
-        "pfn_performance_with_network_chaos" => pfn_performance(duration, false, true, false),
-        "pfn_performance_with_realistic_env" => pfn_performance(duration, true, true, false),
+        "pfn_performance" => pfn_performance(duration, false, false, true, 7, 1, false),
+        "pfn_performance_with_network_chaos" => {
+            pfn_performance(duration, false, true, false, 7, 1, false)
+        },
+        "pfn_performance_with_realistic_env" => {
+            pfn_performance(duration, true, true, false, 7, 1, false)
+        },
+        "pfn_spam_duplicates" => pfn_performance(duration, true, true, true, 7, 7, true),
         _ => return None, // The test name does not match a PFN test
     };
     Some(test)
@@ -1456,6 +1462,79 @@ fn realistic_env_graceful_overload() -> ForgeConfig {
         )
 }
 
+fn mixed_emit_job() -> EmitJobRequest {
+    EmitJobRequest::default()
+        .mode(EmitJobMode::MaxLoad {
+            mempool_backlog: 10000,
+        })
+        .transaction_mix(vec![
+            // To test both variants, make module publish with such frequency, so that there are
+            // similar number of sequential and parallel blocks.
+            // For other transactions, make more expensive transactions somewhat rarer.
+            (
+                TransactionTypeArg::AccountGeneration.materialize_default(),
+                10000,
+            ),
+            (
+                TransactionTypeArg::CoinTransfer.materialize_default(),
+                10000,
+            ),
+            (TransactionTypeArg::PublishPackage.materialize_default(), 3),
+            (
+                TransactionTypeArg::Batch100Transfer.materialize_default(),
+                100,
+            ),
+            (
+                TransactionTypeArg::VectorPicture30k.materialize_default(),
+                100,
+            ),
+            (
+                TransactionTypeArg::SmartTablePicture30KWith200Change.materialize(
+                    1,
+                    true,
+                    WorkflowProgress::when_done_default(),
+                ),
+                100,
+            ),
+            (
+                TransactionTypeArg::TokenV2AmbassadorMint.materialize_default(),
+                10000,
+            ),
+            (
+                TransactionTypeArg::ModifyGlobalResource.materialize_default(),
+                1000,
+            ),
+            (
+                TransactionTypeArg::ModifyGlobalResourceAggV2.materialize_default(),
+                1000,
+            ),
+            (
+                TransactionTypeArg::ModifyGlobalFlagAggV2.materialize_default(),
+                1000,
+            ),
+            (
+                TransactionTypeArg::ModifyGlobalBoundedAggV2.materialize_default(),
+                1000,
+            ),
+            (
+                TransactionTypeArg::ResourceGroupsGlobalWriteTag1KB.materialize_default(),
+                1000,
+            ),
+            (
+                TransactionTypeArg::ResourceGroupsGlobalWriteAndReadTag1KB.materialize_default(),
+                1000,
+            ),
+            (
+                TransactionTypeArg::TokenV1NFTMintAndTransferSequential.materialize_default(),
+                1000,
+            ),
+            (
+                TransactionTypeArg::TokenV1FTMintAndTransfer.materialize_default(),
+                10000,
+            ),
+        ])
+}
+
 fn workload_mix_test() -> ForgeConfig {
     ForgeConfig::default()
         .with_initial_validator_count(NonZeroUsize::new(5).unwrap())
@@ -1464,80 +1543,7 @@ fn workload_mix_test() -> ForgeConfig {
         .with_validator_override_node_config_fn(Arc::new(|config, _| {
             config.execution.processed_transactions_detailed_counters = true;
         }))
-        .with_emit_job(
-            EmitJobRequest::default()
-                .mode(EmitJobMode::MaxLoad {
-                    mempool_backlog: 10000,
-                })
-                .transaction_mix(vec![
-                    // To test both variants, make module publish with such frequency, so that there are
-                    // similar number of sequential and parallel blocks.
-                    // For other transactions, make more expensive transactions somewhat rarer.
-                    (
-                        TransactionTypeArg::AccountGeneration.materialize_default(),
-                        10000,
-                    ),
-                    (
-                        TransactionTypeArg::CoinTransfer.materialize_default(),
-                        10000,
-                    ),
-                    (TransactionTypeArg::PublishPackage.materialize_default(), 3),
-                    (
-                        TransactionTypeArg::Batch100Transfer.materialize_default(),
-                        100,
-                    ),
-                    (
-                        TransactionTypeArg::VectorPicture30k.materialize_default(),
-                        100,
-                    ),
-                    (
-                        TransactionTypeArg::SmartTablePicture30KWith200Change.materialize(
-                            1,
-                            true,
-                            WorkflowProgress::when_done_default(),
-                        ),
-                        100,
-                    ),
-                    (
-                        TransactionTypeArg::TokenV2AmbassadorMint.materialize_default(),
-                        10000,
-                    ),
-                    (
-                        TransactionTypeArg::ModifyGlobalResource.materialize_default(),
-                        1000,
-                    ),
-                    (
-                        TransactionTypeArg::ModifyGlobalResourceAggV2.materialize_default(),
-                        1000,
-                    ),
-                    (
-                        TransactionTypeArg::ModifyGlobalFlagAggV2.materialize_default(),
-                        1000,
-                    ),
-                    (
-                        TransactionTypeArg::ModifyGlobalBoundedAggV2.materialize_default(),
-                        1000,
-                    ),
-                    (
-                        TransactionTypeArg::ResourceGroupsGlobalWriteTag1KB.materialize_default(),
-                        1000,
-                    ),
-                    (
-                        TransactionTypeArg::ResourceGroupsGlobalWriteAndReadTag1KB
-                            .materialize_default(),
-                        1000,
-                    ),
-                    (
-                        TransactionTypeArg::TokenV1NFTMintAndTransferSequential
-                            .materialize_default(),
-                        1000,
-                    ),
-                    (
-                        TransactionTypeArg::TokenV1FTMintAndTransfer.materialize_default(),
-                        10000,
-                    ),
-                ]),
-        )
+        .with_emit_job(mixed_emit_job())
         .with_success_criteria(
             SuccessCriteria::new(3000)
                 .add_no_restarts()
@@ -1808,7 +1814,8 @@ fn compat() -> ForgeConfig {
         .add_network_test(SimpleValidatorUpgrade)
         .with_success_criteria(SuccessCriteria::new(5000).add_wait_for_catchup_s(240))
         .with_genesis_helm_config_fn(Arc::new(|helm_values| {
-            helm_values["chain"]["epoch_duration_secs"] = 30.into();
+            helm_values["chain"]["epoch_duration_secs"] =
+                SimpleValidatorUpgrade::EPOCH_DURATION_SECS.into();
         }))
 }
 
@@ -1818,8 +1825,10 @@ fn framework_upgrade() -> ForgeConfig {
         .add_network_test(FrameworkUpgrade)
         .with_success_criteria(SuccessCriteria::new(5000).add_wait_for_catchup_s(240))
         .with_genesis_helm_config_fn(Arc::new(|helm_values| {
-            helm_values["chain"]["epoch_duration_secs"] = 30.into();
+            helm_values["chain"]["epoch_duration_secs"] =
+                FrameworkUpgrade::EPOCH_DURATION_SECS.into();
         }))
+        .with_emit_job(mixed_emit_job())
 }
 
 fn epoch_changer_performance() -> ForgeConfig {
@@ -1923,37 +1932,6 @@ fn validators_join_and_leave() -> ForgeConfig {
         )
 }
 
-fn land_blocking_test_suite(duration: Duration) -> ForgeConfig {
-    ForgeConfig::default()
-        .with_initial_validator_count(NonZeroUsize::new(20).unwrap())
-        .with_initial_fullnode_count(10)
-        .add_network_test(PerformanceBenchmark)
-        .with_genesis_helm_config_fn(Arc::new(|helm_values| {
-            // Have single epoch change in land blocking
-            helm_values["chain"]["epoch_duration_secs"] = 300.into();
-        }))
-        .with_success_criteria(
-            SuccessCriteria::new(
-                if duration.as_secs() > 1200 {
-                    4500
-                } else {
-                    5000
-                },
-            )
-            .add_no_restarts()
-            .add_wait_for_catchup_s(
-                // Give at least 60s for catchup, give 10% of the run for longer durations.
-                (duration.as_secs() / 10).max(60),
-            )
-            .add_system_metrics_threshold(SYSTEM_12_CORES_10GB_THRESHOLD.clone())
-            .add_chain_progress(StateProgressThreshold {
-                max_no_progress_secs: 10.0,
-                max_round_gap: 4,
-            }),
-        )
-}
-
-// TODO: Replace land_blocking when performance reaches on par with current land_blocking
 fn realistic_env_max_load_test(
     duration: Duration,
     test_cmd: &TestCommand,
@@ -2467,7 +2445,12 @@ fn pfn_const_tps(
         .with_initial_validator_count(NonZeroUsize::new(7).unwrap())
         .with_initial_fullnode_count(7)
         .with_emit_job(EmitJobRequest::default().mode(EmitJobMode::ConstTps { tps: 100 }))
-        .add_network_test(PFNPerformance::new(7, add_cpu_chaos, add_network_emulation))
+        .add_network_test(PFNPerformance::new(
+            7,
+            add_cpu_chaos,
+            add_network_emulation,
+            None,
+        ))
         .with_genesis_helm_config_fn(Arc::new(move |helm_values| {
             helm_values["chain"]["epoch_duration_secs"] = epoch_duration_secs.into();
         }))
@@ -2502,20 +2485,40 @@ fn pfn_performance(
     add_cpu_chaos: bool,
     add_network_emulation: bool,
     epoch_changes: bool,
+    num_validators: usize,
+    num_pfns: usize,
+    broadcast_to_all_vfns: bool,
 ) -> ForgeConfig {
     // Determine the minimum expected TPS
-    let min_expected_tps = 4500;
+    let min_expected_tps = if broadcast_to_all_vfns { 2500 } else { 4500 };
     let epoch_duration_secs = if epoch_changes {
         300 // 5 minutes
     } else {
         60 * 60 * 2 // 2 hours; avoid epoch changes which can introduce noise
     };
 
+    let config_override_fn = if broadcast_to_all_vfns {
+        let f: OverrideNodeConfigFn = Arc::new(move |pfn_config: &mut NodeConfig, _| {
+            pfn_config.mempool.default_failovers = num_validators;
+            for network in &mut pfn_config.full_node_networks {
+                network.max_outbound_connections = num_validators;
+            }
+        });
+        Some(f)
+    } else {
+        None
+    };
+
     // Create the forge config
     ForgeConfig::default()
-        .with_initial_validator_count(NonZeroUsize::new(7).unwrap())
-        .with_initial_fullnode_count(7)
-        .add_network_test(PFNPerformance::new(7, add_cpu_chaos, add_network_emulation))
+        .with_initial_validator_count(NonZeroUsize::new(num_validators).unwrap())
+        .with_initial_fullnode_count(num_validators)
+        .add_network_test(PFNPerformance::new(
+            num_pfns as u64,
+            add_cpu_chaos,
+            add_network_emulation,
+            config_override_fn,
+        ))
         .with_genesis_helm_config_fn(Arc::new(move |helm_values| {
             helm_values["chain"]["epoch_duration_secs"] = epoch_duration_secs.into();
         }))

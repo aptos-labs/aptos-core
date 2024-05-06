@@ -7,7 +7,7 @@ use crate::{
 };
 use aptos_consensus_types::{common::Round, pipelined_block::PipelinedBlock};
 use aptos_reliable_broadcast::DropGuard;
-use aptos_types::randomness::{RandMetadata, Randomness};
+use aptos_types::randomness::{FullRandMetadata, Randomness};
 use std::collections::{BTreeMap, HashMap};
 
 /// Maintain the ordered blocks received from consensus and corresponding randomness
@@ -52,10 +52,10 @@ impl QueueItem {
         self.num_undecided_blocks
     }
 
-    pub fn all_rand_metadata(&self) -> Vec<RandMetadata> {
+    pub fn all_rand_metadata(&self) -> Vec<FullRandMetadata> {
         self.blocks()
             .iter()
-            .map(|block| RandMetadata::from(block.block()))
+            .map(|block| FullRandMetadata::from(block.block()))
             .collect()
     }
 

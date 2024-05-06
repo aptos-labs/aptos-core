@@ -17,7 +17,9 @@ pub fn unused_params_checker(env: &GlobalEnv) {
     for module in env.get_modules() {
         if module.is_target() {
             for struct_env in module.get_structs() {
-                check_unused_params(&struct_env);
+                if !struct_env.is_ghost_memory() {
+                    check_unused_params(&struct_env);
+                }
             }
         }
     }

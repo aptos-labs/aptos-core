@@ -517,15 +517,15 @@ pub struct GlobalEnv {
     pub(crate) file_hash_map: BTreeMap<FileHash, (String, FileId)>,
     /// Reverse of the above mapping, mapping FileId to hash.
     pub(crate) reverse_file_hash_map: BTreeMap<FileId, FileHash>,
-    /// A mapping from file id to associated alias map.
-    pub(crate) file_alias_map: BTreeMap<FileId, Rc<BTreeMap<Symbol, NumericalAddress>>>,
     /// Bijective mapping between FileId and a plain int. FileId's are themselves wrappers around
     /// ints, but the inner representation is opaque and cannot be accessed. This is used so we
     /// can emit FileId's to generated code and read them back.
     pub(crate) file_id_to_idx: BTreeMap<FileId, u16>,
     pub(crate) file_idx_to_id: BTreeMap<u16, FileId>,
-    /// A set indicating whether a file id is a target or a dependency.
-    pub(crate) file_id_is_dep: BTreeSet<FileId>,
+    /// A set indicating whether a file id is a compilation target.
+    pub(crate) file_id_is_target: BTreeSet<FileId>,
+    /// A set indicating whether a file id is a test/docgen/warning/prover target.
+    pub(crate) file_id_is_primary_target: BTreeSet<FileId>,
     /// A special constant location representing an unknown location.
     /// This uses a pseudo entry in `source_files` to be safely represented.
     pub(crate) unknown_loc: Loc,
@@ -613,10 +613,10 @@ impl GlobalEnv {
             internal_loc,
             file_hash_map,
             reverse_file_hash_map,
-            file_alias_map: BTreeMap::new(),
             file_id_to_idx,
             file_idx_to_id,
-            file_id_is_dep: BTreeSet::new(),
+            file_id_is_target: BTreeSet::new(),
+            file_id_is_primary_target: BTreeSet::new(),
             diags: RefCell::new(vec![]),
             symbol_pool: SymbolPool::new(),
             next_free_node_id: Default::default(),
@@ -774,9 +774,10 @@ impl GlobalEnv {
         address_aliases: Rc<BTreeMap<Symbol, NumericalAddress>>,
         file_name: &str,
         source: &str,
-        is_dep: bool,
+        is_target: bool,
+        is_primary_target: bool,
     ) -> FileId {
-        let file_id = self.source_files.add(file_name, source.to_string());
+        // Check for address alias conflicts.
         self.stdlib_address =
             self.resolve_std_address_alias(self.stdlib_address.clone(), "std", &address_aliases);
         self.extlib_address = self.resolve_std_address_alias(
@@ -784,17 +785,33 @@ impl GlobalEnv {
             "Extensions",
             &address_aliases,
         );
-        self.file_alias_map.insert(file_id, address_aliases);
-        self.file_hash_map
-            .insert(file_hash, (file_name.to_string(), file_id));
-        self.reverse_file_hash_map.insert(file_id, file_hash);
-        let file_idx = self.file_id_to_idx.len() as u16;
-        self.file_id_to_idx.insert(file_id, file_idx);
-        self.file_idx_to_id.insert(file_idx, file_id);
-        if is_dep {
-            self.file_id_is_dep.insert(file_id);
+        if let Some((_filename, file_id)) = self.file_hash_map.get(&file_hash) {
+            // This is a duplicate source, make sure it is marked as a target
+            // and/or a primary_target if any instance marks it as such.
+            if is_target && !self.file_id_is_target.contains(file_id) {
+                self.file_id_is_target.insert(*file_id);
+            }
+            if is_primary_target && !self.file_id_is_primary_target.contains(file_id) {
+                self.file_id_is_primary_target.insert(*file_id);
+            }
+            *file_id
+        } else {
+            // Record new source file and properties
+            let file_id = self.source_files.add(file_name, source.to_string());
+            self.file_hash_map
+                .insert(file_hash, (file_name.to_string(), file_id));
+            self.reverse_file_hash_map.insert(file_id, file_hash);
+            let file_idx = self.file_id_to_idx.len() as u16;
+            self.file_id_to_idx.insert(file_id, file_idx);
+            self.file_idx_to_id.insert(file_idx, file_id);
+            if is_target {
+                self.file_id_is_target.insert(file_id);
+            }
+            if is_primary_target {
+                self.file_id_is_primary_target.insert(file_id);
+            }
+            file_id
         }
-        file_id
     }
 
     fn resolve_std_address_alias(
@@ -836,12 +853,11 @@ impl GlobalEnv {
     }
 
     fn add_backtrace(msg: &str, _is_bug: bool) -> String {
-        // For now, we do not use is_bug, but we could have
-        // another env var MOVE_COMPILER_DEBUG_BUG_ENV_VAR to
-        // only backtrace bugs if the env var is set.
-        static DEBUG_COMPILER: Lazy<bool> =
-            Lazy::new(|| read_bool_env_var(cli::MOVE_COMPILER_DEBUG_ENV_VAR));
-        if *DEBUG_COMPILER {
+        // Note that you need both MOVE_COMPILER_BACKTRACE=1 and RUST_BACKTRACE=1 for this to
+        // actually generate a backtrace.
+        static DUMP_BACKTRACE: Lazy<bool> =
+            Lazy::new(|| read_bool_env_var(cli::MOVE_COMPILER_BACKTRACE_ENV_VAR));
+        if *DUMP_BACKTRACE {
             let bt = Backtrace::capture();
             if BacktraceStatus::Captured == bt.status() {
                 format!("{}\nBacktrace: {:#?}", msg, bt)
@@ -2605,7 +2621,13 @@ impl<'env> ModuleEnv<'env> {
     /// a dependency only but not explicitly requested to process.
     pub fn is_target(&self) -> bool {
         let file_id = self.data.loc.file_id;
-        *self.env.everything_is_target.borrow() || !self.env.file_id_is_dep.contains(&file_id)
+        *self.env.everything_is_target.borrow() || self.env.file_id_is_target.contains(&file_id)
+    }
+
+    /// Returns true of this module is a primary (test/docgen/warning/prover) target.
+    pub fn is_primary_target(&self) -> bool {
+        let file_id = self.data.loc.file_id;
+        self.env.file_id_is_primary_target.contains(&file_id)
     }
 
     /// Returns the path to source file of this module.
@@ -3085,11 +3107,8 @@ impl<'env> ModuleEnv<'env> {
 
     /// Disassemble the module bytecode, if it is available.
     pub fn disassemble(&self) -> Option<String> {
-        // TODO(#12541): There seems to be a disassembler bug, or the source map we are generating
-        //   is inconsistent, so we are creating a dummy one until this is fixed.
         let view = BinaryIndexedView::Module(self.get_verified_module()?);
-        let smap = SourceMap::dummy_from_view(&view, self.env.to_ir_loc(&self.get_loc()))
-            .expect("source map");
+        let smap = self.data.source_map.as_ref().expect("source map").clone();
         let disas = Disassembler::new(SourceMapping::new(smap, view), DisassemblerOptions {
             only_externally_visible: false,
             print_code: true,

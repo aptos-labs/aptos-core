@@ -53,6 +53,7 @@ pub fn run_move_prover<W: WriteColor>(
             paths: options.move_sources.clone(),
             named_address_map: addrs.clone(),
         }],
+        vec![],
         vec![PackagePaths {
             name: None,
             paths: options.move_deps.clone(),
@@ -72,7 +73,7 @@ pub fn run_move_prover_v2<W: WriteColor>(
     let now = Instant::now();
     let cloned_options = options.clone();
     let compiler_options = move_compiler_v2::Options {
-        dependencies: cloned_options.move_deps,
+        dependencies: vec![],
         named_address_mapping: cloned_options.move_named_address_values,
         output_dir: cloned_options.output_path,
         language_version: cloned_options.language_version,
@@ -82,11 +83,11 @@ pub fn run_move_prover_v2<W: WriteColor>(
         experiments: vec![],
         experiment_cache: Default::default(),
         sources: cloned_options.move_sources,
+        sources_deps: cloned_options.move_deps,
         warn_unused: false,
         whole_program: false,
         compile_test_code: false,
-    }
-    .set_experiment(Experiment::UNUSED_STRUCT_PARAMS_CHECK, false);
+    };
 
     let mut env = move_compiler_v2::run_move_compiler_for_analysis(error_writer, compiler_options)?;
     run_move_prover_with_model_v2(&mut env, error_writer, options, now)
@@ -120,8 +121,7 @@ pub fn run_move_prover_with_model<W: WriteColor>(
     // Run the compiler v2 checking and rewriting pipeline
     let compiler_options = move_compiler_v2::Options::default()
         .set_experiment(Experiment::OPTIMIZE, false)
-        .set_experiment(Experiment::SPEC_REWRITE, true)
-        .set_experiment(Experiment::UNUSED_STRUCT_PARAMS_CHECK, false);
+        .set_experiment(Experiment::SPEC_REWRITE, true);
     env.set_extension(compiler_options.clone());
     let pipeline = move_compiler_v2::check_and_rewrite_pipeline(
         &compiler_options,
@@ -138,8 +138,6 @@ pub fn run_move_prover_with_model_v2<W: WriteColor>(
     options: Options,
     start_time: Instant,
 ) -> anyhow::Result<()> {
-    debug!("global env before prover run:\n{}", env.dump_env_all());
-
     let build_duration = start_time.elapsed();
     check_errors(
         env,

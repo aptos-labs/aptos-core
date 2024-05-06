@@ -30,16 +30,17 @@ use aptos_api_types::{
 };
 use aptos_crypto::{hash::CryptoHash, signing_message};
 use aptos_types::{
-    account_config::CoinStoreResource,
+    account_address::AccountAddress,
     mempool_status::MempoolStatusCode,
     transaction::{
         EntryFunction, ExecutionStatus, MultisigTransactionPayload, RawTransaction,
         RawTransactionWithData, SignedTransaction, TransactionPayload, TransactionStatus,
     },
     vm_status::StatusCode,
+    APTOS_COIN_TYPE,
 };
-use aptos_vm::{data_cache::AsMoveResolver, AptosSimulationVM};
-use move_core_types::vm_status::VMStatus;
+use aptos_vm::{data_cache::AsMoveResolver, AptosSimulationVM, AptosVM};
+use move_core_types::{ident_str, language_storage::ModuleId, vm_status::VMStatus};
 use poem_openapi::{
     param::{Path, Query},
     payload::Json,
@@ -553,22 +554,45 @@ impl TransactionsApi {
                 let max_number_of_gas_units =
                     u64::from(gas_params.vm.txn.maximum_number_of_gas_units);
 
-                // Retrieve account balance to determine max gas available
-                let coin_store = context
-                    .expect_resource_poem::<CoinStoreResource, SubmitTransactionError>(
-                        signed_transaction.sender(),
-                        ledger_info.version(),
-                        &ledger_info,
-                    )?;
+                // Retrieve account balance to determine max gas available, right now this is using
+                // a view function, but we may want to re-evaluate this based on performance
+                let (_, _, state_view) = context
+                    .state_view::<BasicErrorWith404>(Option::None)
+                    .map_err(|err| {
+                        SubmitTransactionError::bad_request_with_code_no_info(
+                            err,
+                            AptosErrorCode::InvalidInput,
+                        )
+                    })?;
+                let output = AptosVM::execute_view_function(
+                    &state_view,
+                    ModuleId::new(AccountAddress::ONE, ident_str!("coin").into()),
+                    ident_str!("balance").into(),
+                    vec![APTOS_COIN_TYPE.clone()],
+                    vec![signed_transaction.sender().to_vec()],
+                    context.node_config.api.max_gas_view_function,
+                );
+                let values = output.values.map_err(|err| {
+                    SubmitTransactionError::bad_request_with_code_no_info(
+                        err,
+                        AptosErrorCode::InvalidInput,
+                    )
+                })?;
+                let balance: u64 = bcs::from_bytes(&values[0]).map_err(|err| {
+                    SubmitTransactionError::bad_request_with_code_no_info(
+                        err,
+                        AptosErrorCode::InvalidInput,
+                    )
+                })?;
 
                 let gas_unit_price =
                     estimated_gas_unit_price.unwrap_or_else(|| signed_transaction.gas_unit_price());
 
                 // With 0 gas price, we set it to max gas units, since we can't divide by 0
                 let max_account_gas_units = if gas_unit_price == 0 {
-                    coin_store.coin()
+                    balance
                 } else {
-                    coin_store.coin() / gas_unit_price
+                    balance / gas_unit_price
                 };
 
                 // To give better error messaging, we should not go below the minimum number of gas units
@@ -1364,7 +1388,7 @@ impl TransactionsApi {
 
         let stats_key = match txn.payload() {
             TransactionPayload::Script(_) => {
-                format!("Script::{}", txn.clone().committed_hash()).to_string()
+                format!("Script::{}", txn.committed_hash()).to_string()
             },
             TransactionPayload::ModuleBundle(_) => "ModuleBundle::unknown".to_string(),
             TransactionPayload::EntryFunction(entry_function) => FunctionStats::function_to_key(
