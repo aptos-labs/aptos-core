@@ -39,19 +39,6 @@ template CalculateTotal(n) {
     sum <== sums[n - 1];
 }
 
-// Checks `input_not_ascii` is the digit representation of ascii digit string `input_ascii`
-// Assumes both inputs contain only digits
-template DigitStringAsciiEquivalenceCheck(maxInputLen) {
-    signal input input_ascii[maxInputLen];
-    signal input input_not_ascii[maxInputLen];
-    signal input len;
-
-    signal selector_bits[maxInputLen] <== RightArraySelector(maxInputLen)(len-1);
-    for (var i = 0; i < maxInputLen; i++) {
-        ((input_ascii[i]-48)-input_not_ascii[i])*(1-selector_bits[i]) === 0;
-    }
-}
-
 // Given input `in`, enforces that `in[0] === in[1]` if `bool` is 1
 template AssertEqualIfTrue() {
     signal input in[2];

@@ -324,39 +324,3 @@ template ASCIIDigitsToField(maxLen) {
     out <== accumulators[maxLen - 1];
 }
 
-// Given arrays `one` and `two`, which are both 0-padded after `len`, check that `one[0:len]` is the reverse of `two[0:len]`
-template ReverseCheck(maxStrLen) {
-    signal input one[maxStrLen];
-    signal input two[maxStrLen];
-    signal input len;
-
-    signal one_hash <== HashBytesToField(maxStrLen)(one);
-    signal two_hash <== HashBytesToField(maxStrLen)(two);
-    signal random_challenge <== Poseidon(3)([one_hash, two_hash, len]);
-    
-    signal challenge_powers[maxStrLen];
-    challenge_powers[0] <== 1;
-    challenge_powers[1] <== random_challenge;
-    for (var i = 2; i < maxStrLen; i++) {
-       challenge_powers[i] <== challenge_powers[i-1] * random_challenge; 
-    } 
-
-    signal one_poly[maxStrLen];
-    for (var i = 0; i < maxStrLen; i++) {
-       one_poly[i] <== one[i] * challenge_powers[i];
-    }
-
-    signal two_poly[maxStrLen];
-    for (var i = 0; i < maxStrLen; i++) {
-        var idx = maxStrLen-i-1; // Challenge powers are reversed
-        two_poly[i] <== two[idx] * challenge_powers[i];
-    }
-    var two_zero_pad_len = maxStrLen-len;
-
-    signal one_poly_eval <== CalculateTotal(maxStrLen)(one_poly);
-    signal two_poly_eval <== CalculateTotal(maxStrLen)(two_poly); 
-    
-    var distinguishing_value = SelectArrayValue(maxStrLen)(challenge_powers, two_zero_pad_len);
-
-    one_poly_eval * distinguishing_value === two_poly_eval;
-}

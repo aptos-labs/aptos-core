@@ -52,21 +52,6 @@ template BytesToBits(inputLen) {
     }
 }
 
-// Assumes decimals fit into a single 254 bit value when using BN254
-template ASCIIDecimalsToFieldElem(inputLen) {
-    signal input in[inputLen];
-    signal output out;
-
-    var lc1 = in[0];
-     
-    var e2 = 10;
-    for (var i = 1; i<inputLen; i++) {
-        lc1 += in[i] * e2;
-        e2 = e2 * 10;
-    }
-
-    lc1 ==> out;
-}
 
 // Converts bit array 'in' into an array of field elements of size `bitsPerFieldElem` each
 // Example: with inputLen=11, bitsPerFieldElem=4, [0,0,0,0, 0,0,0,1, 0,1,1,] ==> [0, 1, 6]
@@ -106,43 +91,3 @@ template BitsToFieldElems(inputLen, bitsPerFieldElem) {
     bits_2_num_be[num_elems-1].out ==> elems[num_elems-1];
 }
 
-// Assumes `in` is a little endian bit array where `48` corresponds to `0` and `49` corresponds to `1`
-// Packs a maximum of `maxBitsPerFieldElem` bits per field element, actually packs `to_pack_len`
-// TODO: Not tested for more than one field element. We only ever use it to pack one field element anyways
-template AsciiBitsLEToFieldElems(inputLen, maxBitsPerFieldElem) {
-    signal input in[inputLen];
-    signal input to_pack_len;
-    signal selector_bits[inputLen] <== ArraySelector(inputLen)(0, to_pack_len);
-    var num_elems = inputLen%maxBitsPerFieldElem == 0 ? inputLen \ maxBitsPerFieldElem : (inputLen\maxBitsPerFieldElem) + 1; // '\' is the quotient operation - we add 1 if there are extra bits past the full bytes
-    signal output elems[num_elems];
-    component bits_2_num_be[num_elems]; 
-    for (var i = 0; i < num_elems-1; i++) {
-        bits_2_num_be[i] = Bits2Num(maxBitsPerFieldElem); // assign circuit component
-    }
-
-    // If we have an extra byte that isn't full of bits, we truncate the Bits2NumBigEndian component size for that byte. This is equivalent to 0 padding the end of the array
-    var num_extra_bits = inputLen % maxBitsPerFieldElem;
-    if (num_extra_bits == 0) {
-        num_extra_bits = maxBitsPerFieldElem; // The last field element is full
-        bits_2_num_be[num_elems-1] = Bits2Num(maxBitsPerFieldElem);
-    } else {
-        bits_2_num_be[num_elems-1] = Bits2Num(num_extra_bits);
-    }
-
-    // Assign all but the last field element
-    for (var i = 0; i < num_elems-1; i++) {
-        for (var j = 0; j < maxBitsPerFieldElem; j++) {
-            var index = (i * maxBitsPerFieldElem) + j;
-            bits_2_num_be[i].in[j] <== in[index]-48 * selector_bits[index];
-        }
-        bits_2_num_be[i].out ==> elems[i];
-    }
-
-    // Assign the last field element
-    var i = num_elems-1;
-    for (var j = 0; j < num_extra_bits; j++) {
-        var index = (i*maxBitsPerFieldElem) + j;
-        bits_2_num_be[num_elems-1].in[j] <== in[index]-48 * selector_bits[index];
-    }
-    bits_2_num_be[i].out ==> elems[i];
-}
