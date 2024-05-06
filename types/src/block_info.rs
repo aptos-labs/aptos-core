@@ -155,6 +155,10 @@ impl BlockInfo {
         self.epoch
     }
 
+    pub fn set_epoch(&mut self, epoch: u64) {
+        self.epoch = epoch;
+    }
+
     pub fn executed_state_id(&self) -> HashValue {
         self.executed_state_id
     }
