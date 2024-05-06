@@ -326,9 +326,9 @@ impl RemoveEmptyBlockTransformer {
     pub fn transform(&mut self) {
         for block in self.0.blocks() {
             if self.is_empty_block(block) {
-                let suc_block = self.0.get_the_non_trivial_successor(block);
-                if suc_block != block {
-                    self.remove_empty_block(block, suc_block);
+                let succ_block = self.0.get_the_non_trivial_successor(block);
+                if succ_block != block {
+                    self.remove_empty_block(block, succ_block);
                 }
             }
         }
@@ -499,8 +499,8 @@ fn pred_map(cfg: &StacklessControlFlowGraph) -> BTreeMap<BlockId, Vec<BlockId>> 
     let mut pred_map = BTreeMap::new();
     let blocks = cfg.blocks();
     for block in &blocks {
-        for suc_block in cfg.successors(*block) {
-            let preds: &mut Vec<BlockId> = pred_map.entry(*suc_block).or_default();
+        for succ_block in cfg.successors(*block) {
+            let preds: &mut Vec<BlockId> = pred_map.entry(*succ_block).or_default();
             preds.push(*block);
         }
     }
