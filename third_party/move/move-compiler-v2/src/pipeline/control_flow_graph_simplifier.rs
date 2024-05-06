@@ -218,18 +218,18 @@ impl ControlFlowGraphCodeGenerator {
         if Self::falls_to_next_block(&code_block) {
             // if we have block 0 followed by block 1 without jump/branch
             // and we don't visit block 1 after block 0, then we have to add an explicit jump
-            let suc_block = self.get_the_non_trivial_successor(block);
-            if next_block_to_visit.is_none() || *next_block_to_visit.unwrap() != suc_block {
-                self.add_explicit_jump(&mut code_block, suc_block);
+            let succ_block = self.get_the_non_trivial_successor(block);
+            if next_block_to_visit.is_none() || *next_block_to_visit.unwrap() != succ_block {
+                self.add_explicit_jump(&mut code_block, succ_block);
             }
         } else if matches!(
             code_block.last().expect("last instruction"),
             Bytecode::Jump(..)
         ) {
             // no need to jump to the next instruction
-            let suc_block = self.get_the_non_trivial_successor(block);
+            let succ_block = self.get_the_non_trivial_successor(block);
             if let Some(next_to_vist) = next_block_to_visit {
-                if *next_to_vist == suc_block {
+                if *next_to_vist == succ_block {
                     debug_assert!(code_block.pop().is_some());
                 }
             }
@@ -297,7 +297,7 @@ impl ControlFlowGraphCodeGenerator {
             block == self.entry_block || block == self.exit_block
         }
 
-        fn remove_block<F, G>(&mut self, block_to_remove: BlockId, pred_action: F, suc_action: G)
+        fn remove_block<F, G>(&mut self, block_to_remove: BlockId, pred_action: F, succ_action: G)
         where F: FnOnce(&mut Self, BlockId, &[BlockId]) + Copy, G: FnOnce(&mut Self, BlockId, &[BlockId]) + Copy
     {
         let preds = self.predecessors.remove(&block_to_remove).expect("predecessors");
@@ -308,7 +308,7 @@ impl ControlFlowGraphCodeGenerator {
         }
         for &suc in &succs {
             // self.predecessors.get_mut(&suc).expect("predecessors").retain(|&p| p != block_to_remove);
-            suc_action(self, suc, &preds);
+            succ_action(self, suc, &preds);
         }
         self.code_blocks.remove(&block_to_remove);
     }
@@ -363,9 +363,9 @@ impl RemoveEmptyBlockTransformer {
                     Self::redirects_block(pred_codes, from, to);
                 }
                 // update successors of pred
-                for suc_of_pred in this.successors.get_mut(&pred).expect("successors") {
-                    if *suc_of_pred == block_to_remove {
-                        *suc_of_pred = redirect_to;
+                for succ_of_pred in this.successors.get_mut(&pred).expect("successors") {
+                    if *succ_of_pred == block_to_remove {
+                        *succ_of_pred = redirect_to;
                     }
                 }
                 // update predecessors of `redirect_to`
