@@ -394,14 +394,14 @@ impl EmptyBlockRemover {
                     .expect("predecessors")
                     .push(pred);
             },
-            |_this, _suc, _preds| {},
+            |this, succ, _preds| {
+                debug_assert!(succ == redirect_to);
+                this.predecessors
+                    .get_mut(&succ)
+                    .expect("predecessors")
+                    .retain(|pred| *pred != block_to_remove);
+            },
         );
-        // remove `block_to_remove`
-        self.0
-            .predecessors
-            .get_mut(&redirect_to)
-            .expect("predecessors")
-            .retain(|pred| *pred != block_to_remove);
     }
 
     /// Redirects a sequence of codes so that it jumps/branches to `to`
