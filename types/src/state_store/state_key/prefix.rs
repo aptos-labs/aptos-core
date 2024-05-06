@@ -26,7 +26,7 @@ impl StateKeyPrefix {
 
     /// Checks if the current prefix is a valid prefix of a particular state_key
     pub fn is_prefix(&self, state_key: &StateKey) -> anyhow::Result<bool> {
-        let encoded_key = state_key.encode()?;
+        let encoded_key = state_key.encoded();
         let encoded_prefix = self.encode()?;
         // Check if bytes is a sub-vector of encoded key.
         if encoded_prefix.len() > encoded_key.len() {

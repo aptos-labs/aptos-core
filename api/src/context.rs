@@ -98,7 +98,7 @@ impl Context {
             let log_per_call_stats = node_config.api.periodic_function_stats_sec.is_some();
             (
                 Arc::new(FunctionStats::new(
-                    FunctionType::ViewFuntion,
+                    FunctionType::ViewFunction,
                     log_per_call_stats,
                 )),
                 Arc::new(FunctionStats::new(
@@ -1360,21 +1360,21 @@ pub enum LogEvent {
 }
 
 pub enum FunctionType {
-    ViewFuntion,
+    ViewFunction,
     TxnSimulation,
 }
 
 impl FunctionType {
     fn log_event(&self) -> LogEvent {
         match self {
-            FunctionType::ViewFuntion => LogEvent::ViewFunction,
+            FunctionType::ViewFunction => LogEvent::ViewFunction,
             FunctionType::TxnSimulation => LogEvent::TxnSimulation,
         }
     }
 
     fn operation_id(&self) -> &'static str {
         match self {
-            FunctionType::ViewFuntion => "view_function",
+            FunctionType::ViewFunction => "view_function",
             FunctionType::TxnSimulation => "txn_simulation",
         }
     }
