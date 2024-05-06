@@ -1,0 +1,21 @@
+// -- Model dump before bytecode pipeline
+module 0x42::M {
+    struct CoolStruct {
+        dummy_field: bool,
+    }
+    public entry fun late_signer(_u: u64,_s: signer) {
+        Tuple()
+    }
+    public entry fun signer_ref(_: &signer) {
+        Tuple()
+    }
+    public entry fun struct_arg(_: M::CoolStruct) {
+        Tuple()
+    }
+    public entry fun struct_ret(): M::CoolStruct {
+        pack M::CoolStruct(false)
+    }
+    public entry fun u64_ret(): u64 {
+        0
+    }
+} // end 0x42::M

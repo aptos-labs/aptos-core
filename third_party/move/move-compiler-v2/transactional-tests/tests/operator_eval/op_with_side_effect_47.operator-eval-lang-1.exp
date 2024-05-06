@@ -1,0 +1,46 @@
+comparison between v1 and v2 failed:
+- processed 2 tasks
++ processed 2 tasks
+= 
+- task 0 'publish'. lines 1-16:
+- Error: error[E07003]: invalid operation, could create dangling a reference
+-    ┌─ TEMPFILE:4:9
+-    │
+-  4 │         *x = *x + 1;
+-    │         ^^^^^^^^^^^ Invalid mutation of reference.
+-    ·
+- 12 │         x + inc(&mut x) + inc(&mut x)
+-    │                 ------ It is still being mutably borrowed by this reference
+- 
+- error[E07002]: mutable ownership violated
+-    ┌─ TEMPFILE:4:14
+-    │
+-  4 │         *x = *x + 1;
+-    │              ^^ Invalid dereference.
+-    ·
+- 12 │         x + inc(&mut x) + inc(&mut x)
+-    │                 ------ It is still being mutably borrowed by this reference
+- 
+- error[E07006]: ambiguous usage of variable
+-    ┌─ TEMPFILE:12:9
+-    │
+- 12 │         x + inc(&mut x) + inc(&mut x)
+-    │         ^                     ------ It is still being mutably borrowed by this reference
+-    │         │                      
+-    │         Ambiguous usage of variable 'x'
+-    │         Try an explicit annotation, e.g. 'move x' or 'copy x'
+-    │
+-    = Ambiguous inference of 'move' or 'copy' for a borrowed variable's last usage: A 'move' would invalidate the borrowing reference, but a 'copy' might not be the expected implicit behavior since this the last direct usage of the variable.
+- 
+- 
+- 
+= task 1 'run'. lines 18-18:
+- Error: Function execution failed with VMError: {
+-     major_status: LINKER_ERROR,
+-     sub_status: None,
+-     location: undefined,
+-     indices: redacted,
+-     offsets: redacted,
+- }
++ return values: 6
+= 

@@ -104,7 +104,7 @@
 ///
 /// Another model, if viable, is to decouple the `signer` altogether away from permissions and to make an application specific capability. Then this capability can be given to each worker that lets them operate on the shared infrastructure.
 ///
-/// Note that parallelization on the shared infrastructure can be limited if any transaction would have any read, write or write, write conflicts. This wont prevent multiple transactions from executing within a block, but can impact maximum blockchain performance.
+/// Note that parallelization on the shared infrastructure can be limited if any transaction would have any read, write or write, write conflicts. This won't prevent multiple transactions from executing within a block, but can impact maximum blockchain performance.
 /// Long winded text that goes on and on and on
 /// Long winded text that goes on and on and on
 /// Long winded text that goes on and on and on

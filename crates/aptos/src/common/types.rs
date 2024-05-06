@@ -19,6 +19,7 @@ use crate::{
     move_tool::{ArgWithType, FunctionArgType, MemberId},
 };
 use anyhow::Context;
+use aptos_api_types::ViewFunction;
 use aptos_crypto::{
     ed25519::{Ed25519PrivateKey, Ed25519PublicKey, Ed25519Signature},
     encoding_type::{EncodingError, EncodingType},
@@ -1060,15 +1061,13 @@ pub struct MovePackageDir {
     pub bytecode_version: Option<u32>,
 
     /// Specify the version of the compiler.
-    ///
-    /// Currently hidden until the official launch of Compiler V2
-    #[clap(long, hide = true, value_parser = clap::value_parser!(CompilerVersion))]
+    /// Currently, default to `v1`
+    #[clap(long, value_parser = clap::value_parser!(CompilerVersion))]
     pub compiler_version: Option<CompilerVersion>,
 
     /// Specify the language version to be supported.
-    ///
-    /// Currently hidden until the official launch of Compiler V2
-    #[clap(long, hide = true, value_parser = clap::value_parser!(LanguageVersion))]
+    /// Currently, default to `v1`
+    #[clap(long, value_parser = clap::value_parser!(LanguageVersion))]
     pub language_version: Option<LanguageVersion>,
 
     /// Do not complain about unknown attributes in Move code.
@@ -1595,9 +1594,12 @@ impl TransactionOptions {
         get_sequence_number(&client, sender_address).await
     }
 
-    pub async fn view(&self, payload: ViewRequest) -> CliTypedResult<Vec<serde_json::Value>> {
+    pub async fn view(&self, payload: ViewFunction) -> CliTypedResult<Vec<serde_json::Value>> {
         let client = self.rest_client()?;
-        Ok(client.view(&payload, None).await?.into_inner())
+        Ok(client
+            .view_bcs_with_json_response(&payload, None)
+            .await?
+            .into_inner())
     }
 
     /// Submit a transaction
@@ -1792,7 +1794,7 @@ impl TransactionOptions {
         let sender_account = &mut LocalAccount::new(sender_address, sender_key, sequence_number);
         let transaction =
             sender_account.sign_with_transaction_builder(transaction_factory.payload(payload));
-        let hash = transaction.clone().committed_hash();
+        let hash = transaction.committed_hash();
 
         let debugger = AptosDebugger::rest_client(client).unwrap();
         let (vm_status, vm_output) = execute(&debugger, version, transaction, hash)?;
@@ -2059,6 +2061,21 @@ impl TryInto<EntryFunction> for EntryFunctionArguments {
             entry_function_args.type_arg_vec.try_into()?,
             entry_function_args.arg_vec.try_into()?,
         ))
+    }
+}
+
+impl TryInto<ViewFunction> for EntryFunctionArguments {
+    type Error = CliError;
+
+    fn try_into(self) -> Result<ViewFunction, Self::Error> {
+        let view_function_args = self.check_input_style()?;
+        let function_id: MemberId = (&view_function_args).try_into()?;
+        Ok(ViewFunction {
+            module: function_id.module_id,
+            function: function_id.member_id,
+            ty_args: view_function_args.type_arg_vec.try_into()?,
+            args: view_function_args.arg_vec.try_into()?,
+        })
     }
 }
 

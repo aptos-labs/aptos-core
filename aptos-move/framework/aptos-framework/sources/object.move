@@ -510,13 +510,15 @@ module aptos_framework::object {
     inline fun transfer_raw_inner(object: address, to: address) acquires ObjectCore {
         let object_core = borrow_global_mut<ObjectCore>(object);
         if (object_core.owner != to) {
-            event::emit(
-                Transfer {
-                    object,
-                    from: object_core.owner,
-                    to,
-                },
-            );
+            if (std::features::module_event_migration_enabled()) {
+                event::emit(
+                    Transfer {
+                        object,
+                        from: object_core.owner,
+                        to,
+                    },
+                );
+            };
             event::emit_event(
                 &mut object_core.transfer_events,
                 TransferEvent {

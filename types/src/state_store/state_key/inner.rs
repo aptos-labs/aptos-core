@@ -2,16 +2,14 @@
 // SPDX-License-Identifier: Apache-2.0
 
 use crate::{access_path::AccessPath, state_store::table::TableHandle};
-use aptos_crypto::{
-    hash::{CryptoHash, CryptoHasher},
-    HashValue,
-};
 use aptos_crypto_derive::CryptoHasher;
+use bytes::{BufMut, Bytes, BytesMut};
 use num_derive::{FromPrimitive, ToPrimitive};
 use serde::{Deserialize, Serialize};
 use std::{
     fmt,
     fmt::{Debug, Formatter},
+    io::Write,
 };
 use thiserror::Error;
 
@@ -21,20 +19,6 @@ pub enum StateKeyTag {
     AccessPath,
     TableItem,
     Raw = 255,
-}
-
-impl CryptoHash for StateKeyInner {
-    type Hasher = StateKeyInnerHasher;
-
-    fn hash(&self) -> HashValue {
-        let mut state = Self::Hasher::default();
-        state.update(
-            self.encode()
-                .expect("Failed to serialize the state key")
-                .as_ref(),
-        );
-        state.finish()
-    }
 }
 
 /// Error thrown when a [`StateKey`] fails to be deserialized out of a byte sequence stored in physical
@@ -54,6 +38,9 @@ pub enum StateKeyDecodeErr {
 
     #[error(transparent)]
     BcsError(#[from] bcs::Error),
+
+    #[error(transparent)]
+    AnyHow(#[from] anyhow::Error),
 }
 
 #[derive(Clone, CryptoHasher, Eq, PartialEq, Serialize, Deserialize, Ord, PartialOrd, Hash)]
@@ -73,23 +60,26 @@ pub enum StateKeyInner {
 
 impl StateKeyInner {
     /// Serializes to bytes for physical storage.
-    pub fn encode(&self) -> anyhow::Result<Vec<u8>> {
-        let mut out = vec![];
+    pub(crate) fn encode(&self) -> anyhow::Result<Bytes> {
+        let mut writer = BytesMut::new().writer();
 
-        let (prefix, raw_key) = match self {
+        match self {
             StateKeyInner::AccessPath(access_path) => {
-                (StateKeyTag::AccessPath, bcs::to_bytes(access_path)?)
+                writer.write_all(&[StateKeyTag::AccessPath as u8])?;
+                bcs::serialize_into(&mut writer, access_path)?;
             },
             StateKeyInner::TableItem { handle, key } => {
-                let mut bytes = bcs::to_bytes(&handle)?;
-                bytes.extend(key);
-                (StateKeyTag::TableItem, bytes)
+                writer.write_all(&[StateKeyTag::TableItem as u8])?;
+                bcs::serialize_into(&mut writer, &handle)?;
+                writer.write_all(key)?;
             },
-            StateKeyInner::Raw(raw_bytes) => (StateKeyTag::Raw, raw_bytes.to_vec()),
+            StateKeyInner::Raw(raw_bytes) => {
+                writer.write_all(&[StateKeyTag::Raw as u8])?;
+                writer.write_all(raw_bytes)?;
+            },
         };
-        out.push(prefix as u8);
-        out.extend(raw_key);
-        Ok(out)
+
+        Ok(writer.into_inner().into())
     }
 }
 

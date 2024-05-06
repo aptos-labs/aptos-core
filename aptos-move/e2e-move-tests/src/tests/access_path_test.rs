@@ -18,8 +18,6 @@ use move_binary_format::{
 };
 use move_core_types::{identifier::Identifier, vm_status::StatusCode};
 
-/// FIXME(aldenhu): fix or remove
-#[ignore]
 #[test]
 fn access_path_panic() {
     // github.com/aptos-labs/aptos-core/security/advisories/GHSA-rpw2-84hq-48jj

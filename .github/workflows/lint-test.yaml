@@ -120,28 +120,22 @@ jobs:
         with:
           GIT_CREDENTIALS: ${{ secrets.GIT_CREDENTIALS }}
 
-  # Run all rust unit tests. This is a PR required job.
+  # Run all rust unit tests. This is not a PR required job.
   rust-unit-tests:
-    needs: file_change_determinator
-    if: | # Only run on each PR once an appropriate event occurs
+    if: | # Only run when an appropriate event occurs
       (
         github.event_name == 'workflow_dispatch' ||
         github.event_name == 'push' ||
-        contains(github.event.pull_request.labels.*.name, 'CICD:run-all-unit-tests') ||
-        github.event.pull_request.auto_merge != null
+        contains(github.event.pull_request.labels.*.name, 'CICD:run-all-unit-tests')
       )
     runs-on: high-perf-docker
     steps:
       - uses: actions/checkout@v4
-        if: needs.file_change_determinator.outputs.only_docs_changed != 'true'
       - name: Run rust unit tests
         uses: ./.github/actions/rust-unit-tests
-        if: needs.file_change_determinator.outputs.only_docs_changed != 'true'
         with:
           GIT_CREDENTIALS: ${{ secrets.GIT_CREDENTIALS }}
           BUILDKITE_ANALYTICS_TOKEN: ${{ secrets.BUILDKITE_ANALYTICS_TOKEN }}
-      - run: echo "Skipping rust unit tests! Unrelated changes detected."
-        if: needs.file_change_determinator.outputs.only_docs_changed == 'true'
 
   # Run the cached packages build. This is a PR required job.
   rust-build-cached-packages:
