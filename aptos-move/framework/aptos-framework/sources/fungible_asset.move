@@ -334,6 +334,12 @@ module aptos_framework::fungible_asset {
             ),
             error::already_exists(EALREADY_REGISTERED)
         );
+        assert!(
+            exists<Metadata>(
+                object::address_from_constructor_ref(constructor_ref)
+            ),
+            error::not_found(ENOT_METADATA_OWNER),
+        );
 
         let store_obj = &object::generate_signer(constructor_ref);
 

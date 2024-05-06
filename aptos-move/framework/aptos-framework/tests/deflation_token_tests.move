@@ -1,11 +1,12 @@
 #[test_only]
 module 0xcafe::deflation_token_tests {
+    use aptos_framework::account;
+    use aptos_framework::dispatchable_fungible_asset;
     use aptos_framework::function_info;
     use aptos_framework::fungible_asset::{Self, Metadata, TestToken};
-    use aptos_framework::dispatchable_fungible_asset;
+    use aptos_framework::object;
     use aptos_framework::primary_fungible_store;
     use 0xcafe::deflation_token;
-    use aptos_framework::object;
     use std::option;
     use std::string;
     use std::signer;
@@ -282,6 +283,28 @@ module 0xcafe::deflation_token_tests {
         assert!(fungible_asset::supply(metadata) == option::some(100), 2);
         // Deposit would succeed
         dispatchable_fungible_asset::deposit(creator_store, fa);
+    }
+
+    #[test(creator = @0xcafe)]
+    #[expected_failure(abort_code=0x60018, location = aptos_framework::fungible_asset)]
+    fun test_register_on_non_metadata_object(
+        creator: &signer,
+    ) {
+        account::create_account_for_test(signer::address_of(creator));
+        let creator_ref = object::create_named_object(creator, b"TEST");
+         let withdraw = function_info::new_function_info(
+            creator,
+            string::utf8(b"deflation_token"),
+            string::utf8(b"withdraw"),
+        );
+
+        // Change the deposit and withdraw function. Should give a type mismatch error.
+        dispatchable_fungible_asset::register_dispatch_functions(
+            &creator_ref,
+            option::some(withdraw),
+            option::none(),
+            option::none(),
+        );
     }
 
     #[test(creator = @0xcafe, aaron = @0xface)]
