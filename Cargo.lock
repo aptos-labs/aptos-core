@@ -240,7 +240,7 @@ dependencies = [
 
 [[package]]
 name = "aptos"
-version = "3.2.0"
+version = "3.3.0"
 dependencies = [
  "anyhow",
  "aptos-api-types",
@@ -307,7 +307,6 @@ dependencies = [
  "move-symbol-pool",
  "move-unit-test",
  "move-vm-runtime",
- "once_cell",
  "pathsearch",
  "poem",
  "processor",
@@ -3588,7 +3587,6 @@ dependencies = [
  "proptest",
  "proptest-derive",
  "rayon",
- "rocksdb",
  "serde",
  "thiserror",
  "threadpool",

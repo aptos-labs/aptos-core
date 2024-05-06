@@ -4,6 +4,7 @@
 use crate::{
     network::{NetworkSender, QuorumStoreSender},
     quorum_store::{
+        batch_generator::BatchGeneratorCommand,
         batch_store::{BatchStore, BatchWriter},
         counters,
         proof_manager::ProofManagerCommand,
@@ -30,6 +31,7 @@ pub struct BatchCoordinator {
     my_peer_id: PeerId,
     network_sender: Arc<NetworkSender>,
     sender_to_proof_manager: Arc<Sender<ProofManagerCommand>>,
+    sender_to_batch_generator: Arc<Sender<BatchGeneratorCommand>>,
     batch_store: Arc<BatchStore>,
     max_batch_txns: u64,
     max_batch_bytes: u64,
@@ -42,6 +44,7 @@ impl BatchCoordinator {
         my_peer_id: PeerId,
         network_sender: NetworkSender,
         sender_to_proof_manager: Sender<ProofManagerCommand>,
+        sender_to_batch_generator: Sender<BatchGeneratorCommand>,
         batch_store: Arc<BatchStore>,
         max_batch_txns: u64,
         max_batch_bytes: u64,
@@ -52,6 +55,7 @@ impl BatchCoordinator {
             my_peer_id,
             network_sender: Arc::new(network_sender),
             sender_to_proof_manager: Arc::new(sender_to_proof_manager),
+            sender_to_batch_generator: Arc::new(sender_to_batch_generator),
             batch_store,
             max_batch_txns,
             max_batch_bytes,
@@ -131,6 +135,14 @@ impl BatchCoordinator {
 
         let mut persist_requests = vec![];
         for batch in batches.into_iter() {
+            // TODO: maybe don't message batch generator if the persist is unsuccessful?
+            if let Err(e) = self
+                .sender_to_batch_generator
+                .send(BatchGeneratorCommand::RemoteBatch(batch.clone()))
+                .await
+            {
+                warn!("Failed to send batch to batch generator: {}", e);
+            }
             persist_requests.push(batch.into());
         }
         counters::RECEIVED_BATCH_COUNT.inc_by(persist_requests.len() as u64);

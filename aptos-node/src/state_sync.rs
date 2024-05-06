@@ -65,7 +65,9 @@ pub fn create_event_subscription_service(
         .expect("Mempool must subscribe to reconfigurations");
 
     // Create a reconfiguration subscription for consensus (if this is a validator)
-    let consensus_reconfig_subscription = if node_config.base.role.is_validator() {
+    let consensus_reconfig_subscription = if node_config.base.role.is_validator()
+        || node_config.state_sync.state_sync_driver.observer_enabled
+    {
         Some(
             event_subscription_service
                 .subscribe_to_reconfigurations()

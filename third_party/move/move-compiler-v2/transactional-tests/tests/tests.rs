@@ -28,6 +28,11 @@ struct TestConfig {
     runner: fn(&Path) -> datatest_stable::Result<()>,
     experiments: &'static [(&'static str, bool)],
     language_version: LanguageVersion,
+    /// Path substrings for tests to include. If empty, all tests are included.
+    include: &'static [&'static str],
+    /// Path substrings for tests to exclude (applied after the include filter).
+    /// If empty, no additional tests are excluded.
+    exclude: &'static [&'static str],
 }
 
 const TEST_CONFIGS: &[TestConfig] = &[
@@ -39,6 +44,8 @@ const TEST_CONFIGS: &[TestConfig] = &[
             (Experiment::ACQUIRES_CHECK, false),
         ],
         language_version: LanguageVersion::V2_0,
+        include: &[], // all tests except those excluded below
+        exclude: &["/operator_eval/"],
     },
     TestConfig {
         name: "no-optimize",
@@ -48,6 +55,8 @@ const TEST_CONFIGS: &[TestConfig] = &[
             (Experiment::ACQUIRES_CHECK, false),
         ],
         language_version: LanguageVersion::V2_0,
+        include: &[], // all tests except those excluded below
+        exclude: &["/operator_eval/"],
     },
     TestConfig {
         name: "optimize-no-simplify",
@@ -58,6 +67,24 @@ const TEST_CONFIGS: &[TestConfig] = &[
             (Experiment::ACQUIRES_CHECK, false),
         ],
         language_version: LanguageVersion::V2_0,
+        include: &[], // all tests except those excluded below
+        exclude: &["/operator_eval/"],
+    },
+    TestConfig {
+        name: "operator-eval-lang-1",
+        runner: |p| run(p, get_config_by_name("operator-eval-lang-1")),
+        experiments: &[(Experiment::OPTIMIZE, true)],
+        language_version: LanguageVersion::V1,
+        include: &["/operator_eval/"],
+        exclude: &[],
+    },
+    TestConfig {
+        name: "operator-eval-lang-2",
+        runner: |p| run(p, get_config_by_name("operator-eval-lang-2")),
+        experiments: &[(Experiment::OPTIMIZE, true)],
+        language_version: LanguageVersion::V2_0,
+        include: &["/operator_eval/"],
+        exclude: &[],
     },
 ];
 
@@ -69,6 +96,8 @@ const SEPARATE_BASELINE: &[&str] = &[
     "constants/large_vectors.move",
     // Printing bytecode is different depending on optimizations
     "no-v1-comparison/print_bytecode.move",
+    // The output of the tests could be different depending on the language version
+    "/operator_eval/",
 ];
 
 fn get_config_by_name(name: &str) -> TestConfig {
@@ -76,7 +105,7 @@ fn get_config_by_name(name: &str) -> TestConfig {
         .iter()
         .find(|c| c.name == name)
         .cloned()
-        .unwrap_or_else(|| panic!("undeclared test confio `{}`", name))
+        .unwrap_or_else(|| panic!("undeclared test config `{}`", name))
 }
 
 fn run(path: &Path, config: TestConfig) -> datatest_stable::Result<()> {
@@ -128,12 +157,21 @@ fn main() {
         .collect_vec();
     let reqs = TEST_CONFIGS
         .iter()
-        .map(|c| {
+        .map(|config| {
+            let pattern = files
+                .iter()
+                .filter(|file| {
+                    (config.include.is_empty()
+                        || config.include.iter().any(|include| file.contains(include)))
+                        && (!config.exclude.iter().any(|exclude| file.contains(exclude)))
+                })
+                .map(|s| s.to_owned() + "$")
+                .join("|");
             Requirements::new(
-                c.runner,
-                format!("compiler-v2-txn[config={}]", c.name),
+                config.runner,
+                format!("compiler-v2-txn[config={}]", config.name),
                 "tests".to_string(),
-                files.clone().into_iter().map(|s| s + "$").join("|"),
+                pattern,
             )
         })
         .collect_vec();
