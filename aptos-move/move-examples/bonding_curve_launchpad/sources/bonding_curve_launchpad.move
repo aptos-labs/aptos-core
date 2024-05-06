@@ -12,8 +12,8 @@ module resource_account::bonding_curve_launchpad {
     use aptos_std::signer;
     use aptos_std::object::{Object};
     //! Dispatchable FA future standard
-    // use aptos_framework::dispatchable_fungible_asset;
-    // use aptos_framework::function_info;
+    use aptos_framework::dispatchable_fungible_asset;
+    use aptos_framework::function_info;
     // Friend
     use resource_account::resource_signer_holder;
 
@@ -184,11 +184,11 @@ module resource_account::bonding_curve_launchpad {
         let transfer_ref = fungible_asset::generate_transfer_ref(fa_obj_constructor_ref);
 
         //! Needs testing against Dispatchable FA standard.
-        // let withdraw_limitations = function_info::new_function_info(
-        //     &resource_signer_holder::get_signer(),
-        //     string::utf8(b"controlled_token"),
-        //     string::utf8(b"withdraw")
-        // );
+        let withdraw_limitations = function_info::new_function_info(
+            &resource_signer_holder::get_signer(),
+            string::utf8(b"controlled_token"),
+            string::utf8(b"withdraw")
+        );
 
         let fa_obj_signer = object::generate_signer(fa_obj_constructor_ref);
         let fa_obj_address = signer::address_of(&fa_obj_signer);
@@ -238,7 +238,6 @@ module resource_account::bonding_curve_launchpad {
 
 
     //---------------------------Liquidity Pair---------------------------
-    //! Temporarily, x*y=k.
     fun register_liquidity_pair(account: &signer, fa_metadata: Object<Metadata>, fa_key: FAKey, apt_initialPurchaseAmountIn: u64, fa_initialLiquidity: u128) acquires LaunchPad, LiquidityPairSmartTable {
         let fa_smartTable = borrow_global_mut<LaunchPad>(@resource_account);
         let fa_data = smart_table::borrow_mut(&mut fa_smartTable.key_to_fa_data, fa_key);
@@ -278,7 +277,6 @@ module resource_account::bonding_curve_launchpad {
         let liquidity_pair = smart_table::borrow_mut(&mut liquidity_pair_smartTable.liquidity_pairs, fa_metadata);
         assert!(liquidity_pair.is_enabled, ELIQUIDITY_PAIR_DISABLED);
 
-        //* amountIn might end up changing here, so we'll use the value returned.
         let swapper_address = signer::address_of(account);
         let (fa_given, apt_gained, fa_updated_reserves, apt_updated_reserves) = get_amount_out(
             liquidity_pair.fa_reserves,
@@ -318,7 +316,6 @@ module resource_account::bonding_curve_launchpad {
         let liquidity_pair = smart_table::borrow_mut(&mut liquidity_pair_smartTable.liquidity_pairs, fa_metadata);
         assert!(liquidity_pair.is_enabled, ELIQUIDITY_PAIR_DISABLED);
 
-        //* amountIn might end up changing here, so we'll use the value returned.
         let swapper_address = signer::address_of(account);
         let (fa_gained, apt_given, fa_updated_reserves, apt_updated_reserves) = get_amount_out(
             liquidity_pair.fa_reserves,
@@ -357,7 +354,6 @@ module resource_account::bonding_curve_launchpad {
 
 
         if(apt_updated_reserves > APT_LIQUIDITY_THRESHOLD){
-
             //! Offload onto permissionless DEX.
             //! ...Move all APT and FA reserves to the DEX.
 
@@ -367,7 +363,7 @@ module resource_account::bonding_curve_launchpad {
             liquidity_pair.is_enabled = false;
             liquidity_pair.is_frozen = false;
 
-            //? Destroy refs?
+            //? Destroy refs???
             //? ...
 
             event::emit(LiquidityPairGraduated {

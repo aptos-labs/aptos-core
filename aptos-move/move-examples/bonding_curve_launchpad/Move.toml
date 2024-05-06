@@ -1,5 +1,5 @@
 [package]
-name = "fa_bonding_curve_launchpad"
+name = "bonding_curve_launchpad"
 version = "1.0.0"
 authors = []
 upgrade_policy = "compatible"
