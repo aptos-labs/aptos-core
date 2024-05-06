@@ -44,4 +44,14 @@ module resource_account::resource_signer_holder {
         account::create_signer_with_capability(signer_cap)
     }
 
+	//---------------------------Tests---------------------------
+    #[test_only]
+    public fun initialize_for_test(deployer: &signer){
+		let (coin_wrapper_signer, signer_cap) = account::create_resource_account(deployer, b"TEST");
+	    move_to(deployer, Config {
+	        owner: OWNER,
+	        signer_cap,
+	    });
+    }
+
 }

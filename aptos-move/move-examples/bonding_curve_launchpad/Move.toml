@@ -6,14 +6,13 @@ upgrade_policy = "compatible"
 
 [addresses]
 owner_addr = "0x922a028b0dbd8ff206074977ae4c5f9fb003ce384242b6253c67192cd2a45ee1"
-resource_account = "0x756f17af1e6415dc4ba6dbc583d52adbc352b1cdd69f509739ada08c781400e6"
+resource_account = "0x52ddc290f7be79b2583472217af88a8500bdcb16d865e9c2bf4d3c995df0825f"
 memecoin_creator_addr = "0x922a028b0dbd8ff206074977ae4c5f9fb003ce384242b6253c67192cd2a45ee1"
+deployer = "0x922a028b0dbd8ff206074977ae4c5f9fb003ce384242b6253c67192cd2a45ee1"
+swap = "0x922a028b0dbd8ff206074977ae4c5f9fb003ce384242b6253c67192cd2a45ee1"
 
-[dev-addresses]
 
 [dependencies.AptosFramework]
 git = "https://github.com/aptos-labs/aptos-core.git"
-rev = "mainnet"
+rev = "bbf569abd260d94bc30fe96da297d2aecb193644"
 subdir = "aptos-move/framework/aptos-framework"
-
-[dev-dependencies]

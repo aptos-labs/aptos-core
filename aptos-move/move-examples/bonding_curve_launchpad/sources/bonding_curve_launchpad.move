@@ -11,7 +11,6 @@ module resource_account::bonding_curve_launchpad {
     use aptos_std::string::{String};
     use aptos_std::signer;
     use aptos_std::object::{Object};
-    //! Dispatchable FA future standard
     use aptos_framework::dispatchable_fungible_asset;
     use aptos_framework::function_info;
     // Friend
@@ -183,7 +182,6 @@ module resource_account::bonding_curve_launchpad {
         let burn_ref = fungible_asset::generate_burn_ref(fa_obj_constructor_ref);
         let transfer_ref = fungible_asset::generate_transfer_ref(fa_obj_constructor_ref);
 
-        //! Needs testing against Dispatchable FA standard.
         let withdraw_limitations = function_info::new_function_info(
             &resource_signer_holder::get_signer(),
             string::utf8(b"controlled_token"),
@@ -222,7 +220,6 @@ module resource_account::bonding_curve_launchpad {
     }
 
 
-    //! Needs testing against Dispatchable FA standard.
     public fun withdraw<T: key>(
         store: Object<T>,
         amount: u64,
@@ -397,33 +394,30 @@ module resource_account::bonding_curve_launchpad {
 
         primary_fungible_store::balance(user, fa_metadata_obj)
     }
+    #[view]
+    public fun get_metadata(name: String, symbol: String): Object<Metadata> acquires LaunchPad{
+        let fa_key = FAKey { name, symbol };
+        let fa_smartTable = borrow_global<LaunchPad>(@resource_account);
+        let fa_data = smart_table::borrow(&fa_smartTable.key_to_fa_data, fa_key);
+        let fa_metadata_obj:Object<Metadata> = object::address_to_object(fa_data.fa_obj_address);
+
+        fa_metadata_obj
+    }
+
 
 
     //---------------------------Tests---------------------------
-    #[test(account = @resource_account, sender = @memecoin_creator_addr)]
-    fun test_create_fa(account: &signer, sender: &signer) acquires LaunchPad, LiquidityPairSmartTable {
-        init_module(account);
+    #[test_only]
+    public fun initialize_for_test(deployer: &signer){
+        let fa_smartTable: LaunchPad = LaunchPad {
+            key_to_fa_data: smart_table::new()
+        };
+        let liquidity_pair_table: LiquidityPairSmartTable = LiquidityPairSmartTable {
+            liquidity_pairs: smart_table::new()
+        };
 
-        create_fa_pair(
-            sender,
-            0,
-            string::utf8(b"SheepyCoin"),
-            string::utf8(b"SHEEP"),
-            INITIAL_NEW_FA_RESERVE,
-            FA_DECIMALS,
-            string::utf8(b"https://t4.ftcdn.net/jpg/03/12/95/13/360_F_312951336_8LxW7gBLHslTnpbOAwxFo5FpD2R5vGxu.jpg"),
-            string::utf8(b"https://t4.ftcdn.net/jpg/03/12/95/13/360_F_312951336_8LxW7gBLHslTnpbOAwxFo5FpD2R5vGxu.jpg")
-        );
-        create_fa_pair(
-            sender,
-            0,
-            string::utf8(b"PoggieCoin"),
-            string::utf8(b"POGGIE"),
-            INITIAL_NEW_FA_RESERVE,
-            FA_DECIMALS,
-            string::utf8(b"https://t4.ftcdn.net/jpg/03/12/95/13/360_F_312951336_8LxW7gBLHslTnpbOAwxFo5FpD2R5vGxu.jpg"),
-            string::utf8(b"https://t4.ftcdn.net/jpg/03/12/95/13/360_F_312951336_8LxW7gBLHslTnpbOAwxFo5FpD2R5vGxu.jpg")
-        );
+        move_to(deployer, fa_smartTable);
+        move_to(deployer, liquidity_pair_table);
     }
 
 }
