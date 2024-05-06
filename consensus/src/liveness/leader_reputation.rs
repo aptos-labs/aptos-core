@@ -24,6 +24,7 @@ use aptos_types::{
     account_config::NewBlockEvent, epoch_change::EpochChangeProof, epoch_state::EpochState,
 };
 use itertools::Itertools;
+use rayon::iter::{IntoParallelIterator, ParallelIterator};
 use std::{
     cmp::max,
     collections::{HashMap, HashSet},
@@ -710,49 +711,56 @@ impl ProposerElection for LeaderReputation {
             .map(|(i, w)| *w as u128 * self.voting_powers[i] as u128)
             .collect();
 
-        let state = if self.use_root_hash {
-            [
-                root_hash.to_vec(),
-                self.epoch.to_le_bytes().to_vec(),
-                round.to_le_bytes().to_vec(),
-            ]
-            .concat()
-        } else {
-            [
-                self.epoch.to_le_bytes().to_vec(),
-                round.to_le_bytes().to_vec(),
-            ]
-            .concat()
-        };
-
-        let chosen_index = choose_index(stake_weights, state);
-        let chosen_index = shift_number(chosen_index, self.proposers_per_round, proposers.len());
-        let chosen_proposers = if round > 300 {
-            vec![
-                "0xc15f7032d7f6c534ee8c1110a836484859fb4a0e02f1e50b4408fca646d888f8"
-                    .parse()
-                    .unwrap(),
-                "0x020b82795d2800c869dabb32efdd12b61a00e22cf7b7bfb109c9406b3ab0e13e"
-                    .parse()
-                    .unwrap(),
-                "0xe78835b13db6435f6e570f66f246e97550f8ed2be656e1b90e7d75bbee1097ce"
-                    .parse()
-                    .unwrap(),
-                "0xfb6adb0ba507af382583ed88b33c43a9ce7f0d421853efcb5c885613ccf37c69"
-                    .parse()
-                    .unwrap(),
-                "0xbdc0a2d6eee67b97e8d1ffb12bb7219cfa6cba17952996f0693850b5d6d7ec5b"
-                    .parse()
-                    .unwrap(),
-            ]
-        } else {
-            (chosen_index..(chosen_index + self.proposers_per_round))
-                .map(|index| proposers[index % proposers.len()])
-                .collect()
-        };
+        let chosen_proposers = (0..self.proposers_per_round as u64)
+            .into_par_iter()
+            .map(|instance| {
+                let state = if self.use_root_hash {
+                    [
+                        root_hash.to_vec(),
+                        self.epoch.to_le_bytes().to_vec(),
+                        round.to_le_bytes().to_vec(),
+                        instance.to_le_bytes().to_vec(),
+                    ]
+                    .concat()
+                } else {
+                    [
+                        self.epoch.to_le_bytes().to_vec(),
+                        round.to_le_bytes().to_vec(),
+                        instance.to_le_bytes().to_vec(),
+                    ]
+                    .concat()
+                };
+                let chosen_index = choose_index(&stake_weights, state);
+                proposers[chosen_index]
+            })
+            .collect();
+        // let chosen_index = shift_number(chosen_index, self.proposers_per_round, proposers.len());
+        // let chosen_proposers = if round > 300 {
+        //     vec![
+        //         "0xc15f7032d7f6c534ee8c1110a836484859fb4a0e02f1e50b4408fca646d888f8"
+        //             .parse()
+        //             .unwrap(),
+        //         "0x020b82795d2800c869dabb32efdd12b61a00e22cf7b7bfb109c9406b3ab0e13e"
+        //             .parse()
+        //             .unwrap(),
+        //         "0xe78835b13db6435f6e570f66f246e97550f8ed2be656e1b90e7d75bbee1097ce"
+        //             .parse()
+        //             .unwrap(),
+        //         "0xfb6adb0ba507af382583ed88b33c43a9ce7f0d421853efcb5c885613ccf37c69"
+        //             .parse()
+        //             .unwrap(),
+        //         "0xbdc0a2d6eee67b97e8d1ffb12bb7219cfa6cba17952996f0693850b5d6d7ec5b"
+        //             .parse()
+        //             .unwrap(),
+        //     ]
+        // } else {
+        //     (chosen_index..(chosen_index + self.proposers_per_round))
+        //         .map(|index| proposers[index % proposers.len()])
+        //         .collect()
+        // };
 
         (
-            proposers[chosen_index],
+            proposers[0],
             voting_power_participation_ratio,
             chosen_proposers,
         )

@@ -4,6 +4,7 @@
 
 use aptos_consensus_types::common::{Author, Round};
 use aptos_fallible::copy_from_slice::copy_slice_to_vec;
+use futures::SinkExt;
 use num_traits::CheckedAdd;
 use std::cmp::Ordering;
 
@@ -48,18 +49,19 @@ fn next_in_range(state: Vec<u8>, max: u128) -> u128 {
 }
 
 // chose index randomly, with given weight distribution
-pub(crate) fn choose_index(mut weights: Vec<u128>, state: Vec<u8>) -> usize {
+pub(crate) fn choose_index(weights: &Vec<u128>, state: Vec<u8>) -> usize {
+    let mut sum_weights = Vec::with_capacity(weights.len());
     let mut total_weight = 0;
     // Create cumulative weights vector
     // Since we own the vector, we can safely modify it in place
-    for w in &mut weights {
+    for w in weights {
         total_weight = total_weight
             .checked_add(w)
             .expect("Total stake shouldn't exceed u128::MAX");
-        *w = total_weight;
+        sum_weights.push(total_weight);
     }
     let chosen_weight = next_in_range(state, total_weight);
-    weights
+    sum_weights
         .binary_search_by(|w| {
             if *w <= chosen_weight {
                 Ordering::Less
@@ -78,7 +80,7 @@ fn test_bounds() {
     // 10 is enough to get one of each.
     for i in 0i32..10 {
         let state = i.to_le_bytes().to_vec();
-        selected[choose_index(weights.clone(), state)] += 1;
+        selected[choose_index(&weights, state)] += 1;
     }
 
     assert!(selected[0] >= 1);
