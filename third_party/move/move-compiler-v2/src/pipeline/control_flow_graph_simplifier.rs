@@ -194,6 +194,11 @@ impl ControlFlowGraphCodeGenerator {
         self.predecessors.get(&block_id).expect("predecessors")
     }
 
+    /// Gets the successors of a block
+    fn succs(&self, block_id: BlockId) -> &[BlockId] {
+        self.successors.get(&block_id).expect("successors")
+    }
+
     /// Gets the predecessors of a block as mutable
     fn preds_mut(&mut self, block_id: BlockId) -> &mut Vec<BlockId> {
         self.predecessors.get_mut(&block_id).expect("predecessors")
@@ -361,10 +366,18 @@ impl ControlFlowGraphCodeGenerator {
 
     /// Replaces the predecessor `old_pred` of `block` by `new_pred`
     fn replace_pred_by(&mut self, block: BlockId, old_pred: BlockId, new_pred: BlockId) {
-        let preds = self.predecessors.get_mut(&block).expect("predecessors");
-        for pred in preds {
-            if *pred == old_pred {
-                *pred = new_pred;
+        Self::replace_block(self.preds_mut(block), old_pred, new_pred);
+    }
+
+    /// Replaces the predecessor `old_pred` of `block` by `new_pred`
+    fn replace_succ_by(&mut self, block: BlockId, old_succ: BlockId, new_succ: BlockId) {
+        Self::replace_block(self.succs_mut(block), old_succ, new_succ);
+    }
+
+    fn replace_block(blocks: &mut [BlockId], old: BlockId, new: BlockId) {
+        for block in blocks {
+            if *block == old {
+                *block = new;
             }
         }
     }
@@ -421,22 +434,15 @@ impl EmptyBlockRemover {
                     Self::redirects_block(pred_codes, from, to);
                 }
                 // update successors of pred by replacing `block_to_remove` with `redirect_to`
-                for succ_of_pred in this.successors.get_mut(&pred).expect("successors") {
-                    if *succ_of_pred == block_to_remove {
-                        *succ_of_pred = redirect_to;
-                    }
-                }
-                // update predecessors of `redirect_to`
-                // add preds of `remove_block` to `redirect_to`
-                this.preds_mut(redirect_to)
-                    .push(pred);
+                this.replace_succ_by(pred, block_to_remove, redirect_to);
             },
+            // replace `block_to_remove` by predecessors of `block_to_remove`
+            // in predecessors of `redirect_to`
             |this, succ| {
                 debug_assert!(succ == redirect_to);
-                let mut preds_of_block_to_remove = this.preds(block_to_remove).to_vec();
-                let succ_preds = this.predecessors.get_mut(&succ).expect("predecessors");
-                succ_preds.append(&mut preds_of_block_to_remove);
                 this.remove_pred(succ, block_to_remove);
+                let mut preds_of_block_to_remove = this.preds(block_to_remove).to_vec();
+                this.preds_mut(succ).append(&mut preds_of_block_to_remove);
             },
         );
     }
@@ -539,10 +545,7 @@ impl RedundantJumpRemover {
             to,
             |this, pred| {
                 debug_assert!(pred == from);
-                let succs_of_to = this.successors.get(&to).expect("successors").clone();
-                let succs_mut = this.succs_mut(pred);
-                succs_mut.clear();
-                succs_mut.extend(succs_of_to);
+                *this.succs_mut(pred) = this.succs(to).to_vec();
             },
             |this, succ| {
                 this.replace_pred_by(succ, to, from)
