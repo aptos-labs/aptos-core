@@ -274,7 +274,11 @@ pub struct DFSLeft<'a> {
 impl<'a> DFSLeft<'a> {
     /// Iterates over all blocks in DFS order (and always choosing the left-most child to visit) starting from the entry block
     /// `visit_all`: whether to visit all blocks or just blocks reachable from the entry block
-    pub fn new(successors: &'a BTreeMap<BlockId, Vec<BlockId>>, start: BlockId, visit_all: bool) -> Self {
+    pub fn new(
+        successors: &'a BTreeMap<BlockId, Vec<BlockId>>,
+        start: BlockId,
+        visit_all: bool,
+    ) -> Self {
         let to_visit = vec![start];
         Self {
             successors,
@@ -321,7 +325,13 @@ impl<'a> Iterator for DFSLeft<'a> {
         if let Some(unvisited) = &mut self.unvisited {
             unvisited.remove(&visiting);
         }
-        for suc_block in self.successors.get(&visiting).expect("successors").iter().rev() {
+        for suc_block in self
+            .successors
+            .get(&visiting)
+            .expect("successors")
+            .iter()
+            .rev()
+        {
             self.to_visit.push(*suc_block);
         }
         Some(visiting)

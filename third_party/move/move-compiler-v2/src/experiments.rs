@@ -202,8 +202,8 @@ impl Experiment {
     pub const AST_SIMPLIFY: &'static str = "ast-simplify";
     pub const AST_SIMPLIFY_FULL: &'static str = "ast-simplify-full";
     pub const ATTACH_COMPILED_MODULE: &'static str = "attach-compiled-module";
-    pub const CHECKS: &'static str = "checks";
     pub const CFG_SIMPLIFICATION: &'static str = "cfg-simplification";
+    pub const CHECKS: &'static str = "checks";
     pub const COPY_PROPAGATION: &'static str = "copy-propagation";
     pub const DEAD_CODE_ELIMINATION: &'static str = "dead-code-elimination";
     pub const DUPLICATE_STRUCT_PARAMS_CHECK: &'static str = "duplicate-struct-params-check";

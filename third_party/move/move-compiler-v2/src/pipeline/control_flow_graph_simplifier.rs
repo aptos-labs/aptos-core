@@ -105,25 +105,24 @@ struct ControlFlowGraphSimplifierTransformation {
 
 impl ControlFlowGraphSimplifierTransformation {
     pub fn new(data: FunctionData) -> Self {
-        Self {
-            data,
-        }
+        Self { data }
     }
 
     /// Does the first four transformations described in the module doc
     fn transform(&mut self) {
         self.eliminate_branch_to_same_target();
-        let cfg_code_generator = ControlFlowGraphCodeGenerator::new(std::mem::take(&mut self.data.code));
-        let mut elim_empty_blocks_transformer =
-            EmptyBlockRemover::new(cfg_code_generator);
+        let cfg_code_generator =
+            ControlFlowGraphCodeGenerator::new(std::mem::take(&mut self.data.code));
+        let mut elim_empty_blocks_transformer = EmptyBlockRemover::new(cfg_code_generator);
         elim_empty_blocks_transformer.transform();
         let mut remove_redundant_jump_transformer =
             RedundantJumpRemover::new(elim_empty_blocks_transformer.0);
         remove_redundant_jump_transformer.transform();
         self.data.code = remove_redundant_jump_transformer.0.gen_code(true);
         // may introduce new empty blocks
-        let mut elim_empty_blocks_transformer =
-            EmptyBlockRemover::new(ControlFlowGraphCodeGenerator::new(std::mem::take(&mut self.data.code)));
+        let mut elim_empty_blocks_transformer = EmptyBlockRemover::new(
+            ControlFlowGraphCodeGenerator::new(std::mem::take(&mut self.data.code)),
+        );
         elim_empty_blocks_transformer.transform();
         self.data.code = elim_empty_blocks_transformer.0.gen_code(true);
         self.eliminate_branch_to_same_target();
@@ -173,9 +172,10 @@ impl ControlFlowGraphCodeGenerator {
                 BlockContent::Dummy => None,
             })
             .sorted_by_key(|x| x.2)
-            .rev() {
-                let block_code = code.drain(lower as usize..=upper as usize).collect_vec();
-                code_blocks.insert(block_id, block_code);
+            .rev()
+        {
+            let block_code = code.drain(lower as usize..=upper as usize).collect_vec();
+            code_blocks.insert(block_id, block_code);
         }
         code_blocks.insert(cfg.entry_block(), Vec::new());
         code_blocks.insert(cfg.exit_block(), Vec::new());
