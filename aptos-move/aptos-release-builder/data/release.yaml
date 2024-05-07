@@ -6,21 +6,9 @@ proposals:
     metadata:
       title: "Increase max txn gas temporarily for framework upgrade"
       description: "Increase max txn gas temporarily for framework upgrade"
-    execution_mode: MultiStep
+    execution_mode: RootSigner
     update_sequence:
-      - DefaultGasWithOverrideOld:
-          feature_version: 15
+      - DefaultGasWithOverride:
           overrides:
-            - name: "txn.max_execution_gas"
-              value: 3676000000
-  - name: step_2_upgrade_framework
-    metadata:
-      title: "Multi-step proposal to upgrade mainnet framework to v1.11"
-      description: "This includes changes in https://github.com/aptos-labs/aptos-core/commits/aptos-release-v1.11"
-    execution_mode: MultiStep
-    update_sequence:
-      - Framework:
-          bytecode_version: 6
-          git_hash: ~
-      - RawScript: aptos-move/aptos-release-builder/data/proposals/randomness_framework_initialization.move
-      - DefaultGas
+            - name: "txn.max_transaction_size_in_bytes"
+              value: 65536
