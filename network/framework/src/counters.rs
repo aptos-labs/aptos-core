@@ -2,7 +2,7 @@
 // Parts of the project are originally copyright © Meta Platforms, Inc.
 // SPDX-License-Identifier: Apache-2.0
 
-use crate::protocols::wire::handshake::v1::ProtocolId;
+use crate::{peer_manager::MessageSendType, protocols::wire::handshake::v1::ProtocolId};
 use aptos_config::network_id::NetworkContext;
 use aptos_metrics_core::{
     exponential_buckets, register_histogram_vec, register_int_counter_vec, register_int_gauge,
@@ -13,6 +13,7 @@ use aptos_netcore::transport::ConnectionOrigin;
 use aptos_short_hex_str::AsShortHexStr;
 use aptos_types::PeerId;
 use once_cell::sync::Lazy;
+use std::time::Duration;
 
 // some type labels
 pub const REQUEST_LABEL: &str = "request";
@@ -38,6 +39,12 @@ const PRE_DIAL_LABEL: &str = "pre_dial";
 // Serialization labels
 pub const SERIALIZATION_LABEL: &str = "serialization";
 pub const DESERIALIZATION_LABEL: &str = "deserialization";
+
+// Queueing labels
+pub const QUEUEING_FOR_SERIALIZATION_LABEL: &str = "serialization";
+pub const QUEUEING_FOR_PEER_MANAGER_LABEL: &str = "peer_manager";
+pub const QUEUEING_FOR_PEER_DISPATCH_LABEL: &str = "peer_dispatch";
+pub const QUEUEING_FOR_TOTAL_DURATION_LABEL: &str = "total_duration";
 
 pub static APTOS_CONNECTIONS: Lazy<IntGaugeVec> = Lazy::new(|| {
     register_int_gauge_vec!(
@@ -330,6 +337,29 @@ pub fn direct_send_bytes(
         network_context.peer_id().short_str().as_str(),
         state_label,
     ])
+}
+
+/// Counter for tracking the latencies of outbound message queueing operations
+pub static APTOS_NETWORK_OUTBOUND_MESSAGE_QUEUEING_LATENCY: Lazy<HistogramVec> = Lazy::new(|| {
+    register_histogram_vec!(
+        "aptos_network_outbound_message_queueing_latency",
+        "Outbound message queueing latency in seconds",
+        &["message_send_type", "protocol_id", "label"],
+        exponential_buckets(/*start=*/ 1e-6, /*factor=*/ 2.0, /*count=*/ 30).unwrap(),
+    )
+    .unwrap()
+});
+
+/// Observes the latency of outbound message queueing operations
+pub fn observe_outbound_message_queueing_latency(
+    message_send_type: &MessageSendType,
+    protocol_id: &ProtocolId,
+    label: &'static str,
+    latency: Duration,
+) {
+    APTOS_NETWORK_OUTBOUND_MESSAGE_QUEUEING_LATENCY
+        .with_label_values(&[message_send_type.get_label(), protocol_id.as_str(), label])
+        .observe(latency.as_secs_f64());
 }
 
 /// Counters(queued,dequeued,dropped) related to inbound network notifications for RPCs and

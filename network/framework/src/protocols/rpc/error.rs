@@ -4,7 +4,7 @@
 
 //! Rpc protocol errors
 
-use crate::peer_manager::PeerManagerError;
+use crate::{error::NetworkError, peer_manager::PeerManagerError};
 use anyhow::anyhow;
 use aptos_types::PeerId;
 use futures::channel::{mpsc, oneshot};
@@ -42,6 +42,12 @@ pub enum RpcError {
 
     #[error("Rpc timed out")]
     TimedOut,
+}
+
+impl From<NetworkError> for RpcError {
+    fn from(err: NetworkError) -> Self {
+        RpcError::Error(anyhow!(err))
+    }
 }
 
 impl From<PeerManagerError> for RpcError {

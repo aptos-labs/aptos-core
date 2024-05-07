@@ -326,15 +326,20 @@ pub trait TestNode: ApplicationNode + Sync {
                 OutboundRpcRequest {
                     protocol_id,
                     res_tx,
-                    data,
+                    message_and_metadata,
                     ..
                 },
             ) => {
                 // Forcefully close the oneshot channel, otherwise listening task will hang forever.
                 drop(res_tx);
-                (peer_id, protocol_id, data)
+                (
+                    peer_id,
+                    protocol_id,
+                    message_and_metadata.get_message().mdata.clone(),
+                )
             },
-            PeerManagerRequest::SendDirectSend(peer_id, message) => {
+            PeerManagerRequest::SendDirectSend(peer_id, message_and_metadata) => {
+                let message = message_and_metadata.get_message().clone();
                 (peer_id, message.protocol_id, message.mdata)
             },
         }
@@ -348,10 +353,11 @@ pub trait TestNode: ApplicationNode + Sync {
             PeerManagerRequest::SendRpc(peer_id, msg) => (
                 peer_id,
                 msg.protocol_id,
-                msg.data,
+                msg.get_message_data().clone(),
                 Some((msg.timeout, msg.res_tx)),
             ),
-            PeerManagerRequest::SendDirectSend(peer_id, msg) => {
+            PeerManagerRequest::SendDirectSend(peer_id, message_and_metadata) => {
+                let msg = message_and_metadata.get_message().clone();
                 (peer_id, msg.protocol_id, msg.mdata, None)
             },
         };

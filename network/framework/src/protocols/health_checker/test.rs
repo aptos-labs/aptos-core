@@ -103,7 +103,7 @@ impl TestHarness {
         };
 
         let protocol_id = rpc_req.protocol_id;
-        let req_data = rpc_req.data;
+        let req_data = rpc_req.get_message_data().clone();
         let res_tx = rpc_req.res_tx;
 
         assert_eq!(protocol_id, ProtocolId::HealthCheckerRpc);

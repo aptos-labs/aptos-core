@@ -243,17 +243,20 @@ proptest! {
         let f_stream_all = async move {
             for message in messages_clone {
                 if outbound_stream.should_stream(&message) {
-                    outbound_stream.stream_message(message).await.unwrap();
+                    let message_and_metadata = NetworkMessageAndMetadata::new_empty_metadata(message);
+                    outbound_stream.stream_message(message_and_metadata).await.unwrap();
                 } else {
-                    msg_tx.send(MultiplexMessage::Message(message)).await.unwrap();
+                    let multiplex_message = MultiplexMessage::Message(message);
+                    let message_and_metadata = MultiplexMessageAndMetadata::new_empty_metadata(multiplex_message);
+                    msg_tx.send(message_and_metadata).await.unwrap();
                 }
             }
         };
 
         let f_send_all = async {
             let mut stream = select(msg_rx, stream_rx);
-            while let Some(message) = stream.next().await {
-                message_tx.send(&message).await.unwrap();
+            while let Some(message_and_metadata) = stream.next().await {
+                message_tx.send(message_and_metadata.get_message()).await.unwrap();
             }
             message_tx.close().await.unwrap();
         };

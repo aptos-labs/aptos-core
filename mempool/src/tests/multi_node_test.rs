@@ -320,7 +320,8 @@ impl TestHarness {
 
         // Handle outgoing message
         match network_req {
-            PeerManagerRequest::SendDirectSend(remote_peer_id, msg) => {
+            PeerManagerRequest::SendDirectSend(remote_peer_id, message_and_metadata) => {
+                let msg = message_and_metadata.get_message().clone();
                 let mempool_message = common::decompress_and_deserialize(&msg.mdata.to_vec());
                 match mempool_message {
                     MempoolSyncMsg::BroadcastTransactionsRequest {
@@ -412,7 +413,8 @@ impl TestHarness {
         let network_req = sender.get_next_network_req(network_id);
 
         match network_req {
-            PeerManagerRequest::SendDirectSend(remote_peer_id, msg) => {
+            PeerManagerRequest::SendDirectSend(remote_peer_id, message_and_metadata) => {
+                let msg = message_and_metadata.get_message().clone();
                 let mempool_message = common::decompress_and_deserialize(&msg.mdata.to_vec());
                 match mempool_message {
                     MempoolSyncMsg::BroadcastTransactionsResponse { .. } => {
