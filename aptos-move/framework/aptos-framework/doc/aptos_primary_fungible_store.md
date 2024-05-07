@@ -1,7 +1,7 @@
 
 <a id="0x1_aptos_primary_fungible_store"></a>
 
-# Module `0x1::aptos_primary_fungible_store`
+# Module `0x1::apt_primary_fungible_store`
 
 
 
@@ -26,7 +26,7 @@
 
 
 
-<pre><code><b>fun</b> <a href="aptos_primary_fungible_store.md#0x1_aptos_primary_fungible_store_store_address">store_address</a>(<a href="account.md#0x1_account">account</a>: <b>address</b>): <b>address</b>
+<pre><code><b>fun</b> <a href="apt_primary_fungible_store.md#0x1_aptos_primary_fungible_store_store_address">store_address</a>(<a href="account.md#0x1_account">account</a>: <b>address</b>): <b>address</b>
 </code></pre>
 
 
@@ -35,7 +35,7 @@
 <summary>Implementation</summary>
 
 
-<pre><code>inline <b>fun</b> <a href="aptos_primary_fungible_store.md#0x1_aptos_primary_fungible_store_store_address">store_address</a>(<a href="account.md#0x1_account">account</a>: <b>address</b>): <b>address</b> {
+<pre><code>inline <b>fun</b> <a href="apt_primary_fungible_store.md#0x1_aptos_primary_fungible_store_store_address">store_address</a>(<a href="account.md#0x1_account">account</a>: <b>address</b>): <b>address</b> {
     <a href="object.md#0x1_object_create_user_derived_object_address">object::create_user_derived_object_address</a>(<a href="account.md#0x1_account">account</a>, @aptos_fungible_asset)
 }
 </code></pre>
@@ -50,7 +50,7 @@
 
 
 
-<pre><code><b>public</b>(<b>friend</b>) <b>fun</b> <a href="aptos_primary_fungible_store.md#0x1_aptos_primary_fungible_store_is_balance_at_least">is_balance_at_least</a>(<a href="account.md#0x1_account">account</a>: <b>address</b>, amount: u64): bool
+<pre><code><b>public</b>(<b>friend</b>) <b>fun</b> <a href="apt_primary_fungible_store.md#0x1_aptos_primary_fungible_store_is_balance_at_least">is_balance_at_least</a>(<a href="account.md#0x1_account">account</a>: <b>address</b>, amount: u64): bool
 </code></pre>
 
 
@@ -59,8 +59,8 @@
 <summary>Implementation</summary>
 
 
-<pre><code><b>public</b>(<b>friend</b>) <b>fun</b> <a href="aptos_primary_fungible_store.md#0x1_aptos_primary_fungible_store_is_balance_at_least">is_balance_at_least</a>(<a href="account.md#0x1_account">account</a>: <b>address</b>, amount: u64): bool {
-    <b>let</b> store_addr = <a href="aptos_primary_fungible_store.md#0x1_aptos_primary_fungible_store_store_address">store_address</a>(<a href="account.md#0x1_account">account</a>);
+<pre><code><b>public</b>(<b>friend</b>) <b>fun</b> <a href="apt_primary_fungible_store.md#0x1_aptos_primary_fungible_store_is_balance_at_least">is_balance_at_least</a>(<a href="account.md#0x1_account">account</a>: <b>address</b>, amount: u64): bool {
+    <b>let</b> store_addr = <a href="apt_primary_fungible_store.md#0x1_aptos_primary_fungible_store_store_address">store_address</a>(<a href="account.md#0x1_account">account</a>);
     <a href="fungible_asset.md#0x1_fungible_asset_is_address_balance_at_least">fungible_asset::is_address_balance_at_least</a>(store_addr, amount)
 }
 </code></pre>
@@ -75,7 +75,7 @@
 
 
 
-<pre><code><b>public</b>(<b>friend</b>) <b>fun</b> <a href="aptos_primary_fungible_store.md#0x1_aptos_primary_fungible_store_burn_from">burn_from</a>(ref: &<a href="fungible_asset.md#0x1_fungible_asset_BurnRef">fungible_asset::BurnRef</a>, <a href="account.md#0x1_account">account</a>: <b>address</b>, amount: u64)
+<pre><code><b>public</b>(<b>friend</b>) <b>fun</b> <a href="apt_primary_fungible_store.md#0x1_aptos_primary_fungible_store_burn_from">burn_from</a>(ref: &<a href="fungible_asset.md#0x1_fungible_asset_BurnRef">fungible_asset::BurnRef</a>, <a href="account.md#0x1_account">account</a>: <b>address</b>, amount: u64)
 </code></pre>
 
 
@@ -84,14 +84,14 @@
 <summary>Implementation</summary>
 
 
-<pre><code><b>public</b>(<b>friend</b>) <b>fun</b> <a href="aptos_primary_fungible_store.md#0x1_aptos_primary_fungible_store_burn_from">burn_from</a>(
+<pre><code><b>public</b>(<b>friend</b>) <b>fun</b> <a href="apt_primary_fungible_store.md#0x1_aptos_primary_fungible_store_burn_from">burn_from</a>(
     ref: &BurnRef,
     <a href="account.md#0x1_account">account</a>: <b>address</b>,
     amount: u64,
 ) {
     // Skip burning <b>if</b> amount is zero. This shouldn't <a href="../../aptos-stdlib/../move-stdlib/doc/error.md#0x1_error">error</a> out <b>as</b> it's called <b>as</b> part of transaction fee burning.
     <b>if</b> (amount != 0) {
-        <b>let</b> store_addr = <a href="aptos_primary_fungible_store.md#0x1_aptos_primary_fungible_store_store_address">store_address</a>(<a href="account.md#0x1_account">account</a>);
+        <b>let</b> store_addr = <a href="apt_primary_fungible_store.md#0x1_aptos_primary_fungible_store_store_address">store_address</a>(<a href="account.md#0x1_account">account</a>);
         <a href="fungible_asset.md#0x1_fungible_asset_address_burn_from">fungible_asset::address_burn_from</a>(ref, store_addr, amount);
     };
 }
@@ -107,7 +107,7 @@
 
 
 
-<pre><code><b>fun</b> <a href="aptos_primary_fungible_store.md#0x1_aptos_primary_fungible_store_ensure_primary_store_exists">ensure_primary_store_exists</a>(owner: <b>address</b>): <b>address</b>
+<pre><code><b>fun</b> <a href="apt_primary_fungible_store.md#0x1_aptos_primary_fungible_store_ensure_primary_store_exists">ensure_primary_store_exists</a>(owner: <b>address</b>): <b>address</b>
 </code></pre>
 
 
@@ -116,8 +116,8 @@
 <summary>Implementation</summary>
 
 
-<pre><code>inline <b>fun</b> <a href="aptos_primary_fungible_store.md#0x1_aptos_primary_fungible_store_ensure_primary_store_exists">ensure_primary_store_exists</a>(owner: <b>address</b>): <b>address</b> {
-    <b>let</b> store_addr = <a href="aptos_primary_fungible_store.md#0x1_aptos_primary_fungible_store_store_address">store_address</a>(owner);
+<pre><code>inline <b>fun</b> <a href="apt_primary_fungible_store.md#0x1_aptos_primary_fungible_store_ensure_primary_store_exists">ensure_primary_store_exists</a>(owner: <b>address</b>): <b>address</b> {
+    <b>let</b> store_addr = <a href="apt_primary_fungible_store.md#0x1_aptos_primary_fungible_store_store_address">store_address</a>(owner);
     <b>if</b> (<a href="fungible_asset.md#0x1_fungible_asset_store_exists">fungible_asset::store_exists</a>(store_addr)) {
         store_addr
     } <b>else</b> {
@@ -136,7 +136,7 @@
 
 
 
-<pre><code><b>public</b> entry <b>fun</b> <a href="aptos_primary_fungible_store.md#0x1_aptos_primary_fungible_store_transfer">transfer</a>(sender: &<a href="../../aptos-stdlib/../move-stdlib/doc/signer.md#0x1_signer">signer</a>, recipient: <b>address</b>, amount: u64)
+<pre><code><b>public</b> entry <b>fun</b> <a href="apt_primary_fungible_store.md#0x1_aptos_primary_fungible_store_transfer">transfer</a>(sender: &<a href="../../aptos-stdlib/../move-stdlib/doc/signer.md#0x1_signer">signer</a>, recipient: <b>address</b>, amount: u64)
 </code></pre>
 
 
@@ -145,13 +145,13 @@
 <summary>Implementation</summary>
 
 
-<pre><code><b>public</b> entry <b>fun</b> <a href="aptos_primary_fungible_store.md#0x1_aptos_primary_fungible_store_transfer">transfer</a>(
+<pre><code><b>public</b> entry <b>fun</b> <a href="apt_primary_fungible_store.md#0x1_aptos_primary_fungible_store_transfer">transfer</a>(
     sender: &<a href="../../aptos-stdlib/../move-stdlib/doc/signer.md#0x1_signer">signer</a>,
     recipient: <b>address</b>,
     amount: u64,
 ) {
-    <b>let</b> sender_store = <a href="aptos_primary_fungible_store.md#0x1_aptos_primary_fungible_store_ensure_primary_store_exists">ensure_primary_store_exists</a>(<a href="../../aptos-stdlib/../move-stdlib/doc/signer.md#0x1_signer_address_of">signer::address_of</a>(sender));
-    <b>let</b> recipient_store = <a href="aptos_primary_fungible_store.md#0x1_aptos_primary_fungible_store_ensure_primary_store_exists">ensure_primary_store_exists</a>(recipient);
+    <b>let</b> sender_store = <a href="apt_primary_fungible_store.md#0x1_aptos_primary_fungible_store_ensure_primary_store_exists">ensure_primary_store_exists</a>(<a href="../../aptos-stdlib/../move-stdlib/doc/signer.md#0x1_signer_address_of">signer::address_of</a>(sender));
+    <b>let</b> recipient_store = <a href="apt_primary_fungible_store.md#0x1_aptos_primary_fungible_store_ensure_primary_store_exists">ensure_primary_store_exists</a>(recipient);
 
     // <b>use</b> <b>internal</b> APIs, <b>as</b> they skip:
     // - owner, frozen and dispatchable checks

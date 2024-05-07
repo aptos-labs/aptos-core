@@ -62,7 +62,7 @@ module aptos_framework::primary_fungible_store {
     ): Object<FungibleStore> acquires DeriveRefPod {
         let store_addr = primary_store_address(owner, metadata);
         if (fungible_asset::store_exists(store_addr)) {
-            object::address_to_object<FungibleStore>(store_addr)
+            object::address_to_object(store_addr)
         } else {
             create_primary_store(owner, metadata)
         }

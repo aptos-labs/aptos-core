@@ -15,7 +15,7 @@ module aptos_framework::fungible_asset {
 
     friend aptos_framework::coin;
     friend aptos_framework::primary_fungible_store;
-    friend aptos_framework::aptos_primary_fungible_store;
+    friend aptos_framework::apt_primary_fungible_store;
 
     friend aptos_framework::dispatchable_fungible_asset;
 
