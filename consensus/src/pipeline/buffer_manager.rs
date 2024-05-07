@@ -224,8 +224,11 @@ impl BufferManager {
         mut sender: Sender<T>,
         request: T,
         duration: Duration,
+        name: &'static str,
     ) {
-        counters::BUFFER_MANAGER_RETRY_COUNT.inc();
+        counters::BUFFER_MANAGER_RETRY_COUNT
+            .with_label_values(&[name])
+            .inc();
         spawn_named!("retry request", async move {
             tokio::time::sleep(duration).await;
             sender
@@ -287,7 +290,7 @@ impl BufferManager {
                 lifetime_guard: self.create_new_request(()),
             });
             let sender = self.execution_schedule_phase_tx.clone();
-            Self::spawn_retry_request(sender, request, Duration::from_millis(100));
+            Self::spawn_retry_request(sender, request, Duration::from_millis(100), "execution");
         }
         // Otherwise do nothing, because the execution wait phase is driven by the response of
         // the execution schedule phase, which is in turn fed as soon as the ordered blocks
@@ -316,7 +319,7 @@ impl BufferManager {
             });
             if cursor == self.signing_root {
                 let sender = self.signing_phase_tx.clone();
-                Self::spawn_retry_request(sender, request, Duration::from_millis(100));
+                Self::spawn_retry_request(sender, request, Duration::from_millis(100), "signing");
             } else {
                 self.signing_phase_tx
                     .send(request)
