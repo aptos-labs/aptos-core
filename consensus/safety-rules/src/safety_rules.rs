@@ -150,26 +150,18 @@ impl SafetyRules {
         updated
     }
 
-    pub(crate) fn observe_tc(
+    pub(crate) fn verify_and_update_highest_timeout_round(
         &self,
         timeout: &TwoChainTimeout,
         safety_data: &mut SafetyData,
-    ) -> bool {
-        let mut updated = false;
-        if safety_data
-            .highest_timeout_round
-            .map_or(true, |highest_timeout_round| {
-                timeout.round() > highest_timeout_round
-            })
-        {
-            safety_data.highest_timeout_round = Some(timeout.round());
+    ) {
+        if timeout.round() > safety_data.highest_timeout_round {
+            safety_data.highest_timeout_round = timeout.round();
             trace!(
                 SafetyLogSchema::new(LogEntry::HighestTimeoutRound, LogEvent::Update)
-                    .highest_timeout_round(safety_data.highest_timeout_round.unwrap_or(0))
+                    .highest_timeout_round(safety_data.highest_timeout_round)
             );
-            updated = true
         }
-        updated
     }
 
     /// Second voting rule
@@ -300,8 +292,7 @@ impl SafetyRules {
                     0,
                     0,
                     None,
-                    None,
-                    None,
+                    0,
                 ))?;
 
                 info!(SafetyLogSchema::new(LogEntry::Epoch, LogEvent::Update)

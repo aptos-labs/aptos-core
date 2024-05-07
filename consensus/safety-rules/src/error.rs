@@ -15,8 +15,6 @@ pub enum Error {
     IncorrectRound(u64),
     #[error("Provided round, {0}, is incompatible with last voted round, {1}")]
     IncorrectLastVotedRound(u64, u64),
-    #[error("Provided round, {0}, is incompatible with last order voted round, {1}")]
-    IncorrectLastOrderVotedRound(u64, u64),
     #[error("Provided round, {0}, is incompatible with preferred round, {1}")]
     IncorrectPreferredRound(u64, u64),
     #[error("Unable to verify that the new tree extends the parent: {0}")]

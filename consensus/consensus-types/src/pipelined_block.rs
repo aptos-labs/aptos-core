@@ -166,12 +166,7 @@ impl PipelinedBlock {
     }
 
     pub fn order_vote_proposal(&self, quorum_cert: Arc<QuorumCert>) -> OrderVoteProposal {
-        OrderVoteProposal::new(
-            self.block.clone(),
-            self.compute_result().epoch_state().clone(),
-            self.block_info(),
-            quorum_cert,
-        )
+        OrderVoteProposal::new(self.block.clone(), self.block_info(), quorum_cert)
     }
 
     pub fn subscribable_events(&self) -> Vec<ContractEvent> {

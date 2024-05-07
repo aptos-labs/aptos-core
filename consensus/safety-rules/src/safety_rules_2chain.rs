@@ -41,7 +41,7 @@ impl SafetyRules {
         }
         if timeout.round() > safety_data.last_voted_round {
             self.verify_and_update_last_vote_round(timeout.round(), &mut safety_data)?;
-            self.observe_tc(timeout, &mut safety_data);
+            self.verify_and_update_highest_timeout_round(timeout, &mut safety_data);
             self.persistent_storage.set_safety_data(safety_data)?;
         }
 
@@ -93,7 +93,6 @@ impl SafetyRules {
         Ok(vote)
     }
 
-    // TODO: Are these safety rules exhaustive?
     pub(crate) fn guarded_construct_and_sign_order_vote(
         &mut self,
         order_vote_proposal: &OrderVoteProposal,
@@ -104,27 +103,16 @@ impl SafetyRules {
         let proposed_block = order_vote_proposal.block();
         let mut safety_data = self.persistent_storage.safety_data()?;
 
-        // if already voted on this round, send back the previous vote
-        if let Some(order_vote) = safety_data.last_order_vote.clone() {
-            if order_vote.ledger_info().round() == proposed_block.round() {
-                return Ok(order_vote);
-            }
-        }
         // Record 1-chain data
         self.observe_qc(order_vote_proposal.quorum_cert(), &mut safety_data);
 
         self.safe_to_order_vote(proposed_block, &safety_data)?;
-
         // Construct and sign order vote
         let author = self.signer()?.author();
         let ledger_info =
             LedgerInfo::new(order_vote_proposal.block_info().clone(), HashValue::zero());
         let signature = self.sign(&ledger_info)?;
         let order_vote = OrderVote::new_with_signature(author, ledger_info.clone(), signature);
-
-        safety_data.last_order_vote = Some(order_vote.clone());
-        self.persistent_storage.set_safety_data(safety_data)?;
-
         Ok(order_vote)
     }
 
@@ -177,12 +165,12 @@ impl SafetyRules {
 
     fn safe_to_order_vote(&self, block: &Block, safety_data: &SafetyData) -> Result<(), Error> {
         let round = block.round();
-        if round > safety_data.highest_timeout_round.unwrap_or(0) {
+        if round > safety_data.highest_timeout_round {
             Ok(())
         } else {
             Err(Error::NotSafeToOrderVote(
                 round,
-                safety_data.highest_timeout_round.unwrap_or(0),
+                safety_data.highest_timeout_round,
             ))
         }
     }
