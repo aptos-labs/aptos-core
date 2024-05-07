@@ -78,7 +78,7 @@ fn resource_group_bcs_fallback() {
     let data_view = NonEmptyGroupDataView::<KeyType<u32>> {
         group_keys: HashSet::new(),
     };
-    let garage = Arc::new(ThreadGarageExecutor::new(num_cpus::get(), num_cpus::get()*2));
+    let garage = Arc::new(ThreadGarageExecutor::new(num_cpus::get(), num_cpus::get()*2, num_cpus::get()));
 
     let block_executor = BlockExecutor::<
         MockTransaction<KeyType<u32>, MockEvent>,
@@ -168,7 +168,7 @@ fn block_output_err_precedence() {
         phantom: PhantomData,
     };
     
-    let garage = Arc::new(ThreadGarageExecutor::new(num_cpus::get(), num_cpus::get()*2));
+    let garage = Arc::new(ThreadGarageExecutor::new(num_cpus::get(), num_cpus::get()*2, num_cpus::get()));
 
     let block_executor = BlockExecutor::<
         MockTransaction<KeyType<u32>, MockEvent>,
@@ -203,7 +203,7 @@ fn skip_rest_gas_limit() {
         phantom: PhantomData,
     };
     
-    let garage = Arc::new(ThreadGarageExecutor::new(num_cpus::get(), num_cpus::get()*2));
+    let garage = Arc::new(ThreadGarageExecutor::new(num_cpus::get(), num_cpus::get()*2, num_cpus::get()));
 
     let block_executor = BlockExecutor::<
         MockTransaction<KeyType<u32>, MockEvent>,
@@ -231,7 +231,7 @@ where
         phantom: PhantomData,
     };
 
-    let garage = Arc::new(ThreadGarageExecutor::new(num_cpus::get(), num_cpus::get()*2));
+    let garage = Arc::new(ThreadGarageExecutor::new(num_cpus::get(), num_cpus::get()*2, num_cpus::get()));
 
     let output = BlockExecutor::<
         MockTransaction<K, E>,

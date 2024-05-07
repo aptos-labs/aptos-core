@@ -57,11 +57,11 @@ use std::{
     collections::{BTreeMap, HashMap, HashSet},
     marker::{PhantomData, Sync},
     sync::{
-        atomic::{AtomicBool, AtomicU32, AtomicUsize, Ordering}, Arc, Mutex, Once
+        atomic::{AtomicBool, AtomicU32, AtomicU64, AtomicUsize, Ordering}, Arc, Mutex, Once
     },
 };
 use once_cell::unsync::Lazy;
-
+use std::time::Instant;
 
 
 pub struct BlockExecutor<T, E, S, L, X> {
@@ -742,6 +742,8 @@ where
         shared_counter: &AtomicU32,
         shared_commit_state: &ExplicitSyncWrapper<BlockGasLimitProcessor<T>>,
         final_results: &ExplicitSyncWrapper<Vec<E::Output>>,
+        total_validation: &AtomicU64,
+
     ) -> Result<Option<Baton<DependencyStatus>>, PanicOr<ParallelBlockExecutionError>> {
         // Make executor for each task. TODO: fast concurrent executor.
         let init_timer = VM_INIT_SECONDS.start_timer();
@@ -794,8 +796,10 @@ where
 
             scheduler_task = match scheduler_task {
                 SchedulerTask::ValidationTask(txn_idx, incarnation, wave) => {
+                    //measure this maybe?
+                    let start = Instant::now();
                     let valid = Self::validate(txn_idx, last_input_output, versioned_cache)?;
-                    Self::update_on_validation(
+                    let temp = Self::update_on_validation(
                         txn_idx,
                         incarnation,
                         valid,
@@ -803,7 +807,11 @@ where
                         last_input_output,
                         versioned_cache,
                         scheduler_handle,
-                    )?
+                    )?;
+                    let end = Instant::now();
+                    let duration = end-start;
+                    total_validation.fetch_add(duration.as_nanos() as u64, Ordering::Relaxed);
+                    temp
                 },
                 SchedulerTask::ExecutionTask(
                     txn_idx,
@@ -940,6 +948,9 @@ where
 
         let cur_index = AtomicUsize::new(0);
 
+        let start = Instant::now();
+
+        
         self.garage.spawn_n(|_| -> ReturnType {
             loop {
                let index = cur_index.fetch_add(1, Ordering::Relaxed);
@@ -954,8 +965,15 @@ where
             }
         });
 
+        let end = Instant::now();
+        println!("VM_init_time={:?}", end-start);
+
+        
+        let total_validation = AtomicU64::new(0);
+
         {
-            let executor_vec = executor_vec.into_inner();
+            let executor_vec: Vec<Option<E>> = executor_vec.into_inner();
+            
             self.garage.spawn_n(|garage| -> ReturnType {
                 //eprintln!("calling function");
 
@@ -974,6 +992,7 @@ where
                     &shared_counter,
                     &shared_commit_state,
                     &final_results,
+                    &total_validation,
                 );
                 match res {
                     Err(err) => {
@@ -999,6 +1018,7 @@ where
                 }
             });
         }
+        println!("total_validation_time={}ms", total_validation.load(Ordering::Relaxed) as f64/1000000.0);
         drop(timer);
 
         counters::update_state_counters(versioned_cache.stats(), true);

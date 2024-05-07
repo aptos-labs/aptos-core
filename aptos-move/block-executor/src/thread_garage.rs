@@ -12,6 +12,7 @@ use std::sync::{
 };
 
 use crossbeam::utils::CachePadded;
+use std::time::{Instant,Duration};
 
 use std::any::Any;
 use std::thread;
@@ -23,6 +24,7 @@ pub enum SuspendResult<T>
         WokenUpToHaltedGarage,
  //       ErrorNoAvailableThreads,
         FailedRegisteringHook,
+        //FailedDueToMaxSleeping,
         NotHalted(T),
 }
 
@@ -158,6 +160,7 @@ pub struct CurrentThreadData {
     num_completed: usize, //number of threads which finished running worker function
     num_sleeping: usize,
     halting_cleanup_idx: usize,
+    total_time_sleeping: Duration,
     asleep: Vec<bool> //asleep[i] is true if thread i is asleep, waiting for dependencies to be satisfied
 }
 
@@ -168,6 +171,7 @@ impl CurrentThreadData {
             num_completed: 0,
             num_sleeping: 0,
             halting_cleanup_idx: 0,
+            total_time_sleeping: Duration::default(),
             asleep: vec![false; capacity],
         }
     }
@@ -208,6 +212,7 @@ pub struct ThreadGarage {
     // Limit of how many threads we are allowed to spawn.
     max_spawned: usize, // >= max_active
 
+    max_sleeping: usize,
     // number of currently spawned threads
     num_spawned: AtomicUsize,
 
@@ -232,10 +237,11 @@ pub struct ThreadGarage {
 }
 
 impl ThreadGarage {
-    fn new(max_active: usize, max_spawned: usize) -> Self {
+    fn new(max_active: usize, max_spawned: usize, max_sleeping: usize) -> Self {
         Self {
             max_active,
             max_spawned,
+            max_sleeping,
             num_spawned: AtomicUsize::new(0),
             worker_function_vec: ExplicitSyncWrapper::new((0..max_spawned).map(|_| None).collect()),
             global_barrier: ThreadGarageBarrier::new(max_spawned),
@@ -271,7 +277,7 @@ impl ThreadGarage {
         //eprintln!("returned from hook, thread = {}", thread_id);
         match hook_result {
             Some(val) => {
-                eprintln!("dependency already resolved thread={}", thread_id);
+                //eprintln!("dependency already resolved thread={}", thread_id);
                 //depencency already satisfied, no need to suspend
                 {
                     let mut lock = self.global_mutex.lock().unwrap();
@@ -299,19 +305,19 @@ impl ThreadGarage {
                 };
             },
             None => {
-                //eprintln!("actually going to sleep thread={}", thread_id);
                 //suspend logic
                 let mut lock = self.global_mutex.lock().unwrap();
 
-                /*if lock.num_sleeping + 1 == self.max_spawned {
+                //not able to sleep
+                /*if lock.num_sleeping == self.max_sleeping {
                     if !lock.asleep[thread_id] {
                         lock.num_active -= 1;
-                        //self.global_cv.notify_one();
+                        self.global_cv.notify_one();
                     }
                     else {
                         lock.asleep[thread_id] = false;
                     }
-                    return Err(SuspendError::ErrorNoAvailableThreads);
+                    return Ok(SuspendResult::FailedDueToMaxSleeping);
                 }*/
 
                 lock.num_active -= 1;
@@ -324,13 +330,16 @@ impl ThreadGarage {
                 self.global_cv.notify_one();
 
                 //eprintln!("num sleeping prior {}", lock.num_sleeping);
+                let start = Instant::now();
 
                 while lock.asleep[thread_id] {
                     lock = self.baton_cv[thread_id].wait(lock).unwrap();
                 }
 
+                let end = Instant::now();
                 //eprintln!("woke up thread={}", thread_id);
                 lock.num_sleeping -= 1;
+                lock.total_time_sleeping += end-start;
 
                 //eprintln!("num sleeping after {}", lock.num_sleeping);
 
@@ -527,11 +536,12 @@ impl ThreadGarageExecutor {
         self.max_spawned
     }
 
-    pub fn new(max_active: usize, max_spawned: usize) -> Self {
+    pub fn new(max_active: usize, max_spawned: usize, max_sleeping: usize) -> Self {
         assert!(max_spawned >= max_active);
         assert!(max_active > 0usize);
+        assert!(max_spawned >= max_sleeping);
 
-        let temp_thread_garage = Arc::new(ThreadGarage::new(max_active, max_spawned));
+        let temp_thread_garage = Arc::new(ThreadGarage::new(max_active, max_spawned, max_sleeping));
         
         for idx in 1..temp_thread_garage.max_spawned {
             let c = temp_thread_garage.clone(); 
@@ -558,6 +568,7 @@ impl ThreadGarageExecutor {
             let mut lock = self.garage.global_mutex.lock().unwrap();
             lock.num_completed = 0;
             lock.halting_cleanup_idx = 0;
+            lock.total_time_sleeping = Duration::default();
         }
         self.garage.halted.store(false, Ordering::Release);
         
@@ -574,9 +585,13 @@ impl ThreadGarageExecutor {
         //main thread also calls handle_fn_to_run
         
         let worker = temp_executor.get_worker_function_wrapper();
+        
         worker.execute(&self.garage, 0); 
 
         self.garage.global_barrier.arrive_and_wait();
+        
+        let  lock = self.garage.global_mutex.lock().unwrap();
+        println!("total_time_sleeping={:?}", lock.total_time_sleeping);
         
         //all threads are finished with current worker function
 

@@ -119,7 +119,7 @@ where
             phantom: PhantomData,
         };
 
-        let garage = Arc::new(ThreadGarageExecutor::new(num_cpus::get(), num_cpus::get()*2));
+        let garage = Arc::new(ThreadGarageExecutor::new(num_cpus::get(), num_cpus::get()*2, num_cpus::get()));
         
         let config = BlockExecutorConfig::new_no_block_limit(num_cpus::get());
         let output = BlockExecutor::<

@@ -1119,7 +1119,7 @@ mod tests {
     #[test]
     fn scheduler_halt() {
         let s = Scheduler::new(5);   
-        let garage = ThreadGarageExecutor::new(1, 1);
+        let garage = ThreadGarageExecutor::new(10, 10, 10);
 
         garage.spawn_n(|handle| -> ReturnType {
             assert!(!handle.is_halted());
@@ -1135,7 +1135,7 @@ mod tests {
         let s = Scheduler::new(5);
 
 
-        let garage = ThreadGarageExecutor::new(1, 1);
+        let garage = ThreadGarageExecutor::new(10, 10, 10);
         let generate_baton = || -> Baton<DependencyStatus>  { Baton::new(0, DependencyStatus::Unresolved) };
 
         garage.spawn_n(|handle| -> ReturnType {

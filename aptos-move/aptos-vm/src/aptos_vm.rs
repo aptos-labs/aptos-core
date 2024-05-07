@@ -131,7 +131,7 @@ static TIMED_FEATURE_OVERRIDE: OnceCell<TimedFeatureOverride> = OnceCell::new();
 
 pub static THREAD_GARAGE_EXECUTOR: Lazy<Arc<ThreadGarageExecutor>> = Lazy::new(|| {
     Arc::new(
-        ThreadGarageExecutor::new(num_cpus::get(), num_cpus::get())
+        ThreadGarageExecutor::new(10, 15, 0)
     )
 });
 

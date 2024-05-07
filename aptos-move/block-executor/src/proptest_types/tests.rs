@@ -64,7 +64,7 @@ fn run_transactions<K, V, E>(
         phantom: PhantomData,
     };
 
-    let garage = Arc::new(ThreadGarageExecutor::new(num_cpus::get(), 2*num_cpus::get()));
+    let garage = Arc::new(ThreadGarageExecutor::new(num_cpus::get(), 2*num_cpus::get(), num_cpus::get()));
 
 
     for _ in 0..num_repeat {
@@ -195,7 +195,7 @@ fn deltas_writes_mixed_with_block_gas_limit(num_txns: usize, maybe_block_gas_lim
         phantom: PhantomData,
     };
 
-    let garage = Arc::new(ThreadGarageExecutor::new(num_cpus::get(), 2*num_cpus::get()));
+    let garage = Arc::new(ThreadGarageExecutor::new(num_cpus::get(), 2*num_cpus::get(), num_cpus::get()));
 
 
     for _ in 0..20 {
@@ -242,7 +242,7 @@ fn deltas_resolver_with_block_gas_limit(num_txns: usize, maybe_block_gas_limit: 
         .map(|txn_gen| txn_gen.materialize_with_deltas(&universe, 15, false))
         .collect();
 
-    let garage = Arc::new(ThreadGarageExecutor::new(num_cpus::get(), 2*num_cpus::get()));
+    let garage = Arc::new(ThreadGarageExecutor::new(num_cpus::get(), 2*num_cpus::get(), num_cpus::get()));
     
 
     for _ in 0..20 {
@@ -394,7 +394,7 @@ fn publishing_fixed_params_with_block_gas_limit(
         phantom: PhantomData,
     };
 
-    let garage = Arc::new(ThreadGarageExecutor::new(num_cpus::get(), 2*num_cpus::get()));
+    let garage = Arc::new(ThreadGarageExecutor::new(num_cpus::get(), 2*num_cpus::get(), num_cpus::get()));
 
     // Confirm still no intersection
     let output = BlockExecutor::<
@@ -505,7 +505,7 @@ fn non_empty_group(
             .collect(),
     };
 
-    let garage = Arc::new(ThreadGarageExecutor::new(num_cpus::get(), 2*num_cpus::get()));
+    let garage = Arc::new(ThreadGarageExecutor::new(num_cpus::get(), 2*num_cpus::get(), num_cpus::get()));
 
     for _ in 0..num_repeat_parallel {
         let output = BlockExecutor::<
