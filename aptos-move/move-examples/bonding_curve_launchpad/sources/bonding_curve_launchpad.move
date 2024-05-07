@@ -1,6 +1,7 @@
 module resource_account::bonding_curve_launchpad {
     use std::string;
     use std::option;
+    use std::vector;
     use aptos_framework::object::{Self};
     use aptos_framework::fungible_asset::{Self, FungibleAsset, Metadata};
     use aptos_framework::primary_fungible_store;
@@ -86,7 +87,6 @@ module resource_account::bonding_curve_launchpad {
     }
     struct FAData has key, store {
         controller: FAController,
-        fa_obj_address: address, // Since we generate using sticky invocation, we can't reference using a symbol. Instead, just keep a mapping to the final address.
     }
     struct FAController has key, store {
         mint_ref: fungible_asset::MintRef,
@@ -118,8 +118,22 @@ module resource_account::bonding_curve_launchpad {
         move_to(account, liquidity_pair_table);
     }
 
+    //---------------------------Dispatchable Standard---------------------------
+    fun withdraw<T: key>(
+        store: Object<T>,
+        amount: u64,
+        transfer_ref: &fungible_asset::TransferRef
+    ): FungibleAsset acquires LiquidityPairSmartTable {
+        let metadata = fungible_asset::transfer_ref_metadata(transfer_ref);
+        let liquidity_pair_smartTable = borrow_global<LiquidityPairSmartTable>(@resource_account);
+        assert!(smart_table::contains(& liquidity_pair_smartTable.liquidity_pairs, metadata), ELIQUIDITY_PAIR_DOES_NOT_EXIST);
+        let liquidity_pair = smart_table::borrow(& liquidity_pair_smartTable.liquidity_pairs, metadata);
+        assert!(!liquidity_pair.is_frozen, EFA_FROZEN); // If the pair is enabled, then FA is frozen. Vice versa applies.
+        fungible_asset::withdraw_with_ref(transfer_ref, store, amount)
+    }
 
     //---------------------------Bonding Curve Launchpad (BCL)---------------------------
+    // * Creates new FA and store FA owner obj on launchpad.
     public entry fun create_fa_pair(
         account: &signer,
         apt_initialPurchaseAmountIn: u64,
@@ -131,7 +145,6 @@ module resource_account::bonding_curve_launchpad {
         project_uri: string::String
     ) acquires LaunchPad, LiquidityPairSmartTable {
         let fa_key = FAKey { name, symbol };
-        // * Create new FA and store FA owner obj on launchpad.
         let fa_address = create_fa(fa_key, name, symbol, max_supply, decimals, icon_uri, project_uri);
         let fa_metadata_obj = object::address_to_object(fa_address);
         register_liquidity_pair(account, fa_metadata_obj, fa_key, apt_initialPurchaseAmountIn, max_supply);
@@ -142,23 +155,19 @@ module resource_account::bonding_curve_launchpad {
         let fa_key = FAKey { name, symbol };
         let fa_smartTable = borrow_global_mut<LaunchPad>(@resource_account);
         assert!(smart_table::contains(&mut fa_smartTable.key_to_fa_data, fa_key), EFA_DOES_NOT_EXIST);
-        let fa_data = smart_table::borrow_mut(&mut fa_smartTable.key_to_fa_data, fa_key);
-        let fa_metadata_obj:Object<Metadata> = object::address_to_object(fa_data.fa_obj_address);
+        let fa_metadata_obj:Object<Metadata> = object::address_to_object(get_fa_obj_address(name, symbol));
         internal_swap_apt_to_fa(account, fa_smartTable, fa_metadata_obj, fa_key, fa_amountIn);
     }
     public entry fun swap_fa_to_apt (account: &signer, name: string::String, symbol: string::String, apt_amountIn: u64) acquires LaunchPad, LiquidityPairSmartTable {
         assert!(apt_amountIn > 0, ELIQUIDITY_PAIR_SWAP_AMOUNTIN_INVALID);
-        let fa_key = FAKey {
-            name,
-            symbol
-        };
+        let fa_key = FAKey { name, symbol };
         let fa_smartTable = borrow_global_mut<LaunchPad>(@resource_account);
         assert!(smart_table::contains(&mut fa_smartTable.key_to_fa_data, fa_key), EFA_DOES_NOT_EXIST);
-        let fa_data = smart_table::borrow_mut(&mut fa_smartTable.key_to_fa_data, fa_key);
-        let fa_metadata_obj:Object<Metadata> = object::address_to_object(fa_data.fa_obj_address);
+        let fa_metadata_obj:Object<Metadata> = object::address_to_object(get_fa_obj_address(name, symbol));
         internal_swap_fa_to_apt(account, fa_smartTable, fa_metadata_obj, fa_key, apt_amountIn);
     }
 
+    //---------------------------Internal---------------------------z
     fun create_fa(
         fa_key: FAKey,
         name: string::String,
@@ -172,8 +181,10 @@ module resource_account::bonding_curve_launchpad {
         assert!(!smart_table::contains(&mut fa_smartTable.key_to_fa_data, fa_key), EFA_EXISTS_ALREADY);
 
         let base_unit_max_supply: option::Option<u128> = option::some(max_supply * math128::pow(10, (decimals as u128)));
-        let fa_obj_constructor_ref = &object::create_sticky_object(@resource_account); // FA object container. Need to store FA, somewhere, so object is it's home. FA obj is essentially the FA.
-        // Creates FA, the primary store for the FA on the resource account defined by constructor, AND defines the max supply.
+        let fa_key_seed: vector<u8> = *string::bytes(&name);
+        vector::append(&mut fa_key_seed, b"-");
+        vector::append(&mut fa_key_seed, *string::bytes(&symbol));
+        let fa_obj_constructor_ref = &object::create_named_object(&resource_signer_holder::get_signer(), fa_key_seed);
         primary_fungible_store::create_primary_store_enabled_fungible_asset(
             fa_obj_constructor_ref,
             base_unit_max_supply,
@@ -183,29 +194,24 @@ module resource_account::bonding_curve_launchpad {
             icon_uri,
             project_uri
         );
-        // Ref's held by the contract.
         let mint_ref = fungible_asset::generate_mint_ref(fa_obj_constructor_ref);
         let burn_ref = fungible_asset::generate_burn_ref(fa_obj_constructor_ref);
         let transfer_ref = fungible_asset::generate_transfer_ref(fa_obj_constructor_ref);
 
         let withdraw_limitations = function_info::new_function_info(
             &resource_signer_holder::get_signer(),
-            string::utf8(b"controlled_token"),
+            string::utf8(b"globally_frozen_token"),
             string::utf8(b"withdraw")
         );
 
-        let fa_obj_signer = object::generate_signer(fa_obj_constructor_ref);
-        let fa_obj_address = signer::address_of(&fa_obj_signer);
         primary_fungible_store::mint(&mint_ref, @resource_account, INITIAL_NEW_FA_RESERVE_u64);
-
         let fa_controller = FAController {
             mint_ref,
             burn_ref,
             transfer_ref,
         };
         let fa_data = FAData {
-            controller: fa_controller,
-            fa_obj_address
+            controller: fa_controller
         };
         smart_table::add(
             &mut fa_smartTable.key_to_fa_data,
@@ -222,22 +228,11 @@ module resource_account::bonding_curve_launchpad {
             project_uri: project_uri
         });
 
-        return fa_obj_address
+        return get_fa_obj_address(name, symbol)
     }
 
 
-    public fun withdraw<T: key>(
-        store: Object<T>,
-        amount: u64,
-        transfer_ref: &fungible_asset::TransferRef
-    ): FungibleAsset acquires LiquidityPairSmartTable {
-        let metadata = fungible_asset::transfer_ref_metadata(transfer_ref);
-        let liquidity_pair_smartTable = borrow_global_mut<LiquidityPairSmartTable>(@resource_account);
-        assert!(smart_table::contains(&mut liquidity_pair_smartTable.liquidity_pairs, metadata), ELIQUIDITY_PAIR_DOES_NOT_EXIST);
-        let liquidity_pair = smart_table::borrow_mut(&mut liquidity_pair_smartTable.liquidity_pairs, metadata);
-        assert!(!liquidity_pair.is_frozen, EFA_FROZEN); // If the pair is enabled, then FA is frozen. Vice versa applies.
-        fungible_asset::withdraw_with_ref(transfer_ref, store, amount)
-    }
+
 
 
     //---------------------------Liquidity Pair---------------------------
@@ -263,7 +258,7 @@ module resource_account::bonding_curve_launchpad {
         );
 
         event::emit(LiquidityPairCreated {
-            fa_obj_address: fa_data.fa_obj_address,
+            fa_obj_address: get_fa_obj_address(fa_key.name, fa_key.symbol),
             fa_obj: fa_metadata,
             initial_fa_reserves: fa_initialLiquidity,
             initial_apt_reserves: INITIAL_VIRTUAL_APT_LIQUIDITY,
@@ -365,13 +360,14 @@ module resource_account::bonding_curve_launchpad {
             liquidity_pair.is_frozen = false;
 
             event::emit(LiquidityPairGraduated {
-                fa_obj_address: fa_data.fa_obj_address,
+                fa_obj_address: get_fa_obj_address(fa_key.name, fa_key.symbol),
                 fa_obj: fa_metadata,
                 dex_address: @swap
             });
         }
     }
 
+    //---------------------------Views---------------------------
     #[view]
     public fun get_amount_out(fa_reserves: u128, apt_reserves: u128, supplied_fa_else_apt: bool, amountIn: u64): (u64, u64, u128, u128) {
         if (supplied_fa_else_apt) {
@@ -395,16 +391,25 @@ module resource_account::bonding_curve_launchpad {
         let fa_key = FAKey { name, symbol };
         let fa_smartTable = borrow_global<LaunchPad>(@resource_account);
         let fa_data = smart_table::borrow(&fa_smartTable.key_to_fa_data, fa_key);
-        let fa_metadata_obj:Object<Metadata> = object::address_to_object(fa_data.fa_obj_address);
+        let fa_metadata_obj:Object<Metadata> = object::address_to_object(get_fa_obj_address(name, symbol));
 
         primary_fungible_store::balance(user, fa_metadata_obj)
+    }
+    #[view]
+    public fun get_fa_obj_address(name: String, symbol: String): address {
+        let fa_key_seed: vector<u8> = *string::bytes(&name);
+        vector::append(&mut fa_key_seed, b"-");
+        vector::append(&mut fa_key_seed, *string::bytes(&symbol));
+        let fa_obj_address = object::create_object_address(&@resource_account, fa_key_seed);
+
+        fa_obj_address
     }
     #[view]
     public fun get_metadata(name: String, symbol: String): Object<Metadata> acquires LaunchPad{
         let fa_key = FAKey { name, symbol };
         let fa_smartTable = borrow_global<LaunchPad>(@resource_account);
         let fa_data = smart_table::borrow(&fa_smartTable.key_to_fa_data, fa_key);
-        let fa_metadata_obj:Object<Metadata> = object::address_to_object(fa_data.fa_obj_address);
+        let fa_metadata_obj:Object<Metadata> = object::address_to_object(get_fa_obj_address(name, symbol));
 
         fa_metadata_obj
     }
