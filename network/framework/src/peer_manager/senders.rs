@@ -2,21 +2,15 @@
 // Parts of the project are originally copyright © Meta Platforms, Inc.
 // SPDX-License-Identifier: Apache-2.0
 
-use crate::{
-    peer_manager::{types::PeerManagerRequest, ConnectionRequest, PeerManagerError},
-    protocols::{
-        direct_send::Message,
-        rpc::{error::RpcError, OutboundRpcRequest},
-    },
-    ProtocolId,
-};
+use crate::{maul, peer_manager::{ConnectionRequest, PeerManagerError, types::PeerManagerRequest}, ProtocolId, protocols::{
+    direct_send::Message,
+    rpc::{error::RpcError, OutboundRpcRequest},
+}};
 use aptos_channels::{self, aptos_channel};
 use aptos_types::{network_address::NetworkAddress, PeerId};
 use bytes::Bytes;
 use futures::channel::oneshot;
 use std::time::Duration;
-use fail::fail_point;
-use rand::{Rng, thread_rng};
 
 /// Convenience wrapper which makes it easy to issue communication requests and await the responses
 /// from PeerManager.
@@ -80,7 +74,7 @@ impl PeerManagerRequestSender {
             // this send fails.
             self.inner.push(
                 (recipient, protocol_id),
-                PeerManagerRequest::SendDirectSend(recipient, Message { protocol_id, mdata: maul(mdata.clone()) }),
+                PeerManagerRequest::SendDirectSend(recipient, Message { protocol_id, mdata: Bytes::from(maul(mdata.to_vec())) }),
             )?;
         }
         Ok(())
@@ -97,7 +91,7 @@ impl PeerManagerRequestSender {
         let (res_tx, res_rx) = oneshot::channel();
         let request = OutboundRpcRequest {
             protocol_id,
-            data: maul(req),
+            data: Bytes::from(maul(req.to_vec())),
             res_tx,
             timeout,
         };
@@ -132,20 +126,4 @@ impl ConnectionRequestSender {
             .push(peer, ConnectionRequest::DisconnectPeer(peer, oneshot_tx))?;
         oneshot_rx.await?
     }
-}
-
-fn maul(bytes: Bytes) -> Bytes {
-    let sample = thread_rng().gen_range(0.0, 1.0);
-    if sample < 0.33 {
-        fail_point!("network::maul_outgoing_msgs", |_| {
-            let mut bytes  = bytes.to_vec();
-            let n = bytes.len();
-            let idx: usize = thread_rng().gen_range(0, n);
-            bytes[idx] = thread_rng().gen::<u8>();
-            println!("0420b - mauled, sample = {}", sample);
-            Bytes::from(bytes)
-        });
-    }
-
-    bytes
 }
