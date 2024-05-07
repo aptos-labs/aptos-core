@@ -373,6 +373,7 @@ impl EmptyBlockRemover {
             )
     }
 
+    /// Removes the block `block_to_remove` and redirects all jumps to it to `redirect_to`
     fn remove_empty_block(&mut self, block_to_remove: BlockId, redirect_to: BlockId) {
         debug_assert!(block_to_remove != redirect_to);
         debug_assert!(!self
