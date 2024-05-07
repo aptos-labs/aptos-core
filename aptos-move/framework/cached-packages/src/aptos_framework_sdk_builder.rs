@@ -147,6 +147,11 @@ pub enum EntryFunctionCall {
         cap_update_table: Vec<u8>,
     },
 
+    AptPrimaryFungibleStoreTransfer {
+        recipient: AccountAddress,
+        amount: u64,
+    },
+
     /// Batch version of APT transfer.
     AptosAccountBatchTransfer {
         recipients: Vec<AccountAddress>,
@@ -160,6 +165,7 @@ pub enum EntryFunctionCall {
         amounts: Vec<u64>,
     },
 
+    /// Basic account creation methods.
     AptosAccountCreateAccount {
         auth_key: AccountAddress,
     },
@@ -262,11 +268,6 @@ pub enum EntryFunctionCall {
         stake_pool: AccountAddress,
         proposal_id: u64,
         should_pass: bool,
-    },
-
-    AptosPrimaryFungibleStoreTransfer {
-        recipient: AccountAddress,
-        amount: u64,
     },
 
     /// Same as `publish_package` but as an entry function which can be called as a transaction. Because
@@ -1076,6 +1077,9 @@ impl EntryFunctionCall {
                 new_public_key_bytes,
                 cap_update_table,
             ),
+            AptPrimaryFungibleStoreTransfer { recipient, amount } => {
+                apt_primary_fungible_store_transfer(recipient, amount)
+            },
             AptosAccountBatchTransfer {
                 recipients,
                 amounts,
@@ -1139,9 +1143,6 @@ impl EntryFunctionCall {
                 proposal_id,
                 should_pass,
             } => aptos_governance_vote(stake_pool, proposal_id, should_pass),
-            AptosPrimaryFungibleStoreTransfer { recipient, amount } => {
-                aptos_primary_fungible_store_transfer(recipient, amount)
-            },
             CodePublishPackageTxn {
                 metadata_serialized,
                 code,
@@ -1872,6 +1873,27 @@ pub fn account_rotate_authentication_key_with_rotation_capability(
     ))
 }
 
+pub fn apt_primary_fungible_store_transfer(
+    recipient: AccountAddress,
+    amount: u64,
+) -> TransactionPayload {
+    TransactionPayload::EntryFunction(EntryFunction::new(
+        ModuleId::new(
+            AccountAddress::new([
+                0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+                0, 0, 0, 1,
+            ]),
+            ident_str!("apt_primary_fungible_store").to_owned(),
+        ),
+        ident_str!("transfer").to_owned(),
+        vec![],
+        vec![
+            bcs::to_bytes(&recipient).unwrap(),
+            bcs::to_bytes(&amount).unwrap(),
+        ],
+    ))
+}
+
 /// Batch version of APT transfer.
 pub fn aptos_account_batch_transfer(
     recipients: Vec<AccountAddress>,
@@ -1917,6 +1939,7 @@ pub fn aptos_account_batch_transfer_coins(
     ))
 }
 
+/// Basic account creation methods.
 pub fn aptos_account_create_account(auth_key: AccountAddress) -> TransactionPayload {
     TransactionPayload::EntryFunction(EntryFunction::new(
         ModuleId::new(
@@ -2221,27 +2244,6 @@ pub fn aptos_governance_vote(
             bcs::to_bytes(&stake_pool).unwrap(),
             bcs::to_bytes(&proposal_id).unwrap(),
             bcs::to_bytes(&should_pass).unwrap(),
-        ],
-    ))
-}
-
-pub fn aptos_primary_fungible_store_transfer(
-    recipient: AccountAddress,
-    amount: u64,
-) -> TransactionPayload {
-    TransactionPayload::EntryFunction(EntryFunction::new(
-        ModuleId::new(
-            AccountAddress::new([
-                0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
-                0, 0, 0, 1,
-            ]),
-            ident_str!("aptos_primary_fungible_store").to_owned(),
-        ),
-        ident_str!("transfer").to_owned(),
-        vec![],
-        vec![
-            bcs::to_bytes(&recipient).unwrap(),
-            bcs::to_bytes(&amount).unwrap(),
         ],
     ))
 }
@@ -4693,6 +4695,19 @@ mod decoder {
         }
     }
 
+    pub fn apt_primary_fungible_store_transfer(
+        payload: &TransactionPayload,
+    ) -> Option<EntryFunctionCall> {
+        if let TransactionPayload::EntryFunction(script) = payload {
+            Some(EntryFunctionCall::AptPrimaryFungibleStoreTransfer {
+                recipient: bcs::from_bytes(script.args().get(0)?).ok()?,
+                amount: bcs::from_bytes(script.args().get(1)?).ok()?,
+            })
+        } else {
+            None
+        }
+    }
+
     pub fn aptos_account_batch_transfer(payload: &TransactionPayload) -> Option<EntryFunctionCall> {
         if let TransactionPayload::EntryFunction(script) = payload {
             Some(EntryFunctionCall::AptosAccountBatchTransfer {
@@ -4890,19 +4905,6 @@ mod decoder {
                 stake_pool: bcs::from_bytes(script.args().get(0)?).ok()?,
                 proposal_id: bcs::from_bytes(script.args().get(1)?).ok()?,
                 should_pass: bcs::from_bytes(script.args().get(2)?).ok()?,
-            })
-        } else {
-            None
-        }
-    }
-
-    pub fn aptos_primary_fungible_store_transfer(
-        payload: &TransactionPayload,
-    ) -> Option<EntryFunctionCall> {
-        if let TransactionPayload::EntryFunction(script) = payload {
-            Some(EntryFunctionCall::AptosPrimaryFungibleStoreTransfer {
-                recipient: bcs::from_bytes(script.args().get(0)?).ok()?,
-                amount: bcs::from_bytes(script.args().get(1)?).ok()?,
             })
         } else {
             None
@@ -6334,6 +6336,10 @@ static SCRIPT_FUNCTION_DECODER_MAP: once_cell::sync::Lazy<EntryFunctionDecoderMa
             Box::new(decoder::account_rotate_authentication_key_with_rotation_capability),
         );
         map.insert(
+            "apt_primary_fungible_store_transfer".to_string(),
+            Box::new(decoder::apt_primary_fungible_store_transfer),
+        );
+        map.insert(
             "aptos_account_batch_transfer".to_string(),
             Box::new(decoder::aptos_account_batch_transfer),
         );
@@ -6400,10 +6406,6 @@ static SCRIPT_FUNCTION_DECODER_MAP: once_cell::sync::Lazy<EntryFunctionDecoderMa
         map.insert(
             "aptos_governance_vote".to_string(),
             Box::new(decoder::aptos_governance_vote),
-        );
-        map.insert(
-            "aptos_primary_fungible_store_transfer".to_string(),
-            Box::new(decoder::aptos_primary_fungible_store_transfer),
         );
         map.insert(
             "code_publish_package_txn".to_string(),

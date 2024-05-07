@@ -1,11 +1,12 @@
 
-module aptos_framework::aptos_primary_fungible_store {
+module aptos_framework::apt_primary_fungible_store {
     use aptos_framework::fungible_asset::{Self, Metadata, BurnRef};
     use aptos_framework::primary_fungible_store;
     use aptos_framework::object;
 
     use std::signer;
 
+    friend aptos_framework::aptos_account;
     friend aptos_framework::transaction_fee;
     friend aptos_framework::transaction_validation;
 
@@ -30,7 +31,7 @@ module aptos_framework::aptos_primary_fungible_store {
         };
     }
 
-    inline fun ensure_primary_store_exists(owner: address): address {
+    public(friend) inline fun ensure_primary_store_exists(owner: address): address {
         let store_addr = store_address(owner);
         if (fungible_asset::store_exists(store_addr)) {
             store_addr
