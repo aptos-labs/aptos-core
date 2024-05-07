@@ -180,7 +180,7 @@
     "state_change_hash": "",
     "event_root_hash": "",
     "state_checkpoint_hash": null,
-    "gas_used": "5",
+    "gas_used": "6",
     "success": true,
     "vm_status": "Executed successfully",
     "accumulator_root_hash": "",
@@ -343,10 +343,10 @@
         "type": "0x1::transaction_fee::FeeStatement",
         "data": {
           "execution_gas_units": "4",
-          "io_gas_units": "2",
+          "io_gas_units": "3",
           "storage_fee_octas": "0",
           "storage_fee_refund_octas": "0",
-          "total_charge_gas_units": "5"
+          "total_charge_gas_units": "6"
         }
       }
     ],
@@ -534,7 +534,7 @@
     "state_change_hash": "",
     "event_root_hash": "",
     "state_checkpoint_hash": null,
-    "gas_used": "5",
+    "gas_used": "6",
     "success": true,
     "vm_status": "Executed successfully",
     "accumulator_root_hash": "",
@@ -697,10 +697,10 @@
         "type": "0x1::transaction_fee::FeeStatement",
         "data": {
           "execution_gas_units": "4",
-          "io_gas_units": "2",
+          "io_gas_units": "3",
           "storage_fee_octas": "0",
           "storage_fee_refund_octas": "0",
-          "total_charge_gas_units": "5"
+          "total_charge_gas_units": "6"
         }
       }
     ],
@@ -888,7 +888,7 @@
     "state_change_hash": "",
     "event_root_hash": "",
     "state_checkpoint_hash": null,
-    "gas_used": "5",
+    "gas_used": "6",
     "success": true,
     "vm_status": "Executed successfully",
     "accumulator_root_hash": "",
@@ -1051,10 +1051,10 @@
         "type": "0x1::transaction_fee::FeeStatement",
         "data": {
           "execution_gas_units": "4",
-          "io_gas_units": "2",
+          "io_gas_units": "3",
           "storage_fee_octas": "0",
           "storage_fee_refund_octas": "0",
-          "total_charge_gas_units": "5"
+          "total_charge_gas_units": "6"
         }
       }
     ],
@@ -1242,7 +1242,7 @@
     "state_change_hash": "",
     "event_root_hash": "",
     "state_checkpoint_hash": null,
-    "gas_used": "5",
+    "gas_used": "6",
     "success": true,
     "vm_status": "Executed successfully",
     "accumulator_root_hash": "",
@@ -1405,10 +1405,10 @@
         "type": "0x1::transaction_fee::FeeStatement",
         "data": {
           "execution_gas_units": "4",
-          "io_gas_units": "2",
+          "io_gas_units": "3",
           "storage_fee_octas": "0",
           "storage_fee_refund_octas": "0",
-          "total_charge_gas_units": "5"
+          "total_charge_gas_units": "6"
         }
       }
     ],
@@ -1596,7 +1596,7 @@
     "state_change_hash": "",
     "event_root_hash": "",
     "state_checkpoint_hash": null,
-    "gas_used": "5",
+    "gas_used": "6",
     "success": true,
     "vm_status": "Executed successfully",
     "accumulator_root_hash": "",
@@ -1759,10 +1759,10 @@
         "type": "0x1::transaction_fee::FeeStatement",
         "data": {
           "execution_gas_units": "4",
-          "io_gas_units": "2",
+          "io_gas_units": "3",
           "storage_fee_octas": "0",
           "storage_fee_refund_octas": "0",
-          "total_charge_gas_units": "5"
+          "total_charge_gas_units": "6"
         }
       }
     ],
@@ -1950,7 +1950,7 @@
     "state_change_hash": "",
     "event_root_hash": "",
     "state_checkpoint_hash": null,
-    "gas_used": "5",
+    "gas_used": "6",
     "success": true,
     "vm_status": "Executed successfully",
     "accumulator_root_hash": "",
@@ -2113,10 +2113,10 @@
         "type": "0x1::transaction_fee::FeeStatement",
         "data": {
           "execution_gas_units": "4",
-          "io_gas_units": "2",
+          "io_gas_units": "3",
           "storage_fee_octas": "0",
           "storage_fee_refund_octas": "0",
-          "total_charge_gas_units": "5"
+          "total_charge_gas_units": "6"
         }
       }
     ],
@@ -2304,7 +2304,7 @@
     "state_change_hash": "",
     "event_root_hash": "",
     "state_checkpoint_hash": null,
-    "gas_used": "5",
+    "gas_used": "6",
     "success": true,
     "vm_status": "Executed successfully",
     "accumulator_root_hash": "",
@@ -2467,10 +2467,10 @@
         "type": "0x1::transaction_fee::FeeStatement",
         "data": {
           "execution_gas_units": "4",
-          "io_gas_units": "2",
+          "io_gas_units": "3",
           "storage_fee_octas": "0",
           "storage_fee_refund_octas": "0",
-          "total_charge_gas_units": "5"
+          "total_charge_gas_units": "6"
         }
       }
     ],
@@ -2658,7 +2658,7 @@
     "state_change_hash": "",
     "event_root_hash": "",
     "state_checkpoint_hash": null,
-    "gas_used": "5",
+    "gas_used": "6",
     "success": true,
     "vm_status": "Executed successfully",
     "accumulator_root_hash": "",
@@ -2821,10 +2821,10 @@
         "type": "0x1::transaction_fee::FeeStatement",
         "data": {
           "execution_gas_units": "4",
-          "io_gas_units": "2",
+          "io_gas_units": "3",
           "storage_fee_octas": "0",
           "storage_fee_refund_octas": "0",
-          "total_charge_gas_units": "5"
+          "total_charge_gas_units": "6"
         }
       }
     ],
