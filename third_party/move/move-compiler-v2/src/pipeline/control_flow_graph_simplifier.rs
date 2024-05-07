@@ -309,27 +309,37 @@ impl ControlFlowGraphCodeGenerator {
     }
 
     /// Removes a block from the control flow graph
-    /// `pred_action`: action to take on each  predecessor of the block
-    /// `succ_action`: action to take on each  successor of the block
+    /// `pred_action`: action to take on each predecessor of the block
+    /// `succ_action`: action to take on each successor of the block
     fn remove_block<F, G>(&mut self, block_to_remove: BlockId, pred_action: F, succ_action: G)
     where
-        F: FnOnce(&mut Self, BlockId, &[BlockId]) + Copy,
-        G: FnOnce(&mut Self, BlockId, &[BlockId]) + Copy,
+        F: FnOnce(&mut Self, BlockId) + Copy,
+        G: FnOnce(&mut Self, BlockId) + Copy,
     {
         let preds = self
             .predecessors
+            .get(&block_to_remove)
+            .expect("predecessors")
+            .clone();
+        let succs = self
+            .successors
+            .get(&block_to_remove)
+            .expect("successors")
+            .clone();
+        for pred in preds {
+            pred_action(self, pred);
+        }
+        for suc in succs {
+            succ_action(self, suc);
+        }
+        self
+            .predecessors
             .remove(&block_to_remove)
             .expect("predecessors");
-        let succs = self
+        self
             .successors
             .remove(&block_to_remove)
             .expect("successors");
-        for &pred in &preds {
-            pred_action(self, pred, &succs);
-        }
-        for &suc in &succs {
-            succ_action(self, suc, &preds);
-        }
         self.code_blocks.remove(&block_to_remove);
     }
 }
@@ -377,7 +387,7 @@ impl EmptyBlockRemover {
         let to = self.0.get_block_label(redirect_to).expect("label");
         self.0.remove_block(
             block_to_remove,
-            |this, pred, _succs| {
+            |this, pred| {
                 // for all predecessors of `block_to_remove`, let them jump to `redirect_to` instead
                 if pred != this.entry_block {
                     let pred_codes = this.code_blocks.get_mut(&pred).expect("code block");
@@ -396,7 +406,7 @@ impl EmptyBlockRemover {
                     .expect("predecessors")
                     .push(pred);
             },
-            |this, succ, _preds| {
+            |this, succ| {
                 debug_assert!(succ == redirect_to);
                 this.predecessors
                     .get_mut(&succ)
@@ -502,13 +512,14 @@ impl RedundantJumpRemover {
 
         self.0.remove_block(
             to,
-            |this, pred, succs| {
+            |this, pred| {
                 debug_assert!(pred == from);
+                let succs = this.successors.get(&to).expect("successors").clone();
                 let succs_mut = this.successors.get_mut(&pred).expect("successors");
                 succs_mut.clear();
                 succs_mut.extend(succs);
             },
-            |this, suc, _preds| {
+            |this, suc| {
                 for pred in this.predecessors.get_mut(&suc).expect("predecessors") {
                     if *pred == to {
                         *pred = from;
