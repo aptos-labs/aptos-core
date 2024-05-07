@@ -191,6 +191,7 @@ impl ControlFlowGraphCodeGenerator {
     }
 
     /// Iterate over the blocks in DFS order
+    /// `visit_all`: determines whether to visit unreachable blocks
     pub fn iter_dfs_left(&self, visit_all: bool) -> impl Iterator<Item = BlockId> + '_ {
         DFSLeft::new(&self.successors, self.entry_block, visit_all)
     }
