@@ -15,9 +15,10 @@ module resource_account::bonding_curve_launchpad {
     use aptos_std::object::{Object};
     use aptos_framework::dispatchable_fungible_asset;
     use aptos_framework::function_info;
-    use std::debug; //! Debug
     // FA-supported DEX
     use swap::router;
+    use swap::liquidity_pool;
+    use swap::coin_wrapper;
     // Friend
     use resource_account::resource_signer_holder;
 
@@ -72,7 +73,7 @@ module resource_account::bonding_curve_launchpad {
     struct LiquidityPairGraduated has store, drop {
         fa_obj_address: address,
         fa_obj: Object<Metadata>,
-        //! New DEX info...
+        dex_address: address
     }
 
     //---------------------------Structs---------------------------
@@ -352,24 +353,21 @@ module resource_account::bonding_curve_launchpad {
         });
 
         if(apt_updated_reserves > APT_LIQUIDITY_THRESHOLD){
-            //! Offload onto permissionless DEX.
-            //! ...Move all APT and FA reserves to the DEX.
+            // Offload onto permissionless DEX.
             router::create_pool_coin<AptosCoin>(fa_metadata, false);
-
-
-            //! Burn any LP tokens received by the DEX.
-            //! ...
-
+            router::add_liquidity_coin_entry<AptosCoin>(&resource_signer_holder::get_signer(), fa_metadata, false, ((apt_updated_reserves >> 1) as u64), ((fa_updated_reserves >> 1) as u64), 0, 0);
+            // Send liquidity tokens to dead address
+            let apt_coin_wrapped = coin_wrapper::get_wrapper<AptosCoin>();
+            let liquidity_obj = liquidity_pool::liquidity_pool(apt_coin_wrapped, fa_metadata, false);
+            liquidity_pool::transfer(&resource_signer_holder::get_signer(), liquidity_obj, @0xdead, primary_fungible_store::balance(@resource_account, liquidity_obj));
+            // Disable BCL pair.
             liquidity_pair.is_enabled = false;
             liquidity_pair.is_frozen = false;
-
-            //? Destroy refs???
-            //? ...
 
             event::emit(LiquidityPairGraduated {
                 fa_obj_address: fa_data.fa_obj_address,
                 fa_obj: fa_metadata,
-                //! New DEX info...
+                dex_address: @swap
             });
         }
     }
@@ -377,12 +375,16 @@ module resource_account::bonding_curve_launchpad {
     #[view]
     public fun get_amount_out(fa_reserves: u128, apt_reserves: u128, supplied_fa_else_apt: bool, amountIn: u64): (u64, u64, u128, u128) {
         if (supplied_fa_else_apt) {
-            let apt_gained: u64 = (((apt_reserves as u256)* (amountIn as u256)) / ((fa_reserves  as u256) + (amountIn as u256)) as u64);
+            let top = (apt_reserves as u256)* (amountIn as u256);
+            let bot = (fa_reserves  as u256) + (amountIn as u256);
+            let apt_gained: u64 = ((top/bot) as u64);
             assert!(apt_gained > 0, ELIQUIDITY_PAIR_SWAP_AMOUNTOUT_INSIGNIFICANT);
             return (amountIn, apt_gained, fa_reserves+(amountIn as u128), apt_reserves-(apt_gained as u128))
         }
         else {
-            let fa_gained: u64 = (((fa_reserves as u256) * (amountIn as u256)/(apt_reserves as u256) + (amountIn as u256)) as u64);
+            let top = (fa_reserves as u256) * (amountIn as u256);
+            let bot = (apt_reserves as u256) + (amountIn as u256);
+            let fa_gained: u64 = ((top/bot) as u64);
             assert!(fa_gained > 0, ELIQUIDITY_PAIR_SWAP_AMOUNTOUT_INSIGNIFICANT);
             return (fa_gained, amountIn, fa_reserves-(fa_gained as u128), apt_reserves+(amountIn as u128))
         }
