@@ -113,18 +113,18 @@ impl ControlFlowGraphSimplifierTransformation {
         self.eliminate_branch_to_same_target();
         let cfg_code_generator =
             ControlFlowGraphCodeGenerator::new(std::mem::take(&mut self.data.code));
-        let mut elim_empty_blocks_transformer = EmptyBlockRemover::new(cfg_code_generator);
-        elim_empty_blocks_transformer.transform();
-        let mut remove_redundant_jump_transformer =
-            RedundantJumpRemover::new(elim_empty_blocks_transformer.0);
-        remove_redundant_jump_transformer.transform();
-        self.data.code = remove_redundant_jump_transformer.0.gen_code(true);
+        let mut empty_blocks_remover = EmptyBlockRemover::new(cfg_code_generator);
+        empty_blocks_remover.transform();
+        let mut redundant_jump_remover =
+            RedundantJumpRemover::new(empty_blocks_remover.0);
+        redundant_jump_remover.transform();
+        self.data.code = redundant_jump_remover.0.gen_code(true);
         // may introduce new empty blocks
-        let mut elim_empty_blocks_transformer = EmptyBlockRemover::new(
+        let mut empty_blocks_remover = EmptyBlockRemover::new(
             ControlFlowGraphCodeGenerator::new(std::mem::take(&mut self.data.code)),
         );
-        elim_empty_blocks_transformer.transform();
-        self.data.code = elim_empty_blocks_transformer.0.gen_code(true);
+        empty_blocks_remover.transform();
+        self.data.code = empty_blocks_remover.0.gen_code(true);
         self.eliminate_branch_to_same_target();
         self.data.annotations.clear()
     }
