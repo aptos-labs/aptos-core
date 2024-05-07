@@ -4,15 +4,15 @@ module stablecoin::usdk {
     use aptos_framework::dispatchable_fungible_asset;
     use aptos_framework::event;
     use aptos_framework::function_info;
-    use aptos_framework::fungible_asset::{Self, MintRef, TransferRef, BurnRef, Metadata, FungibleAsset};
+    use aptos_framework::fungible_asset::{Self, MintRef, TransferRef, BurnRef, Metadata, FungibleAsset, FungibleStore};
     use aptos_framework::object::{Self, Object, ExtendRef};
     use aptos_framework::primary_fungible_store;
     use aptos_std::smart_table::{Self, SmartTable};
     use std::option;
     use std::signer;
-    use std::string::utf8;
-    use std::string;
+    use std::string::{Self, utf8};
     use std::vector;
+    use aptos_framework::chain_id;
 
     /// Caller is not authorized to make this call
     const EUNAUTHORIZED: u64 = 1;
@@ -22,7 +22,7 @@ module stablecoin::usdk {
     const EALREADY_MINTER: u64 = 3;
     /// The account is not a minter
     const ENOT_MINTER: u64 = 4;
-    /// The account is blacklisted
+    /// The account is denylisted
     const EBLACKLISTED: u64 = 5;
 
     const ASSET_SYMBOL: vector<u8> = b"USDK";
@@ -32,7 +32,7 @@ module stablecoin::usdk {
         master_minter: address,
         minters: vector<address>,
         pauser: address,
-        blacklister: address,
+        denylister: address,
     }
 
     #[resource_group_member(group = aptos_framework::object::ObjectGroup)]
@@ -46,11 +46,13 @@ module stablecoin::usdk {
     #[resource_group_member(group = aptos_framework::object::ObjectGroup)]
     struct State has key {
         paused: bool,
-        blacklist: SmartTable<address, bool>,
+        denylist: SmartTable<address, bool>,
     }
 
     struct Approval has drop {
         owner: address,
+        nonce: u64,
+        chain_id: u8,
         spender: address,
         amount: u64,
     }
@@ -66,6 +68,7 @@ module stablecoin::usdk {
     struct Burn has drop, store {
         minter: address,
         from: address,
+        store: Object<FungibleStore>,
         amount: u64,
     }
 
@@ -76,8 +79,8 @@ module stablecoin::usdk {
     }
 
     #[event]
-    struct Blacklist has drop, store {
-        blacklister: address,
+    struct Denylist has drop, store {
+        denylister: address,
         account: address,
     }
 
@@ -110,7 +113,7 @@ module stablecoin::usdk {
             master_minter: @master_minter,
             minters: vector[@minter],
             pauser: @pauser,
-            blacklister: @blacklister,
+            denylister: @denylister,
         });
 
         // Create mint/burn/transfer refs to allow creator to manage the stablecoin.
@@ -123,7 +126,7 @@ module stablecoin::usdk {
 
         move_to(metadata_object_signer, State {
             paused: false,
-            blacklist: smart_table::new(),
+            denylist: smart_table::new(),
         });
 
         // Override the deposit and withdraw functions which mean overriding transfer.
@@ -159,11 +162,13 @@ module stablecoin::usdk {
         amount: u64,
     ) acquires Management, State {
         assert_not_paused();
-        assert_not_blacklisted(from);
-        assert_not_blacklisted(to);
+        assert_not_denylisted(from);
+        assert_not_denylisted(to);
 
         let expected_message = Approval {
             owner: from,
+            nonce: account::get_sequence_number(from),
+            chain_id: chain_id::get(),
             spender: signer::address_of(spender),
             amount,
         };
@@ -173,34 +178,34 @@ module stablecoin::usdk {
         primary_fungible_store::transfer_with_ref(transfer_ref, from, to, amount);
     }
 
-    /// Deposit function override to ensure that the account is not blacklisted and the stablecoin is not paused.
+    /// Deposit function override to ensure that the account is not denylisted and the stablecoin is not paused.
     public fun deposit<T: key>(
         store: Object<T>,
         fa: FungibleAsset,
         transfer_ref: &TransferRef,
     ) acquires State {
         assert_not_paused();
-        assert_not_blacklisted(object::owner(store));
+        assert_not_denylisted(object::owner(store));
         fungible_asset::deposit_with_ref(transfer_ref, store, fa);
     }
 
-    /// Withdraw function override to ensure that the account is not blacklisted and the stablecoin is not paused.
+    /// Withdraw function override to ensure that the account is not denylisted and the stablecoin is not paused.
     public fun withdraw<T: key>(
         store: Object<T>,
         amount: u64,
         transfer_ref: &TransferRef,
     ): FungibleAsset acquires State {
         assert_not_paused();
-        assert_not_blacklisted(object::owner(store));
+        assert_not_denylisted(object::owner(store));
         fungible_asset::withdraw_with_ref(transfer_ref, store, amount)
     }
 
     /// Mint new tokens to the specified account. This checks that the caller is a minter, the stablecoin is not paused,
-    /// and the account is not blacklisted.
+    /// and the account is not denylisted.
     public entry fun mint(minter: &signer, to: address, amount: u64) acquires Management, Roles, State {
         assert_is_minter(minter);
         assert_not_paused();
-        assert_not_blacklisted(to);
+        assert_not_denylisted(to);
 
         let management = borrow_global<Management>(usdk_address());
         let tokens = fungible_asset::mint(&management.mint_ref, amount);
@@ -215,19 +220,30 @@ module stablecoin::usdk {
 
     /// Burn tokens from the specified account. This checks that the caller is a minter and the stablecoin is not paused.
     public entry fun burn(minter: &signer, from: address, amount: u64) acquires Management, Roles, State {
+        burn_from(minter, primary_fungible_store::ensure_primary_store_exists(from, metadata()), amount);
+    }
+
+    /// Burn tokens from the specified account's store. This checks that the caller is a minter and the stablecoin is
+    /// not paused.
+    public entry fun burn_from(
+        minter: &signer,
+        store: Object<FungibleStore>,
+        amount: u64,
+    ) acquires Management, Roles, State {
         assert_is_minter(minter);
         assert_not_paused();
         let management = borrow_global<Management>(usdk_address());
         let tokens = fungible_asset::withdraw_with_ref(
             &management.transfer_ref,
-            primary_fungible_store::ensure_primary_store_exists(from, metadata()),
+            store,
             amount,
         );
         fungible_asset::burn(&management.burn_ref, tokens);
 
         event::emit(Burn {
             minter: signer::address_of(minter),
-            from,
+            from: object::owner(store),
+            store,
             amount,
         });
     }
@@ -245,36 +261,36 @@ module stablecoin::usdk {
         });
     }
 
-    /// Add an account to the blacklist. This checks that the caller is the blacklister.
-    public entry fun blacklist(blacklister: &signer, account: address) acquires Management, Roles, State {
+    /// Add an account to the denylist. This checks that the caller is the denylister.
+    public entry fun denylist(denylister: &signer, account: address) acquires Management, Roles, State {
         assert_not_paused();
         let roles = borrow_global<Roles>(usdk_address());
-        assert!(signer::address_of(blacklister) == roles.blacklister, EUNAUTHORIZED);
+        assert!(signer::address_of(denylister) == roles.denylister, EUNAUTHORIZED);
         let state = borrow_global_mut<State>(usdk_address());
-        smart_table::upsert(&mut state.blacklist, account, true);
+        smart_table::upsert(&mut state.denylist, account, true);
 
         let freeze_ref = &borrow_global<Management>(usdk_address()).transfer_ref;
         primary_fungible_store::set_frozen_flag(freeze_ref, account, true);
 
-        event::emit(Blacklist {
-            blacklister: signer::address_of(blacklister),
+        event::emit(Denylist {
+            denylister: signer::address_of(denylister),
             account,
         });
     }
 
-    /// Remove an account from the blacklist. This checks that the caller is the blacklister.
-    public entry fun unblacklist(blacklister: &signer, account: address) acquires Management, Roles, State {
+    /// Remove an account from the denylist. This checks that the caller is the denylister.
+    public entry fun undenylist(denylister: &signer, account: address) acquires Management, Roles, State {
         assert_not_paused();
         let roles = borrow_global<Roles>(usdk_address());
-        assert!(signer::address_of(blacklister) == roles.blacklister, EUNAUTHORIZED);
+        assert!(signer::address_of(denylister) == roles.denylister, EUNAUTHORIZED);
         let state = borrow_global_mut<State>(usdk_address());
-        smart_table::remove(&mut state.blacklist, account);
+        smart_table::remove(&mut state.denylist, account);
 
         let freeze_ref = &borrow_global<Management>(usdk_address()).transfer_ref;
         primary_fungible_store::set_frozen_flag(freeze_ref, account, false);
 
-        event::emit(Blacklist {
-            blacklister: signer::address_of(blacklister),
+        event::emit(Denylist {
+            denylister: signer::address_of(denylister),
             account,
         });
     }
@@ -298,9 +314,9 @@ module stablecoin::usdk {
         assert!(!state.paused, EPAUSED);
     }
 
-    fun assert_not_blacklisted(account: address) acquires State {
+    fun assert_not_denylisted(account: address) acquires State {
         let state = borrow_global<State>(usdk_address());
-        assert!(!smart_table::contains(&state.blacklist, account), EBLACKLISTED);
+        assert!(!smart_table::contains(&state.denylist, account), EBLACKLISTED);
     }
 
     #[test_only]
