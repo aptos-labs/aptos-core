@@ -124,24 +124,23 @@ pub(crate) fn validate_authenticators(
     pvk: &PreparedVerifyingKey<Bn254>,
     authenticators: &Vec<(KeylessPublicKey, KeylessSignature)>,
     features: &Features,
-    gas_feature_version: u64,
     resolver: &impl AptosMoveResolver,
 ) -> Result<(), VMStatus> {
     for (_, sig) in authenticators {
         // Feature-gating for keyless TXNs (whether ZK or ZKless, whether passkey-based or not)
         if matches!(sig.cert, EphemeralCertificate::ZeroKnowledgeSig { .. })
-            && !(features.is_zk_keyless_enabled() && gas_feature_version >= 17)
+            && !features.is_zk_keyless_enabled()
         {
             return Err(VMStatus::error(StatusCode::FEATURE_UNDER_GATING, None));
         }
 
         if matches!(sig.cert, EphemeralCertificate::OpenIdSig { .. })
-            && !(features.is_zkless_keyless_enabled() && gas_feature_version >= 17)
+            && !features.is_zkless_keyless_enabled()
         {
             return Err(VMStatus::error(StatusCode::FEATURE_UNDER_GATING, None));
         }
         if matches!(sig.ephemeral_signature, EphemeralSignature::WebAuthn { .. })
-            && !(features.is_keyless_with_passkeys_enabled() && gas_feature_version >= 17)
+            && !features.is_keyless_with_passkeys_enabled()
         {
             return Err(VMStatus::error(StatusCode::FEATURE_UNDER_GATING, None));
         }

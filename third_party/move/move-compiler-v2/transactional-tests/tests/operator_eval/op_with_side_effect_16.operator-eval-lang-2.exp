@@ -1,0 +1,16 @@
+comparison between v1 and v2 failed:
+- processed 2 tasks
++ processed 2 tasks
+= 
+- task 0 'publish'. lines 1-7:
+- warning[W09005]: dead or unreachable code
+-   ┌─ TEMPFILE:5:67
+-   │
+- 5 │         {x = x + 1; x = x + 1; x } + {x = x + 1; return x; x } + {x = x + 1; x = x + 1; x }
+-   │                                                                   ^^^^^^^^^ Unreachable code. This statement (and any following statements) will not be executed.
+- 
+- 
+- 
+= task 1 'run'. lines 9-9:
+= return values: 4
+= 

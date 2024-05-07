@@ -1,0 +1,9 @@
+processed 3 tasks
+
+task 1 'run'. lines 8-8:
+return values: true
+
+task 2 'run'. lines 10-10:
+return values: false
+
+==> Compiler v2 delivered same results!

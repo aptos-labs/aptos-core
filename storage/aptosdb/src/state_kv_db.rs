@@ -196,6 +196,14 @@ impl StateKvDb {
         NUM_STATE_SHARDS as u8
     }
 
+    pub(crate) fn hack_num_real_shards(&self) -> usize {
+        if self.enabled_sharding {
+            NUM_STATE_SHARDS
+        } else {
+            1
+        }
+    }
+
     pub(crate) fn commit_single_shard(
         &self,
         version: Version,

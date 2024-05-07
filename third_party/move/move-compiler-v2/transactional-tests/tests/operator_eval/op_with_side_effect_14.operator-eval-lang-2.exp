@@ -1,0 +1,11 @@
+comparison between v1 and v2 failed:
+= processed 3 tasks
+= 
+= task 1 'run'. lines 28-28:
+- return values: 513
++ return values: 232
+= 
+= task 2 'run'. lines 30-30:
+- return values: 513
++ return values: 232
+= 

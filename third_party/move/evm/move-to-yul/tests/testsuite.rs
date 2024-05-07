@@ -59,6 +59,7 @@ fn test_runner(path: &Path) -> datatest_stable::Result<()> {
             paths: sources,
             named_address_map: named_address_map.clone(),
         }],
+        vec![],
         vec![PackagePaths {
             name: None,
             paths: deps,
