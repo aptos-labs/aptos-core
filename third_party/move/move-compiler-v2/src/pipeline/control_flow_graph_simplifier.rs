@@ -189,6 +189,7 @@ impl ControlFlowGraphCodeGenerator {
         }
     }
 
+    /// Returns all the blocks in the control flow graph
     pub fn blocks(&self) -> Vec<BlockId> {
         self.successors.keys().cloned().collect()
     }
@@ -307,6 +308,9 @@ impl ControlFlowGraphCodeGenerator {
         block == self.entry_block || block == self.exit_block
     }
 
+    /// Removes a block from the control flow graph
+    /// `pred_action`: action to take on each  predecessor of the block
+    /// `succ_action`: action to take on each  successor of the block
     fn remove_block<F, G>(&mut self, block_to_remove: BlockId, pred_action: F, succ_action: G)
     where
         F: FnOnce(&mut Self, BlockId, &[BlockId]) + Copy,
@@ -321,11 +325,9 @@ impl ControlFlowGraphCodeGenerator {
             .remove(&block_to_remove)
             .expect("successors");
         for &pred in &preds {
-            // self.successors.get_mut(&pred).expect("successors").retain(|&s| s != block_to_remove);
             pred_action(self, pred, &succs);
         }
         for &suc in &succs {
-            // self.predecessors.get_mut(&suc).expect("predecessors").retain(|&p| p != block_to_remove);
             succ_action(self, suc, &preds);
         }
         self.code_blocks.remove(&block_to_remove);
