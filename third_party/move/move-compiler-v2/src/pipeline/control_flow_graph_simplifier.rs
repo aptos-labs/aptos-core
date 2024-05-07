@@ -152,7 +152,6 @@ struct ControlFlowGraphCodeGenerator {
     /// Maps a basic block to its successors.
     successors: BTreeMap<BlockId, Vec<BlockId>>,
     /// Maps a basic block to its predecessors.
-    /// If `block_id` not in `pred_map`, the block either doesn't exist or doesn't have predecessors
     predecessors: BTreeMap<BlockId, Vec<BlockId>>,
 }
 
