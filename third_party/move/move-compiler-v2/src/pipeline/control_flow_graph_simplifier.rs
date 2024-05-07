@@ -150,7 +150,7 @@ struct ControlFlowGraphCodeGenerator {
     entry_block: BlockId,
     exit_block: BlockId,
     /// The code of each basic block under transformation.
-    /// Entry/exit block is mapped to a empty vector.
+    /// Entry/exit block is mapped to an empty vector.
     code_blocks: BTreeMap<BlockId, Vec<Bytecode>>,
     /// Maps a basic block to its successors.
     successors: BTreeMap<BlockId, Vec<BlockId>>,
