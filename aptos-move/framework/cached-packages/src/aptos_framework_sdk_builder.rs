@@ -264,6 +264,11 @@ pub enum EntryFunctionCall {
         should_pass: bool,
     },
 
+    AptosPrimaryFungibleStoreTransfer {
+        recipient: AccountAddress,
+        amount: u64,
+    },
+
     /// Same as `publish_package` but as an entry function which can be called as a transaction. Because
     /// of current restrictions for txn parameters, the metadata needs to be passed in serialized form.
     CodePublishPackageTxn {
@@ -664,11 +669,6 @@ pub enum EntryFunctionCall {
     ObjectCodeDeploymentPublish {
         metadata_serialized: Vec<u8>,
         code: Vec<Vec<u8>>,
-    },
-
-    PrimaryFungibleStoreAptTransfer {
-        recipient: AccountAddress,
-        amount: u64,
     },
 
     /// Creates a new resource account and rotates the authentication key to either
@@ -1139,6 +1139,9 @@ impl EntryFunctionCall {
                 proposal_id,
                 should_pass,
             } => aptos_governance_vote(stake_pool, proposal_id, should_pass),
+            AptosPrimaryFungibleStoreTransfer { recipient, amount } => {
+                aptos_primary_fungible_store_transfer(recipient, amount)
+            },
             CodePublishPackageTxn {
                 metadata_serialized,
                 code,
@@ -1400,9 +1403,6 @@ impl EntryFunctionCall {
                 metadata_serialized,
                 code,
             } => object_code_deployment_publish(metadata_serialized, code),
-            PrimaryFungibleStoreAptTransfer { recipient, amount } => {
-                primary_fungible_store_apt_transfer(recipient, amount)
-            },
             ResourceAccountCreateResourceAccount {
                 seed,
                 optional_auth_key,
@@ -2221,6 +2221,27 @@ pub fn aptos_governance_vote(
             bcs::to_bytes(&stake_pool).unwrap(),
             bcs::to_bytes(&proposal_id).unwrap(),
             bcs::to_bytes(&should_pass).unwrap(),
+        ],
+    ))
+}
+
+pub fn aptos_primary_fungible_store_transfer(
+    recipient: AccountAddress,
+    amount: u64,
+) -> TransactionPayload {
+    TransactionPayload::EntryFunction(EntryFunction::new(
+        ModuleId::new(
+            AccountAddress::new([
+                0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+                0, 0, 0, 1,
+            ]),
+            ident_str!("aptos_primary_fungible_store").to_owned(),
+        ),
+        ident_str!("transfer").to_owned(),
+        vec![],
+        vec![
+            bcs::to_bytes(&recipient).unwrap(),
+            bcs::to_bytes(&amount).unwrap(),
         ],
     ))
 }
@@ -3416,27 +3437,6 @@ pub fn object_code_deployment_publish(
         vec![
             bcs::to_bytes(&metadata_serialized).unwrap(),
             bcs::to_bytes(&code).unwrap(),
-        ],
-    ))
-}
-
-pub fn primary_fungible_store_apt_transfer(
-    recipient: AccountAddress,
-    amount: u64,
-) -> TransactionPayload {
-    TransactionPayload::EntryFunction(EntryFunction::new(
-        ModuleId::new(
-            AccountAddress::new([
-                0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
-                0, 0, 0, 1,
-            ]),
-            ident_str!("primary_fungible_store").to_owned(),
-        ),
-        ident_str!("apt_transfer").to_owned(),
-        vec![],
-        vec![
-            bcs::to_bytes(&recipient).unwrap(),
-            bcs::to_bytes(&amount).unwrap(),
         ],
     ))
 }
@@ -4896,6 +4896,19 @@ mod decoder {
         }
     }
 
+    pub fn aptos_primary_fungible_store_transfer(
+        payload: &TransactionPayload,
+    ) -> Option<EntryFunctionCall> {
+        if let TransactionPayload::EntryFunction(script) = payload {
+            Some(EntryFunctionCall::AptosPrimaryFungibleStoreTransfer {
+                recipient: bcs::from_bytes(script.args().get(0)?).ok()?,
+                amount: bcs::from_bytes(script.args().get(1)?).ok()?,
+            })
+        } else {
+            None
+        }
+    }
+
     pub fn code_publish_package_txn(payload: &TransactionPayload) -> Option<EntryFunctionCall> {
         if let TransactionPayload::EntryFunction(script) = payload {
             Some(EntryFunctionCall::CodePublishPackageTxn {
@@ -5595,19 +5608,6 @@ mod decoder {
             Some(EntryFunctionCall::ObjectCodeDeploymentPublish {
                 metadata_serialized: bcs::from_bytes(script.args().get(0)?).ok()?,
                 code: bcs::from_bytes(script.args().get(1)?).ok()?,
-            })
-        } else {
-            None
-        }
-    }
-
-    pub fn primary_fungible_store_apt_transfer(
-        payload: &TransactionPayload,
-    ) -> Option<EntryFunctionCall> {
-        if let TransactionPayload::EntryFunction(script) = payload {
-            Some(EntryFunctionCall::PrimaryFungibleStoreAptTransfer {
-                recipient: bcs::from_bytes(script.args().get(0)?).ok()?,
-                amount: bcs::from_bytes(script.args().get(1)?).ok()?,
             })
         } else {
             None
@@ -6402,6 +6402,10 @@ static SCRIPT_FUNCTION_DECODER_MAP: once_cell::sync::Lazy<EntryFunctionDecoderMa
             Box::new(decoder::aptos_governance_vote),
         );
         map.insert(
+            "aptos_primary_fungible_store_transfer".to_string(),
+            Box::new(decoder::aptos_primary_fungible_store_transfer),
+        );
+        map.insert(
             "code_publish_package_txn".to_string(),
             Box::new(decoder::code_publish_package_txn),
         );
@@ -6620,10 +6624,6 @@ static SCRIPT_FUNCTION_DECODER_MAP: once_cell::sync::Lazy<EntryFunctionDecoderMa
         map.insert(
             "object_code_deployment_publish".to_string(),
             Box::new(decoder::object_code_deployment_publish),
-        );
-        map.insert(
-            "primary_fungible_store_apt_transfer".to_string(),
-            Box::new(decoder::primary_fungible_store_apt_transfer),
         );
         map.insert(
             "resource_account_create_resource_account".to_string(),

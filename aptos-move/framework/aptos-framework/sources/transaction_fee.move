@@ -3,7 +3,7 @@ module aptos_framework::transaction_fee {
     use aptos_framework::coin::{Self, AggregatableCoin, BurnCapability, Coin, MintCapability};
     use aptos_framework::aptos_coin::AptosCoin;
     use aptos_framework::stake;
-    use aptos_framework::primary_fungible_store;
+    use aptos_framework::aptos_primary_fungible_store;
     use aptos_framework::fungible_asset::BurnRef;
     use aptos_framework::system_addresses;
     use std::error;
@@ -211,12 +211,12 @@ module aptos_framework::transaction_fee {
     public(friend) fun burn_fee(account: address, fee: u64) acquires AptosFABurnCapabilities, AptosCoinCapabilities {
         if (exists<AptosFABurnCapabilities>(@aptos_framework)) {
             let burn_ref = &borrow_global<AptosFABurnCapabilities>(@aptos_framework).burn_ref;
-            primary_fungible_store::apt_burn_from(burn_ref, account, fee);
+            aptos_primary_fungible_store::burn_from(burn_ref, account, fee);
         } else {
             let burn_cap = &borrow_global<AptosCoinCapabilities>(@aptos_framework).burn_cap;
             if (features::operations_default_to_fa_apt_store()) {
                 let (burn_ref, burn_receipt) = coin::get_paired_burn_ref(burn_cap);
-                primary_fungible_store::apt_burn_from(&burn_ref, account, fee);
+                aptos_primary_fungible_store::burn_from(&burn_ref, account, fee);
                 coin::return_paired_burn_ref(burn_ref, burn_receipt);
             } else {
                 coin::burn_from<AptosCoin>(

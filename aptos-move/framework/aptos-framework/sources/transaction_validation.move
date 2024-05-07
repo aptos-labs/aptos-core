@@ -11,7 +11,7 @@ module aptos_framework::transaction_validation {
     use aptos_framework::aptos_coin::AptosCoin;
     use aptos_framework::chain_id;
     use aptos_framework::coin;
-    use aptos_framework::primary_fungible_store;
+    use aptos_framework::aptos_primary_fungible_store;
     use aptos_framework::system_addresses;
     use aptos_framework::timestamp;
     use aptos_framework::transaction_fee;
@@ -154,7 +154,7 @@ module aptos_framework::transaction_validation {
         let max_transaction_fee = txn_gas_price * txn_max_gas_units;
         if (features::operations_default_to_fa_apt_store()) {
             assert!(
-                primary_fungible_store::is_apt_balance_at_least(gas_payer, max_transaction_fee),
+                aptos_primary_fungible_store::is_balance_at_least(gas_payer, max_transaction_fee),
                 error::invalid_argument(PROLOGUE_ECANT_PAY_GAS_DEPOSIT)
             );
         } else {
@@ -382,7 +382,7 @@ module aptos_framework::transaction_validation {
         // to do failed transaction cleanup.
         if (features::operations_default_to_fa_apt_store()) {
             assert!(
-                primary_fungible_store::is_apt_balance_at_least(gas_payer, transaction_fee_amount),
+                aptos_primary_fungible_store::is_balance_at_least(gas_payer, transaction_fee_amount),
                 error::out_of_range(PROLOGUE_ECANT_PAY_GAS_DEPOSIT),
             );
         } else {

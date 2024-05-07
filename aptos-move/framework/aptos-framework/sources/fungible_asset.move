@@ -15,6 +15,7 @@ module aptos_framework::fungible_asset {
 
     friend aptos_framework::coin;
     friend aptos_framework::primary_fungible_store;
+    friend aptos_framework::aptos_primary_fungible_store;
 
     friend aptos_framework::dispatchable_fungible_asset;
 
@@ -438,7 +439,7 @@ module aptos_framework::fungible_asset {
         store_exists_inline(store)
     }
 
-    fun store_exists_inline(store: address): bool {
+    inline fun store_exists_inline(store: address): bool {
         exists<FungibleStore>(store)
     }
 
