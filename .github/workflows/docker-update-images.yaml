@@ -2,6 +2,7 @@ name: Docker Update Images
 
 permissions:
   pull-requests: write
+  contents: write
 
 on:
   workflow_dispatch:
