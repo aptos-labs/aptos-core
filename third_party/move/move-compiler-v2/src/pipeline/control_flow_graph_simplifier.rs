@@ -59,8 +59,6 @@
 //!
 //!     goto L
 //! (Implemented by `UnreachableCodeElimination`)
-//! 5. removes unreachable codes
-//! (TODO: eliminate jump to branch)
 //!
 //! Side effects: remove all annotations.
 
