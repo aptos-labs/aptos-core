@@ -328,43 +328,43 @@ impl BufferItem {
     pub fn try_advance_to_aggregated(self, validator: &ValidatorVerifier) -> Self {
         match self {
             Self::Signed(signed_item) => {
-                if validator
-                    .check_voting_power(signed_item.partial_commit_proof.signatures().keys(), true)
-                    .is_ok()
-                {
-                    Self::Aggregated(Box::new(AggregatedItem {
-                        executed_blocks: signed_item.executed_blocks,
-                        commit_proof: aggregate_commit_proof(
-                            signed_item.partial_commit_proof.ledger_info(),
-                            signed_item.partial_commit_proof.partial_sigs(),
-                            validator,
-                        ),
-                        callback: signed_item.callback,
-                    }))
-                } else {
-                    Self::Signed(signed_item)
-                }
+                // if validator
+                //     .check_voting_power(signed_item.partial_commit_proof.signatures().keys(), true)
+                //     .is_ok()
+                // {
+                Self::Aggregated(Box::new(AggregatedItem {
+                    executed_blocks: signed_item.executed_blocks,
+                    commit_proof: aggregate_commit_proof(
+                        signed_item.partial_commit_proof.ledger_info(),
+                        signed_item.partial_commit_proof.partial_sigs(),
+                        validator,
+                    ),
+                    callback: signed_item.callback,
+                }))
+                // } else {
+                //     Self::Signed(signed_item)
+                // }
             },
             Self::Executed(executed_item) => {
-                if validator
-                    .check_voting_power(
-                        executed_item.partial_commit_proof.signatures().keys(),
-                        true,
-                    )
-                    .is_ok()
-                {
-                    Self::Aggregated(Box::new(AggregatedItem {
-                        executed_blocks: executed_item.executed_blocks,
-                        commit_proof: aggregate_commit_proof(
-                            executed_item.partial_commit_proof.ledger_info(),
-                            executed_item.partial_commit_proof.partial_sigs(),
-                            validator,
-                        ),
-                        callback: executed_item.callback,
-                    }))
-                } else {
-                    Self::Executed(executed_item)
-                }
+                // if validator
+                //     .check_voting_power(
+                //         executed_item.partial_commit_proof.signatures().keys(),
+                //         true,
+                //     )
+                //     .is_ok()
+                // {
+                Self::Aggregated(Box::new(AggregatedItem {
+                    executed_blocks: executed_item.executed_blocks,
+                    commit_proof: aggregate_commit_proof(
+                        executed_item.partial_commit_proof.ledger_info(),
+                        executed_item.partial_commit_proof.partial_sigs(),
+                        validator,
+                    ),
+                    callback: executed_item.callback,
+                }))
+                // } else {
+                //     Self::Executed(executed_item)
+                // }
             },
             _ => self,
         }

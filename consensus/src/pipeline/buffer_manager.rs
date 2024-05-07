@@ -355,8 +355,8 @@ impl BufferManager {
                     let commit_decision = CommitMessage::Decision(CommitDecision::new(
                         aggregated_item.commit_proof.clone(),
                     ));
-                    self.commit_proof_rb_handle
-                        .replace(self.do_reliable_broadcast(commit_decision));
+                    // self.commit_proof_rb_handle
+                    //     .replace(self.do_reliable_broadcast(commit_decision));
                 }
                 let commit_proof = aggregated_item.commit_proof.clone();
                 if commit_proof.ledger_info().ends_epoch() {
@@ -525,9 +525,9 @@ impl BufferManager {
                 let signed_item_mut = signed_item.unwrap_signed_mut();
                 let commit_vote = signed_item_mut.commit_vote.clone();
                 let commit_vote = CommitMessage::Vote(commit_vote);
-                signed_item_mut
-                    .rb_handle
-                    .replace((Instant::now(), self.do_reliable_broadcast(commit_vote)));
+                // signed_item_mut
+                //     .rb_handle
+                //     .replace((Instant::now(), self.do_reliable_broadcast(commit_vote)));
                 self.buffer.set(&current_cursor, signed_item);
             } else {
                 self.buffer.set(&current_cursor, item);
