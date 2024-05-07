@@ -1,11 +1,11 @@
 // Copyright © Aptos Foundation
 // SPDX-License-Identifier: Apache-2.0
 
-use aptos_crypto::
-    ed25519::Ed25519PublicKey
-;
+use aptos_crypto::ed25519::{Ed25519PrivateKey, Ed25519PublicKey};
 use aptos_keyless_pepper_common::{
-    jwt, vuf::{self, VUF}, PepperInput, PepperRequest, PepperResponse, PepperV0VufPubKey
+    jwt,
+    vuf::{self, VUF},
+    PepperInput, PepperRequest, PepperResponse, PepperV0VufPubKey,
 };
 use aptos_types::{
     keyless::{Configuration, OpenIdSig},
@@ -13,11 +13,7 @@ use aptos_types::{
 };
 use ark_serialize::CanonicalDeserialize;
 use reqwest::StatusCode;
-use std::{
-    fs,
-    io::stdin,
-};
-use aptos_crypto::ed25519::Ed25519PrivateKey;
+use std::{fs, io::stdin};
 
 const TEST_JWT: &str = "eyJhbGciOiJSUzI1NiIsImtpZCI6ImUxYjkzYzY0MDE0NGI4NGJkMDViZjI5NmQ2NzI2MmI2YmM2MWE0ODciLCJ0eXAiOiJKV1QifQ.eyJpc3MiOiJodHRwczovL2FjY291bnRzLmdvb2dsZS5jb20iLCJhenAiOiI0MDc0MDg3MTgxOTIuYXBwcy5nb29nbGV1c2VyY29udGVudC5jb20iLCJhdWQiOiI0MDc0MDg3MTgxOTIuYXBwcy5nb29nbGV1c2VyY29udGVudC5jb20iLCJzdWIiOiIxMTE2Mjc3NzI0NjA3NTIzNDIzMTIiLCJhdF9oYXNoIjoiaG5OWHFJVTZ3dWFPYlVqR05lRVhGQSIsIm5vbmNlIjoiNzQyMDQxODMxNDYwMDk1MDM0MTU3NzQ0MzEzMzY0MTU4OTk0NzYwNTExMjc1MDEwNDIyNjY5MDY3NTc3OTY3NTIyNDAwNjA0OTI0NCIsIm5hbWUiOiJPbGl2ZXIgSGUiLCJnaXZlbl9uYW1lIjoiT2xpdmVyIiwiZmFtaWx5X25hbWUiOiJIZSIsImlhdCI6MTcxNDQ0MTc4MywiZXhwIjoxNzE0NDQ1MzgzfQ.iNeVzp4BTQj2I_WH6UaUOfUBV4Q_wUriV7jWkh1fUqTPSs30jMMSjEDZml8lQ_NUIpivnGvfEHt_rF9rlrsuRur9pTVKRRKhJUNf5avrAujvLzrz-bwdgKXtTY_nmYisNNNQwmFIVP004ICois4DHD7EmO8PI88CzSzdDbl9qAIoxOP3JRKRwU05wK5qkGz6FpYzTYiG50lQCybSzzUN5Lws49ANCAOZiROG5lmszOW41mAbFSd6MUX469uvyMA2ZZ5av9ArKricHJPutGtLoOSWpzKQ_mlCzofVs5tHoMhGgcOFKuhnEVdY4J7TdcV6pZv9Ih5F8MX3-Wz9Iz9O4w";
 
@@ -108,7 +104,8 @@ async fn main() {
     let epk_expiry_time_secs = 1721397501;
     println!("expiry_time_sec={}", epk_expiry_time_secs);
 
-    let esk_bytes = hex::decode("1111111111111111111111111111111111111111111111111111111111111111").unwrap();
+    let esk_bytes =
+        hex::decode("1111111111111111111111111111111111111111111111111111111111111111").unwrap();
     let serialized: &[u8] = esk_bytes.as_slice();
     let esk = Ed25519PrivateKey::try_from(serialized).unwrap();
     let epk = EphemeralPublicKey::ed25519(Ed25519PublicKey::from(&esk));
@@ -167,7 +164,7 @@ async fn main() {
     let PepperResponse {
         signature,
         pepper,
-        address
+        address,
     } = pepper_response;
     println!("signature={:?}", hex::encode(signature.clone()));
     println!("pepper={:?}", hex::encode(pepper.clone()));
