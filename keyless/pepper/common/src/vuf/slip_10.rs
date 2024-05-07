@@ -147,7 +147,7 @@ mod tests {
     #[test]
     fn test_pepper_derivation() {
         let derive_path = "m/44'/637'/0'/0'/0'";
-        let checked_derivation_path = get_aptos_derivation_path(&derive_path).unwrap();
+        let checked_derivation_path = get_aptos_derivation_path(derive_path).unwrap();
         let master_pepper = "9b543408c1a90aac54e5130e61c7fbc30994d86aea62782b477448e585d194";
         let derived_pepper =
             ExtendedPepper::from_seed(hex::decode(master_pepper).unwrap().as_slice())
@@ -167,7 +167,7 @@ mod tests {
     #[test]
     fn test_pepper_derivation_second_account() {
         let derive_path = "m/44'/637'/1'/0'/0'";
-        let checked_derivation_path = get_aptos_derivation_path(&derive_path).unwrap();
+        let checked_derivation_path = get_aptos_derivation_path(derive_path).unwrap();
         let master_pepper = "9b543408c1a90aac54e5130e61c7fbc30994d86aea62782b477448e585d194";
         let derived_pepper =
             ExtendedPepper::from_seed(hex::decode(master_pepper).unwrap().as_slice())

@@ -124,7 +124,7 @@ fn process_common(
         DEFAULT_DERIVATION_PATH.to_owned()
     };
     let checked_derivation_path =
-        get_aptos_derivation_path(&derivation_path).or_else(|e| Err(BadRequest(e.to_string())))?;
+        get_aptos_derivation_path(&derivation_path).map_err(|e| BadRequest(e.to_string()))?;
 
     let curve25519_pk_point = match &epk {
         EphemeralPublicKey::Ed25519 { public_key } => public_key
@@ -225,12 +225,12 @@ fn process_common(
     }
 
     let pinkas_pepper = PinkasPepper::from_affine_bytes(&pepper_base)
-        .or_else(|_| Err(InternalError("Failed to derive pinkas pepper".to_string())))?;
+        .map_err(|_| InternalError("Failed to derive pinkas pepper".to_string()))?;
     let master_pepper = pinkas_pepper.to_master_pepper();
     let derived_pepper = ExtendedPepper::from_seed(master_pepper.to_bytes())
-        .or_else(|e| Err(InternalError(e.to_string())))?
+        .map_err(|e| InternalError(e.to_string()))?
         .derive(&checked_derivation_path)
-        .or_else(|e| Err(InternalError(e.to_string())))?
+        .map_err(|e| InternalError(e.to_string()))?
         .get_pepper();
 
     let idc = IdCommitment::new_from_preimage(
@@ -239,7 +239,7 @@ fn process_common(
         &input.uid_key,
         &input.uid_val,
     )
-    .or_else(|e| Err(InternalError(e.to_string())))?;
+    .map_err(|e| InternalError(e.to_string()))?;
     let public_key = KeylessPublicKey {
         iss_val: input.iss,
         idc,
