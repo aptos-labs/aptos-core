@@ -51,8 +51,11 @@ use aptos_types::{
     write_set::WriteSet,
 };
 use dashmap::DashMap;
-use itertools::zip_eq;
+use itertools::{zip_eq, Itertools};
 use move_core_types::move_resource::MoveStructType;
+use rayon::iter::{
+    IndexedParallelIterator, IntoParallelIterator, IntoParallelRefIterator, ParallelIterator,
+};
 use std::{
     borrow::Borrow,
     sync::{
@@ -283,7 +286,8 @@ impl FakeAptosDB {
     ) -> Result<HashValue> {
         let new_root_hash = self.save_and_compute_root_hash(
             &txns_to_commit
-                .iter()
+                .par_iter()
+                .with_min_len(10)
                 .map(|txn_to_commit| txn_to_commit.transaction_info())
                 .collect::<Vec<_>>(),
             first_version,
@@ -291,8 +295,12 @@ impl FakeAptosDB {
         let last_version = first_version + txns_to_commit.len() as u64 - 1;
 
         // Iterate through the transactions and update the in-memory maps
-        zip_eq(first_version..=last_version, txns_to_commit).try_for_each(
-            |(ver, txn_to_commit)| -> Result<(), anyhow::Error> {
+        txns_to_commit
+            .into_par_iter()
+            .enumerate()
+            .with_min_len(10)
+            .try_for_each(|(idx, txn_to_commit)| -> Result<(), anyhow::Error> {
+                let ver = first_version + idx as u64;
                 self.txn_by_version
                     .insert(ver, txn_to_commit.transaction().clone());
                 self.txn_info_by_version
@@ -319,8 +327,7 @@ impl FakeAptosDB {
                 }
 
                 Ok::<(), anyhow::Error>(())
-            },
-        )?;
+            })?;
 
         *self.latest_version.lock() = Some(last_version);
 
