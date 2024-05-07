@@ -4,44 +4,21 @@
 
 use crate::{
     block_storage::{
-        tracing::{observe_block, BlockStage},
-        BlockReader, BlockRetriever, BlockStore,
-    },
-    counters::{self, PROPOSED_VTXN_BYTES, PROPOSED_VTXN_COUNT},
-    error::{error_kind, VerifyError},
-    liveness::{
+        block_fetch_manager::{BlockFetchContext, BlockFetchRequest, BlockFetchResponse}, tracing::{observe_block, BlockStage}, BlockReader, BlockRetriever, BlockStore
+    }, counters::{self, PROPOSED_VTXN_BYTES, PROPOSED_VTXN_COUNT}, error::{error_kind, VerifyError}, liveness::{
         proposal_generator::ProposalGenerator,
         proposer_election::ProposerElection,
         round_state::{NewRoundEvent, NewRoundReason, RoundState, RoundStateLogSchema},
         unequivocal_proposer_election::UnequivocalProposerElection,
-    },
-    logging::{LogEvent, LogSchema},
-    metrics_safety_rules::MetricsSafetyRules,
-    monitor,
-    network::NetworkSender,
-    network_interface::ConsensusMsg,
-    pending_votes::VoteReceptionResult,
-    persistent_liveness_storage::PersistentLivenessStorage,
-    quorum_store::types::BatchMsg,
-    rand::rand_gen::types::{FastShare, RandConfig, Share, TShare},
-    util::is_vtxn_expected,
+    }, logging::{LogEvent, LogSchema}, metrics_safety_rules::MetricsSafetyRules, monitor, network::NetworkSender, network_interface::ConsensusMsg, pending_votes::VoteReceptionResult, persistent_liveness_storage::PersistentLivenessStorage, quorum_store::types::BatchMsg, rand::rand_gen::types::{FastShare, RandConfig, Share, TShare}, util::is_vtxn_expected
 };
 use anyhow::{bail, ensure, Context};
 use aptos_channels::aptos_channel;
 use aptos_config::config::ConsensusConfig;
 use aptos_consensus_types::{
-    block::Block,
-    block_data::BlockType,
-    common::{Author, Round},
-    delayed_qc_msg::DelayedQcMsg,
-    proof_of_store::{ProofCache, ProofOfStoreMsg, SignedBatchInfoMsg},
-    proposal_msg::ProposalMsg,
-    quorum_cert::QuorumCert,
-    sync_info::SyncInfo,
-    timeout_2chain::TwoChainTimeoutCertificate,
-    vote::Vote,
-    vote_msg::VoteMsg,
+    block::Block, block_data::BlockType, common::{Author, Round}, delayed_qc_msg::DelayedQcMsg, proof_of_store::{ProofCache, ProofOfStoreMsg, SignedBatchInfoMsg}, proposal_msg::ProposalMsg, quorum_cert::QuorumCert, sync_info::SyncInfo, timeout_2chain::TwoChainTimeoutCertificate, vote::Vote, vote_data::VoteData, vote_msg::VoteMsg
 };
+use aptos_crypto::HashValue;
 use aptos_infallible::{checked, Mutex};
 use aptos_logger::prelude::*;
 #[cfg(test)]
@@ -66,6 +43,7 @@ use tokio::{
     sync::oneshot as TokioOneshot,
     time::{sleep, Instant},
 };
+use lru::LruCache;
 
 #[derive(Serialize, Clone)]
 pub enum UnverifiedEvent {
@@ -219,6 +197,9 @@ pub struct RoundManager {
     randomness_config: OnChainRandomnessConfig,
     jwk_consensus_config: OnChainJWKConsensusConfig,
     fast_rand_config: Option<RandConfig>,
+    vote_cache: LruCache<(Author, VoteData), ()>,
+    proposal_cache: LruCache<HashValue, ()>,
+    block_fetch_request_tx: aptos_channel::Sender<BlockFetchContext, BlockFetchRequest>,
 }
 
 impl RoundManager {
@@ -238,6 +219,7 @@ impl RoundManager {
         randomness_config: OnChainRandomnessConfig,
         jwk_consensus_config: OnChainJWKConsensusConfig,
         fast_rand_config: Option<RandConfig>,
+        block_fetch_request_tx: aptos_channel::Sender<BlockFetchContext, BlockFetchRequest>,
     ) -> Self {
         // when decoupled execution is false,
         // the counter is still static.
@@ -265,11 +247,14 @@ impl RoundManager {
             randomness_config,
             jwk_consensus_config,
             fast_rand_config,
+            vote_cache: LruCache::new(2000),
+            proposal_cache: LruCache::new(50),
+            block_fetch_request_tx,
         }
     }
 
     // TODO: Evaluate if creating a block retriever is slow and cache this if needed.
-    fn create_block_retriever(&self, author: Author) -> BlockRetriever {
+    fn create_block_retriever(&self, author: Author, extra_block_store: HashMap<HashValue, Arc<Block>>, fetch_context: BlockFetchContext) -> BlockRetriever {
         BlockRetriever::new(
             self.network.clone(),
             author,
@@ -279,6 +264,9 @@ impl RoundManager {
                 .collect(),
             self.local_config
                 .max_blocks_per_sending_request(self.onchain_config.quorum_store_enabled()),
+            extra_block_store,
+            fetch_context,
+            self.block_fetch_request_tx.clone(),
         )
     }
 
@@ -436,7 +424,9 @@ impl RoundManager {
         fail_point!("consensus::process_proposal_msg", |_| {
             Err(anyhow::anyhow!("Injected error in process_proposal_msg"))
         });
-
+        if self.proposal_cache.contains(&proposal_msg.id()) {
+            return Ok(());
+        }
         observe_block(
             proposal_msg.proposal().timestamp_usecs(),
             BlockStage::ROUND_MANAGER_RECEIVED,
@@ -458,7 +448,7 @@ impl RoundManager {
             .await
             .context("[RoundManager] Process proposal")?
         {
-            self.process_proposal(proposal_msg.take_proposal()).await
+            self.process_proposal(proposal_msg.take_proposal()).await?;
         } else {
             bail!(
                 "Stale proposal {}, current round {}",
@@ -466,6 +456,8 @@ impl RoundManager {
                 self.round_state.current_round()
             );
         }
+        self.proposal_cache.put(proposal_msg.id(), ());
+        Ok(())
     }
 
     pub async fn process_delayed_proposal_msg(&mut self, proposal: Block) -> anyhow::Result<()> {
@@ -498,6 +490,39 @@ impl RoundManager {
         );
         self.process_vote_reception_result(&vote, vote_reception_result)
             .await
+    }
+
+    /// Sync to the sync info sending from peer if it has newer certificates.
+    async fn sync_up(&mut self, sync_info: &SyncInfo, author: Author) -> anyhow::Result<()> {
+        let local_sync_info = self.block_store.sync_info();
+        if sync_info.has_newer_certificates(&local_sync_info) {
+            info!(
+                self.new_log(LogEvent::ReceiveNewCertificate)
+                    .remote_peer(author),
+                "Local state {}, remote state {}", local_sync_info, sync_info
+            );
+            // Some information in SyncInfo is ahead of what we have locally.
+            // First verify the SyncInfo (didn't verify it in the yet).
+            sync_info
+                .verify(&self.epoch_state().verifier)
+                .map_err(|e| {
+                    error!(
+                        SecurityEvent::InvalidSyncInfoMsg,
+                        sync_info = sync_info,
+                        remote_peer = author,
+                        error = ?e,
+                    );
+                    VerifyError::from(e)
+                })?;
+            let result = self
+                .block_store
+                .add_certs(sync_info, self.create_block_retriever(author, HashMap::new(), BlockFetchContext::ProcessRegular(sync_info, author)))
+                .await;
+            self.process_certificates().await?;
+            result
+        } else {
+            Ok(())
+        }
     }
 
     /// Sync to the sync info sending from peer if it has newer certificates.
@@ -930,6 +955,9 @@ impl RoundManager {
         fail_point!("consensus::process_vote_msg", |_| {
             Err(anyhow::anyhow!("Injected error in process_vote_msg"))
         });
+        if vote_cache.contains(&((vote_msg.vote().author(), vote_msg.vote().vote_data()))) {
+            return Ok(());
+        }
         // Check whether this validator is a valid recipient of the vote.
         if self
             .ensure_round_and_sync_up(
@@ -944,6 +972,7 @@ impl RoundManager {
                 .await
                 .context("[RoundManager] Add a new vote")?;
         }
+        self.vote_cache.put(((vote_msg.vote().author(), vote_msg.vote().vote_data())), ());
         Ok(())
     }
 
@@ -1007,7 +1036,7 @@ impl RoundManager {
                         BlockStage::QC_AGGREGATED,
                     );
                 }
-                self.new_qc_aggregated(qc, vote.author()).await
+                self.new_qc_aggregated(qc, vote.author(), HashMap::new()).await
             },
             VoteReceptionResult::New2ChainTimeoutCertificate(tc) => {
                 self.new_2chain_tc_aggregated(tc).await
@@ -1027,10 +1056,16 @@ impl RoundManager {
         &mut self,
         qc: Arc<QuorumCert>,
         preferred_peer: Author,
+        extra_block_store: HashMap<HashValue, Arc<Block>>
     ) -> anyhow::Result<()> {
         let result = self
             .block_store
-            .insert_quorum_cert(&qc, &mut self.create_block_retriever(preferred_peer))
+            .insert_quorum_cert(&qc, &mut self.create_block_retriever(
+                                                    preferred_peer, 
+                                                    extra_block_store, 
+                                                    BlockFetchContext::InsertQuorumCert(qc.lone(), preferred_peer.clone())
+                                                )
+                                )
             .await
             .context("[RoundManager] Failed to process a newly aggregated QC");
         self.process_certificates().await?;
@@ -1047,6 +1082,29 @@ impl RoundManager {
             .context("[RoundManager] Failed to process a newly aggregated 2-chain TC");
         self.process_certificates().await?;
         result
+    }
+
+    async fn process_block_fetch_response(&mut self, block_fetch_response: BlockFetchResponse) -> anyhow::Result<()> {
+        // TODO: Is this block insertion enough?
+        // TODO: Sort the blocks before inserting them.
+        for block in block_fetch_response.blocks() {
+            self.block_store.insert_ordered_block(*block);
+        }
+
+        match block_fetch_response.context() {
+            BlockFetchContext::InsertQuorumCert(qc, preferred_peer) => {
+                self.new_qc_aggregated(Arc::new(*qc), *preferred_peer, block_fetch_response.blocks()).await
+            },
+            BlockFetchContext::ProcessProposal(proposal) => {
+                self.process_proposal_msg(*proposal).await
+            },
+            BlockFetchContext::ProcessVote(vote) => {
+                self.process_vote_msg(*vote).await
+            },
+            _ => {
+                bail!("Unexpected FetchBlocksContext::Recovery in round manager");
+            },
+        }
     }
 
     /// To jump start new round with the current certificates we have.
@@ -1098,12 +1156,26 @@ impl RoundManager {
         mut buffered_proposal_rx: aptos_channel::Receiver<Author, VerifiedEvent>,
         mut delayed_qc_rx: UnboundedReceiver<DelayedQcMsg>,
         close_rx: oneshot::Receiver<oneshot::Sender<()>>,
+        mut block_fetch_response_rx: aptos_channel::Receiver<BlockFetchContext, BlockFetchResponse>,
     ) {
         info!(epoch = self.epoch_state().epoch, "RoundManager started");
         let mut close_rx = close_rx.into_stream();
         loop {
             tokio::select! {
                 biased;
+                block_fetch_response = block_fetch_response_rx.select_next_some() => {
+                    let result = monitor!(
+                        "process_block_fetch_response",
+                        self.process_block_fetch_response(block_fetch_response).await
+                    );
+                    match result {
+                        Ok(_) => trace!(RoundStateLogSchema::new(self.round_state())),
+                        Err(e) => {
+                            counters::ERROR_COUNT.inc();
+                            warn!(error = ?e, kind = error_kind(&e), RoundStateLogSchema::new(self.round_state()));
+                        }
+                    }
+                }
                 close_req = close_rx.select_next_some() => {
                     if let Ok(ack_sender) = close_req {
                         ack_sender.send(()).expect("[RoundManager] Fail to ack shutdown");

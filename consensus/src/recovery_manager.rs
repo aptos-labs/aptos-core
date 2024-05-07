@@ -2,7 +2,7 @@
 // SPDX-License-Identifier: Apache-2.0
 
 use crate::{
-    block_storage::{BlockRetriever, BlockStore},
+    block_storage::{block_fetch_manager::{BlockFetchContext, BlockFetchResponse}, BlockRetriever, BlockStore},
     counters,
     error::error_kind,
     monitor,
@@ -15,13 +15,15 @@ use crate::{
 use anyhow::{anyhow, ensure, Context, Result};
 use aptos_channels::aptos_channel;
 use aptos_consensus_types::{
-    common::Author, proposal_msg::ProposalMsg, sync_info::SyncInfo, vote_msg::VoteMsg,
+    block_retrieval, common::Author, proposal_msg::ProposalMsg, sync_info::SyncInfo, vote_msg::{self, VoteMsg}
 };
+use aptos_crypto::HashValue;
 use aptos_logger::prelude::*;
 use aptos_types::{block_info::Round, epoch_state::EpochState};
 use futures::{FutureExt, StreamExt};
 use futures_channel::oneshot;
 use std::{mem::Discriminant, process, sync::Arc};
+use lru::LruCache;
 
 /// If the node can't recover corresponding blocks from local storage, RecoveryManager is responsible
 /// for processing the events carrying sync info and use the info to retrieve blocks from peers
@@ -33,6 +35,8 @@ pub struct RecoveryManager {
     last_committed_round: Round,
     max_blocks_to_request: u64,
     payload_manager: Arc<PayloadManager>,
+    vote_cache: LruCache<(Author, VoteData), ()>,
+    proposal_cache: LruCache<HashValue, ()>,
 }
 
 impl RecoveryManager {
@@ -53,6 +57,9 @@ impl RecoveryManager {
             last_committed_round,
             max_blocks_to_request,
             payload_manager,
+            // TODO: Make the capacity a parameter in the config
+            vote_cache: LruCache::new(2000),
+            proposal_cache: LruCache::new(max(max_blocks_to_request, 50)),
         }
     }
 
@@ -61,17 +68,25 @@ impl RecoveryManager {
         proposal_msg: ProposalMsg,
     ) -> Result<RecoveryData> {
         let author = proposal_msg.proposer();
-        let sync_info = proposal_msg.sync_info();
-        self.sync_up(sync_info, author).await
+        let sync_info: &SyncInfo = proposal_msg.sync_info();
+        self.sync_up(sync_info, author, HashMap::new()).await
     }
 
-    pub async fn process_vote_msg(&mut self, vote_msg: VoteMsg) -> Result<RecoveryData> {
+    pub async fn process_vote_msg(
+        &mut self,
+        vote_msg: VoteMsg,
+    ) -> Result<RecoveryData> {
         let author = vote_msg.vote().author();
         let sync_info = vote_msg.sync_info();
-        self.sync_up(sync_info, author).await
+        self.sync_up(sync_info, author, HashMap::new()).await
     }
 
-    pub async fn sync_up(&mut self, sync_info: &SyncInfo, peer: Author) -> Result<RecoveryData> {
+    pub async fn sync_up(
+        &mut self,
+        sync_info: &SyncInfo,
+        peer: Author,
+        extra_block_store: HashMap<HashValue, Arc<Block>>,
+    ) -> Result<RecoveryData> {
         sync_info.verify(&self.epoch_state.verifier)?;
         ensure!(
             sync_info.highest_round() > self.last_committed_round,
@@ -89,6 +104,8 @@ impl RecoveryManager {
                 .get_ordered_account_addresses_iter()
                 .collect(),
             self.max_blocks_to_request,
+            extra_block_store,
+            BlockFetchContext::ProcessRecovery(sync_info, peer)
         );
         let recovery_data = BlockStore::fast_forward_sync(
             sync_info.highest_ordered_cert(),
@@ -103,6 +120,15 @@ impl RecoveryManager {
         Ok(recovery_data)
     }
 
+    async fn process_block_fetch_response(&mut self, block_fetch_response: BlockFetchResponse) -> Result<RecoveryData> {
+        match block_fetch_response.context() {
+            BlockFetchContext::ProcessRecovery(sync_info, peer) => {
+                self.sync_up(sync_info, peer, block_fetch_response.blocks()).await
+            }
+            _ => bail!("Unexpected FetchBlocksContext in recovery manager")
+        }
+    }
+
     pub async fn start(
         mut self,
         mut event_rx: aptos_channel::Receiver<
@@ -110,26 +136,34 @@ impl RecoveryManager {
             (Author, VerifiedEvent),
         >,
         close_rx: oneshot::Receiver<oneshot::Sender<()>>,
+        block_fetch_response_rx: aptos_channel::Receiver<BlockFetchContext, BlockFetchResponse>,
     ) {
         info!(epoch = self.epoch_state.epoch, "RecoveryManager started");
         let mut close_rx = close_rx.into_stream();
         loop {
             futures::select! {
+                biased;
+                block_fetch_respone = block_fetch_response_rx.select_next_some() => {
+                    monitor!(
+                        "process_block_fetch_response",
+                        self.process_block_fetch_response(block_fetch_respone).await
+                    )
+                },
                 (peer_id, event) = event_rx.select_next_some() => {
                     let result = match event {
                         VerifiedEvent::ProposalMsg(proposal_msg) => {
                             monitor!(
                                 "process_recovery",
-                                self.process_proposal_msg(*proposal_msg).await
+                                self.process_proposal_msg(*proposal_msg, HashMap::new()).await
                             )
                         }
                         VerifiedEvent::VoteMsg(vote_msg) => {
-                            monitor!("process_recovery", self.process_vote_msg(*vote_msg).await)
+                            monitor!("process_recovery", self.process_vote_msg(*vote_msg, HashMap::new()).await)
                         }
                         VerifiedEvent::UnverifiedSyncInfo(sync_info) => {
                             monitor!(
                                 "process_recovery",
-                                self.sync_up(&sync_info, peer_id).await
+                                self.sync_up(&sync_info, peer_id, HashMap::new()).await
                             )
                         }
                         unexpected_event => Err(anyhow!("Unexpected event: {:?}", unexpected_event)),

@@ -15,7 +15,7 @@ use aptos_types::{
 use serde::{Deserialize, Serialize};
 use std::fmt::{Display, Formatter};
 
-#[derive(Deserialize, Serialize, Clone, Debug, Eq, PartialEq)]
+#[derive(Deserialize, Serialize, Clone, Debug, Eq, PartialEq, Hash)]
 pub struct QuorumCert {
     /// The vote information certified by the quorum.
     vote_data: VoteData,

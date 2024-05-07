@@ -12,7 +12,9 @@ use std::{sync::Arc, time::Duration};
 
 mod block_store;
 mod block_tree;
+pub mod block_fetch_manager;
 pub mod tracing;
+mod counters;
 
 pub trait BlockReader: Send + Sync {
     /// Check if a block with the block_id exist in the BlockTree.

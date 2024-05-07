@@ -4,6 +4,7 @@
 
 use crate::{block::Block, common::Author, proof_of_store::ProofCache, sync_info::SyncInfo};
 use anyhow::{anyhow, ensure, format_err, Context, Result};
+use aptos_crypto::HashValue;
 use aptos_short_hex_str::AsShortHexStr;
 use aptos_types::validator_verifier::ValidatorVerifier;
 use serde::{Deserialize, Serialize};
@@ -117,6 +118,10 @@ impl ProposalMsg {
         self.proposal
             .author()
             .expect("Proposal should be verified having an author")
+    }
+
+    pub fn id(&self) -> HashValue {
+        self.proposal.id()
     }
 }
 

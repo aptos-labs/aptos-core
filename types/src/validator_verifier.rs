@@ -66,7 +66,7 @@ pub enum VerifyError {
 }
 
 /// Helper struct to manage validator information for validation
-#[derive(Clone, Debug, Deserialize, Eq, PartialEq, Serialize)]
+#[derive(Clone, Debug, Deserialize, Eq, PartialEq, Serialize, Hash)]
 #[cfg_attr(any(test, feature = "fuzzing"), derive(Arbitrary))]
 pub struct ValidatorConsensusInfo {
     pub address: AccountAddress,
@@ -128,7 +128,7 @@ impl TryFrom<ValidatorConsensusInfoMoveStruct> for ValidatorConsensusInfo {
 /// Supports validation of signatures for known authors with individual voting powers. This struct
 /// can be used for all signature verification operations including block and network signature
 /// verification, respectively.
-#[derive(Clone, Debug, Eq, PartialEq, Serialize)]
+#[derive(Clone, Debug, Eq, PartialEq, Serialize, Hash)]
 pub struct ValidatorVerifier {
     /// A vector of each validator's on-chain account address to its pubkeys and voting power.
     validator_infos: Vec<ValidatorConsensusInfo>,

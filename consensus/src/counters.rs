@@ -760,6 +760,25 @@ pub static ROUND_MANAGER_CHANNEL_MSGS: Lazy<IntCounterVec> = Lazy::new(|| {
     .unwrap()
 });
 
+/// Counters(queued,dequeued,dropped) related to block fetch manager channel
+pub static BLOCK_FETCH_MANAGER_REQUEST_CHANNEL_MSGS: Lazy<IntCounterVec> = Lazy::new(|| {
+    register_int_counter_vec!(
+        "aptos_consensus_block_fetch_manager_request_msgs_count",
+        "Counters(queued,dequeued,dropped) related to the channel of requests sent to block fetch manager",
+        &["state"]
+    )
+    .unwrap()
+});
+
+pub static BLOCK_FETCH_MANAGER_RESPONSE_CHANNEL_MSGS: Lazy<IntCounterVec> = Lazy::new(|| {
+    register_int_counter_vec!(
+        "aptos_consensus_block_fetch_manager_response_msgs_count",
+        "Counters(queued,dequeued,dropped) related to the channel of responses from the block fetch manager",
+        &["state"]
+    )
+    .unwrap()
+});
+
 /// Counters(queued,dequeued,dropped) related to quorum store channel
 pub static QUORUM_STORE_CHANNEL_MSGS: Lazy<IntCounterVec> = Lazy::new(|| {
     register_int_counter_vec!(
