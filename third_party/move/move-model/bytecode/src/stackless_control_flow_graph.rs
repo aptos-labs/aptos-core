@@ -32,7 +32,6 @@ pub enum BlockContent {
     Dummy,
 }
 
-#[derive(Default)]
 pub struct StacklessControlFlowGraph {
     entry_block_id: BlockId,
     blocks: Map<BlockId, Block>,
