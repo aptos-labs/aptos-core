@@ -8,6 +8,10 @@ permissions:
   id-token: write
   actions: write #required for workflow cancellation via check-aptos-core
 
+concurrency:
+  group: forge-stable-${{ github.ref_name }}
+  cancel-in-progress: true
+
 on:
   # Allow triggering manually
   workflow_dispatch:

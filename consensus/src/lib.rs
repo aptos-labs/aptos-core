@@ -49,6 +49,7 @@ mod txn_notifier;
 pub mod util;
 
 mod block_preparer;
+pub mod consensus_observer;
 /// AptosBFT implementation
 pub mod consensus_provider;
 /// Required by the telemetry service

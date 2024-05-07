@@ -157,6 +157,7 @@ pub fn prepare_buffer_manager(
         }),
         bounded_executor,
         false,
+        None,
     );
 
     (

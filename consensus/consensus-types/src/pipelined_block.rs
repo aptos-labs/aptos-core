@@ -16,6 +16,7 @@ use aptos_types::{
     transaction::SignedTransaction, validator_txn::ValidatorTransaction,
 };
 use once_cell::sync::OnceCell;
+use serde::{Deserialize, Deserializer, Serialize, Serializer};
 use std::{
     fmt::{Debug, Display, Formatter},
     sync::Arc,
@@ -37,6 +38,65 @@ pub struct PipelinedBlock {
     state_compute_result: StateComputeResult,
     randomness: OnceCell<Randomness>,
     pipeline_insertion_time: OnceCell<Instant>,
+}
+
+impl Serialize for PipelinedBlock {
+    fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
+    where
+        S: Serializer,
+    {
+        #[derive(Serialize)]
+        #[serde(rename = "PipelineBlock")]
+        struct SerializedBlock<'a> {
+            block: &'a Block,
+            input_transactions: &'a Vec<SignedTransaction>,
+            state_compute_result: &'a StateComputeResult,
+            randomness: Option<&'a Randomness>,
+        }
+
+        let serialized = SerializedBlock {
+            block: &self.block,
+            input_transactions: &self.input_transactions,
+            state_compute_result: &self.state_compute_result,
+            randomness: self.randomness.get(),
+        };
+        serialized.serialize(serializer)
+    }
+}
+
+impl<'de> Deserialize<'de> for PipelinedBlock {
+    fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
+    where
+        D: Deserializer<'de>,
+    {
+        #[derive(Deserialize)]
+        #[serde(rename = "PipelineBlock")]
+        struct SerializedBlock {
+            block: Block,
+            input_transactions: Vec<SignedTransaction>,
+            state_compute_result: StateComputeResult,
+            randomness: Option<Randomness>,
+        }
+
+        let SerializedBlock {
+            block,
+            input_transactions,
+            state_compute_result,
+            randomness,
+        } = SerializedBlock::deserialize(deserializer)?;
+
+        let block = PipelinedBlock {
+            block,
+            input_transactions,
+            state_compute_result,
+            randomness: OnceCell::new(),
+            pipeline_insertion_time: OnceCell::new(),
+        };
+        if let Some(r) = randomness {
+            block.set_randomness(r);
+        }
+        Ok(block)
+    }
 }
 
 impl PipelinedBlock {
