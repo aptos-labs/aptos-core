@@ -5,6 +5,7 @@ pub extern crate derivation_path;
 pub extern crate ed25519_dalek;
 
 use anyhow::{bail, Result};
+use aptos_types::keyless::Pepper;
 use core::fmt;
 pub use derivation_path::{ChildIndex, DerivationPath};
 pub use ed25519_dalek::{PublicKey, SecretKey};
@@ -36,15 +37,15 @@ impl fmt::Display for Error {
 #[cfg(feature = "std")]
 impl std::error::Error for Error {}
 
-/// An expanded secret key with chain code and meta data
+/// An expanded pepper with chain code and meta data
 #[derive(Debug)]
 pub struct ExtendedPepper {
     /// How many derivations this key is from the root (0 for root)
     pub depth: u8,
     /// Child index of the key used to derive from parent (`Normal(0)` for root)
     pub child_index: ChildIndex,
-    /// Pepper
-    pub pepper: [u8; 32],
+    /// 32 byte extended Pepper. Not exposed as get_pepper() should be used to get the 31 byte version
+    pepper: [u8; 32],
     /// Chain code
     pub chain_code: [u8; 32],
 }
@@ -65,10 +66,10 @@ pub fn get_aptos_derivation_path(s: &str) -> Result<DerivationPath> {
 }
 
 impl ExtendedPepper {
-    pub fn get_pepper(&self) -> [u8; 31] {
+    pub fn get_pepper(&self) -> Pepper {
         let mut pepper = [0; 31];
         pepper.copy_from_slice(&self.pepper[..31]);
-        pepper
+        Pepper::new(pepper[0..31].try_into().unwrap())
     }
 
     /// Create a new extended secret key from a seed
@@ -136,5 +137,54 @@ impl ExtendedPepper {
             pepper: self.pepper,
             chain_code: self.chain_code,
         }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_pepper_derivation() {
+        let derive_path = "m/44'/637'/0'/0'/0'";
+        let checked_derivation_path = get_aptos_derivation_path(&derive_path).unwrap();
+        let master_pepper = "9b543408c1a90aac54e5130e61c7fbc30994d86aea62782b477448e585d194";
+        let derived_pepper = ExtendedPepper::from_seed(
+            hex::decode(master_pepper)
+                .unwrap()
+                .as_slice(),
+        )
+        .unwrap()
+        .derive(&checked_derivation_path)
+        .unwrap()
+        .get_pepper();
+
+        let pepper_hex = "06f449a8c833c95ddcbfe345541ada065667c4e2e25030f88380bac26f30844f";
+        let expected_pepper = Pepper::new(hex::decode(pepper_hex).unwrap()[0..31].try_into().unwrap());
+        println!("expected: {:?}", hex::encode(expected_pepper.to_bytes()));
+        println!("actual: {:?}", hex::encode(derived_pepper.to_bytes()));
+        assert_eq!(expected_pepper, derived_pepper);
+    }
+
+    #[test]
+    fn test_pepper_derivation_second_account() {
+        let derive_path = "m/44'/637'/1'/0'/0'";
+        let checked_derivation_path = get_aptos_derivation_path(&derive_path).unwrap();
+        let master_pepper = "9b543408c1a90aac54e5130e61c7fbc30994d86aea62782b477448e585d194";
+        let derived_pepper = ExtendedPepper::from_seed(
+            hex::decode(master_pepper)
+                .unwrap()
+                .as_slice(),
+        )
+        .unwrap()
+        .derive(&checked_derivation_path)
+        .unwrap()
+        .get_pepper();
+
+        let pepper_hex = "81d5647372c2762fd50993f7556025211768e6ac72dbc7294ad462d447c161f2";
+        let expected_pepper = Pepper::new(hex::decode(pepper_hex).unwrap()[0..31].try_into().unwrap());
+        println!("expected: {:?}", hex::encode(expected_pepper.to_bytes()));
+        println!("actual: {:?}", hex::encode(derived_pepper.to_bytes()));
+        assert_eq!(expected_pepper, derived_pepper);
     }
 }

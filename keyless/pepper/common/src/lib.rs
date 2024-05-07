@@ -85,6 +85,11 @@ pub struct PepperResponse {
         deserialize_with = "deserialize_bytes_from_hex"
     )]
     pub pepper: Vec<u8>,
+    #[serde(
+        serialize_with = "serialize_bytes_to_hex",
+        deserialize_with = "deserialize_bytes_from_hex"
+    )]
+    pub address: Vec<u8>,
 }
 
 /// A pepper scheme where:

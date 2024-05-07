@@ -21,8 +21,9 @@ use aptos_keyless_pepper_common::{
 };
 use aptos_logger::info;
 use aptos_types::{
-    keyless::{Configuration, OpenIdSig},
-    transaction::authenticator::EphemeralPublicKey,
+    account_address::AccountAddress,
+    keyless::{Configuration, IdCommitment, KeylessPublicKey, OpenIdSig},
+    transaction::authenticator::{AnyPublicKey, AuthenticationKey, EphemeralPublicKey},
 };
 use jsonwebtoken::{Algorithm::RS256, Validation};
 use rand::thread_rng;
@@ -58,7 +59,7 @@ pub fn process_v0(request: PepperRequest) -> Result<PepperResponse, ProcessingFa
         derivation_path,
     } = request;
 
-    let (pepper_base, pepper) = process_common(
+    let (pepper_base, pepper, address) = process_common(
         &session_id,
         jwt,
         epk,
@@ -69,9 +70,11 @@ pub fn process_v0(request: PepperRequest) -> Result<PepperResponse, ProcessingFa
         false,
         None,
     )?;
+
     Ok(PepperResponse {
         signature: pepper_base,
         pepper,
+        address: address.to_vec(),
     })
 }
 
@@ -85,7 +88,7 @@ pub fn process_v1(request: PepperRequestV1) -> Result<PepperResponseV1, Processi
         uid_key,
         aud,
     } = request;
-    let (pepper_base_encrypted, pepper_encrypted) = process_common(
+    let (pepper_base_encrypted, pepper_encrypted, _address) = process_common(
         &session_id,
         jwt,
         epk,
@@ -112,7 +115,7 @@ fn process_common(
     derivation_path: Option<String>,
     encrypts_pepper: bool,
     aud: Option<String>,
-) -> Result<(Vec<u8>, Vec<u8>), ProcessingFailure> {
+) -> Result<(Vec<u8>, Vec<u8>, AccountAddress), ProcessingFailure> {
     let config = Configuration::new_for_devnet();
 
     let derivation_path = if let Some(path) = derivation_path {
@@ -227,7 +230,22 @@ fn process_common(
     let derived_pepper = ExtendedPepper::from_seed(master_pepper.to_bytes())
         .or_else(|e| Err(InternalError(e.to_string())))?
         .derive(&checked_derivation_path)
-        .or_else(|e| Err(InternalError(e.to_string())))?;
+        .or_else(|e| Err(InternalError(e.to_string())))?
+        .get_pepper();
+
+    let idc = IdCommitment::new_from_preimage(
+        &derived_pepper,
+        &input.aud,
+        &input.uid_key,
+        &input.uid_val,
+    )
+    .or_else(|e| Err(InternalError(e.to_string())))?;
+    let public_key = KeylessPublicKey {
+        iss_val: input.iss,
+        idc,
+    };
+    let address =
+        AuthenticationKey::any_key(AnyPublicKey::keyless(public_key.clone())).account_address();
 
     if encrypts_pepper {
         let mut main_rng: rand::prelude::ThreadRng = thread_rng();
@@ -243,11 +261,11 @@ fn process_common(
             &mut main_rng,
             &mut aead_rng,
             &curve25519_pk_point,
-            &derived_pepper.get_pepper(),
+            derived_pepper.to_bytes(),
         )
         .map_err(|e| InternalError(format!("ElGamalCurve25519Aes256Gcm enc error: {e}")))?;
-        Ok((pepper_base_encrypted, pepper_encrypted))
+        Ok((pepper_base_encrypted, pepper_encrypted, address))
     } else {
-        Ok((pepper_base, derived_pepper.get_pepper().to_vec()))
+        Ok((pepper_base, derived_pepper.to_bytes().to_vec(), address))
     }
 }
