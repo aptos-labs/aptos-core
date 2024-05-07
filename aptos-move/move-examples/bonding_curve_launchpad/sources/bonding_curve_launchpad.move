@@ -16,6 +16,8 @@ module resource_account::bonding_curve_launchpad {
     use aptos_framework::dispatchable_fungible_asset;
     use aptos_framework::function_info;
     use std::debug; //! Debug
+    // FA-supported DEX
+    use swap::router;
     // Friend
     use resource_account::resource_signer_holder;
 
@@ -29,10 +31,10 @@ module resource_account::bonding_curve_launchpad {
     const ELIQUIDITY_PAIR_SWAP_AMOUNTIN_INVALID: u64 = 110;
     const ELIQUIDITY_PAIR_SWAP_AMOUNTOUT_INSIGNIFICANT: u64 = 111;
 
-    const INITIAL_NEW_FA_RESERVE: u128 = 803_000_000_000_000_000;
-    const INITIAL_NEW_FA_RESERVE_u64: u64 = 803_000_000_000_000_000;
+    const INITIAL_NEW_FA_RESERVE: u128 = 8_003_000_000_000;
+    const INITIAL_NEW_FA_RESERVE_u64: u64 = 8_003_000_000_000;
     const FA_DECIMALS: u8 = 8;
-    const INITIAL_VIRTUAL_LIQUIDITY: u128 = 50_000_000_000;
+    const INITIAL_VIRTUAL_APT_LIQUIDITY: u128 = 50_000_000_000;
     const APT_LIQUIDITY_THRESHOLD: u128 = 600_000_000_000;
 
     //---------------------------Events---------------------------
@@ -245,12 +247,12 @@ module resource_account::bonding_curve_launchpad {
         assert!(!smart_table::contains(&mut liquidity_pair_smartTable.liquidity_pairs, fa_metadata), ELIQUIDITY_PAIR_EXISTS_ALREADY);
         //* FA already exists on the platform, since it's a shared address.
         //* Initial APT reserves are virtual liquidity.
-        let k_constant: u256 = (fa_initialLiquidity as u256) * (INITIAL_VIRTUAL_LIQUIDITY as u256);
+        let k_constant: u256 = (fa_initialLiquidity as u256) * (INITIAL_VIRTUAL_APT_LIQUIDITY as u256);
         let initial_liquidity_pair = LiquidityPair {
             is_enabled: true,
             is_frozen: true,
             fa_reserves: fa_initialLiquidity,
-            apt_reserves: INITIAL_VIRTUAL_LIQUIDITY,
+            apt_reserves: INITIAL_VIRTUAL_APT_LIQUIDITY,
             k_constant: k_constant
         };
         smart_table::add(
@@ -263,7 +265,7 @@ module resource_account::bonding_curve_launchpad {
             fa_obj_address: fa_data.fa_obj_address,
             fa_obj: fa_metadata,
             initial_fa_reserves: fa_initialLiquidity,
-            initial_apt_reserves: INITIAL_VIRTUAL_LIQUIDITY,
+            initial_apt_reserves: INITIAL_VIRTUAL_APT_LIQUIDITY,
             k: k_constant
         });
 
@@ -332,10 +334,6 @@ module resource_account::bonding_curve_launchpad {
         aptos_account::transfer(account, @resource_account, apt_given);
         primary_fungible_store::transfer_with_ref(&fa_data.controller.transfer_ref, @resource_account, swapper_address, fa_gained);
         // Disable transfers from users.
-        //? Do I really need to check this every time?
-        if(!primary_fungible_store::is_frozen(swapper_address, fa_metadata))
-            primary_fungible_store::set_frozen_flag(&fa_data.controller.transfer_ref, swapper_address, true);
-
         let old_fa_reserves = liquidity_pair.fa_reserves;
         let old_apt_reserves = liquidity_pair.apt_reserves;
         liquidity_pair.fa_reserves = fa_updated_reserves;
@@ -353,10 +351,11 @@ module resource_account::bonding_curve_launchpad {
             swapper_address: swapper_address
         });
 
-
         if(apt_updated_reserves > APT_LIQUIDITY_THRESHOLD){
             //! Offload onto permissionless DEX.
             //! ...Move all APT and FA reserves to the DEX.
+            router::create_pool_coin<AptosCoin>(fa_metadata, false);
+
 
             //! Burn any LP tokens received by the DEX.
             //! ...
@@ -383,7 +382,7 @@ module resource_account::bonding_curve_launchpad {
             return (amountIn, apt_gained, fa_reserves+(amountIn as u128), apt_reserves-(apt_gained as u128))
         }
         else {
-            let fa_gained: u64 = (((fa_reserves as u256) * (amountIn as u256))/((apt_reserves as u256) - (amountIn as u256)) as u64);
+            let fa_gained: u64 = (((fa_reserves as u256) * (amountIn as u256)/(apt_reserves as u256) + (amountIn as u256)) as u64);
             assert!(fa_gained > 0, ELIQUIDITY_PAIR_SWAP_AMOUNTOUT_INSIGNIFICANT);
             return (fa_gained, amountIn, fa_reserves-(fa_gained as u128), apt_reserves+(amountIn as u128))
         }
@@ -407,6 +406,13 @@ module resource_account::bonding_curve_launchpad {
 
         fa_metadata_obj
     }
+    #[view]
+    public fun get_is_frozen(name: String, symbol: String):bool acquires LaunchPad, LiquidityPairSmartTable {
+        let fa_metadata = get_metadata(name, symbol);
+        let liquidity_pair_smartTable = borrow_global<LiquidityPairSmartTable>(@resource_account);
+        assert!(smart_table::contains(&liquidity_pair_smartTable.liquidity_pairs, fa_metadata), ELIQUIDITY_PAIR_DOES_NOT_EXIST);
+        smart_table::borrow(&liquidity_pair_smartTable.liquidity_pairs, fa_metadata).is_enabled
+    }
 
 
 
@@ -423,6 +429,4 @@ module resource_account::bonding_curve_launchpad {
         move_to(deployer, fa_smartTable);
         move_to(deployer, liquidity_pair_table);
     }
-
-
 }
