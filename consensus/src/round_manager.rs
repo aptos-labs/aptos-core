@@ -9,7 +9,7 @@ use crate::{
     },
     counters::{
         self, ORDER_VOTE_ADDED, ORDER_VOTE_BROADCASTED, ORDER_VOTE_OTHER_ERRORS,
-        PROPOSED_VTXN_BYTES, PROPOSED_VTXN_COUNT,
+        ORDER_VOTE_VERY_OLD, PROPOSED_VTXN_BYTES, PROPOSED_VTXN_COUNT,
     },
     error::{error_kind, VerifyError},
     liveness::{
@@ -952,14 +952,25 @@ impl RoundManager {
             {
                 return Ok(());
             }
-            let vote_reception_result = self
-                .round_state
-                .insert_order_vote(&order_vote, &self.epoch_state.verifier);
-            self.process_order_vote_reception_result(&order_vote, vote_reception_result)
-                .await
-        } else {
-            Ok(())
+
+            if order_vote.ledger_info().round()
+                > self.block_store.sync_info().highest_commit_round()
+            {
+                let vote_reception_result = self
+                    .round_state
+                    .insert_order_vote(&order_vote, &self.epoch_state.verifier);
+                self.process_order_vote_reception_result(&order_vote, vote_reception_result)
+                    .await?;
+            } else {
+                ORDER_VOTE_VERY_OLD.inc();
+                info!(
+                    "Received old order vote. Order vote round: {:?}, Highest commit round: {:?}",
+                    order_vote.ledger_info().round(),
+                    self.block_store.sync_info().highest_commit_round()
+                );
+            }
         }
+        Ok(())
     }
 
     async fn broadcast_order_vote(
@@ -1083,7 +1094,11 @@ impl RoundManager {
                     if result.is_ok() {
                         let _ = self.broadcast_order_vote(vote, qc.clone()).await;
                     } else {
-                        warn!("OrderVoteBrodcastFailed. Round = {}", round);
+                        warn!(
+                            "OrderVoteBrodcastFailed. Round = {}. Block id = {}",
+                            round,
+                            vote.vote_data().proposed().id()
+                        );
                     }
                 }
                 result

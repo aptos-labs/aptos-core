@@ -3,7 +3,7 @@
 // SPDX-License-Identifier: Apache-2.0
 
 use crate::{
-    counters::{self, ORDER_VOTE_VERY_OLD},
+    counters,
     pending_order_votes::{OrderVoteReceptionResult, PendingOrderVotes},
     pending_votes::{PendingVotes, VoteReceptionResult},
     util::time_service::{SendTask, TimeService},
@@ -259,9 +259,12 @@ impl RoundState {
     /// Notify the RoundState about the potentially new QC, TC, and highest committed round.
     /// Note that some of these values might not be available by the caller.
     pub fn process_certificates(&mut self, sync_info: SyncInfo) -> Option<NewRoundEvent> {
+        // Question: We are comparing ordered round with committed round. Is this accurate?
         if sync_info.highest_ordered_round() > self.highest_committed_round {
             self.highest_committed_round = sync_info.highest_ordered_round();
         }
+        self.pending_order_votes
+            .garbage_collect(sync_info.highest_commit_round());
         let new_round = sync_info.highest_round() + 1;
         if new_round > self.current_round {
             let (prev_round_votes, prev_round_timeout_votes) = self.pending_votes.drain_votes();
@@ -274,7 +277,6 @@ impl RoundState {
                 self.qc_aggregator_type.clone(),
             );
             self.vote_sent = None;
-            self.pending_order_votes.set_round(self.current_round);
             let timeout = self.setup_timeout(1);
             // The new round reason is QCReady in case both QC.round + 1 == new_round, otherwise
             // it's Timeout and TC.round + 1 == new_round.
@@ -316,16 +318,8 @@ impl RoundState {
         order_vote: &OrderVote,
         verifier: &ValidatorVerifier,
     ) -> OrderVoteReceptionResult {
-        if order_vote.ledger_info().round() + 3 >= self.current_round {
-            self.pending_order_votes
-                .insert_order_vote(order_vote, verifier)
-        } else {
-            ORDER_VOTE_VERY_OLD.inc();
-            OrderVoteReceptionResult::UnexpectedRound(
-                order_vote.ledger_info().round(),
-                self.current_round,
-            )
-        }
+        self.pending_order_votes
+            .insert_order_vote(order_vote, verifier)
     }
 
     pub fn has_enough_order_votes(&self, ledger_info: &LedgerInfo) -> bool {

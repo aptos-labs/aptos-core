@@ -156,12 +156,12 @@ impl PendingOrderVotes {
         }
     }
 
-    // Removes votes older than round-1
-    pub fn set_round(&mut self, round: u64) {
+    // Removes votes older than highest_committed_round
+    pub fn garbage_collect(&mut self, highest_committed_round: u64) {
         self.li_digest_to_votes
-            .retain(|_, (_, _, li)| li.ledger_info().round() + 3 >= round);
+            .retain(|_, (_, _, li)| li.ledger_info().round() > highest_committed_round);
         self.author_to_order_vote
-            .retain(|&(_, r), _| r + 3 >= round);
+            .retain(|&(_, r), _| r >= highest_committed_round);
     }
 
     pub fn has_enough_order_votes(&self, ledger_info: &LedgerInfo) -> bool {
