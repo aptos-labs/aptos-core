@@ -6,7 +6,7 @@ error: cyclic type instantiation: a cycle of recursive calls causes a type to gr
 6 │     public fun t<T>() {
   │                ^
   │
-  = `t<T>` calls `t<X::Box<T>>` at tests/cyclic-instantiation-checker/v1-typing/infinite_instantiations_invalid.move:6
+  = `t<T>` calls `t<X::Box<T>>` at tests/cyclic-instantiation-checker/v1-typing/infinite_instantiations_invalid.move:7
 
 error: cyclic type instantiation: a cycle of recursive calls causes a type to grow without bound
    ┌─ tests/cyclic-instantiation-checker/v1-typing/infinite_instantiations_invalid.move:10:16
@@ -14,8 +14,8 @@ error: cyclic type instantiation: a cycle of recursive calls causes a type to gr
 10 │     public fun x<T>() {
    │                ^
    │
-   = `x<T>` calls `y<X::Box<T>>` at tests/cyclic-instantiation-checker/v1-typing/infinite_instantiations_invalid.move:10
-   = `y<X::Box<T>>` calls `x<X::Box<X::Box<T>>>` at tests/cyclic-instantiation-checker/v1-typing/infinite_instantiations_invalid.move:11
+   = `x<T>` calls `y<X::Box<T>>` at tests/cyclic-instantiation-checker/v1-typing/infinite_instantiations_invalid.move:11
+   = `y<X::Box<T>>` calls `x<X::Box<X::Box<T>>>` at tests/cyclic-instantiation-checker/v1-typing/infinite_instantiations_invalid.move:14
 
 error: cyclic type instantiation: a cycle of recursive calls causes a type to grow without bound
    ┌─ tests/cyclic-instantiation-checker/v1-typing/infinite_instantiations_invalid.move:13:16
@@ -23,8 +23,8 @@ error: cyclic type instantiation: a cycle of recursive calls causes a type to gr
 13 │     public fun y<T>() {
    │                ^
    │
-   = `y<T>` calls `x<X::Box<T>>` at tests/cyclic-instantiation-checker/v1-typing/infinite_instantiations_invalid.move:13
-   = `x<X::Box<T>>` calls `y<X::Box<X::Box<T>>>` at tests/cyclic-instantiation-checker/v1-typing/infinite_instantiations_invalid.move:14
+   = `y<T>` calls `x<X::Box<T>>` at tests/cyclic-instantiation-checker/v1-typing/infinite_instantiations_invalid.move:14
+   = `x<X::Box<T>>` calls `y<X::Box<X::Box<T>>>` at tests/cyclic-instantiation-checker/v1-typing/infinite_instantiations_invalid.move:11
 
 error: cyclic type instantiation: a cycle of recursive calls causes a type to grow without bound
    ┌─ tests/cyclic-instantiation-checker/v1-typing/infinite_instantiations_invalid.move:17:16
@@ -32,9 +32,9 @@ error: cyclic type instantiation: a cycle of recursive calls causes a type to gr
 17 │     public fun a<A>() {
    │                ^
    │
-   = `a<A>` calls `b<A>` at tests/cyclic-instantiation-checker/v1-typing/infinite_instantiations_invalid.move:17
-   = `b<A>` calls `c<A>` at tests/cyclic-instantiation-checker/v1-typing/infinite_instantiations_invalid.move:18
-   = `c<A>` calls `a<X::Box<A>>` at tests/cyclic-instantiation-checker/v1-typing/infinite_instantiations_invalid.move:21
+   = `a<A>` calls `b<A>` at tests/cyclic-instantiation-checker/v1-typing/infinite_instantiations_invalid.move:18
+   = `b<A>` calls `c<A>` at tests/cyclic-instantiation-checker/v1-typing/infinite_instantiations_invalid.move:21
+   = `c<A>` calls `a<X::Box<A>>` at tests/cyclic-instantiation-checker/v1-typing/infinite_instantiations_invalid.move:24
 
 error: cyclic type instantiation: a cycle of recursive calls causes a type to grow without bound
    ┌─ tests/cyclic-instantiation-checker/v1-typing/infinite_instantiations_invalid.move:20:16
@@ -42,9 +42,9 @@ error: cyclic type instantiation: a cycle of recursive calls causes a type to gr
 20 │     public fun b<B>() {
    │                ^
    │
-   = `b<B>` calls `c<B>` at tests/cyclic-instantiation-checker/v1-typing/infinite_instantiations_invalid.move:20
-   = `c<B>` calls `a<X::Box<B>>` at tests/cyclic-instantiation-checker/v1-typing/infinite_instantiations_invalid.move:21
-   = `a<X::Box<B>>` calls `b<X::Box<B>>` at tests/cyclic-instantiation-checker/v1-typing/infinite_instantiations_invalid.move:24
+   = `b<B>` calls `c<B>` at tests/cyclic-instantiation-checker/v1-typing/infinite_instantiations_invalid.move:21
+   = `c<B>` calls `a<X::Box<B>>` at tests/cyclic-instantiation-checker/v1-typing/infinite_instantiations_invalid.move:24
+   = `a<X::Box<B>>` calls `b<X::Box<B>>` at tests/cyclic-instantiation-checker/v1-typing/infinite_instantiations_invalid.move:18
 
 error: cyclic type instantiation: a cycle of recursive calls causes a type to grow without bound
    ┌─ tests/cyclic-instantiation-checker/v1-typing/infinite_instantiations_invalid.move:23:16
@@ -52,9 +52,9 @@ error: cyclic type instantiation: a cycle of recursive calls causes a type to gr
 23 │     public fun c<C>() {
    │                ^
    │
-   = `c<C>` calls `a<X::Box<C>>` at tests/cyclic-instantiation-checker/v1-typing/infinite_instantiations_invalid.move:23
-   = `a<X::Box<C>>` calls `b<X::Box<C>>` at tests/cyclic-instantiation-checker/v1-typing/infinite_instantiations_invalid.move:24
-   = `b<X::Box<C>>` calls `c<X::Box<C>>` at tests/cyclic-instantiation-checker/v1-typing/infinite_instantiations_invalid.move:18
+   = `c<C>` calls `a<X::Box<C>>` at tests/cyclic-instantiation-checker/v1-typing/infinite_instantiations_invalid.move:24
+   = `a<X::Box<C>>` calls `b<X::Box<C>>` at tests/cyclic-instantiation-checker/v1-typing/infinite_instantiations_invalid.move:18
+   = `b<X::Box<C>>` calls `c<X::Box<C>>` at tests/cyclic-instantiation-checker/v1-typing/infinite_instantiations_invalid.move:21
 
 error: cyclic type instantiation: a cycle of recursive calls causes a type to grow without bound
    ┌─ tests/cyclic-instantiation-checker/v1-typing/infinite_instantiations_invalid.move:37:16
@@ -62,7 +62,7 @@ error: cyclic type instantiation: a cycle of recursive calls causes a type to gr
 37 │     public fun z<T>() {
    │                ^
    │
-   = `z<T>` calls `z<Y::Box<T>>` at tests/cyclic-instantiation-checker/v1-typing/infinite_instantiations_invalid.move:37
+   = `z<T>` calls `z<Y::Box<T>>` at tests/cyclic-instantiation-checker/v1-typing/infinite_instantiations_invalid.move:38
 
 error: cyclic type instantiation: a cycle of recursive calls causes a type to grow without bound
    ┌─ tests/cyclic-instantiation-checker/v1-typing/infinite_instantiations_invalid.move:41:16
@@ -70,10 +70,10 @@ error: cyclic type instantiation: a cycle of recursive calls causes a type to gr
 41 │     public fun a<A>() {
    │                ^
    │
-   = `a<A>` calls `b<A>` at tests/cyclic-instantiation-checker/v1-typing/infinite_instantiations_invalid.move:41
-   = `b<A>` calls `c<A>` at tests/cyclic-instantiation-checker/v1-typing/infinite_instantiations_invalid.move:42
-   = `c<A>` calls `d<Y::Box<A>>` at tests/cyclic-instantiation-checker/v1-typing/infinite_instantiations_invalid.move:45
-   = `d<Y::Box<A>>` calls `a<Y::Box<A>>` at tests/cyclic-instantiation-checker/v1-typing/infinite_instantiations_invalid.move:48
+   = `a<A>` calls `b<A>` at tests/cyclic-instantiation-checker/v1-typing/infinite_instantiations_invalid.move:42
+   = `b<A>` calls `c<A>` at tests/cyclic-instantiation-checker/v1-typing/infinite_instantiations_invalid.move:45
+   = `c<A>` calls `d<Y::Box<A>>` at tests/cyclic-instantiation-checker/v1-typing/infinite_instantiations_invalid.move:48
+   = `d<Y::Box<A>>` calls `a<Y::Box<A>>` at tests/cyclic-instantiation-checker/v1-typing/infinite_instantiations_invalid.move:51
 
 error: cyclic type instantiation: a cycle of recursive calls causes a type to grow without bound
    ┌─ tests/cyclic-instantiation-checker/v1-typing/infinite_instantiations_invalid.move:44:16
@@ -81,10 +81,10 @@ error: cyclic type instantiation: a cycle of recursive calls causes a type to gr
 44 │     public fun b<B>() {
    │                ^
    │
-   = `b<B>` calls `c<B>` at tests/cyclic-instantiation-checker/v1-typing/infinite_instantiations_invalid.move:44
-   = `c<B>` calls `d<Y::Box<B>>` at tests/cyclic-instantiation-checker/v1-typing/infinite_instantiations_invalid.move:45
-   = `d<Y::Box<B>>` calls `a<Y::Box<B>>` at tests/cyclic-instantiation-checker/v1-typing/infinite_instantiations_invalid.move:48
-   = `a<Y::Box<B>>` calls `b<Y::Box<B>>` at tests/cyclic-instantiation-checker/v1-typing/infinite_instantiations_invalid.move:51
+   = `b<B>` calls `c<B>` at tests/cyclic-instantiation-checker/v1-typing/infinite_instantiations_invalid.move:45
+   = `c<B>` calls `d<Y::Box<B>>` at tests/cyclic-instantiation-checker/v1-typing/infinite_instantiations_invalid.move:48
+   = `d<Y::Box<B>>` calls `a<Y::Box<B>>` at tests/cyclic-instantiation-checker/v1-typing/infinite_instantiations_invalid.move:51
+   = `a<Y::Box<B>>` calls `b<Y::Box<B>>` at tests/cyclic-instantiation-checker/v1-typing/infinite_instantiations_invalid.move:42
 
 error: cyclic type instantiation: a cycle of recursive calls causes a type to grow without bound
    ┌─ tests/cyclic-instantiation-checker/v1-typing/infinite_instantiations_invalid.move:47:16
@@ -92,10 +92,10 @@ error: cyclic type instantiation: a cycle of recursive calls causes a type to gr
 47 │     public fun c<C>() {
    │                ^
    │
-   = `c<C>` calls `d<Y::Box<C>>` at tests/cyclic-instantiation-checker/v1-typing/infinite_instantiations_invalid.move:47
-   = `d<Y::Box<C>>` calls `a<Y::Box<C>>` at tests/cyclic-instantiation-checker/v1-typing/infinite_instantiations_invalid.move:48
-   = `a<Y::Box<C>>` calls `b<Y::Box<C>>` at tests/cyclic-instantiation-checker/v1-typing/infinite_instantiations_invalid.move:51
-   = `b<Y::Box<C>>` calls `c<Y::Box<C>>` at tests/cyclic-instantiation-checker/v1-typing/infinite_instantiations_invalid.move:42
+   = `c<C>` calls `d<Y::Box<C>>` at tests/cyclic-instantiation-checker/v1-typing/infinite_instantiations_invalid.move:48
+   = `d<Y::Box<C>>` calls `a<Y::Box<C>>` at tests/cyclic-instantiation-checker/v1-typing/infinite_instantiations_invalid.move:51
+   = `a<Y::Box<C>>` calls `b<Y::Box<C>>` at tests/cyclic-instantiation-checker/v1-typing/infinite_instantiations_invalid.move:42
+   = `b<Y::Box<C>>` calls `c<Y::Box<C>>` at tests/cyclic-instantiation-checker/v1-typing/infinite_instantiations_invalid.move:45
 
 error: cyclic type instantiation: a cycle of recursive calls causes a type to grow without bound
    ┌─ tests/cyclic-instantiation-checker/v1-typing/infinite_instantiations_invalid.move:50:16
@@ -103,10 +103,10 @@ error: cyclic type instantiation: a cycle of recursive calls causes a type to gr
 50 │     public fun d<D>() {
    │                ^
    │
-   = `d<D>` calls `a<D>` at tests/cyclic-instantiation-checker/v1-typing/infinite_instantiations_invalid.move:50
-   = `a<D>` calls `b<D>` at tests/cyclic-instantiation-checker/v1-typing/infinite_instantiations_invalid.move:51
-   = `b<D>` calls `c<D>` at tests/cyclic-instantiation-checker/v1-typing/infinite_instantiations_invalid.move:42
-   = `c<D>` calls `d<Y::Box<D>>` at tests/cyclic-instantiation-checker/v1-typing/infinite_instantiations_invalid.move:45
+   = `d<D>` calls `a<D>` at tests/cyclic-instantiation-checker/v1-typing/infinite_instantiations_invalid.move:51
+   = `a<D>` calls `b<D>` at tests/cyclic-instantiation-checker/v1-typing/infinite_instantiations_invalid.move:42
+   = `b<D>` calls `c<D>` at tests/cyclic-instantiation-checker/v1-typing/infinite_instantiations_invalid.move:45
+   = `c<D>` calls `d<Y::Box<D>>` at tests/cyclic-instantiation-checker/v1-typing/infinite_instantiations_invalid.move:48
 
 error: cyclic type instantiation: a cycle of recursive calls causes a type to grow without bound
    ┌─ tests/cyclic-instantiation-checker/v1-typing/infinite_instantiations_invalid.move:58:16
@@ -114,9 +114,9 @@ error: cyclic type instantiation: a cycle of recursive calls causes a type to gr
 58 │     public fun tl<TL>() {
    │                ^^
    │
-   = `tl<TL>` calls `tr<TL>` at tests/cyclic-instantiation-checker/v1-typing/infinite_instantiations_invalid.move:58
-   = `tr<TL>` calls `bl<Z::Box<TL>>` at tests/cyclic-instantiation-checker/v1-typing/infinite_instantiations_invalid.move:59
-   = `bl<Z::Box<TL>>` calls `tl<Z::Box<TL>>` at tests/cyclic-instantiation-checker/v1-typing/infinite_instantiations_invalid.move:62
+   = `tl<TL>` calls `tr<TL>` at tests/cyclic-instantiation-checker/v1-typing/infinite_instantiations_invalid.move:59
+   = `tr<TL>` calls `bl<Z::Box<TL>>` at tests/cyclic-instantiation-checker/v1-typing/infinite_instantiations_invalid.move:62
+   = `bl<Z::Box<TL>>` calls `tl<Z::Box<TL>>` at tests/cyclic-instantiation-checker/v1-typing/infinite_instantiations_invalid.move:69
 
 error: cyclic type instantiation: a cycle of recursive calls causes a type to grow without bound
    ┌─ tests/cyclic-instantiation-checker/v1-typing/infinite_instantiations_invalid.move:61:16
@@ -124,9 +124,9 @@ error: cyclic type instantiation: a cycle of recursive calls causes a type to gr
 61 │     public fun tr<TR>() {
    │                ^^
    │
-   = `tr<TR>` calls `bl<Z::Box<TR>>` at tests/cyclic-instantiation-checker/v1-typing/infinite_instantiations_invalid.move:61
-   = `bl<Z::Box<TR>>` calls `tl<Z::Box<TR>>` at tests/cyclic-instantiation-checker/v1-typing/infinite_instantiations_invalid.move:62
-   = `tl<Z::Box<TR>>` calls `tr<Z::Box<TR>>` at tests/cyclic-instantiation-checker/v1-typing/infinite_instantiations_invalid.move:69
+   = `tr<TR>` calls `bl<Z::Box<TR>>` at tests/cyclic-instantiation-checker/v1-typing/infinite_instantiations_invalid.move:62
+   = `bl<Z::Box<TR>>` calls `tl<Z::Box<TR>>` at tests/cyclic-instantiation-checker/v1-typing/infinite_instantiations_invalid.move:69
+   = `tl<Z::Box<TR>>` calls `tr<Z::Box<TR>>` at tests/cyclic-instantiation-checker/v1-typing/infinite_instantiations_invalid.move:59
 
 error: cyclic type instantiation: a cycle of recursive calls causes a type to grow without bound
    ┌─ tests/cyclic-instantiation-checker/v1-typing/infinite_instantiations_invalid.move:68:16
@@ -134,6 +134,6 @@ error: cyclic type instantiation: a cycle of recursive calls causes a type to gr
 68 │     public fun bl<BL>() {
    │                ^^
    │
-   = `bl<BL>` calls `tl<BL>` at tests/cyclic-instantiation-checker/v1-typing/infinite_instantiations_invalid.move:68
-   = `tl<BL>` calls `tr<BL>` at tests/cyclic-instantiation-checker/v1-typing/infinite_instantiations_invalid.move:69
-   = `tr<BL>` calls `bl<Z::Box<BL>>` at tests/cyclic-instantiation-checker/v1-typing/infinite_instantiations_invalid.move:59
+   = `bl<BL>` calls `tl<BL>` at tests/cyclic-instantiation-checker/v1-typing/infinite_instantiations_invalid.move:69
+   = `tl<BL>` calls `tr<BL>` at tests/cyclic-instantiation-checker/v1-typing/infinite_instantiations_invalid.move:59
+   = `tr<BL>` calls `bl<Z::Box<BL>>` at tests/cyclic-instantiation-checker/v1-typing/infinite_instantiations_invalid.move:62

@@ -167,8 +167,6 @@ pub enum QuorumStoreRequest {
         u64,
         // return non full
         bool,
-        // include gas upgraded
-        bool,
         // transactions to exclude from the requested batch
         BTreeMap<TransactionSummary, TransactionInProgress>,
         // callback to respond to
@@ -191,16 +189,14 @@ impl fmt::Display for QuorumStoreRequest {
                 max_txns,
                 max_bytes,
                 return_non_full,
-                include_gas_upgraded,
                 excluded_txns,
                 _,
             ) => {
                 format!(
-                    "GetBatchRequest [max_txns: {}, max_bytes: {}, return_non_full: {}, include_gas_upgraded: {}, excluded_txns_length: {}]",
+                    "GetBatchRequest [max_txns: {}, max_bytes: {}, return_non_full: {}, excluded_txns_length: {}]",
                     max_txns,
                     max_bytes,
                     return_non_full,
-                    include_gas_upgraded,
                     excluded_txns.len()
                 )
             },

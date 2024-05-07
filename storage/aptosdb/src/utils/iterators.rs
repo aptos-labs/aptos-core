@@ -15,7 +15,10 @@ use aptos_types::{
     account_address::AccountAddress,
     contract_event::ContractEvent,
     ledger_info::LedgerInfoWithSignatures,
-    state_store::{state_key::StateKey, state_key_prefix::StateKeyPrefix, state_value::StateValue},
+    state_store::{
+        state_key::{prefix::StateKeyPrefix, StateKey},
+        state_value::StateValue,
+    },
     transaction::Version,
 };
 use std::{iter::Peekable, marker::PhantomData};

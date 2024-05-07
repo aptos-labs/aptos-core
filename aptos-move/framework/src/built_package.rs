@@ -272,22 +272,25 @@ impl BuiltPackage {
         let effective_compiler_version = compiler_version.unwrap_or_default();
         let effective_language_version = language_version.unwrap_or_default();
         let mut error_writer = StandardStream::stderr(ColorChoice::Auto);
-        error_writer.set_color(ColorSpec::new().set_fg(Some(Color::Yellow)))?;
         if effective_compiler_version.unstable() {
+            error_writer.set_color(ColorSpec::new().set_fg(Some(Color::Yellow)))?;
             writeln!(
                 &mut error_writer,
                 "Warning: compiler version `{}` is experimental \
                 and should not be used in production",
                 effective_compiler_version
-            )?
+            )?;
+            error_writer.reset()?;
         }
         if effective_language_version.unstable() {
+            error_writer.set_color(ColorSpec::new().set_fg(Some(Color::Yellow)))?;
             writeln!(
                 &mut error_writer,
                 "Warning: language version `{}` is experimental \
                 and should not be used in production",
                 effective_language_version
-            )?
+            )?;
+            error_writer.reset()?;
         }
         effective_compiler_version.check_language_support(effective_language_version)?;
         Ok(())

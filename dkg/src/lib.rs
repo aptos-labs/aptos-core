@@ -33,6 +33,7 @@ pub fn start_dkg_runtime(
     dkg_start_events: EventNotificationListener,
     vtxn_pool: VTxnPoolState,
     rb_config: ReliableBroadcastConfig,
+    randomness_override_seq_num: u64,
 ) -> Runtime {
     let runtime = aptos_runtimes::spawn_named_runtime("dkg".into(), Some(4));
     let (self_sender, self_receiver) = aptos_channels::new(1_024, &counters::PENDING_SELF_MESSAGES);
@@ -47,6 +48,7 @@ pub fn start_dkg_runtime(
         dkg_network_client,
         vtxn_pool,
         rb_config,
+        randomness_override_seq_num,
     );
     let (network_task, network_receiver) = NetworkTask::new(network_events, self_receiver);
     runtime.spawn(network_task.start());

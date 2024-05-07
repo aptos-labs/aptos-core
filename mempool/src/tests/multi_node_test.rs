@@ -470,7 +470,6 @@ impl TestHarness {
                                 100,
                                 102400,
                                 true,
-                                false,
                                 btreemap![],
                             );
                             for txn in transactions.iter() {

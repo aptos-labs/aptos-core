@@ -8,7 +8,7 @@ error: post-condition does not hold
    =     at tests/sources/functional/choice.move:16: simple_incorrect
    =         b = <redacted>
    =     at tests/sources/functional/choice.move:17: simple_incorrect
-   =         b = <redacted>
+   =         return = <redacted>
    =     at tests/sources/functional/choice.move:17: simple_incorrect
    =         result = <redacted>
    =     at tests/sources/functional/choice.move:18: simple_incorrect
@@ -30,9 +30,9 @@ error: post-condition does not hold
    =         s1 = <redacted>
    =         s2 = <redacted>
    =     at tests/sources/functional/choice.move:47: populate_R
-   =         s1 = <redacted>
+   =         <redacted> = <redacted>
    =     at tests/sources/functional/choice.move:48: populate_R
-   =         s2 = <redacted>
+   =         <redacted> = <redacted>
    =     at tests/sources/functional/choice.move:49: populate_R
    =     at tests/sources/functional/choice.move:56: populate_R (spec)
 
@@ -75,7 +75,7 @@ error: post-condition does not hold
     =     at tests/sources/functional/choice.move:95: test_choice_dup_expected_fail
     =         x = <redacted>
     =     at tests/sources/functional/choice.move:96: test_choice_dup_expected_fail
-    =         x = <redacted>
+    =         <redacted> = <redacted>
     =         result = <redacted>
     =     at tests/sources/functional/choice.move:97: test_choice_dup_expected_fail
     =     at tests/sources/functional/choice.move:100: test_choice_dup_expected_fail (spec)
@@ -138,7 +138,7 @@ error: post-condition does not hold
     =         ballot_account = <redacted>
     =     at tests/sources/functional/choice.move:284: create_ballot
     =     at tests/sources/functional/choice.move:283: create_ballot
-    =         ballot_account = <redacted>
+    =         <redacted> = <redacted>
     =     at tests/sources/functional/choice.move:291
     =     at tests/sources/functional/choice.move:286: create_ballot
     =     at tests/sources/functional/choice.move:272: new_ballot_id
@@ -147,7 +147,7 @@ error: post-condition does not hold
     =         result = <redacted>
     =     at tests/sources/functional/choice.move:278: new_ballot_id
     =     at tests/sources/functional/choice.move:287: create_ballot
-    =         <redacted> = <redacted>
+    =         return = <redacted>
     =     at tests/sources/functional/choice.move:282: create_ballot
     =         result = <redacted>
     =     at tests/sources/functional/choice.move:288: create_ballot

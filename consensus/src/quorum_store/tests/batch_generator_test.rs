@@ -50,7 +50,6 @@ async fn queue_mempool_batch_response(
         _max_batch_size,
         _max_bytes,
         _return_non_full,
-        _include_gas_upgraded,
         exclude_txns,
         callback,
     ) = timeout(

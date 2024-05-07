@@ -37,8 +37,7 @@ use aptos_types::{
     state_proof::StateProof,
     state_store::{
         combine_sharded_state_updates,
-        state_key::StateKey,
-        state_key_prefix::StateKeyPrefix,
+        state_key::{prefix::StateKeyPrefix, StateKey},
         state_storage_usage::StateStorageUsage,
         state_value::{StateValue, StateValueChunkWithProof},
         table, ShardedStateUpdates,
