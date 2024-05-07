@@ -45,13 +45,13 @@ This module provides an interface to burn or collect and redistribute transactio
 
 
 <pre><code><b>use</b> <a href="aptos_coin.md#0x1_aptos_coin">0x1::aptos_coin</a>;
+<b>use</b> <a href="aptos_primary_fungible_store.md#0x1_aptos_primary_fungible_store">0x1::aptos_primary_fungible_store</a>;
 <b>use</b> <a href="coin.md#0x1_coin">0x1::coin</a>;
 <b>use</b> <a href="../../aptos-stdlib/../move-stdlib/doc/error.md#0x1_error">0x1::error</a>;
 <b>use</b> <a href="event.md#0x1_event">0x1::event</a>;
 <b>use</b> <a href="../../aptos-stdlib/../move-stdlib/doc/features.md#0x1_features">0x1::features</a>;
 <b>use</b> <a href="fungible_asset.md#0x1_fungible_asset">0x1::fungible_asset</a>;
 <b>use</b> <a href="../../aptos-stdlib/../move-stdlib/doc/option.md#0x1_option">0x1::option</a>;
-<b>use</b> <a href="primary_fungible_store.md#0x1_primary_fungible_store">0x1::primary_fungible_store</a>;
 <b>use</b> <a href="../../aptos-stdlib/../move-stdlib/doc/signer.md#0x1_signer">0x1::signer</a>;
 <b>use</b> <a href="stake.md#0x1_stake">0x1::stake</a>;
 <b>use</b> <a href="system_addresses.md#0x1_system_addresses">0x1::system_addresses</a>;
@@ -561,12 +561,12 @@ Burn transaction fees in epilogue.
 <pre><code><b>public</b>(<b>friend</b>) <b>fun</b> <a href="transaction_fee.md#0x1_transaction_fee_burn_fee">burn_fee</a>(<a href="account.md#0x1_account">account</a>: <b>address</b>, fee: u64) <b>acquires</b> <a href="transaction_fee.md#0x1_transaction_fee_AptosFABurnCapabilities">AptosFABurnCapabilities</a>, <a href="transaction_fee.md#0x1_transaction_fee_AptosCoinCapabilities">AptosCoinCapabilities</a> {
     <b>if</b> (<b>exists</b>&lt;<a href="transaction_fee.md#0x1_transaction_fee_AptosFABurnCapabilities">AptosFABurnCapabilities</a>&gt;(@aptos_framework)) {
         <b>let</b> burn_ref = &<b>borrow_global</b>&lt;<a href="transaction_fee.md#0x1_transaction_fee_AptosFABurnCapabilities">AptosFABurnCapabilities</a>&gt;(@aptos_framework).burn_ref;
-        <a href="primary_fungible_store.md#0x1_primary_fungible_store_apt_burn_from">primary_fungible_store::apt_burn_from</a>(burn_ref, <a href="account.md#0x1_account">account</a>, fee);
+        <a href="aptos_primary_fungible_store.md#0x1_aptos_primary_fungible_store_burn_from">aptos_primary_fungible_store::burn_from</a>(burn_ref, <a href="account.md#0x1_account">account</a>, fee);
     } <b>else</b> {
         <b>let</b> burn_cap = &<b>borrow_global</b>&lt;<a href="transaction_fee.md#0x1_transaction_fee_AptosCoinCapabilities">AptosCoinCapabilities</a>&gt;(@aptos_framework).burn_cap;
         <b>if</b> (<a href="../../aptos-stdlib/../move-stdlib/doc/features.md#0x1_features_operations_default_to_fa_apt_store">features::operations_default_to_fa_apt_store</a>()) {
             <b>let</b> (burn_ref, burn_receipt) = <a href="coin.md#0x1_coin_get_paired_burn_ref">coin::get_paired_burn_ref</a>(burn_cap);
-            <a href="primary_fungible_store.md#0x1_primary_fungible_store_apt_burn_from">primary_fungible_store::apt_burn_from</a>(&burn_ref, <a href="account.md#0x1_account">account</a>, fee);
+            <a href="aptos_primary_fungible_store.md#0x1_aptos_primary_fungible_store_burn_from">aptos_primary_fungible_store::burn_from</a>(&burn_ref, <a href="account.md#0x1_account">account</a>, fee);
             <a href="coin.md#0x1_coin_return_paired_burn_ref">coin::return_paired_burn_ref</a>(burn_ref, burn_receipt);
         } <b>else</b> {
             <a href="coin.md#0x1_coin_burn_from">coin::burn_from</a>&lt;AptosCoin&gt;(

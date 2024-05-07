@@ -42,13 +42,13 @@
 
 <pre><code><b>use</b> <a href="account.md#0x1_account">0x1::account</a>;
 <b>use</b> <a href="aptos_coin.md#0x1_aptos_coin">0x1::aptos_coin</a>;
+<b>use</b> <a href="aptos_primary_fungible_store.md#0x1_aptos_primary_fungible_store">0x1::aptos_primary_fungible_store</a>;
 <b>use</b> <a href="../../aptos-stdlib/../move-stdlib/doc/bcs.md#0x1_bcs">0x1::bcs</a>;
 <b>use</b> <a href="chain_id.md#0x1_chain_id">0x1::chain_id</a>;
 <b>use</b> <a href="coin.md#0x1_coin">0x1::coin</a>;
 <b>use</b> <a href="../../aptos-stdlib/../move-stdlib/doc/error.md#0x1_error">0x1::error</a>;
 <b>use</b> <a href="../../aptos-stdlib/../move-stdlib/doc/features.md#0x1_features">0x1::features</a>;
 <b>use</b> <a href="../../aptos-stdlib/../move-stdlib/doc/option.md#0x1_option">0x1::option</a>;
-<b>use</b> <a href="primary_fungible_store.md#0x1_primary_fungible_store">0x1::primary_fungible_store</a>;
 <b>use</b> <a href="../../aptos-stdlib/../move-stdlib/doc/signer.md#0x1_signer">0x1::signer</a>;
 <b>use</b> <a href="system_addresses.md#0x1_system_addresses">0x1::system_addresses</a>;
 <b>use</b> <a href="timestamp.md#0x1_timestamp">0x1::timestamp</a>;
@@ -421,7 +421,7 @@ Called in epilogue to optionally released the amount held in prologue for specia
     <b>let</b> max_transaction_fee = txn_gas_price * txn_max_gas_units;
     <b>if</b> (<a href="../../aptos-stdlib/../move-stdlib/doc/features.md#0x1_features_operations_default_to_fa_apt_store">features::operations_default_to_fa_apt_store</a>()) {
         <b>assert</b>!(
-            <a href="primary_fungible_store.md#0x1_primary_fungible_store_is_apt_balance_at_least">primary_fungible_store::is_apt_balance_at_least</a>(gas_payer, max_transaction_fee),
+            <a href="aptos_primary_fungible_store.md#0x1_aptos_primary_fungible_store_is_balance_at_least">aptos_primary_fungible_store::is_balance_at_least</a>(gas_payer, max_transaction_fee),
             <a href="../../aptos-stdlib/../move-stdlib/doc/error.md#0x1_error_invalid_argument">error::invalid_argument</a>(<a href="transaction_validation.md#0x1_transaction_validation_PROLOGUE_ECANT_PAY_GAS_DEPOSIT">PROLOGUE_ECANT_PAY_GAS_DEPOSIT</a>)
         );
     } <b>else</b> {
@@ -829,7 +829,7 @@ Called by the Adapter
     // <b>to</b> do failed transaction cleanup.
     <b>if</b> (<a href="../../aptos-stdlib/../move-stdlib/doc/features.md#0x1_features_operations_default_to_fa_apt_store">features::operations_default_to_fa_apt_store</a>()) {
         <b>assert</b>!(
-            <a href="primary_fungible_store.md#0x1_primary_fungible_store_is_apt_balance_at_least">primary_fungible_store::is_apt_balance_at_least</a>(gas_payer, transaction_fee_amount),
+            <a href="aptos_primary_fungible_store.md#0x1_aptos_primary_fungible_store_is_balance_at_least">aptos_primary_fungible_store::is_balance_at_least</a>(gas_payer, transaction_fee_amount),
             <a href="../../aptos-stdlib/../move-stdlib/doc/error.md#0x1_error_out_of_range">error::out_of_range</a>(<a href="transaction_validation.md#0x1_transaction_validation_PROLOGUE_ECANT_PAY_GAS_DEPOSIT">PROLOGUE_ECANT_PAY_GAS_DEPOSIT</a>),
         );
     } <b>else</b> {

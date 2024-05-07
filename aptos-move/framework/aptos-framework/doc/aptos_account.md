@@ -37,12 +37,12 @@
 
 <pre><code><b>use</b> <a href="account.md#0x1_account">0x1::account</a>;
 <b>use</b> <a href="aptos_coin.md#0x1_aptos_coin">0x1::aptos_coin</a>;
+<b>use</b> <a href="aptos_primary_fungible_store.md#0x1_aptos_primary_fungible_store">0x1::aptos_primary_fungible_store</a>;
 <b>use</b> <a href="coin.md#0x1_coin">0x1::coin</a>;
 <b>use</b> <a href="create_signer.md#0x1_create_signer">0x1::create_signer</a>;
 <b>use</b> <a href="../../aptos-stdlib/../move-stdlib/doc/error.md#0x1_error">0x1::error</a>;
 <b>use</b> <a href="event.md#0x1_event">0x1::event</a>;
 <b>use</b> <a href="../../aptos-stdlib/../move-stdlib/doc/features.md#0x1_features">0x1::features</a>;
-<b>use</b> <a href="primary_fungible_store.md#0x1_primary_fungible_store">0x1::primary_fungible_store</a>;
 <b>use</b> <a href="../../aptos-stdlib/../move-stdlib/doc/signer.md#0x1_signer">0x1::signer</a>;
 </code></pre>
 
@@ -310,7 +310,7 @@ This would create the recipient account first, which also registers it to receiv
     };
 
     <b>if</b> (<a href="../../aptos-stdlib/../move-stdlib/doc/features.md#0x1_features_operations_default_to_fa_apt_store">features::operations_default_to_fa_apt_store</a>()) {
-        <a href="primary_fungible_store.md#0x1_primary_fungible_store_apt_transfer">primary_fungible_store::apt_transfer</a>(source, <b>to</b>, amount)
+        <a href="aptos_primary_fungible_store.md#0x1_aptos_primary_fungible_store_transfer">aptos_primary_fungible_store::transfer</a>(source, <b>to</b>, amount)
     } <b>else</b> {
         // Resource accounts can be created without registering them <b>to</b> receive APT.
         // This conveniently does the registration <b>if</b> necessary.

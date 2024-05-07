@@ -1567,7 +1567,7 @@ Return whether the provided address has a store initialized.
 <summary>Implementation</summary>
 
 
-<pre><code><b>fun</b> <a href="fungible_asset.md#0x1_fungible_asset_store_exists_inline">store_exists_inline</a>(store: <b>address</b>): bool {
+<pre><code>inline <b>fun</b> <a href="fungible_asset.md#0x1_fungible_asset_store_exists_inline">store_exists_inline</a>(store: <b>address</b>): bool {
     <b>exists</b>&lt;<a href="fungible_asset.md#0x1_fungible_asset_FungibleStore">FungibleStore</a>&gt;(store)
 }
 </code></pre>

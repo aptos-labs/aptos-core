@@ -16,13 +16,9 @@ module aptos_framework::primary_fungible_store {
     use aptos_framework::fungible_asset::{Self, FungibleAsset, FungibleStore, Metadata, MintRef, TransferRef, BurnRef};
     use aptos_framework::object::{Self, Object, ConstructorRef, DeriveRef};
 
-    use std::features;
     use std::option::Option;
     use std::signer;
     use std::string::String;
-
-    friend aptos_framework::transaction_fee;
-    friend aptos_framework::transaction_validation;
 
     #[resource_group_member(group = aptos_framework::object::ObjectGroup)]
     /// A resource that holds the derive ref for the fungible asset metadata object. This is used to create primary
@@ -72,17 +68,6 @@ module aptos_framework::primary_fungible_store {
         }
     }
 
-    inline fun apt_ensure_primary_store_exists(
-        owner: address,
-    ): address acquires DeriveRefPod {
-        let store_addr = apt_store_address(owner);
-        if (fungible_asset::store_exists(store_addr)) {
-            store_addr
-        } else {
-            object::object_address(&create_primary_store(owner, object::address_to_object<Metadata>(@aptos_fungible_asset)))
-        }
-    }
-
     /// Create a primary store object to hold fungible asset for the given address.
     public fun create_primary_store<T: key>(
         owner_addr: address,
@@ -91,12 +76,7 @@ module aptos_framework::primary_fungible_store {
         let metadata_addr = object::object_address(&metadata);
         object::address_to_object<Metadata>(metadata_addr);
         let derive_ref = &borrow_global<DeriveRefPod>(metadata_addr).metadata_derive_ref;
-        let constructor_ref = if (metadata_addr == @aptos_fungible_asset && features::primary_apt_fungible_store_at_user_address_enabled(
-        )) {
-            &object::create_sticky_object_at_address(owner_addr, owner_addr)
-        } else {
-            &object::create_user_derived_object(owner_addr, derive_ref)
-        };
+        let constructor_ref = &object::create_user_derived_object(owner_addr, derive_ref);
         // Disable ungated transfer as deterministic stores shouldn't be transferrable.
         let transfer_ref = &object::generate_transfer_ref(constructor_ref);
         object::disable_ungated_transfer(transfer_ref);
@@ -108,11 +88,7 @@ module aptos_framework::primary_fungible_store {
     /// Get the address of the primary store for the given account.
     public fun primary_store_address<T: key>(owner: address, metadata: Object<T>): address {
         let metadata_addr = object::object_address(&metadata);
-        if (metadata_addr == @aptos_fungible_asset && features::primary_apt_fungible_store_at_user_address_enabled()) {
-            owner
-        } else {
-            object::create_user_derived_object_address(owner, metadata_addr)
-        }
+        object::create_user_derived_object_address(owner, metadata_addr)
     }
 
     #[view]
@@ -145,31 +121,6 @@ module aptos_framework::primary_fungible_store {
         } else {
             amount == 0
         }
-    }
-
-    inline fun apt_store_address(account: address): address {
-        if (features::primary_apt_fungible_store_at_user_address_enabled()) {
-            account
-        } else {
-            object::create_user_derived_object_address(account, @aptos_fungible_asset)
-        }
-    }
-
-    public(friend) fun is_apt_balance_at_least(account: address, amount: u64): bool {
-        let store_addr = apt_store_address(account);
-        fungible_asset::is_address_balance_at_least(store_addr, amount)
-    }
-
-    public(friend) fun apt_burn_from(
-        ref: &BurnRef,
-        account: address,
-        amount: u64,
-    ) {
-        // Skip burning if amount is zero. This shouldn't error out as it's called as part of transaction fee burning.
-        if (amount != 0) {
-            let store_addr = apt_store_address(account);
-            fungible_asset::address_burn_from(ref, store_addr, amount);
-        };
     }
 
     #[view]
@@ -216,22 +167,6 @@ module aptos_framework::primary_fungible_store {
         may_be_unburn(sender, sender_store);
         let recipient_store = ensure_primary_store_exists(recipient, metadata);
         dispatchable_fungible_asset::transfer(sender, sender_store, recipient_store, amount);
-    }
-
-    public entry fun apt_transfer(
-        sender: &signer,
-        recipient: address,
-        amount: u64,
-    ) acquires DeriveRefPod {
-        let sender_store = apt_ensure_primary_store_exists(signer::address_of(sender));
-        let recipient_store = apt_ensure_primary_store_exists(recipient);
-
-        // use internal APIs, as they skip:
-        // - owner, frozen and dispatchable checks
-        // as APT cannot be frozen or have dispatch, and PFS cannot be transfered
-        // (PFS could potentially be burned. regular transfer would permanently unburn the store.
-        // Ignoring the check here has the equivalent of unburning, transfers, and then burning again)
-        fungible_asset::deposit_internal(recipient_store, fungible_asset::withdraw_internal(sender_store, amount));
     }
 
     /// Transfer `amount` of fungible asset from sender's primary store to receiver's primary store.
