@@ -978,16 +978,11 @@ impl RoundManager {
                 "[RoundManager] SafetyRules Rejected {} for order vote",
                 proposed_block.block()
             ))?;
-            if let Some(to_be_order_voted_block) = self
-                .block_store
-                .get_block(order_vote.ledger_info().consensus_block_id())
-            {
-                if !to_be_order_voted_block.block().is_nil_block() {
-                    observe_block(
-                        to_be_order_voted_block.block().timestamp_usecs(),
-                        BlockStage::ORDER_VOTED,
-                    );
-                }
+            if !proposed_block.block().is_nil_block() {
+                observe_block(
+                    proposed_block.block().timestamp_usecs(),
+                    BlockStage::ORDER_VOTED,
+                );
             }
             info!(self.new_log(LogEvent::SendOrderVote), "{}", order_vote);
             self.network.broadcast_order_vote(order_vote).await;
@@ -1086,10 +1081,9 @@ impl RoundManager {
                 let result = self.new_qc_aggregated(qc.clone(), vote.author()).await;
                 if self.onchain_config.order_vote_enabled() {
                     if result.is_ok() {
-                        info!("OrderVoteBrodcast");
                         let _ = self.broadcast_order_vote(vote, qc.clone()).await;
                     } else {
-                        warn!("OrderVoteBrodcastFailed");
+                        warn!("OrderVoteBrodcastFailed. Round = {}", round);
                     }
                 }
                 result
