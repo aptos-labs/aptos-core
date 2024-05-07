@@ -140,7 +140,7 @@ impl ControlFlowGraphSimplifierTransformation {
     }
 }
 
-/// Control flow graph based code transformation
+/// Control flow graph that owns the code for transformation
 struct ControlFlowGraphCodeGenerator {
     /// The control flow graph.
     /// `BlockContent` is invalidated during transformations
