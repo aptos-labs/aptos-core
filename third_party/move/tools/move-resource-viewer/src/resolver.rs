@@ -19,7 +19,7 @@ use move_binary_format::{
     views::FunctionHandleView,
     CompiledModule,
 };
-use move_bytecode_utils::module_cache::GetModule;
+use move_bytecode_utils::compiled_module_viewer::CompiledModuleViewer;
 use move_core_types::{
     account_address::AccountAddress,
     identifier::{IdentStr, Identifier},
@@ -34,11 +34,14 @@ pub(crate) struct Resolver<'a, T: ?Sized> {
     max_bytecode_version: u32,
 }
 
-impl<'a, T: ModuleResolver + ?Sized> GetModule for Resolver<'a, T> {
+impl<'a, T: ModuleResolver + ?Sized> CompiledModuleViewer for Resolver<'a, T> {
     type Error = Error;
     type Item = Rc<CompiledModule>;
 
-    fn get_module_by_id(&self, module_id: &ModuleId) -> Result<Option<Self::Item>, Self::Error> {
+    fn view_compiled_module(
+        &self,
+        module_id: &ModuleId,
+    ) -> Result<Option<Self::Item>, Self::Error> {
         if let Some(module) = self.cache.get(module_id) {
             return Ok(Some(module));
         }
@@ -83,7 +86,7 @@ impl<'a, T: ModuleResolver + ?Sized> Resolver<'a, T> {
     }
 
     pub fn get_module_by_id_or_err(&self, module_id: &ModuleId) -> Result<Rc<CompiledModule>> {
-        self.get_module_by_id(module_id)
+        self.view_compiled_module(module_id)
             .map(|opt| opt.expect("My GetModule impl always returns Some."))
     }
 

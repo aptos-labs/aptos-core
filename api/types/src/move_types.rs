@@ -46,7 +46,7 @@ impl TryFrom<AnnotatedMoveStruct> for MoveResource {
 
     fn try_from(s: AnnotatedMoveStruct) -> anyhow::Result<Self> {
         Ok(Self {
-            typ: s.type_.clone().into(),
+            typ: s.ty_tag.clone().into(),
             data: s.try_into()?,
         })
     }
@@ -302,7 +302,7 @@ impl TryFrom<AnnotatedMoveValue> for MoveValue {
             ),
             AnnotatedMoveValue::Bytes(v) => MoveValue::Bytes(HexEncodedBytes(v)),
             AnnotatedMoveValue::Struct(v) => {
-                if MoveValue::is_utf8_string(&v.type_) {
+                if MoveValue::is_utf8_string(&v.ty_tag) {
                     MoveValue::convert_utf8_string(v)?
                 } else {
                     MoveValue::Struct(v.try_into()?)
@@ -1506,7 +1506,7 @@ mod tests {
     ) -> AnnotatedMoveStruct {
         AnnotatedMoveStruct {
             abilities: AbilitySet::EMPTY,
-            type_: type_struct(typ),
+            ty_tag: type_struct(typ),
             value: values,
         }
     }

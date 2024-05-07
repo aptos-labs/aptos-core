@@ -2,6 +2,8 @@
 // Parts of the project are originally copyright © Meta Platforms, Inc.
 // SPDX-License-Identifier: Apache-2.0
 
+pub mod module_view;
+
 use anyhow::{bail, Result};
 use aptos_types::{access_path::AccessPath, contract_event::ContractEvent};
 use move_core_types::{language_storage::StructTag, resolver::ModuleResolver};

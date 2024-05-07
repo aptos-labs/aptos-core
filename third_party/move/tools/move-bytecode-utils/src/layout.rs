@@ -2,7 +2,7 @@
 // Copyright (c) The Move Contributors
 // SPDX-License-Identifier: Apache-2.0
 
-use crate::module_cache::GetModule;
+use crate::compiled_module_viewer::CompiledModuleViewer;
 use anyhow::{anyhow, bail, Result};
 use move_binary_format::{
     access::ModuleAccess,
@@ -38,7 +38,7 @@ const U256_SERDE_NAME: &str = "u256";
 /// struct bindings for Move types in source languages that use Move-based services.
 pub struct SerdeLayoutBuilder<'a, T> {
     registry: Registry,
-    module_resolver: &'a T,
+    compiled_module_viewer: &'a T,
     config: SerdeLayoutConfig,
 }
 
@@ -65,12 +65,12 @@ pub struct SerdeLayoutConfig {
     pub shallow: bool,
 }
 
-impl<'a, T: GetModule> SerdeLayoutBuilder<'a, T> {
+impl<'a, T: CompiledModuleViewer> SerdeLayoutBuilder<'a, T> {
     /// Create a `LayoutBuilder` with an empty registry and deep layout resolution
     pub fn new(module_resolver: &'a T) -> Self {
         Self {
             registry: Self::default_registry(),
-            module_resolver,
+            compiled_module_viewer: module_resolver,
             config: SerdeLayoutConfig::default(),
         }
     }
@@ -79,7 +79,7 @@ impl<'a, T: GetModule> SerdeLayoutBuilder<'a, T> {
     pub fn new_with_config(module_resolver: &'a T, config: SerdeLayoutConfig) -> Self {
         Self {
             registry: Self::default_registry(),
-            module_resolver,
+            compiled_module_viewer: module_resolver,
             config,
         }
     }
@@ -183,8 +183,8 @@ impl<'a, T: GetModule> SerdeLayoutBuilder<'a, T> {
         // StructTag::display(), but it's not easy to use that code here
 
         let declaring_module = self
-            .module_resolver
-            .get_module_by_id(module_id)?
+            .compiled_module_viewer
+            .view_compiled_module(module_id)?
             .expect("Failed to resolve module");
         let def = declaring_module
             .borrow()
@@ -318,27 +318,36 @@ impl TypeLayoutBuilder {
     /// Construct a WithTypes `TypeLayout` with fields from `t`.
     /// Panics if `resolver` cannot resolve a module whose types are referenced directly or
     /// transitively by `t`
-    pub fn build_with_types(t: &TypeTag, resolver: &impl GetModule) -> Result<MoveTypeLayout> {
+    pub fn build_with_types(
+        t: &TypeTag,
+        resolver: &impl CompiledModuleViewer,
+    ) -> Result<MoveTypeLayout> {
         Self::build(t, resolver, LayoutType::WithTypes)
     }
 
     /// Construct a WithFields `TypeLayout` with fields from `t`.
     /// Panics if `resolver` cannot resolve a module whose types are referenced directly or
     /// transitively by `t`.
-    pub fn build_with_fields(t: &TypeTag, resolver: &impl GetModule) -> Result<MoveTypeLayout> {
+    pub fn build_with_fields(
+        t: &TypeTag,
+        resolver: &impl CompiledModuleViewer,
+    ) -> Result<MoveTypeLayout> {
         Self::build(t, resolver, LayoutType::WithFields)
     }
 
     /// Construct a runtime `TypeLayout` from `t`.
     /// Panics if `resolver` cannot resolve a module whose types are referenced directly or
     /// transitively by `t`.
-    pub fn build_runtime(t: &TypeTag, resolver: &impl GetModule) -> Result<MoveTypeLayout> {
+    pub fn build_runtime(
+        t: &TypeTag,
+        resolver: &impl CompiledModuleViewer,
+    ) -> Result<MoveTypeLayout> {
         Self::build(t, resolver, LayoutType::Runtime)
     }
 
     fn build(
         t: &TypeTag,
-        resolver: &impl GetModule,
+        resolver: &impl CompiledModuleViewer,
         layout_type: LayoutType,
     ) -> Result<MoveTypeLayout> {
         use TypeTag::*;
@@ -365,7 +374,7 @@ impl TypeLayoutBuilder {
         m: &CompiledModule,
         s: &SignatureToken,
         type_arguments: &[MoveTypeLayout],
-        resolver: &impl GetModule,
+        resolver: &impl CompiledModuleViewer,
         layout_type: LayoutType,
     ) -> Result<MoveTypeLayout> {
         use SignatureToken::*;
@@ -421,11 +430,17 @@ impl TypeLayoutBuilder {
 }
 
 impl StructLayoutBuilder {
-    pub fn build_runtime(s: &StructTag, resolver: &impl GetModule) -> Result<MoveStructLayout> {
+    pub fn build_runtime(
+        s: &StructTag,
+        resolver: &impl CompiledModuleViewer,
+    ) -> Result<MoveStructLayout> {
         Self::build(s, resolver, LayoutType::Runtime)
     }
 
-    pub fn build_with_fields(s: &StructTag, resolver: &impl GetModule) -> Result<MoveStructLayout> {
+    pub fn build_with_fields(
+        s: &StructTag,
+        resolver: &impl CompiledModuleViewer,
+    ) -> Result<MoveStructLayout> {
         Self::build(s, resolver, LayoutType::WithFields)
     }
 
@@ -434,7 +449,7 @@ impl StructLayoutBuilder {
     /// transitively by `s`.
     fn build(
         s: &StructTag,
-        resolver: &impl GetModule,
+        resolver: &impl CompiledModuleViewer,
         layout_type: LayoutType,
     ) -> Result<MoveStructLayout> {
         let type_arguments = s
@@ -455,7 +470,7 @@ impl StructLayoutBuilder {
         m: &CompiledModule,
         s: &StructDefinition,
         type_arguments: Vec<MoveTypeLayout>,
-        resolver: &impl GetModule,
+        resolver: &impl CompiledModuleViewer,
         layout_type: LayoutType,
     ) -> Result<MoveStructLayout> {
         let s_handle = m.struct_handle_at(s.struct_handle);
@@ -517,10 +532,10 @@ impl StructLayoutBuilder {
         declaring_module: &ModuleId,
         name: &IdentStr,
         type_arguments: Vec<MoveTypeLayout>,
-        resolver: &impl GetModule,
+        resolver: &impl CompiledModuleViewer,
         layout_type: LayoutType,
     ) -> Result<MoveStructLayout> {
-        let module = match resolver.get_module_by_id(declaring_module) {
+        let module = match resolver.view_compiled_module(declaring_module) {
             Err(_) | Ok(None) => bail!("Could not find module"),
             Ok(Some(m)) => m,
         };
@@ -541,7 +556,7 @@ impl StructLayoutBuilder {
         m: &CompiledModule,
         s: StructHandleIndex,
         type_arguments: Vec<MoveTypeLayout>,
-        resolver: &impl GetModule,
+        resolver: &impl CompiledModuleViewer,
         layout_type: LayoutType,
     ) -> Result<MoveStructLayout> {
         if let Some(def) = m.find_struct_def(s) {

@@ -38,7 +38,7 @@ mod resolver;
 #[derive(Clone, Debug)]
 pub struct AnnotatedMoveStruct {
     pub abilities: AbilitySet,
-    pub type_: StructTag,
+    pub ty_tag: StructTag,
     pub value: Vec<(Identifier, AnnotatedMoveValue)>,
 }
 
@@ -76,7 +76,7 @@ impl AnnotatedMoveValue {
             Address(_) => TypeTag::Address,
             Vector(t, _) => t.clone(),
             Bytes(_) => TypeTag::Vector(Box::new(TypeTag::U8)),
-            Struct(s) => TypeTag::Struct(Box::new(s.type_.clone())),
+            Struct(s) => TypeTag::Struct(Box::new(s.ty_tag.clone())),
         }
     }
 }
@@ -236,7 +236,7 @@ impl<'a, T: ModuleResolver + ?Sized> MoveValueAnnotator<'a, T> {
         }
         Ok(AnnotatedMoveStruct {
             abilities: ty.abilities.0,
-            type_: struct_tag,
+            ty_tag: struct_tag,
             value: field_names.into_iter().zip(annotated_fields).collect(),
         })
     }
@@ -342,7 +342,7 @@ fn pretty_print_struct(
     indent: u64,
 ) -> std::fmt::Result {
     pretty_print_ability_modifiers(f, value.abilities)?;
-    writeln!(f, "{} {{", value.type_)?;
+    writeln!(f, "{} {{", value.ty_tag)?;
     for (field_name, v) in value.value.iter() {
         write_indent(f, indent + 4)?;
         write!(f, "{}: ", field_name)?;

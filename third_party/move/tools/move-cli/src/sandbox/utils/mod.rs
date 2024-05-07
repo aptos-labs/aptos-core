@@ -39,7 +39,7 @@ use std::{
 pub mod on_disk_state_view;
 pub mod package_context;
 
-use move_bytecode_utils::module_cache::GetModule;
+use move_bytecode_utils::compiled_module_viewer::CompiledModuleViewer;
 use move_vm_test_utils::gas_schedule::{CostTable, GasStatus};
 pub use on_disk_state_view::*;
 pub use package_context::*;
@@ -333,7 +333,7 @@ pub(crate) fn explain_publish_error(
         } => {
             println!("Breaking change detected--publishing aborted. Re-run with --ignore-breaking-changes to publish anyway.");
 
-            let old_module = state.get_module_by_id(&module_id)?.unwrap();
+            let old_module = state.view_compiled_module(&module_id)?.unwrap();
             let old_api = normalized::Module::new(&old_module);
             let new_api = normalized::Module::new(module);
 

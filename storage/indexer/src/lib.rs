@@ -229,7 +229,7 @@ impl<'a, R: ModuleResolver> TableInfoParser<'a, R> {
                 }
             },
             AnnotatedMoveValue::Struct(struct_value) => {
-                let struct_tag = &struct_value.type_;
+                let struct_tag = &struct_value.ty_tag;
                 if Self::is_table(struct_tag) {
                     assert_eq!(struct_tag.type_params.len(), 2);
                     let table_info = TableInfo {
