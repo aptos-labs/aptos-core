@@ -163,7 +163,7 @@ impl StateSyncTrigger {
         dag_reader.is_empty()
             || dag_reader.highest_round() + 1 + self.dag_window_size_config
                 < commit_info_anchor_round
-            || local_highest_committed_anchor_round + 2 * self.dag_window_size_config
+            || local_highest_committed_anchor_round + 2 * 1000 * self.dag_window_size_config
                 < commit_info_anchor_round
     }
 }
