@@ -240,7 +240,8 @@ impl ControlFlowGraphCodeGenerator {
             let succ_block = self.get_the_non_trivial_successor(block);
             if let Some(next_to_vist) = next_block_to_visit {
                 if *next_to_vist == succ_block {
-                    debug_assert!(code_block.pop().is_some());
+                    let last_instr = code_block.pop();
+                    debug_assert!(last_instr.is_some());
                 }
             }
         }
