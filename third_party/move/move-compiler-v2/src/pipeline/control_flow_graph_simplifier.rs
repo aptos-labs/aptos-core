@@ -92,7 +92,7 @@ impl FunctionTargetProcessor for ControlFlowGraphSimplifier {
     }
 
     fn name(&self) -> String {
-        "EliminateEmptyBlocksProcessor".to_owned()
+        "ControlFlowGraphSimplifier".to_owned()
     }
 }
 
