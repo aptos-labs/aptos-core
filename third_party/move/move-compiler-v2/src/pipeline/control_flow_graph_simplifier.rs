@@ -58,7 +58,6 @@
 //!     replace it by simply
 //!
 //!     goto L
-//! (Implemented by `UnreachableCodeElimination`)
 //!
 //! Side effects: remove all annotations.
 
@@ -140,6 +139,11 @@ impl ControlFlowGraphSimplifierTransformation {
 }
 
 /// Control flow graph that owns the code for transformation
+///
+/// To do a control flow graph based transformation:
+/// 1. construct a `ControlFlowGraphCodeGenerator` from the code,
+/// 2. perform the transformation on the `ControlFlowGraphCodeGenerator`
+/// 3. generate the code back from the `ControlFlowGraphCodeGenerator`
 struct ControlFlowGraphCodeGenerator {
     /// The control flow graph.
     /// `BlockContent` is invalidated during transformations
@@ -382,6 +386,7 @@ impl ControlFlowGraphCodeGenerator {
     }
 }
 
+/// Transformation state for transformation 1 in the module doc
 struct EmptyBlockRemover(ControlFlowGraphCodeGenerator);
 
 impl EmptyBlockRemover {
@@ -465,7 +470,7 @@ impl EmptyBlockRemover {
     }
 }
 
-/// Transformation state
+/// Transformation state for transformation 2 in the module doc
 struct RedundantJumpRemover(pub ControlFlowGraphCodeGenerator);
 
 impl RedundantJumpRemover {
