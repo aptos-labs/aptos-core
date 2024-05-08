@@ -128,8 +128,8 @@ impl ControlFlowGraphSimplifierTransformation {
 
     /// Transforms `if _ goto L else goto L` to `goto L`, which is the transformation 4 in the module doc
     fn eliminate_branch_to_same_target(&mut self) {
-        let codes = std::mem::take(&mut self.data.code);
-        self.data.code = codes
+        let code = std::mem::take(&mut self.data.code);
+        self.data.code = code
             .into_iter()
             .map(|bytecode| match bytecode {
                 Bytecode::Branch(attr_id, l0, l1, _) if l0 == l1 => Bytecode::Jump(attr_id, l0),
@@ -199,14 +199,19 @@ impl ControlFlowGraphCodeGenerator {
         self.successors.get(&block_id).expect("successors")
     }
 
-    /// Gets the predecessors of a block as mutable
+    /// Gets the predecessors of a block mutably
     fn preds_mut(&mut self, block_id: BlockId) -> &mut Vec<BlockId> {
         self.predecessors.get_mut(&block_id).expect("predecessors")
     }
 
-    /// Gets the successors of a block as mutable
+    /// Gets the successors of a block mutably
     fn succs_mut(&mut self, block_id: BlockId) -> &mut Vec<BlockId> {
         self.successors.get_mut(&block_id).expect("predecessors")
+    }
+
+    /// Gets the code of a block mutably
+    fn code_block_mut(&mut self, block_id: BlockId) -> &mut Vec<Bytecode> {
+        self.code_blocks.get_mut(&block_id).expect("code block")
     }
 
     /// Iterate over the blocks in DFS order
@@ -257,8 +262,7 @@ impl ControlFlowGraphCodeGenerator {
             let succ_block = self.get_the_non_trivial_successor(block);
             if let Some(next_to_vist) = next_block_to_visit {
                 if *next_to_vist == succ_block {
-                    let last_instr = code_block.pop();
-                    debug_assert!(last_instr.is_some());
+                    remove_tail_jump(&mut code_block);
                 }
             }
         }
@@ -267,8 +271,8 @@ impl ControlFlowGraphCodeGenerator {
 
     /// Checks whether a block falls to the next block without jump, branch, abort, or return;
     /// i.e., the block is followed by the next in the original code
-    fn falls_to_next_block(codes: &[Bytecode]) -> bool {
-        let last_instr = codes.last().expect("last instr");
+    fn falls_to_next_block(code: &[Bytecode]) -> bool {
+        let last_instr = code.last().expect("last instr");
         !last_instr.is_always_branching()
     }
 
@@ -288,18 +292,12 @@ impl ControlFlowGraphCodeGenerator {
         the_suc
     }
 
-    /// Adds an explicit jump to `to_block` to the end of `codes`
-    fn add_explicit_jump(&self, codes: &mut Vec<Bytecode>, to_block: BlockId) {
+    /// Adds an explicit jump to `to_block` to the end of `code`
+    fn add_explicit_jump(&self, code: &mut Vec<Bytecode>, to_block: BlockId) {
         debug_assert!(!self.is_trivial_block(to_block));
         let to_label = self.get_block_label(to_block).expect("label");
-        let attr_id = self
-            .code_blocks
-            .get(&to_block)
-            .expect("code block")
-            .first()
-            .expect("first instruction")
-            .get_attr_id();
-        codes.push(Bytecode::Jump(attr_id, to_label));
+        let attr_id = code.last().expect("instruction").get_attr_id();
+        code.push(Bytecode::Jump(attr_id, to_label));
     }
 
     /// Returns the instructions of the block
@@ -326,8 +324,8 @@ impl ControlFlowGraphCodeGenerator {
     }
 
     /// Removes a block from the control flow graph
-    /// `pred_action`: action to take on each predecessor of the block
-    /// `succ_action`: action to take on each successor of the block
+    /// `pred_action`: action to take for each predecessor of the block
+    /// `succ_action`: action to take for each successor of the block
     fn remove_block<F, G>(&mut self, block_to_remove: BlockId, pred_action: F, succ_action: G)
     where
         F: FnOnce(&mut Self, BlockId) + Copy,
@@ -365,16 +363,17 @@ impl ControlFlowGraphCodeGenerator {
     }
 
     /// Replaces the predecessor `old_pred` of `block` by `new_pred`
-    fn replace_pred_by(&mut self, block: BlockId, old_pred: BlockId, new_pred: BlockId) {
-        Self::replace_block(self.preds_mut(block), old_pred, new_pred);
+    fn replace_preds(&mut self, block: BlockId, old_pred: BlockId, new_pred: BlockId) {
+        Self::replace_blocks(self.preds_mut(block), old_pred, new_pred);
     }
 
     /// Replaces the predecessor `old_pred` of `block` by `new_pred`
-    fn replace_succ_by(&mut self, block: BlockId, old_succ: BlockId, new_succ: BlockId) {
-        Self::replace_block(self.succs_mut(block), old_succ, new_succ);
+    fn replace_succs(&mut self, block: BlockId, old_succ: BlockId, new_succ: BlockId) {
+        Self::replace_blocks(self.succs_mut(block), old_succ, new_succ);
     }
 
-    fn replace_block(blocks: &mut [BlockId], old: BlockId, new: BlockId) {
+    /// Replaces `old` by `new` in `blocks`
+    fn replace_blocks(blocks: &mut [BlockId], old: BlockId, new: BlockId) {
         for block in blocks {
             if *block == old {
                 *block = new;
@@ -430,11 +429,11 @@ impl EmptyBlockRemover {
             |this, pred| {
                 // for all predecessors of `block_to_remove`, let them jump to `redirect_to` instead
                 if pred != this.entry_block {
-                    let pred_codes = this.code_blocks.get_mut(&pred).expect("code block");
-                    Self::redirects_block(pred_codes, from, to);
+                    let code = this.code_blocks.get_mut(&pred).expect("code block");
+                    Self::redirects_block(code, from, to);
                 }
                 // update successors of pred by replacing `block_to_remove` with `redirect_to`
-                this.replace_succ_by(pred, block_to_remove, redirect_to);
+                this.replace_succs(pred, block_to_remove, redirect_to);
             },
             // replace `block_to_remove` by predecessors of `block_to_remove`
             // in predecessors of `redirect_to`
@@ -447,12 +446,12 @@ impl EmptyBlockRemover {
         );
     }
 
-    /// Redirects a sequence of codes so that it jumps/branches to `to`
+    /// Redirects a code block so that it jumps/branches to `to`
     /// where it originally jumps/branches to `from`.
-    /// Does nothing if `codes` doesn't end with a jump/branch
-    /// Requries: `codes` not empty
-    fn redirects_block(codes: &mut [Bytecode], from: Label, to: Label) {
-        let last_instr = codes.last_mut().expect("last instruction");
+    /// Does nothing if `code` doesn't end with a jump/branch
+    /// Requries: `code` not empty
+    fn redirects_block(code: &mut [Bytecode], from: Label, to: Label) {
+        let last_instr = code.last_mut().expect("last instruction");
         match last_instr {
             Bytecode::Branch(_, l0, l1, _) => {
                 subst_label(l0, from, to);
@@ -507,8 +506,7 @@ impl RedundantJumpRemover {
     fn can_remove_edge(&self, from: BlockId, to: BlockId) -> bool {
         debug_assert!(!self.0.is_trivial_block(from));
         debug_assert!(!self.0.is_trivial_block(to));
-        self.0.successors.get(&from).expect("successors").len() == 1
-            && self.0.predecessors.get(&to).map_or(0, |preds| preds.len()) == 1
+        self.0.succs(from).len() == 1 && self.0.preds(to).len() == 1
     }
 
     /// If possible, append the code of block `to` to the back of block `from` and remove the `to` block
@@ -516,43 +514,33 @@ impl RedundantJumpRemover {
     fn remove_jump_if_possible(&mut self, from: BlockId, to: BlockId) -> bool {
         debug_assert!(self
             .0
-            .successors
-            .get(&from)
-            .expect("successors")
+            .succs(from)
             .contains(&to));
         debug_assert!(!self.0.is_trivial_block(from));
         debug_assert!(!self.0.is_trivial_block(to));
+
         if from == to || !self.can_remove_edge(from, to) {
             return false;
-        }
-        let mut to_codes = self.0.code_blocks.remove(&to).expect("codes");
-        if matches!(
-            to_codes.first().expect("first instruction"),
-            Bytecode::Label(..)
-        ) {
-            to_codes.remove(0);
-        }
-        let from_codes = self.0.code_blocks.get_mut(&from).expect("codes");
-        if matches!(
-            from_codes.last().expect("last instruction"),
-            Bytecode::Jump(..)
-        ) {
-            from_codes.pop();
-        }
-        from_codes.append(&mut to_codes);
+        } else {
+            self.0.remove_block(
+                to,
+                |this, pred| {
+                    debug_assert!(pred == from);
 
-        self.0.remove_block(
-            to,
-            |this, pred| {
-                debug_assert!(pred == from);
-                *this.succs_mut(pred) = this.succs(to).to_vec();
-            },
-            |this, succ| {
-                this.replace_pred_by(succ, to, from)
-            },
-        );
+                    let mut to_code = this.code_blocks.remove(&to).expect("code block");
+                    remove_front_label(&mut to_code);
+                    let from_code = this.code_block_mut(pred);
+                    remove_tail_jump(from_code);
+                    from_code.append(&mut to_code);
 
-        true
+                    *this.succs_mut(pred) = this.succs(to).to_vec();
+                },
+                |this, succ| {
+                    this.replace_preds(succ, to, from)
+                },
+            );
+            true
+        }
     }
 }
 
@@ -576,5 +564,25 @@ fn pred_map(cfg: &StacklessControlFlowGraph) -> BTreeMap<BlockId, Vec<BlockId>> 
 fn subst_label(label: &mut Label, from: Label, to: Label) {
     if *label == from {
         *label = to;
+    }
+}
+
+/// If the tail of `code` is a jump, removes it
+fn remove_tail_jump(code: &mut Vec<Bytecode>) {
+    if matches!(
+        code.last().expect("last instruction"),
+        Bytecode::Jump(..)
+    ) {
+        code.pop();
+    }
+}
+
+/// If the head of `code` is a label, removes it
+fn remove_front_label(code: &mut Vec<Bytecode>) {
+    if matches!(
+        code.first().expect("first instruction"),
+        Bytecode::Label(..)
+    ) {
+        code.remove(0);
     }
 }
