@@ -17,7 +17,7 @@ pub struct TxnStats {
     pub committed: u64,
     pub expired: u64,
     pub failed_submission: u64,
-    pub latency: u64, // total milliseconds across all latency measurements
+    pub latency: u64,         // total milliseconds across all latency measurements
     pub latency_samples: u64, // number of events with latency measured
     pub latency_buckets: AtomicHistogramSnapshot, // millisecond snapshot buckets
     pub lasted: Duration,
@@ -25,15 +25,15 @@ pub struct TxnStats {
 
 #[derive(Debug, Clone, Default)]
 pub struct TxnStatsRate {
-    pub submitted: f64, // per second
-    pub committed: f64, // per second
-    pub expired: f64, // per second
+    pub submitted: f64,         // per second
+    pub committed: f64,         // per second
+    pub expired: f64,           // per second
     pub failed_submission: f64, // per second
-    pub latency: f64, // mean latency (milliseconds)
-    pub latency_samples: u64, // number latency-measured events
-    pub p50_latency: u64, // milliseconds, 50% this or better
-    pub p90_latency: u64, // milliseconds, 90% this or better
-    pub p99_latency: u64, // milliseconds, 99% this or better
+    pub latency: f64,           // mean latency (milliseconds)
+    pub latency_samples: u64,   // number latency-measured events
+    pub p50_latency: u64,       // milliseconds, 50% this or better
+    pub p90_latency: u64,       // milliseconds, 90% this or better
+    pub p99_latency: u64,       // milliseconds, 99% this or better
 }
 
 impl fmt::Display for TxnStatsRate {
