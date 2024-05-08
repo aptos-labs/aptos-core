@@ -47,7 +47,7 @@ error: post-condition does not hold
    │
    = Related Global Memory:
    =         Resource name: TestTracing_R
-   =         Values:  {Address(18467): <redacted>, Default: TestTracing.R{x = 4}}
+   =         Values:  {Address(41): <redacted>, Default: TestTracing.R{x = 4}}
    = Related Bindings:
    =         addr = <redacted>
    =         exists<R>(addr) = <redacted>
