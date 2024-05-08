@@ -723,6 +723,22 @@ module aptos_framework::delegation_pool {
     }
 
     #[view]
+    /// Return the current state of a voting delegation of a delegator in a delegation pool.
+    public fun calculate_and_update_voting_delegation(
+        pool_address: address,
+        delegator_address: address
+    ): (address, address, u64) acquires DelegationPool, GovernanceRecords {
+        assert_partial_governance_voting_enabled(pool_address);
+        let vote_delegation = update_and_borrow_mut_delegator_vote_delegation(
+            borrow_global<DelegationPool>(pool_address),
+            borrow_global_mut<GovernanceRecords>(pool_address),
+            delegator_address
+        );
+
+        (vote_delegation.voter, vote_delegation.pending_voter, vote_delegation.last_locked_until_secs)
+    }
+
+    #[view]
     /// Return the address of the stake pool to be created with the provided owner, and seed.
     public fun get_expected_stake_pool_address(owner: address, delegation_pool_creation_seed: vector<u8>
     ): address {
@@ -1144,9 +1160,9 @@ module aptos_framework::delegation_pool {
 
         let vote_delegation = smart_table::borrow_mut(vote_delegation_table, delegator);
         // A lockup period has passed since last time `vote_delegation` was updated. Pending voter takes effect.
-        if (vote_delegation.last_locked_until_secs < locked_until_secs &&
-            vote_delegation.voter != vote_delegation.pending_voter) {
+        if (vote_delegation.last_locked_until_secs < locked_until_secs) {
             vote_delegation.voter = vote_delegation.pending_voter;
+            vote_delegation.last_locked_until_secs = locked_until_secs;
         };
         vote_delegation
     }
@@ -4729,6 +4745,271 @@ module aptos_framework::delegation_pool {
 
         // Delegator1 has no stake. Abort.
         delegate_voting_power(delegator1, pool_address, signer::address_of(voter1));
+    }
+
+    #[test(
+        aptos_framework = @aptos_framework,
+        validator = @0x123,
+        delegator = @0x010,
+        voter1 = @0x020,
+        voter2 = @0x030
+    )]
+    public entry fun test_delegate_voting_power_applies_next_lockup(
+        aptos_framework: &signer,
+        validator: &signer,
+        delegator: &signer,
+        voter1: &signer,
+        voter2: &signer,
+    ) acquires DelegationPoolOwnership, DelegationPool, GovernanceRecords, BeneficiaryForOperator, NextCommissionPercentage, DelegationPoolAllowlisting {
+        initialize_for_test(aptos_framework);
+        aptos_governance::initialize_partial_voting(aptos_framework);
+        features::change_feature_flags_for_testing(
+            aptos_framework,
+            vector[
+                features::get_partial_governance_voting(),
+                features::get_delegation_pool_partial_governance_voting()
+            ],
+            vector[]
+        );
+
+        initialize_test_validator(validator, 100 * ONE_APT, true, true);
+        let validator_address = signer::address_of(validator);
+        let pool_address = get_owned_pool_address(validator_address);
+
+        let delegator_address = signer::address_of(delegator);
+        account::create_account_for_test(delegator_address);
+        let voter1_address = signer::address_of(voter1);
+        let voter2_address = signer::address_of(voter2);
+
+        stake::mint(delegator, 100 * ONE_APT);
+        add_stake(delegator, pool_address, 20 * ONE_APT);
+
+        let first_lockup_end = stake::get_lockup_secs(pool_address);
+        // default voter is the delegator
+        let (voter, pending_voter, last_locked_until_secs) = calculate_and_update_voting_delegation(
+            pool_address,
+            delegator_address
+        );
+        assert!(voter == delegator_address, 0);
+        assert!(pending_voter == delegator_address, 0);
+        assert!(last_locked_until_secs == first_lockup_end, 0);
+
+        // delegate to voter 1 which takes effect next lockup
+        delegate_voting_power(delegator, pool_address, voter1_address);
+        (voter, pending_voter, last_locked_until_secs) = calculate_and_update_voting_delegation(
+            pool_address,
+            delegator_address
+        );
+        assert!(voter == delegator_address, 0);
+        assert!(pending_voter == voter1_address, 0);
+        assert!(last_locked_until_secs == first_lockup_end, 0);
+        assert!(
+            calculate_and_update_voter_total_voting_power(
+                pool_address,
+                delegator_address
+            ) == 20 * ONE_APT - get_add_stake_fee(pool_address, 20 * ONE_APT),
+            0
+        );
+
+        // end this lockup cycle
+        fast_forward_to_unlock(pool_address);
+        let second_lockup_end = stake::get_lockup_secs(pool_address);
+        assert!(second_lockup_end > first_lockup_end, 0);
+
+        (voter, pending_voter, last_locked_until_secs) = calculate_and_update_voting_delegation(
+            pool_address,
+            delegator_address
+        );
+        // voter 1 becomes current voter and owns all voting power of delegator
+        assert!(voter == voter1_address, 0);
+        assert!(pending_voter == voter1_address, 0);
+        assert!(last_locked_until_secs == second_lockup_end, 0);
+        assert!(
+            calculate_and_update_voter_total_voting_power(pool_address, voter1_address) == 20 * ONE_APT,
+            0
+        );
+
+        // delegate to voter 2, current voter should still be voter 1
+        delegate_voting_power(delegator, pool_address, voter2_address);
+        (voter, pending_voter, last_locked_until_secs) = calculate_and_update_voting_delegation(
+            pool_address,
+            delegator_address
+        );
+        assert!(voter == voter1_address, 0);
+        assert!(pending_voter == voter2_address, 0);
+        assert!(last_locked_until_secs == second_lockup_end, 0);
+        assert!(
+            calculate_and_update_voter_total_voting_power(pool_address, voter1_address) == 20 * ONE_APT,
+            0
+        );
+
+        // stake added by delegator counts as voting power for the current voter
+        add_stake(delegator, pool_address, 30 * ONE_APT);
+        assert!(
+            calculate_and_update_voter_total_voting_power(
+                pool_address,
+                voter1_address
+            ) == 20 * ONE_APT + 30 * ONE_APT - get_add_stake_fee(pool_address, 30 * ONE_APT),
+            0
+        );
+
+        // refunded `add_stake` fee is counted as voting power too
+        end_aptos_epoch();
+        assert!(
+            calculate_and_update_voter_total_voting_power(pool_address, voter1_address) == 5020000000,
+            0
+        );
+
+        // delegator can unlock their entire stake (all voting shares are owned by voter 1)
+        unlock(delegator, pool_address, 5020000000);
+        assert!(
+            calculate_and_update_voter_total_voting_power(pool_address, voter1_address) == 5020000000,
+            0
+        );
+
+        // delegator can reactivate their entire stake (all voting shares are owned by voter 1)
+        reactivate_stake(delegator, pool_address, 5020000000);
+        assert!(
+            calculate_and_update_voter_total_voting_power(pool_address, voter1_address) == 5019999999,
+            0
+        );
+
+        // end this lockup cycle
+        fast_forward_to_unlock(pool_address);
+        let third_lockup_end = stake::get_lockup_secs(pool_address);
+        assert!(third_lockup_end > second_lockup_end, 0);
+
+        // voter 2 becomes current voter and owns all voting power of delegator
+        (voter, pending_voter, last_locked_until_secs) = calculate_and_update_voting_delegation(
+            pool_address,
+            delegator_address
+        );
+        assert!(voter == voter2_address, 0);
+        assert!(pending_voter == voter2_address, 0);
+        assert!(last_locked_until_secs == third_lockup_end, 0);
+        assert!(
+            calculate_and_update_voter_total_voting_power(pool_address, voter2_address) == 5070199999,
+            0
+        );
+    }
+
+    #[test(
+        aptos_framework = @aptos_framework,
+        validator = @0x123,
+        validator_min_consensus = @0x234,
+        delegator = @0x010,
+        voter1 = @0x020,
+        voter2 = @0x030
+    )]
+    public entry fun test_delegate_voting_power_from_inactive_validator(
+        aptos_framework: &signer,
+        validator: &signer,
+        validator_min_consensus: &signer,
+        delegator: &signer,
+        voter1: &signer,
+        voter2: &signer,
+    ) acquires DelegationPoolOwnership, DelegationPool, GovernanceRecords, BeneficiaryForOperator, NextCommissionPercentage, DelegationPoolAllowlisting {
+        initialize_for_test(aptos_framework);
+        aptos_governance::initialize_partial_voting(aptos_framework);
+        features::change_feature_flags_for_testing(
+            aptos_framework,
+            vector[
+                features::get_partial_governance_voting(),
+                features::get_delegation_pool_partial_governance_voting()
+            ],
+            vector[]
+        );
+
+        // activate more validators in order to inactivate one later
+        initialize_test_validator(validator, 100 * ONE_APT, true, false);
+        initialize_test_validator(validator_min_consensus, 100 * ONE_APT, true, true);
+
+        let validator_address = signer::address_of(validator);
+        let pool_address = get_owned_pool_address(validator_address);
+
+        let delegator_address = signer::address_of(delegator);
+        account::create_account_for_test(delegator_address);
+        let voter1_address = signer::address_of(voter1);
+        let voter2_address = signer::address_of(voter2);
+
+        let first_lockup_end = stake::get_lockup_secs(pool_address);
+        let (voter, pending_voter, last_locked_until_secs) = calculate_and_update_voting_delegation(
+            pool_address,
+            delegator_address
+        );
+        assert!(voter == delegator_address, 0);
+        assert!(pending_voter == delegator_address, 0);
+        assert!(last_locked_until_secs == first_lockup_end, 0);
+
+        delegate_voting_power(delegator, pool_address, voter1_address);
+        (voter, pending_voter, last_locked_until_secs) = calculate_and_update_voting_delegation(
+            pool_address,
+            delegator_address
+        );
+        assert!(voter == delegator_address, 0);
+        assert!(pending_voter == voter1_address, 0);
+        assert!(last_locked_until_secs == first_lockup_end, 0);
+
+        // end this lockup cycle
+        fast_forward_to_unlock(pool_address);
+        let second_lockup_end = stake::get_lockup_secs(pool_address);
+        assert!(second_lockup_end > first_lockup_end, 0);
+
+        // voter 1 becomes current voter
+        (voter, pending_voter, last_locked_until_secs) = calculate_and_update_voting_delegation(
+            pool_address,
+            delegator_address
+        );
+        assert!(voter == voter1_address, 0);
+        assert!(pending_voter == voter1_address, 0);
+        assert!(last_locked_until_secs == second_lockup_end, 0);
+
+        // delegate to voter 2 which should apply next lockup
+        delegate_voting_power(delegator, pool_address, voter2_address);
+        (voter, pending_voter, last_locked_until_secs) = calculate_and_update_voting_delegation(
+            pool_address,
+            delegator_address
+        );
+        assert!(voter == voter1_address, 0);
+        assert!(pending_voter == voter2_address, 0);
+        assert!(last_locked_until_secs == second_lockup_end, 0);
+
+        // lockup cycle won't be refreshed on the pool anymore
+        stake::leave_validator_set(validator, pool_address);
+        end_aptos_epoch();
+        assert!(stake::get_validator_state(pool_address) == VALIDATOR_STATUS_INACTIVE, 0);
+
+        // lockup cycle passes, but validator has no lockup refresh because it is inactive
+        fast_forward_to_unlock(pool_address);
+        assert!(second_lockup_end == stake::get_lockup_secs(pool_address), 0);
+        assert!(second_lockup_end <= reconfiguration::last_reconfiguration_time(), 0);
+
+        // pending voter 2 is not applied
+        (voter, pending_voter, last_locked_until_secs) = calculate_and_update_voting_delegation(
+            pool_address,
+            delegator_address
+        );
+        assert!(voter == voter1_address, 0);
+        assert!(pending_voter == voter2_address, 0);
+        assert!(last_locked_until_secs == second_lockup_end, 0);
+
+        // reactivate validator
+        stake::join_validator_set(validator, pool_address);
+        end_aptos_epoch();
+        assert!(stake::get_validator_state(pool_address) == VALIDATOR_STATUS_ACTIVE, 0);
+
+        // lockup cycle of pool has been refreshed again
+        let third_lockup_end = stake::get_lockup_secs(pool_address);
+        assert!(third_lockup_end > second_lockup_end, 0);
+
+        // voter 2 finally becomes current voter
+        (voter, pending_voter, last_locked_until_secs) = calculate_and_update_voting_delegation(
+            pool_address,
+            delegator_address
+        );
+        assert!(voter == voter2_address, 0);
+        assert!(pending_voter == voter2_address, 0);
+        assert!(last_locked_until_secs == third_lockup_end, 0);
     }
 
     #[test(staker = @0xe256f4f4e2986cada739e339895cf5585082ff247464cab8ec56eea726bd2263)]
