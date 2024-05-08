@@ -161,9 +161,9 @@ impl StateSyncTrigger {
 
         // fetch can't work since nodes are garbage collected
         dag_reader.is_empty()
-            || dag_reader.highest_round() + 1 + self.dag_window_size_config
+            || dag_reader.highest_round() + 1 + self.dag_window_size_config * 1000
                 < commit_info_anchor_round
-            || local_highest_committed_anchor_round + 2 * 1000 * self.dag_window_size_config
+            || local_highest_committed_anchor_round + 2 * 10000 * self.dag_window_size_config
                 < commit_info_anchor_round
     }
 }
