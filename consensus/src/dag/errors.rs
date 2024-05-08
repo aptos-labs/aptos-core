@@ -31,6 +31,8 @@ pub enum NodeBroadcastHandleError {
 pub enum DagDriverError {
     #[error("missing parents")]
     MissingParents,
+    #[error("payload not found")]
+    PayloadNotFound,
 }
 
 #[derive(Clone, Debug, ThisError, Serialize, Deserialize)]

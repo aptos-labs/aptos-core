@@ -316,6 +316,10 @@ impl Node {
         &self.validator_txns
     }
 
+    pub fn unpack(self) -> (NodeMetadata, Payload) {
+        (self.metadata, self.payload)
+    }
+
     pub fn verify(&self, sender: Author, verifier: &ValidatorVerifier) -> anyhow::Result<()> {
         ensure!(
             sender == *self.author(),
@@ -428,6 +432,14 @@ impl NodeCertificate {
         &self.metadata
     }
 
+    pub fn epoch(&self) -> u64 {
+        self.metadata.epoch
+    }
+
+    pub fn author(&self) -> &Author {
+        self.metadata.author()
+    }
+
     pub fn signers(&self, validators: &[Author]) -> Vec<Author> {
         self.signatures.get_signers_addresses(validators)
     }
@@ -472,6 +484,61 @@ impl Deref for CertifiedNode {
 
     fn deref(&self) -> &Self::Target {
         &self.node
+    }
+}
+
+#[derive(Serialize, Deserialize, Clone, Debug, PartialEq)]
+pub struct NodeCertificateMessage {
+    node_certificate: NodeCertificate,
+    ledger_info: LedgerInfoWithSignatures,
+}
+
+impl NodeCertificateMessage {
+    pub fn new(node_certificate: NodeCertificate, ledger_info: LedgerInfoWithSignatures) -> Self {
+        Self {
+            node_certificate,
+            ledger_info,
+        }
+    }
+
+    pub fn dag_id(&self) -> u8 {
+        self.node_certificate.metadata.dag_id
+    }
+
+    pub fn ledger_info(&self) -> &LedgerInfoWithSignatures {
+        &self.ledger_info
+    }
+
+    pub fn verify(&self, sender: Author, verifier: &ValidatorVerifier) -> anyhow::Result<()> {
+        ensure!(
+            *self.node_certificate.author() == sender,
+            "Author {} doesn't match sender {}",
+            self.node_certificate.author(),
+            sender
+        );
+        ensure!(
+            self.node_certificate.epoch() == self.ledger_info.commit_info().epoch(),
+            "Epoch {} from node doesn't match epoch {} from ledger info",
+            self.node_certificate.epoch(),
+            self.ledger_info().commit_info().epoch()
+        );
+        self.node_certificate.verify(verifier)
+    }
+
+    pub(crate) fn round(&self) -> Round {
+        self.metadata.round()
+    }
+
+    pub(crate) fn certificate(&self) -> &NodeCertificate {
+        &self.node_certificate
+    }
+}
+
+impl Deref for NodeCertificateMessage {
+    type Target = NodeCertificate;
+
+    fn deref(&self) -> &Self::Target {
+        &self.node_certificate
     }
 }
 
@@ -687,7 +754,7 @@ impl TryFrom<DAGRpcResult> for CertifiedAck {
 
 impl BroadcastStatus<DAGMessage, DAGRpcResult> for Arc<CertificateAckState> {
     type Aggregated = ();
-    type Message = CertifiedNodeMessage;
+    type Message = NodeCertificateMessage;
     type Response = CertifiedAck;
 
     fn add(&self, peer: Author, _ack: Self::Response) -> anyhow::Result<Option<Self::Aggregated>> {
@@ -881,6 +948,7 @@ pub enum DAGMessage {
     NodeMsg(Node),
     VoteMsg(Vote),
     CertifiedNodeMsg(CertifiedNodeMessage),
+    NodeCertificateMsg(NodeCertificateMessage),
     CertifiedAckMsg(CertifiedAck),
     FetchRequest(RemoteFetchRequest),
     FetchResponse(FetchResponse),
@@ -898,6 +966,7 @@ impl DAGMessage {
             DAGMessage::VoteMsg(_) => "VoteMsg",
             DAGMessage::CertifiedNodeMsg(_) => "CertifiedNodeMsg",
             DAGMessage::CertifiedAckMsg(_) => "CertifiedAckMsg",
+            DAGMessage::NodeCertificateMsg(_) => "NodeCertificateMsg",
             DAGMessage::FetchRequest(_) => "FetchRequest",
             DAGMessage::FetchResponse(_) => "FetchResponse",
             #[cfg(test)]
@@ -928,6 +997,9 @@ impl DAGMessage {
             DAGMessage::NodeMsg(node) => node.verify(sender, verifier),
             DAGMessage::CertifiedNodeMsg(certified_node) => certified_node.verify(sender, verifier),
             DAGMessage::FetchRequest(fetch_request) => fetch_request.verify(verifier),
+            DAGMessage::NodeCertificateMsg(node_certificate) => {
+                node_certificate.verify(sender, verifier)
+            },
             DAGMessage::VoteMsg(_)
             | DAGMessage::CertifiedAckMsg(_)
             | DAGMessage::FetchResponse(_) => {
@@ -945,6 +1017,7 @@ impl DAGMessage {
             DAGMessage::NodeMsg(node) => node.dag_id(),
             DAGMessage::VoteMsg(vote) => vote.dag_id(),
             DAGMessage::CertifiedNodeMsg(cnm) => cnm.dag_id(),
+            DAGMessage::NodeCertificateMsg(ncm) => ncm.dag_id(),
             DAGMessage::CertifiedAckMsg(ack) => ack.dag_id(),
             DAGMessage::FetchRequest(req) => req.dag_id(),
             DAGMessage::FetchResponse(rsp) => rsp.dag_id(),
@@ -964,6 +1037,7 @@ impl TConsensusMsg for DAGMessage {
             DAGMessage::NodeMsg(node) => node.metadata.epoch,
             DAGMessage::VoteMsg(vote) => vote.metadata.epoch,
             DAGMessage::CertifiedNodeMsg(node) => node.metadata.epoch,
+            DAGMessage::NodeCertificateMsg(ncm) => ncm.metadata.epoch,
             DAGMessage::CertifiedAckMsg(ack) => ack.epoch,
             DAGMessage::FetchRequest(req) => req.epoch,
             DAGMessage::FetchResponse(res) => res.epoch,

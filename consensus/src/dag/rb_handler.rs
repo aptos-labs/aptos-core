@@ -32,7 +32,7 @@ use aptos_types::{
 };
 use async_trait::async_trait;
 use claims::assert_some;
-use dashmap::DashSet;
+use dashmap::{DashMap, DashSet};
 use futures::executor::block_on;
 use mini_moka::sync::Cache;
 use rayon::iter::{IndexedParallelIterator, IntoParallelRefIterator, ParallelIterator};
@@ -59,6 +59,7 @@ pub(crate) struct NodeBroadcastHandler {
     health_backoff: HealthBackoff,
     quorum_store_enabled: bool,
     missing_parent_tx: Option<UnboundedSender<Node>>,
+    payload_store: Arc<DashMap<(Round, Author), Node>>,
 }
 
 impl NodeBroadcastHandler {
@@ -76,6 +77,7 @@ impl NodeBroadcastHandler {
         jwk_consensus_config: OnChainJWKConsensusConfig,
         health_backoff: HealthBackoff,
         quorum_store_enabled: bool,
+        payload_store: Arc<DashMap<(Round, Author), Node>>,
     ) -> Self {
         let epoch = epoch_state.epoch;
         let votes_by_round_peer = monitor!(
@@ -101,6 +103,7 @@ impl NodeBroadcastHandler {
             health_backoff,
             quorum_store_enabled,
             missing_parent_tx: None,
+            payload_store,
         }
     }
 
@@ -339,19 +342,24 @@ impl RpcHandler for NodeBroadcastHandler {
 
         let signature = node.sign_vote(&self.signer)?;
 
-        let vote = Vote::new(node.metadata().clone(), signature);
-        self.storage.save_vote(&node.id(), &vote, self.dag_id)?;
+        let metadata = node.metadata().clone();
+        let id = node.id();
+        self.payload_store
+            .insert((metadata.round(), *metadata.author()), node);
+
+        let vote = Vote::new(metadata.clone(), signature);
+        self.storage.save_vote(&id, &vote, self.dag_id)?;
         self.votes_by_round_peer
             .lock()
-            .get_mut(&node.round())
+            .get_mut(&metadata.round())
             .expect("must exist")
-            .insert(*node.author(), vote.clone());
+            .insert(*metadata.author(), vote.clone());
 
         debug!(
             dag_id = self.dag_id,
             LogSchema::new(LogEvent::Vote)
-                .remote_peer(*node.author())
-                .round(node.round())
+                .remote_peer(*metadata.author())
+                .round(metadata.round())
         );
 
         Ok(vote)

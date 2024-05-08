@@ -2,7 +2,7 @@
 // SPDX-License-Identifier: Apache-2.0
 
 use crate::dag::{
-    types::{CertificateAckState, CertifiedNodeMessage, SignatureBuilder},
+    types::{CertificateAckState, CertifiedNodeMessage, NodeCertificateMessage, SignatureBuilder},
     DAGMessage, DAGRpcResult, Node,
 };
 use aptos_consensus_types::common::Author;
@@ -13,7 +13,11 @@ use tokio_retry::strategy::ExponentialBackoff;
 
 pub enum BoltBCParms {
     Node(Node, Arc<SignatureBuilder>, Vec<Author>),
-    CertifiedNode(CertifiedNodeMessage, Arc<CertificateAckState>, Vec<Author>),
+    CertifiedNode(
+        NodeCertificateMessage,
+        Arc<CertificateAckState>,
+        Vec<Author>,
+    ),
 }
 
 pub enum BoltBCRet {

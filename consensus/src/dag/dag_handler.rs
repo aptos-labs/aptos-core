@@ -19,6 +19,7 @@ use crate::{
     monitor,
     network::{IncomingDAGRequest, RpcResponder},
 };
+use anyhow::anyhow;
 use aptos_bounded_executor::{BoundedExecutor, ConcurrentStream};
 use aptos_channels::aptos_channel;
 use aptos_consensus_types::common::{Author, Round};
@@ -28,6 +29,7 @@ use aptos_logger::{
     warn,
 };
 use aptos_types::epoch_state::EpochState;
+use dashmap::DashMap;
 use futures::{stream::FuturesUnordered, FutureExt, StreamExt};
 use std::{
     collections::BTreeMap,
@@ -63,6 +65,7 @@ impl NetworkHandler {
         new_round_event: tokio::sync::mpsc::UnboundedReceiver<Round>,
         next_dag_tx: tokio::sync::mpsc::UnboundedSender<()>,
         prev_dag_rx: tokio::sync::mpsc::UnboundedReceiver<()>,
+        payload_store: Arc<DashMap<(Round, Author), Node>>,
     ) -> Self {
         let (missing_parents_tx, missing_parents_rx) = tokio::sync::mpsc::unbounded_channel();
         node_receiver.set_missing_parent_tx(missing_parents_tx);
@@ -84,6 +87,7 @@ impl NetworkHandler {
                 fetch_receiver,
                 state_sync_trigger,
                 epoch_state,
+                payload_store,
             }),
             next_dag_tx,
             prev_dag_rx,
@@ -300,6 +304,7 @@ struct VerifiedMessageProcessor {
     fetch_receiver: FetchRequestHandler,
     state_sync_trigger: StateSyncTrigger,
     epoch_state: Arc<EpochState>,
+    payload_store: Arc<DashMap<(Round, Author), Node>>,
 }
 
 impl VerifiedMessageProcessor {
@@ -339,29 +344,39 @@ impl VerifiedMessageProcessor {
                                         })
                                 })
                         ),
-                        DAGMessage::CertifiedNodeMsg(certified_node_msg) => {
+                        DAGMessage::NodeCertificateMsg(node_certificate_msg) => {
                             monitor!("dag_on_cert_node_msg", {
                                 match monitor!(
                                     "dag_state_sync_trigger_check",
-                                    self.state_sync_trigger.check(certified_node_msg).await
+                                    self.state_sync_trigger.check(node_certificate_msg).await
                                 )? {
-                                    SyncOutcome::Synced(Some(certified_node_msg)) => self
-                                        .dag_driver
-                                        .process(certified_node_msg.certified_node())
-                                        .await
-                                        .map(|r| {
-                                            let driver = self.dag_driver.clone();
-                                            tokio::task::spawn_blocking(move || {
-                                                driver.check_new_round();
-                                            });
-                                            r.into()
-                                        })
+                                    SyncOutcome::Synced(Some(certified_node_msg)) => {
+                                        let node_metadata = certified_node_msg.metadata();
+                                        if let Some((_, node)) = self.payload_store.remove(&(
+                                            node_metadata.round(),
+                                            *node_metadata.author(),
+                                        )) {
+                                            let certified_node = CertifiedNode::new(
+                                                node,
+                                                certified_node_msg.signatures().clone(),
+                                            );
+                                            self.dag_driver.process(certified_node).await.map(|r| {
+                                                let driver = self.dag_driver.clone();
+                                                tokio::task::spawn_blocking(move || {
+                                                    driver.check_new_round();
+                                                });
+                                                r.into()
+                                            })
+                                        } else {
+                                            Err(anyhow!(DagDriverError::PayloadNotFound))
+                                        }
                                         .map_err(|err| {
                                             err.downcast::<DagDriverError>()
                                                 .map_or(DAGError::Unknown, |err| {
                                                     DAGError::DagDriverError(err)
                                                 })
-                                        }),
+                                        })
+                                    },
                                     status @ (SyncOutcome::NeedsSync(_)
                                     | SyncOutcome::EpochEnds) => return Ok(status),
                                     _ => unreachable!(),

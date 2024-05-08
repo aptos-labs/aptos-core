@@ -16,7 +16,7 @@ use super::{
     order_rule::OrderRule,
     rb_handler::NodeBroadcastHandler,
     storage::{CommitEvent, DAGStorage},
-    types::{CertifiedNodeMessage, DAGMessage},
+    types::{CertifiedNodeMessage, DAGMessage, NodeCertificateMessage},
     DAGRpcResult, ProofNotifier,
 };
 use crate::{
@@ -62,6 +62,7 @@ use aptos_types::{
 };
 use arc_swap::{access::Access, ArcSwapAny, ArcSwapOption};
 use async_trait::async_trait;
+use dashmap::DashMap;
 use enum_dispatch::enum_dispatch;
 use futures_channel::oneshot;
 use std::{cell::RefCell, collections::HashMap, fmt, ops::Deref, sync::Arc, time::Duration};
@@ -183,7 +184,7 @@ impl ActiveMode {
 }
 
 struct SyncMode {
-    certified_node_msg: CertifiedNodeMessage,
+    certified_node_msg: NodeCertificateMessage,
     base_state: BootstrapBaseState,
 }
 
@@ -706,6 +707,7 @@ impl DagBootstrapper {
             peers_by_latency,
             self.broadcast_sender.clone(),
         );
+        let payload_store = Arc::new(DashMap::new());
         let rb_handler = NodeBroadcastHandler::new(
             self.dag_id,
             dag_store.clone(),
@@ -720,6 +722,7 @@ impl DagBootstrapper {
             self.jwk_consensus_config.clone(),
             health_backoff,
             self.quorum_store_enabled,
+            payload_store.clone(),
         );
         let fetch_handler =
             FetchRequestHandler::new(self.dag_id, dag_store.clone(), self.epoch_state.clone());
@@ -736,6 +739,7 @@ impl DagBootstrapper {
             new_round_rx,
             self.next_dag_tx.clone(),
             self.prev_dag_rx.lock().take().unwrap(),
+            payload_store,
         );
 
         (dag_handler, dag_fetcher)

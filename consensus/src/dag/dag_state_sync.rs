@@ -6,7 +6,7 @@ use super::{
     dag_fetcher::TDagFetcher,
     dag_store::DagStore,
     storage::DAGStorage,
-    types::{CertifiedNodeMessage, RemoteFetchRequest},
+    types::{CertifiedNodeMessage, NodeCertificateMessage, RemoteFetchRequest},
     ProofNotifier,
 };
 use crate::{
@@ -32,8 +32,8 @@ use tokio::runtime::Handle;
 
 #[derive(Debug)]
 pub enum SyncOutcome {
-    NeedsSync(CertifiedNodeMessage),
-    Synced(Option<CertifiedNodeMessage>),
+    NeedsSync(NodeCertificateMessage),
+    Synced(Option<NodeCertificateMessage>),
     EpochEnds,
 }
 
@@ -88,7 +88,7 @@ impl StateSyncTrigger {
     }
 
     /// This method checks if a state sync is required
-    pub(super) async fn check(&self, node: CertifiedNodeMessage) -> anyhow::Result<SyncOutcome> {
+    pub(super) async fn check(&self, node: NodeCertificateMessage) -> anyhow::Result<SyncOutcome> {
         let ledger_info_with_sigs = node.ledger_info();
 
         self.notify_commit_proof(ledger_info_with_sigs).await;
@@ -201,7 +201,7 @@ impl DagStateSynchronizer {
 
     pub(crate) fn build_request(
         &self,
-        node: &CertifiedNodeMessage,
+        node: &NodeCertificateMessage,
         current_dag_store: Arc<DagStore>,
         highest_committed_anchor_round: Round,
     ) -> (RemoteFetchRequest, Vec<Author>, Arc<DagStore>) {
@@ -326,7 +326,7 @@ impl SyncModeMessageHandler {
         self,
         dag_rpc_rx: &mut aptos_channel::Receiver<Author, IncomingDAGRequest>,
         buffer: &mut Vec<DAGMessage>,
-    ) -> Option<CertifiedNodeMessage> {
+    ) -> Option<NodeCertificateMessage> {
         let executor = BoundedExecutor::new(32, Handle::current());
         let epoch_state = self.epoch_state.clone();
         let mut verified_msg_stream =
@@ -370,7 +370,7 @@ impl SyncModeMessageHandler {
         author: Author,
         responder: RpcResponder,
         buffer: &mut Vec<DAGMessage>,
-    ) -> anyhow::Result<Option<CertifiedNodeMessage>> {
+    ) -> anyhow::Result<Option<NodeCertificateMessage>> {
         match dag_message_result {
             Ok(dag_message) => {
                 debug!(
@@ -383,7 +383,7 @@ impl SyncModeMessageHandler {
                     DAGMessage::NodeMsg(_) => {
                         debug!("ignoring node msg");
                     },
-                    DAGMessage::CertifiedNodeMsg(ref cert_node_msg) => {
+                    DAGMessage::NodeCertificateMsg(ref cert_node_msg) => {
                         if cert_node_msg.round() < self.start_round {
                             debug!("ignoring stale certified node msg");
                         } else if cert_node_msg.round() > self.target_round + (2 * self.window) {

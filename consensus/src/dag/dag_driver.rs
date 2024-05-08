@@ -8,7 +8,7 @@ use crate::{
     dag::{
         adapter::TLedgerInfoProvider,
         dag_fetcher::TFetchRequester,
-        errors::DagDriverError,
+        errors::{DagDriverError, NodeBroadcastHandleError},
         observability::{
             counters::{self, FETCH_ENQUEUE_FAILURES, NODE_PAYLOAD_SIZE, NUM_TXNS_PER_NODE},
             logging::{LogEvent, LogSchema},
@@ -20,7 +20,7 @@ use crate::{
         storage::DAGStorage,
         types::{
             CertificateAckState, CertifiedAck, CertifiedNode, CertifiedNodeMessage, DAGMessage,
-            Extensions, Node, SignatureBuilder,
+            Extensions, Node, NodeCertificateMessage, SignatureBuilder,
         },
         DAGRpcResult, RpcHandler,
     },
@@ -41,6 +41,7 @@ use aptos_time_service::{TimeService, TimeServiceTrait};
 use aptos_types::{block_info::Round, epoch_state::EpochState};
 use aptos_validator_transaction_pool as vtxn_pool;
 use async_trait::async_trait;
+use dashmap::DashMap;
 use futures::{
     executor::block_on,
     future::{join, AbortHandle, Abortable},
@@ -492,10 +493,8 @@ impl DagDriver {
                 "[Bolt] certified broadcast task was spawned for dag_id: {}",
                 dag_id
             );
-            let certified_node =
-                CertifiedNode::new(node_clone, certificate.signatures().to_owned());
-            let certified_node_msg = CertifiedNodeMessage::new(
-                certified_node,
+            let certified_node_msg = NodeCertificateMessage::new(
+                certificate,
                 latest_ledger_info.get_latest_ledger_info(),
             );
             let (tx, rx) = oneshot::channel();
