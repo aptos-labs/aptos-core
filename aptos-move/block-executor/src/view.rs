@@ -413,9 +413,12 @@ fn wait_for_dependency(
     //eprintln!("calling suspend txn={} dep_txn={}", txn_idx, dep_idx);
     
     match wait_for.conditional_suspend(txn_idx, dep_idx)? {
+        // TODO: if suspended but need re-execution, return the thread!
+        // SpeculativeExecutionError
         DependencyStatus::ExecutionHalted => Ok(false),
         DependencyStatus::Resolved => Ok(true),
-        DependencyStatus::Unresolved => Err(code_invariant_error("dependency should not be unresolved after conditional suspend"))
+        DependencyStatus::Unresolved => Ok(false),
+        // Err(code_invariant_error("dependency should not be unresolved after conditional suspend"))
     }
 
     /*
@@ -1864,7 +1867,7 @@ mod test {
             &self,
             _txn_idx: TxnIndex,
             _dep_txn_idx: TxnIndex,
-            _baton: Baton<DependencyStatus>,
+            _baton: Option<Baton<DependencyStatus>>,
         ) -> Result<DependencyStatus, PanicError> {
             unreachable!();
         }

@@ -131,7 +131,8 @@ pub enum SchedulerTask {
 enum ExecutionStatus {
     Ready(Incarnation, ExecutionTaskType),
     Executing(Incarnation, ExecutionTaskType),
-    Suspended(Incarnation, Baton<DependencyStatus>),
+    // Some means a worker is waiting while None means it needs re-execution.
+    Suspended(Incarnation, Option<Baton<DependencyStatus>>),
     Executed(Incarnation),
     // TODO[agg_v2](cleanup): rename to Finalized or ReadyToCommit / CommitReady?
     // it gets committed later, without scheduler tracking.
@@ -240,7 +241,7 @@ pub trait TWaitForDependency {
         &self,
         txn_idx: TxnIndex,
         dep_txn_idx: TxnIndex,
-        baton: Baton<DependencyStatus>,
+        baton: Option<Baton<DependencyStatus>>,
     ) -> Result<DependencyStatus, PanicError>;
 }
 
@@ -266,9 +267,23 @@ impl<'a> ConditionalSuspend for SchedulerHandle<'a> {
         dep_txn_idx: TxnIndex,
     ) -> Result<DependencyStatus, PanicError> {
         
-        
+        // TODO: Check if index is too far from committed index (some configurable param)
+        // if it's not too far, then as before;
+        // Otherwise, do not conditional suspend the garage, and update txn status to Suspended(.., None)
+        // Return a different status to the caller indicated 'suspended but should re-execute'
+        if txn_idx > self.scheduler.commit_state().0 + 100 {
+            if self.garage.unwrap().is_halted() {
+                return Ok(DependencyStatus::ExecutionHalted);
+            }
+            let res = self.scheduler.wait_for_dependency(txn_idx, dep_txn_idx, None)?;
+            if self.garage.unwrap().is_halted() {
+                return Ok(DependencyStatus::ExecutionHalted);
+            }
+            return Ok(res);
+        } 
+
         let suspend_result = self.garage.unwrap().conditional_suspend(|baton|-> Option<Result<DependencyStatus,PanicError>> {
-            let dep_result = self.scheduler.wait_for_dependency(txn_idx, dep_txn_idx, baton);
+            let dep_result = self.scheduler.wait_for_dependency(txn_idx, dep_txn_idx, Some(baton));
             match dep_result {
                 Ok(dep_result) => {
                     match dep_result {
@@ -284,6 +299,8 @@ impl<'a> ConditionalSuspend for SchedulerHandle<'a> {
         }, 
         DependencyStatus::Unresolved);  
 
+
+        //here return unresolved if 
         match suspend_result {
             Ok(suspend_result) => {
                 if let  SuspendResult::NotHalted(dependency_status) = suspend_result {
@@ -497,7 +514,7 @@ impl Scheduler {
         None
     }
 
-    #[cfg(test)]
+    //#[cfg(test)]
     /// Return the TxnIndex and Wave of current commit index
     pub fn commit_state(&self) -> (TxnIndex, u32) {
         let commit_state = self.commit_state.dereference();
@@ -619,7 +636,9 @@ impl Scheduler {
         // the write lock directly, and never release it during the whole function. This way,
         // even validation status readers have to wait if they somehow end up at the same index.
         let mut validation_status = self.txn_status[txn_idx as usize].1.write();
-        self.set_executed_status(txn_idx, incarnation)?;
+        if !self.set_executed_status(txn_idx, incarnation)? {
+            return Ok(SchedulerTask::Retry);
+        }
 
         self.wake_dependencies_after_execution(txn_idx)?;
 
@@ -749,7 +768,7 @@ impl TWaitForDependency for Scheduler {
         &self,
         txn_idx: TxnIndex,
         dep_txn_idx: TxnIndex,
-        baton: Baton<DependencyStatus>
+        baton: Option<Baton<DependencyStatus>>
     ) -> Result<DependencyStatus, PanicError> {
         if txn_idx <= dep_txn_idx || dep_txn_idx >= self.num_txns {
             return Err(code_invariant_error(
@@ -1016,7 +1035,7 @@ impl Scheduler {
     fn suspend(
         &self,
         txn_idx: TxnIndex,
-        baton: Baton<DependencyStatus>,
+        baton: Option<Baton<DependencyStatus>>,
     ) -> Result<(), PanicError> {
         let mut status = self.txn_status[txn_idx as usize].0.write();
         match *status {
@@ -1038,10 +1057,18 @@ impl Scheduler {
         let mut status = self.txn_status[txn_idx as usize].0.write();
         match &*status {
             ExecutionStatus::Suspended(incarnation, baton) => {
-                *status = ExecutionStatus::Ready(
-                    *incarnation,
-                    ExecutionTaskType::Wakeup(baton.clone()),
-                );
+                if baton.is_some() {
+                    *status = ExecutionStatus::Ready(
+                        *incarnation,
+                        ExecutionTaskType::Wakeup(baton.as_ref().unwrap().clone()),
+                    );
+                }
+                else {
+                    *status = ExecutionStatus::Ready(
+                        *incarnation+1,
+                        ExecutionTaskType::Execution,
+                    );
+                }
                 Ok(())
             },
             _ => Err(code_invariant_error(format!(
@@ -1056,7 +1083,7 @@ impl Scheduler {
         &self,
         txn_idx: TxnIndex,
         incarnation: Incarnation,
-    ) -> Result<(), PanicError> {
+    ) -> Result<bool, PanicError> {
         let mut status = self.txn_status[txn_idx as usize].0.write();
         //eprintln!("was here maybe should be halted?");
         match *status {
@@ -1064,16 +1091,13 @@ impl Scheduler {
                 if stored_incarnation == incarnation && !self.done() =>
             {
                 *status = ExecutionStatus::Executed(incarnation);
-                Ok(())
+                Ok(true)
             },
             _ if self.done() => {
                 // The execution is already halted.
-                Ok(())
+                Ok(true)
             },
-            _ => { Err(code_invariant_error(format!(
-                "Expected Executing incarnation {incarnation}, got {:?}",
-                &*status,
-            ))) },
+            _ => { Ok(false) },
         }
     }
 
@@ -1143,14 +1167,14 @@ mod tests {
                 s.try_incarnate(i);     }
            
             let baton1 = generate_baton();
-            let dep_1 = s.wait_for_dependency(1, 0, baton1.clone());
+            let dep_1 = s.wait_for_dependency(1, 0, Some(baton1.clone()));
             let baton2 = generate_baton();
-            let dep_2 =s.wait_for_dependency(2, 0, baton2.clone());
+            let dep_2 =s.wait_for_dependency(2, 0, Some(baton2.clone()));
             // Check wait for dependency error conditions w. indices (correct statuses).
-            assert_err!(s.wait_for_dependency(3, 3, generate_baton()));
-            assert_err!(s.wait_for_dependency(6, 5, generate_baton()));
+            assert_err!(s.wait_for_dependency(3, 3, Some(generate_baton())));
+            assert_err!(s.wait_for_dependency(6, 5, Some(generate_baton())));
             let baton3 = generate_baton();
-            let dep_3 = s.wait_for_dependency(3, 0, baton3.clone());
+            let dep_3 = s.wait_for_dependency(3, 0, Some(baton3.clone()));
             assert_ok!(s.resume(2));
             assert_ok!(s.resume(3));
             assert_some!(s.try_incarnate(3)); 
@@ -1175,11 +1199,11 @@ mod tests {
         let baton = Baton::new(0, DependencyStatus::Unresolved);
         assert_err!(s.suspend(
             0,
-            baton.clone(),
+            Some(baton.clone()),
         ));
         assert_err!(s.resume(0));
         assert_err!(s.set_executed_status(0, 0));
         assert_err!(s.set_aborted_status(0, 0));
-        assert_err!(s.wait_for_dependency(1, 0, baton.clone()));
+        assert_err!(s.wait_for_dependency(1, 0, Some(baton.clone())));
     }
 }

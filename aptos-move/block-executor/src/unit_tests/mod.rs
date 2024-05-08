@@ -655,10 +655,10 @@ fn scheduler_dependency() {
     // Now we can validate version (0, 0).
     assert_matches!(s.next_task(), SchedulerTask::ValidationTask(0, 0, 0));
     // Current status of 0 is executed - hence, no dependency added.
-    assert_matches!(s.wait_for_dependency(3, 0, baton.clone()), Ok(DependencyStatus::Resolved));
+    assert_matches!(s.wait_for_dependency(3, 0, Some(baton.clone())), Ok(DependencyStatus::Resolved));
     // Dependency added for transaction 4 on transaction 2.
     assert_matches!(
-        s.wait_for_dependency(4, 2, baton.clone()),
+        s.wait_for_dependency(4, 2, Some(baton.clone())),
         Ok(DependencyStatus::Unresolved)
     );
 
@@ -703,11 +703,11 @@ fn scheduler_incarnation() {
     let baton = Baton::new(0, DependencyStatus::Unresolved);
     // execution/validation index = 5, wave = 0.
     assert_matches!(
-        s.wait_for_dependency(1, 0, baton.clone()),
+        s.wait_for_dependency(1, 0, Some(baton.clone())),
         Ok(DependencyStatus::Unresolved)
     );
     assert_matches!(
-        s.wait_for_dependency(3, 0, baton.clone()),
+        s.wait_for_dependency(3, 0, Some(baton.clone())),
         Ok(DependencyStatus::Unresolved)
     );
 
