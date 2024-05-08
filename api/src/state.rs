@@ -308,7 +308,6 @@ impl StateApi {
         match accept_type {
             AcceptType::Json => {
                 let resource = state_view
-                    .as_move_resolver()
                     .as_converter(
                         self.context.db.clone(),
                         self.context.table_info_reader.clone(),
@@ -413,8 +412,7 @@ impl StateApi {
             .context
             .state_view(ledger_version.map(|inner| inner.0))?;
 
-        let resolver = state_view.as_move_resolver();
-        let converter = resolver.as_converter(
+        let converter = state_view.as_converter(
             self.context.db.clone(),
             self.context.table_info_reader.clone(),
         );

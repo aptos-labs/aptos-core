@@ -23,7 +23,6 @@ use aptos_protos::{
     },
     util::timestamp::Timestamp,
 };
-use aptos_vm::data_cache::AsMoveResolver;
 use itertools::Itertools;
 use serde::Serialize;
 use std::{sync::Arc, time::Duration};
@@ -340,9 +339,8 @@ impl IndexerStreamCoordinator {
 
         let first_version = raw_txns.first().map(|txn| txn.version).unwrap();
         let state_view = context.latest_state_view().unwrap();
-        let resolver = state_view.as_move_resolver();
         let converter =
-            resolver.as_converter(context.db.clone(), context.table_info_reader.clone());
+            state_view.as_converter(context.db.clone(), context.table_info_reader.clone());
 
         // Enrich data with block metadata
         let (_, _, block_event) = context

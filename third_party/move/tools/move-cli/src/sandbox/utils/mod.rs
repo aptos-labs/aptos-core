@@ -39,7 +39,7 @@ use std::{
 pub mod on_disk_state_view;
 pub mod package_context;
 
-use move_bytecode_utils::compiled_module_viewer::CompiledModuleViewer;
+use move_bytecode_utils::compiled_module_viewer::CompiledModuleView;
 use move_vm_test_utils::gas_schedule::{CostTable, GasStatus};
 pub use on_disk_state_view::*;
 pub use package_context::*;
@@ -172,6 +172,8 @@ pub(crate) fn explain_execution_effects(
             account.resources().len(),
             addr
         );
+
+        let annotator = MoveValueAnnotator::new(state.clone());
         for (struct_tag, write_op) in account.resources() {
             print!("    ");
             let mut bytes_to_write = struct_tag.access_vector().len();
@@ -183,8 +185,7 @@ pub(crate) fn explain_execution_effects(
                         struct_tag, blob, bytes_to_write
                     );
                     // Print new resource
-                    let resource =
-                        MoveValueAnnotator::new(state).view_resource(struct_tag, blob)?;
+                    let resource = annotator.view_resource(struct_tag, blob)?;
                     print_struct_with_indent(&resource, 6)
                 },
                 Op::Modify(blob) => {
@@ -197,10 +198,8 @@ pub(crate) fn explain_execution_effects(
                     let resource_data = state
                         .get_resource_bytes(*addr, struct_tag.clone())?
                         .unwrap();
-                    let resource_old =
-                        MoveValueAnnotator::new(state).view_resource(struct_tag, &resource_data)?;
-                    let resource_new =
-                        MoveValueAnnotator::new(state).view_resource(struct_tag, blob)?;
+                    let resource_old = annotator.view_resource(struct_tag, &resource_data)?;
+                    let resource_new = annotator.view_resource(struct_tag, blob)?;
 
                     print_struct_diff_with_indent(&resource_old, &resource_new, 8)
                 },
@@ -213,8 +212,7 @@ pub(crate) fn explain_execution_effects(
                     let resource_data = state
                         .get_resource_bytes(*addr, struct_tag.clone())?
                         .unwrap();
-                    let resource_old =
-                        MoveValueAnnotator::new(state).view_resource(struct_tag, &resource_data)?;
+                    let resource_old = annotator.view_resource(struct_tag, &resource_data)?;
                     print_struct_with_indent(&resource_old, 6);
                 },
             };
@@ -333,7 +331,7 @@ pub(crate) fn explain_publish_error(
         } => {
             println!("Breaking change detected--publishing aborted. Re-run with --ignore-breaking-changes to publish anyway.");
 
-            let old_module = state.view_compiled_module(&module_id)?.unwrap();
+            let old_module = state.view_compiled_module(&module_id)?;
             let old_api = normalized::Module::new(&old_module);
             let new_api = normalized::Module::new(module);
 
@@ -516,11 +514,7 @@ pub(crate) fn explain_execution_error(
             // TODO: map to source code location
             let location_explanation = match location {
                 AbortLocation::Module(id) => {
-                    format!(
-                        "{}::{}",
-                        id,
-                        state.resolve_function(&id, function)?.unwrap()
-                    )
+                    format!("{}::{}", id, state.resolve_function(&id, function)?)
                 },
                 AbortLocation::Script => "script".to_string(),
             };

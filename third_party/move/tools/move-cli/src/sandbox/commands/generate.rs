@@ -33,7 +33,7 @@ pub fn generate_struct_layouts(
                 type_params,
             };
             let mut layout_builder =
-                SerdeLayoutBuilder::new_with_config(&state, SerdeLayoutConfig {
+                SerdeLayoutBuilder::new_with_config(state, SerdeLayoutConfig {
                     separator,
                     omit_addresses,
                     ignore_phantom_types,

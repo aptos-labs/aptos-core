@@ -637,8 +637,7 @@ impl Context {
         }
 
         let state_view = self.latest_state_view_poem(ledger_info)?;
-        let resolver = state_view.as_move_resolver();
-        let converter = resolver.as_converter(self.db.clone(), self.table_info_reader.clone());
+        let converter = state_view.as_converter(self.db.clone(), self.table_info_reader.clone());
         let txns: Vec<aptos_api_types::Transaction> = data
             .into_iter()
             .map(|t| {
@@ -670,8 +669,7 @@ impl Context {
         }
 
         let state_view = self.latest_state_view_poem(ledger_info)?;
-        let resolver = state_view.as_move_resolver();
-        let converter = resolver.as_converter(self.db.clone(), self.table_info_reader.clone());
+        let converter = state_view.as_converter(self.db.clone(), self.table_info_reader.clone());
         let txns: Vec<aptos_api_types::Transaction> = data
             .into_iter()
             .map(|t| {
@@ -1192,17 +1190,16 @@ impl Context {
                 .map_err(|e| {
                     E::internal_with_code(e, AptosErrorCode::InternalError, ledger_info)
                 })?;
-            let resolver = state_view.as_move_resolver();
 
             let gas_schedule_params =
-                match GasScheduleV2::fetch_config(&resolver).and_then(|gas_schedule| {
+                match GasScheduleV2::fetch_config(&state_view).and_then(|gas_schedule| {
                     let feature_version = gas_schedule.feature_version;
                     let gas_schedule = gas_schedule.to_btree_map();
                     AptosGasParameters::from_on_chain_gas_schedule(&gas_schedule, feature_version)
                         .ok()
                 }) {
                     Some(gas_schedule) => Ok(gas_schedule),
-                    None => GasSchedule::fetch_config(&resolver)
+                    None => GasSchedule::fetch_config(&state_view)
                         .and_then(|gas_schedule| {
                             let gas_schedule = gas_schedule.to_btree_map();
                             AptosGasParameters::from_on_chain_gas_schedule(&gas_schedule, 0).ok()
@@ -1257,9 +1254,8 @@ impl Context {
                 .map_err(|e| {
                     E::internal_with_code(e, AptosErrorCode::InternalError, ledger_info)
                 })?;
-            let resolver = state_view.as_move_resolver();
 
-            let block_executor_onchain_config = OnChainExecutionConfig::fetch_config(&resolver)
+            let block_executor_onchain_config = OnChainExecutionConfig::fetch_config(&state_view)
                 .unwrap_or_else(OnChainExecutionConfig::default_if_missing)
                 .block_executor_onchain_config();
 

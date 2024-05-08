@@ -4,54 +4,65 @@
 
 pub mod module_view;
 
-use anyhow::{bail, Result};
-use aptos_types::{access_path::AccessPath, contract_event::ContractEvent};
-use move_core_types::{language_storage::StructTag, resolver::ModuleResolver};
+use crate::module_view::ModuleView;
+use aptos_types::state_store::StateView;
+use move_binary_format::CompiledModule;
+use move_core_types::{
+    identifier::{IdentStr, Identifier},
+    language_storage::{ModuleId, StructTag, TypeTag},
+    value::{MoveTypeLayout, MoveValue},
+};
 use move_resource_viewer::MoveValueAnnotator;
 pub use move_resource_viewer::{AnnotatedMoveStruct, AnnotatedMoveValue};
-use std::{
-    collections::BTreeMap,
-    fmt::{Display, Formatter},
-};
+use std::sync::Arc;
 
-/// A wrapper around `MoveValueAnnotator` that adds a few aptos-specific functionalities.
-pub struct AptosValueAnnotator<'a, T>(MoveValueAnnotator<'a, T>);
+pub struct AptosValueAnnotator<'a, S>(MoveValueAnnotator<ModuleView<'a, S>>);
 
-#[derive(Debug)]
-pub struct AnnotatedAccountStateBlob(BTreeMap<StructTag, AnnotatedMoveStruct>);
-
-impl<'a, T: ModuleResolver> AptosValueAnnotator<'a, T> {
-    pub fn new(storage: &'a T) -> Self {
-        Self(MoveValueAnnotator::new(storage))
+impl<'a, S: StateView> AptosValueAnnotator<'a, S> {
+    pub fn new(state_view: &'a S) -> Self {
+        let view = ModuleView::new(state_view);
+        Self(MoveValueAnnotator::new(view))
     }
 
-    pub fn view_resource(&self, tag: &StructTag, blob: &[u8]) -> Result<AnnotatedMoveStruct> {
+    pub fn view_value(&self, ty_tag: &TypeTag, blob: &[u8]) -> anyhow::Result<AnnotatedMoveValue> {
+        self.0.view_value(ty_tag, blob)
+    }
+
+    pub fn view_module(&self, module_id: &ModuleId) -> anyhow::Result<Arc<CompiledModule>> {
+        self.0.view_module(module_id)
+    }
+
+    pub fn view_resource(
+        &self,
+        tag: &StructTag,
+        blob: &[u8],
+    ) -> anyhow::Result<AnnotatedMoveStruct> {
         self.0.view_resource(tag, blob)
     }
 
-    pub fn view_access_path(
+    pub fn view_struct_fields(
         &self,
-        access_path: AccessPath,
+        tag: &StructTag,
         blob: &[u8],
-    ) -> Result<AnnotatedMoveStruct> {
-        match access_path.get_struct_tag() {
-            Some(tag) => self.view_resource(&tag, blob),
-            None => bail!("Bad resource access path"),
-        }
+    ) -> anyhow::Result<Vec<(Identifier, MoveValue)>> {
+        self.0.move_struct_fields(tag, blob)
     }
 
-    pub fn view_contract_event(&self, event: &ContractEvent) -> Result<AnnotatedMoveValue> {
-        self.0.view_value(event.type_tag(), event.event_data())
+    pub fn view_function_arguments(
+        &self,
+        module: &ModuleId,
+        function: &IdentStr,
+        ty_args: &[TypeTag],
+        args: &[Vec<u8>],
+    ) -> anyhow::Result<Vec<AnnotatedMoveValue>> {
+        self.0
+            .view_function_arguments(module, function, ty_args, args)
     }
-}
 
-impl Display for AnnotatedAccountStateBlob {
-    fn fmt(&self, f: &mut Formatter) -> std::fmt::Result {
-        writeln!(f, "{{")?;
-        for v in self.0.values() {
-            write!(f, "{}", v)?;
-            writeln!(f, ",")?;
-        }
-        writeln!(f, "}}")
+    pub fn view_fully_decorated_ty_layout(
+        &self,
+        type_tag: &TypeTag,
+    ) -> anyhow::Result<MoveTypeLayout> {
+        self.0.get_type_layout_with_types(type_tag)
     }
 }

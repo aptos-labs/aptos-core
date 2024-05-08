@@ -3,7 +3,11 @@
 // SPDX-License-Identifier: Apache-2.0
 
 use bytes::Bytes;
-use move_binary_format::errors::{PartialVMError, PartialVMResult};
+use move_binary_format::{
+    errors::{PartialVMError, PartialVMResult},
+    CompiledModule,
+};
+use move_bytecode_utils::compiled_module_viewer::CompiledModuleView;
 use move_core_types::{
     account_address::AccountAddress,
     effects::{AccountChangeSet, ChangeSet, Op},
@@ -153,6 +157,16 @@ pub struct InMemoryStorage {
     accounts: BTreeMap<AccountAddress, InMemoryAccountStorage>,
     #[cfg(feature = "table-extension")]
     tables: BTreeMap<TableHandle, BTreeMap<Vec<u8>, Bytes>>,
+}
+
+impl CompiledModuleView for InMemoryStorage {
+    type Item = CompiledModule;
+
+    fn view_compiled_module(&self, id: &ModuleId) -> anyhow::Result<Self::Item> {
+        let bytes = self.get_module(id)?.unwrap();
+        let m = CompiledModule::deserialize(&bytes)?;
+        Ok(m)
+    }
 }
 
 fn apply_changes<K, V>(

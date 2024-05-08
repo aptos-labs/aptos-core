@@ -4,6 +4,7 @@
 
 use crate::{Address, Bytecode, IdentifierWrapper, VerifyInput, VerifyInputWithRecursion};
 use anyhow::{bail, format_err};
+use aptos_resource_viewer::{AnnotatedMoveStruct, AnnotatedMoveValue};
 use aptos_types::{account_config::CORE_CODE_ADDRESS, event::EventKey, transaction::Module};
 use move_binary_format::{
     access::ModuleAccess,
@@ -18,7 +19,6 @@ use move_core_types::{
     parser::{parse_struct_tag, parse_type_tag},
     transaction_argument::TransactionArgument,
 };
-use move_resource_viewer::{AnnotatedMoveStruct, AnnotatedMoveValue};
 use poem_openapi::{types::Type, Enum, Object, Union};
 use serde::{de::Error as _, Deserialize, Deserializer, Serialize, Serializer};
 use std::{
@@ -1223,7 +1223,6 @@ mod tests {
         identifier::Identifier,
         language_storage::{StructTag, TypeTag},
     };
-    use move_resource_viewer::{AnnotatedMoveStruct, AnnotatedMoveValue};
     use serde::{de::DeserializeOwned, Serialize};
     use serde_json::{json, to_value, Value};
     use std::{boxed::Box, convert::TryFrom, fmt::Debug};

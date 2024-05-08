@@ -26,6 +26,7 @@ aptos-jellyfish-merkle = { workspace = true }
 aptos-logger = { workspace = true }
 aptos-metrics-core = { workspace = true }
 aptos-proptest-helpers = { workspace = true, optional = true }
+aptos-resource-viewer = { workspace = true }
 aptos-rocksdb-options = { workspace = true }
 aptos-schemadb = { workspace = true }
 aptos-scratchpad = { workspace = true }
@@ -44,7 +45,6 @@ either = { workspace = true }
 itertools = { workspace = true }
 lru = { workspace = true }
 move-core-types = { workspace = true }
-move-resource-viewer = { workspace = true }
 num-derive = { workspace = true }
 once_cell = { workspace = true }
 owo-colors = { workspace = true, optional = true }

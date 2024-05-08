@@ -104,7 +104,7 @@ fn print_resources_and_extensions(
 ) -> Result<String> {
     use std::fmt::Write;
     let mut buf = String::new();
-    let annotator = MoveValueAnnotator::new(storage);
+    let annotator = MoveValueAnnotator::new(storage.clone());
     for (account_addr, account_state) in cs.accounts() {
         writeln!(&mut buf, "0x{}:", account_addr.short_str_lossless())?;
 

@@ -42,8 +42,8 @@ aptos-moving-average = { workspace = true }
 aptos-protos = { workspace = true }
 aptos-runtimes = { workspace = true }
 aptos-storage-interface = { workspace = true }
+aptos-resource-viewer = { workspace = true }
 aptos-types = { workspace = true }
-aptos-vm = { workspace = true }
 
 move-binary-format = { workspace = true }
 move-core-types = { workspace = true }

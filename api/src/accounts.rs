@@ -345,7 +345,6 @@ impl Account {
                     .context
                     .latest_state_view_poem(&self.latest_ledger_info)?;
                 let converted_resources = state_view
-                    .as_move_resolver()
                     .as_converter(
                         self.context.db.clone(),
                         self.context.table_info_reader.clone(),
@@ -542,7 +541,7 @@ impl Account {
                 resource_not_found(self.address, resource_type, ledger_version, &ledger_info)
             })?;
 
-        resolver
+        state_view
             .as_converter(
                 self.context.db.clone(),
                 self.context.table_info_reader.clone(),
