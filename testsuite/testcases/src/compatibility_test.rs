@@ -2,7 +2,7 @@
 // Parts of the project are originally copyright © Meta Platforms, Inc.
 // SPDX-License-Identifier: Apache-2.0
 
-use crate::{batch_update, generate_traffic};
+use crate::{batch_update_gradually, generate_traffic};
 use anyhow::bail;
 use aptos_forge::{NetworkContext, NetworkTest, Result, SwarmExt, Test};
 use aptos_logger::info;
@@ -23,6 +23,9 @@ impl Test for SimpleValidatorUpgrade {
 impl NetworkTest for SimpleValidatorUpgrade {
     fn run(&self, ctx: &mut NetworkContext<'_>) -> Result<()> {
         let runtime = Runtime::new()?;
+        let upgrade_wait_for_healthy = true;
+        let upgrade_node_delay = Duration::from_secs(10);
+        let upgrade_max_wait = Duration::from_secs(40);
 
         let epoch_duration = Duration::from_secs(Self::EPOCH_DURATION_SECS);
 
@@ -53,6 +56,8 @@ impl NetworkTest for SimpleValidatorUpgrade {
             .validators()
             .map(|v| v.peer_id())
             .collect::<Vec<_>>();
+        // TODO: this is the "compat" test. Expand and refine to properly validate network2.
+        // TODO: Ensure sustained TPS during upgrade. Slower upgrade rollout.
         let mut first_batch = all_validators.clone();
         let second_batch = first_batch.split_off(first_batch.len() / 2);
         let first_node = first_batch.pop().unwrap();
@@ -66,9 +71,9 @@ impl NetworkTest for SimpleValidatorUpgrade {
         ctx.report.report_text(msg);
 
         // Generate some traffic
-        let txn_stat = generate_traffic(ctx, &all_validators, duration)?;
+        let txn_stat_prior = generate_traffic(ctx, &all_validators, duration)?;
         ctx.report
-            .report_txn_stats(format!("{}::liveness-check", self.name()), &txn_stat);
+            .report_txn_stats(format!("{}::liveness-check", self.name()), &txn_stat_prior);
 
         // Update the first Validator
         let msg = format!(
@@ -77,13 +82,13 @@ impl NetworkTest for SimpleValidatorUpgrade {
         );
         info!("{}", msg);
         ctx.report.report_text(msg);
-        runtime.block_on(batch_update(ctx, &[first_node], &new_version))?;
+        runtime.block_on(batch_update_gradually(ctx, &[first_node], &new_version, upgrade_wait_for_healthy, upgrade_node_delay, upgrade_max_wait))?;
 
         // Generate some traffic
-        let txn_stat = generate_traffic(ctx, &[first_node], duration)?;
+        let txn_stat_one = generate_traffic(ctx, &[first_node], duration)?;
         ctx.report.report_txn_stats(
             format!("{}::single-validator-upgrade", self.name()),
-            &txn_stat,
+            &txn_stat_one,
         );
 
         // Update the rest of the first batch
@@ -93,13 +98,13 @@ impl NetworkTest for SimpleValidatorUpgrade {
         );
         info!("{}", msg);
         ctx.report.report_text(msg);
-        runtime.block_on(batch_update(ctx, &first_batch, &new_version))?;
+        runtime.block_on(batch_update_gradually(ctx, &first_batch, &new_version, upgrade_wait_for_healthy, upgrade_node_delay, upgrade_max_wait))?;
 
         // Generate some traffic
-        let txn_stat = generate_traffic(ctx, &first_batch, duration)?;
+        let txn_stat_half = generate_traffic(ctx, &first_batch, duration)?;
         ctx.report.report_txn_stats(
             format!("{}::half-validator-upgrade", self.name()),
-            &txn_stat,
+            &txn_stat_half,
         );
 
         ctx.swarm().fork_check(epoch_duration)?;
@@ -108,13 +113,13 @@ impl NetworkTest for SimpleValidatorUpgrade {
         let msg = format!("4. upgrading second batch to new version: {}", new_version);
         info!("{}", msg);
         ctx.report.report_text(msg);
-        runtime.block_on(batch_update(ctx, &second_batch, &new_version))?;
+        runtime.block_on(batch_update_gradually(ctx, &second_batch, &new_version, upgrade_wait_for_healthy, upgrade_node_delay, upgrade_max_wait))?;
 
         // Generate some traffic
-        let txn_stat = generate_traffic(ctx, &second_batch, duration)?;
+        let txn_stat_all = generate_traffic(ctx, &second_batch, duration)?;
         ctx.report.report_txn_stats(
             format!("{}::rest-validator-upgrade", self.name()),
-            &txn_stat,
+            &txn_stat_all,
         );
 
         let msg = "5. check swarm health".to_string();

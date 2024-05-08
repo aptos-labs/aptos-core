@@ -68,6 +68,30 @@ async fn batch_update(
     Ok(())
 }
 
+async fn batch_update_gradually(
+    ctx: &mut NetworkContext<'_>,
+    validators_to_update: &[PeerId],
+    version: &Version,
+    wait_until_healthy: bool,
+    delay: Duration,
+    max_wait: Duration,
+) -> Result<()> {
+    for validator in validators_to_update {
+        ctx.swarm().upgrade_validator(*validator, version).await?;
+        if wait_until_healthy {
+            let deadline = Instant::now() + max_wait;
+            ctx.swarm().validator_mut(*validator).unwrap().wait_until_healthy(deadline).await?;
+        }
+        if !delay.is_zero() {
+            tokio::time::sleep(delay).await;
+        }
+    }
+
+    ctx.swarm().health_check().await?;
+
+    Ok(())
+}
+
 pub fn create_emitter_and_request(
     swarm: &mut dyn Swarm,
     mut emit_job_request: EmitJobRequest,
