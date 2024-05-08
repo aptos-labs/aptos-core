@@ -40,6 +40,7 @@
 //!          yy
 //!
 //!     and BB2 is removed.
+//!
 //! 3. Removes all jumps to the next instruction:
 //!     Whenever we have
 //!
@@ -243,7 +244,7 @@ impl ControlFlowGraphCodeGenerator {
         generated
     }
 
-    /// Generates code for block.
+    /// Generates code for block. The way we generate code effectively does the transformation 3 in the module doc.
     fn gen_code_for_block(
         &self,
         mut code_block: Vec<Bytecode>,
