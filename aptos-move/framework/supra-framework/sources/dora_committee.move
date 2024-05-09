@@ -198,8 +198,8 @@ module supra_framework::dora_committee {
     }
 
     #[view]
-    /// Get the committee's dora node vector
-    public fun get_committee_info(com_store_addr: address, id: u64): vector<NodeData> acquires CommitteeInfoStore {
+    /// Get the committee's dora node vector and committee type
+    public fun get_committee_info(com_store_addr: address, id: u64): (vector<NodeData>, u8) acquires CommitteeInfoStore {
         let committee_store = borrow_global<CommitteeInfoStore>(com_store_addr);
         let committee = simple_map::borrow(&committee_store.committee_map, &id);
         let (addrs, dora_nodes) = simple_map::to_vec_pair(committee.map);
@@ -218,7 +218,7 @@ module supra_framework::dora_committee {
             };
             vector::push_back(&mut node_data_vec, node_data);
         };
-        node_data_vec
+        (node_data_vec, committee.committee_type)
     }
 
     #[view]
@@ -275,17 +275,17 @@ module supra_framework::dora_committee {
     }
 
     #[view]
-    /// Get the dora node peers vector for a single node
+    /// Get a tuple of the node itself and dora node peers vector for a single node
     public fun get_peers_for_node(
         com_store_addr: address,
         node_address: address
-    ): vector<NodeData> acquires CommitteeInfoStore {
+    ): (NodeData, vector<NodeData>) acquires CommitteeInfoStore {
         let committee_id = get_committee_id_for_node(com_store_addr, node_address);
         let this_node = get_node_info(com_store_addr, committee_id, node_address);
-        let dora_node_info = get_committee_info(com_store_addr, committee_id);
+        let (dora_node_info,_) = get_committee_info(com_store_addr, committee_id);
         let (_, index) = vector::index_of(&dora_node_info, &this_node);
-        vector::remove(&mut dora_node_info, index);
-        dora_node_info
+        let self= vector::remove(&mut dora_node_info, index);
+        (self, dora_node_info)
     }
 
     #[view]
@@ -968,7 +968,7 @@ module supra_framework::dora_committee {
             vector[123, 123],
             1
         );
-        let node_data = get_committee_info(resource_address, 1);
+        let (node_data,_) = get_committee_info(resource_address, 1);
         assert!(vector::length(&node_data) == 2, 0);
     }
 
@@ -1037,7 +1037,7 @@ module supra_framework::dora_committee {
             vector[123, 123],
             1
         );
-        let peers = get_peers_for_node(resource_address, @0x1);
+        let (_,peers) = get_peers_for_node(resource_address, @0x1);
         assert!(vector::length(&peers) == 1, 0);
     }
 }
