@@ -213,6 +213,7 @@ impl ChunkOutput {
             transaction::TransactionAuxiliaryData,
             write_set::WriteSet,
         };
+        use rayon::iter::{IndexedParallelIterator, IntoParallelRefIterator, ParallelIterator};
 
         let transaction_outputs = match state_view.id() {
             // this state view ID implies a genesis block in non-test cases.
@@ -221,7 +222,8 @@ impl ChunkOutput {
             },
             _ => BlockOutput::new(
                 transactions
-                    .iter()
+                    .par_iter()
+                    .with_min_len(100)
                     .map(|_| {
                         TransactionOutput::new(
                             WriteSet::default(),
