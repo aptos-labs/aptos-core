@@ -36,12 +36,6 @@ pub struct BlockFetchRequest {
     context: BlockFetchContext,
 }
 
-
-#[derive(Debug)]
-pub enum BlockFetchCommand {
-    FetchBlocksRequest(BlockFetchRequest),
-}
-
 #[derive(Debug)]
 pub struct BlockFetchResponse {
     // TODO: Check if using a Vector is better here.
@@ -83,16 +77,14 @@ impl BlockFetchManager {
 
     pub async fn start(
         mut self,
-        mut proposal_rx: Receiver<(HashValue, HashValue), BlockFetchCommand>,
+        mut proposal_rx: Receiver<(HashValue, HashValue), BlockFetchRequest>,
     ) {
         loop {
             let _timer = BLOCK_FETCH_MANAGER_MAIN_LOOP.start_timer();
 
             tokio::select! {
-                Some(msg) = proposal_rx.next() => monitor!("block_fetch_manager_handle_proposal", {
-                    match msg {
-                        BlockFetchCommand::FetchBlocksRequest(request) => self.handle_fetch_request(request).await,
-                    }
+                Some(request) = proposal_rx.next() => monitor!("block_fetch_manager_handle_proposal", {
+                    self.handle_fetch_request(request).await,
                 })
             }
         }

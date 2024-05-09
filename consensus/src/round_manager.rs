@@ -207,7 +207,7 @@ pub struct RoundManager {
     // Caching recently processed votes and proposals to avoid processing them twice.
     processed_vote_cache: LruCache<(Author, HashValue, HashValue), ()>,
     processed_proposal_cache: LruCache<HashValue, ()>,
-    block_fetch_request_tx: aptos_channel::Sender<BlockFetchContext, BlockFetchRequest>,
+    block_fetch_request_tx: aptos_channel::Sender<(HashValue, HashValue), BlockFetchRequest>,
     // These are proposals and votes that failed sync_up and are parked to be re-executed
     failed_messages: VecDeque<VerifiedEvent>,
 }
@@ -229,7 +229,7 @@ impl RoundManager {
         randomness_config: OnChainRandomnessConfig,
         jwk_consensus_config: OnChainJWKConsensusConfig,
         fast_rand_config: Option<RandConfig>,
-        block_fetch_request_tx: aptos_channel::Sender<BlockFetchContext, BlockFetchRequest>,
+        block_fetch_request_tx: aptos_channel::Sender<(HashValue, HashValue), BlockFetchRequest>,
     ) -> Self {
         // when decoupled execution is false,
         // the counter is still static.
