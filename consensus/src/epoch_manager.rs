@@ -60,7 +60,7 @@ use aptos_config::config::{
 use aptos_consensus_types::{
     block::Block, common::{Author, Round}, delayed_qc_msg::DelayedQcMsg, epoch_retrieval::EpochRetrievalRequest, proof_of_store::ProofCache
 };
-use aptos_crypto::bls12381;
+use aptos_crypto::{bls12381, HashValue};
 use aptos_dkg::{
     pvss::{traits::Transcript, Player},
     weighted_vuf::traits::WeightedVUF,
@@ -1246,7 +1246,6 @@ impl<P: OnChainConfigProvider> EpochManager<P> {
                     consensus_config,
                     epoch_state,
                     network_sender.clone(),
-                    block_fetch_response_rx,
                 )
                 .await
             },
@@ -1257,7 +1256,7 @@ impl<P: OnChainConfigProvider> EpochManager<P> {
         &mut self,
         network: Arc<NetworkSender>,
         max_blocks_per_request: u64,
-    ) -> aptos_channel::Receiver<BlockFetchContext, BlockFetchResponse> {
+    ) -> aptos_channel::Receiver<(HashValue, HashValue), BlockFetchResponse> {
         let (block_fetch_request_tx, block_fetch_request_rx) = aptos_channel::new(
             QueueStyle::LIFO,
             1000,

@@ -6,26 +6,25 @@ use aptos_consensus_types::{
     block::Block, block_retrieval::{
         BlockRetrievalRequest, BlockRetrievalResponse, BlockRetrievalStatus, NUM_PEERS_PER_RETRY,
         NUM_RETRIES, RETRY_INTERVAL_MSEC, RPC_TIMEOUT_MSEC,
-    }, common::Author, proposal_msg::ProposalMsg, quorum_cert::QuorumCert, sync_info::SyncInfo, vote::Vote, vote_msg::VoteMsg
+    }, common::Author, quorum_cert::QuorumCert, sync_info::SyncInfo,
 };
 use aptos_types::account_address::AccountAddress;
 use aptos_logger::prelude::*;
 use anyhow::{bail, Context};
 use crate::{block_storage::counters::BLOCK_FETCH_MANAGER_MAIN_LOOP, monitor, network::NetworkSender, logging::{LogEvent, LogSchema}};
-use std::{collections::HashMap, cmp::min, sync::Arc, time::Duration};
+use std::{collections::HashMap, cmp::{min, max}, sync::Arc, time::Duration};
 use rand::{thread_rng, Rng};
 use tokio::time;
 use futures::{stream::FuturesUnordered, StreamExt};
 use aptos_channels::aptos_channel::{Sender, Receiver};
 use lru::LruCache;
 
-#[derive(Debug, PartialEq, Eq, Hash, Clone)]
+#[derive(Debug, PartialEq, Eq, Clone)]
 pub enum BlockFetchContext {
     ProcessRecovery(SyncInfo, Author),
     ProcessRegular(SyncInfo, Author),
     InsertQuorumCert(QuorumCert, Author),
 }
-
 
 #[derive(Debug)]
 pub struct BlockFetchRequest {
@@ -45,17 +44,13 @@ pub enum BlockFetchCommand {
 
 #[derive(Debug)]
 pub struct BlockFetchResponse {
-    // TODO: We probably don't need to have the blocks in the response, just the context
+    // TODO: Check if using a Vector is better here.
     blocks: HashMap<HashValue, Arc<Block>>,
     context: BlockFetchContext,
 }
 
 impl BlockFetchResponse {
-    pub fn new(blocks: Vec<Block>, context: BlockFetchContext) -> Self {
-        Self { blocks, context }
-    }
-
-    pub fn blocks(&self) -> &[Block] {
+    pub fn blocks(&self) -> &HashMap<HashValue, Arc<Block>> {
         &self.blocks
     }
 
@@ -71,16 +66,16 @@ pub struct BlockFetchManager {
     // TODO: Store the fetched blocks in the block_store for reuse
     block_store: LruCache<HashValue, Arc<Block>>,
     max_blocks_per_request: u64,
-    // TODO: BlockFetchContext is too big to use as a key. Use a simpler key
-    response_sender: Arc<Sender<BlockFetchContext, BlockFetchResponse>>,
+    // The key for the queue is (initial_block_id, target_block_id) of the request
+    response_sender: Sender<(HashValue, HashValue), BlockFetchResponse>,
 }
 
 impl BlockFetchManager {
-    pub fn new(network: Arc<NetworkSender>, max_blocks_per_request: u64, response_sender: Arc<Sender<BlockFetchContext, BlockFetchResponse>>) -> Self {
+    pub fn new(network: Arc<NetworkSender>, max_blocks_per_request: u64, response_sender: Sender<(HashValue, HashValue), BlockFetchResponse>) -> Self {
         BlockFetchManager {
             network,
             // TODO: Is storing 50 blocks enough even for recovery manager?
-            block_store: LruCache::new(max(max_blocks_per_request, 50)),
+            block_store: LruCache::new(max(max_blocks_per_request as usize, 50)),
             max_blocks_per_request,
             response_sender,
         }
@@ -88,7 +83,7 @@ impl BlockFetchManager {
 
     pub async fn start(
         mut self,
-        mut proposal_rx: Receiver<BlockFetchContext, BlockFetchCommand>,
+        mut proposal_rx: Receiver<(HashValue, HashValue), BlockFetchCommand>,
     ) {
         loop {
             let _timer = BLOCK_FETCH_MANAGER_MAIN_LOOP.start_timer();
@@ -112,20 +107,37 @@ impl BlockFetchManager {
             num_blocks,
             context,
         } = fetch_request;
-
-        let mut peers = peers;
-        let peers = self.pick_peers(true, preferred_peer, &mut peers, 2);
-        let blocks = self.retrieve_block_for_id(initial_block_id, target_block_id, preferred_peer, peers, num_blocks).await;
-        for block in blocks {
-            self.block_store.put(block.id(), block);
+        let blocks = HashMap::new();
+        let mut current_block_id = initial_block_id;
+        while current_block_id != target_block_id {
+            if let Some(block) = self.block_store.get(&current_block_id) {
+                blocks.insert(block.id(), block.clone());
+                current_block_id = block.parent_id();
+            } else {
+                break;
+            }
         }
-        match blocks {
-            Ok(blocks) => {
-                info!("Successfully fetched blocks: {:?}", blocks);
-                let fetch_response = BlockFetchResponse { blocks, context };
-            },
-            Err(e) => {
-                error!("Failed to fetch blocks: {:?}", e);
+        if blocks.len() == num_blocks as usize {
+            let fetch_response = BlockFetchResponse { blocks, context };
+            self.response_sender.push(context, fetch_response);
+            return;
+        } else {
+            // TODO: Optimize this. We are fetching between [target_block_id, current_block_id] even if 
+            // some of these blocks could be present in block_store.
+            let mut peers = peers;
+            let peers = self.pick_peers(true, preferred_peer, &mut peers, 2);
+            let blocks = self.retrieve_block_for_id(initial_block_id, target_block_id, preferred_peer, peers, num_blocks).await;
+            for block in blocks {
+                self.block_store.push(block.id(), block);
+            }
+            match blocks {
+                Ok(blocks) => {
+                    info!("Successfully fetched blocks: {:?}", blocks);
+                    let fetch_response = BlockFetchResponse { blocks, context };
+                },
+                Err(e) => {
+                    error!("Failed to fetch blocks: {:?}", e);
+                }
             }
         }
     }

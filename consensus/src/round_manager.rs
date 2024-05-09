@@ -1191,7 +1191,8 @@ impl RoundManager {
         mut buffered_proposal_rx: aptos_channel::Receiver<Author, VerifiedEvent>,
         mut delayed_qc_rx: UnboundedReceiver<DelayedQcMsg>,
         close_rx: oneshot::Receiver<oneshot::Sender<()>>,
-        mut block_fetch_response_rx: aptos_channel::Receiver<BlockFetchContext, BlockFetchResponse>,
+        // The key for the channel is (initial_block_id, target_block_id) of the request
+        mut block_fetch_response_rx: aptos_channel::Receiver<(HashValue, HashValue), BlockFetchResponse>,
     ) {
         info!(epoch = self.epoch_state().epoch, "RoundManager started");
         let mut close_rx = close_rx.into_stream();

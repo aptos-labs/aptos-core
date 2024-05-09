@@ -3,7 +3,7 @@
 // SPDX-License-Identifier: Apache-2.0
 
 use crate::{
-    block_storage::{block_fetch_manager::{BlockFetchContext, BlockFetchRequest}, BlockReader, BlockStore},
+    block_storage::{block_fetch_manager::{BlockFetchContext, BlockFetchRequest}, block_retriever::{BlockRetriever, RetrieverResult}, BlockReader, BlockStore},
     epoch_manager::LivenessStorageData,
     logging::{LogEvent, LogSchema},
     monitor,
@@ -84,7 +84,7 @@ impl BlockStore {
     ) -> anyhow::Result<SyncResult> {
         self.sync_to_highest_commit_cert(
             sync_info.highest_commit_cert().ledger_info(),
-            &retriever.network,
+            &retriever.network(),
         )
         .await;
         if SyncResult::Fetching == self.sync_to_highest_ordered_cert(
@@ -127,7 +127,7 @@ impl BlockStore {
             self.send_for_execution(qc.clone()).await?;
             if qc.ends_epoch() {
                 retriever
-                    .network
+                    .network()
                     .broadcast_epoch_change(EpochChangeProof::new(
                         vec![qc.ledger_info().clone()],
                         /* more = */ false,
@@ -213,7 +213,7 @@ impl BlockStore {
 
         if highest_commit_cert.ledger_info().ledger_info().ends_epoch() {
             retriever
-                .network
+                .network()
                 .send_epoch_change(EpochChangeProof::new(
                     // Question: If highest_commit_cert has ends_epoch() == true, why are we sending
                     // highest_ordered_cert instead of highest_commit_cert?
@@ -232,10 +232,9 @@ impl BlockStore {
         storage: Arc<dyn PersistentLivenessStorage>,
         execution_client: Arc<dyn TExecutionClient>,
         payload_manager: Arc<PayloadManager>,
-        extra_block_store: HashMap<HashValue, Arc<Block>>,
     ) -> anyhow::Result<RecoveryData> {
         info!(
-            LogSchema::new(LogEvent::StateSync).remote_peer(retriever.preferred_peer),
+            LogSchema::new(LogEvent::StateSync).remote_peer(retriever.preferred_peer()),
             "Start state sync to commit cert: {}, ordered cert: {}",
             highest_commit_cert,
             highest_ordered_cert,
@@ -415,60 +414,5 @@ impl BlockStore {
             .response_sender
             .send(Ok(response_bytes.into()))
             .map_err(|_| anyhow::anyhow!("Failed to send block retrieval response"))
-    }
-}
-
-enum RetrieverResult {
-    Blocks(Vec<Block>),
-    Fetching,
-}
-
-/// BlockRetriever is used internally to retrieve blocks
-pub struct BlockRetriever {
-    network: Arc<NetworkSender>,
-    preferred_peer: Author,
-    validator_addresses: Vec<AccountAddress>,
-    max_blocks_to_request: u64,
-    extra_block_store: HashMap<HashValue, Arc<Block>>,
-    fetch_context: BlockFetchContext,
-    block_fetch_request_tx: aptos_channel::Sender<BlockFetchContext, BlockFetchRequest>,
-}
-
-impl BlockRetriever {
-    pub fn new(
-        network: Arc<NetworkSender>,
-        preferred_peer: Author,
-        validator_addresses: Vec<AccountAddress>,
-        max_blocks_to_request: u64,
-        extra_block_store: HashMap<HashValue, Arc<Block>>,
-        fetch_context: BlockFetchContext,
-        block_fetch_request_tx: aptos_channel::Sender<BlockFetchContext, BlockFetchRequest>,
-    ) -> Self {
-        Self {
-            network,
-            preferred_peer,
-            validator_addresses,
-            max_blocks_to_request,
-            extra_block_store,
-            fetch_context,
-            block_fetch_request_tx
-        }
-    }
-
-    /// Retrieve chain of n blocks for given QC
-    async fn retrieve_block_for_qc<'a>(
-        &'a mut self,
-        qc: &'a QuorumCert,
-        num_blocks: u64,
-        target_block_id: HashValue,
-    ) -> anyhow::Result<RetrieverResult> {
-        let peers = qc.ledger_info().get_voters(&self.validator_addresses);
-        self.retrieve_block_for_id(
-            qc.certified_block().id(),
-            target_block_id,
-            peers,
-            num_blocks,
-        )
-        .await
     }
 }

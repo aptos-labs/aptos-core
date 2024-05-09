@@ -7,7 +7,7 @@ use aptos_consensus_types::{
     timeout_2chain::TwoChainTimeoutCertificate,
 };
 use aptos_crypto::HashValue;
-pub use block_store::{sync_manager::BlockRetriever, BlockStore};
+pub use block_store::{block_retriever::BlockRetriever, BlockStore};
 use std::{sync::Arc, time::Duration};
 
 mod block_store;
@@ -15,6 +15,7 @@ mod block_tree;
 pub mod block_fetch_manager;
 pub mod tracing;
 mod counters;
+pub mod block_retriever;
 
 pub trait BlockReader: Send + Sync {
     /// Check if a block with the block_id exist in the BlockTree.
