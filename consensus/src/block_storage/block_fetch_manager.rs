@@ -23,8 +23,6 @@ use lru::LruCache;
 pub enum BlockFetchContext {
     ProcessRecovery(SyncInfo, Author),
     ProcessRegular(SyncInfo, Author),
-    ProcessVote(VoteMsg),
-    ProcessProposal(ProposalMsg),
     InsertQuorumCert(QuorumCert, Author),
 }
 

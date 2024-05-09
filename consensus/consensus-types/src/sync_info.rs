@@ -8,7 +8,7 @@ use aptos_types::{block_info::BlockInfo, validator_verifier::ValidatorVerifier};
 use serde::{Deserialize, Serialize};
 use std::fmt::{Debug, Display, Formatter};
 
-#[derive(Deserialize, Serialize, Clone, Eq, PartialEq, Hash)]
+#[derive(Deserialize, Serialize, Clone, Eq, PartialEq)]
 /// This struct describes basic synchronization metadata.
 pub struct SyncInfo {
     /// Highest quorum certificate known to the peer.

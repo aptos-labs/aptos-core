@@ -15,7 +15,7 @@ use std::fmt;
 
 /// EpochState represents a trusted validator set to validate messages from the specific epoch,
 /// it could be updated with EpochChangeProof.
-#[derive(Clone, Deserialize, Eq, PartialEq, Serialize, Hash)]
+#[derive(Clone, Deserialize, Eq, PartialEq, Serialize)]
 #[cfg_attr(any(test, feature = "fuzzing"), derive(Arbitrary))]
 pub struct EpochState {
     pub epoch: u64,
