@@ -16,7 +16,6 @@ rust-version = { workspace = true }
 aes-gcm = { workspace = true }
 anyhow = { workspace = true }
 aptos-crypto = { workspace = true }
-aptos-crypto-derive = { workspace = true }
 aptos-inspection-service = { workspace = true }
 aptos-keyless-pepper-common = { workspace = true }
 aptos-logger = { workspace = true }

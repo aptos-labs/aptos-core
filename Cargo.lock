@@ -2358,7 +2358,6 @@ dependencies = [
  "aes-gcm",
  "anyhow",
  "aptos-crypto",
- "aptos-crypto-derive",
  "aptos-inspection-service",
  "aptos-keyless-pepper-common",
  "aptos-logger",

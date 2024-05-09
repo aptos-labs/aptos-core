@@ -36,3 +36,6 @@ regex = { workspace = true }
 serde = { workspace = true }
 serde-big-array = { workspace = true }
 sha2_0_10_6 = { workspace = true }
+
+[package.metadata.cargo-machete]
+ignored = ["bcs"]
