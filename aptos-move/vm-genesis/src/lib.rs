@@ -246,7 +246,7 @@ pub fn encode_genesis_change_set(
     );
     initialize_features(&mut session);
     if genesis_config.is_test {
-        initialize_core_resources_and_aptos_coin(&mut session, core_resources_key);
+        initialize_core_resources_and_supra_coin(&mut session, core_resources_key);
     } else {
         initialize_aptos_coin(&mut session);
     }
@@ -502,7 +502,7 @@ fn set_genesis_end(session: &mut SessionExt) {
     );
 }
 
-fn initialize_core_resources_and_aptos_coin(
+fn initialize_core_resources_and_supra_coin(
     session: &mut SessionExt,
     core_resources_key: &Ed25519PublicKey,
 ) {
@@ -510,7 +510,7 @@ fn initialize_core_resources_and_aptos_coin(
     exec_function(
         session,
         GENESIS_MODULE_NAME,
-        "initialize_core_resources_and_aptos_coin",
+        "initialize_core_resources_and_supra_coin",
         vec![],
         serialize_values(&vec![
             MoveValue::Signer(CORE_CODE_ADDRESS),

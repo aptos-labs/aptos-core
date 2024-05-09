@@ -23,9 +23,9 @@ royalty.
 -  [Function `payee_address`](#0x4_royalty_payee_address)
 
 
-<pre><code><b>use</b> <a href="../../aptos-framework/../aptos-stdlib/../move-stdlib/doc/error.md#0x1_error">0x1::error</a>;
-<b>use</b> <a href="../../aptos-framework/doc/object.md#0x1_object">0x1::object</a>;
-<b>use</b> <a href="../../aptos-framework/../aptos-stdlib/../move-stdlib/doc/option.md#0x1_option">0x1::option</a>;
+<pre><code><b>use</b> <a href="../../move-stdlib/doc/error.md#0x1_error">0x1::error</a>;
+<b>use</b> <a href="../../supra-framework/doc/object.md#0x1_object">0x1::object</a>;
+<b>use</b> <a href="../../move-stdlib/doc/option.md#0x1_option">0x1::option</a>;
 </code></pre>
 
 
@@ -40,7 +40,7 @@ Royalties are optional for a collection.  Royalty percentage is calculated
 by (numerator / denominator) * 100%
 
 
-<pre><code>#[resource_group_member(#[group = <a href="../../aptos-framework/doc/object.md#0x1_object_ObjectGroup">0x1::object::ObjectGroup</a>])]
+<pre><code>#[resource_group_member(#[group = <a href="../../supra-framework/doc/object.md#0x1_object_ObjectGroup">0x1::object::ObjectGroup</a>])]
 <b>struct</b> <a href="royalty.md#0x4_royalty_Royalty">Royalty</a> <b>has</b> <b>copy</b>, drop, key
 </code></pre>
 
@@ -93,7 +93,7 @@ This enables creating or overwriting a <code><a href="royalty.md#0x4_royalty_Mut
 
 <dl>
 <dt>
-<code>inner: <a href="../../aptos-framework/doc/object.md#0x1_object_ExtendRef">object::ExtendRef</a></code>
+<code>inner: <a href="../../supra-framework/doc/object.md#0x1_object_ExtendRef">object::ExtendRef</a></code>
 </dt>
 <dd>
 
@@ -145,7 +145,7 @@ The royalty cannot be greater than 100%
 Add a royalty, given a ConstructorRef.
 
 
-<pre><code><b>public</b> <b>fun</b> <a href="royalty.md#0x4_royalty_init">init</a>(ref: &<a href="../../aptos-framework/doc/object.md#0x1_object_ConstructorRef">object::ConstructorRef</a>, <a href="royalty.md#0x4_royalty">royalty</a>: <a href="royalty.md#0x4_royalty_Royalty">royalty::Royalty</a>)
+<pre><code><b>public</b> <b>fun</b> <a href="royalty.md#0x4_royalty_init">init</a>(ref: &<a href="../../supra-framework/doc/object.md#0x1_object_ConstructorRef">object::ConstructorRef</a>, <a href="royalty.md#0x4_royalty">royalty</a>: <a href="royalty.md#0x4_royalty_Royalty">royalty::Royalty</a>)
 </code></pre>
 
 
@@ -155,8 +155,8 @@ Add a royalty, given a ConstructorRef.
 
 
 <pre><code><b>public</b> <b>fun</b> <a href="royalty.md#0x4_royalty_init">init</a>(ref: &ConstructorRef, <a href="royalty.md#0x4_royalty">royalty</a>: <a href="royalty.md#0x4_royalty_Royalty">Royalty</a>) {
-    <b>let</b> <a href="../../aptos-framework/../aptos-stdlib/../move-stdlib/doc/signer.md#0x1_signer">signer</a> = <a href="../../aptos-framework/doc/object.md#0x1_object_generate_signer">object::generate_signer</a>(ref);
-    <b>move_to</b>(&<a href="../../aptos-framework/../aptos-stdlib/../move-stdlib/doc/signer.md#0x1_signer">signer</a>, <a href="royalty.md#0x4_royalty">royalty</a>);
+    <b>let</b> <a href="../../move-stdlib/doc/signer.md#0x1_signer">signer</a> = <a href="../../supra-framework/doc/object.md#0x1_object_generate_signer">object::generate_signer</a>(ref);
+    <b>move_to</b>(&<a href="../../move-stdlib/doc/signer.md#0x1_signer">signer</a>, <a href="royalty.md#0x4_royalty">royalty</a>);
 }
 </code></pre>
 
@@ -181,13 +181,13 @@ Set the royalty if it does not exist, replace it otherwise.
 
 
 <pre><code><b>public</b> <b>fun</b> <b>update</b>(mutator_ref: &<a href="royalty.md#0x4_royalty_MutatorRef">MutatorRef</a>, <a href="royalty.md#0x4_royalty">royalty</a>: <a href="royalty.md#0x4_royalty_Royalty">Royalty</a>) <b>acquires</b> <a href="royalty.md#0x4_royalty_Royalty">Royalty</a> {
-    <b>let</b> addr = <a href="../../aptos-framework/doc/object.md#0x1_object_address_from_extend_ref">object::address_from_extend_ref</a>(&mutator_ref.inner);
+    <b>let</b> addr = <a href="../../supra-framework/doc/object.md#0x1_object_address_from_extend_ref">object::address_from_extend_ref</a>(&mutator_ref.inner);
     <b>if</b> (<b>exists</b>&lt;<a href="royalty.md#0x4_royalty_Royalty">Royalty</a>&gt;(addr)) {
         <b>move_from</b>&lt;<a href="royalty.md#0x4_royalty_Royalty">Royalty</a>&gt;(addr);
     };
 
-    <b>let</b> <a href="../../aptos-framework/../aptos-stdlib/../move-stdlib/doc/signer.md#0x1_signer">signer</a> = <a href="../../aptos-framework/doc/object.md#0x1_object_generate_signer_for_extending">object::generate_signer_for_extending</a>(&mutator_ref.inner);
-    <b>move_to</b>(&<a href="../../aptos-framework/../aptos-stdlib/../move-stdlib/doc/signer.md#0x1_signer">signer</a>, <a href="royalty.md#0x4_royalty">royalty</a>);
+    <b>let</b> <a href="../../move-stdlib/doc/signer.md#0x1_signer">signer</a> = <a href="../../supra-framework/doc/object.md#0x1_object_generate_signer_for_extending">object::generate_signer_for_extending</a>(&mutator_ref.inner);
+    <b>move_to</b>(&<a href="../../move-stdlib/doc/signer.md#0x1_signer">signer</a>, <a href="royalty.md#0x4_royalty">royalty</a>);
 }
 </code></pre>
 
@@ -212,8 +212,8 @@ Creates a new royalty, verifying that it is a valid percentage
 
 
 <pre><code><b>public</b> <b>fun</b> <a href="royalty.md#0x4_royalty_create">create</a>(numerator: u64, denominator: u64, payee_address: <b>address</b>): <a href="royalty.md#0x4_royalty_Royalty">Royalty</a> {
-    <b>assert</b>!(denominator != 0, <a href="../../aptos-framework/../aptos-stdlib/../move-stdlib/doc/error.md#0x1_error_out_of_range">error::out_of_range</a>(<a href="royalty.md#0x4_royalty_EROYALTY_DENOMINATOR_IS_ZERO">EROYALTY_DENOMINATOR_IS_ZERO</a>));
-    <b>assert</b>!(<a href="royalty.md#0x4_royalty_numerator">numerator</a> &lt;= denominator, <a href="../../aptos-framework/../aptos-stdlib/../move-stdlib/doc/error.md#0x1_error_out_of_range">error::out_of_range</a>(<a href="royalty.md#0x4_royalty_EROYALTY_EXCEEDS_MAXIMUM">EROYALTY_EXCEEDS_MAXIMUM</a>));
+    <b>assert</b>!(denominator != 0, <a href="../../move-stdlib/doc/error.md#0x1_error_out_of_range">error::out_of_range</a>(<a href="royalty.md#0x4_royalty_EROYALTY_DENOMINATOR_IS_ZERO">EROYALTY_DENOMINATOR_IS_ZERO</a>));
+    <b>assert</b>!(<a href="royalty.md#0x4_royalty_numerator">numerator</a> &lt;= denominator, <a href="../../move-stdlib/doc/error.md#0x1_error_out_of_range">error::out_of_range</a>(<a href="royalty.md#0x4_royalty_EROYALTY_EXCEEDS_MAXIMUM">EROYALTY_EXCEEDS_MAXIMUM</a>));
 
     <a href="royalty.md#0x4_royalty_Royalty">Royalty</a> { numerator, denominator, payee_address }
 }
@@ -229,7 +229,7 @@ Creates a new royalty, verifying that it is a valid percentage
 
 
 
-<pre><code><b>public</b> <b>fun</b> <a href="royalty.md#0x4_royalty_generate_mutator_ref">generate_mutator_ref</a>(ref: <a href="../../aptos-framework/doc/object.md#0x1_object_ExtendRef">object::ExtendRef</a>): <a href="royalty.md#0x4_royalty_MutatorRef">royalty::MutatorRef</a>
+<pre><code><b>public</b> <b>fun</b> <a href="royalty.md#0x4_royalty_generate_mutator_ref">generate_mutator_ref</a>(ref: <a href="../../supra-framework/doc/object.md#0x1_object_ExtendRef">object::ExtendRef</a>): <a href="royalty.md#0x4_royalty_MutatorRef">royalty::MutatorRef</a>
 </code></pre>
 
 
@@ -287,7 +287,7 @@ Creates a new royalty, verifying that it is a valid percentage
 
 
 <pre><code><b>public</b>(<b>friend</b>) <b>fun</b> <a href="royalty.md#0x4_royalty_delete">delete</a>(addr: <b>address</b>) <b>acquires</b> <a href="royalty.md#0x4_royalty_Royalty">Royalty</a> {
-    <b>assert</b>!(<b>exists</b>&lt;<a href="royalty.md#0x4_royalty_Royalty">Royalty</a>&gt;(addr), <a href="../../aptos-framework/../aptos-stdlib/../move-stdlib/doc/error.md#0x1_error_not_found">error::not_found</a>(<a href="royalty.md#0x4_royalty_EROYALTY_DOES_NOT_EXIST">EROYALTY_DOES_NOT_EXIST</a>));
+    <b>assert</b>!(<b>exists</b>&lt;<a href="royalty.md#0x4_royalty_Royalty">Royalty</a>&gt;(addr), <a href="../../move-stdlib/doc/error.md#0x1_error_not_found">error::not_found</a>(<a href="royalty.md#0x4_royalty_EROYALTY_DOES_NOT_EXIST">EROYALTY_DOES_NOT_EXIST</a>));
     <b>move_from</b>&lt;<a href="royalty.md#0x4_royalty_Royalty">Royalty</a>&gt;(addr);
 }
 </code></pre>
@@ -302,7 +302,7 @@ Creates a new royalty, verifying that it is a valid percentage
 
 
 
-<pre><code><b>public</b> <b>fun</b> <a href="royalty.md#0x4_royalty_get">get</a>&lt;T: key&gt;(maybe_royalty: <a href="../../aptos-framework/doc/object.md#0x1_object_Object">object::Object</a>&lt;T&gt;): <a href="../../aptos-framework/../aptos-stdlib/../move-stdlib/doc/option.md#0x1_option_Option">option::Option</a>&lt;<a href="royalty.md#0x4_royalty_Royalty">royalty::Royalty</a>&gt;
+<pre><code><b>public</b> <b>fun</b> <a href="royalty.md#0x4_royalty_get">get</a>&lt;T: key&gt;(maybe_royalty: <a href="../../supra-framework/doc/object.md#0x1_object_Object">object::Object</a>&lt;T&gt;): <a href="../../move-stdlib/doc/option.md#0x1_option_Option">option::Option</a>&lt;<a href="royalty.md#0x4_royalty_Royalty">royalty::Royalty</a>&gt;
 </code></pre>
 
 
@@ -312,11 +312,11 @@ Creates a new royalty, verifying that it is a valid percentage
 
 
 <pre><code><b>public</b> <b>fun</b> <a href="royalty.md#0x4_royalty_get">get</a>&lt;T: key&gt;(maybe_royalty: Object&lt;T&gt;): Option&lt;<a href="royalty.md#0x4_royalty_Royalty">Royalty</a>&gt; <b>acquires</b> <a href="royalty.md#0x4_royalty_Royalty">Royalty</a> {
-    <b>let</b> obj_addr = <a href="../../aptos-framework/doc/object.md#0x1_object_object_address">object::object_address</a>(&maybe_royalty);
+    <b>let</b> obj_addr = <a href="../../supra-framework/doc/object.md#0x1_object_object_address">object::object_address</a>(&maybe_royalty);
     <b>if</b> (<b>exists</b>&lt;<a href="royalty.md#0x4_royalty_Royalty">Royalty</a>&gt;(obj_addr)) {
-        <a href="../../aptos-framework/../aptos-stdlib/../move-stdlib/doc/option.md#0x1_option_some">option::some</a>(*<b>borrow_global</b>&lt;<a href="royalty.md#0x4_royalty_Royalty">Royalty</a>&gt;(obj_addr))
+        <a href="../../move-stdlib/doc/option.md#0x1_option_some">option::some</a>(*<b>borrow_global</b>&lt;<a href="royalty.md#0x4_royalty_Royalty">Royalty</a>&gt;(obj_addr))
     } <b>else</b> {
-        <a href="../../aptos-framework/../aptos-stdlib/../move-stdlib/doc/option.md#0x1_option_none">option::none</a>()
+        <a href="../../move-stdlib/doc/option.md#0x1_option_none">option::none</a>()
     }
 }
 </code></pre>

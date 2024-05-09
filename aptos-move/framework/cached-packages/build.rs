@@ -51,11 +51,11 @@ fn main() -> Result<()> {
         );
         println!(
             "cargo:rerun-if-changed={}",
-            prev_dir.join("aptos-framework").join("sources").display()
+            prev_dir.join("supra-framework").join("sources").display()
         );
         println!(
             "cargo:rerun-if-changed={}",
-            prev_dir.join("aptos-framework").join("Move.toml").display()
+            prev_dir.join("supra-framework").join("Move.toml").display()
         );
         println!(
             "cargo:rerun-if-changed={}",
