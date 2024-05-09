@@ -223,7 +223,7 @@ module 0xcafe::deflation_token_tests {
     }
 
     #[test(creator = @0xcafe, aaron = @0xface)]
-    #[expected_failure(major_status=1091, location = aptos_framework::function_info)]
+    #[expected_failure(major_status=1081, location = aptos_framework::function_info)]
     fun test_register_bad_withdraw_non_exist(
         creator: &signer,
         aaron: &signer,
