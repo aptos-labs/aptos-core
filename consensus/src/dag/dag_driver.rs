@@ -287,10 +287,12 @@ impl DagDriver {
                 dag_id = self.dag_id,
                 "{}, attempting starting new round {}", self.dag_id, new_round
             );
-            defer!({
-                let _ = next_dag_tx.send(());
-            });
         }
+        defer!(
+            if new_round > 5 {
+                let _ = next_dag_tx.send(());
+            }
+        );
 
         self.enter_new_round(new_round).await
     }
