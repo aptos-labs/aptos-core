@@ -43,8 +43,6 @@ use aptos_types::{
     },
     transaction::{SignedTransaction, TransactionWithProof, Version},
 };
-use aptos_utils::aptos_try;
-use aptos_vm::{data_cache::AsMoveResolver, move_vm_ext::AptosMoveResolver};
 use futures::{channel::oneshot, SinkExt};
 use mini_moka::sync::Cache;
 use move_core_types::{
@@ -418,38 +416,19 @@ impl Context {
 
         // We should be able to do an unwrap here, otherwise the above db read would fail.
         let state_view = self.state_view_at_version(version)?;
+        let converter = state_view.as_converter(self.db.clone(), self.table_info_reader.clone());
 
         // Extract resources from resource groups and flatten into all resources
         let kvs = kvs
             .into_iter()
-            .map(|(key, value)| {
-                let is_resource_group =
-                    |resolver: &dyn AptosMoveResolver, struct_tag: &StructTag| -> bool {
-                        aptos_try!({
-                            let md = aptos_framework::get_metadata(
-                                &resolver.get_module_metadata(&struct_tag.module_id()),
-                            )?;
-                            md.struct_attributes
-                                .get(struct_tag.name.as_ident_str().as_str())?
-                                .iter()
-                                .find(|attr| attr.is_resource_group())?;
-                            Some(())
-                        })
-                        .is_some()
-                    };
-
-                let resolver = state_view.as_move_resolver();
-                if is_resource_group(&resolver, &key) {
+            .map(|(tag, value)| {
+                if converter.is_resource_group(&tag)? {
                     // An error here means a storage invariant has been violated
                     bcs::from_bytes::<ResourceGroup>(&value)
-                        .map(|map| {
-                            map.into_iter()
-                                .map(|(key, value)| (key, value))
-                                .collect::<Vec<_>>()
-                        })
+                        .map(|map| map.into_iter().map(|(t, v)| (t, v)).collect::<Vec<_>>())
                         .map_err(|e| e.into())
                 } else {
-                    Ok(vec![(key, value)])
+                    Ok(vec![(tag, value)])
                 }
             })
             .collect::<Result<Vec<Vec<(StructTag, Vec<u8>)>>>>()?

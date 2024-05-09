@@ -49,7 +49,7 @@ use std::{
     sync::Arc,
 };
 
-pub(crate) fn get_resource_group_from_metadata(
+pub fn get_resource_group_from_metadata(
     struct_tag: &StructTag,
     metadata: &[Metadata],
 ) -> Option<StructTag> {

@@ -26,6 +26,7 @@ aptos-types = { workspace = true }
 aptos-vm = { workspace = true }
 async-trait = { workspace = true }
 bcs = { workspace = true }
+bytes = { workspace = true }
 hex = { workspace = true }
 indoc = { workspace = true }
 move-binary-format = { workspace = true }

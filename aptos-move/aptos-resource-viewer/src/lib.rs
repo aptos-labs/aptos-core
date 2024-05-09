@@ -6,6 +6,7 @@ pub mod module_view;
 
 use crate::module_view::ModuleView;
 use aptos_types::state_store::StateView;
+use aptos_vm::data_cache::get_resource_group_from_metadata;
 use move_binary_format::CompiledModule;
 use move_core_types::{
     identifier::{IdentStr, Identifier},
@@ -30,6 +31,11 @@ impl<'a, S: StateView> AptosValueAnnotator<'a, S> {
 
     pub fn view_module(&self, module_id: &ModuleId) -> anyhow::Result<Arc<CompiledModule>> {
         self.0.view_module(module_id)
+    }
+
+    pub fn view_resource_group_tag(&self, tag: &StructTag) -> anyhow::Result<Option<StructTag>> {
+        let module = self.view_module(&tag.module_id())?;
+        Ok(get_resource_group_from_metadata(tag, &module.metadata))
     }
 
     pub fn view_resource(

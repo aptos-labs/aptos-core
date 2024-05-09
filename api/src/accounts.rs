@@ -23,10 +23,8 @@ use aptos_types::{
     event::{EventHandle, EventKey},
     state_store::state_key::StateKey,
 };
-use aptos_vm::data_cache::AsMoveResolver;
 use move_core_types::{
     identifier::Identifier, language_storage::StructTag, move_resource::MoveStructType,
-    resolver::MoveResolver,
 };
 use poem_openapi::{
     param::{Path, Query},
@@ -518,17 +516,20 @@ impl Account {
     /// Find a resource associated with an account
     fn find_resource(
         &self,
-        resource_type: &StructTag,
+        tag: &StructTag,
     ) -> Result<Vec<(Identifier, move_core_types::value::MoveValue)>, BasicErrorWith404> {
         let (ledger_info, ledger_version, state_view) =
             self.context.state_view(Some(self.ledger_version))?;
-        let resolver = state_view.as_move_resolver();
 
-        let bytes = resolver
-            .get_resource(&self.address.into(), resource_type)
+        let bytes = state_view
+            .as_converter(
+                self.context.db.clone(),
+                self.context.table_info_reader.clone(),
+            )
+            .find_resource(&state_view, self.address, tag)
             .context(format!(
                 "Failed to query DB to check for {} at {}",
-                resource_type, self.address
+                tag, self.address
             ))
             .map_err(|err| {
                 BasicErrorWith404::internal_with_code(
@@ -537,16 +538,14 @@ impl Account {
                     &ledger_info,
                 )
             })?
-            .ok_or_else(|| {
-                resource_not_found(self.address, resource_type, ledger_version, &ledger_info)
-            })?;
+            .ok_or_else(|| resource_not_found(self.address, tag, ledger_version, &ledger_info))?;
 
         state_view
             .as_converter(
                 self.context.db.clone(),
                 self.context.table_info_reader.clone(),
             )
-            .move_struct_fields(resource_type, &bytes)
+            .move_struct_fields(tag, &bytes)
             .context("Failed to convert move structs from storage")
             .map_err(|err| {
                 BasicErrorWith404::internal_with_code(

@@ -9,11 +9,12 @@ use crate::{
         UserTransactionRequestInner, WriteModule, WriteResource, WriteTableItem,
     },
     view::{ViewFunction, ViewRequest},
-    Bytecode, DirectWriteSet, EntryFunctionId, EntryFunctionPayload, Event, HexEncodedBytes,
-    MoveFunction, MoveModuleBytecode, MoveResource, MoveScriptBytecode, MoveType, MoveValue,
-    PendingTransaction, ResourceGroup, ScriptPayload, ScriptWriteSet, SubmitTransactionRequest,
-    Transaction, TransactionInfo, TransactionOnChainData, TransactionPayload,
-    UserTransactionRequest, VersionedEvent, WriteSet, WriteSetChange, WriteSetPayload,
+    Address, Bytecode, DirectWriteSet, EntryFunctionId, EntryFunctionPayload, Event,
+    HexEncodedBytes, MoveFunction, MoveModuleBytecode, MoveResource, MoveScriptBytecode, MoveType,
+    MoveValue, PendingTransaction, ResourceGroup, ScriptPayload, ScriptWriteSet,
+    SubmitTransactionRequest, Transaction, TransactionInfo, TransactionOnChainData,
+    TransactionPayload, UserTransactionRequest, VersionedEvent, WriteSet, WriteSetChange,
+    WriteSetPayload,
 };
 use anyhow::{bail, ensure, format_err, Context as AnyhowContext, Result};
 use aptos_crypto::{hash::CryptoHash, HashValue};
@@ -36,6 +37,7 @@ use aptos_types::{
     vm_status::AbortLocation,
     write_set::WriteOp,
 };
+use bytes::Bytes;
 use move_binary_format::file_format::FunctionHandleIndex;
 use move_core_types::{
     account_address::AccountAddress,
@@ -46,6 +48,7 @@ use move_core_types::{
 };
 use serde_json::Value;
 use std::{
+    collections::BTreeMap,
     convert::{TryFrom, TryInto},
     iter::IntoIterator,
     sync::Arc,
@@ -86,8 +89,36 @@ impl<'a, S: StateView> MoveConverter<'a, S> {
             .collect()
     }
 
-    pub fn try_into_resource(&self, typ: &StructTag, bytes: &'_ [u8]) -> Result<MoveResource> {
-        self.inner.view_resource(typ, bytes)?.try_into()
+    pub fn try_into_resource(&self, tag: &StructTag, bytes: &'_ [u8]) -> Result<MoveResource> {
+        self.inner.view_resource(tag, bytes)?.try_into()
+    }
+
+    pub fn is_resource_group(&self, tag: &StructTag) -> Result<bool> {
+        Ok(self.inner.view_resource_group_tag(tag)?.is_some())
+    }
+
+    pub fn find_resource(
+        &self,
+        state_view: &impl StateView,
+        address: Address,
+        tag: &StructTag,
+    ) -> Result<Option<Bytes>> {
+        Ok(match self.inner.view_resource_group_tag(tag)? {
+            Some(group_tag) => {
+                let key = StateKey::resource_group(&address.into(), &group_tag);
+                match state_view.get_state_value_bytes(&key)? {
+                    Some(group_bytes) => {
+                        let group: BTreeMap<StructTag, Bytes> = bcs::from_bytes(&group_bytes)?;
+                        group.get(tag).cloned()
+                    },
+                    None => None,
+                }
+            },
+            None => {
+                let key = StateKey::resource(&address.into(), tag)?;
+                state_view.get_state_value_bytes(&key)?
+            },
+        })
     }
 
     pub fn try_into_resources_from_resource_group(
