@@ -153,7 +153,7 @@ impl OrderedNotifierAdapter {
                 current_round,
                 current_idx,
             }),
-            buffer: Mutex::new(Vec::new()),
+            buffer: Mutex::new(Vec::with_capacity(150)),
         }
     }
 
@@ -193,6 +193,7 @@ impl OrderedNotifier for OrderedNotifierAdapter {
                         return;
                     } else {
                         mem::swap(&mut *self.buffer.lock(), &mut ordered_nodes);
+                        self.buffer.lock().reserve(100);
                     }
                 } else {
                     self.buffer.lock().append(&mut ordered_nodes);
