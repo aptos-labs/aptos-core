@@ -88,7 +88,7 @@ pub fn process_v1(request: PepperRequestV1) -> Result<PepperResponseV1, Processi
         uid_key,
         aud,
     } = request;
-    let (pepper_base_encrypted, pepper_encrypted, _address) = process_common(
+    let (pepper_base_encrypted, _pepper_encrypted, _address) = process_common(
         &session_id,
         jwt,
         epk,
@@ -101,7 +101,6 @@ pub fn process_v1(request: PepperRequestV1) -> Result<PepperResponseV1, Processi
     )?;
     Ok(PepperResponseV1 {
         signature_encrypted: pepper_base_encrypted,
-        pepper_encrypted,
     })
 }
 

@@ -23,6 +23,7 @@ ark-ec = { workspace = true }
 ark-ff = { workspace = true }
 ark-serialize = { workspace = true }
 ark-std = { workspace = true }
+bcs = { workspace = true }
 blstrs = { workspace = true }
 derivation-path = { workspace = true }
 ed25519-dalek = { workspace = true }

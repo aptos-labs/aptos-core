@@ -123,11 +123,6 @@ pub struct PepperResponseV1 {
         deserialize_with = "deserialize_bytes_from_hex"
     )]
     pub signature_encrypted: Vec<u8>, // unique BLS signature encrypted
-    #[serde(
-        serialize_with = "serialize_bytes_to_hex",
-        deserialize_with = "deserialize_bytes_from_hex"
-    )]
-    pub pepper_encrypted: Vec<u8>, // unique BLS signature encrypted
 }
 
 /// The response to `/v0/vuf-pub-key`.
