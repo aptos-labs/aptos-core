@@ -72,6 +72,7 @@ use move_stackless_bytecode::{
 };
 use std::collections::BTreeMap;
 
+/// Simplifies the control flow graph as described in the module doc
 pub struct ControlFlowGraphSimplifier {}
 
 impl FunctionTargetProcessor for ControlFlowGraphSimplifier {
