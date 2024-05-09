@@ -224,7 +224,10 @@ pub fn get_vm_metadata_v0(
 }
 
 /// Check if the metadata has unknown key/data types
-pub fn check_metadata_format(module: &CompiledModule) -> Result<(), MalformedError> {
+pub fn check_metadata_format(
+    module: &CompiledModule,
+    features: &Features,
+) -> Result<(), MalformedError> {
     let mut exist = false;
     let mut compilation_key_exist = false;
     for data in module.metadata.iter() {
@@ -241,7 +244,9 @@ pub fn check_metadata_format(module: &CompiledModule) -> Result<(), MalformedErr
                 bcs::from_bytes::<RuntimeModuleMetadataV1>(&data.value)
                     .map_err(|e| MalformedError::DeserializedError(data.key.clone(), e))?;
             }
-        } else if data.key == *COMPILATION_METADATA_KEY {
+        } else if features.is_enabled(FeatureFlag::REJECT_UNSTABLE_BYTECODE)
+            && data.key == *COMPILATION_METADATA_KEY
+        {
             if compilation_key_exist {
                 return Err(MalformedError::DuplicateKey);
             }
@@ -450,7 +455,7 @@ pub fn verify_module_metadata(
     }
 
     if features.are_resource_groups_enabled() {
-        check_metadata_format(module)?;
+        check_metadata_format(module, features)?;
     }
     let metadata = if let Some(metadata) = get_metadata_from_compiled_module(module) {
         metadata
