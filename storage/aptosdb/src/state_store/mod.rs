@@ -98,7 +98,7 @@ pub(crate) struct StateStore {
     // The `base` of buffered_state is the latest snapshot in state_merkle_db while `current`
     // is the latest state sparse merkle tree that is replayed from that snapshot until the latest
     // write set stored in ledger_db.
-    buffered_state: Mutex<BufferedState>,
+    pub(crate) buffered_state: Mutex<BufferedState>,
     buffered_state_target_items: usize,
     smt_ancestors: Mutex<SmtAncestors<StateValue>>,
 }

@@ -3,10 +3,10 @@
 
 use crate::{
     db::{
-        get_first_seq_num_and_limit, test_helper,
+        get_first_seq_num_and_limit,
         test_helper::{
-            arb_blocks_to_commit, put_as_state_root, put_transaction_auxiliary_data,
-            put_transaction_infos,
+            self, arb_blocks_to_commit, arb_blocks_to_commit_with_block_nums, put_as_state_root,
+            put_transaction_auxiliary_data, put_transaction_infos, update_in_memory_state,
         },
         AptosDB,
     },
@@ -18,23 +18,38 @@ use aptos_config::config::{
     StateMerklePrunerConfig, StorageDirPaths, BUFFERED_STATE_TARGET_ITEMS,
     DEFAULT_MAX_NUM_NODES_PER_LRU_CACHE_SHARD,
 };
-use aptos_crypto::{hash::CryptoHash, HashValue};
-use aptos_storage_interface::{DbReader, ExecutedTrees, Order};
+use aptos_crypto::{
+    ed25519::{Ed25519PrivateKey, Ed25519Signature},
+    hash::CryptoHash,
+    HashValue, PrivateKey, Uniform,
+};
+use aptos_executor_types::StateComputeResult;
+use aptos_proptest_helpers::ValueGenerator;
+use aptos_storage_interface::{DbReader, DbReaderWriter, DbWriter, ExecutedTrees, Order};
 use aptos_temppath::TempPath;
 use aptos_types::{
-    ledger_info::LedgerInfoWithSignatures,
-    proof::SparseMerkleLeafNode,
+    chain_id::ChainId,
+    ledger_info::{generate_ledger_info_with_sig, LedgerInfoWithSignatures},
+    on_chain_config::ValidatorSet,
+    proof::{position::Position, SparseMerkleLeafNode},
+    proptest_types::{
+        AccountInfoUniverse, BlockInfoGen, LedgerInfoGen, LedgerInfoWithSignaturesGen,
+        ValidatorSetGen,
+    },
     state_store::{
         state_key::StateKey, state_storage_usage::StateStorageUsage, state_value::StateValue,
     },
     transaction::{
-        ExecutionStatus, TransactionAuxiliaryData, TransactionAuxiliaryDataV1, TransactionInfo,
+        ExecutionStatus, RawTransaction, Script, SignedTransaction, Transaction,
+        TransactionAuxiliaryData, TransactionAuxiliaryDataV1, TransactionInfo, TransactionPayload,
         TransactionToCommit, VMErrorDetail, Version,
     },
     vm_status::StatusCode,
+    write_set::WriteSet,
 };
-use proptest::prelude::*;
-use std::{collections::HashSet, sync::Arc};
+use move_core_types::{account_address::AccountAddress, vm_status::StatusType::Execution};
+use proptest::{prelude::*, std_facade::HashMap, test_runner::TestRunner};
+use std::{collections::HashSet, default, ops::DerefMut, sync::Arc};
 use test_helper::{test_save_blocks_impl, test_sync_transactions_impl};
 
 proptest! {
@@ -109,13 +124,15 @@ fn test_pruner_config() {
         assert_eq!(state_merkle_pruner.is_pruner_enabled(), enable);
         assert_eq!(state_merkle_pruner.get_prune_window(), 20);
 
-        let ledger_pruner =
-            LedgerPrunerManager::new(Arc::clone(&aptos_db.ledger_db), LedgerPrunerConfig {
+        let ledger_pruner = LedgerPrunerManager::new(
+            Arc::clone(&aptos_db.ledger_db),
+            LedgerPrunerConfig {
                 enable,
                 prune_window: 100,
                 batch_size: 1,
                 user_pruning_window_offset: 0,
-            });
+            },
+        );
         assert_eq!(ledger_pruner.is_pruner_enabled(), enable);
         assert_eq!(ledger_pruner.get_prune_window(), 100);
     }
@@ -205,6 +222,193 @@ fn test_get_latest_executed_trees() {
             1,
         ))
     );
+}
+
+fn create_signed_transaction(gas_unit_price: u64) -> SignedTransaction {
+    let private_key = Ed25519PrivateKey::generate_for_testing();
+    let public_key = private_key.public_key();
+
+    let transaction_payload = TransactionPayload::Script(Script::new(vec![], vec![], vec![]));
+    let raw_transaction = RawTransaction::new(
+        AccountAddress::random(),
+        0,
+        transaction_payload,
+        0,
+        gas_unit_price,
+        0,
+        ChainId::new(10), // This is the value used in aptos testing code.
+    );
+    SignedTransaction::new(
+        raw_transaction,
+        public_key,
+        Ed25519Signature::dummy_signature(),
+    )
+}
+
+#[test]
+fn test_revert_last_commit() {
+    aptos_logger::Logger::new().init();
+
+    let tmp_dir = TempPath::new();
+    let db = AptosDB::new_for_test(&tmp_dir);
+
+    let mut cur_ver: Version = 0;
+    let mut in_memory_state = db.buffered_state().lock().current_state().clone();
+    let _ancestor = in_memory_state.base.clone();
+    let mut val_generator = ValueGenerator::new();
+    let (blocks, _) = val_generator.generate(arb_blocks_to_commit_with_block_nums(3, 3));
+    for (txns_to_commit, ledger_info_with_sigs) in &blocks {
+        update_in_memory_state(&mut in_memory_state, txns_to_commit.as_slice());
+        db.save_transactions_for_test(
+            txns_to_commit,
+            cur_ver, /* first_version */
+            cur_ver.checked_sub(1),
+            Some(ledger_info_with_sigs),
+            true, /* sync_commit */
+            in_memory_state.clone(),
+        )
+        .unwrap();
+        cur_ver += txns_to_commit.len() as u64;
+    }
+
+    // Check expected before revert commit
+    let expected_version = cur_ver - 1;
+    assert_eq!(db.get_latest_version().unwrap(), expected_version);
+
+    // Get the latest ledger info before revert
+    let latest_ledger_info_before_revert = db.get_latest_ledger_info().unwrap();
+    let root_hash = db
+        .get_latest_ledger_info()
+        .unwrap()
+        .ledger_info()
+        .commit_info()
+        .executed_state_id();
+
+    // Revert the last commit
+    db.revert_commit(
+        db.get_latest_version().unwrap(),
+        db.get_latest_version().unwrap(), // In this case the last commit and version to commit are same
+        root_hash,                        // the hash is also the lastest
+        latest_ledger_info_before_revert,
+    )
+    .unwrap();
+
+    let exepcted_version = cur_ver - 2;
+    assert_eq!(db.get_latest_version().unwrap(), exepcted_version);
+}
+
+#[test]
+fn test_revert_nth_commit() {
+    aptos_logger::Logger::new().init();
+    let tmp_dir = TempPath::new();
+    let db = AptosDB::new_for_test(&tmp_dir);
+
+    let mut cur_ver: Version = 0;
+    let mut in_memory_state = db.buffered_state().lock().current_state().clone();
+    let _ancestor = in_memory_state.base.clone();
+
+    let mut val_generator = ValueGenerator::new();
+    // set range of min and max blocks to 5 to always gen 5 blocks
+    let (blocks, _) = val_generator.generate(arb_blocks_to_commit_with_block_nums(5, 5));
+
+    #[derive(Debug)]
+    struct Commit {
+        hash: HashValue,
+        info: LedgerInfoWithSignatures,
+        first_version: Version,
+    }
+
+    let mut committed_blocks = HashMap::new();
+    let mut commit_versions = Vec::new();
+    let mut blockheight = 0;
+
+    for (txns_to_commit, ledger_info_with_sigs) in &blocks {
+        println!("Blockheight: {}", blockheight);
+        let first_version = cur_ver;
+        update_in_memory_state(&mut in_memory_state, txns_to_commit.as_slice());
+        db.save_transactions_for_test(
+            txns_to_commit,
+            cur_ver, /* first_version */
+            cur_ver.checked_sub(1),
+            Some(ledger_info_with_sigs),
+            true, /* sync_commit */
+            in_memory_state.clone(),
+        )
+        .unwrap();
+
+        committed_blocks.insert(
+            blockheight,
+            Commit {
+                hash: ledger_info_with_sigs.commit_info().executed_state_id(),
+                info: ledger_info_with_sigs.clone(),
+                first_version,
+            },
+        );
+        commit_versions.push(cur_ver);
+        cur_ver += txns_to_commit.len() as u64;
+        blockheight += 1;
+    }
+
+    // Check expected before revert commit
+    let expected_version = cur_ver - 1;
+    assert_eq!(db.get_latest_version().unwrap(), expected_version);
+
+    // Get the 3rd block back from the latest block
+    let revert_block_num = blockheight - 3;
+    let revert = committed_blocks.get(&revert_block_num).unwrap();
+
+    // Get the version to revert to
+    let version_to_revert = revert.first_version - 1;
+
+    db.revert_commit(
+        version_to_revert,
+        db.get_latest_version().unwrap(),
+        revert.hash.clone(),
+        revert.info.clone(),
+    )
+    .unwrap();
+
+    assert_eq!(db.get_latest_version().unwrap(), version_to_revert - 1);
+}
+
+#[test]
+fn test_revert_commit_should_fail_with_wrong_hash() {
+    aptos_logger::Logger::new().init();
+
+    let tmp_dir = TempPath::new();
+    let db = AptosDB::new_for_test(&tmp_dir);
+
+    let mut cur_ver: Version = 0;
+    let mut in_memory_state = db.buffered_state().lock().current_state().clone();
+    let _ancestor = in_memory_state.base.clone();
+    let mut val_generator = ValueGenerator::new();
+    let blocks = val_generator.generate(arb_blocks_to_commit());
+    for (txns_to_commit, ledger_info_with_sigs) in &blocks {
+        update_in_memory_state(&mut in_memory_state, txns_to_commit.as_slice());
+        db.save_transactions_for_test(
+            txns_to_commit,
+            cur_ver, /* first_version */
+            cur_ver.checked_sub(1),
+            Some(ledger_info_with_sigs),
+            true, /* sync_commit */
+            in_memory_state.clone(),
+        )
+        .unwrap();
+        cur_ver += txns_to_commit.len() as u64;
+    }
+
+    // Get the latest ledger info before revert
+    let latest_ledger_info_before_revert = db.get_latest_ledger_info().unwrap();
+    let last_committed_version = latest_ledger_info_before_revert.ledger_info().version();
+
+    // Revert the last commit
+    let result = db.revert_commit(
+        last_committed_version,
+        last_committed_version.clone(), // In this case the last commit and version to commit are the same
+        HashValue::random(),            // A wrong hash
+        latest_ledger_info_before_revert,
+    );
+    assert!(result.is_err());
 }
 
 pub fn test_state_merkle_pruning_impl(

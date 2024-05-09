@@ -117,6 +117,10 @@ impl LedgerInfo {
         self.commit_info.version()
     }
 
+    pub fn set_version(&mut self, version: Version) {
+        self.commit_info.set_version(version)
+    }
+
     pub fn timestamp_usecs(&self) -> u64 {
         self.commit_info.timestamp_usecs()
     }

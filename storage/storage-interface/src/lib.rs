@@ -572,6 +572,17 @@ pub trait DbWriter: Send + Sync {
     ) -> Result<()> {
         unimplemented!()
     }
+
+    /// Revert a commit.
+    fn revert_commit(
+        &self,
+        version_to_revert: Version,
+        latest_version: Version,
+        new_root_hash: HashValue,
+        ledger_info_with_sigs: LedgerInfoWithSignatures,
+    ) -> Result<()> {
+        unimplemented!()
+    }
 }
 
 #[derive(Clone)]

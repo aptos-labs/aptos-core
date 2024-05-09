@@ -209,4 +209,27 @@ impl EventDb {
             .prune_event_accumulator(start, end, db_batch)?;
         Ok(())
     }
+
+    pub(crate) fn delete_events(
+        &self,
+        version: Version,
+        db_batch: &SchemaBatch,
+    ) -> anyhow::Result<()> {
+        for events in self.get_events_by_version_iter(version, 1)? {
+            for (idx, event) in (events?).into_iter().enumerate() {
+                if let ContractEvent::V1(v1) = event {
+                    db_batch.delete::<EventByVersionSchema>(&(
+                        *v1.key(),
+                        version,
+                        v1.sequence_number(),
+                    ))?;
+                    db_batch.delete::<EventByKeySchema>(&(*v1.key(), v1.sequence_number()))?;
+                }
+                db_batch.delete::<EventSchema>(&(version, idx as u64))?;
+            }
+        }
+        self.event_store
+            .delete_event_accumulator(version, db_batch)?;
+        Ok(())
+    }
 }

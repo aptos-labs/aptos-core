@@ -155,6 +155,10 @@ impl BlockInfo {
         self.epoch
     }
 
+    pub fn set_epoch(&mut self, epoch: u64) {
+        self.epoch = epoch;
+    }
+
     pub fn executed_state_id(&self) -> HashValue {
         self.executed_state_id
     }
@@ -181,6 +185,10 @@ impl BlockInfo {
 
     pub fn version(&self) -> Version {
         self.version
+    }
+
+    pub fn set_version(&mut self, version: Version) {
+        self.version = version;
     }
 
     /// This function checks if the current BlockInfo has
