@@ -176,11 +176,11 @@ impl FakeAptosDB {
     pub fn new(db: AptosDB) -> Self {
         Self {
             inner: db,
-            txn_by_version: Arc::new(DashMap::new()),
-            txn_version_by_hash: Arc::new(DashMap::new()),
-            txn_info_by_version: Arc::new(DashMap::new()),
-            txn_hash_by_position: Arc::new(DashMap::new()),
-            account_seq_num: Arc::new(DashMap::new()),
+            txn_by_version: Arc::new(DashMap::with_capacity(10_000_000)),
+            txn_version_by_hash: Arc::new(DashMap::with_capacity(10_000_000)),
+            txn_info_by_version: Arc::new(DashMap::with_capacity(10_000_000)),
+            txn_hash_by_position: Arc::new(DashMap::with_capacity(10_000_000)),
+            account_seq_num: Arc::new(DashMap::with_capacity(10_000)),
             latest_block_timestamp: AtomicU64::new(0),
             latest_version: Mutex::new(None),
             ledger_commit_lock: std::sync::Mutex::new(()),
@@ -430,6 +430,12 @@ impl FakeAptosDB {
                     buffered_state
                         .update(state_updates_until_last_checkpoint, latest_in_memory_state)?;
                 }
+            }
+
+            const MAX_RETAIN_VERSIONS: u64 = 1_000_000;
+            if self.txn_by_version.len() as u64 > MAX_RETAIN_VERSIONS {
+                self.txn_by_version
+                    .retain(|k, _| *k >= first_version.saturating_sub(MAX_RETAIN_VERSIONS));
             }
 
             Ok(())
