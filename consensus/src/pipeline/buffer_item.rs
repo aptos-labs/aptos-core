@@ -328,10 +328,7 @@ impl BufferItem {
     pub fn try_advance_to_aggregated(self, validator: &ValidatorVerifier) -> Self {
         match self {
             Self::Signed(signed_item) => {
-                if validator
-                    .check_voting_power(signed_item.partial_commit_proof.signatures().keys(), true)
-                    .is_ok()
-                {
+                if signed_item.partial_commit_proof.signatures().len() == validator.len() {
                     Self::Aggregated(Box::new(AggregatedItem {
                         executed_blocks: signed_item.executed_blocks,
                         commit_proof: aggregate_commit_proof(
