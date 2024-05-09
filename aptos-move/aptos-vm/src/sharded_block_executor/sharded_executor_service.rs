@@ -29,7 +29,6 @@ use aptos_types::{
     },
 };
 use aptos_vm_logging::disable_speculative_logging;
-use futures::{channel::oneshot, executor::block_on};
 use move_core_types::vm_status::VMStatus;
 use std::sync::Arc;
 
@@ -104,8 +103,6 @@ impl<S: StateView + Sync + Send + 'static> ShardedExecutorService<S> {
         state_view: &S,
         config: BlockExecutorConfig,
     ) -> Result<Vec<TransactionOutput>, VMStatus> {
-        let (callback, callback_receiver) = oneshot::channel();
-
         let cross_shard_state_view = Arc::new(CrossShardStateView::create_cross_shard_state_view(
             state_view,
             &transactions,
@@ -123,8 +120,8 @@ impl<S: StateView + Sync + Send + 'static> ShardedExecutorService<S> {
             .into_iter()
             .map(|txn| txn.into_txn().into_txn())
             .collect();
-        let executor_thread_pool_clone = executor_thread_pool.clone();
 
+        let mut outputs = Ok(vec![]);
         executor_thread_pool.clone().scope(|s| {
             s.spawn(move |_| {
                 CrossShardCommitReceiver::start(
@@ -133,8 +130,8 @@ impl<S: StateView + Sync + Send + 'static> ShardedExecutorService<S> {
                     round,
                 );
             });
-            s.spawn(move |_| {
-                let ret = BlockAptosVM::execute_block(
+            s.spawn(|s| {
+                outputs = BlockAptosVM::execute_block(
                     executor_thread_pool,
                     &signature_verified_transactions,
                     aggr_overridden_state_view.as_ref(),
@@ -159,15 +156,13 @@ impl<S: StateView + Sync + Send + 'static> ShardedExecutorService<S> {
                     // Send a self message to stop the cross-shard commit receiver.
                     cross_shard_client_clone.send_global_msg(CrossShardMsg::StopMsg);
                 }
-                callback.send(ret).unwrap();
-                executor_thread_pool_clone.spawn(move || {
+                s.spawn(move |_| {
                     // Explicit async drop
                     drop(signature_verified_transactions);
                 });
             });
         });
-
-        block_on(callback_receiver).unwrap()
+        outputs
     }
 
     fn execute_block(

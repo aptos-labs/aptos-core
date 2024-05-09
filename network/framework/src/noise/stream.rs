@@ -525,6 +525,7 @@ where
 mod test {
     use super::*;
     use crate::{
+        noise::crypto::{NoiseSession, MAX_SIZE_NOISE_MSG},
         noise::{AntiReplayTimestamps, HandshakeAuthMode, NoiseUpgrader},
         testutils::fake_socket::{ReadOnlyTestSocket, ReadWriteTestSocket},
     };
@@ -627,7 +628,7 @@ mod test {
         fake_socket.set_trailing();
 
         // setup a NoiseStream with a dummy state
-        let noise_session = noise::NoiseSession::new_for_testing();
+        let noise_session = NoiseSession::new_for_testing();
         let mut peer = NoiseStream::new(fake_socket, noise_session);
 
         // make sure we error and we don't continuously read
@@ -670,11 +671,11 @@ mod test {
         let ((client, _client_public), (server, server_public)) = build_peers();
         let (mut client, mut server) = perform_handshake(client, server_public, server);
 
-        let buf_send = [1; noise::MAX_SIZE_NOISE_MSG];
+        let buf_send = [1; MAX_SIZE_NOISE_MSG];
         block_on(client.write_all(&buf_send)).unwrap();
         block_on(client.flush()).unwrap();
 
-        let mut buf_receive = [0; noise::MAX_SIZE_NOISE_MSG];
+        let mut buf_receive = [0; MAX_SIZE_NOISE_MSG];
         block_on(server.read_exact(&mut buf_receive)).unwrap();
         assert_eq!(&buf_receive[..], &buf_send[..]);
     }
