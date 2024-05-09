@@ -18,8 +18,10 @@ use aptos_types::{
 };
 use move_binary_format::CompiledModule;
 use move_core_types::{
-    account_address::AccountAddress, language_storage::CORE_CODE_ADDRESS, metadata::Metadata,
-    vm_status::StatusCode,
+    account_address::AccountAddress,
+    language_storage::CORE_CODE_ADDRESS,
+    metadata::Metadata,
+    vm_status::{StatusCode, StatusCode::CONSTRAINT_NOT_SATISFIED},
 };
 use move_model::metadata::{CompilationMetadata, CompilerVersion, COMPILATION_METADATA_KEY};
 use std::collections::BTreeMap;
@@ -275,13 +277,13 @@ fn test_compilation_metadata() {
         test_compilation_metadata_internal(true, true, enable_check),
         StatusCode::UNSTABLE_BYTECODE_REJECTED
     );
-    // publish compiler v2 code to test
+    // publish compiler v1 code to mainnet
     assert_success!(test_compilation_metadata_internal(
         true,
         false,
         enable_check
     ));
-    // publish compiler v1 code to mainnet
+    // publish compiler v2 code to test
     assert_success!(test_compilation_metadata_internal(
         false,
         true,
@@ -296,20 +298,23 @@ fn test_compilation_metadata() {
 
     enable_check = false;
     // publish compiler v2 code to mainnet
-    // success because the feature flag is disabled
-    assert_success!(test_compilation_metadata_internal(true, true, enable_check));
-    // publish compiler v2 code to test
-    assert_success!(test_compilation_metadata_internal(
-        true,
-        false,
-        enable_check
-    ));
+    // failed because the metadata cannot be recognized
+    assert_vm_status!(
+        test_compilation_metadata_internal(true, true, enable_check),
+        CONSTRAINT_NOT_SATISFIED
+    );
     // publish compiler v1 code to mainnet
     assert_success!(test_compilation_metadata_internal(
-        false,
         true,
+        false,
         enable_check
     ));
+    // publish compiler v2 code to test
+    // failed because the metadata cannot be recognized
+    assert_vm_status!(
+        test_compilation_metadata_internal(false, true, enable_check),
+        CONSTRAINT_NOT_SATISFIED
+    );
     // publish compiler v1 code to test
     assert_success!(test_compilation_metadata_internal(
         false,
