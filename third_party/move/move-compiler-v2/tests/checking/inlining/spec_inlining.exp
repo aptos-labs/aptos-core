@@ -1,5 +1,12 @@
 // -- Model dump before bytecode pipeline
 module 0x42::Test {
+    private inline fun apply(v: u64,predicate: |u64|bool): bool {
+        spec {
+          assert Ge($t0, 0);
+        }
+        ;
+        (predicate)(v)
+    }
     public fun test_apply(x: u64) {
         {
           let r1: bool = {
