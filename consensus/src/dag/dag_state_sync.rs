@@ -134,9 +134,9 @@ impl StateSyncTrigger {
         if local_highest_committed_anchor_round < commit_info_anchor_round
         // && local_highest_ordered_round < ledger_info.commit_info().round()
         {
-            self.proof_notifier
-                .send_commit_proof(ledger_info.clone())
-                .await
+            let ledger_info = ledger_info.clone();
+            let proof_notifier = self.proof_notifier.clone();
+            tokio::spawn(async move { proof_notifier.send_commit_proof(ledger_info).await });
         }
     }
 
