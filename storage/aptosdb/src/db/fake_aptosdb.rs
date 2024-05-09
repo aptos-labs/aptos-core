@@ -436,6 +436,8 @@ impl FakeAptosDB {
             if self.txn_by_version.len() as u64 > MAX_RETAIN_VERSIONS {
                 self.txn_by_version
                     .retain(|k, _| *k >= first_version.saturating_sub(MAX_RETAIN_VERSIONS));
+                self.txn_info_by_version
+                    .retain(|k, _| *k >= first_version.saturating_sub(MAX_RETAIN_VERSIONS));
             }
 
             Ok(())
