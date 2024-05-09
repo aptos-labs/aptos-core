@@ -3,7 +3,7 @@
 // SPDX-License-Identifier: Apache-2.0
 
 use crate::{
-    block_storage::{block_fetch_manager::BlockFetchRequest, BlockReader, BlockStore},
+    block_storage::{block_fetch_manager::{BlockFetchContext, BlockFetchRequest}, BlockReader, BlockStore},
     epoch_manager::LivenessStorageData,
     logging::{LogEvent, LogSchema},
     monitor,
@@ -87,7 +87,7 @@ impl BlockStore {
             &retriever.network,
         )
         .await;
-        if let Ok(SyncResult::Fetching) = self.sync_to_highest_ordered_cert(
+        if SyncResult::Fetching == self.sync_to_highest_ordered_cert(
             sync_info.highest_ordered_cert().clone(),
             sync_info.highest_commit_cert().clone(),
             &mut retriever,
@@ -96,11 +96,11 @@ impl BlockStore {
             return Ok(SyncResult::Fetching);
         }
 
-        if let Ok(SyncResult::Fetching) = self.insert_quorum_cert(sync_info.highest_ordered_cert(), &mut retriever).await? {
+        if SyncResult::Fetching == self.insert_quorum_cert(sync_info.highest_ordered_cert(), &mut retriever).await? {
             return Ok(SyncResult::Fetching);
         }
 
-        if let Ok(SyncResult::Fetching) = self.insert_quorum_cert(sync_info.highest_quorum_cert(), &mut retriever).await? {
+        if SyncResult::Fetching == self.insert_quorum_cert(sync_info.highest_quorum_cert(), &mut retriever).await? {
             return Ok(SyncResult::Fetching);
         }
 
@@ -116,11 +116,11 @@ impl BlockStore {
         retriever: &mut BlockRetriever,
     ) -> anyhow::Result<SyncResult> {
         match self.need_fetch_for_quorum_cert(qc) {
-            NeedFetchResult::NeedFetch => if let Ok(SyncResult::Fetching) = self.fetch_quorum_cert(qc.clone(), retriever).await? {
+            NeedFetchResult::NeedFetch => if SyncResult::Fetching == self.fetch_quorum_cert(qc.clone(), retriever).await? {
                 return Ok(SyncResult::Fetching);
             },
             NeedFetchResult::QCBlockExist => self.insert_single_quorum_cert(qc.clone())?,
-            NeedFetchResult::QCAlreadyExist => return Ok(()),
+            NeedFetchResult::QCAlreadyExist => return Ok(SyncResult::Success),
             _ => (),
         }
         if self.ordered_root().round() < qc.commit_info().round() {
@@ -189,7 +189,7 @@ impl BlockStore {
         highest_ordered_cert: QuorumCert,
         highest_commit_cert: QuorumCert,
         retriever: &mut BlockRetriever,
-    ) -> anyhow::Result<()> {
+    ) -> anyhow::Result<SyncResult> {
         if !self.need_sync_for_ledger_info(highest_commit_cert.ledger_info()) {
             return Ok(SyncResult::Success);
         }

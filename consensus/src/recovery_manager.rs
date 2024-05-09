@@ -15,15 +15,14 @@ use crate::{
 use anyhow::{anyhow, ensure, Context, Result};
 use aptos_channels::aptos_channel;
 use aptos_consensus_types::{
-    block_retrieval, common::Author, proposal_msg::ProposalMsg, sync_info::SyncInfo, vote_msg::{self, VoteMsg}
+    common::Author, proposal_msg::ProposalMsg, sync_info::SyncInfo, vote_msg::VoteMsg
 };
 use aptos_crypto::HashValue;
 use aptos_logger::prelude::*;
 use aptos_types::{block_info::Round, epoch_state::EpochState};
 use futures::{FutureExt, StreamExt};
 use futures_channel::oneshot;
-use std::{mem::Discriminant, process, sync::Arc};
-use lru::LruCache;
+use std::{collections::HashMap, mem::Discriminant, process, sync::Arc};
 
 /// If the node can't recover corresponding blocks from local storage, RecoveryManager is responsible
 /// for processing the events carrying sync info and use the info to retrieve blocks from peers
@@ -35,8 +34,6 @@ pub struct RecoveryManager {
     last_committed_round: Round,
     max_blocks_to_request: u64,
     payload_manager: Arc<PayloadManager>,
-    vote_cache: LruCache<(Author, VoteData), ()>,
-    proposal_cache: LruCache<HashValue, ()>,
 }
 
 impl RecoveryManager {
@@ -57,9 +54,6 @@ impl RecoveryManager {
             last_committed_round,
             max_blocks_to_request,
             payload_manager,
-            // TODO: Make the capacity a parameter in the config
-            vote_cache: LruCache::new(2000),
-            proposal_cache: LruCache::new(max(max_blocks_to_request, 50)),
         }
     }
 
@@ -105,7 +99,7 @@ impl RecoveryManager {
                 .collect(),
             self.max_blocks_to_request,
             extra_block_store,
-            BlockFetchContext::ProcessRecovery(sync_info, peer)
+            BlockFetchContext::ProcessRecovery(*sync_info, peer)
         );
         let recovery_data = BlockStore::fast_forward_sync(
             sync_info.highest_ordered_cert(),
@@ -142,7 +136,6 @@ impl RecoveryManager {
         let mut close_rx = close_rx.into_stream();
         loop {
             futures::select! {
-                biased;
                 block_fetch_respone = block_fetch_response_rx.select_next_some() => {
                     monitor!(
                         "process_block_fetch_response",
@@ -154,11 +147,11 @@ impl RecoveryManager {
                         VerifiedEvent::ProposalMsg(proposal_msg) => {
                             monitor!(
                                 "process_recovery",
-                                self.process_proposal_msg(*proposal_msg, HashMap::new()).await
+                                self.process_proposal_msg(*proposal_msg).await
                             )
                         }
                         VerifiedEvent::VoteMsg(vote_msg) => {
-                            monitor!("process_recovery", self.process_vote_msg(*vote_msg, HashMap::new()).await)
+                            monitor!("process_recovery", self.process_vote_msg(*vote_msg).await)
                         }
                         VerifiedEvent::UnverifiedSyncInfo(sync_info) => {
                             monitor!(

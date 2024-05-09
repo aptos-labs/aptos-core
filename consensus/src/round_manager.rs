@@ -16,7 +16,7 @@ use anyhow::{bail, ensure, Context};
 use aptos_channels::aptos_channel;
 use aptos_config::config::ConsensusConfig;
 use aptos_consensus_types::{
-    block::Block, block_data::BlockType, common::{Author, Round}, delayed_qc_msg::DelayedQcMsg, proof_of_store::{ProofCache, ProofOfStoreMsg, SignedBatchInfoMsg}, proposal_msg::ProposalMsg, quorum_cert::QuorumCert, sync_info::SyncInfo, timeout_2chain::TwoChainTimeoutCertificate, vote::Vote, vote_data::VoteData, vote_msg::VoteMsg
+    block::Block, block_data::BlockType, common::{Author, Round}, delayed_qc_msg::DelayedQcMsg, proof_of_store::{ProofCache, ProofOfStoreMsg, SignedBatchInfoMsg}, proposal_msg::ProposalMsg, quorum_cert::QuorumCert, sync_info::SyncInfo, timeout_2chain::TwoChainTimeoutCertificate, vote::Vote, vote_msg::VoteMsg
 };
 use aptos_crypto::HashValue;
 use aptos_infallible::{checked, Mutex};
@@ -38,7 +38,7 @@ use fail::fail_point;
 use futures::{channel::oneshot, FutureExt, StreamExt};
 use futures_channel::mpsc::UnboundedReceiver;
 use serde::Serialize;
-use std::{mem::Discriminant, sync::Arc, time::Duration, collections::VecDeque};
+use std::{mem::Discriminant, sync::Arc, time::Duration, collections::{VecDeque, HashMap}};
 use tokio::{
     sync::oneshot as TokioOneshot,
     time::{sleep, Instant},
@@ -176,6 +176,7 @@ mod round_manager_test;
 #[path = "round_manager_fuzzing.rs"]
 pub mod round_manager_fuzzing;
 
+#[derive(Debug, PartialEq, Eq)]
 pub enum SyncResult {
     Stale,
     Success,
@@ -204,7 +205,7 @@ pub struct RoundManager {
     jwk_consensus_config: OnChainJWKConsensusConfig,
     fast_rand_config: Option<RandConfig>,
     // Caching recently processed votes and proposals to avoid processing them twice.
-    processed_vote_cache: LruCache<(Author, VoteData), ()>,
+    processed_vote_cache: LruCache<(Author, HashValue, HashValue), ()>,
     processed_proposal_cache: LruCache<HashValue, ()>,
     block_fetch_request_tx: aptos_channel::Sender<BlockFetchContext, BlockFetchRequest>,
     // These are proposals and votes that failed sync_up and are parked to be re-executed
@@ -458,18 +459,19 @@ impl RoundManager {
             .await
         {
             Ok(SyncResult::Success) => {
+                let proposal_id = proposal_msg.id();
                 self.process_verified_proposal(proposal_msg.take_proposal()).await?;
-                self.processed_proposal_cache.put(proposal_msg.id(), ());
+                self.processed_proposal_cache.put(proposal_id, ());
             }
             Ok(SyncResult::Stale) => {
                 info!("Stale proposal. Current Round: {}, Proposal: {}", self.round_state.current_round(), proposal_msg.proposal());
                 return Ok(());
             }
             Ok(SyncResult::Fetching) => {
-                self.failed_messages.push_back(VerifiedEvent::ProposalMsg(proposal_msg));
+                self.failed_messages.push_back(VerifiedEvent::ProposalMsg(Box::new(proposal_msg)));
             }
             Err(e) => {
-                self.failed_messages.push_back(VerifiedEvent::ProposalMsg(proposal_msg));
+                self.failed_messages.push_back(VerifiedEvent::ProposalMsg(Box::new(proposal_msg)));
                 return Err(e).context("[RoundManager] Failed to process proposal");
             }
         }
@@ -532,7 +534,7 @@ impl RoundManager {
                 })?;
             let result = self
                 .block_store
-                .add_certs(sync_info, self.create_block_retriever(author, HashMap::new(), BlockFetchContext::ProcessSyncInfo(sync_info.clone(), author)))
+                .add_certs(sync_info, self.create_block_retriever(author, HashMap::new(), BlockFetchContext::ProcessRegular(sync_info.clone(), author)))
                 .await;
             self.process_certificates().await?;
             result
@@ -583,7 +585,7 @@ impl RoundManager {
         match self.ensure_round_and_sync_up(checked!((sync_info.highest_round()) + 1)?, &sync_info, peer)
             .await {
             Ok(SyncResult::Fetching) => {
-                self.failed_messages.push_back(VerifiedEvent::SyncInfo(sync_info));
+                self.failed_messages.push_back(VerifiedEvent::UnverifiedSyncInfo(Box::new(sync_info)));
             }
             Ok(SyncResult::Stale) => {
                 info!("Stale SyncInfo. Current Round: {}, SyncInfo: {}", self.round_state.current_round(), sync_info);
@@ -591,7 +593,7 @@ impl RoundManager {
             Ok(SyncResult::Success) => {
             }
             Err(e) => {
-                self.failed_messages.push_back(VerifiedEvent::SyncInfo(sync_info));
+                self.failed_messages.push_back(VerifiedEvent::UnverifiedSyncInfo(Box::new(sync_info)));
                 return Err(e).context("[RoundManager] Failed to process sync info msg");
             }
         }
@@ -950,7 +952,7 @@ impl RoundManager {
         fail_point!("consensus::process_vote_msg", |_| {
             Err(anyhow::anyhow!("Injected error in process_vote_msg"))
         });
-        if processed_vote_cache.contains(&((vote_msg.vote().author(), vote_msg.vote().vote_data()))) {
+        if self.processed_vote_cache.contains(&((vote_msg.vote().author(), vote_msg.vote().vote_data().proposed().id(), vote_msg.vote().vote_data().parent().id()))) {
             return Ok(());
         }
         // Check whether this validator is a valid recipient of the vote.
@@ -970,14 +972,14 @@ impl RoundManager {
                 self.process_vote(vote_msg.vote())
                     .await
                     .context("[RoundManager] Add a new vote")?;
-                self.processed_vote_cache.put(((vote_msg.vote().author(), vote_msg.vote().vote_data())), ());
+                self.processed_vote_cache.put((vote_msg.vote().author(), vote_msg.vote().vote_data().proposed().id(), vote_msg.vote().vote_data().parent().id()), ());
             },
             Ok(SyncResult::Fetching) => {
-                self.failed_messages.push_back(VerifiedEvent::VoteMsg(vote_msg));
                 warn!("Processing vote delayed to fetch necessary blocks. Current Round: {}, Vote Round: {}", self.round_state.current_round(), vote_msg.vote().vote_data().proposed().round());
+                self.failed_messages.push_back(VerifiedEvent::VoteMsg(Box::new(vote_msg)));
             },
             Err(err) => {
-                self.failed_messages.push_back(VerifiedEvent::VoteMsg(vote_msg));
+                self.failed_messages.push_back(VerifiedEvent::VoteMsg(Box::new(vote_msg)));
                 return Err(err).context("[RoundManager] Failed to process vote msg");
             }
         }
@@ -1065,8 +1067,8 @@ impl RoundManager {
         qc: Arc<QuorumCert>,
         preferred_peer: Author,
         extra_block_store: HashMap<HashValue, Arc<Block>>
-    ) -> anyhow::Result<()> {
-        let result = self
+    ) -> anyhow::Result<SyncResult> {
+        match self
             .block_store
             .insert_quorum_cert(&qc, &mut self.create_block_retriever(
                                                     preferred_peer, 
@@ -1074,8 +1076,16 @@ impl RoundManager {
                                                     BlockFetchContext::InsertQuorumCert(qc.lone(), preferred_peer.clone())
                                                 )
                                 )
-            .await
-            .context("[RoundManager] Failed to process a newly aggregated QC");
+            .await 
+        {
+            Ok(SyncResult::Fetching) => {
+                self.process_certificates().await?;
+            },
+            Ok(SyncResult::Success)
+            Err(err) => {
+                Err(err).context("[RoundManager] Failed to process a newly aggregated QC");
+            }
+        }
         self.process_certificates().await?;
         result
     }
@@ -1106,7 +1116,8 @@ impl RoundManager {
         }
     }
 
-    async fn process_failed_messages(&mut self) -> anyhow::Result<()> {
+    /// Process the previously failed messages in the `failed_messages` queue.
+    async fn process_failed_messages(&mut self) {
         let num_failed_messages = self.failed_messages.len();
         for _ in 0..num_failed_messages {
             if let Some(event) = self.failed_messages.pop_front() {
@@ -1124,7 +1135,7 @@ impl RoundManager {
                         self.process_sync_info_msg(*sync_info).await;
                     },
                     _ => {
-                        bail!("Unexpected event in failed_messages");
+                        unreachable!("Unexpected event in failed_messages");
                     },
                 }
             }
@@ -1184,11 +1195,11 @@ impl RoundManager {
     ) {
         info!(epoch = self.epoch_state().epoch, "RoundManager started");
         let mut close_rx = close_rx.into_stream();
-        let (retry_tx, retry_rx) = tokio::sync::mpsc::channel(1);
+        let (retry_tx, mut retry_rx) = tokio::sync::mpsc::channel(1);
         struct Dummy {};
         tokio::spawn(async move {
             loop {
-                thread::sleep(Duration::from_millis(5));
+                sleep(Duration::from_millis(5));
                 retry_tx.send(Dummy {});
             }
         });
