@@ -2277,6 +2277,7 @@ dependencies = [
  "aptos-enum-conversion-derive",
  "aptos-event-notifications",
  "aptos-infallible",
+ "aptos-jwk-utils",
  "aptos-logger",
  "aptos-metrics-core",
  "aptos-network",
@@ -2292,11 +2293,23 @@ dependencies = [
  "futures-util",
  "move-core-types",
  "once_cell",
+ "serde",
+ "tokio",
+ "tokio-retry",
+]
+
+[[package]]
+name = "aptos-jwk-utils"
+version = "0.1.0"
+dependencies = [
+ "anyhow",
+ "aptos-types",
+ "http",
+ "move-core-types",
  "reqwest",
  "serde",
  "serde_json",
  "tokio",
- "tokio-retry",
 ]
 
 [[package]]
