@@ -34,6 +34,7 @@ use move_command_line_common::{
     address::ParsedAddress,
     env::{get_move_compiler_block_v1_from_env, get_move_compiler_v2_from_env},
     files::verify_and_create_named_address_mapping,
+    testing::{EXP_EXT, EXP_EXT_V2},
 };
 use move_compiler::{self, shared::PackagePaths, FullyCompiledProgram};
 use move_core_types::{
@@ -1021,17 +1022,17 @@ pub fn run_aptos_test_with_config(
     path: &Path,
     config: TestRunConfig,
 ) -> Result<(), Box<dyn std::error::Error>> {
-    let config =
+    let (suffix, config) =
         if get_move_compiler_v2_from_env() && !matches!(config, TestRunConfig::CompilerV2 { .. }) {
-            TestRunConfig::CompilerV2 {
+            (Some(EXP_EXT_V2.to_owned()), TestRunConfig::CompilerV2 {
                 language_version: LanguageVersion::default(),
                 v2_experiments: vec![],
-            }
+            })
         } else {
-            config
+            (Some(EXP_EXT.to_owned()), config)
         };
     let v1_lib = precompiled_v1_stdlib_if_needed(&config);
     let v2_lib = precompiled_v2_stdlib_if_needed(&config);
     AptosVM::set_paranoid_type_checks(true);
-    run_test_impl::<AptosTestAdapter>(config, path, v1_lib, v2_lib, &None)
+    run_test_impl::<AptosTestAdapter>(config, path, v1_lib, v2_lib, &suffix)
 }

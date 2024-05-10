@@ -240,7 +240,7 @@ dependencies = [
 
 [[package]]
 name = "aptos"
-version = "3.2.0"
+version = "3.3.0"
 dependencies = [
  "anyhow",
  "aptos-api-types",
@@ -2311,16 +2311,27 @@ name = "aptos-keyless-pepper-common"
 version = "0.1.0"
 dependencies = [
  "anyhow",
+ "aptos-crypto",
+ "aptos-crypto-derive",
+ "aptos-dkg",
  "aptos-types",
  "ark-bls12-381",
  "ark-ec",
  "ark-ff",
  "ark-serialize",
  "ark-std",
+ "bcs 0.1.4",
+ "blstrs",
+ "derivation-path",
+ "ed25519-dalek 1.0.1",
  "hex",
+ "hmac 0.12.1",
  "jsonwebtoken 8.3.0",
+ "once_cell",
  "rand 0.7.3",
+ "regex",
  "serde",
+ "serde-big-array",
  "sha2 0.10.8",
 ]
 
