@@ -8,8 +8,11 @@
 /// dependency.
 /// However, reading the aggregator value (i.e. calling `read(X)`) is a resource-intensive
 /// operation that also reduced parallelism, and should be avoided as much as possible.
+/// If you need to capture the value, without revealing it, use snapshot function instead,
+/// which has no parallelism impact.
 module aptos_framework::aggregator_v2 {
     use std::error;
+    use std::features;
     use std::string::String;
 
     /// The value of aggregator overflows. Raised by uncoditional add() call
@@ -66,12 +69,24 @@ module aptos_framework::aggregator_v2 {
     /// EAGGREGATOR_ELEMENT_TYPE_NOT_SUPPORTED raised if called with a different type.
     public native fun create_aggregator<IntElement: copy + drop>(max_value: IntElement): Aggregator<IntElement>;
 
+    public fun create_aggregator_with_value<IntElement: copy + drop>(start_value: IntElement, max_value: IntElement): Aggregator<IntElement> {
+        let aggregator = create_aggregator(max_value);
+        add(&mut aggregator, start_value);
+        aggregator
+    }
+
     /// Creates new aggregator, without any 'max_value' on top of the implicit bound restriction
     /// due to the width of the type (i.e. MAX_U64 for u64, MAX_U128 for u128).
     ///
     /// Currently supported types for IntElement are u64 and u128.
     /// EAGGREGATOR_ELEMENT_TYPE_NOT_SUPPORTED raised if called with a different type.
     public native fun create_unbounded_aggregator<IntElement: copy + drop>(): Aggregator<IntElement>;
+
+    public fun create_unbounded_aggregator_with_value<IntElement: copy + drop>(start_value: IntElement): Aggregator<IntElement> {
+        let aggregator = create_unbounded_aggregator();
+        add(&mut aggregator, start_value);
+        aggregator
+    }
 
     /// Adds `value` to aggregator.
     /// If addition would exceed the max_value, `false` is returned, and aggregator value is left unchanged.
@@ -93,10 +108,21 @@ module aptos_framework::aggregator_v2 {
         assert!(try_sub(aggregator, value), error::out_of_range(EAGGREGATOR_UNDERFLOW));
     }
 
+    native fun is_at_least_impl<IntElement: copy + drop>(aggregator: &Aggregator<IntElement>, min_amount: IntElement): bool;
+
+    public fun is_at_least<IntElement: copy + drop>(aggregator: &Aggregator<IntElement>, min_amount: IntElement): bool {
+        assert!(features::aggregator_v2_is_at_least_api_enabled(), EAGGREGATOR_API_V2_NOT_ENABLED);
+        is_at_least_impl(aggregator, min_amount)
+    }
+
     /// Returns a value stored in this aggregator.
     /// Note: This operation is resource-intensive, and reduces parallelism.
-    /// (Especially if called in a transaction that also modifies the aggregator,
-    /// or has other read/write conflicts)
+    /// If you need to capture the value, without revealing it, use snapshot function instead,
+    /// which has no parallelism impact.
+    /// If called in a transaction that also modifies the aggregator, or has other read/write conflicts,
+    /// it will sequentialize that transaction. (i.e. up to concurrency_level times slower)
+    /// If called in a separate transaction (i.e. after transaction that modifies aggregator), it might be
+    /// up to two times slower.
     public native fun read<IntElement>(aggregator: &Aggregator<IntElement>): IntElement;
 
     /// Returns a wrapper of a current value of an aggregator
