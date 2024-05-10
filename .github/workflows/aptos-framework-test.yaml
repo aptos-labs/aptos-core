@@ -1,0 +1,40 @@
+name: Run aptos framework checks
+
+on:
+  push:
+    branches: 
+        - master
+        - integrate_supra_framework
+  pull_request:
+    branches:
+        - master
+        - consensus_key
+
+env:
+  CARGO_TERM_COLOR: always
+  CARGO_BIN: ~/.cargo/bin/cargo
+  CARGO_NET_GIT_FETCH_WITH_CLI: true
+  FORGE_BIN: ~/.foundry/bin/forge
+  SUI_BIN: ~/.cargo/bin/sui
+  APTOS_BIN: ~/.local/bin/aptos
+  SCRYPTO_BIN: ~/.cargo/bin/scrypto
+
+jobs:
+  build:
+
+    runs-on: self-hosted
+
+    steps:
+
+    - uses: actions/checkout@v4
+      with:
+        clean: false
+
+    - name: Get changed files
+      id: changed-files
+      uses: tj-actions/changed-files@v42
+ 
+    - name: Run tests
+      run: |
+        ${{ env.CARGO_BIN }} test --release -p aptos-framework -- --skip prover
+        ${{ env.CARGO_BIN }} nextest run -p e2e-move-tests
