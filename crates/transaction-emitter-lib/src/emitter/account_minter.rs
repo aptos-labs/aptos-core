@@ -1,7 +1,7 @@
 // Copyright © Aptos Foundation
 // SPDX-License-Identifier: Apache-2.0
 
-use crate::{emitter::local_account_generator::LocalAccountGenerator, EmitJobRequest};
+use crate::EmitJobRequest;
 use anyhow::{anyhow, bail, format_err, Context, Result};
 use aptos_crypto::{
     ed25519::{Ed25519PrivateKey, Ed25519PublicKey},
@@ -22,7 +22,7 @@ use core::{
     cmp::min,
     result::Result::{Err, Ok},
 };
-use futures::StreamExt;
+use futures::{future::try_join_all, StreamExt};
 use rand::{rngs::StdRng, Rng, SeedableRng};
 use std::{
     path::Path,
@@ -250,7 +250,6 @@ impl<'t> AccountMinter<'t> {
         &mut self,
         txn_executor: &dyn ReliableTransactionSubmitter,
         req: &EmitJobRequest,
-        account_generator: Box<dyn LocalAccountGenerator>,
         max_submit_batch_size: usize,
         local_accounts: Vec<Arc<LocalAccount>>,
     ) -> Result<()> {
@@ -317,7 +316,6 @@ impl<'t> AccountMinter<'t> {
             .create_and_fund_seed_accounts(
                 new_source_account,
                 txn_executor,
-                account_generator,
                 expected_num_seed_accounts,
                 coins_per_seed_account,
                 max_submit_batch_size,
@@ -395,7 +393,6 @@ impl<'t> AccountMinter<'t> {
         &mut self,
         mut new_source_account: Option<LocalAccount>,
         txn_executor: &dyn ReliableTransactionSubmitter,
-        account_generator: Box<dyn LocalAccountGenerator>,
         seed_account_num: usize,
         coins_per_seed_account: u64,
         max_submit_batch_size: usize,
@@ -410,9 +407,7 @@ impl<'t> AccountMinter<'t> {
         while i < seed_account_num {
             let batch_size = min(max_submit_batch_size, seed_account_num - i);
             let mut rng = StdRng::from_rng(self.rng()).unwrap();
-            let mut batch = account_generator
-                .gen_local_accounts(txn_executor, batch_size, &mut rng)
-                .await?;
+            let mut batch = gen_reusable_accounts(txn_executor, batch_size, &mut rng).await?;
             let txn_factory = &self.txn_factory;
             let create_requests: Vec<_> = batch
                 .iter()
@@ -549,6 +544,43 @@ async fn create_and_fund_new_accounts(
             .with_context(|| format!("Account {} couldn't mint", source_account.address()))?;
     }
     Ok(())
+}
+
+pub async fn gen_reusable_accounts<R>(
+    txn_executor: &dyn ReliableTransactionSubmitter,
+    num_accounts: usize,
+    rng: &mut R,
+) -> Result<Vec<LocalAccount>>
+where
+    R: rand_core::RngCore + ::rand_core::CryptoRng,
+{
+    let mut account_keys = vec![];
+    let mut addresses = vec![];
+    let mut i = 0;
+    while i < num_accounts {
+        let account_key = AccountKey::generate(rng);
+        addresses.push(account_key.authentication_key().account_address());
+        account_keys.push(account_key);
+        i += 1;
+    }
+    let result_futures = addresses
+        .iter()
+        .map(|address| txn_executor.query_sequence_number(*address))
+        .collect::<Vec<_>>();
+    let seq_nums: Vec<_> = try_join_all(result_futures).await?.into_iter().collect();
+
+    let accounts = account_keys
+        .into_iter()
+        .zip(seq_nums.into_iter())
+        .map(|(account_key, sequence_number)| {
+            LocalAccount::new(
+                account_key.authentication_key().account_address(),
+                account_key,
+                sequence_number,
+            )
+        })
+        .collect();
+    Ok(accounts)
 }
 
 pub fn create_and_fund_account_request(

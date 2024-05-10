@@ -2,14 +2,12 @@
 // SPDX-License-Identifier: Apache-2.0
 
 pub mod account_minter;
-pub mod local_account_generator;
 pub mod stats;
 pub mod submission_worker;
 pub mod transaction_executor;
 
 use crate::emitter::{
-    account_minter::{AccountMinter, SourceAccountManager},
-    local_account_generator::{create_account_generator, LocalAccountGenerator},
+    account_minter::{gen_reusable_accounts, AccountMinter, SourceAccountManager},
     stats::{DynamicStatsTracking, TxnStats},
     submission_worker::SubmissionWorker,
     transaction_executor::RestApiReliableTransactionSubmitter,
@@ -25,7 +23,7 @@ use aptos_sdk::{
     types::{transaction::SignedTransaction, LocalAccount},
 };
 use aptos_transaction_generator_lib::{
-    create_txn_generator_creator, AccountType, ReliableTransactionSubmitter, TransactionType,
+    create_txn_generator_creator, ReliableTransactionSubmitter, TransactionType,
 };
 use futures::future::{try_join_all, FutureExt};
 use once_cell::sync::Lazy;
@@ -143,7 +141,7 @@ pub struct EmitJobRequest {
     mode: EmitJobMode,
 
     transaction_mix_per_phase: Vec<Vec<(TransactionType, usize)>>,
-    account_type: AccountType,
+
     max_gas_per_txn: u64,
     init_max_gas_per_txn: Option<u64>,
 
@@ -183,7 +181,6 @@ impl Default for EmitJobRequest {
                 mempool_backlog: 3000,
             },
             transaction_mix_per_phase: vec![vec![(TransactionType::default(), 1)]],
-            account_type: AccountType::Local,
             max_gas_per_txn: aptos_global_constants::MAX_GAS_AMOUNT,
             gas_price: aptos_global_constants::GAS_UNIT_PRICE,
             init_max_gas_per_txn: None,
@@ -277,11 +274,6 @@ impl EmitJobRequest {
         transaction_mix_per_phase: Vec<Vec<(TransactionType, usize)>>,
     ) -> Self {
         self.transaction_mix_per_phase = transaction_mix_per_phase;
-        self
-    }
-
-    pub fn account_type(mut self, account_type: AccountType) -> Self {
-        self.account_type = account_type;
         self
     }
 
@@ -460,7 +452,7 @@ impl EmitJobRequest {
                 };
 
                 info!(
-                    " Transaction emitter targeting {} TPS, expecting {} TPS",
+                    " Transaction emitter targetting {} TPS, expecting {} TPS",
                     tps,
                     num_accounts * transactions_per_account / wait_seconds as usize
                 );
@@ -701,12 +693,9 @@ impl TxnEmitter {
             usize::try_from(init_expiration_time / req.init_retry_interval.as_secs()).unwrap();
         let seed = req.account_minter_seed.unwrap_or_else(|| self.rng.gen());
 
-        let account_generator = create_account_generator(req.account_type);
-
         let mut all_accounts = create_accounts(
             root_account,
             &init_txn_factory,
-            account_generator,
             &req,
             mode_params.max_submit_batch_size,
             req.skip_minting_accounts,
@@ -1131,7 +1120,6 @@ pub fn parse_seed(seed_string: &str) -> [u8; 32] {
 pub async fn create_accounts(
     root_account: &LocalAccount,
     txn_factory: &TransactionFactory,
-    account_generator: Box<dyn LocalAccountGenerator>,
     req: &EmitJobRequest,
     max_submit_batch_size: usize,
     skip_minting_accounts: bool,
@@ -1163,10 +1151,7 @@ pub async fn create_accounts(
 
     let mut rng = StdRng::from_seed(seed);
 
-    let accounts = account_generator
-        .gen_local_accounts(&txn_executor, num_accounts, &mut rng)
-        .await?;
-
+    let accounts = gen_reusable_accounts(&txn_executor, num_accounts, &mut rng).await?;
     info!("Generated re-usable accounts for seed {:?}", seed);
 
     let all_accounts_already_exist = accounts.iter().all(|account| account.sequence_number() > 0);
@@ -1185,13 +1170,7 @@ pub async fn create_accounts(
     if !skip_minting_accounts {
         let accounts: Vec<_> = accounts.into_iter().map(Arc::new).collect();
         account_minter
-            .create_and_fund_accounts(
-                &txn_executor,
-                req,
-                account_generator,
-                max_submit_batch_size,
-                accounts.clone(),
-            )
+            .create_and_fund_accounts(&txn_executor, req, max_submit_batch_size, accounts.clone())
             .await?;
         let accounts: Vec<_> = accounts
             .into_iter()
