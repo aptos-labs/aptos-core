@@ -4,7 +4,9 @@
 //! This module defines the gas parameters for Aptos Framework & Stdlib.
 
 use crate::{
-    gas_feature_versions::{RELEASE_V1_14, RELEASE_V1_8, RELEASE_V1_9, RELEASE_V1_9_SKIPPED}, gas_schedule::NativeGasParameters, ver::gas_feature_versions::{RELEASE_V1_12, RELEASE_V1_13}
+    gas_feature_versions::{RELEASE_V1_14, RELEASE_V1_8, RELEASE_V1_9_SKIPPED},
+    gas_schedule::NativeGasParameters,
+    ver::gas_feature_versions::{RELEASE_V1_12, RELEASE_V1_13},
 };
 use aptos_gas_algebra::{
     InternalGas, InternalGasPerAbstractValueUnit, InternalGasPerArg, InternalGasPerByte,

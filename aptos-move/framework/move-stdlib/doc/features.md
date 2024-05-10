@@ -123,6 +123,10 @@ return true.
 -  [Function `new_accounts_default_to_fa_apt_store_enabled`](#0x1_features_new_accounts_default_to_fa_apt_store_enabled)
 -  [Function `get_operations_default_to_fa_apt_store_feature`](#0x1_features_get_operations_default_to_fa_apt_store_feature)
 -  [Function `operations_default_to_fa_apt_store_enabled`](#0x1_features_operations_default_to_fa_apt_store_enabled)
+-  [Function `get_concurrent_fungible_balance_feature`](#0x1_features_get_concurrent_fungible_balance_feature)
+-  [Function `concurrent_fungible_balance_enabled`](#0x1_features_concurrent_fungible_balance_enabled)
+-  [Function `get_migrate_to_concurrent_fungible_balance_feature`](#0x1_features_get_migrate_to_concurrent_fungible_balance_feature)
+-  [Function `migrate_to_concurrent_fungible_balance_enabled`](#0x1_features_migrate_to_concurrent_fungible_balance_enabled)
 -  [Function `change_feature_flags`](#0x1_features_change_feature_flags)
 -  [Function `change_feature_flags_internal`](#0x1_features_change_feature_flags_internal)
 -  [Function `change_feature_flags_for_next_epoch`](#0x1_features_change_feature_flags_for_next_epoch)
@@ -390,6 +394,18 @@ Lifetime: transient
 
 
 
+<a id="0x1_features_CONCURRENT_FUNGIBLE_BALANCE"></a>
+
+Whether enable concurent Fungible Balance
+to create higher throughput concurrent variants.
+Lifetime: transient
+
+
+<pre><code><b>const</b> <a href="features.md#0x1_features_CONCURRENT_FUNGIBLE_BALANCE">CONCURRENT_FUNGIBLE_BALANCE</a>: u64 = 67;
+</code></pre>
+
+
+
 <a id="0x1_features_CONCURRENT_TOKEN_V2"></a>
 
 Whether enable TokenV2 collection creation and Fungible Asset creation
@@ -579,6 +595,18 @@ Whether checking the maximum object nesting is enabled.
 
 
 <pre><code><b>const</b> <a href="features.md#0x1_features_MAX_OBJECT_NESTING_CHECK">MAX_OBJECT_NESTING_CHECK</a>: u64 = 53;
+</code></pre>
+
+
+
+<a id="0x1_features_MIGRATE_TO_CONCURRENT_FUNGIBLE_BALANCE"></a>
+
+Whether to default new Fungible Stores and migrate existing ones
+to the concurrent variant.
+Lifetime: transient
+
+
+<pre><code><b>const</b> <a href="features.md#0x1_features_MIGRATE_TO_CONCURRENT_FUNGIBLE_BALANCE">MIGRATE_TO_CONCURRENT_FUNGIBLE_BALANCE</a>: u64 = 68;
 </code></pre>
 
 
@@ -2979,6 +3007,98 @@ Lifetime: transient
 
 <pre><code><b>public</b> <b>fun</b> <a href="features.md#0x1_features_operations_default_to_fa_apt_store_enabled">operations_default_to_fa_apt_store_enabled</a>(): bool <b>acquires</b> <a href="features.md#0x1_features_Features">Features</a> {
     <a href="features.md#0x1_features_is_enabled">is_enabled</a>(<a href="features.md#0x1_features_OPERATIONS_DEFAULT_TO_FA_APT_STORE">OPERATIONS_DEFAULT_TO_FA_APT_STORE</a>)
+}
+</code></pre>
+
+
+
+</details>
+
+<a id="0x1_features_get_concurrent_fungible_balance_feature"></a>
+
+## Function `get_concurrent_fungible_balance_feature`
+
+
+
+<pre><code><b>public</b> <b>fun</b> <a href="features.md#0x1_features_get_concurrent_fungible_balance_feature">get_concurrent_fungible_balance_feature</a>(): u64
+</code></pre>
+
+
+
+<details>
+<summary>Implementation</summary>
+
+
+<pre><code><b>public</b> <b>fun</b> <a href="features.md#0x1_features_get_concurrent_fungible_balance_feature">get_concurrent_fungible_balance_feature</a>(): u64 { <a href="features.md#0x1_features_CONCURRENT_FUNGIBLE_BALANCE">CONCURRENT_FUNGIBLE_BALANCE</a> }
+</code></pre>
+
+
+
+</details>
+
+<a id="0x1_features_concurrent_fungible_balance_enabled"></a>
+
+## Function `concurrent_fungible_balance_enabled`
+
+
+
+<pre><code><b>public</b> <b>fun</b> <a href="features.md#0x1_features_concurrent_fungible_balance_enabled">concurrent_fungible_balance_enabled</a>(): bool
+</code></pre>
+
+
+
+<details>
+<summary>Implementation</summary>
+
+
+<pre><code><b>public</b> <b>fun</b> <a href="features.md#0x1_features_concurrent_fungible_balance_enabled">concurrent_fungible_balance_enabled</a>(): bool <b>acquires</b> <a href="features.md#0x1_features_Features">Features</a> {
+    <a href="features.md#0x1_features_is_enabled">is_enabled</a>(<a href="features.md#0x1_features_CONCURRENT_FUNGIBLE_BALANCE">CONCURRENT_FUNGIBLE_BALANCE</a>)
+}
+</code></pre>
+
+
+
+</details>
+
+<a id="0x1_features_get_migrate_to_concurrent_fungible_balance_feature"></a>
+
+## Function `get_migrate_to_concurrent_fungible_balance_feature`
+
+
+
+<pre><code><b>public</b> <b>fun</b> <a href="features.md#0x1_features_get_migrate_to_concurrent_fungible_balance_feature">get_migrate_to_concurrent_fungible_balance_feature</a>(): u64
+</code></pre>
+
+
+
+<details>
+<summary>Implementation</summary>
+
+
+<pre><code><b>public</b> <b>fun</b> <a href="features.md#0x1_features_get_migrate_to_concurrent_fungible_balance_feature">get_migrate_to_concurrent_fungible_balance_feature</a>(): u64 { <a href="features.md#0x1_features_MIGRATE_TO_CONCURRENT_FUNGIBLE_BALANCE">MIGRATE_TO_CONCURRENT_FUNGIBLE_BALANCE</a> }
+</code></pre>
+
+
+
+</details>
+
+<a id="0x1_features_migrate_to_concurrent_fungible_balance_enabled"></a>
+
+## Function `migrate_to_concurrent_fungible_balance_enabled`
+
+
+
+<pre><code><b>public</b> <b>fun</b> <a href="features.md#0x1_features_migrate_to_concurrent_fungible_balance_enabled">migrate_to_concurrent_fungible_balance_enabled</a>(): bool
+</code></pre>
+
+
+
+<details>
+<summary>Implementation</summary>
+
+
+<pre><code><b>public</b> <b>fun</b> <a href="features.md#0x1_features_migrate_to_concurrent_fungible_balance_enabled">migrate_to_concurrent_fungible_balance_enabled</a>(): bool <b>acquires</b> <a href="features.md#0x1_features_Features">Features</a> {
+    <a href="features.md#0x1_features_is_enabled">is_enabled</a>(<a href="features.md#0x1_features_MIGRATE_TO_CONCURRENT_FUNGIBLE_BALANCE">MIGRATE_TO_CONCURRENT_FUNGIBLE_BALANCE</a>)
 }
 </code></pre>
 

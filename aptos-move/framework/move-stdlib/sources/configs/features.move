@@ -556,6 +556,28 @@ module std::features {
         is_enabled(OPERATIONS_DEFAULT_TO_FA_APT_STORE)
     }
 
+    /// Whether enable concurent Fungible Balance
+    /// to create higher throughput concurrent variants.
+    /// Lifetime: transient
+    const CONCURRENT_FUNGIBLE_BALANCE: u64 = 67;
+
+    public fun get_concurrent_fungible_balance_feature(): u64 { CONCURRENT_FUNGIBLE_BALANCE }
+
+    public fun concurrent_fungible_balance_enabled(): bool acquires Features {
+        is_enabled(CONCURRENT_FUNGIBLE_BALANCE)
+    }
+
+    /// Whether to default new Fungible Stores and migrate existing ones
+    /// to the concurrent variant.
+    /// Lifetime: transient
+    const MIGRATE_TO_CONCURRENT_FUNGIBLE_BALANCE: u64 = 68;
+
+    public fun get_migrate_to_concurrent_fungible_balance_feature(): u64 { MIGRATE_TO_CONCURRENT_FUNGIBLE_BALANCE }
+
+    public fun migrate_to_concurrent_fungible_balance_enabled(): bool acquires Features {
+        is_enabled(MIGRATE_TO_CONCURRENT_FUNGIBLE_BALANCE)
+    }
+
     // ============================================================================================
     // Feature Flag Implementation
 
