@@ -107,7 +107,7 @@ fn native_check_dispatch_type_compatibility_impl(
         )
     };
 
-    if lhs.ty_param_abilities.is_empty() {
+    if lhs.param_tys.is_empty() {
         return Err(SafeNativeError::Abort { abort_code: 2 });
     }
 
