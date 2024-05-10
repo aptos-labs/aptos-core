@@ -75,8 +75,8 @@ pub struct ModuleGenerator {
         BTreeMap<(QualifiedId<StructId>, usize, FF::SignatureIndex), FF::FieldInstantiationIndex>,
     /// A mapping from type sequences to signature indices.
     types_to_signature: BTreeMap<Vec<Type>, FF::SignatureIndex>,
-    /// A mapping from constants sequences to pool indices.
-    cons_to_idx: BTreeMap<Constant, FF::ConstantPoolIndex>,
+    /// A mapping from constants sequences (with the corresponding type information) to pool indices.
+    cons_to_idx: BTreeMap<(Constant, Type), FF::ConstantPoolIndex>,
     /// The file-format module we are building.
     pub module: FF::CompiledModule,
     /// The source map for the module.
@@ -763,7 +763,7 @@ impl ModuleGenerator {
         cons: &Constant,
         ty: &Type,
     ) -> FF::ConstantPoolIndex {
-        if let Some(idx) = self.cons_to_idx.get(cons) {
+        if let Some(idx) = self.cons_to_idx.get(&(cons.clone(), ty.clone())) {
             return *idx;
         }
         let data = cons
@@ -781,7 +781,7 @@ impl ModuleGenerator {
             "constant",
         ));
         self.module.constant_pool.push(ff_cons);
-        self.cons_to_idx.insert(cons.clone(), idx);
+        self.cons_to_idx.insert((cons.clone(), ty.clone()), idx);
         idx
     }
 }
