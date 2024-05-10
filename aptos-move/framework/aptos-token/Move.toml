@@ -4,9 +4,9 @@ version = "1.0.0"
 
 [addresses]
 std = "0x1"
-aptos_framework = "0x1"
+supra_framework = "0x1"
 aptos_token = "0x3"
 
 [dependencies]
 MoveStdlib = { local = "../move-stdlib" }
-AptosFramework = { local = "../aptos-framework"}
+SupraFramework = { local = "../supra-framework"}

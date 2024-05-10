@@ -479,8 +479,8 @@ spec aptos_token::token {
     spec withdraw_with_capability(
         withdraw_proof: WithdrawCapability,
     ): Token {
-        let now_seconds = global<timestamp::CurrentTimeMicroseconds>(@aptos_framework).microseconds;
-        aborts_if !exists<timestamp::CurrentTimeMicroseconds>(@aptos_framework);
+        let now_seconds = global<timestamp::CurrentTimeMicroseconds>(@supra_framework).microseconds;
+        aborts_if !exists<timestamp::CurrentTimeMicroseconds>(@supra_framework);
         aborts_if now_seconds / timestamp::MICRO_CONVERSION_FACTOR > withdraw_proof.expiration_sec;
         include WithdrawWithEventInternalAbortsIf{
         account_addr: withdraw_proof.token_owner,
@@ -492,8 +492,8 @@ spec aptos_token::token {
         withdraw_proof: WithdrawCapability,
         withdraw_amount: u64,
     ): (Token, Option<WithdrawCapability>) {
-        let now_seconds = global<timestamp::CurrentTimeMicroseconds>(@aptos_framework).microseconds;
-        aborts_if !exists<timestamp::CurrentTimeMicroseconds>(@aptos_framework);
+        let now_seconds = global<timestamp::CurrentTimeMicroseconds>(@supra_framework).microseconds;
+        aborts_if !exists<timestamp::CurrentTimeMicroseconds>(@supra_framework);
         aborts_if now_seconds / timestamp::MICRO_CONVERSION_FACTOR > withdraw_proof.expiration_sec;
         aborts_if withdraw_amount > withdraw_proof.amount;
         include WithdrawWithEventInternalAbortsIf{

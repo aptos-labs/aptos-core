@@ -10,7 +10,7 @@ spec aptos_token::token_transfers {
 
     /// Abort according to the code
     spec schema InitializeTokenTransfersAbortsIf {
-        use aptos_framework::account::{Account};
+        use supra_framework::account::{Account};
         account: &signer;
 
         let addr = signer::address_of(account);
