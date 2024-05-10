@@ -287,6 +287,8 @@ impl DagDriver {
                 dag_id = self.dag_id,
                 "{}, attempting starting new round {}", self.dag_id, new_round
             );
+        } else {
+            tokio::time::sleep(Duration::from_secs(30));
         }
         defer!(
             if new_round > 5 {
