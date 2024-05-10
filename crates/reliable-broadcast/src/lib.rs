@@ -3,7 +3,7 @@
 
 use aptos_bounded_executor::BoundedExecutor;
 use aptos_consensus_types::common::Author;
-use aptos_logger::info;
+use aptos_logger::{debug, sample, sample::SampleRate, warn};
 use aptos_time_service::{TimeService, TimeServiceTrait};
 use async_trait::async_trait;
 use futures::{
@@ -148,7 +148,7 @@ where
                                 }
                             },
                             Err(e) => {
-                                info!(error = ?e, "rpc to {} failed", receiver);
+                                log_rpc_failure(e, receiver);
 
                                 let backoff_strategy = backoff_policies
                                     .get_mut(&receiver)
@@ -164,6 +164,18 @@ where
             }
         }
     }
+}
+
+fn log_rpc_failure(error: anyhow::Error, receiver: Author) {
+    // Log a sampled warning (to prevent spam)
+    sample!(
+        SampleRate::Duration(Duration::from_secs(1)),
+        warn!(error = ?error, "rpc to {} failed", receiver)
+    );
+
+    // Log at the debug level (this is useful for debugging
+    // and won't spam the logs in a production environment).
+    debug!(error = ?error, "rpc to {} failed", receiver);
 }
 
 pub struct DropGuard {

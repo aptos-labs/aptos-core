@@ -20,6 +20,7 @@ use move_command_line_common::{
     address::ParsedAddress,
     env::{get_move_compiler_block_v1_from_env, get_move_compiler_v2_from_env, read_bool_env_var},
     files::verify_and_create_named_address_mapping,
+    testing::{EXP_EXT, EXP_EXT_V2},
 };
 use move_compiler::{
     compiled_unit::AnnotatedCompiledUnit,
@@ -103,7 +104,7 @@ pub struct AdapterPublishArgs {
 
 #[derive(Debug, Parser)]
 pub struct AdapterExecuteArgs {
-    #[clap(long)]
+    #[clap(long, default_value = "true")]
     pub check_runtime_types: bool,
     /// print more complete information for VMErrors on run
     #[clap(long)]
@@ -199,7 +200,7 @@ impl<'a> MoveTestAdapter<'a> for SimpleVMTestAdapter<'a> {
                     }
                     Ok(())
                 },
-                VMConfig::production(),
+                production_vm_config_with_paranoid_type_checks(),
             )
             .unwrap();
         let mut addr_to_name_mapping = BTreeMap::new();
@@ -250,7 +251,7 @@ impl<'a> MoveTestAdapter<'a> for SimpleVMTestAdapter<'a> {
                     compat,
                 )
             },
-            VMConfig::production(),
+            production_vm_config_with_paranoid_type_checks(),
         ) {
             Ok(()) => Ok((None, module)),
             Err(vm_error) => Err(anyhow!(
@@ -468,6 +469,7 @@ impl PrecompiledFilesModules {
 static PRECOMPILED_MOVE_STDLIB_V2: Lazy<PrecompiledFilesModules> = Lazy::new(|| {
     let options = move_compiler_v2::Options {
         sources: move_stdlib::move_stdlib_files(),
+        sources_deps: vec![],
         dependencies: vec![],
         named_address_mapping: move_stdlib::move_stdlib_named_addresses_strings(),
         known_attributes: KnownAttribute::get_all_attribute_names().clone(),
@@ -518,18 +520,21 @@ fn precompiled_v2_stdlib_if_needed(
 }
 
 pub fn run_test_with_config(
-    mut config: TestRunConfig,
+    config: TestRunConfig,
     path: &Path,
 ) -> Result<(), Box<dyn std::error::Error>> {
-    if get_move_compiler_v2_from_env() && !matches!(config, TestRunConfig::CompilerV2 { .. }) {
-        config = TestRunConfig::CompilerV2 {
-            language_version: LanguageVersion::default(),
-            v2_experiments: vec![],
-        }
-    }
+    let (suffix, config) =
+        if get_move_compiler_v2_from_env() && !matches!(config, TestRunConfig::CompilerV2 { .. }) {
+            (Some(EXP_EXT_V2.to_owned()), TestRunConfig::CompilerV2 {
+                language_version: LanguageVersion::default(),
+                v2_experiments: vec![],
+            })
+        } else {
+            (Some(EXP_EXT.to_owned()), config)
+        };
     let v1_lib = precompiled_v1_stdlib_if_needed(&config);
     let v2_lib = precompiled_v2_stdlib_if_needed(&config);
-    run_test_impl::<SimpleVMTestAdapter>(config, path, v1_lib, v2_lib, &None)
+    run_test_impl::<SimpleVMTestAdapter>(config, path, v1_lib, v2_lib, &suffix)
 }
 
 pub fn run_test_with_config_and_exp_suffix(
@@ -557,5 +562,12 @@ impl From<AdapterExecuteArgs> for VMConfig {
             paranoid_type_checks: arg.check_runtime_types,
             ..Self::production()
         }
+    }
+}
+
+fn production_vm_config_with_paranoid_type_checks() -> VMConfig {
+    VMConfig {
+        paranoid_type_checks: true,
+        ..VMConfig::production()
     }
 }
