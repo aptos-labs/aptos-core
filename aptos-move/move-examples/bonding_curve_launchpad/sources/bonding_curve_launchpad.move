@@ -21,9 +21,8 @@ module resource_account::bonding_curve_launchpad {
     use swap::liquidity_pool;
     use swap::coin_wrapper;
     // Friend
+    use resource_account::liquidity_pair;
     use resource_account::resource_signer_holder;
-    //! Debug
-    use std::debug;
 
     const EFA_EXISTS_ALREADY: u64 = 10;
     const EFA_DOES_NOT_EXIST: u64 = 11;
@@ -133,7 +132,6 @@ module resource_account::bonding_curve_launchpad {
         assert!(smart_table::contains(& liquidity_pair_smartTable.liquidity_pairs, metadata), ELIQUIDITY_PAIR_DOES_NOT_EXIST);
         let liquidity_pair = smart_table::borrow(& liquidity_pair_smartTable.liquidity_pairs, metadata);
         assert!(!liquidity_pair.is_frozen, EFA_FROZEN); // If the pair is enabled, then FA is frozen. Vice versa applies.
-        debug::print(&liquidity_pair.is_frozen);
         fungible_asset::withdraw_with_ref(transfer_ref, store, amount)
     }
 
@@ -334,7 +332,8 @@ module resource_account::bonding_curve_launchpad {
             primary_fungible_store::create_primary_store(swapper_address, fa_metadata);
         };
         aptos_account::transfer(account, @resource_account, apt_given);
-        primary_fungible_store::transfer_with_ref(&fa_data.controller.transfer_ref, @resource_account, swapper_address, fa_gained);
+        //! primary_fungible_store::transfer_with_ref(&fa_data.controller.transfer_ref, @resource_account, swapper_address, fa_gained);
+        liquidity_pair::test_this(&fa_data.controller.transfer_ref, swapper_address, fa_gained);
         // Disable transfers from users.
         let old_fa_reserves = liquidity_pair.fa_reserves;
         let old_apt_reserves = liquidity_pair.apt_reserves;
@@ -360,10 +359,10 @@ module resource_account::bonding_curve_launchpad {
             // Offload onto permissionless DEX.
             router::create_pool_coin<AptosCoin>(fa_metadata, false);
             add_liquidity_coin_entry_transfer_ref<AptosCoin>(&fa_data.controller.transfer_ref, &resource_signer_holder::get_signer(), fa_metadata, false, ((apt_updated_reserves >> 1) as u64), ((fa_updated_reserves >> 1) as u64), 0, 0);
-            // // Send liquidity tokens to dead address
-            // let apt_coin_wrapped = coin_wrapper::get_wrapper<AptosCoin>();
-            // let liquidity_obj = liquidity_pool::liquidity_pool(apt_coin_wrapped, fa_metadata, false);
-            // liquidity_pool::transfer(&resource_signer_holder::get_signer(), liquidity_obj, @0xdead, primary_fungible_store::balance(@resource_account, liquidity_obj));
+            // Send liquidity tokens to dead address
+            let apt_coin_wrapped = coin_wrapper::get_wrapper<AptosCoin>();
+            let liquidity_obj = liquidity_pool::liquidity_pool(apt_coin_wrapped, fa_metadata, false);
+            liquidity_pool::transfer(&resource_signer_holder::get_signer(), liquidity_obj, @0xdead, primary_fungible_store::balance(@resource_account, liquidity_obj));
 
             event::emit(LiquidityPairGraduated {
                 fa_obj_address: get_fa_obj_address(fa_key.name, fa_key.symbol),
@@ -372,6 +371,7 @@ module resource_account::bonding_curve_launchpad {
             });
         }
     }
+
 
     //---------------------------DEX-helpers---------------------------
     fun add_liquidity_coin_entry_transfer_ref<CoinType>(
@@ -462,6 +462,36 @@ module resource_account::bonding_curve_launchpad {
 
         move_to(deployer, fa_smartTable);
         move_to(deployer, liquidity_pair_table);
+    }
+
+    //---------------------------View Tests---------------------------
+    #[test(deployer = @resource_account)]
+    #[expected_failure(abort_code = 393218, location=aptos_framework::object)]
+    public fun test_nonexistant_is_frozen(deployer: &signer) acquires LiquidityPairSmartTable {
+        initialize_for_test(deployer);
+        let name =  string::utf8(b"SheepyCoin");
+        let symbol = string::utf8(b"SHEEP");
+        get_is_frozen(name, symbol);
+    }
+    #[test(deployer = @resource_account)]
+    #[expected_failure(abort_code = 393218, location=aptos_framework::object)]
+    public fun test_nonexistant_get_metadata(deployer: &signer) {
+        initialize_for_test(deployer);
+        let name =  string::utf8(b"SheepyCoin");
+        let symbol = string::utf8(b"SHEEP");
+        get_metadata(name, symbol);
+    }
+    #[test(deployer = @resource_account)]
+    #[expected_failure(abort_code = ELIQUIDITY_PAIR_SWAP_AMOUNTOUT_INSIGNIFICANT)]
+    public fun test_insignificant_fa_swap(deployer: &signer) {
+        initialize_for_test(deployer);
+        get_amount_out(1_000_000_000, 1_000_000_000, true, 0);
+    }
+    #[test(deployer = @resource_account)]
+    #[expected_failure(abort_code = ELIQUIDITY_PAIR_SWAP_AMOUNTOUT_INSIGNIFICANT)]
+    public fun test_insignificant_apt_swap(deployer: &signer) {
+        initialize_for_test(deployer);
+        get_amount_out(1_000_000_000, 1_000_000_000, false, 0);
     }
 
 }
