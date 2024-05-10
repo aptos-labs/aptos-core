@@ -24,3 +24,12 @@ proposals:
           git_hash: ~
       - DefaultGasWithOverride:
           feature_version: 17
+  - name: step_3_enable_remove_error_deails
+    metadata:
+      title: "Multi-step proposal to enable remove_error_details"
+      description: "This turns on the feature flag to remove error details from hash calculation"
+    execution_mode: MultiStep
+    update_sequence:
+      - FeatureFlag:
+          enabled:
+            - remove_detailed_error_from_hash
