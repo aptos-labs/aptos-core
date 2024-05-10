@@ -4,7 +4,7 @@
 use crate::{
     access_path::AccessPath,
     state_store::{state_key::StateKey, table::TableHandle},
-    utility_coin::APTOS_COIN_TYPE,
+    utility_coin::SUPRA_COIN_TYPE,
     write_set::{WriteOp, WriteSet, WriteSetMut},
 };
 use move_core_types::{
@@ -65,7 +65,7 @@ impl MoveStructType for CoinInfoResource {
     const STRUCT_NAME: &'static IdentStr = ident_str!("CoinInfo");
 
     fn type_params() -> Vec<TypeTag> {
-        vec![APTOS_COIN_TYPE.clone()]
+        vec![SUPRA_COIN_TYPE.clone()]
     }
 }
 
