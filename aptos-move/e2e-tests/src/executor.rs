@@ -25,7 +25,6 @@ use aptos_gas_schedule::{
     LATEST_GAS_FEATURE_VERSION,
 };
 use aptos_keygen::KeyGen;
-use aptos_memory_usage_tracker::MemoryTrackedGasMeter;
 use aptos_types::{
     account_config::{
         new_block_event_key, AccountResource, CoinInfoResource, CoinStoreResource, NewBlockEvent,
@@ -57,7 +56,7 @@ use aptos_types::{
 use aptos_vm::{
     block_executor::{AptosTransactionOutput, BlockAptosVM},
     data_cache::AsMoveResolver,
-    gas::get_gas_parameters,
+    gas::{get_gas_parameters, make_prod_gas_meter},
     move_vm_ext::{AptosMoveResolver, MoveVmExt, SessionId},
     verifier, AptosVM, VMValidator,
 };
@@ -659,18 +658,11 @@ impl FakeExecutor {
             &resolver, /*override_is_delayed_field_optimization_capable=*/ None,
         );
 
-        let (_status, output, gas_profiler) = vm.execute_user_transaction_with_custom_gas_meter(
+        let (_status, output, gas_profiler) = vm.execute_user_transaction_with_modified_gas_meter(
             &resolver,
             &txn,
             &log_context,
-            |gas_feature_version, gas_params, storage_gas_params, balance| {
-                let gas_meter =
-                    MemoryTrackedGasMeter::new(StandardGasMeter::new(StandardGasAlgebra::new(
-                        gas_feature_version,
-                        gas_params,
-                        storage_gas_params,
-                        balance,
-                    )));
+            |gas_meter| {
                 let gas_profiler = match txn.payload() {
                     TransactionPayload::Script(_) => GasProfiler::new_script(gas_meter),
                     TransactionPayload::EntryFunction(entry_func) => GasProfiler::new_function(
@@ -686,7 +678,7 @@ impl FakeExecutor {
                         unreachable!("Module bundle payload has been removed")
                     },
                 };
-                Ok(gas_profiler)
+                gas_profiler
             },
         )?;
 
@@ -907,14 +899,13 @@ impl FakeExecutor {
 
             let (mut regular, mut unmetered) = match gas_meter_type {
                 GasMeterType::RegularGasMeter => (
-                    Some(MemoryTrackedGasMeter::new(StandardGasMeter::new(
-                        StandardGasAlgebra::new(
-                            LATEST_GAS_FEATURE_VERSION,
-                            gas_params.vm.clone(),
-                            storage_gas_params.clone(),
-                            1_000_000_000_000_000,
-                        ),
-                    ))),
+                    Some(make_prod_gas_meter(
+                        LATEST_GAS_FEATURE_VERSION,
+                        gas_params.vm.clone(),
+                        storage_gas_params.clone(),
+                        false,
+                        1_000_000_000_000_000.into(),
+                    )),
                     None,
                 ),
                 GasMeterType::UnmeteredGasMeter => (None, Some(UnmeteredGasMeter)),
@@ -1016,6 +1007,7 @@ impl FakeExecutor {
                         LATEST_GAS_FEATURE_VERSION,
                         InitialGasSchedule::initial(),
                         StorageGasParameters::latest(),
+                        false,
                         10000000000000,
                     ),
                     // coeff_buffer: BTreeMap::new(),
@@ -1134,13 +1126,13 @@ impl FakeExecutor {
         ) = get_gas_parameters(&features, state_view);
 
         let gas_params = gas_params_res.unwrap();
-        let mut gas_meter =
-            MemoryTrackedGasMeter::new(StandardGasMeter::new(StandardGasAlgebra::new(
-                gas_feature_version,
-                gas_params.clone().vm,
-                storage_gas_params.unwrap(),
-                10000000000000,
-            )));
+        let mut gas_meter = make_prod_gas_meter(
+            gas_feature_version,
+            gas_params.clone().vm,
+            storage_gas_params.unwrap(),
+            false,
+            10000000000000.into(),
+        );
 
         let timed_features = TimedFeaturesBuilder::enable_all()
             .with_override_profile(TimedFeatureOverride::Testing)
