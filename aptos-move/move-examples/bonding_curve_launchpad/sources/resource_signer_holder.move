@@ -3,8 +3,6 @@ module resource_account::resource_signer_holder {
 	use aptos_std::code;
     use aptos_framework::account;
     use aptos_framework::resource_account;
-	use aptos_framework::object::{Object};
-	use aptos_framework::fungible_asset::{Self, FungibleAsset};
 	use resource_account::bonding_curve_launchpad;
 	friend bonding_curve_launchpad;
 

@@ -119,7 +119,6 @@ module resource_account::test_bonding_curve_launchpad {
 
 
     #[test(aptos_framework = @0x1, bcl_owner_signer = @0x922a028b0dbd8ff206074977ae4c5f9fb003ce384242b6253c67192cd2a45ee1, resource_signer = @0x52ddc290f7be79b2583472217af88a8500bdcb16d865e9c2bf4d3c995df0825f, bonding_curve_creator = @0x803)]
-    #[expected_failure(major_status=4037, location=aptos_framework::dispatchable_fungible_asset)]
     fun test_graduation(aptos_framework: &signer, bcl_owner_signer: &signer, resource_signer: &signer, bonding_curve_creator: &signer){
         test_bonding_curve_creation(aptos_framework, bcl_owner_signer, resource_signer, bonding_curve_creator);
         let grad_apt: u64 = 6_000 * math64::pow(10, (8 as u64));
@@ -152,8 +151,7 @@ module resource_account::test_bonding_curve_launchpad {
     }
 
     #[test(aptos_framework = @0x1, bcl_owner_signer = @0x922a028b0dbd8ff206074977ae4c5f9fb003ce384242b6253c67192cd2a45ee1, resource_signer = @0x52ddc290f7be79b2583472217af88a8500bdcb16d865e9c2bf4d3c995df0825f, bonding_curve_creator = @0x803)]
-    // #[expected_failure(abort_code = 102, location = bonding_curve_launchpad)]
-    #[expected_failure(major_status=4037, location=aptos_framework::dispatchable_fungible_asset)]
+    #[expected_failure(abort_code = 102, location = bonding_curve_launchpad)]
     fun test_failing_swap_after_graduation(aptos_framework: &signer, bcl_owner_signer: &signer, resource_signer: &signer, bonding_curve_creator: &signer){
         test_graduation(aptos_framework, bcl_owner_signer, resource_signer, bonding_curve_creator);
         bonding_curve_launchpad::swap_apt_to_fa(bonding_curve_creator, string::utf8(b"SheepyCoin"), string::utf8(b"SHEEP"), 1_000_000); // Swap afer graduation, guaranteed to fail. APT -> FA

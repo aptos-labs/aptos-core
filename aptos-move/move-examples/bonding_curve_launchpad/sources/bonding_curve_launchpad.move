@@ -2,13 +2,14 @@ module resource_account::bonding_curve_launchpad {
     use std::string;
     use std::option;
     use std::vector;
+    use aptos_framework::coin;
     use aptos_framework::object::{Self};
     use aptos_framework::fungible_asset::{Self, FungibleAsset, Metadata};
     use aptos_framework::primary_fungible_store;
     use aptos_framework::event;
     use aptos_framework::aptos_coin::{AptosCoin};
     use aptos_framework::aptos_account;
-    use aptos_framework::function_info::{Self, FunctionInfo};
+    use aptos_framework::function_info;
     use aptos_framework::dispatchable_fungible_asset;
     use aptos_std::smart_table::{Self, SmartTable};
     use aptos_std::math128;
@@ -81,7 +82,6 @@ module resource_account::bonding_curve_launchpad {
     //---------------------------Structs---------------------------
     struct LaunchPad has key {
         key_to_fa_data: SmartTable<FAKey, FAData>,
-        permissioned_withdraw_info: FunctionInfo
     }
     struct FAKey has store, copy, drop {
         name: string::String,
@@ -109,14 +109,8 @@ module resource_account::bonding_curve_launchpad {
 
     //---------------------------Init---------------------------
     fun init_module(account: &signer) {
-       let permissioned_withdraw_info = function_info::new_function_info(
-            &resource_signer_holder::get_signer(),
-            string::utf8(b"bonding_curve_launchpad"),
-            string::utf8(b"withdraw")
-        );
         let fa_smartTable: LaunchPad = LaunchPad {
-            key_to_fa_data: smart_table::new(),
-            permissioned_withdraw_info: permissioned_withdraw_info
+            key_to_fa_data: smart_table::new()
         };
         let liquidity_pair_table: LiquidityPairSmartTable = LiquidityPairSmartTable {
             liquidity_pairs: smart_table::new()
@@ -132,23 +126,16 @@ module resource_account::bonding_curve_launchpad {
         amount: u64,
         transfer_ref: &fungible_asset::TransferRef
     ): FungibleAsset
+    acquires LiquidityPairSmartTable
     {
+        let metadata = fungible_asset::transfer_ref_metadata(transfer_ref);
+        let liquidity_pair_smartTable = borrow_global<LiquidityPairSmartTable>(@resource_account);
+        assert!(smart_table::contains(& liquidity_pair_smartTable.liquidity_pairs, metadata), ELIQUIDITY_PAIR_DOES_NOT_EXIST);
+        let liquidity_pair = smart_table::borrow(& liquidity_pair_smartTable.liquidity_pairs, metadata);
+        assert!(!liquidity_pair.is_frozen, EFA_FROZEN); // If the pair is enabled, then FA is frozen. Vice versa applies.
+        debug::print(&liquidity_pair.is_frozen);
         fungible_asset::withdraw_with_ref(transfer_ref, store, amount)
     }
-    // public fun withdraw<T: key>(
-    //     store: Object<T>,
-    //     amount: u64,
-    //     transfer_ref: &fungible_asset::TransferRef
-    // ): FungibleAsset
-    // // acquires LiquidityPairSmartTable
-    // {
-    //     // let metadata = fungible_asset::transfer_ref_metadata(transfer_ref);
-    //     // let liquidity_pair_smartTable = borrow_global<LiquidityPairSmartTable>(@resource_account);
-    //     // assert!(smart_table::contains(& liquidity_pair_smartTable.liquidity_pairs, metadata), ELIQUIDITY_PAIR_DOES_NOT_EXIST);
-    //     // let liquidity_pair = smart_table::borrow(& liquidity_pair_smartTable.liquidity_pairs, metadata);
-    //     // assert!(!liquidity_pair.is_frozen, EFA_FROZEN); // If the pair is enabled, then FA is frozen. Vice versa applies.
-    //     fungible_asset::withdraw_with_ref(transfer_ref, store, amount)
-    // }
 
     //---------------------------Bonding Curve Launchpad (BCL)---------------------------
     // * Creates new FA and store FA owner obj on launchpad.
@@ -216,14 +203,14 @@ module resource_account::bonding_curve_launchpad {
         let burn_ref = fungible_asset::generate_burn_ref(fa_obj_constructor_ref);
         let transfer_ref = fungible_asset::generate_transfer_ref(fa_obj_constructor_ref);
 
-        // let permissioned_withdraw = function_info::new_function_info(
-        //     &resource_signer_holder::get_signer(), // the function needs to be held at, here... so use public views and move withdraw to resource_signer_holder
-        //     string::utf8(b"bonding_curve_launchpad"),
-        //     string::utf8(b"withdraw")
-        // );
+        let permissioned_withdraw = function_info::new_function_info(
+            &resource_signer_holder::get_signer(), // the function needs to be held at, here... so use public views and move withdraw to resource_signer_holder
+            string::utf8(b"bonding_curve_launchpad"),
+            string::utf8(b"withdraw")
+        );
         dispatchable_fungible_asset::register_dispatch_functions(
             fa_obj_constructor_ref,
-            option::some(fa_smartTable.permissioned_withdraw_info),
+            option::some(permissioned_withdraw),
             option::none(),
             option::none(),
         );
@@ -366,14 +353,14 @@ module resource_account::bonding_curve_launchpad {
             swapper_address: swapper_address
         });
 
-        if(apt_updated_reserves > APT_LIQUIDITY_THRESHOLD){
+        if(apt_updated_reserves > APT_LIQUIDITY_THRESHOLD && liquidity_pair.is_enabled){
             // Disable BCL pair.
             liquidity_pair.is_enabled = false;
             liquidity_pair.is_frozen = false;
             // Offload onto permissionless DEX.
             router::create_pool_coin<AptosCoin>(fa_metadata, false);
-            router::add_liquidity_coin_entry<AptosCoin>(&resource_signer_holder::get_signer(), fa_metadata, false, ((apt_updated_reserves >> 1) as u64), ((fa_updated_reserves >> 1) as u64), 0, 0);
-            // Send liquidity tokens to dead address
+            add_liquidity_coin_entry_transfer_ref<AptosCoin>(&fa_data.controller.transfer_ref, &resource_signer_holder::get_signer(), fa_metadata, false, ((apt_updated_reserves >> 1) as u64), ((fa_updated_reserves >> 1) as u64), 0, 0);
+            // // Send liquidity tokens to dead address
             // let apt_coin_wrapped = coin_wrapper::get_wrapper<AptosCoin>();
             // let liquidity_obj = liquidity_pool::liquidity_pool(apt_coin_wrapped, fa_metadata, false);
             // liquidity_pool::transfer(&resource_signer_holder::get_signer(), liquidity_obj, @0xdead, primary_fungible_store::balance(@resource_account, liquidity_obj));
@@ -385,6 +372,33 @@ module resource_account::bonding_curve_launchpad {
             });
         }
     }
+
+    //---------------------------DEX-helpers---------------------------
+    fun add_liquidity_coin_entry_transfer_ref<CoinType>(
+        transfer_ref: &fungible_asset::TransferRef,
+        lp: &signer,
+        token_2: Object<Metadata>,
+        is_stable: bool,
+        amount_1_desired: u64,
+        amount_2_desired: u64,
+        amount_1_min: u64,
+        amount_2_min: u64,
+    ) {
+        let token_1 = coin_wrapper::get_wrapper<CoinType>();
+        let (optimal_amount_1, optimal_amount_2, _) = router::optimal_liquidity_amounts(
+            token_1,
+            token_2,
+            is_stable,
+            amount_1_desired,
+            amount_2_desired,
+            amount_1_min,
+            amount_2_min,
+        );
+        let optimal_1 = coin::withdraw<CoinType>(lp, optimal_amount_1);
+        let optimal_2 = primary_fungible_store::withdraw_with_ref(transfer_ref, signer::address_of(lp), optimal_amount_2);
+        router::add_liquidity_coin<CoinType>(lp, optimal_1, optimal_2, is_stable);
+    }
+
 
     //---------------------------Views---------------------------
     #[view]
@@ -439,15 +453,8 @@ module resource_account::bonding_curve_launchpad {
     //---------------------------Tests---------------------------
     #[test_only]
     public fun initialize_for_test(deployer: &signer){
-        let permissioned_withdraw_info = function_info::new_function_info(
-            deployer, // the function needs to be held at, here... so use public views and move withdraw to resource_signer_holder
-            string::utf8(b"bonding_curve_launchpad"),
-            string::utf8(b"withdraw")
-        );
-
         let fa_smartTable: LaunchPad = LaunchPad {
-            key_to_fa_data: smart_table::new(),
-            permissioned_withdraw_info: permissioned_withdraw_info
+            key_to_fa_data: smart_table::new()
         };
         let liquidity_pair_table: LiquidityPairSmartTable = LiquidityPairSmartTable {
             liquidity_pairs: smart_table::new()
