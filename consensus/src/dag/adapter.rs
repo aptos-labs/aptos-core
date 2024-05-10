@@ -201,7 +201,9 @@ impl OrderedNotifier for OrderedNotifierAdapter {
             }
         }
 
-        BLOCK_COUNTER.with_label_values(&[self.dag_id]).inc();
+        BLOCK_COUNTER
+            .with_label_values(&[&self.dag_id.to_string()])
+            .inc();
 
         let anchor = ordered_nodes.last().unwrap();
         let round = anchor.round();

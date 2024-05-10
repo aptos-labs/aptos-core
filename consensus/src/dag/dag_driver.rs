@@ -271,6 +271,10 @@ impl DagDriver {
             return;
         }
 
+        if new_round > 5 && new_round < 10 {
+            tokio::time::sleep(Duration::from_secs(30)).await;
+        }
+
         if new_round > 5 {
             if tokio::time::timeout(Duration::from_millis(300), prev_dag_rx.recv())
                 .await
@@ -287,8 +291,6 @@ impl DagDriver {
                 dag_id = self.dag_id,
                 "{}, attempting starting new round {}", self.dag_id, new_round
             );
-        } else {
-            tokio::time::sleep(Duration::from_secs(30));
         }
         defer!(
             if new_round > 5 {
