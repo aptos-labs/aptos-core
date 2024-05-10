@@ -1257,13 +1257,13 @@ impl<P: OnChainConfigProvider> EpochManager<P> {
     ) -> (aptos_channel::Sender<(HashValue, HashValue), BlockFetchRequest>, aptos_channel::Receiver<(HashValue, HashValue), BlockFetchResponse>) {
         let (block_fetch_request_tx, block_fetch_request_rx) = aptos_channel::new(
             QueueStyle::LIFO,
-            1000,
+            1,
             Some(&counters::BLOCK_FETCH_MANAGER_REQUEST_CHANNEL_MSGS),
         );
 
         let (block_fetch_response_tx, block_fetch_response_rx) = aptos_channel::new(
             QueueStyle::LIFO,
-            1000,
+            1,
             Some(&counters::BLOCK_FETCH_MANAGER_RESPONSE_CHANNEL_MSGS),
         );
         let block_fetch_manager = BlockFetchManager::new(network, max_blocks_per_request, block_fetch_response_tx);

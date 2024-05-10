@@ -4,7 +4,7 @@
 
 use crate::{
     block_storage::{
-        block_fetch_manager::{BlockFetchContext, BlockFetchRequest, BlockFetchResponse}, tracing::{observe_block, BlockStage}, BlockReader, BlockRetriever, BlockStore
+        block_fetch_manager::{BlockFetchContext, BlockFetchRequest, BlockFetchResponse}, block_retriever::{BlockRetriever, RetrieverMode}, tracing::{observe_block, BlockStage}, BlockReader, BlockStore
     }, counters::{self, PROPOSED_VTXN_BYTES, PROPOSED_VTXN_COUNT}, error::{error_kind, VerifyError}, liveness::{
         proposal_generator::ProposalGenerator,
         proposer_election::ProposerElection,
@@ -207,7 +207,7 @@ pub struct RoundManager {
     // Caching recently processed votes and proposals to avoid processing them twice.
     processed_vote_cache: LruCache<(Author, HashValue, HashValue), ()>,
     processed_proposal_cache: LruCache<HashValue, ()>,
-    block_fetch_request_tx: aptos_channel::Sender<(HashValue, HashValue), BlockFetchRequest>,
+    block_fetch_request_tx: Arc<aptos_channel::Sender<(HashValue, HashValue), BlockFetchRequest>>,
     // These are proposals and votes that failed sync_up and are parked to be re-executed
     failed_messages: VecDeque<VerifiedEvent>,
 }
@@ -259,7 +259,7 @@ impl RoundManager {
             fast_rand_config,
             processed_vote_cache: LruCache::new(2000),
             processed_proposal_cache: LruCache::new(50),
-            block_fetch_request_tx,
+            block_fetch_request_tx: Arc::new(block_fetch_request_tx),
             failed_messages: VecDeque::new(),
         }
     }
@@ -275,9 +275,8 @@ impl RoundManager {
                 .collect(),
             self.local_config
                 .max_blocks_per_sending_request(self.onchain_config.quorum_store_enabled()),
-            extra_block_store,
-            fetch_context,
-            self.block_fetch_request_tx.clone(),
+            RetrieverMode::Asynchronous,
+            Some(self.block_fetch_request_tx.clone()),
         )
     }
 
@@ -990,7 +989,7 @@ impl RoundManager {
     /// If a new QC / TC is formed then
     /// 1) fetch missing dependencies if required, and then
     /// 2) call process_certificates(), which will start a new round in return.
-    async fn process_vote(&mut self, vote: &Vote) -> anyhow::Result<()> {
+    async fn process_vote(&mut self, vote: &Vote) -> anyhow::Result<SyncResult> {
         let round = vote.vote_data().proposed().round();
 
         debug!(
@@ -1036,7 +1035,7 @@ impl RoundManager {
         &mut self,
         vote: &Vote,
         result: VoteReceptionResult,
-    ) -> anyhow::Result<()> {
+    ) -> anyhow::Result<SyncResult> {
         let round = vote.vote_data().proposed().round();
         match result {
             VoteReceptionResult::NewQuorumCertificate(qc) => {
@@ -1049,15 +1048,15 @@ impl RoundManager {
                 self.new_qc_aggregated(qc, vote.author(), HashMap::new()).await
             },
             VoteReceptionResult::New2ChainTimeoutCertificate(tc) => {
-                self.new_2chain_tc_aggregated(tc).await
+                self.new_2chain_tc_aggregated(tc).await.map(|_| SyncResult::Success)
             },
             VoteReceptionResult::EchoTimeout(_) if !self.round_state.is_vote_timeout() => {
-                self.process_local_timeout(round).await
+                self.process_local_timeout(round).await.map(|_| SyncResult::Success)
             },
             VoteReceptionResult::VoteAdded(_)
             | VoteReceptionResult::VoteAddedQCDelayed(_)
             | VoteReceptionResult::EchoTimeout(_)
-            | VoteReceptionResult::DuplicateVote => Ok(()),
+            | VoteReceptionResult::DuplicateVote => Ok(SyncResult::Success),
             e => Err(anyhow::anyhow!("{:?}", e)),
         }
     }
@@ -1071,7 +1070,7 @@ impl RoundManager {
         match self
             .block_store
             .insert_quorum_cert(&qc, &mut self.create_block_retriever(
-                                                    preferred_peer, 
+                                                    preferred_peer,
                                                     extra_block_store, 
                                                     BlockFetchContext::InsertQuorumCert(qc.lone(), preferred_peer.clone())
                                                 )
@@ -1102,18 +1101,24 @@ impl RoundManager {
         result
     }
 
-    async fn process_block_fetch_response(&mut self, block_fetch_response: BlockFetchResponse) -> anyhow::Result<()> {
-        match block_fetch_response.context() {
-            BlockFetchContext::InsertQuorumCert(qc, preferred_peer) => {
-                self.new_qc_aggregated(Arc::new(*qc), *preferred_peer, block_fetch_response.blocks()).await
-            },
-            BlockFetchContext::ProcessRegular(sync_info, peer) => {
-                self.sync_up(sync_info, peer).await
-            },
-            _ => {
-                bail!("Unexpected FetchBlocksContext::Recovery in round manager");
-            },
+    async fn process_block_fetch_response(&mut self, block_fetch_response: BlockFetchResponse) -> anyhow::Result<SyncResult> {
+        let mut blocks: Vec<Arc<Block>> = block_fetch_response.blocks().values().collect();
+        blocks.sort_by(|a, b| (a.epoch(), a.round()).cmp(&(b.epoch(), b.round())));
+        for block in blocks {
+            self.new_qc_aggregated(qc, preferred_peer, extra_block_store)
         }
+        Ok(SyncResult::Success)
+        // match block_fetch_response.context() {
+        //     BlockFetchContext::InsertQuorumCert(qc, preferred_peer) => {
+        //         self.new_qc_aggregated(Arc::new(*qc), *preferred_peer, block_fetch_response.blocks()).await
+        //     },
+        //     BlockFetchContext::ProcessRegular(sync_info, peer) => {
+        //         self.sync_up(sync_info, peer).await
+        //     },
+        //     _ => {
+        //         bail!("Unexpected FetchBlocksContext::Recovery in round manager");
+        //     },
+        // }
     }
 
     /// Process the previously failed messages in the `failed_messages` queue.

@@ -17,8 +17,7 @@ use anyhow::{bail, Context};
 use aptos_consensus_types::{
     block::Block,
     block_retrieval::{
-        BlockRetrievalRequest, BlockRetrievalResponse, BlockRetrievalStatus, NUM_PEERS_PER_RETRY,
-        NUM_RETRIES, RETRY_INTERVAL_MSEC, RPC_TIMEOUT_MSEC,
+        BlockRetrievalRequest, BlockRetrievalResponse, BlockRetrievalStatus,
     },
     common::Author,
     quorum_cert::QuorumCert,
@@ -193,7 +192,7 @@ impl BlockStore {
         if !self.need_sync_for_ledger_info(highest_commit_cert.ledger_info()) {
             return Ok(SyncResult::Success);
         }
-        let (root, root_metadata, blocks, quorum_certs) = Self::fast_forward_sync(
+        match Self::fast_forward_sync(
             &highest_ordered_cert,
             &highest_commit_cert,
             retriever,
@@ -201,28 +200,32 @@ impl BlockStore {
             self.execution_client.clone(),
             self.payload_manager.clone(),
         )
-        .await?
-        .take();
-        info!(
-            LogSchema::new(LogEvent::CommitViaSync).round(self.ordered_root().round()),
-            committed_round = root.0.round(),
-            block_id = root.0.id(),
-        );
-        self.rebuild(root, root_metadata, blocks, quorum_certs)
-            .await;
-
-        if highest_commit_cert.ledger_info().ledger_info().ends_epoch() {
-            retriever
-                .network()
-                .send_epoch_change(EpochChangeProof::new(
-                    // Question: If highest_commit_cert has ends_epoch() == true, why are we sending
-                    // highest_ordered_cert instead of highest_commit_cert?
-                    vec![highest_ordered_cert.ledger_info().clone()],
-                    /* more = */ false,
-                ))
-                .await;
+        .await? {
+            Some(recovery_data) => {
+                let (root, root_metadata, blocks, quorum_certs) = recovery_data.take();
+                info!(
+                    LogSchema::new(LogEvent::CommitViaSync).round(self.ordered_root().round()),
+                    committed_round = root.0.round(),
+                    block_id = root.0.id(),
+                );
+                self.rebuild(root, root_metadata, blocks, quorum_certs)
+                    .await;
+        
+                if highest_commit_cert.ledger_info().ledger_info().ends_epoch() {
+                    retriever
+                        .network()
+                        .send_epoch_change(EpochChangeProof::new(
+                            // Question: If highest_commit_cert has ends_epoch() == true, why are we sending
+                            // highest_ordered_cert instead of highest_commit_cert?
+                            vec![highest_ordered_cert.ledger_info().clone()],
+                            /* more = */ false,
+                        ))
+                        .await;
+                }
+                Ok(SyncResult::Success)
+            }
+            None => Ok(SyncResult::Fetching)
         }
-        Ok(())
     }
 
     pub async fn fast_forward_sync<'a>(
@@ -232,7 +235,7 @@ impl BlockStore {
         storage: Arc<dyn PersistentLivenessStorage>,
         execution_client: Arc<dyn TExecutionClient>,
         payload_manager: Arc<PayloadManager>,
-    ) -> anyhow::Result<RecoveryData> {
+    ) -> anyhow::Result<Option<RecoveryData>> {
         info!(
             LogSchema::new(LogEvent::StateSync).remote_peer(retriever.preferred_peer()),
             "Start state sync to commit cert: {}, ordered cert: {}",
@@ -248,113 +251,115 @@ impl BlockStore {
         // although unlikely, we might wrap num_blocks around on a 32-bit machine
         assert!(num_blocks < std::usize::MAX as u64);
 
-        let mut blocks = retriever
+        if let RetrieverResult::Blocks(mut blocks) = retriever
             .retrieve_block_for_qc(
                 highest_ordered_cert,
                 num_blocks,
                 highest_commit_cert.commit_info().id(),
             )
-            .await?;
-
-        assert_eq!(
-            blocks.first().expect("blocks are empty").id(),
-            highest_ordered_cert.certified_block().id(),
-            "Expecting in the retrieval response, first block should be {}, but got {}",
-            highest_ordered_cert.certified_block().id(),
-            blocks.first().expect("blocks are empty").id(),
-        );
-
-        // Confirm retrieval ended when it hit the last block we care about, even if it didn't reach all num_blocks blocks.
-        assert_eq!(
-            blocks.last().expect("blocks are empty").id(),
-            highest_commit_cert.commit_info().id()
-        );
-
-        let mut quorum_certs = vec![highest_ordered_cert.clone()];
-        quorum_certs.extend(
-            blocks
-                .iter()
-                .take(blocks.len() - 1)
-                .map(|block| block.quorum_cert().clone()),
-        );
-
-        // check if highest_commit_cert comes from a fork
-        // if so, we need to fetch it's block as well, to have a proof of commit.
-        if !blocks
-            .iter()
-            .any(|block| block.id() == highest_commit_cert.certified_block().id())
-        {
-            info!(
-                "Found forked QC {}, fetching it as well",
-                highest_commit_cert
+            .await? {
+            assert_eq!(
+                blocks.first().expect("blocks are empty").id(),
+                highest_ordered_cert.certified_block().id(),
+                "Expecting in the retrieval response, first block should be {}, but got {}",
+                highest_ordered_cert.certified_block().id(),
+                blocks.first().expect("blocks are empty").id(),
             );
-            let mut additional_blocks = retriever
-                .retrieve_block_for_qc(
-                    highest_commit_cert,
-                    1,
+
+            // Confirm retrieval ended when it hit the last block we care about, even if it didn't reach all num_blocks blocks.
+            assert_eq!(
+                blocks.last().expect("blocks are empty").id(),
+                highest_commit_cert.commit_info().id()
+            );
+
+            let mut quorum_certs = vec![highest_ordered_cert.clone()];
+            quorum_certs.extend(
+                blocks
+                    .iter()
+                    .take(blocks.len() - 1)
+                    .map(|block| block.quorum_cert().clone()),
+            );
+
+            // check if highest_commit_cert comes from a fork
+            // if so, we need to fetch it's block as well, to have a proof of commit.
+            if !blocks
+                .iter()
+                .any(|block| block.id() == highest_commit_cert.certified_block().id())
+            {
+                info!(
+                    "Found forked QC {}, fetching it as well",
+                    highest_commit_cert
+                );
+                let mut additional_blocks = retriever
+                    .retrieve_block_for_qc(
+                        highest_commit_cert,
+                        1,
+                        highest_commit_cert.certified_block().id(),
+                    )
+                    .await?;
+
+                assert_eq!(additional_blocks.len(), 1);
+                let block = additional_blocks.pop().expect("blocks are empty");
+                assert_eq!(
+                    block.id(),
                     highest_commit_cert.certified_block().id(),
-                )
+                    "Expecting in the retrieval response, for commit certificate fork, first block should be {}, but got {}",
+                    highest_commit_cert.certified_block().id(),
+                    block.id(),
+                );
+
+                blocks.push(block);
+                quorum_certs.push(highest_commit_cert.clone());
+            }
+
+            assert_eq!(blocks.len(), quorum_certs.len());
+            for (i, block) in blocks.iter().enumerate() {
+                assert_eq!(block.id(), quorum_certs[i].certified_block().id());
+                if let Some(payload) = block.payload() {
+                    payload_manager.prefetch_payload_data(payload, block.timestamp_usecs());
+                }
+            }
+
+            // Check early that recovery will succeed, and return before corrupting our state in case it will not.
+            LedgerRecoveryData::new(highest_commit_cert.ledger_info().clone())
+                .find_root(&mut blocks.clone(), &mut quorum_certs.clone())
+                .with_context(|| {
+                    // for better readability
+                    quorum_certs.sort_by_key(|qc| qc.certified_block().round());
+                    format!(
+                        "\nRoot: {:?}\nBlocks in db: {}\nQuorum Certs in db: {}\n",
+                        highest_commit_cert.commit_info(),
+                        blocks
+                            .iter()
+                            .map(|b| format!("\n\t{}", b))
+                            .collect::<Vec<String>>()
+                            .concat(),
+                        quorum_certs
+                            .iter()
+                            .map(|qc| format!("\n\t{}", qc))
+                            .collect::<Vec<String>>()
+                            .concat(),
+                    )
+                })?;
+
+            storage.save_tree(blocks.clone(), quorum_certs.clone())?;
+
+            execution_client
+                .sync_to(highest_commit_cert.ledger_info().clone())
                 .await?;
 
-            assert_eq!(additional_blocks.len(), 1);
-            let block = additional_blocks.pop().expect("blocks are empty");
-            assert_eq!(
-                block.id(),
-                highest_commit_cert.certified_block().id(),
-                "Expecting in the retrieval response, for commit certificate fork, first block should be {}, but got {}",
-                highest_commit_cert.certified_block().id(),
-                block.id(),
-            );
+            // we do not need to update block_tree.highest_commit_decision_ledger_info here
+            // because the block_tree is going to rebuild itself.
 
-            blocks.push(block);
-            quorum_certs.push(highest_commit_cert.clone());
+            let recovery_data: RecoveryData = match storage.start() {
+                LivenessStorageData::FullRecoveryData(recovery_data) => recovery_data,
+                _ => panic!("Failed to construct recovery data after fast forward sync"),
+            };
+
+            Ok(Some(recovery_data))
+        } else {
+            Ok(None)
         }
-
-        assert_eq!(blocks.len(), quorum_certs.len());
-        for (i, block) in blocks.iter().enumerate() {
-            assert_eq!(block.id(), quorum_certs[i].certified_block().id());
-            if let Some(payload) = block.payload() {
-                payload_manager.prefetch_payload_data(payload, block.timestamp_usecs());
-            }
-        }
-
-        // Check early that recovery will succeed, and return before corrupting our state in case it will not.
-        LedgerRecoveryData::new(highest_commit_cert.ledger_info().clone())
-            .find_root(&mut blocks.clone(), &mut quorum_certs.clone())
-            .with_context(|| {
-                // for better readability
-                quorum_certs.sort_by_key(|qc| qc.certified_block().round());
-                format!(
-                    "\nRoot: {:?}\nBlocks in db: {}\nQuorum Certs in db: {}\n",
-                    highest_commit_cert.commit_info(),
-                    blocks
-                        .iter()
-                        .map(|b| format!("\n\t{}", b))
-                        .collect::<Vec<String>>()
-                        .concat(),
-                    quorum_certs
-                        .iter()
-                        .map(|qc| format!("\n\t{}", qc))
-                        .collect::<Vec<String>>()
-                        .concat(),
-                )
-            })?;
-
-        storage.save_tree(blocks.clone(), quorum_certs.clone())?;
-
-        execution_client
-            .sync_to(highest_commit_cert.ledger_info().clone())
-            .await?;
-
-        // we do not need to update block_tree.highest_commit_decision_ledger_info here
-        // because the block_tree is going to rebuild itself.
-
-        let recovery_data = match storage.start() {
-            LivenessStorageData::FullRecoveryData(recovery_data) => recovery_data,
-            _ => panic!("Failed to construct recovery data after fast forward sync"),
-        };
-
-        Ok(recovery_data)
     }
 
     /// Fast forward in the decoupled-execution pipeline if the block exists there

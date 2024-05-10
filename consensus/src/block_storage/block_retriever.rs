@@ -4,16 +4,11 @@
 
 use crate::{
     block_storage::{block_fetch_manager::{BlockFetchContext, BlockFetchRequest}, BlockReader, BlockStore},
-    epoch_manager::LivenessStorageData,
     logging::{LogEvent, LogSchema},
     monitor,
-    network::{IncomingBlockRetrievalRequest, NetworkSender},
-    network_interface::ConsensusMsg,
-    payload_manager::PayloadManager,
-    persistent_liveness_storage::{LedgerRecoveryData, PersistentLivenessStorage, RecoveryData},
-    pipeline::execution_client::TExecutionClient, round_manager::SyncResult,
+    network::NetworkSender,
 };
-use anyhow::{bail, Context};
+use anyhow::bail;
 use aptos_consensus_types::{
     block::Block,
     block_retrieval::{
@@ -26,11 +21,7 @@ use aptos_consensus_types::{
 };
 use aptos_crypto::HashValue;
 use aptos_logger::prelude::*;
-use aptos_types::{
-    account_address::AccountAddress, epoch_change::EpochChangeProof,
-    ledger_info::LedgerInfoWithSignatures,
-};
-use fail::fail_point;
+use aptos_types::account_address::AccountAddress;
 use futures::{stream::FuturesUnordered, StreamExt};
 use rand::{prelude::*, Rng};
 use std::{clone::Clone, cmp::min, sync::Arc, time::Duration};
@@ -61,8 +52,8 @@ pub struct BlockRetriever {
     preferred_peer: Author,
     validator_addresses: Vec<AccountAddress>,
     max_blocks_to_request: u64,
-    retrieval_mode: RetrievalMode,
-    block_fetch_request_tx: Sender<(HashValue, HashValue), BlockFetchRequest>,
+    retriever_mode: RetrieverMode,
+    block_fetch_request_tx: Option<Arc<Sender<(HashValue, HashValue), BlockFetchRequest>>>,
 }
 
 impl BlockRetriever {
@@ -71,14 +62,16 @@ impl BlockRetriever {
         preferred_peer: Author,
         validator_addresses: Vec<AccountAddress>,
         max_blocks_to_request: u64,
-        retrieval_mode: RetrievalMode,
+        retriever_mode: RetrieverMode,
+        block_fetch_request_tx: Option<Arc<Sender<(HashValue, HashValue), BlockFetchRequest>>>,
     ) -> Self {
         Self {
             network,
             preferred_peer,
             validator_addresses,
             max_blocks_to_request,
-            retrieval_mode,
+            retriever_mode,
+            block_fetch_request_tx,
         }
     }
 
@@ -97,8 +90,8 @@ impl BlockRetriever {
         num_blocks: u64,
         target_block_id: HashValue,
     ) -> anyhow::Result<RetrieverResult> {
-        if self.retrieval_mode == RetrievalMode::Synchronous {
-            let peers = qc.ledger_info().get_voters(&self.validator_addresses);
+        let peers = qc.ledger_info().get_voters(&self.validator_addresses);
+        if self.retriever_mode == RetrieverMode::Synchronous {
             retrieve_block_for_id(
                 self.network.clone(),
                 qc.certified_block().id(),
@@ -112,6 +105,18 @@ impl BlockRetriever {
             .map(|blocks| RetrieverResult::Blocks(blocks))
         } else {
             // TODO: Send the request to the block fetch manager
+            self.block_fetch_request_tx
+                .expect("block_fetch_request_tx cannot be None when retriever mode is set to Asynchronous")
+                .push((qc.certified_block().id(), target_block_id), 
+                    BlockFetchRequest::new(
+                        qc.certified_block().id(), 
+                        target_block_id, 
+                        self.preferred_peer, 
+                        peers,
+                        num_blocks,
+                        context
+                    )
+                );
             Ok(RetrieverResult::Fetching)
         }
     }

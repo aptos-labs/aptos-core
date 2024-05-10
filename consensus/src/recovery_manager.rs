@@ -2,7 +2,7 @@
 // SPDX-License-Identifier: Apache-2.0
 
 use crate::{
-    block_storage::{block_retriever::{BlockRetriever, RetrieverMode}, BlockRetriever, BlockStore},
+    block_storage::{block_retriever::{BlockRetriever, RetrieverMode}, BlockStore},
     counters,
     error::error_kind,
     monitor,
@@ -97,6 +97,7 @@ impl RecoveryManager {
                 .collect(),
             self.max_blocks_to_request,
             RetrieverMode::Synchronous,
+            None,
         );
         let recovery_data = BlockStore::fast_forward_sync(
             sync_info.highest_ordered_cert(),

@@ -21,7 +21,6 @@ use lru::LruCache;
 
 #[derive(Debug, PartialEq, Eq, Clone)]
 pub enum BlockFetchContext {
-    ProcessRecovery(SyncInfo, Author),
     ProcessRegular(SyncInfo, Author),
     InsertQuorumCert(QuorumCert, Author),
 }
@@ -34,6 +33,26 @@ pub struct BlockFetchRequest {
     peers: Vec<AccountAddress>,
     num_blocks: u64,
     context: BlockFetchContext,
+}
+
+impl BlockFetchRequest {
+    pub fn new(
+        initial_block_id: HashValue,
+        target_block_id: HashValue,
+        preferred_peer: AccountAddress,
+        peers: Vec<AccountAddress>,
+        num_blocks: u64,
+        context: BlockFetchContext,
+    ) -> Self {
+        BlockFetchRequest {
+            initial_block_id,
+            target_block_id,
+            preferred_peer,
+            peers,
+            num_blocks,
+            context,
+        }
+    }
 }
 
 #[derive(Debug)]

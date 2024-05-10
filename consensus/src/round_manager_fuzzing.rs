@@ -199,6 +199,7 @@ fn create_node_for_fuzzing() -> RoundManager {
     let proposer_election = Arc::new(RotatingProposer::new(vec![signer.author()], 1));
 
     let (round_manager_tx, _) = aptos_channel::new(QueueStyle::LIFO, 1, None);
+    let (block_fetch_request_tx, _) = aptos_channel::new(QueueStyle::LIFO, 1, None);
 
     // event processor
     RoundManager::new(
@@ -219,6 +220,7 @@ fn create_node_for_fuzzing() -> RoundManager {
         OnChainRandomnessConfig::default_enabled(),
         OnChainJWKConsensusConfig::default_enabled(),
         None,
+        block_fetch_request_tx,
     )
 }
 

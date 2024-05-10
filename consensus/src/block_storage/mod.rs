@@ -7,7 +7,8 @@ use aptos_consensus_types::{
     timeout_2chain::TwoChainTimeoutCertificate,
 };
 use aptos_crypto::HashValue;
-pub use block_store::{block_retriever::BlockRetriever, BlockStore};
+pub use block_store::BlockStore;
+use block_retriever::BlockRetriever;
 use std::{sync::Arc, time::Duration};
 
 mod block_store;
