@@ -117,6 +117,8 @@ pub enum FeatureFlag {
     NewAccountsDefaultToFaAptStore,
     OperationsDefaultToFaAptStore,
     AggregatorV2IsAtLeastApi,
+    ConcurrentFungibleBalance,
+    MigrateToConcurrentFungibleBalance,
 }
 
 fn generate_features_blob(writer: &CodeWriter, data: &[u64]) {
@@ -304,6 +306,10 @@ impl From<FeatureFlag> for AptosFeatureFlag {
             FeatureFlag::AggregatorV2IsAtLeastApi => {
                 AptosFeatureFlag::AGGREGATOR_V2_IS_AT_LEAST_API
             },
+            FeatureFlag::ConcurrentFungibleBalance => AptosFeatureFlag::CONCURRENT_FUNGIBLE_BALANCE,
+            FeatureFlag::MigrateToConcurrentFungibleBalance => {
+                AptosFeatureFlag::MIGRATE_TO_CONCURRENT_FUNGIBLE_BALANCE
+            },
         }
     }
 }
@@ -419,6 +425,10 @@ impl From<AptosFeatureFlag> for FeatureFlag {
             },
             AptosFeatureFlag::AGGREGATOR_V2_IS_AT_LEAST_API => {
                 FeatureFlag::AggregatorV2IsAtLeastApi
+            },
+            AptosFeatureFlag::CONCURRENT_FUNGIBLE_BALANCE => FeatureFlag::ConcurrentFungibleBalance,
+            AptosFeatureFlag::MIGRATE_TO_CONCURRENT_FUNGIBLE_BALANCE => {
+                FeatureFlag::MigrateToConcurrentFungibleBalance
             },
         }
     }
