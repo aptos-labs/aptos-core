@@ -22,9 +22,9 @@ pub struct DagPayloadConfig {
 impl Default for DagPayloadConfig {
     fn default() -> Self {
         Self {
-            max_sending_txns_per_round: 70_000,
+            max_sending_txns_per_round: 50_000,
             max_sending_size_per_round_bytes: 300 * 1024 * 1024,
-            max_receiving_txns_per_round: 71_000,
+            max_receiving_txns_per_round: 51_000,
             max_receiving_size_per_round_bytes: 310 * 1024 * 1024,
 
             payload_pull_max_poll_time_ms: 50,
