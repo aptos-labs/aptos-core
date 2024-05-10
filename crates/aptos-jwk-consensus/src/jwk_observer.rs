@@ -2,54 +2,16 @@
 // SPDX-License-Identifier: Apache-2.0
 
 use crate::counters::OBSERVATION_SECONDS;
-use anyhow::Result;
+use anyhow::{anyhow, Result};
 use aptos_channels::aptos_channel;
 use aptos_logger::{debug, info};
-use aptos_types::jwks::{jwk::JWK, Issuer};
+use aptos_types::jwks::{Issuer, jwk::JWK};
 use futures::{FutureExt, StreamExt};
 use move_core_types::account_address::AccountAddress;
 use serde::{Deserialize, Serialize};
 use std::time::{Duration, Instant};
 use tokio::{sync::oneshot, task::JoinHandle, time::MissedTickBehavior};
-
-#[derive(Serialize, Deserialize)]
-struct OpenIDConfiguration {
-    issuer: String,
-    jwks_uri: String,
-}
-
-#[derive(Serialize, Deserialize)]
-struct JWKsResponse {
-    keys: Vec<serde_json::Value>,
-}
-
-/// Given an Open ID configuration URL, fetch its JWKs.
-pub async fn fetch_jwks(my_addr: AccountAddress, config_url: Vec<u8>) -> Result<Vec<JWK>> {
-    if cfg!(feature = "smoke-test") {
-        use reqwest::header;
-        let maybe_url = String::from_utf8(config_url);
-        let jwk_url = maybe_url?;
-        let client = reqwest::Client::new();
-        let JWKsResponse { keys } = client
-            .get(jwk_url.as_str())
-            .header(header::COOKIE, my_addr.to_hex())
-            .send()
-            .await?
-            .json()
-            .await?;
-        let jwks = keys.into_iter().map(JWK::from).collect();
-        Ok(jwks)
-    } else {
-        let maybe_url = String::from_utf8(config_url);
-        let config_url = maybe_url?;
-        let client = reqwest::Client::new();
-        let OpenIDConfiguration { jwks_uri, .. } =
-            client.get(config_url.as_str()).send().await?.json().await?;
-        let JWKsResponse { keys } = client.get(jwks_uri.as_str()).send().await?.json().await?;
-        let jwks = keys.into_iter().map(JWK::from).collect();
-        Ok(jwks)
-    }
-}
+use aptos_jwk_utils::{fetch_jwks_from_jwks_uri, fetch_jwks_uri_from_openid_config};
 
 /// A process thread that periodically fetch JWKs of a provider and push it back to JWKManager.
 pub struct JWKObserver {
@@ -90,29 +52,35 @@ impl JWKObserver {
     async fn start(
         fetch_interval: Duration,
         my_addr: AccountAddress,
-        issuer: Issuer,
+        issuer_bytes: Issuer,
         open_id_config_url: Vec<u8>,
         observation_tx: aptos_channel::Sender<(), (Issuer, Vec<JWK>)>,
         close_rx: oneshot::Receiver<()>,
     ) {
-        let issuer_str =
-            String::from_utf8(issuer.clone()).unwrap_or_else(|_e| "UNKNOWN_ISSUER".to_string());
+        let issuer =
+            String::from_utf8(issuer_bytes.clone()).unwrap_or_else(|_e| "UNKNOWN_ISSUER".to_string());
         let mut interval = tokio::time::interval(fetch_interval);
         interval.set_missed_tick_behavior(MissedTickBehavior::Delay);
         let mut close_rx = close_rx.into_stream();
+        let my_addr = if cfg!(feature = "smoke-test") {
+            Some(my_addr)
+        } else {
+            None
+        };
+
         loop {
             tokio::select! {
                 _ = interval.tick().fuse() => {
                     let timer = Instant::now();
-                    let result = fetch_jwks(my_addr, open_id_config_url.clone()).await;
+                    let result = fetch_jwks(issuer.as_str(), my_addr).await;
+                    debug!(issuer = issuer, "observe_result={:?}", result);
                     let secs = timer.elapsed().as_secs_f64();
-                    debug!(issuer = issuer_str, "observe_result={:?}", result);
                     if let Ok(mut jwks) = result {
-                        OBSERVATION_SECONDS.with_label_values(&[&issuer_str, "ok"]).observe(secs);
+                        OBSERVATION_SECONDS.with_label_values(&[&issuer, "ok"]).observe(secs);
                         jwks.sort();
-                        let _ = observation_tx.push((), (issuer.clone(), jwks));
+                        let _ = observation_tx.push((), (issuer_bytes.clone(), jwks));
                     } else {
-                        OBSERVATION_SECONDS.with_label_values(&[&issuer_str, "err"]).observe(secs);
+                        OBSERVATION_SECONDS.with_label_values(&[&issuer, "err"]).observe(secs);
                     }
                 },
                 _ = close_rx.select_next_some() => {
@@ -132,16 +100,8 @@ impl JWKObserver {
     }
 }
 
-#[ignore]
-#[tokio::test]
-async fn test_fetch_real_jwks() {
-    let jwks = fetch_jwks(
-        AccountAddress::ZERO,
-        "https://www.facebook.com/.well-known/openid-configuration/"
-            .as_bytes()
-            .to_vec(),
-    )
-    .await
-    .unwrap();
-    println!("{:?}", jwks);
+async fn fetch_jwks(open_id_config_url: &str, my_addr: Option<AccountAddress>) -> Result<Vec<JWK>> {
+    let jwks_uri = fetch_jwks_uri_from_openid_config(open_id_config_url).await.map_err(|e|anyhow!("fetch_jwks failed with open-id config request: {e}"))?;
+    let jwks = fetch_jwks_from_jwks_uri(my_addr, jwks_uri.as_str()).await.map_err(|e|anyhow!("fetch_jwks failed with jwks uri request: {e}"))?;
+    Ok(jwks)
 }

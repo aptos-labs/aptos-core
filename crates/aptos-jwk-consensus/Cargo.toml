@@ -23,6 +23,7 @@ aptos-crypto = { workspace = true }
 aptos-enum-conversion-derive = { workspace = true }
 aptos-event-notifications = { workspace = true }
 aptos-infallible = { workspace = true }
+aptos-jwk-utils = { workspace = true }
 aptos-logger = { workspace = true }
 aptos-metrics-core = { workspace = true }
 aptos-network = { workspace = true }

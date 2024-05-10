@@ -5,7 +5,7 @@ use crate::{
     jwks::{
         dummy_provider::{
             request_handler::{EquivocatingServer, StaticContentServer},
-            DummyProvider,
+            DummyHttpServer,
         },
         get_patched_jwks, update_jwk_consensus_config,
     },
@@ -58,25 +58,34 @@ async fn jwk_consensus_per_issuer() {
     assert!(patched_jwks.jwks.entries.len() == 1);
 
     info!("Adding some providers, one seriously equivocating, the other well behaving.");
-    let (provider_alice, provider_bob) =
-        tokio::join!(DummyProvider::spawn(), DummyProvider::spawn());
-    provider_alice.update_request_handler(Some(Arc::new(EquivocatingServer::new(
+    let (alice_config_server, alice_jwks_server, bob_config_server, bob_jwks_server) =
+        tokio::join!(DummyHttpServer::spawn(), DummyHttpServer::spawn(), DummyHttpServer::spawn(), DummyHttpServer::spawn());
+    let alice_issuer_id = "https://alice.io";
+    let bob_issuer_id = "https://bob.dev";
+    alice_config_server.update_request_handler(Some(Arc::new(StaticContentServer::new_str(
+        format!(r#"{{"issuer": "{}", "jwks_uri": "{}"}}"#, alice_issuer_id, alice_jwks_server.url()).as_str()
+    ))));
+    bob_config_server.update_request_handler(Some(Arc::new(StaticContentServer::new_str(
+        format!(r#"{{"issuer": "{}", "jwks_uri": "{}"}}"#, bob_issuer_id, bob_jwks_server.url()).as_str()
+    ))));
+
+    alice_jwks_server.update_request_handler(Some(Arc::new(EquivocatingServer::new(
         r#"{"keys": ["ALICE_JWK_V1A"]}"#.as_bytes().to_vec(),
         r#"{"keys": ["ALICE_JWK_V1B"]}"#.as_bytes().to_vec(),
         2,
     ))));
-    provider_bob.update_request_handler(Some(Arc::new(StaticContentServer::new(
+    bob_jwks_server.update_request_handler(Some(Arc::new(StaticContentServer::new(
         r#"{"keys": ["BOB_JWK_V0"]}"#.as_bytes().to_vec(),
     ))));
     let config = OnChainJWKConsensusConfig::V1(JWKConsensusConfigV1 {
         oidc_providers: vec![
             OIDCProvider {
-                name: "https://alice.io".to_string(),
-                config_url: provider_alice.open_id_config_url(),
+                name: alice_issuer_id.to_string(),
+                config_url: alice_jwks_server.url(),
             },
             OIDCProvider {
-                name: "https://bob.dev".to_string(),
-                config_url: provider_bob.open_id_config_url(),
+                name: bob_issuer_id.to_string(),
+                config_url: bob_jwks_server.url(),
             },
         ],
     });
@@ -92,7 +101,7 @@ async fn jwk_consensus_per_issuer() {
         AllProvidersJWKs {
             entries: vec![
                 ProviderJWKs {
-                    issuer: b"https://bob.dev".to_vec(),
+                    issuer: bob_issuer_id.as_bytes().to_vec(),
                     version: 1,
                     jwks: vec![JWK::Unsupported(UnsupportedJWK::new_with_payload(
                         "\"BOB_JWK_V0\""
@@ -110,5 +119,5 @@ async fn jwk_consensus_per_issuer() {
     );
 
     info!("Tear down.");
-    provider_alice.shutdown().await;
+    tokio::join!(alice_jwks_server.shutdown(), alice_config_server.shutdown(), bob_jwks_server.shutdown(), bob_config_server.shutdown());
 }
