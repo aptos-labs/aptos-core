@@ -73,7 +73,7 @@ module supra_framework::dora_committee {
         dora_public_key: vector<u8>,
         // public key for secure TLS connection
         network_public_key: vector<u8>,
-        elgamal_pub_key: vector<u8>,
+        cg_public_key: vector<u8>,
         // port number at which the node listens to for connection attempts by peers
         network_port: u16,
         // port number to serve RPC requests
@@ -85,7 +85,7 @@ module supra_framework::dora_committee {
         ip_public_address: vector<u8>,
         dora_public_key: vector<u8>,
         network_public_key: vector<u8>,
-        elgamal_pub_key: vector<u8>,
+        cg_public_key: vector<u8>,
         network_port: u16,
         rpc_port: u16
     }
@@ -212,7 +212,7 @@ module supra_framework::dora_committee {
                 ip_public_address: dora_node_info.ip_public_address,
                 dora_public_key: dora_node_info.dora_public_key,
                 network_public_key: dora_node_info.network_public_key,
-                elgamal_pub_key: dora_node_info.elgamal_pub_key,
+                cg_public_key: dora_node_info.cg_public_key,
                 network_port: dora_node_info.network_port,
                 rpc_port: dora_node_info.rpc_port,
             };
@@ -257,7 +257,7 @@ module supra_framework::dora_committee {
             ip_public_address: dora_node_info.ip_public_address,
             dora_public_key: dora_node_info.dora_public_key,
             network_public_key: dora_node_info.network_public_key,
-            elgamal_pub_key: dora_node_info.elgamal_pub_key,
+            cg_public_key: dora_node_info.cg_public_key,
             network_port: dora_node_info.network_port,
             rpc_port: dora_node_info.rpc_port,
         }
@@ -327,7 +327,7 @@ module supra_framework::dora_committee {
         ip_public_address: vector<vector<u8>>,
         dora_public_key: vector<vector<u8>>,
         network_public_key: vector<vector<u8>>,
-        elgamal_pub_key: vector<vector<u8>>,
+        cg_public_key: vector<vector<u8>>,
         network_port: vector<u16>,
         rpc_port: vector<u16>,
         committee_type: u8
@@ -347,7 +347,7 @@ module supra_framework::dora_committee {
             error::invalid_argument(INVALID_COMMITTEE_NUMBERS)
         );
         assert!(
-            node_address_len == vector::length(&elgamal_pub_key),
+            node_address_len == vector::length(&cg_public_key),
             error::invalid_argument(INVALID_COMMITTEE_NUMBERS)
         );
         assert!(
@@ -367,14 +367,14 @@ module supra_framework::dora_committee {
             let ip_public_address = vector::pop_back(&mut ip_public_address);
             let dora_public_key = vector::pop_back(&mut dora_public_key);
             let network_public_key = vector::pop_back(&mut network_public_key);
-            let elgamal_pub_key = vector::pop_back(&mut elgamal_pub_key);
+            let cg_public_key = vector::pop_back(&mut cg_public_key);
             let network_port = vector::pop_back(&mut network_port);
             let rpc_port = vector::pop_back(&mut rpc_port);
             let dora_node = DoraNodeInfo {
                 ip_public_address: copy ip_public_address,
                 dora_public_key: copy dora_public_key,
                 network_public_key: copy network_public_key,
-                elgamal_pub_key: copy elgamal_pub_key,
+                cg_public_key: copy cg_public_key,
                 network_port,
                 rpc_port,
             };
@@ -421,7 +421,7 @@ module supra_framework::dora_committee {
         ip_public_address_bulk: vector<vector<vector<u8>>>,
         dora_public_key_bulk: vector<vector<vector<u8>>>,
         network_public_key_bulk: vector<vector<vector<u8>>>,
-        elgamal_pub_key_bulk: vector<vector<vector<u8>>>,
+        cg_public_key_bulk: vector<vector<vector<u8>>>,
         network_port_bulk: vector<vector<u16>>,
         rpc_por_bulkt: vector<vector<u16>>,
         committee_types: vector<u8>
@@ -445,7 +445,7 @@ module supra_framework::dora_committee {
             error::invalid_argument(INVALID_COMMITTEE_NUMBERS)
         );
         assert!(
-            ids_len == vector::length(&elgamal_pub_key_bulk),
+            ids_len == vector::length(&cg_public_key_bulk),
             error::invalid_argument(INVALID_COMMITTEE_NUMBERS)
         );
         assert!(
@@ -462,7 +462,7 @@ module supra_framework::dora_committee {
             let ip_public_address = vector::pop_back(&mut ip_public_address_bulk);
             let dora_public_key = vector::pop_back(&mut dora_public_key_bulk);
             let network_public_key = vector::pop_back(&mut network_public_key_bulk);
-            let elgamal_pub_key = vector::pop_back(&mut elgamal_pub_key_bulk);
+            let cg_public_key = vector::pop_back(&mut cg_public_key_bulk);
             let network_port = vector::pop_back(&mut network_port_bulk);
             let rpc_port = vector::pop_back(&mut rpc_por_bulkt);
             let committee_type = vector::pop_back(&mut committee_types);
@@ -474,7 +474,7 @@ module supra_framework::dora_committee {
                 ip_public_address,
                 dora_public_key,
                 network_public_key,
-                elgamal_pub_key,
+                cg_public_key,
                 network_port,
                 rpc_port,
                 committee_type
@@ -537,7 +537,7 @@ module supra_framework::dora_committee {
         ip_public_address: vector<u8>,
         dora_public_key: vector<u8>,
         network_public_key: vector<u8>,
-        elgamal_pub_key: vector<u8>,
+        cg_public_key: vector<u8>,
         network_port: u16,
         rpc_port: u16,
     ) acquires CommitteeInfoStore, SupraCommitteeEventHandler {
@@ -550,7 +550,7 @@ module supra_framework::dora_committee {
             ip_public_address: copy ip_public_address,
             dora_public_key: copy dora_public_key,
             network_public_key: copy network_public_key,
-            elgamal_pub_key: copy elgamal_pub_key,
+            cg_public_key: copy cg_public_key,
             network_port: network_port,
             rpc_port: rpc_port,
         };
@@ -585,7 +585,7 @@ module supra_framework::dora_committee {
         ip_public_address: vector<vector<u8>>,
         dora_public_key: vector<vector<u8>>,
         network_public_key: vector<vector<u8>>,
-        elgamal_pub_key: vector<vector<u8>>,
+        cg_public_key: vector<vector<u8>>,
         network_port: vector<u16>,
         rpc_port: vector<u16>
     ) acquires CommitteeInfoStore, SupraCommitteeEventHandler {
@@ -607,7 +607,7 @@ module supra_framework::dora_committee {
             error::invalid_argument(INVALID_COMMITTEE_NUMBERS)
         );
         assert!(
-            vector::length(&ids) == vector::length(&elgamal_pub_key),
+            vector::length(&ids) == vector::length(&cg_public_key),
             error::invalid_argument(INVALID_COMMITTEE_NUMBERS)
         );
         assert!(
@@ -624,7 +624,7 @@ module supra_framework::dora_committee {
             let ip_public_address = vector::pop_back(&mut ip_public_address);
             let dora_public_key = vector::pop_back(&mut dora_public_key);
             let network_public_key = vector::pop_back(&mut network_public_key);
-            let elgamal_pub_key = vector::pop_back(&mut elgamal_pub_key);
+            let cg_public_key = vector::pop_back(&mut cg_public_key);
             let network_port = vector::pop_back(&mut network_port);
             let rpc_port = vector::pop_back(&mut rpc_port);
             upsert_committee_member(
@@ -635,7 +635,7 @@ module supra_framework::dora_committee {
                 ip_public_address,
                 dora_public_key,
                 network_public_key,
-                elgamal_pub_key,
+                cg_public_key,
                 network_port,
                 rpc_port
             );
@@ -665,7 +665,7 @@ module supra_framework::dora_committee {
                     ip_public_address: node_info.ip_public_address,
                     dora_public_key: node_info.dora_public_key,
                     network_public_key: node_info.network_public_key,
-                    elgamal_pub_key: node_info.elgamal_pub_key,
+                    cg_public_key: node_info.cg_public_key,
                     network_port: node_info.network_port,
                     rpc_port: node_info.rpc_port,
                 }
@@ -690,7 +690,7 @@ module supra_framework::dora_committee {
                 ip_public_address: vector::empty(),
                 dora_public_key: vector::empty(),
                 network_public_key: vector::empty(),
-                elgamal_pub_key: vector::empty(),
+                cg_public_key: vector::empty(),
                 network_port: 0,
                 rpc_port: 0,
             })
@@ -701,7 +701,7 @@ module supra_framework::dora_committee {
                 ip_public_address: dora_node_info.ip_public_address,
                 dora_public_key: dora_node_info.dora_public_key,
                 network_public_key: dora_node_info.network_public_key,
-                elgamal_pub_key: dora_node_info.elgamal_pub_key,
+                cg_public_key: dora_node_info.cg_public_key,
                 network_port: dora_node_info.network_port,
                 rpc_port: dora_node_info.rpc_port,
             })
