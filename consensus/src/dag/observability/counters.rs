@@ -150,3 +150,10 @@ pub static RPC_PROCESS_DURATION: Lazy<HistogramVec> = Lazy::new(|| {
     )
     .unwrap()
 });
+
+pub static BLOCK_COUNTER: Lazy<IntCounterVec> = Lazy::new(|| {
+    register_int_counter_vec!("aptos_consensus_dag_block_count", "dag block count", &[
+        "dag_id"
+    ])
+    .unwrap()
+});

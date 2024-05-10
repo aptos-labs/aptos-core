@@ -13,6 +13,7 @@ use crate::{
     },
     counters,
     dag::{
+        observability::counters::BLOCK_COUNTER,
         storage::{CommitEvent, DAGStorage},
         CertifiedNode, Node, NodeId, Vote,
     },
@@ -199,6 +200,8 @@ impl OrderedNotifier for OrderedNotifierAdapter {
                 return;
             }
         }
+
+        BLOCK_COUNTER.with_label_values(&[self.dag_id]).inc();
 
         let anchor = ordered_nodes.last().unwrap();
         let round = anchor.round();
