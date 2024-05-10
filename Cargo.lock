@@ -3357,6 +3357,7 @@ dependencies = [
  "aptos-secure-storage",
  "aptos-types",
  "aptos-vault-client",
+ "claims",
  "criterion",
  "once_cell",
  "proptest",

@@ -95,6 +95,13 @@ impl SafetyRules {
             ));
         }
 
+        if qc.certified_block().id() != proposed_block.id() {
+            return Err(Error::InvalidOneChainQuorumCertificate(
+                qc.certified_block().id(),
+                proposed_block.id(),
+            ));
+        }
+
         self.verify_qc(qc)?;
         proposed_block
             .validate_signature(&self.epoch_state()?.verifier)
