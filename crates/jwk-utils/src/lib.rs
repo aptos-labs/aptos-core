@@ -42,7 +42,9 @@ pub async fn fetch_jwks_from_jwks_uri(my_addr: Option<AccountAddress>, jwks_uri:
 /// Given an Open ID configuration URL, fetch its JWK url.
 pub async fn fetch_jwks_uri_from_openid_config(config_url: &str) -> Result<String> {
     let client = reqwest::Client::new();
-    let OpenIDConfiguration { jwks_uri, .. } = client.get(config_url).send().await?.json().await?;
+    let x = client.get(config_url).send().await?;
+    println!("0510 - x={:?}", x);
+    let OpenIDConfiguration { jwks_uri, .. } = x.json().await?;
     Ok(jwks_uri)
 }
 
