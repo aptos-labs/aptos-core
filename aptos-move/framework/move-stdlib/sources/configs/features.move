@@ -222,10 +222,13 @@ module std::features {
     /// Lifetime: transient
     const APTOS_UNIQUE_IDENTIFIERS: u64 = 23;
 
-    public fun get_auids(): u64 { APTOS_UNIQUE_IDENTIFIERS }
+    public fun get_auids(): u64 {
+        // Deployed to production, and disabling deprecated.
+        error::invalid_argument(EINVALID_FEATURE)
+     }
 
-    public fun auids_enabled(): bool acquires Features {
-        is_enabled(APTOS_UNIQUE_IDENTIFIERS)
+    public fun auids_enabled(): bool {
+        true
     }
 
     /// Whether the Bulletproofs zero-knowledge range proof module is enabled, and the related native function is
@@ -264,15 +267,13 @@ module std::features {
     /// Lifetime: transient
     const SIGNATURE_CHECKER_V2_SCRIPT_FIX: u64 = 29;
 
-    /// Whether the Aggregator V2 API feature is enabled.
-    /// Once enabled, the functions from aggregator_v2.move will be available for use.
-    /// Lifetime: transient
-    const AGGREGATOR_V2_API: u64 = 30;
+    public fun get_aggregator_v2_api_feature(): u64 {
+        // API fully rolled out, cannot be reverted any more
+        abort error::invalid_argument(EINVALID_FEATURE)
+    }
 
-    public fun get_aggregator_v2_api_feature(): u64 { AGGREGATOR_V2_API }
-
-    public fun aggregator_v2_api_enabled(): bool acquires Features {
-        is_enabled(AGGREGATOR_V2_API)
+    public fun aggregator_v2_api_enabled(): bool {
+        true
     }
 
     #[deprecated]
@@ -303,21 +304,13 @@ module std::features {
 
     const FEE_PAYER_ACCOUNT_OPTIONAL: u64 = 35;
 
-    /// Whether the Aggregator V2 delayed fields feature is enabled.
-    /// Once enabled, Aggregator V2 functions become parallel.
-    /// Lifetime: transient
-    const AGGREGATOR_V2_DELAYED_FIELDS: u64 = 36;
+    public fun get_concurrent_token_v2_feature(): u64 {
+        // Deployed to production, and disabling deprecated.
+        error::invalid_argument(EINVALID_FEATURE)
+    }
 
-    /// Whether enable TokenV2 collection creation and Fungible Asset creation
-    /// to create higher throughput concurrent variants.
-    /// Lifetime: transient
-    const CONCURRENT_TOKEN_V2: u64 = 37;
-
-    public fun get_concurrent_token_v2_feature(): u64 { CONCURRENT_TOKEN_V2 }
-
-    public fun concurrent_token_v2_enabled(): bool acquires Features {
-        // concurrent token v2 cannot be used if aggregator v2 api is not enabled.
-        is_enabled(CONCURRENT_TOKEN_V2) && aggregator_v2_api_enabled()
+    public fun concurrent_token_v2_enabled(): bool {
+        true
     }
 
     #[deprecated]
@@ -415,8 +408,7 @@ module std::features {
     public fun get_concurrent_fungible_assets_feature(): u64 { CONCURRENT_FUNGIBLE_ASSETS }
 
     public fun concurrent_fungible_assets_enabled(): bool acquires Features {
-        // concurrent fungible assets cannot be used if aggregator v2 api is not enabled.
-        is_enabled(CONCURRENT_FUNGIBLE_ASSETS) && aggregator_v2_api_enabled()
+        is_enabled(CONCURRENT_FUNGIBLE_ASSETS)
     }
 
     /// Whether deploying to objects is enabled.

@@ -16,7 +16,6 @@ module rewards_pool::test_helpers {
     use std::vector;
 
     public fun set_up() {
-        aptos_governance::toggle_features_for_test(vector[features::get_auids()], vector[]);
         timestamp::set_time_has_started_for_testing(&account::create_signer_for_test(@0x1));
         epoch::fast_forward(100);
     }
