@@ -23,8 +23,8 @@ impl JWKObserver {
     pub fn spawn(
         epoch: u64,
         my_addr: AccountAddress,
-        issuer: Issuer,
-        config_url: Vec<u8>,
+        issuer: String,
+        config_url: String,
         fetch_interval: Duration,
         observation_tx: aptos_channel::Sender<(), (Issuer, Vec<JWK>)>,
     ) -> Self {
@@ -39,8 +39,8 @@ impl JWKObserver {
         ));
         info!(
             epoch = epoch,
-            issuer = String::from_utf8(issuer).ok(),
-            config_url = String::from_utf8(config_url).ok(),
+            issuer = issuer,
+            config_url = config_url,
             "JWKObserver spawned."
         );
         Self {
@@ -52,13 +52,11 @@ impl JWKObserver {
     async fn start(
         fetch_interval: Duration,
         my_addr: AccountAddress,
-        issuer_bytes: Issuer,
-        open_id_config_url: Vec<u8>,
+        issuer: String,
+        open_id_config_url: String,
         observation_tx: aptos_channel::Sender<(), (Issuer, Vec<JWK>)>,
         close_rx: oneshot::Receiver<()>,
     ) {
-        let issuer =
-            String::from_utf8(issuer_bytes.clone()).unwrap_or_else(|_e| "UNKNOWN_ISSUER".to_string());
         let mut interval = tokio::time::interval(fetch_interval);
         interval.set_missed_tick_behavior(MissedTickBehavior::Delay);
         let mut close_rx = close_rx.into_stream();
@@ -72,15 +70,15 @@ impl JWKObserver {
             tokio::select! {
                 _ = interval.tick().fuse() => {
                     let timer = Instant::now();
-                    let result = fetch_jwks(issuer.as_str(), my_addr).await;
+                    let result = fetch_jwks(open_id_config_url.as_str(), my_addr).await;
                     debug!(issuer = issuer, "observe_result={:?}", result);
                     let secs = timer.elapsed().as_secs_f64();
                     if let Ok(mut jwks) = result {
-                        OBSERVATION_SECONDS.with_label_values(&[&issuer, "ok"]).observe(secs);
+                        OBSERVATION_SECONDS.with_label_values(&[issuer.as_str(), "ok"]).observe(secs);
                         jwks.sort();
-                        let _ = observation_tx.push((), (issuer_bytes.clone(), jwks));
+                        let _ = observation_tx.push((), (issuer.as_bytes().to_vec(), jwks));
                     } else {
-                        OBSERVATION_SECONDS.with_label_values(&[&issuer, "err"]).observe(secs);
+                        OBSERVATION_SECONDS.with_label_values(&[issuer.as_str(), "err"]).observe(secs);
                     }
                 },
                 _ = close_rx.select_next_some() => {
