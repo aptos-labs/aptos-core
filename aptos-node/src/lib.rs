@@ -20,13 +20,15 @@ use anyhow::anyhow;
 use aptos_admin_service::AdminService;
 use aptos_api::bootstrap as bootstrap_api;
 use aptos_build_info::build_information;
-use aptos_config::config::{
-    merge_node_config, InitialSafetyRulesConfig, NodeConfig, PersistableConfig,
+use aptos_config::{
+    config::{merge_node_config, InitialSafetyRulesConfig, NodeConfig, PersistableConfig},
+    network_id::PeerNetworkId,
 };
 use aptos_dkg_runtime::start_dkg_runtime;
 use aptos_framework::ReleaseBundle;
 use aptos_jwk_consensus::start_jwk_consensus_runtime;
 use aptos_logger::{prelude::*, telemetry_log_writer::TelemetryLog, Level, LoggerFilterUpdater};
+use aptos_network::ProtocolId;
 use aptos_safety_rules::safety_rules_manager::load_consensus_key_from_secure_storage;
 use aptos_state_sync_driver::driver_factory::StateSyncRuntimes;
 use aptos_types::{chain_id::ChainId, on_chain_config::OnChainJWKConsensusConfig};
@@ -44,6 +46,7 @@ use std::{
         Arc,
     },
     thread,
+    time::Duration,
 };
 use tokio::runtime::Runtime;
 
@@ -773,6 +776,19 @@ pub fn setup_environment_and_start_node(
         },
         _ => None,
     };
+
+    loop {
+        let peers = peers_and_metadata
+            .get_connected_peers_and_metadata()
+            .unwrap();
+        debug!("current peers {}", peers.len());
+        if peers.len() == 99 {
+            thread::sleep(Duration::from_secs(30));
+            break;
+        }
+
+        thread::sleep(Duration::from_secs(1));
+    }
 
     // Create the consensus runtime (this blocks on state sync first)
     let consensus_runtime = consensus_network_interfaces.map(|consensus_network_interfaces| {
