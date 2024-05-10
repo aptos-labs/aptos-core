@@ -6,8 +6,8 @@
 use crate::{
     gas::get_gas_config_from_storage,
     move_vm_ext::{
-        get_max_binary_format_version, get_max_identifier_size, resource_state_key,
-        AptosMoveResolver, AsExecutorView, AsResourceGroupView, ResourceGroupResolver,
+        resource_state_key, AptosMoveResolver, AsExecutorView, AsResourceGroupView,
+        ResourceGroupResolver,
     },
 };
 use aptos_aggregator::{
@@ -80,8 +80,8 @@ impl<'e, E: ExecutorView> StorageAdapter<'e, E> {
         features: &Features,
         maybe_resource_group_view: Option<&'e dyn ResourceGroupView>,
     ) -> Self {
-        let max_binary_version = get_max_binary_format_version(features, Some(gas_feature_version));
-        let max_identifier_size = get_max_identifier_size(features);
+        let max_binary_version = features.get_max_binary_format_version(Some(gas_feature_version));
+        let max_identifier_size = features.get_max_identifier_size();
         let resource_group_adapter = ResourceGroupAdapter::new(
             maybe_resource_group_view,
             executor_view,
@@ -315,15 +315,14 @@ impl<S: StateView> AsMoveResolver<S> for S {
     fn as_move_resolver(&self) -> StorageAdapter<S> {
         let (_, gas_feature_version) = get_gas_config_from_storage(self);
         let features = Features::fetch_config(self).unwrap_or_default();
-        let max_binary_version =
-            get_max_binary_format_version(&features, Some(gas_feature_version));
+        let max_binary_version = features.get_max_binary_format_version(Some(gas_feature_version));
         let resource_group_adapter = ResourceGroupAdapter::new(
             None,
             self,
             gas_feature_version,
             features.is_resource_groups_split_in_vm_change_set_enabled(),
         );
-        let max_identifier_size = get_max_identifier_size(&features);
+        let max_identifier_size = features.get_max_identifier_size();
         StorageAdapter::new(
             self,
             max_binary_version,

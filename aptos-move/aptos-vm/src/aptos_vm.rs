@@ -10,7 +10,6 @@ use crate::{
     gas::{check_gas, get_gas_parameters},
     keyless_validation,
     move_vm_ext::{
-        get_max_binary_format_version, get_max_identifier_size,
         session::user_transaction_sessions::{
             abort_hook::AbortHookSession, epilogue::EpilogueSession, prologue::PrologueSession,
             user::UserSession,
@@ -1368,8 +1367,10 @@ impl AptosVM {
 
     /// Deserialize a module bundle.
     fn deserialize_module_bundle(&self, modules: &ModuleBundle) -> VMResult<Vec<CompiledModule>> {
-        let max_version = get_max_binary_format_version(self.features(), None);
-        let max_identifier_size = get_max_identifier_size(self.features());
+        let max_version = self
+            .features()
+            .get_max_binary_format_version(Some(self.gas_feature_version));
+        let max_identifier_size = self.features().get_max_identifier_size();
         let config = DeserializerConfig::new(max_version, max_identifier_size);
         let mut result = vec![];
         for module_blob in modules.iter() {

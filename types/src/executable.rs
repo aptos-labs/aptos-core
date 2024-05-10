@@ -6,7 +6,6 @@ use crate::{
     state_store::state_key::{inner::StateKeyInner, StateKey},
 };
 use aptos_crypto::HashValue;
-use std::sync::Arc;
 
 #[derive(PartialEq, Eq, Debug)]
 pub enum ExecutableDescriptor {
@@ -48,44 +47,4 @@ impl Executable for ExecutableTestType {
     fn size_bytes(&self) -> usize {
         0
     }
-}
-
-// TODO: variant for a compiled module when available to avoid deserialization.
-pub enum FetchedModule<X: Executable> {
-    Blob(Option<Vec<u8>>),
-    // Note: We could use Weak / & for parallel and sequential modes, respectively
-    // but rely on Arc for a simple and unified treatment for the time being.
-    // TODO: change Arc<X> to custom reference when we have memory manager / arena.
-    Executable(Arc<X>),
-}
-
-/// View for the VM for interacting with the multi-versioned executable cache.
-pub trait ExecutableView {
-    type Key;
-    type Executable: Executable;
-
-    /// This is an optimization to bypass transactional semantics and share the
-    /// executable (and all the useful work for producing it) as early as possible
-    /// other txns / VM sessions. It is safe as storage-version module can't change,
-    /// and o.w. the key is the (cryptographic) hash of the module blob.
-    ///
-    /// W.o. this, we would have to include executables in TransactionOutputExt.
-    /// This may occur much later leading to work duplication (producing the same
-    /// executable by other sessions) in the common case when the executable isn't
-    /// based on the module published by the transaction itself.
-    fn store_executable(
-        &self,
-        key: &Self::Key,
-        descriptor: ExecutableDescriptor,
-        executable: Self::Executable,
-    );
-
-    /// Returns either the blob of the module, that will need to be deserialized into
-    /// CompiledModule and then made into an executable, or executable directly, if
-    /// the executable corresponding to the latest published module was already stored.
-    /// TODO: Return CompiledModule directly to avoid deserialization.
-    fn fetch_module(
-        &self,
-        key: &Self::Key,
-    ) -> anyhow::Result<(ExecutableDescriptor, FetchedModule<Self::Executable>)>;
 }

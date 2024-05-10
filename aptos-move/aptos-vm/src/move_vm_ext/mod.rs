@@ -12,7 +12,7 @@ pub(crate) mod write_op_converter;
 pub use crate::move_vm_ext::{
     resolver::{AptosMoveResolver, AsExecutorView, AsResourceGroupView, ResourceGroupResolver},
     session::SessionExt,
-    vm::{get_max_binary_format_version, get_max_identifier_size, verifier_config, MoveVmExt},
+    vm::{verifier_config, MoveVmExt},
 };
 use aptos_types::state_store::state_key::StateKey;
 pub use aptos_types::transaction::user_transaction_context::UserTransactionContext;
