@@ -81,11 +81,11 @@ async fn jwk_consensus_per_issuer() {
         oidc_providers: vec![
             OIDCProvider {
                 name: alice_issuer_id.to_string(),
-                config_url: alice_jwks_server.url(),
+                config_url: alice_config_server.url(),
             },
             OIDCProvider {
                 name: bob_issuer_id.to_string(),
-                config_url: bob_jwks_server.url(),
+                config_url: bob_config_server.url(),
             },
         ],
     });
