@@ -441,7 +441,6 @@ Only called for testnets and e2e tests.
     <b>let</b> core_resources = <a href="account.md#0x1_account_create_account">account::create_account</a>(@core_resources);
     <a href="account.md#0x1_account_rotate_authentication_key_internal">account::rotate_authentication_key_internal</a>(&core_resources, core_resources_auth_key);
     <a href="aptos_coin.md#0x1_aptos_coin_configure_accounts_for_test">aptos_coin::configure_accounts_for_test</a>(aptos_framework, &core_resources, mint_cap);
-    <a href="coin.md#0x1_coin_migrate_to_fungible_store">coin::migrate_to_fungible_store</a>&lt;AptosCoin&gt;(&core_resources);
 }
 </code></pre>
 
