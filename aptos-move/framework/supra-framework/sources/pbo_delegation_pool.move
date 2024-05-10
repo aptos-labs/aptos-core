@@ -206,7 +206,7 @@ module supra_framework::pbo_delegation_pool {
     const VECTOR_LENGTH_NOT_SAME:u64 = 23;
 
     /// Coin value is not the same with principle stake.
-    const COIN_VALUE_NOT_SAME:u64 = 24;
+    const COIN_VALUE_NOT_SAME_AS_PRINCIPAL_STAKE:u64 = 24;
 
     const MAX_U64: u64 = 18446744073709551615;
 
