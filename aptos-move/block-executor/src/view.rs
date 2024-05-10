@@ -205,7 +205,7 @@ fn get_delayed_field_value_impl<T: Transaction>(
                 return Ok(value);
             },
             Err(PanicOr::Or(MVDelayedFieldsError::Dependency(dep_idx))) => {
-                if !wait_for_dependency(wait_for, txn_idx, dep_idx)? {
+                if let DependencyStatus::ExecutionHalted = wait_for_dependency(wait_for, txn_idx, dep_idx)? {
                     // TODO[agg_v2](cleanup): think of correct return type
                     return Err(PanicOr::Or(DelayedFieldsSpeculativeError::InconsistentRead));
                 }
@@ -371,12 +371,13 @@ fn delayed_field_try_add_delta_outcome_impl<T: Transaction>(
                 ) {
                     Ok(v) => break v,
                     Err(MVDelayedFieldsError::Dependency(dep_idx)) => {
-                        if !wait_for_dependency(wait_for, txn_idx, dep_idx)? {
-                            // TODO[agg_v2](cleanup): think of correct return type
-                            return Err(PanicOr::Or(
-                                DelayedFieldsSpeculativeError::InconsistentRead,
-                            ));
-                        }
+                        unreachable!();
+                        // if !wait_for_dependency(wait_for, txn_idx, dep_idx)? {
+                        //     // TODO[agg_v2](cleanup): think of correct return type
+                        //     return Err(PanicOr::Or(
+                        //         DelayedFieldsSpeculativeError::InconsistentRead,
+                        //     ));
+                        // }
                     },
                     Err(_) => {
                         return Err(PanicOr::Or(DelayedFieldsSpeculativeError::InconsistentRead))
@@ -400,6 +401,8 @@ fn delayed_field_try_add_delta_outcome_impl<T: Transaction>(
     }
 }
 
+
+
 // txn_idx is estimated to have a r/w dependency on dep_idx.
 // Returns after the dependency has been resolved, the returned indicator is true if
 // it is safe to continue, and false if the execution has been halted.
@@ -407,20 +410,18 @@ fn wait_for_dependency(
     wait_for: &dyn ConditionalSuspend,
     txn_idx: TxnIndex,
     dep_idx: TxnIndex,
-) -> Result<bool, PanicError> {
+) -> Result<DependencyStatus, PanicError> {
     
 
     //eprintln!("calling suspend txn={} dep_txn={}", txn_idx, dep_idx);
     
-    match wait_for.conditional_suspend(txn_idx, dep_idx)? {
-        // TODO: if suspended but need re-execution, return the thread!
-        // SpeculativeExecutionError
+   wait_for.conditional_suspend(txn_idx, dep_idx)
+
+    /*match res {
         DependencyStatus::ExecutionHalted => Ok(false),
         DependencyStatus::Resolved => Ok(true),
         DependencyStatus::Unresolved => Ok(false),
-        // Err(code_invariant_error("dependency should not be unresolved after conditional suspend"))
-    }
-
+    }*/
     /*
     match wait_for.wait_for_dependency(txn_idx, dep_idx)? {
         DependencyResult::Dependency(dep_condition) => {
@@ -524,7 +525,7 @@ impl<'a, T: Transaction, X: Executable> ParallelState<'a, T, X> {
                     unreachable!("Reading group size does not require a specific tag look-up");
                 },
                 Err(Dependency(dep_idx)) => {
-                    if !wait_for_dependency(self.scheduler_handle, txn_idx, dep_idx)? {
+                    if let DependencyStatus::ExecutionHalted = wait_for_dependency(self.scheduler_handle, txn_idx, dep_idx)? {
                         return Err(PartialVMError::new(
                             StatusCode::SPECULATIVE_EXECUTION_ABORT_ERROR,
                         )
@@ -649,6 +650,7 @@ impl<'a, T: Transaction, X: Executable> ResourceState<T> for ParallelState<'a, T
                     return ReadResult::Uninitialized;
                 },
                 Err(Dependency(dep_idx)) => {
+
                     match wait_for_dependency(self.scheduler_handle, txn_idx, dep_idx) {
                         Err(e) => {
                             error!("Error {:?} in wait for dependency", e);
@@ -658,15 +660,18 @@ impl<'a, T: Transaction, X: Executable> ResourceState<T> for ParallelState<'a, T
                                 e
                             ));
                         },
-                        Ok(false) => {
+                        Ok(DependencyStatus::ExecutionHalted) => {
                             self.captured_reads.borrow_mut().mark_failure();
                             return ReadResult::HaltSpeculativeExecution(
                                 "Interrupted as block execution was halted".to_string(),
                             );
                         },
-                        Ok(true) => {
+                        Ok(DependencyStatus::Resolved) => {
                             //dependency resolved
                         },
+                        Ok(DependencyStatus::Unresolved) => {
+                            self.captured_reads.borrow_mut().set_unresolved_dependency(true);
+                        }
                     }
                 },
                 Err(DeltaApplicationFailure) => {
@@ -767,13 +772,17 @@ impl<'a, T: Transaction, X: Executable> ResourceGroupState<T> for ParallelState<
                     return Ok(GroupReadResult::Value(None, None));
                 },
                 Err(Dependency(dep_idx)) => {
-                    if !wait_for_dependency(self.scheduler_handle, txn_idx, dep_idx)? {
+                    match wait_for_dependency(self.scheduler_handle, txn_idx, dep_idx)? {
                         // TODO[agg_v2](cleanup): consider changing from PartialVMResult<GroupReadResult> to GroupReadResult
                         // like in ReadResult for resources.
-                        return Err(PartialVMError::new(
-                            StatusCode::SPECULATIVE_EXECUTION_ABORT_ERROR,
-                        )
-                        .with_message("Interrupted as block execution was halted".to_string()));
+                        DependencyStatus::ExecutionHalted => {
+                            return Err(PartialVMError::new(
+                                StatusCode::SPECULATIVE_EXECUTION_ABORT_ERROR,
+                            )
+                            .with_message("Interrupted as block execution was halted".to_string()));
+                        },
+                        _ => {
+                        }    
                     }
                 },
                 Err(TagSerializationError(_)) => {

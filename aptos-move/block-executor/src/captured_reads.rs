@@ -313,6 +313,7 @@ pub(crate) struct CapturedReads<T: Transaction> {
     /// Set if the invarint on CapturedReads intended use is violated. Leads to an alert
     /// and sequential execution fallback.
     incorrect_use: bool,
+    unresolved_dependency: bool,
 }
 
 #[derive(Debug)]
@@ -549,6 +550,9 @@ impl<T: Transaction> CapturedReads<T> {
         self.incorrect_use
     }
 
+    pub(crate) fn is_unresolved_dependency(&self) -> bool {
+        self.unresolved_dependency
+    }
     pub(crate) fn validate_data_reads(
         &self,
         data_map: &VersionedData<T::Key, T::Value>,
@@ -713,6 +717,10 @@ impl<T: Transaction> CapturedReads<T> {
 
     pub(crate) fn mark_incorrect_use(&mut self) {
         self.incorrect_use = true;
+    }
+
+    pub(crate) fn set_unresolved_dependency(&mut self,  flag: bool) {
+        self.unresolved_dependency = flag;
     }
 }
 

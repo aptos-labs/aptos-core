@@ -271,18 +271,20 @@ impl<'a> ConditionalSuspend for SchedulerHandle<'a> {
         // if it's not too far, then as before;
         // Otherwise, do not conditional suspend the garage, and update txn status to Suspended(.., None)
         // Return a different status to the caller indicated 'suspended but should re-execute'
+        println!("was in conditional suspend");
         if txn_idx > self.scheduler.commit_state().0 + 100 {
-            if self.garage.unwrap().is_halted() {
+            /*if self.garage.unwrap().is_halted() {
                 return Ok(DependencyStatus::ExecutionHalted);
-            }
+            }*/
             let res = self.scheduler.wait_for_dependency(txn_idx, dep_txn_idx, None)?;
             if self.garage.unwrap().is_halted() {
                 return Ok(DependencyStatus::ExecutionHalted);
             }
             return Ok(res);
         } 
+        println!("got past commit state check");
 
-        let suspend_result = self.garage.unwrap().conditional_suspend(|baton|-> Option<Result<DependencyStatus,PanicError>> {
+        let suspend_result: Result<SuspendResult<DependencyStatus>, PanicError> = self.garage.unwrap().conditional_suspend(|baton|-> Option<Result<DependencyStatus,PanicError>> {
             let dep_result = self.scheduler.wait_for_dependency(txn_idx, dep_txn_idx, Some(baton));
             match dep_result {
                 Ok(dep_result) => {
@@ -299,7 +301,7 @@ impl<'a> ConditionalSuspend for SchedulerHandle<'a> {
         }, 
         DependencyStatus::Unresolved);  
 
-
+        println!("got past actual suspend");
         //here return unresolved if 
         match suspend_result {
             Ok(suspend_result) => {
@@ -636,9 +638,8 @@ impl Scheduler {
         // the write lock directly, and never release it during the whole function. This way,
         // even validation status readers have to wait if they somehow end up at the same index.
         let mut validation_status = self.txn_status[txn_idx as usize].1.write();
-        if !self.set_executed_status(txn_idx, incarnation)? {
-            return Ok(SchedulerTask::Retry);
-        }
+       
+        self.set_executed_status(txn_idx, incarnation)?;
 
         self.wake_dependencies_after_execution(txn_idx)?;
 
@@ -1040,7 +1041,7 @@ impl Scheduler {
         let mut status = self.txn_status[txn_idx as usize].0.write();
         match *status {
             ExecutionStatus::Executing(incarnation, _) => {
-                *status = ExecutionStatus::Suspended(incarnation, baton);
+                *status = ExecutionStatus::Suspended(incarnation, baton);            
                 Ok(()) 
             },
             //ExecutionStatus::ExecutionHalted => Ok(false),
@@ -1048,7 +1049,7 @@ impl Scheduler {
                 "Unexpected status {:?} in suspend",
                 &*status,
             ))),
-        }
+        } 
     }
 
     /// When a dependency is resolved, mark the transaction as Ready.
@@ -1083,7 +1084,7 @@ impl Scheduler {
         &self,
         txn_idx: TxnIndex,
         incarnation: Incarnation,
-    ) -> Result<bool, PanicError> {
+    ) -> Result<(), PanicError> {
         let mut status = self.txn_status[txn_idx as usize].0.write();
         //eprintln!("was here maybe should be halted?");
         match *status {
@@ -1091,13 +1092,16 @@ impl Scheduler {
                 if stored_incarnation == incarnation && !self.done() =>
             {
                 *status = ExecutionStatus::Executed(incarnation);
-                Ok(true)
+                Ok(())
             },
             _ if self.done() => {
                 // The execution is already halted.
-                Ok(true)
+                Ok(())
             },
-            _ => { Ok(false) },
+            _ => {  Err(code_invariant_error(format!(
+                "Expected Executing incarnation {incarnation}, got {:?}",
+                &*status,
+            ))) },
         }
     }
 

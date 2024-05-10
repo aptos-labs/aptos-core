@@ -834,12 +834,25 @@ where
                             start_shared_counter,
                             shared_counter,
                         ),
-                    )?;
-                    scheduler_handle.get_scheduler().finish_execution(txn_idx, incarnation, updates_outside)?
+                    )?;         
+                      
+                    let read_set = last_input_output
+                        .read_set(txn_idx)
+                        .expect("[BlockSTM]: Prior read-set must be recorded");
+
+        
+                    if read_set.is_unresolved_dependency() {
+                        println!("was here A txn={}", txn_idx);
+                        //panic!("retry again");
+                        SchedulerTask::Retry
+                    } else {
+                        scheduler_handle.get_scheduler().finish_execution(txn_idx, incarnation, updates_outside)?
+                    }
+                    //scheduler_handle.get_scheduler().finish_execution(txn_idx, incarnation, updates_outside)?
                 },
                 SchedulerTask::ExecutionTask(_, _, ExecutionTaskType::Wakeup(baton)) => {
                     //eprintln!("getting new task thread={}, wakeup, txn={}", scheduler_handle.get_thread_id(), txn_idx);
-
+                    
                     assert!(baton.get_value() == DependencyStatus::Unresolved);
                     let temp_baton = baton.change_value(DependencyStatus::Resolved);
                     assert!(temp_baton.get_value() == DependencyStatus::Resolved);
@@ -874,6 +887,8 @@ where
             self.config.local.concurrency_level > 1,
             "Must use sequential execution"
         );
+
+        println!("I was here");
 
         let versioned_cache = MVHashMap::new();
         let start_shared_counter = gen_id_start_value(false);
@@ -996,6 +1011,7 @@ where
                 );
                 match res {
                     Err(err) => {
+
                         // If there are multiple errors, they all get logged:
                         // ModulePathReadWriteError and FatalVMErrorvariant is logged at construction,
                         // and below we log CodeInvariantErrors.
@@ -1121,9 +1137,9 @@ where
         drop(init_timer);
 
         let start_counter = gen_id_start_value(true);
-        let counter = RefCell::new(start_counter);
         let unsync_map = UnsyncMap::new();
         let mut ret = Vec::with_capacity(num_txns);
+        let counter = RefCell::new(start_counter);
         let mut block_limit_processor = BlockGasLimitProcessor::<T>::new(
             self.config.onchain.block_gas_limit_type.clone(),
             num_txns,
