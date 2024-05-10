@@ -3,6 +3,8 @@ module resource_account::resource_signer_holder {
 	use aptos_std::code;
     use aptos_framework::account;
     use aptos_framework::resource_account;
+	use aptos_framework::object::{Object};
+	use aptos_framework::fungible_asset::{Self, FungibleAsset};
 	use resource_account::bonding_curve_launchpad;
 	friend bonding_curve_launchpad;
 
@@ -39,10 +41,12 @@ module resource_account::resource_signer_holder {
 		code::publish_package_txn(&signer, metadata_serialized, code);
 	}
 
+	#[view]
     public(friend) fun get_signer(): signer acquires Config {
         let signer_cap = &borrow_global<Config>(RESOURCE_ACCOUNT).signer_cap;
         account::create_signer_with_capability(signer_cap)
     }
+	#[view]
 	public(friend) fun get_owner(): address acquires Config {
 		let owner = borrow_global<Config>(RESOURCE_ACCOUNT).owner;
         owner
