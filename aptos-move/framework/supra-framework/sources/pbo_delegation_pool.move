@@ -696,7 +696,7 @@ module supra_framework::pbo_delegation_pool {
             index = index + 1;
         };
         // fail if the value of coin and the sum of principle_stake is not the same
-        assert!(coin::value(&coin) == sum, error::invalid_argument(COIN_VALUE_NOT_SAME));
+        assert!(coin::value(&coin) == sum, error::invalid_argument(COIN_VALUE_NOT_SAME_AS_PRINCIPAL_STAKE));
         // generate a seed to be used to create the resource account hosting the delegation pool
         let seed = create_resource_account_seed(delegation_pool_creation_seed);
 
