@@ -224,7 +224,7 @@ fn test_bad_execution_output(safety_rules: &Callback) {
     let a3 = make_proposal_with_parent(round + 3, &a2, None, &signer);
 
     safety_rules.initialize(&proof).unwrap();
-    let a2_output = a2
+    let a1_output = a1
         .accumulator_extension_proof()
         .verify(
             a1.block()
@@ -235,8 +235,8 @@ fn test_bad_execution_output(safety_rules: &Callback) {
         .unwrap();
 
     let evil_proof = Proof::new(
-        a2_output.frozen_subtree_roots().clone(),
-        a2_output.num_leaves() + 1,
+        a1_output.frozen_subtree_roots().clone(),
+        a1_output.num_leaves() + 1,
         vec![],
     );
 
@@ -293,7 +293,7 @@ fn test_order_votes_bad_execution_output(safety_rules: &Callback) {
     );
 
     safety_rules.initialize(&proof).unwrap();
-    let a2_output = a2
+    let a1_output = a1
         .accumulator_extension_proof()
         .verify(
             a2.block()
@@ -304,8 +304,8 @@ fn test_order_votes_bad_execution_output(safety_rules: &Callback) {
         .unwrap();
 
     let evil_proof = Proof::new(
-        a2_output.frozen_subtree_roots().clone(),
-        a2_output.num_leaves(),
+        a1_output.frozen_subtree_roots().clone(),
+        a1_output.num_leaves(),
         vec![],
     );
 
