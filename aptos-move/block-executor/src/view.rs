@@ -650,6 +650,7 @@ impl<'a, T: Transaction, X: Executable> ResourceState<T> for ParallelState<'a, T
                     return ReadResult::Uninitialized;
                 },
                 Err(Dependency(dep_idx)) => {
+                    //self.captured_reads.borrow_mut().set_unresolved_dependency(false);
 
                     match wait_for_dependency(self.scheduler_handle, txn_idx, dep_idx) {
                         Err(e) => {
@@ -671,6 +672,9 @@ impl<'a, T: Transaction, X: Executable> ResourceState<T> for ParallelState<'a, T
                         },
                         Ok(DependencyStatus::Unresolved) => {
                             self.captured_reads.borrow_mut().set_unresolved_dependency(true);
+                            return ReadResult::HaltSpeculativeExecution(
+                                "not able to sleep".to_string(),
+                            );
                         }
                     }
                 },
