@@ -1462,6 +1462,8 @@ def test(
     enable_failpoints = forge_enable_failpoints == "true"
     enable_performance_profile = forge_enable_performance == "true"
 
+    image_tag = f"consensus_only_perf_test_{image_tag}"
+
     # In the below, assume that the image is pushed to all registries
     # across all clouds and supported regions
     image_tag, upgrade_image_tag = ensure_provided_image_tags_has_profile_or_features(
@@ -1571,9 +1573,11 @@ def test(
         forge_username=forge_username,
         forge_blocking=forge_blocking == "true",
         github_actions=github_actions,
-        github_job_url=f"{github_server_url}/{github_repository}/actions/runs/{github_run_id}"
-        if github_run_id
-        else None,
+        github_job_url=(
+            f"{github_server_url}/{github_repository}/actions/runs/{github_run_id}"
+            if github_run_id
+            else None
+        ),
         forge_args=forge_args,
     )
     forge_runner_mapping = {

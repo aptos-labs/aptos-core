@@ -23,6 +23,12 @@ multicluster:
       "forge-multiregion-2",
       "forge-multiregion-3",
       "forge-multiregion-4",
+      "forge-multiregion-5",
+      "forge-multiregion-6",
+      "forge-multiregion-7",
+      "forge-multiregion-8",
+      "forge-multiregion-9",
+      "forge-multiregion-10",
     ]
 
 # -- Specify validator and fullnode NodeConfigs via named ConfigMaps, rather than the generated ones from this chart.

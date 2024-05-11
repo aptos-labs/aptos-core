@@ -17,7 +17,8 @@ use aptos_sdk::types::on_chain_config::{
 use aptos_testcases::{
     consensus_reliability_tests::ChangingWorkingQuorumTest,
     dag_onchain_enable_test::DagOnChainEnableTest,
-    multi_region_network_test::MultiRegionNetworkEmulationTest, two_traffics_test::TwoTrafficsTest,
+    multi_region_network_test::MultiRegionNetworkEmulationTest,
+    performance_test::PerformanceBenchmark, two_traffics_test::TwoTrafficsTest,
 };
 use std::{num::NonZeroUsize, sync::Arc, time::Duration};
 
@@ -419,6 +420,68 @@ pub fn run_dag_consensus_only_realistic_env_max_tps() -> ForgeConfig {
         }))
         .with_validator_resource_override(NodeResourceOverride { cpu_cores: Some(58), memory_gib: Some(220) })
         // TODO(ibalajiarun): tune these success critiera after we have a better idea of the test behavior
+        .with_success_criteria(
+            SuccessCriteria::new(10000)
+                .add_no_restarts()
+                .add_wait_for_catchup_s(240)
+                .add_chain_progress(StateProgressThreshold {
+                    max_no_progress_secs: 20.0,
+                    max_round_gap: 6,
+                }),
+        )
+}
+
+pub fn run_dag_multiregion_benchmark_test() -> ForgeConfig {
+    ForgeConfig::default()
+        .with_initial_validator_count(NonZeroUsize::new(100).unwrap())
+        .with_emit_job(
+            EmitJobRequest::default()
+                .mode(EmitJobMode::MaxLoad {
+                    mempool_backlog: 800_000,
+                })
+                .txn_expiration_time_secs(5 * 60),
+        )
+        .add_network_test(PerformanceBenchmark)
+        .with_genesis_helm_config_fn(Arc::new(|helm_values| {
+            let onchain_consensus_config = OnChainConsensusConfig::V3 {
+                alg: ConsensusAlgorithmConfig::DAG(DagConsensusConfigV1::default()),
+                vtxn: ValidatorTxnConfig::default_disabled(),
+            };
+
+            helm_values["chain"]["on_chain_consensus_config"] =
+                serde_yaml::to_value(onchain_consensus_config).expect("must serialize");
+
+            let mut on_chain_execution_config = OnChainExecutionConfig::default_for_genesis();
+            // Need to update if the default changes
+            match &mut on_chain_execution_config {
+                OnChainExecutionConfig::Missing
+                | OnChainExecutionConfig::V1(_)
+                | OnChainExecutionConfig::V2(_)
+                | OnChainExecutionConfig::V3(_) => {
+                    unreachable!("Unexpected on-chain execution config type, if OnChainExecutionConfig::default_for_genesis() has been updated, this test must be updated too.")
+                }
+                OnChainExecutionConfig::V4(config_v4) => {
+                    config_v4.block_gas_limit_type = BlockGasLimitType::NoLimit;
+                    config_v4.transaction_shuffler_type = TransactionShufflerType::NoShuffling;
+                    config_v4.transaction_deduper_type = TransactionDeduperType::NoDedup;
+                }
+            }
+            helm_values["chain"]["on_chain_execution_config"] =
+            serde_yaml::to_value(on_chain_execution_config).expect("must serialize");
+
+            // Have single epoch change in land blocking
+            helm_values["chain"]["epoch_duration_secs"] = 300.into();
+
+            helm_values["genesis"]["multicluster"]["enabled"] = true.into();
+        }))
+        .with_multi_region_config()
+        .with_validator_override_node_config_fn(Arc::new(|config, _| {
+            optimize_for_maximum_throughput(config, 20_000, 4_500, 3.0);
+            // Increase the state sync chunk sizes (consensus blocks are much larger than 1k)
+            optimize_state_sync_for_throughput(config);
+            state_sync_config_execute_transactions(&mut config.state_sync);
+        }))
+        .with_validator_resource_override(NodeResourceOverride { cpu_cores: Some(60), memory_gib: Some(500) })
         .with_success_criteria(
             SuccessCriteria::new(10000)
                 .add_no_restarts()

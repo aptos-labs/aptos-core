@@ -27,7 +27,7 @@ RANDOM_SEED=${RANDOM_SEED:-$RANDOM}
 export APTOS_DISABLE_TELEMETRY=true
 
 ENABLE_MULTICLUSTER_DOMAIN_SUFFIX=${ENABLE_MULTICLUSTER_DOMAIN_SUFFIX:-false}
-MULTICLUSTER_DOMAIN_SUFFIXES_DEFAULT="forge-multiregion-1,forge-multiregion-2,forge-multiregion-3,forge-multiregion-4"
+MULTICLUSTER_DOMAIN_SUFFIXES_DEFAULT="forge-multiregion-1,forge-multiregion-2,forge-multiregion-3,forge-multiregion-4,forge-multiregion-5,forge-multiregion-6,forge-multiregion-7,forge-multiregion-8,forge-multiregion-9,forge-multiregion-10"
 MULTICLUSTER_DOMAIN_SUFFIXES_STRING=${MULTICLUSTER_DOMAIN_SUFFIXES_STRING:-${MULTICLUSTER_DOMAIN_SUFFIXES_DEFAULT}}
 echo $MULTICLUSTER_DOMAIN_SUFFIXES_STRING
 # convert comma separated string to array

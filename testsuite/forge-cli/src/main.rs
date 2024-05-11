@@ -76,7 +76,9 @@ use std::{
     thread,
     time::Duration,
 };
-use suites::dag::{get_dag_test, run_dag_consensus_only_realistic_env_max_tps};
+use suites::dag::{
+    get_dag_test, run_dag_consensus_only_realistic_env_max_tps, run_dag_multiregion_benchmark_test,
+};
 use tokio::{runtime::Runtime, select};
 use url::Url;
 
@@ -279,7 +281,7 @@ fn main() -> Result<()> {
     let args = Args::parse();
     let duration = Duration::from_secs(args.duration_secs as u64);
     // let suite_name: &str = args.suite.as_ref();
-    let suite_name = "consensus_only_realistic_env_max_tps";
+    let suite_name = "run_dag_multiregion_benchmark_test";
 
     let runtime = Runtime::new()?;
     match args.cli_cmd {
@@ -708,6 +710,7 @@ fn get_state_sync_test(test_name: &str) -> Option<ForgeConfig> {
 fn get_multi_region_test(test_name: &str) -> Option<ForgeConfig> {
     let test = match test_name {
         "multiregion_benchmark_test" => multiregion_benchmark_test(),
+        "run_dag_multiregion_benchmark_test" => run_dag_multiregion_benchmark_test(),
         "three_region_simulation" => three_region_simulation(),
         "three_region_simulation_with_different_node_speed" => {
             three_region_simulation_with_different_node_speed()
