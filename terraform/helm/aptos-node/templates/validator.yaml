@@ -95,7 +95,7 @@ spec:
             - |
               set -x
               cp /opt/aptos/genesis_readonly/* /opt/aptos/genesis
-              if [ ! -f /opt/aptos/genesis/genesis.blob ]; then
+              if [ ! -f /opt/aptos/genesis/genesis.blob.tar.gz ]; then
                 genesis_blob_upload_url="{{ $.Values.genesis_blob_upload_url }}"
                 genesis_blob_upload_url="$genesis_blob_upload_url&namespace={{ $.Release.Namespace }}&method=GET"
                 echo "genesis.blob not found locally, downloading..."
@@ -103,6 +103,8 @@ spec:
                 curl -o /opt/aptos/genesis/genesis.blob "$signed_url"
               else
                 echo "genesis.blob found locally"
+                # Extract genesis.blob
+                tar -xvf /opt/aptos/genesis/genesis.blob.tar.gz -C /opt/aptos/genesis
               fi
               ls -l /opt/aptos/genesis
           volumeMounts:
