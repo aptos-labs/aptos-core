@@ -75,6 +75,7 @@ pub fn run_test_suite(safety_rules: &Callback) {
     test_order_votes_correct_execution(safety_rules);
     test_order_votes_out_of_order_execution(safety_rules);
     test_order_votes_incorrect_qc(safety_rules);
+    test_order_votes_bad_execution_output(safety_rules);
 }
 
 fn test_order_votes_correct_execution(safety_rules: &Callback) {
@@ -90,7 +91,6 @@ fn test_order_votes_correct_execution(safety_rules: &Callback) {
     let p2 = test_utils::make_proposal_with_parent(data.clone(), round + 3, &p1, None, &signer);
     let p3 = test_utils::make_proposal_with_parent(data, round + 4, &p2, Some(&p0), &signer);
 
-    safety_rules.initialize(&proof).unwrap();
     let ov1 = OrderVoteProposal::new(
         p0.block().clone(),
         p1.block().quorum_cert().certified_block().clone(),
@@ -106,6 +106,8 @@ fn test_order_votes_correct_execution(safety_rules: &Callback) {
         p3.block().quorum_cert().certified_block().clone(),
         Arc::new(p3.block().quorum_cert().clone()),
     );
+
+    safety_rules.initialize(&proof).unwrap();
 
     safety_rules.construct_and_sign_order_vote(&ov1).unwrap();
 
@@ -127,7 +129,6 @@ fn test_order_votes_out_of_order_execution(safety_rules: &Callback) {
     let p2 = test_utils::make_proposal_with_parent(data.clone(), round + 3, &p1, None, &signer);
     let p3 = test_utils::make_proposal_with_parent(data, round + 4, &p2, Some(&p0), &signer);
 
-    safety_rules.initialize(&proof).unwrap();
     let ov1 = OrderVoteProposal::new(
         p0.block().clone(),
         p1.block().quorum_cert().certified_block().clone(),
@@ -144,12 +145,15 @@ fn test_order_votes_out_of_order_execution(safety_rules: &Callback) {
         Arc::new(p3.block().quorum_cert().clone()),
     );
 
+    safety_rules.initialize(&proof).unwrap();
+
     safety_rules.construct_and_sign_order_vote(&ov1).unwrap();
 
     safety_rules.construct_and_sign_order_vote(&ov3).unwrap();
 
     safety_rules.construct_and_sign_order_vote(&ov2).unwrap();
 
+    // TODO: Safety rules current do not preven this out of order signing. Should we prevent it?
     safety_rules
         .construct_and_sign_vote_two_chain(&p0, None)
         .unwrap();
@@ -177,7 +181,6 @@ fn test_order_votes_incorrect_qc(safety_rules: &Callback) {
     let p2 = test_utils::make_proposal_with_parent(data.clone(), round + 3, &p1, None, &signer);
     let p3 = test_utils::make_proposal_with_parent(data, round + 4, &p2, Some(&p0), &signer);
 
-    safety_rules.initialize(&proof).unwrap();
     let ov1 = OrderVoteProposal::new(
         p0.block().clone(),
         p1.block().quorum_cert().certified_block().clone(),
@@ -193,6 +196,8 @@ fn test_order_votes_incorrect_qc(safety_rules: &Callback) {
         p2.block().quorum_cert().certified_block().clone(),
         Arc::new(p2.block().quorum_cert().clone()),
     );
+
+    safety_rules.initialize(&proof).unwrap();
 
     safety_rules.construct_and_sign_order_vote(&ov1).unwrap();
 
@@ -219,7 +224,7 @@ fn test_bad_execution_output(safety_rules: &Callback) {
     let a3 = make_proposal_with_parent(round + 3, &a2, None, &signer);
 
     safety_rules.initialize(&proof).unwrap();
-    let a1_output = a1
+    let a2_output = a2
         .accumulator_extension_proof()
         .verify(
             a1.block()
@@ -230,8 +235,8 @@ fn test_bad_execution_output(safety_rules: &Callback) {
         .unwrap();
 
     let evil_proof = Proof::new(
-        a1_output.frozen_subtree_roots().clone(),
-        a1_output.num_leaves() + 1,
+        a2_output.frozen_subtree_roots().clone(),
+        a2_output.num_leaves() + 1,
         vec![],
     );
 
@@ -251,6 +256,89 @@ fn test_bad_execution_output(safety_rules: &Callback) {
 
     let a3_block = safety_rules.construct_and_sign_vote_two_chain(&a3, None);
     a3_block.unwrap();
+}
+
+fn test_order_votes_bad_execution_output(safety_rules: &Callback) {
+    // build a tree of the following form:
+    //                 __________
+    //                /          \
+    // genesis---a1--a2--a3--a4  evil_a3--evil_a4
+    //
+    // evil_a3 attempts to append to a1 but fails append only check
+    // a3 works as it properly extends a2
+    let (mut safety_rules, signer) = safety_rules();
+
+    let (proof, genesis_qc) = test_utils::make_genesis(&signer);
+    let round = genesis_qc.certified_block().round();
+
+    let a1 = test_utils::make_proposal_with_qc(round + 1, genesis_qc, &signer);
+    let a2 = make_proposal_with_parent(round + 2, &a1, None, &signer);
+    let a3 = make_proposal_with_parent(round + 3, &a2, None, &signer);
+    let a4 = make_proposal_with_parent(round + 4, &a3, None, &signer);
+
+    let ov1 = OrderVoteProposal::new(
+        a1.block().clone(),
+        a2.block().quorum_cert().certified_block().clone(),
+        Arc::new(a2.block().quorum_cert().clone()),
+    );
+    let ov2 = OrderVoteProposal::new(
+        a2.block().clone(),
+        a3.block().quorum_cert().certified_block().clone(),
+        Arc::new(a3.block().quorum_cert().clone()),
+    );
+    let ov3 = OrderVoteProposal::new(
+        a3.block().clone(),
+        a4.block().quorum_cert().certified_block().clone(),
+        Arc::new(a4.block().quorum_cert().clone()),
+    );
+
+    safety_rules.initialize(&proof).unwrap();
+    let a2_output = a2
+        .accumulator_extension_proof()
+        .verify(
+            a2.block()
+                .quorum_cert()
+                .certified_block()
+                .executed_state_id(),
+        )
+        .unwrap();
+
+    let evil_proof = Proof::new(
+        a2_output.frozen_subtree_roots().clone(),
+        a2_output.num_leaves(),
+        vec![],
+    );
+
+    let evil_a3 = make_proposal_with_qc_and_proof(
+        round + 3,
+        evil_proof,
+        a3.block().quorum_cert().clone(),
+        &signer,
+    );
+    let evil_a4 = make_proposal_with_parent(round + 4, &evil_a3, None, &signer);
+    let evil_ov3 = OrderVoteProposal::new(
+        evil_a3.block().clone(),
+        evil_a4.block().quorum_cert().certified_block().clone(),
+        Arc::new(evil_a4.block().quorum_cert().clone()),
+    );
+
+    safety_rules
+        .construct_and_sign_vote_two_chain(&a1, None)
+        .unwrap();
+    safety_rules.construct_and_sign_order_vote(&ov1).unwrap();
+    safety_rules
+        .construct_and_sign_vote_two_chain(&a2, None)
+        .unwrap();
+    safety_rules.construct_and_sign_order_vote(&ov2).unwrap();
+    safety_rules
+        .construct_and_sign_vote_two_chain(&a3, None)
+        .unwrap();
+    safety_rules.construct_and_sign_order_vote(&ov3).unwrap();
+
+    // TODO: This works without any errors. Should we prevent this?
+    safety_rules
+        .construct_and_sign_order_vote(&evil_ov3)
+        .unwrap();
 }
 
 fn test_end_to_end(safety_rules: &Callback) {
