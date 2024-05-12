@@ -313,7 +313,7 @@ pub trait AsMoveResolver<S> {
 
 impl<S: StateView> AsMoveResolver<S> for S {
     fn as_move_resolver(&self) -> StorageAdapter<S> {
-        let (_, gas_feature_version) = get_gas_config_from_storage(self);
+        let (_, gas_feature_version) = get_gas_config_from_storage(self).expect("TODO");
         let features = Features::fetch_config(self).unwrap_or_default();
         let max_binary_version = features.get_max_binary_format_version(Some(gas_feature_version));
         let resource_group_adapter = ResourceGroupAdapter::new(

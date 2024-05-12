@@ -36,8 +36,6 @@ use aptos_gas_schedule::{AptosGasParameters, TransactionGasParameters, VMGasPara
 use aptos_logger::{enabled, prelude::*, Level};
 use aptos_memory_usage_tracker::MemoryTrackedGasMeter;
 use aptos_metrics_core::TimerHelper;
-#[cfg(any(test, feature = "testing"))]
-use aptos_types::state_store::StateViewId;
 use aptos_types::{
     account_config,
     account_config::{new_block_event_key, AccountResource},
@@ -185,23 +183,12 @@ pub(crate) fn get_transaction_output(
     ))
 }
 
-pub(crate) fn get_or_vm_startup_failure<'a, T>(
-    gas_params: &'a Result<T, String>,
-    log_context: &AdapterLogSchema,
-) -> Result<&'a T, VMStatus> {
-    gas_params.as_ref().map_err(|err| {
-        let msg = format!("VM Startup Failed. {}", err);
-        speculative_error!(log_context, msg.clone());
-        VMStatus::error(StatusCode::VM_STARTUP_FAILURE, Some(msg))
-    })
-}
-
 pub struct AptosVM {
     is_simulation: bool,
     move_vm: MoveVmExt,
     gas_feature_version: u64,
-    gas_params: Result<AptosGasParameters, String>,
-    pub(crate) storage_gas_params: Result<StorageGasParameters, String>,
+    gas_params: AptosGasParameters,
+    pub(crate) storage_gas_params: StorageGasParameters,
     timed_features: TimedFeatures,
     /// For a new chain, or even mainnet, the VK might not necessarily be set.
     pvk: Option<PreparedVerifyingKey<Bn254>>,
@@ -217,13 +204,8 @@ impl AptosVM {
         let randomness_api_v0_required_deposit = RequiredGasDeposit::fetch_config(resolver)
             .unwrap_or_else(RequiredGasDeposit::default_if_missing);
         let features = Features::fetch_config(resolver).unwrap_or_default();
-        let (
-            gas_params,
-            storage_gas_params,
-            native_gas_params,
-            misc_gas_params,
-            gas_feature_version,
-        ) = get_gas_parameters(&features, resolver);
+        let (gas_params, storage_gas_params, gas_feature_version) =
+            get_gas_parameters(&features, resolver).expect("TODO");
 
         // If no chain ID is in storage, we assume we are in a testing environment and use ChainId::TESTING
         let chain_id = ChainId::fetch_config(resolver).unwrap_or_else(ChainId::test);
@@ -247,8 +229,8 @@ impl AptosVM {
             && features.is_aggregator_v2_delayed_fields_enabled();
 
         let move_vm = MoveVmExt::new(
-            native_gas_params,
-            misc_gas_params,
+            gas_params.natives.clone(),
+            gas_params.vm.misc.clone(),
             gas_feature_version,
             chain_id.id(),
             features,
@@ -391,13 +373,6 @@ impl AptosVM {
             Some(value) => *value,
             None => false,
         }
-    }
-
-    /// Returns the internal gas schedule if it has been loaded, or an error if it hasn't.
-    #[cfg(any(test, feature = "testing"))]
-    pub fn gas_params(&self) -> Result<&AptosGasParameters, VMStatus> {
-        let log_context = AdapterLogSchema::new(StateViewId::Miscellaneous, 0);
-        get_or_vm_startup_failure(&self.gas_params, &log_context)
     }
 
     pub fn as_move_resolver<'r, R: ExecutorView>(
@@ -597,7 +572,6 @@ impl AptosVM {
                 AptosVM::fee_statement_from_gas_meter(txn_data, gas_meter, ZERO_STORAGE_REFUND);
 
             // Verify we charged sufficiently for creating an account slot
-            let gas_params = get_or_vm_startup_failure(&self.gas_params, log_context)?;
             let gas_unit_price = u64::from(txn_data.gas_unit_price());
             let gas_used = fee_statement.gas_used();
             let storage_fee = fee_statement.storage_fee_used();
@@ -607,7 +581,7 @@ impl AptosVM {
             let expected = u64::from(
                 gas_meter
                     .disk_space_pricing()
-                    .hack_account_creation_fee_lower_bound(&gas_params.vm.txn),
+                    .hack_account_creation_fee_lower_bound(&self.gas_params.vm.txn),
             );
             if actual < expected {
                 expect_only_successful_execution(
@@ -1589,17 +1563,12 @@ impl AptosVM {
     pub(crate) fn make_standard_gas_meter(
         &self,
         balance: Gas,
-        log_context: &AdapterLogSchema,
-    ) -> Result<MemoryTrackedGasMeter<StandardGasMeter<StandardGasAlgebra>>, VMStatus> {
-        Ok(MemoryTrackedGasMeter::new(StandardGasMeter::new(
-            StandardGasAlgebra::new(
-                self.gas_feature_version,
-                get_or_vm_startup_failure(&self.gas_params, log_context)?
-                    .vm
-                    .clone(),
-                get_or_vm_startup_failure(&self.storage_gas_params, log_context)?.clone(),
-                balance,
-            ),
+    ) -> MemoryTrackedGasMeter<StandardGasMeter<StandardGasAlgebra>> {
+        MemoryTrackedGasMeter::new(StandardGasMeter::new(StandardGasAlgebra::new(
+            self.gas_feature_version,
+            self.gas_params.vm.clone(),
+            self.storage_gas_params.clone(),
+            balance,
         )))
     }
 
@@ -1720,18 +1689,13 @@ impl AptosVM {
                 traversal_context,
             )
         }));
-        let storage_gas_params = unwrap_or_discard!(get_or_vm_startup_failure(
-            &self.storage_gas_params,
-            log_context
-        ));
-        let change_set_configs = &storage_gas_params.change_set_configs;
         let (prologue_change_set, mut user_session) = unwrap_or_discard!(prologue_session
             .into_user_session(
                 self,
                 &txn_data,
                 resolver,
                 self.gas_feature_version,
-                change_set_configs,
+                &self.storage_gas_params.change_set_configs,
             ));
 
         let is_account_init_for_sponsored_transaction = unwrap_or_discard!(
@@ -1764,7 +1728,7 @@ impl AptosVM {
                     payload,
                     log_context,
                     &mut new_published_modules_loaded,
-                    change_set_configs,
+                    &self.storage_gas_params.change_set_configs,
                 ),
             TransactionPayload::Multisig(payload) => self.execute_or_simulate_multisig_transaction(
                 resolver,
@@ -1776,7 +1740,7 @@ impl AptosVM {
                 payload,
                 log_context,
                 &mut new_published_modules_loaded,
-                change_set_configs,
+                &self.storage_gas_params.change_set_configs,
             ),
 
             // Deprecated. We cannot make this `unreachable!` because a malicious
@@ -1800,7 +1764,7 @@ impl AptosVM {
                 &txn_data,
                 log_context,
                 gas_meter,
-                change_set_configs,
+                &self.storage_gas_params.change_set_configs,
                 new_published_modules_loaded,
                 traversal_context,
             )
@@ -1814,8 +1778,7 @@ impl AptosVM {
         log_context: &AdapterLogSchema,
     ) -> (VMStatus, VMOutput) {
         let balance = txn.max_gas_amount().into();
-        // TODO: would we end up having a diverging behavior by creating the gas meter at an earlier time?
-        let mut gas_meter = unwrap_or_discard!(self.make_standard_gas_meter(balance, log_context));
+        let mut gas_meter = self.make_standard_gas_meter(balance);
 
         let traversal_storage = TraversalStorage::new();
         let mut traversal_context = TraversalContext::new(&traversal_storage);
@@ -1843,10 +1806,8 @@ impl AptosVM {
         let balance = txn.max_gas_amount().into();
         let mut gas_meter = make_gas_meter(
             self.gas_feature_version,
-            get_or_vm_startup_failure(&self.gas_params, log_context)?
-                .vm
-                .clone(),
-            get_or_vm_startup_failure(&self.storage_gas_params, log_context)?.clone(),
+            self.gas_params.vm.clone(),
+            self.storage_gas_params.clone(),
             balance,
         )?;
         let traversal_storage = TraversalStorage::new();
@@ -2047,7 +2008,7 @@ impl AptosVM {
             session,
             FeeStatement::zero(),
             ExecutionStatus::Success,
-            &get_or_vm_startup_failure(&self.storage_gas_params, log_context)?.change_set_configs,
+            &self.storage_gas_params.change_set_configs,
         )?;
         Ok((VMStatus::Executed, output))
     }
@@ -2128,7 +2089,7 @@ impl AptosVM {
             session,
             FeeStatement::zero(),
             ExecutionStatus::Success,
-            &get_or_vm_startup_failure(&self.storage_gas_params, log_context)?.change_set_configs,
+            &self.storage_gas_params.change_set_configs,
         )?;
         Ok((VMStatus::Executed, output))
     }
@@ -2154,11 +2115,7 @@ impl AptosVM {
             &resolver,
             /*override_is_delayed_field_optimization_capable=*/ Some(false),
         );
-        let log_context = AdapterLogSchema::new(state_view.id(), 0);
-        let mut gas_meter = match vm.make_standard_gas_meter(max_gas_amount.into(), &log_context) {
-            Ok(gas_meter) => gas_meter,
-            Err(e) => return ViewFunctionOutput::new(Err(anyhow::Error::msg(format!("{}", e))), 0),
-        };
+        let mut gas_meter = vm.make_standard_gas_meter(max_gas_amount.into());
 
         let mut session = vm.new_session(&resolver, SessionId::Void, None);
         let execution_result = Self::execute_view_function_in_vm(
@@ -2232,7 +2189,7 @@ impl AptosVM {
         traversal_context: &mut TraversalContext,
     ) -> Result<(), VMStatus> {
         check_gas(
-            get_or_vm_startup_failure(&self.gas_params, log_context)?,
+            &self.gas_params,
             self.gas_feature_version,
             resolver,
             txn_data,
@@ -2589,11 +2546,11 @@ impl VMValidator for AptosVM {
             SessionId::prologue_meta(&txn_data),
             Some(txn_data.as_user_transaction_context()),
         );
-        let required_deposit = if let Ok(gas_params) = &self.gas_params {
+        let required_deposit = {
             let maybe_required_deposit = self.get_required_deposit(
                 &mut session,
                 &resolver,
-                &gas_params.vm.txn,
+                &self.gas_params.vm.txn,
                 &txn_data,
                 txn.payload(),
             );
@@ -2603,8 +2560,6 @@ impl VMValidator for AptosVM {
                     return VMValidatorResult::error(vm_status.status_code());
                 },
             }
-        } else {
-            return VMValidatorResult::error(StatusCode::GAS_PARAMS_MISSING);
         };
 
         txn_data.set_required_deposit(required_deposit);

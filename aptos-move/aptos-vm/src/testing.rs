@@ -3,10 +3,7 @@
 
 use crate::AptosVM;
 #[cfg(any(test, feature = "testing"))]
-use crate::{
-    aptos_vm::get_or_vm_startup_failure, data_cache::AsMoveResolver,
-    transaction_metadata::TransactionMetadata,
-};
+use crate::{data_cache::AsMoveResolver, transaction_metadata::TransactionMetadata};
 #[cfg(any(test, feature = "testing"))]
 use aptos_types::{state_store::StateView, transaction::SignedTransaction};
 #[cfg(any(test, feature = "testing"))]
@@ -75,13 +72,7 @@ impl AptosVM {
 
         let txn_data = TransactionMetadata::new(txn);
         let log_context = AdapterLogSchema::new(state_view.id(), 0);
-
-        let mut gas_meter = self
-            .make_standard_gas_meter(gas_meter_balance.into(), &log_context)
-            .expect("Should be able to create a gas meter for tests");
-        let change_set_configs = &get_or_vm_startup_failure(&self.storage_gas_params, &log_context)
-            .expect("Storage gas parameters should exist for tests")
-            .change_set_configs;
+        let mut gas_meter = self.make_standard_gas_meter(gas_meter_balance.into());
 
         let resolver = state_view.as_move_resolver();
         let storage = TraversalStorage::new();
@@ -92,7 +83,7 @@ impl AptosVM {
             &txn_data,
             &resolver,
             &log_context,
-            change_set_configs,
+            &self.storage_gas_params.change_set_configs,
             &mut TraversalContext::new(&storage),
         )
     }

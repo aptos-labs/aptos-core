@@ -1125,20 +1125,14 @@ impl FakeExecutor {
         state_view: &impl AptosMoveResolver,
         features: Features,
     ) -> Result<(WriteSet, Vec<ContractEvent>), VMStatus> {
-        let (
-            gas_params_res,
-            storage_gas_params,
-            native_gas_params,
-            misc_gas_params,
-            gas_feature_version,
-        ) = get_gas_parameters(&features, state_view);
+        let (gas_params, storage_gas_params, gas_feature_version) =
+            get_gas_parameters(&features, state_view).unwrap();
 
-        let gas_params = gas_params_res.unwrap();
         let mut gas_meter =
             MemoryTrackedGasMeter::new(StandardGasMeter::new(StandardGasAlgebra::new(
                 gas_feature_version,
-                gas_params.clone().vm,
-                storage_gas_params.unwrap(),
+                gas_params.vm.clone(),
+                storage_gas_params,
                 10000000000000,
             )));
 
@@ -1147,8 +1141,8 @@ impl FakeExecutor {
             .build();
         let struct_constructors = features.is_enabled(FeatureFlag::STRUCT_CONSTRUCTORS);
         let vm = MoveVmExt::new(
-            native_gas_params,
-            misc_gas_params,
+            gas_params.natives.clone(),
+            gas_params.vm.misc.clone(),
             LATEST_GAS_FEATURE_VERSION,
             self.chain_id,
             features,
