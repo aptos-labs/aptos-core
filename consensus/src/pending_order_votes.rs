@@ -27,8 +27,6 @@ pub enum OrderVoteReceptionResult {
     NewLedgerInfoWithSignatures(Arc<LedgerInfoWithSignatures>),
     /// There might be some issues adding a vote
     ErrorAddingVote(VerifyError),
-    /// The vote is not for one of the last 2 rounds
-    UnexpectedRound(u64, u64),
     /// Error happens when aggregating signature
     ErrorAggregatingSignature(VerifyError),
 }
@@ -39,17 +37,16 @@ enum OrderVoteStatus {
     NotEnoughVotes,
 }
 
-/// A PendingVotes structure keep track of votes
+/// A PendingVotes structure keep track of order votes for the last few rounds
 pub struct PendingOrderVotes {
     /// Maps LedgerInfo digest to associated signatures (contained in a partial LedgerInfoWithSignatures).
-    /// This might keep multiple LedgerInfos for the current round: either due to different proposals (byzantine behavior)
-    /// or due to different NIL proposals (clients can have a different view of what block to extend).
+    /// Order vote status stores caches the information on whether the votes are enough to form a QC.
     li_digest_to_votes: HashMap<
         HashValue, /* LedgerInfo digest */
-        (usize, OrderVoteStatus, LedgerInfoWithPartialSignatures),
+        (OrderVoteStatus, LedgerInfoWithPartialSignatures),
     >,
-    /// Map of Author to (vote, li_digest). This is useful to discard multiple votes.
-    author_to_order_vote: HashMap<(Author, u64), (OrderVote, HashValue)>,
+    /// Map of (Author, round number) to order vote. This is useful to discard multiple votes.
+    author_to_order_vote: HashMap<(Author, u64), OrderVote>,
 }
 
 impl PendingOrderVotes {
@@ -72,11 +69,11 @@ impl PendingOrderVotes {
         let li_digest = order_vote.ledger_info().hash();
         let round = order_vote.ledger_info().round();
 
-        if let Some((previously_seen_vote, previous_li_digest)) =
+        if let Some(previously_seen_vote) =
             self.author_to_order_vote.get(&(order_vote.author(), round))
         {
             // is it the same vote?
-            if &li_digest == previous_li_digest {
+            if li_digest == previously_seen_vote.ledger_info().hash() {
                 return OrderVoteReceptionResult::DuplicateVote;
             } else {
                 // we have seen a different vote for the same round
@@ -91,25 +88,20 @@ impl PendingOrderVotes {
             }
         }
 
-        self.author_to_order_vote.insert(
-            (order_vote.author(), round),
-            (order_vote.clone(), li_digest),
-        );
+        self.author_to_order_vote
+            .insert((order_vote.author(), round), order_vote.clone());
 
-        let len = self.li_digest_to_votes.len() + 1;
         // obtain the ledger info with signatures associated to the order vote's ledger info
-        let (_hash_index, status, li_with_sig) =
-            self.li_digest_to_votes.entry(li_digest).or_insert_with(|| {
-                // if the ledger info with signatures doesn't exist yet, create it
-                (
-                    len,
-                    OrderVoteStatus::NotEnoughVotes,
-                    LedgerInfoWithPartialSignatures::new(
-                        order_vote.ledger_info().clone(),
-                        PartialSignatures::empty(),
-                    ),
-                )
-            });
+        let (status, li_with_sig) = self.li_digest_to_votes.entry(li_digest).or_insert_with(|| {
+            // if the ledger info with signatures doesn't exist yet, create it
+            (
+                OrderVoteStatus::NotEnoughVotes,
+                LedgerInfoWithPartialSignatures::new(
+                    order_vote.ledger_info().clone(),
+                    PartialSignatures::empty(),
+                ),
+            )
+        });
         let validator_voting_power = validator_verifier
             .get_voting_power(&order_vote.author())
             .unwrap_or(0);
@@ -159,18 +151,112 @@ impl PendingOrderVotes {
     // Removes votes older than highest_committed_round
     pub fn garbage_collect(&mut self, highest_committed_round: u64) {
         self.li_digest_to_votes
-            .retain(|_, (_, _, li)| li.ledger_info().round() > highest_committed_round);
+            .retain(|_, (_, li)| li.ledger_info().round() > highest_committed_round);
         self.author_to_order_vote
-            .retain(|&(_, r), _| r >= highest_committed_round);
+            .retain(|&(_, r), _| r > highest_committed_round);
     }
 
     pub fn has_enough_order_votes(&self, ledger_info: &LedgerInfo) -> bool {
         let li_digest = ledger_info.hash();
-        if let Some((_, status, _)) = self.li_digest_to_votes.get(&li_digest) {
+        if let Some((status, _)) = self.li_digest_to_votes.get(&li_digest) {
             if *status == OrderVoteStatus::EnoughVotes {
                 return true;
             }
         }
         false
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::{OrderVoteReceptionResult, PendingOrderVotes};
+    use aptos_consensus_types::order_vote::OrderVote;
+    use aptos_crypto::HashValue;
+    use aptos_types::{
+        block_info::BlockInfo, ledger_info::LedgerInfo,
+        validator_verifier::random_validator_verifier,
+    };
+
+    /// Creates a random ledger info for epoch 1 and round 1.
+    fn random_ledger_info() -> LedgerInfo {
+        LedgerInfo::new(
+            BlockInfo::new(1, 0, HashValue::random(), HashValue::random(), 0, 0, None),
+            HashValue::random(),
+        )
+    }
+
+    #[test]
+    fn order_vote_aggregation() {
+        ::aptos_logger::Logger::init_for_testing();
+        // set up 4 validators
+        let (signers, validator) = random_validator_verifier(4, Some(2), false);
+
+        let mut pending_order_votes = PendingOrderVotes::new();
+
+        // create random vote from validator[0]
+        let li1 = random_ledger_info();
+        let order_vote_1_author_0 = OrderVote::new_with_signature(
+            signers[0].author(),
+            li1.clone(),
+            signers[0].sign(&li1).expect("Unable to sign ledger info"),
+        );
+
+        // first time a new order vote is added -> OrdrVoteAdded
+        assert_eq!(
+            pending_order_votes.insert_order_vote(&order_vote_1_author_0, &validator),
+            OrderVoteReceptionResult::VoteAdded(1)
+        );
+
+        // same author voting for the same thing -> DuplicateVote
+        assert_eq!(
+            pending_order_votes.insert_order_vote(&order_vote_1_author_0, &validator),
+            OrderVoteReceptionResult::DuplicateVote
+        );
+
+        // same author voting for a different result -> EquivocateVote
+        let li2 = random_ledger_info();
+        let order_vote_2_author_0 = OrderVote::new_with_signature(
+            signers[0].author(),
+            li2.clone(),
+            signers[0].sign(&li2).expect("Unable to sign ledger info"),
+        );
+
+        assert_eq!(
+            pending_order_votes.insert_order_vote(&order_vote_2_author_0, &validator),
+            OrderVoteReceptionResult::EquivocateVote
+        );
+
+        let order_vote_2_author_1 = OrderVote::new_with_signature(
+            signers[1].author(),
+            li2.clone(),
+            signers[1].sign(&li2).expect("Unable to sign ledger info"),
+        );
+        assert_eq!(
+            pending_order_votes.insert_order_vote(&order_vote_2_author_1, &validator),
+            OrderVoteReceptionResult::VoteAdded(1)
+        );
+
+        assert!(!pending_order_votes.has_enough_order_votes(&li1));
+        assert!(!pending_order_votes.has_enough_order_votes(&li2));
+
+        let order_vote_2_author_2 = OrderVote::new_with_signature(
+            signers[2].author(),
+            li2.clone(),
+            signers[2].sign(&li2).expect("Unable to sign ledger info"),
+        );
+        match pending_order_votes.insert_order_vote(&order_vote_2_author_2, &validator) {
+            OrderVoteReceptionResult::NewLedgerInfoWithSignatures(li_with_sig) => {
+                assert!(li_with_sig.check_voting_power(&validator).is_ok());
+            },
+            _ => {
+                panic!("No QC formed.");
+            },
+        };
+        assert!(!pending_order_votes.has_enough_order_votes(&li1));
+        assert!(pending_order_votes.has_enough_order_votes(&li2));
+
+        pending_order_votes.garbage_collect(0);
+        assert!(!pending_order_votes.has_enough_order_votes(&li1));
+        assert!(!pending_order_votes.has_enough_order_votes(&li2));
     }
 }
