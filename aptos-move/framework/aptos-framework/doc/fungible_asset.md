@@ -10,6 +10,7 @@ metadata object can be any object that equipped with <code><a href="fungible_ass
 -  [Resource `Supply`](#0x1_fungible_asset_Supply)
 -  [Resource `ConcurrentSupply`](#0x1_fungible_asset_ConcurrentSupply)
 -  [Resource `Metadata`](#0x1_fungible_asset_Metadata)
+-  [Resource `Untransferable`](#0x1_fungible_asset_Untransferable)
 -  [Resource `FungibleStore`](#0x1_fungible_asset_FungibleStore)
 -  [Resource `DispatchFunctionStore`](#0x1_fungible_asset_DispatchFunctionStore)
 -  [Struct `FungibleAsset`](#0x1_fungible_asset_FungibleAsset)
@@ -25,6 +26,8 @@ metadata object can be any object that equipped with <code><a href="fungible_ass
 -  [Struct `FrozenEvent`](#0x1_fungible_asset_FrozenEvent)
 -  [Constants](#@Constants_0)
 -  [Function `add_fungibility`](#0x1_fungible_asset_add_fungibility)
+-  [Function `set_untransferable`](#0x1_fungible_asset_set_untransferable)
+-  [Function `is_untransferable`](#0x1_fungible_asset_is_untransferable)
 -  [Function `register_dispatch_functions`](#0x1_fungible_asset_register_dispatch_functions)
 -  [Function `generate_mint_ref`](#0x1_fungible_asset_generate_mint_ref)
 -  [Function `generate_burn_ref`](#0x1_fungible_asset_generate_burn_ref)
@@ -212,6 +215,36 @@ Metadata of a Fungible asset
 </dt>
 <dd>
  The Uniform Resource Identifier (uri) pointing to the website for the fungible asset.
+</dd>
+</dl>
+
+
+</details>
+
+<a id="0x1_fungible_asset_Untransferable"></a>
+
+## Resource `Untransferable`
+
+Defines a <code><a href="fungible_asset.md#0x1_fungible_asset_FungibleAsset">FungibleAsset</a></code>, such that all <code><a href="fungible_asset.md#0x1_fungible_asset_FungibleStore">FungibleStore</a></code>s stores are untransferable at
+the object layer.
+
+
+<pre><code>#[resource_group_member(#[group = <a href="object.md#0x1_object_ObjectGroup">0x1::object::ObjectGroup</a>])]
+<b>struct</b> <a href="fungible_asset.md#0x1_fungible_asset_Untransferable">Untransferable</a> <b>has</b> key
+</code></pre>
+
+
+
+<details>
+<summary>Fields</summary>
+
+
+<dl>
+<dt>
+<code>dummy_field: bool</code>
+</dt>
+<dd>
+
 </dd>
 </dl>
 
@@ -784,6 +817,16 @@ Fungible asset do not match when merging.
 
 
 
+<a id="0x1_fungible_asset_EFUNGIBLE_METADATA_EXISTENCE"></a>
+
+Fungible metadata does not exist on this account.
+
+
+<pre><code><b>const</b> <a href="fungible_asset.md#0x1_fungible_asset_EFUNGIBLE_METADATA_EXISTENCE">EFUNGIBLE_METADATA_EXISTENCE</a>: u64 = 30;
+</code></pre>
+
+
+
 <a id="0x1_fungible_asset_EFUNGIBLE_STORE_EXISTENCE"></a>
 
 Flag for the existence of fungible store.
@@ -1055,6 +1098,60 @@ if option::some(MAX_U128) is used, it is treated as unlimited supply.
     };
 
     <a href="object.md#0x1_object_object_from_constructor_ref">object::object_from_constructor_ref</a>&lt;<a href="fungible_asset.md#0x1_fungible_asset_Metadata">Metadata</a>&gt;(constructor_ref)
+}
+</code></pre>
+
+
+
+</details>
+
+<a id="0x1_fungible_asset_set_untransferable"></a>
+
+## Function `set_untransferable`
+
+Set that only untransferable stores can be created for this fungible asset.
+
+
+<pre><code><b>public</b> <b>fun</b> <a href="fungible_asset.md#0x1_fungible_asset_set_untransferable">set_untransferable</a>(constructor_ref: &<a href="object.md#0x1_object_ConstructorRef">object::ConstructorRef</a>)
+</code></pre>
+
+
+
+<details>
+<summary>Implementation</summary>
+
+
+<pre><code><b>public</b> <b>fun</b> <a href="fungible_asset.md#0x1_fungible_asset_set_untransferable">set_untransferable</a>(constructor_ref: &ConstructorRef) {
+    <b>let</b> metadata_addr = <a href="object.md#0x1_object_address_from_constructor_ref">object::address_from_constructor_ref</a>(constructor_ref);
+    <b>assert</b>!(<b>exists</b>&lt;<a href="fungible_asset.md#0x1_fungible_asset_Metadata">Metadata</a>&gt;(metadata_addr), <a href="../../aptos-stdlib/../move-stdlib/doc/error.md#0x1_error_not_found">error::not_found</a>(<a href="fungible_asset.md#0x1_fungible_asset_EFUNGIBLE_METADATA_EXISTENCE">EFUNGIBLE_METADATA_EXISTENCE</a>));
+    <b>let</b> metadata_signer = &<a href="object.md#0x1_object_generate_signer">object::generate_signer</a>(constructor_ref);
+    <b>move_to</b>(metadata_signer, <a href="fungible_asset.md#0x1_fungible_asset_Untransferable">Untransferable</a> {});
+}
+</code></pre>
+
+
+
+</details>
+
+<a id="0x1_fungible_asset_is_untransferable"></a>
+
+## Function `is_untransferable`
+
+Returns true if the FA is untransferable.
+
+
+<pre><code>#[view]
+<b>public</b> <b>fun</b> <a href="fungible_asset.md#0x1_fungible_asset_is_untransferable">is_untransferable</a>&lt;T: key&gt;(metadata: <a href="object.md#0x1_object_Object">object::Object</a>&lt;T&gt;): bool
+</code></pre>
+
+
+
+<details>
+<summary>Implementation</summary>
+
+
+<pre><code><b>public</b> <b>fun</b> <a href="fungible_asset.md#0x1_fungible_asset_is_untransferable">is_untransferable</a>&lt;T: key&gt;(metadata: Object&lt;T&gt;): bool {
+    <b>exists</b>&lt;<a href="fungible_asset.md#0x1_fungible_asset_Untransferable">Untransferable</a>&gt;(<a href="object.md#0x1_object_object_address">object::object_address</a>(&metadata))
 }
 </code></pre>
 
@@ -1936,6 +2033,9 @@ Applications can use this to create multiple stores for isolating fungible asset
         balance: 0,
         frozen: <b>false</b>,
     });
+    <b>if</b> (<a href="fungible_asset.md#0x1_fungible_asset_is_untransferable">is_untransferable</a>(metadata)) {
+        <a href="object.md#0x1_object_set_untransferable">object::set_untransferable</a>(constructor_ref);
+    };
     <a href="object.md#0x1_object_object_from_constructor_ref">object::object_from_constructor_ref</a>&lt;<a href="fungible_asset.md#0x1_fungible_asset_FungibleStore">FungibleStore</a>&gt;(constructor_ref)
 }
 </code></pre>
