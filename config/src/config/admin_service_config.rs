@@ -153,7 +153,7 @@ mod tests {
         )
         .unwrap();
 
-        // Verify that the admin service is enabled and and that the config was not modified
+        // Verify that the admin service is enabled and that the config was not modified
         assert_eq!(node_config.admin_service.enabled, Some(true));
         assert!(!modified_config);
     }

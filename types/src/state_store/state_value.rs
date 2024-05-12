@@ -327,7 +327,7 @@ pub struct StateValueChunkWithProof {
     pub last_index: u64,      // The last hashed state index in chunk
     pub first_key: HashValue, // The first hashed state key in chunk
     pub last_key: HashValue,  // The last hashed state key in chunk
-    pub raw_values: Vec<(StateKey, StateValue)>, // The hashed state key and and raw state value.
+    pub raw_values: Vec<(StateKey, StateValue)>, // The hashed state key and raw state value.
     pub proof: SparseMerkleRangeProof, // The proof to ensure the chunk is in the hashed states
     pub root_hash: HashValue, // The root hash of the sparse merkle tree for this chunk
 }
