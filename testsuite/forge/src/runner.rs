@@ -293,7 +293,7 @@ impl ForgeConfig {
                     existing_db_tag.clone().into();
             }
 
-            helm_values["validator"]["storage"]["size"] = "2048Gi".into();
+            helm_values["validator"]["storage"]["size"] = "150Gi".into();
             helm_values["validator"]["resources"]["requests"]["ephemeral-storage"] = "30Gi".into();
             helm_values["validator"]["resources"]["limits"]["ephemeral-storage"] = "30Gi".into();
             // validator resource overrides
