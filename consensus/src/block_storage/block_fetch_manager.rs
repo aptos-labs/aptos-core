@@ -14,6 +14,9 @@ use aptos_consensus_types::{
         BlockRetrievalRequest, BlockRetrievalResponse, BlockRetrievalStatus, NUM_PEERS_PER_RETRY,
         NUM_RETRIES, RETRY_INTERVAL_MSEC, RPC_TIMEOUT_MSEC,
     },
+    common::Author,
+    quorum_cert::QuorumCert,
+    sync_info::SyncInfo,
 };
 use aptos_crypto::HashValue;
 use aptos_logger::prelude::*;
@@ -28,11 +31,11 @@ use std::{
 };
 use tokio::time;
 
-// #[derive(Debug, PartialEq, Eq, Clone)]
-// pub enum BlockFetchContext {
-//     ProcessRegular(SyncInfo, Author),
-//     InsertQuorumCert(QuorumCert, Author),
-// }
+#[derive(Debug, PartialEq, Eq, Clone)]
+pub enum BlockFetchContext {
+    ProcessRegular(Arc<SyncInfo>, Arc<SyncInfo>, Author),
+    InsertQuorumCert(Arc<QuorumCert>),
+}
 
 #[derive(Debug)]
 pub struct BlockFetchRequest {
@@ -41,7 +44,7 @@ pub struct BlockFetchRequest {
     preferred_peer: AccountAddress,
     peers: Vec<AccountAddress>,
     num_blocks: u64,
-    // context: BlockFetchContext,
+    context: BlockFetchContext,
 }
 
 impl BlockFetchRequest {
@@ -51,7 +54,7 @@ impl BlockFetchRequest {
         preferred_peer: AccountAddress,
         peers: Vec<AccountAddress>,
         num_blocks: u64,
-        // context: BlockFetchContext,
+        context: BlockFetchContext,
     ) -> Self {
         BlockFetchRequest {
             initial_block_id,
@@ -59,7 +62,7 @@ impl BlockFetchRequest {
             preferred_peer,
             peers,
             num_blocks,
-            // context,
+            context,
         }
     }
 }
@@ -83,8 +86,6 @@ impl BlockFetchResponse {
 
 pub struct BlockFetchManager {
     network: Arc<NetworkSender>,
-    // TODO: Consider using a cache
-    // TODO: Store the fetched blocks in the block_store for reuse
     block_store: LruCache<HashValue, Arc<Block>>,
     max_blocks_per_request: u64,
     // The key for the queue is (initial_block_id, target_block_id) of the request
@@ -124,7 +125,7 @@ impl BlockFetchManager {
             preferred_peer,
             peers,
             num_blocks,
-            // context,
+            context,
         } = fetch_request;
         let mut blocks = Vec::new();
         let mut current_block_id = initial_block_id;
@@ -177,8 +178,8 @@ impl BlockFetchManager {
                 },
                 Err(e) => {
                     error!(
-                        "Failed to fetch blocks between {:?} {:?}: {:?}",
-                        initial_block_id, target_block_id, e
+                        "Failed to fetch blocks between {:?} {:?}. Context: {:?}, Error: {:?}",
+                        initial_block_id, target_block_id, context, e
                     );
                 },
             }

@@ -760,6 +760,15 @@ pub static ROUND_MANAGER_CHANNEL_MSGS: Lazy<IntCounterVec> = Lazy::new(|| {
     .unwrap()
 });
 
+/// The number of events in failed_events queue in round manager
+pub static ROUND_MANAGER_FAILED_EVENTS: Lazy<IntGauge> = Lazy::new(|| {
+    register_int_gauge!(
+        "aptos_consensus_round_manager_failed_events",
+        "The timeout of the current round."
+    )
+    .unwrap()
+});
+
 /// Counters(queued,dequeued,dropped) related to block fetch manager channel
 pub static BLOCK_FETCH_MANAGER_REQUEST_CHANNEL_MSGS: Lazy<IntCounterVec> = Lazy::new(|| {
     register_int_counter_vec!(

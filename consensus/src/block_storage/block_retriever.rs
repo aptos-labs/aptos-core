@@ -2,6 +2,7 @@
 // Parts of the project are originally copyright © Meta Platforms, Inc.
 // SPDX-License-Identifier: Apache-2.0
 
+use super::block_fetch_manager::BlockFetchContext;
 use crate::{
     block_storage::block_fetch_manager::BlockFetchRequest,
     logging::{LogEvent, LogSchema},
@@ -52,6 +53,7 @@ pub struct BlockRetriever {
     max_blocks_to_request: u64,
     retriever_mode: RetrieverMode,
     block_fetch_request_tx: Option<Arc<Sender<(HashValue, HashValue), BlockFetchRequest>>>,
+    context: Option<BlockFetchContext>,
 }
 
 impl BlockRetriever {
@@ -70,11 +72,16 @@ impl BlockRetriever {
             max_blocks_to_request,
             retriever_mode,
             block_fetch_request_tx,
+            context: None,
         }
     }
 
     pub fn network(&self) -> Arc<NetworkSender> {
         self.network.clone()
+    }
+
+    pub fn add_context(&mut self, context: BlockFetchContext) {
+        self.context = Some(context);
     }
 
     pub fn preferred_peer(&self) -> Author {
@@ -103,6 +110,7 @@ impl BlockRetriever {
             .map(RetrieverResult::Blocks)
         } else {
             // TODO: Send the request to the block fetch manager
+            let context = self.context.clone().unwrap();
             self.block_fetch_request_tx
                 .as_ref()
                 .map(|block_fetch_request_tx| {
@@ -114,7 +122,7 @@ impl BlockRetriever {
                             self.preferred_peer,
                             peers,
                             num_blocks,
-                            // context
+                            context,
                         ),
                     )
                 });

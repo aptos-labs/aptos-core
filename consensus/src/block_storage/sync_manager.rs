@@ -257,7 +257,6 @@ impl BlockStore {
 
         // although unlikely, we might wrap num_blocks around on a 32-bit machine
         assert!(num_blocks < std::usize::MAX as u64);
-
         if let RetrieverResult::Blocks(blocks) = retriever
             .retrieve_block_for_qc(
                 highest_ordered_cert,

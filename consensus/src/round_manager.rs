@@ -4,12 +4,12 @@
 
 use crate::{
     block_storage::{
-        block_fetch_manager::{BlockFetchRequest, BlockFetchResponse},
+        block_fetch_manager::{BlockFetchContext, BlockFetchRequest, BlockFetchResponse},
         block_retriever::{BlockRetriever, RetrieverMode},
         tracing::{observe_block, BlockStage},
         BlockReader, BlockStore,
     },
-    counters::{self, PROPOSED_VTXN_BYTES, PROPOSED_VTXN_COUNT},
+    counters::{self, PROPOSED_VTXN_BYTES, PROPOSED_VTXN_COUNT, ROUND_MANAGER_FAILED_EVENTS},
     error::{error_kind, VerifyError},
     liveness::{
         proposal_generator::ProposalGenerator,
@@ -298,8 +298,8 @@ impl RoundManager {
     }
 
     // TODO: Evaluate if creating a block retriever is slow and cache this if needed.
-    fn create_block_retriever(&self, author: Author) -> BlockRetriever {
-        BlockRetriever::new(
+    fn create_block_retriever(&self, author: Author, context: BlockFetchContext) -> BlockRetriever {
+        let mut retriever = BlockRetriever::new(
             self.network.clone(),
             author,
             self.epoch_state
@@ -310,7 +310,9 @@ impl RoundManager {
                 .max_blocks_per_sending_request(self.onchain_config.quorum_store_enabled()),
             RetrieverMode::Asynchronous,
             Some(self.block_fetch_request_tx.clone()),
-        )
+        );
+        retriever.add_context(context);
+        retriever
     }
 
     /// Leader:
@@ -507,10 +509,12 @@ impl RoundManager {
             Ok(SyncResult::Fetching) => {
                 self.failed_events
                     .push_back(FailedEvent::ProposalMsg(Box::new(proposal_msg)));
+                ROUND_MANAGER_FAILED_EVENTS.set(self.failed_events.len() as i64);
             },
             Err(e) => {
                 self.failed_events
                     .push_back(FailedEvent::ProposalMsg(Box::new(proposal_msg)));
+                ROUND_MANAGER_FAILED_EVENTS.set(self.failed_events.len() as i64);
                 return Err(e).context("[RoundManager] Failed to process proposal");
             },
         }
@@ -580,7 +584,17 @@ impl RoundManager {
                 })?;
             let result = self
                 .block_store
-                .add_certs(sync_info, self.create_block_retriever(author))
+                .add_certs(
+                    sync_info,
+                    self.create_block_retriever(
+                        author,
+                        BlockFetchContext::ProcessRegular(
+                            Arc::new(sync_info.clone()),
+                            Arc::new(local_sync_info.clone()),
+                            author,
+                        ),
+                    ),
+                )
                 .await;
             self.process_certificates().await?;
             result
@@ -638,6 +652,7 @@ impl RoundManager {
                         Box::new(sync_info),
                         Box::new(peer),
                     ));
+                ROUND_MANAGER_FAILED_EVENTS.set(self.failed_events.len() as i64);
             },
             Ok(SyncResult::Stale) => {
                 info!(
@@ -653,6 +668,7 @@ impl RoundManager {
                         Box::new(sync_info),
                         Box::new(peer),
                     ));
+                ROUND_MANAGER_FAILED_EVENTS.set(self.failed_events.len() as i64);
                 return Err(e).context("[RoundManager] Failed to process sync info msg");
             },
         }
@@ -1052,10 +1068,12 @@ impl RoundManager {
                 warn!("Processing vote delayed to fetch necessary blocks. Current Round: {}, Vote Round: {}", self.round_state.current_round(), vote_msg.vote().vote_data().proposed().round());
                 self.failed_events
                     .push_back(FailedEvent::VoteMsg(Box::new(vote_msg)));
+                ROUND_MANAGER_FAILED_EVENTS.set(self.failed_events.len() as i64);
             },
             Err(err) => {
                 self.failed_events
                     .push_back(FailedEvent::VoteMsg(Box::new(vote_msg)));
+                ROUND_MANAGER_FAILED_EVENTS.set(self.failed_events.len() as i64);
                 return Err(err).context("[RoundManager] Failed to process vote msg");
             },
         }
@@ -1147,7 +1165,13 @@ impl RoundManager {
     ) -> anyhow::Result<SyncResult> {
         match self
             .block_store
-            .insert_quorum_cert(&qc, &mut self.create_block_retriever(preferred_peer))
+            .insert_quorum_cert(
+                &qc,
+                &mut self.create_block_retriever(
+                    preferred_peer,
+                    BlockFetchContext::InsertQuorumCert(qc.clone()),
+                ),
+            )
             .await
         {
             Ok(SyncResult::Success) => {
@@ -1159,6 +1183,7 @@ impl RoundManager {
                     qc.clone(),
                     Box::new(preferred_peer),
                 ));
+                ROUND_MANAGER_FAILED_EVENTS.set(self.failed_events.len() as i64);
                 Ok(SyncResult::Fetching)
             },
             Ok(SyncResult::Stale) => {
@@ -1169,7 +1194,14 @@ impl RoundManager {
                 );
                 Ok(SyncResult::Stale)
             },
-            Err(err) => Err(err).context("[RoundManager] Failed to process a newly aggregated QC"),
+            Err(err) => {
+                self.failed_events.push_back(FailedEvent::QuorumCert(
+                    qc.clone(),
+                    Box::new(preferred_peer),
+                ));
+                ROUND_MANAGER_FAILED_EVENTS.set(self.failed_events.len() as i64);
+                Err(err).context("[RoundManager] Failed to process a newly aggregated QC")
+            },
         }
     }
 
@@ -1220,6 +1252,7 @@ impl RoundManager {
                 }
             }
         }
+        ROUND_MANAGER_FAILED_EVENTS.set(self.failed_events.len() as i64);
     }
 
     /// To jump start new round with the current certificates we have.
@@ -1280,12 +1313,13 @@ impl RoundManager {
         info!(epoch = self.epoch_state().epoch, "RoundManager started");
         let mut close_rx = close_rx.into_stream();
         let (retry_tx, mut retry_rx) = tokio::sync::mpsc::channel(1);
-        struct Dummy {}
         tokio::spawn(async move {
             loop {
-                sleep(Duration::from_millis(5)).await;
-                if let Err(e) = retry_tx.send(Dummy {}).await {
-                    warn!("Failed to send retry signal in round manager: {:?}", e);
+                sleep(Duration::from_millis(10)).await;
+                if retry_tx.send(()).await.is_err() {
+                    info!("Failed to send retry signal in round manager. Channel full");
+                } else {
+                    info!("Successfully sent retry signal in round manager");
                 }
             }
         });
