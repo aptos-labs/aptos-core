@@ -766,4 +766,6 @@ module swap::liquidity_pool {
         y
     }
 
+    #[test_only]
+    friend swap::liquidity_pool_tests;
 }

@@ -65,4 +65,6 @@ module swap::package_manager {
         };
     }
 
+    #[test_only]
+    friend swap::package_manager_tests;
 }

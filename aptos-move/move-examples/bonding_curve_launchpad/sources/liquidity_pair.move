@@ -17,15 +17,15 @@ module resource_account::liquidity_pair {
     use resource_account::bonding_curve_launchpad;
 	friend bonding_curve_launchpad;
 
+    const FA_DECIMALS: u8 = 8;
+    const INITIAL_VIRTUAL_APT_LIQUIDITY: u128 = 50_000_000_000;
+    const APT_LIQUIDITY_THRESHOLD: u128 = 600_000_000_000;
+
     const EFA_PRIMARY_STORE_DOES_NOT_EXIST: u64 = 12;
     const ELIQUIDITY_PAIR_EXISTS_ALREADY: u64 = 100;
     const ELIQUIDITY_PAIR_DOES_NOT_EXIST: u64 = 101;
     const ELIQUIDITY_PAIR_DISABLED: u64 = 102;
     const ELIQUIDITY_PAIR_SWAP_AMOUNTOUT_INSIGNIFICANT: u64 = 111;
-
-    const FA_DECIMALS: u8 = 8;
-    const INITIAL_VIRTUAL_APT_LIQUIDITY: u128 = 50_000_000_000;
-    const APT_LIQUIDITY_THRESHOLD: u128 = 600_000_000_000;
 
     //---------------------------Events---------------------------
     #[event]
@@ -102,7 +102,7 @@ module resource_account::liquidity_pair {
             k: k_constant
         });
 
-        if(apt_initialPurchaseAmountIn != 0){
+        if(apt_initialPurchaseAmountIn != 0) {
             internal_swap_apt_to_fa(transfer_ref, account, fa_metadata, apt_initialPurchaseAmountIn);
         }
     }
@@ -126,7 +126,6 @@ module resource_account::liquidity_pair {
         primary_fungible_store::transfer_with_ref(transfer_ref, swapper_address, @resource_account, fa_given);
         aptos_account::transfer(&resource_signer_holder::get_signer(), account_address, apt_gained);
 
-
         let old_fa_reserves = liquidity_pair.fa_reserves;
         let old_apt_reserves = liquidity_pair.apt_reserves;
         liquidity_pair.fa_reserves = fa_updated_reserves;
@@ -143,7 +142,6 @@ module resource_account::liquidity_pair {
             gained: (apt_gained as u128),
             swapper_address: swapper_address
         });
-
     }
 
     public(friend) fun internal_swap_apt_to_fa(transfer_ref: &fungible_asset::TransferRef, account: &signer,  fa_metadata: Object<Metadata>, amountIn: u64) acquires LiquidityPairSmartTable {
@@ -184,13 +182,13 @@ module resource_account::liquidity_pair {
         });
 
         if(apt_updated_reserves > APT_LIQUIDITY_THRESHOLD && liquidity_pair.is_enabled){
-            // Disable BCL pair.
+            // Disable Bonding Curve Launchpad pair.
             liquidity_pair.is_enabled = false;
             liquidity_pair.is_frozen = false;
-            // Offload onto permissionless DEX.
+            // Offload onto third party, public DEX.
             router::create_pool_coin<AptosCoin>(fa_metadata, false);
-            add_liquidity_coin_entry_transfer_ref<AptosCoin>(transfer_ref, &resource_signer_holder::get_signer(), fa_metadata, false, ((apt_updated_reserves >> 1) as u64), ((fa_updated_reserves >> 1) as u64), 0, 0);
-            // Send liquidity tokens to dead address
+            add_liquidity_coin_entry_transfer_ref<AptosCoin>(transfer_ref, &resource_signer_holder::get_signer(), fa_metadata, false, ((apt_updated_reserves - (apt_updated_reserves / 10)) as u64), ((fa_updated_reserves - (fa_updated_reserves / 10)) as u64), 0, 0);
+            // Send liquidity tokens to dead address.
             let apt_coin_wrapped = coin_wrapper::get_wrapper<AptosCoin>();
             let liquidity_obj = liquidity_pool::liquidity_pool(apt_coin_wrapped, fa_metadata, false);
             liquidity_pool::transfer(&resource_signer_holder::get_signer(), liquidity_obj, @0xdead, primary_fungible_store::balance(@resource_account, liquidity_obj));
@@ -232,8 +230,8 @@ module resource_account::liquidity_pair {
     #[view]
     public fun get_amount_out(fa_reserves: u128, apt_reserves: u128, supplied_fa_else_apt: bool, amountIn: u64): (u64, u64, u128, u128) {
         if (supplied_fa_else_apt) {
-            let top = (apt_reserves as u256)* (amountIn as u256);
-            let bot = (fa_reserves  as u256) + (amountIn as u256);
+            let top = (apt_reserves as u256) * (amountIn as u256);
+            let bot = (fa_reserves as u256) + (amountIn as u256);
             let apt_gained: u64 = ((top/bot) as u64);
             assert!(apt_gained > 0, ELIQUIDITY_PAIR_SWAP_AMOUNTOUT_INSIGNIFICANT);
             return (amountIn, apt_gained, fa_reserves+(amountIn as u128), apt_reserves-(apt_gained as u128))

@@ -16,14 +16,13 @@ module resource_account::bonding_curve_launchpad {
     use resource_account::liquidity_pair;
     use resource_account::resource_signer_holder;
 
-    const INITIAL_NEW_FA_RESERVE_u64: u64 = 8_003_000_000_000;
-    const INITIAL_NEW_FA_RESERVE: u128 = 8_003_000_000_000;
-
     const EFA_EXISTS_ALREADY: u64 = 10;
     const EFA_DOES_NOT_EXIST: u64 = 11;
     const EFA_FROZEN: u64 = 13;
     const ELIQUIDITY_PAIR_SWAP_AMOUNTIN_INVALID: u64 = 110;
 
+    const INITIAL_NEW_FA_RESERVE_u64: u64 = 8_003_000_000_000;
+    const INITIAL_NEW_FA_RESERVE: u128 = 8_003_000_000_000;
 
     //---------------------------Events---------------------------
     #[event]
@@ -220,7 +219,7 @@ module resource_account::bonding_curve_launchpad {
         move_to(deployer, fa_smartTable);
     }
 
-    //---------------------------View Tests---------------------------
+    //---------------------------Unit Tests---------------------------
     #[test(deployer = @resource_account)]
     #[expected_failure(abort_code = 393218, location=aptos_framework::object)]
     public fun test_nonexistant_is_frozen(deployer: &signer) {

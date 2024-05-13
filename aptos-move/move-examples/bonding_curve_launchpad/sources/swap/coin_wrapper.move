@@ -203,4 +203,6 @@ module swap::coin_wrapper {
         borrow_global_mut<WrapperAccount>(wrapper_address())
     }
 
+    #[test_only]
+    friend swap::coin_wrapper_tests;
 }

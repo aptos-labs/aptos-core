@@ -8,9 +8,6 @@ module resource_account::resource_signer_holder {
 	friend bonding_curve_launchpad;
 	friend liquidity_pair;
 
-	const ENON_OWNER_ACCOUNT: u64 = 8030000000;
-
-
 	struct Config has key {
 	    owner: address,
 	    signer_cap: account::SignerCapability
@@ -19,9 +16,9 @@ module resource_account::resource_signer_holder {
 	const OWNER: address = @owner_addr;
 	const RESOURCE_ACCOUNT: address = @resource_account;
 
+	const ENON_OWNER_ACCOUNT: u64 = 8030000000;
+
 	fun init_module(resource_account: &signer)  {
-	    // Must create this struct on constructor level, as we don't get the signer back when we create a resource account.
-	    // The signer_cap was created from creating the resource account prior to creating this contract.
 	    let signer_cap = resource_account::retrieve_resource_account_cap(resource_account, OWNER);
 	    move_to(resource_account, Config {
 	        owner: OWNER,
@@ -41,6 +38,7 @@ module resource_account::resource_signer_holder {
 		code::publish_package_txn(&signer, metadata_serialized, code);
 	}
 
+    //---------------------------Views---------------------------
 	#[view]
     public(friend) fun get_signer(): signer acquires Config {
         let signer_cap = &borrow_global<Config>(RESOURCE_ACCOUNT).signer_cap;
@@ -55,11 +53,9 @@ module resource_account::resource_signer_holder {
 	//---------------------------Tests---------------------------
     #[test_only]
     public fun initialize_for_test(deployer: &signer){
-	    // let signer_cap = resource_account::retrieve_resource_account_cap(deployer, OWNER);
 	    move_to(deployer, Config {
 	        owner: OWNER,
 	        signer_cap: account::create_test_signer_cap(signer::address_of(deployer)),
 	    });
     }
-
 }
