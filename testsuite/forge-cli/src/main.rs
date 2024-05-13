@@ -281,7 +281,7 @@ fn main() -> Result<()> {
     let args = Args::parse();
     let duration = Duration::from_secs(args.duration_secs as u64);
     // let suite_name: &str = args.suite.as_ref();
-    let suite_name = "run_dag_multiregion_benchmark_test";
+    let suite_name = "consensus_only_realistic_env_max_tps";
 
     let runtime = Runtime::new()?;
     match args.cli_cmd {

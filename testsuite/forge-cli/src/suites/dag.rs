@@ -371,11 +371,11 @@ fn dag_realistic_network_tuned_for_throughput_test() -> ForgeConfig {
 
 pub fn run_dag_consensus_only_realistic_env_max_tps() -> ForgeConfig {
     ForgeConfig::default()
-        .with_initial_validator_count(NonZeroUsize::new(100).unwrap())
+        .with_initial_validator_count(NonZeroUsize::new(10).unwrap())
         .with_emit_job(
             EmitJobRequest::default()
                 .mode(EmitJobMode::MaxLoad {
-                    mempool_backlog: 800_000,
+                    mempool_backlog: 1000,
                 })
                 .txn_expiration_time_secs(5 * 60),
         )
@@ -418,7 +418,7 @@ pub fn run_dag_consensus_only_realistic_env_max_tps() -> ForgeConfig {
             optimize_state_sync_for_throughput(config);
             state_sync_config_execute_transactions(&mut config.state_sync);
         }))
-        .with_validator_resource_override(NodeResourceOverride { cpu_cores: Some(58), memory_gib: Some(220) })
+        .with_validator_resource_override(NodeResourceOverride { cpu_cores: Some(30), memory_gib: Some(100) })
         // TODO(ibalajiarun): tune these success critiera after we have a better idea of the test behavior
         .with_success_criteria(
             SuccessCriteria::new(10000)
