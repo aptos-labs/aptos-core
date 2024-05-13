@@ -1599,24 +1599,6 @@ def test(
         return
 
     try:
-        mig_list = []
-        if forge_cluster.is_multiregion:
-            # Get a list of MIGs with name prefix k3s-agent-forge-multiregion using gcloud command
-            cmd = [
-                "gcloud",
-                "compute",
-                "instance-groups",
-                "list",
-                "--project",
-                "forge-gcp-multiregion-test",
-                "--filter",
-                "name~k3s-agent-forge-multiregion",
-                "--format",
-                "csv[no-heading](name,zone.basename())",
-            ]
-            # run the command and process the csv output
-            mig_list = shell.run(cmd).unwrap().decode().strip().split("\n")
-
         forge_runner = forge_runner_mapping[forge_runner_mode]()
         result = forge_runner.run(forge_context)
 
@@ -1653,26 +1635,6 @@ def test(
                 ]
             )
         ) from e
-    finally:
-        if forge_cluster.is_multireregion:
-            # Resize the MIGs back to 0 instances each
-            for mig in mig_list:
-                mig, zone = mig.split(",")
-                # Resize the MIG to 1 instance each
-                cmd = [
-                    "gcloud",
-                    "compute",
-                    "instance-groups",
-                    "managed",
-                    "resize",
-                    mig,
-                    "--size=0",
-                    "--project",
-                    "forge-gcp-multiregion-test",
-                    "--zone",
-                    zone,
-                ]
-                shell.run(cmd).unwrap()
 
 
 async def get_all_forge_jobs(
