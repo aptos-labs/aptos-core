@@ -369,23 +369,22 @@ fn dag_realistic_network_tuned_for_throughput_test() -> ForgeConfig {
     forge_config
 }
 
+/// !!!!This one has no chaos!!!!
 pub fn run_dag_consensus_only_realistic_env_max_tps() -> ForgeConfig {
     ForgeConfig::default()
         .with_initial_validator_count(NonZeroUsize::new(100).unwrap())
         .with_emit_job(
             EmitJobRequest::default()
                 .mode(EmitJobMode::MaxLoad {
-                    mempool_backlog: 1000,
+                    mempool_backlog: 500_000,
                 })
                 .txn_expiration_time_secs(5 * 60),
         )
-        .add_network_test(
-            MultiRegionNetworkEmulationTest::default(),
-        )
+        .add_network_test(PerformanceBenchmark)
         .with_genesis_helm_config_fn(Arc::new(|helm_values| {
             let onchain_consensus_config = OnChainConsensusConfig::V3 {
                 alg: ConsensusAlgorithmConfig::DAG(DagConsensusConfigV1::default()),
-                vtxn: ValidatorTxnConfig::default_for_genesis(),
+                vtxn: ValidatorTxnConfig::default_disabled(),
             };
 
             helm_values["chain"]["on_chain_consensus_config"] =
