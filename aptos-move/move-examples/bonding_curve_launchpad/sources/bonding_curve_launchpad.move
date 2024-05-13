@@ -2,43 +2,28 @@ module resource_account::bonding_curve_launchpad {
     use std::string;
     use std::option;
     use std::vector;
-    use aptos_framework::coin;
     use aptos_framework::object::{Self};
     use aptos_framework::fungible_asset::{Self, FungibleAsset, Metadata};
     use aptos_framework::primary_fungible_store;
     use aptos_framework::event;
-    use aptos_framework::aptos_coin::{AptosCoin};
-    use aptos_framework::aptos_account;
     use aptos_framework::function_info;
     use aptos_framework::dispatchable_fungible_asset;
     use aptos_std::smart_table::{Self, SmartTable};
     use aptos_std::math128;
     use aptos_std::string::{String};
-    use aptos_std::signer;
     use aptos_std::object::{Object};
-    // FA-supported DEX
-    use swap::router;
-    use swap::liquidity_pool;
-    use swap::coin_wrapper;
     // Friend
     use resource_account::liquidity_pair;
     use resource_account::resource_signer_holder;
 
+    const INITIAL_NEW_FA_RESERVE_u64: u64 = 8_003_000_000_000;
+    const INITIAL_NEW_FA_RESERVE: u128 = 8_003_000_000_000;
+
     const EFA_EXISTS_ALREADY: u64 = 10;
     const EFA_DOES_NOT_EXIST: u64 = 11;
-    const EFA_PRIMARY_STORE_DOES_NOT_EXIST: u64 = 12;
     const EFA_FROZEN: u64 = 13;
-    const ELIQUIDITY_PAIR_EXISTS_ALREADY: u64 = 100;
-    const ELIQUIDITY_PAIR_DOES_NOT_EXIST: u64 = 101;
-    const ELIQUIDITY_PAIR_DISABLED: u64 = 102;
     const ELIQUIDITY_PAIR_SWAP_AMOUNTIN_INVALID: u64 = 110;
-    const ELIQUIDITY_PAIR_SWAP_AMOUNTOUT_INSIGNIFICANT: u64 = 111;
 
-    const INITIAL_NEW_FA_RESERVE: u128 = 8_003_000_000_000;
-    const INITIAL_NEW_FA_RESERVE_u64: u64 = 8_003_000_000_000;
-    const FA_DECIMALS: u8 = 8;
-    const INITIAL_VIRTUAL_APT_LIQUIDITY: u128 = 50_000_000_000;
-    const APT_LIQUIDITY_THRESHOLD: u128 = 600_000_000_000;
 
     //---------------------------Events---------------------------
     #[event]
@@ -50,73 +35,27 @@ module resource_account::bonding_curve_launchpad {
         icon_uri: string::String,
         project_uri: string::String
     }
-    #[event]
-    struct LiquidityPairCreated has store, drop {
-        fa_obj_address: address,
-        fa_obj: Object<Metadata>,
-        initial_fa_reserves: u128,
-        initial_apt_reserves: u128,
-        k: u256
-    }
-    #[event]
-    struct LiquidityPairReservesUpdated has store, drop {
-        old_fa_reserves: u128,
-        old_apt_reserves: u128,
-        new_fa_reserves: u128,
-        new_apt_reserves: u128
-    }
-    #[event]
-    struct LiquidityPairSwap has store, drop {
-        is_fa_else_apt: bool,
-        gained: u128,
-        swapper_address: address
-    }
-    #[event]
-    struct LiquidityPairGraduated has store, drop {
-        fa_obj_address: address,
-        fa_obj: Object<Metadata>,
-        dex_address: address
-    }
 
     //---------------------------Structs---------------------------
     struct LaunchPad has key {
-        key_to_fa_data: SmartTable<FAKey, FAData>,
+        key_to_fa_data: SmartTable<FAKey, FAController>,
     }
     struct FAKey has store, copy, drop {
         name: string::String,
         symbol: string::String,
-    }
-    struct FAData has key, store {
-        controller: FAController,
     }
     struct FAController has key, store {
         mint_ref: fungible_asset::MintRef,
         burn_ref: fungible_asset::BurnRef,
         transfer_ref: fungible_asset::TransferRef
     }
-    struct LiquidityPairSmartTable has key {
-        liquidity_pairs: SmartTable<Object<Metadata>, LiquidityPair>
-    }
-    struct LiquidityPair has store {
-        is_enabled: bool,
-        is_frozen: bool,
-        fa_reserves: u128,
-        apt_reserves: u128,
-        k_constant: u256
-    }
-
 
     //---------------------------Init---------------------------
     fun init_module(account: &signer) {
         let fa_smartTable: LaunchPad = LaunchPad {
             key_to_fa_data: smart_table::new()
         };
-        let liquidity_pair_table: LiquidityPairSmartTable = LiquidityPairSmartTable {
-            liquidity_pairs: smart_table::new()
-        };
-
         move_to(account, fa_smartTable);
-        move_to(account, liquidity_pair_table);
     }
 
     //---------------------------Dispatchable Standard---------------------------
@@ -124,14 +63,9 @@ module resource_account::bonding_curve_launchpad {
         store: Object<T>,
         amount: u64,
         transfer_ref: &fungible_asset::TransferRef
-    ): FungibleAsset
-    acquires LiquidityPairSmartTable
-    {
+    ): FungibleAsset {
         let metadata = fungible_asset::transfer_ref_metadata(transfer_ref);
-        let liquidity_pair_smartTable = borrow_global<LiquidityPairSmartTable>(@resource_account);
-        assert!(smart_table::contains(& liquidity_pair_smartTable.liquidity_pairs, metadata), ELIQUIDITY_PAIR_DOES_NOT_EXIST);
-        let liquidity_pair = smart_table::borrow(& liquidity_pair_smartTable.liquidity_pairs, metadata);
-        assert!(!liquidity_pair.is_frozen, EFA_FROZEN); // If the pair is enabled, then FA is frozen. Vice versa applies.
+        assert!(!liquidity_pair::get_is_frozen_metadata(metadata), EFA_FROZEN); // If the pair is enabled, then FA is frozen. Vice versa applies.
         fungible_asset::withdraw_with_ref(transfer_ref, store, amount)
     }
 
@@ -146,28 +80,37 @@ module resource_account::bonding_curve_launchpad {
         decimals: u8,
         icon_uri: string::String,
         project_uri: string::String
-    ) acquires LaunchPad, LiquidityPairSmartTable {
+    ) acquires LaunchPad {
         let fa_key = FAKey { name, symbol };
         let fa_address = create_fa(fa_key, name, symbol, max_supply, decimals, icon_uri, project_uri);
-        let fa_metadata_obj = object::address_to_object(fa_address);
-        register_liquidity_pair(account, fa_metadata_obj, fa_key, apt_initialPurchaseAmountIn, max_supply);
+        let fa_metadata_obj: Object<Metadata> = object::address_to_object(fa_address);
+
+        let fa_smartTable = borrow_global_mut<LaunchPad>(@resource_account);
+        assert!(smart_table::contains(&mut fa_smartTable.key_to_fa_data, fa_key), EFA_DOES_NOT_EXIST);
+        let transfer_ref = &smart_table::borrow(&mut fa_smartTable.key_to_fa_data, fa_key).transfer_ref;
+
+        liquidity_pair::register_liquidity_pair(transfer_ref, account, fa_metadata_obj, apt_initialPurchaseAmountIn, max_supply);
     }
 
-    public entry fun swap_apt_to_fa (account: &signer, name: string::String, symbol: string::String, fa_amountIn: u64) acquires LaunchPad, LiquidityPairSmartTable {
+    public entry fun swap_apt_to_fa (account: &signer, name: string::String, symbol: string::String, fa_amountIn: u64) acquires LaunchPad {
         assert!(fa_amountIn > 0, ELIQUIDITY_PAIR_SWAP_AMOUNTIN_INVALID);
         let fa_key = FAKey { name, symbol };
         let fa_smartTable = borrow_global_mut<LaunchPad>(@resource_account);
         assert!(smart_table::contains(&mut fa_smartTable.key_to_fa_data, fa_key), EFA_DOES_NOT_EXIST);
         let fa_metadata_obj:Object<Metadata> = object::address_to_object(get_fa_obj_address(name, symbol));
-        internal_swap_apt_to_fa(account, fa_smartTable, fa_metadata_obj, fa_key, fa_amountIn);
+        let transfer_ref = &smart_table::borrow(&mut fa_smartTable.key_to_fa_data, fa_key).transfer_ref;
+
+        liquidity_pair::internal_swap_apt_to_fa(transfer_ref, account, fa_metadata_obj, fa_amountIn);
     }
-    public entry fun swap_fa_to_apt (account: &signer, name: string::String, symbol: string::String, apt_amountIn: u64) acquires LaunchPad, LiquidityPairSmartTable {
+    public entry fun swap_fa_to_apt (account: &signer, name: string::String, symbol: string::String, apt_amountIn: u64) acquires LaunchPad {
         assert!(apt_amountIn > 0, ELIQUIDITY_PAIR_SWAP_AMOUNTIN_INVALID);
         let fa_key = FAKey { name, symbol };
         let fa_smartTable = borrow_global_mut<LaunchPad>(@resource_account);
         assert!(smart_table::contains(&mut fa_smartTable.key_to_fa_data, fa_key), EFA_DOES_NOT_EXIST);
         let fa_metadata_obj:Object<Metadata> = object::address_to_object(get_fa_obj_address(name, symbol));
-        internal_swap_fa_to_apt(account, fa_smartTable, fa_metadata_obj, fa_key, apt_amountIn);
+        let transfer_ref = &smart_table::borrow(&mut fa_smartTable.key_to_fa_data, fa_key).transfer_ref;
+
+        liquidity_pair::internal_swap_fa_to_apt(transfer_ref, account, fa_metadata_obj, apt_amountIn);
     }
 
     //---------------------------Internal---------------------------z
@@ -219,13 +162,10 @@ module resource_account::bonding_curve_launchpad {
             burn_ref,
             transfer_ref,
         };
-        let fa_data = FAData {
-            controller: fa_controller
-        };
         smart_table::add(
             &mut fa_smartTable.key_to_fa_data,
             fa_key,
-            fa_data
+            fa_controller
         );
 
         event::emit(FungibleAssetCreated {
@@ -240,185 +180,7 @@ module resource_account::bonding_curve_launchpad {
         return get_fa_obj_address(name, symbol)
     }
 
-    //---------------------------Liquidity Pair---------------------------
-    fun register_liquidity_pair(account: &signer, fa_metadata: Object<Metadata>, fa_key: FAKey, apt_initialPurchaseAmountIn: u64, fa_initialLiquidity: u128) acquires LaunchPad, LiquidityPairSmartTable {
-        let liquidity_pair_smartTable = borrow_global_mut<LiquidityPairSmartTable>(@resource_account);
-        assert!(!smart_table::contains(&mut liquidity_pair_smartTable.liquidity_pairs, fa_metadata), ELIQUIDITY_PAIR_EXISTS_ALREADY);
-        //* Initial APT reserves are virtual liquidity, for less extreme initial swaps.
-        let k_constant: u256 = (fa_initialLiquidity as u256) * (INITIAL_VIRTUAL_APT_LIQUIDITY as u256);
-        let initial_liquidity_pair = LiquidityPair {
-            is_enabled: true,
-            is_frozen: true,
-            fa_reserves: fa_initialLiquidity,
-            apt_reserves: INITIAL_VIRTUAL_APT_LIQUIDITY,
-            k_constant: k_constant
-        };
-        smart_table::add(
-            &mut liquidity_pair_smartTable.liquidity_pairs,
-            fa_metadata,
-            initial_liquidity_pair
-        );
-
-        event::emit(LiquidityPairCreated {
-            fa_obj_address: get_fa_obj_address(fa_key.name, fa_key.symbol),
-            fa_obj: fa_metadata,
-            initial_fa_reserves: fa_initialLiquidity,
-            initial_apt_reserves: INITIAL_VIRTUAL_APT_LIQUIDITY,
-            k: k_constant
-        });
-
-        if(apt_initialPurchaseAmountIn != 0){
-            let fa_smartTable = borrow_global_mut<LaunchPad>(@resource_account);
-            internal_swap_apt_to_fa(account, fa_smartTable, fa_metadata, fa_key, apt_initialPurchaseAmountIn);
-        }
-    }
-
-    fun internal_swap_fa_to_apt(account: &signer, fa_smartTable: &mut LaunchPad,  fa_metadata: Object<Metadata>, fa_key: FAKey, amountIn: u64) acquires LiquidityPairSmartTable {
-        let liquidity_pair_smartTable = borrow_global_mut<LiquidityPairSmartTable>(@resource_account);
-        assert!(smart_table::contains(&mut liquidity_pair_smartTable.liquidity_pairs, fa_metadata), ELIQUIDITY_PAIR_DOES_NOT_EXIST);
-        let liquidity_pair = smart_table::borrow_mut(&mut liquidity_pair_smartTable.liquidity_pairs, fa_metadata);
-        assert!(liquidity_pair.is_enabled, ELIQUIDITY_PAIR_DISABLED);
-
-        let swapper_address = signer::address_of(account);
-        let (fa_given, apt_gained, fa_updated_reserves, apt_updated_reserves) = get_amount_out(
-            liquidity_pair.fa_reserves,
-            liquidity_pair.apt_reserves,
-            true,
-            amountIn
-        );
-        let fa_data = smart_table::borrow_mut(&mut fa_smartTable.key_to_fa_data, fa_key);
-        let does_primary_store_exist_for_swapper = primary_fungible_store::primary_store_exists(swapper_address, fa_metadata);
-        assert!(does_primary_store_exist_for_swapper, EFA_PRIMARY_STORE_DOES_NOT_EXIST);
-        let account_address = signer::address_of(account);
-        primary_fungible_store::transfer_with_ref(&fa_data.controller.transfer_ref, swapper_address, @resource_account, fa_given);
-        aptos_account::transfer(&resource_signer_holder::get_signer(), account_address, apt_gained);
-
-
-        let old_fa_reserves = liquidity_pair.fa_reserves;
-        let old_apt_reserves = liquidity_pair.apt_reserves;
-        liquidity_pair.fa_reserves = fa_updated_reserves;
-        liquidity_pair.apt_reserves = apt_updated_reserves;
-
-        event::emit(LiquidityPairReservesUpdated {
-            old_fa_reserves: old_fa_reserves,
-            old_apt_reserves: old_apt_reserves,
-            new_fa_reserves: fa_updated_reserves,
-            new_apt_reserves: apt_updated_reserves
-        });
-        event::emit(LiquidityPairSwap {
-            is_fa_else_apt: false,
-            gained: (apt_gained as u128),
-            swapper_address: swapper_address
-        });
-
-    }
-
-    fun internal_swap_apt_to_fa(account: &signer, fa_smartTable: &mut LaunchPad,  fa_metadata: Object<Metadata>, fa_key: FAKey, amountIn: u64) acquires LiquidityPairSmartTable {
-        let liquidity_pair_smartTable = borrow_global_mut<LiquidityPairSmartTable>(@resource_account);
-        assert!(smart_table::contains(&mut liquidity_pair_smartTable.liquidity_pairs, fa_metadata), ELIQUIDITY_PAIR_DOES_NOT_EXIST);
-        let liquidity_pair = smart_table::borrow_mut(&mut liquidity_pair_smartTable.liquidity_pairs, fa_metadata);
-        assert!(liquidity_pair.is_enabled, ELIQUIDITY_PAIR_DISABLED);
-
-        let swapper_address = signer::address_of(account);
-        let (fa_gained, apt_given, fa_updated_reserves, apt_updated_reserves) = get_amount_out(
-            liquidity_pair.fa_reserves,
-            liquidity_pair.apt_reserves,
-            false,
-            amountIn
-        );
-        let fa_data = smart_table::borrow_mut(&mut fa_smartTable.key_to_fa_data, fa_key);
-        let does_primary_store_exist_for_swapper = primary_fungible_store::primary_store_exists(swapper_address, fa_metadata);
-        if(!does_primary_store_exist_for_swapper){
-            primary_fungible_store::create_primary_store(swapper_address, fa_metadata);
-        };
-        aptos_account::transfer(account, @resource_account, apt_given);
-        //! primary_fungible_store::transfer_with_ref(&fa_data.controller.transfer_ref, @resource_account, swapper_address, fa_gained);
-        liquidity_pair::test_this(&fa_data.controller.transfer_ref, swapper_address, fa_gained);
-        // Disable transfers from users.
-        let old_fa_reserves = liquidity_pair.fa_reserves;
-        let old_apt_reserves = liquidity_pair.apt_reserves;
-        liquidity_pair.fa_reserves = fa_updated_reserves;
-        liquidity_pair.apt_reserves = apt_updated_reserves;
-
-        event::emit(LiquidityPairReservesUpdated {
-            old_fa_reserves: old_fa_reserves,
-            old_apt_reserves: old_apt_reserves,
-            new_fa_reserves: fa_updated_reserves,
-            new_apt_reserves: apt_updated_reserves
-        });
-        event::emit(LiquidityPairSwap {
-            is_fa_else_apt: true,
-            gained: (fa_gained as u128),
-            swapper_address: swapper_address
-        });
-
-        if(apt_updated_reserves > APT_LIQUIDITY_THRESHOLD && liquidity_pair.is_enabled){
-            // Disable BCL pair.
-            liquidity_pair.is_enabled = false;
-            liquidity_pair.is_frozen = false;
-            // Offload onto permissionless DEX.
-            router::create_pool_coin<AptosCoin>(fa_metadata, false);
-            add_liquidity_coin_entry_transfer_ref<AptosCoin>(&fa_data.controller.transfer_ref, &resource_signer_holder::get_signer(), fa_metadata, false, ((apt_updated_reserves >> 1) as u64), ((fa_updated_reserves >> 1) as u64), 0, 0);
-            // Send liquidity tokens to dead address
-            let apt_coin_wrapped = coin_wrapper::get_wrapper<AptosCoin>();
-            let liquidity_obj = liquidity_pool::liquidity_pool(apt_coin_wrapped, fa_metadata, false);
-            liquidity_pool::transfer(&resource_signer_holder::get_signer(), liquidity_obj, @0xdead, primary_fungible_store::balance(@resource_account, liquidity_obj));
-
-            event::emit(LiquidityPairGraduated {
-                fa_obj_address: get_fa_obj_address(fa_key.name, fa_key.symbol),
-                fa_obj: fa_metadata,
-                dex_address: @swap
-            });
-        }
-    }
-
-
-    //---------------------------DEX-helpers---------------------------
-    fun add_liquidity_coin_entry_transfer_ref<CoinType>(
-        transfer_ref: &fungible_asset::TransferRef,
-        lp: &signer,
-        token_2: Object<Metadata>,
-        is_stable: bool,
-        amount_1_desired: u64,
-        amount_2_desired: u64,
-        amount_1_min: u64,
-        amount_2_min: u64,
-    ) {
-        let token_1 = coin_wrapper::get_wrapper<CoinType>();
-        let (optimal_amount_1, optimal_amount_2, _) = router::optimal_liquidity_amounts(
-            token_1,
-            token_2,
-            is_stable,
-            amount_1_desired,
-            amount_2_desired,
-            amount_1_min,
-            amount_2_min,
-        );
-        let optimal_1 = coin::withdraw<CoinType>(lp, optimal_amount_1);
-        let optimal_2 = primary_fungible_store::withdraw_with_ref(transfer_ref, signer::address_of(lp), optimal_amount_2);
-        router::add_liquidity_coin<CoinType>(lp, optimal_1, optimal_2, is_stable);
-    }
-
-
     //---------------------------Views---------------------------
-    #[view]
-    public fun get_amount_out(fa_reserves: u128, apt_reserves: u128, supplied_fa_else_apt: bool, amountIn: u64): (u64, u64, u128, u128) {
-        if (supplied_fa_else_apt) {
-            let top = (apt_reserves as u256)* (amountIn as u256);
-            let bot = (fa_reserves  as u256) + (amountIn as u256);
-            let apt_gained: u64 = ((top/bot) as u64);
-            assert!(apt_gained > 0, ELIQUIDITY_PAIR_SWAP_AMOUNTOUT_INSIGNIFICANT);
-            return (amountIn, apt_gained, fa_reserves+(amountIn as u128), apt_reserves-(apt_gained as u128))
-        }
-        else {
-            let top = (fa_reserves as u256) * (amountIn as u256);
-            let bot = (apt_reserves as u256) + (amountIn as u256);
-            let fa_gained: u64 = ((top/bot) as u64);
-            assert!(fa_gained > 0, ELIQUIDITY_PAIR_SWAP_AMOUNTOUT_INSIGNIFICANT);
-            return (fa_gained, amountIn, fa_reserves-(fa_gained as u128), apt_reserves+(amountIn as u128))
-        }
-
-    }
     #[view]
     public fun get_fa_obj_address(name: String, symbol: String): address {
         let fa_key_seed: vector<u8> = *string::bytes(&name);
@@ -441,11 +203,9 @@ module resource_account::bonding_curve_launchpad {
         fa_metadata_obj
     }
     #[view]
-    public fun get_is_frozen(name: String, symbol: String):bool acquires LiquidityPairSmartTable {
+    public fun get_is_frozen(name: String, symbol: String): bool {
         let fa_metadata = get_metadata(name, symbol);
-        let liquidity_pair_smartTable = borrow_global<LiquidityPairSmartTable>(@resource_account);
-        assert!(smart_table::contains(&liquidity_pair_smartTable.liquidity_pairs, fa_metadata), ELIQUIDITY_PAIR_DOES_NOT_EXIST);
-        smart_table::borrow(&liquidity_pair_smartTable.liquidity_pairs, fa_metadata).is_enabled
+        liquidity_pair::get_is_frozen_metadata(fa_metadata)
     }
 
 
@@ -456,18 +216,14 @@ module resource_account::bonding_curve_launchpad {
         let fa_smartTable: LaunchPad = LaunchPad {
             key_to_fa_data: smart_table::new()
         };
-        let liquidity_pair_table: LiquidityPairSmartTable = LiquidityPairSmartTable {
-            liquidity_pairs: smart_table::new()
-        };
 
         move_to(deployer, fa_smartTable);
-        move_to(deployer, liquidity_pair_table);
     }
 
     //---------------------------View Tests---------------------------
     #[test(deployer = @resource_account)]
     #[expected_failure(abort_code = 393218, location=aptos_framework::object)]
-    public fun test_nonexistant_is_frozen(deployer: &signer) acquires LiquidityPairSmartTable {
+    public fun test_nonexistant_is_frozen(deployer: &signer) {
         initialize_for_test(deployer);
         let name =  string::utf8(b"SheepyCoin");
         let symbol = string::utf8(b"SHEEP");
@@ -481,17 +237,6 @@ module resource_account::bonding_curve_launchpad {
         let symbol = string::utf8(b"SHEEP");
         get_metadata(name, symbol);
     }
-    #[test(deployer = @resource_account)]
-    #[expected_failure(abort_code = ELIQUIDITY_PAIR_SWAP_AMOUNTOUT_INSIGNIFICANT)]
-    public fun test_insignificant_fa_swap(deployer: &signer) {
-        initialize_for_test(deployer);
-        get_amount_out(1_000_000_000, 1_000_000_000, true, 0);
-    }
-    #[test(deployer = @resource_account)]
-    #[expected_failure(abort_code = ELIQUIDITY_PAIR_SWAP_AMOUNTOUT_INSIGNIFICANT)]
-    public fun test_insignificant_apt_swap(deployer: &signer) {
-        initialize_for_test(deployer);
-        get_amount_out(1_000_000_000, 1_000_000_000, false, 0);
-    }
+
 
 }

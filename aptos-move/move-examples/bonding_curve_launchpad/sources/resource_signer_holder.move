@@ -4,7 +4,9 @@ module resource_account::resource_signer_holder {
     use aptos_framework::account;
     use aptos_framework::resource_account;
 	use resource_account::bonding_curve_launchpad;
+	use resource_account::liquidity_pair;
 	friend bonding_curve_launchpad;
+	friend liquidity_pair;
 
 	const ENON_OWNER_ACCOUNT: u64 = 8030000000;
 
