@@ -417,24 +417,30 @@ impl NodeSetup {
     }
 
     pub async fn next_proposal(&mut self) -> ProposalMsg {
-        match self.next_network_message().await {
-            ConsensusMsg::ProposalMsg(p) => *p,
-            msg => panic!(
-                "Unexpected Consensus Message: {:?} on node {}",
-                msg,
-                self.identity_desc()
-            ),
+        loop {
+            match self.next_network_message().await {
+                ConsensusMsg::ProposalMsg(p) => return *p,
+                ConsensusMsg::OrderVoteMsg(_) => continue,
+                msg => panic!(
+                    "Unexpected Consensus Message: {:?} on node {}",
+                    msg,
+                    self.identity_desc()
+                ),
+            }
         }
     }
 
     pub async fn next_vote(&mut self) -> VoteMsg {
-        match self.next_network_message().await {
-            ConsensusMsg::VoteMsg(v) => *v,
-            msg => panic!(
-                "Unexpected Consensus Message: {:?} on node {}",
-                msg,
-                self.identity_desc()
-            ),
+        loop {
+            match self.next_network_message().await {
+                ConsensusMsg::VoteMsg(v) => return *v,
+                ConsensusMsg::OrderVoteMsg(_) => continue,
+                msg => panic!(
+                    "Unexpected Consensus Message: {:?} on node {}",
+                    msg,
+                    self.identity_desc()
+                ),
+            }
         }
     }
 
