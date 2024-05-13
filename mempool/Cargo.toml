@@ -46,6 +46,7 @@ serde = { workspace = true }
 thiserror = { workspace = true }
 tokio = { workspace = true }
 tokio-stream = { workspace = true }
+dashmap = { workspace = true }
 
 [dev-dependencies]
 aptos-compression = { workspace = true }
@@ -60,5 +61,10 @@ proptest = { workspace = true }
 [features]
 default = []
 failpoints = ["fail/failpoints", "aptos-vm-validator/failpoints"]
-fuzzing = ["proptest", "aptos-types/fuzzing", "aptos-storage-interface/fuzzing", "aptos-config/fuzzing"]
+fuzzing = [
+    "proptest",
+    "aptos-types/fuzzing",
+    "aptos-storage-interface/fuzzing",
+    "aptos-config/fuzzing",
+]
 consensus-only-perf-test = []

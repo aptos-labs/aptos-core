@@ -67,7 +67,7 @@ use aptos_consensus_types::{
     epoch_retrieval::EpochRetrievalRequest,
     proof_of_store::ProofCache,
 };
-use aptos_crypto::bls12381;
+use aptos_crypto::{bls12381, HashValue};
 use aptos_dkg::{
     pvss::{traits::Transcript, Player},
     weighted_vuf::traits::WeightedVUF,
@@ -98,6 +98,7 @@ use aptos_types::{
     validator_signer::ValidatorSigner,
 };
 use aptos_validator_transaction_pool::VTxnPoolState;
+use dashmap::DashMap;
 use fail::fail_point;
 use futures::{
     channel::{
@@ -116,7 +117,7 @@ use std::{
     hash::Hash,
     mem::{discriminant, Discriminant},
     sync::Arc,
-    time::Duration,
+    time::{Duration, SystemTime},
 };
 
 /// Range of rounds (window) that we might be calling proposer election
@@ -178,6 +179,7 @@ pub struct EpochManager<P: OnChainConfigProvider> {
     rand_storage: Arc<dyn RandStorage<AugmentedData>>,
     proof_cache: ProofCache,
     peers_and_metadata: Arc<PeersAndMetadata>,
+    txn_timestamp_store: Arc<DashMap<HashValue, SystemTime>>,
 }
 
 impl<P: OnChainConfigProvider> EpochManager<P> {
@@ -197,6 +199,7 @@ impl<P: OnChainConfigProvider> EpochManager<P> {
         vtxn_pool: VTxnPoolState,
         rand_storage: Arc<dyn RandStorage<AugmentedData>>,
         peers_and_metadata: Arc<PeersAndMetadata>,
+        txn_timestamp_store: Arc<DashMap<HashValue, SystemTime>>,
     ) -> Self {
         let author = node_config.validator_network.as_ref().unwrap().peer_id();
         let config = node_config.consensus.clone();
@@ -244,6 +247,7 @@ impl<P: OnChainConfigProvider> EpochManager<P> {
                 .time_to_live(Duration::from_secs(20))
                 .build(),
             peers_and_metadata,
+            txn_timestamp_store,
         }
     }
 
@@ -1322,6 +1326,7 @@ impl<P: OnChainConfigProvider> EpochManager<P> {
                 .quorum_store
                 .allow_batches_without_pos_in_proposal,
             self.peers_and_metadata.clone(),
+            self.txn_timestamp_store.clone(),
         );
 
         let (shoalpp_rpc_tx, shoalpp_rpc_rx) = aptos_channel::new(

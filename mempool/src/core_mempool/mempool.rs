@@ -24,9 +24,10 @@ use aptos_types::{
     transaction::SignedTransaction,
     vm_status::DiscardedVMStatus,
 };
+use dashmap::DashMap;
 use std::{
     collections::{BTreeMap, HashMap, HashSet},
-    sync::atomic::Ordering,
+    sync::{atomic::Ordering, Arc},
     time::{Duration, Instant, SystemTime},
 };
 
@@ -35,15 +36,21 @@ pub struct Mempool {
     transactions: TransactionStore,
 
     pub system_transaction_timeout: Duration,
+
+    txn_timestamp_store: Arc<DashMap<HashValue, SystemTime>>,
 }
 
 impl Mempool {
-    pub fn new(config: &NodeConfig) -> Self {
+    pub fn new(
+        config: &NodeConfig,
+        txn_timestamp_store: Arc<DashMap<HashValue, SystemTime>>,
+    ) -> Self {
         Mempool {
             transactions: TransactionStore::new(&config.mempool),
             system_transaction_timeout: Duration::from_secs(
                 config.mempool.system_transaction_timeout_secs,
             ),
+            txn_timestamp_store,
         }
     }
 
@@ -251,6 +258,7 @@ impl Mempool {
         let expiration_time =
             aptos_infallible::duration_since_epoch_at(&now) + self.system_transaction_timeout;
 
+        let txn_hash = txn.clone().committed_hash();
         let txn_info = MempoolTransaction::new(
             txn,
             expiration_time,
@@ -261,6 +269,7 @@ impl Mempool {
             client_submitted,
         );
 
+        self.txn_timestamp_store.insert(txn_hash, now);
         let status = self.transactions.insert(txn_info);
         counters::core_mempool_txn_ranking_score(
             counters::INSERT_LABEL,

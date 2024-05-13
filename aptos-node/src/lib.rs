@@ -34,6 +34,7 @@ use aptos_state_sync_driver::driver_factory::StateSyncRuntimes;
 use aptos_types::{chain_id::ChainId, on_chain_config::OnChainJWKConsensusConfig};
 use aptos_validator_transaction_pool::VTxnPoolState;
 use clap::Parser;
+use dashmap::DashMap;
 use futures::channel::mpsc;
 use hex::{FromHex, FromHexError};
 use rand::{rngs::StdRng, SeedableRng};
@@ -694,6 +695,7 @@ pub fn setup_environment_and_start_node(
         indexer_grpc_runtime,
     ) = services::bootstrap_api_and_indexer(&node_config, db_rw.clone(), chain_id)?;
 
+    let txn_timestamp_store = Arc::new(DashMap::new());
     // Create mempool and get the consensus to mempool sender
     let (mempool_runtime, consensus_to_mempool_sender) =
         services::start_mempool_runtime_and_get_consensus_sender(
@@ -704,6 +706,7 @@ pub fn setup_environment_and_start_node(
             mempool_listener,
             mempool_client_receiver,
             peers_and_metadata.clone(),
+            txn_timestamp_store.clone(),
         );
 
     // Ensure consensus key in secure DB.
@@ -794,6 +797,7 @@ pub fn setup_environment_and_start_node(
             consensus_to_mempool_sender,
             vtxn_pool,
             peers_and_metadata,
+            txn_timestamp_store,
         );
         admin_service.set_consensus_dbs(consensus_db, quorum_store_db);
         runtime

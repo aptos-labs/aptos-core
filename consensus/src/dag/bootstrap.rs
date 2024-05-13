@@ -46,6 +46,7 @@ use aptos_channels::{
 };
 use aptos_config::{config::DagConsensusConfig, network_id::NetworkId};
 use aptos_consensus_types::common::{Author, Round};
+use aptos_crypto::HashValue;
 use aptos_infallible::{Mutex, RwLock};
 use aptos_logger::{debug, info};
 use aptos_network::application::storage::PeersAndMetadata;
@@ -71,7 +72,7 @@ use std::{
     fmt,
     ops::Deref,
     sync::Arc,
-    time::{Duration, Instant},
+    time::{Duration, Instant, SystemTime},
 };
 use tokio::{
     runtime::Handle,
@@ -362,6 +363,7 @@ pub struct DagBootstrapper {
     dag_store: Arc<ArcSwapOption<DagStore>>,
     next_dag_tx: tokio::sync::mpsc::UnboundedSender<Instant>,
     prev_dag_rx: Mutex<Option<tokio::sync::mpsc::UnboundedReceiver<Instant>>>,
+    txn_timestamp_store: Arc<DashMap<HashValue, SystemTime>>,
 }
 
 impl DagBootstrapper {
@@ -396,6 +398,7 @@ impl DagBootstrapper {
         dag_store: Arc<ArcSwapOption<DagStore>>,
         next_dag_tx: tokio::sync::mpsc::UnboundedSender<Instant>,
         prev_dag_rx: tokio::sync::mpsc::UnboundedReceiver<Instant>,
+        txn_timestamp_store: Arc<DashMap<HashValue, SystemTime>>,
     ) -> Self {
         info!("OnChainConfig: {:?}", onchain_config);
         Self {
@@ -427,6 +430,7 @@ impl DagBootstrapper {
             dag_store,
             next_dag_tx,
             prev_dag_rx: Mutex::new(Some(prev_dag_rx)),
+            txn_timestamp_store,
         }
     }
 
@@ -596,6 +600,7 @@ impl DagBootstrapper {
                 self.epoch_state.clone(),
                 self.ledger_info_provider.clone(),
                 self.allow_batches_without_pos_in_proposal,
+                self.txn_timestamp_store.clone(),
             ))
         );
 
@@ -880,6 +885,7 @@ pub(super) fn bootstrap_dag_for_test(
         dag_store,
         tx,
         rx,
+        Arc::new(DashMap::new()),
     );
 
     let (_base_state, handler, fetch_service) = bootstraper.full_bootstrap(None);

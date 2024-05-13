@@ -12,6 +12,7 @@ use crate::{
     QuorumStoreRequest,
 };
 use aptos_config::config::NodeConfig;
+use aptos_crypto::HashValue;
 use aptos_event_notifications::{DbBackedOnChainConfig, ReconfigNotificationListener};
 use aptos_infallible::{Mutex, RwLock};
 use aptos_logger::Level;
@@ -23,8 +24,9 @@ use aptos_network::application::{
 use aptos_storage_interface::DbReader;
 use aptos_types::on_chain_config::OnChainConfigProvider;
 use aptos_vm_validator::vm_validator::{TransactionValidation, VMValidator};
+use dashmap::DashMap;
 use futures::channel::mpsc::{Receiver, UnboundedSender};
-use std::sync::Arc;
+use std::{sync::Arc, time::SystemTime};
 use tokio::runtime::{Handle, Runtime};
 
 /// Bootstrap of SharedMempool.
@@ -96,9 +98,10 @@ pub fn bootstrap(
     mempool_listener: MempoolNotificationListener,
     mempool_reconfig_events: ReconfigNotificationListener<DbBackedOnChainConfig>,
     peers_and_metadata: Arc<PeersAndMetadata>,
+    txn_timestamp_store: Arc<DashMap<HashValue, SystemTime>>,
 ) -> Runtime {
     let runtime = aptos_runtimes::spawn_named_runtime("shared-mem".into(), None);
-    let mempool = Arc::new(Mutex::new(CoreMempool::new(config)));
+    let mempool = Arc::new(Mutex::new(CoreMempool::new(config, txn_timestamp_store)));
     let vm_validator = Arc::new(RwLock::new(VMValidator::new(Arc::clone(&db))));
     start_shared_mempool(
         runtime.handle(),

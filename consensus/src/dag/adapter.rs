@@ -13,7 +13,7 @@ use crate::{
     },
     counters,
     dag::{
-        observability::counters::BLOCK_COUNTER,
+        observability::counters::{BLOCK_COUNTER, TXN_ORDERED_LATENCY},
         storage::{CommitEvent, DAGStorage},
         CertifiedNode, Node, NodeId, Vote,
     },
@@ -22,7 +22,7 @@ use anyhow::{anyhow, bail, format_err};
 use aptos_bitvec::BitVec;
 use aptos_consensus_types::{
     block::Block,
-    common::{Author, Round},
+    common::{Author, Payload::DirectMempool, Round},
     quorum_cert::QuorumCert,
 };
 use aptos_crypto::HashValue;
@@ -40,11 +40,13 @@ use aptos_types::{
     state_store::state_key::StateKey,
 };
 use async_trait::async_trait;
+use dashmap::DashMap;
+use rayon::iter::{IndexedParallelIterator, IntoParallelRefIterator, ParallelIterator};
 use std::{
     collections::{BTreeMap, HashMap},
     mem,
     sync::Arc,
-    time::{Duration, Instant},
+    time::{Duration, Instant, SystemTime},
 };
 
 pub trait OrderedNotifier: Send + Sync {
@@ -124,6 +126,7 @@ pub(super) struct OrderedNotifierAdapter {
     allow_batches_without_pos_in_proposal: bool,
     author_to_index: HashMap<Author, usize>,
     idx_gen: Mutex<RoundIndexGenerator>,
+    txn_timestamp_store: Arc<DashMap<HashValue, SystemTime>>,
 }
 
 impl OrderedNotifierAdapter {
@@ -134,6 +137,7 @@ impl OrderedNotifierAdapter {
         epoch_state: Arc<EpochState>,
         ledger_info_provider: Arc<RwLock<LedgerInfoProvider>>,
         allow_batches_without_pos_in_proposal: bool,
+        txn_timestamp_store: Arc<DashMap<HashValue, SystemTime>>,
     ) -> Self {
         let author_to_index = epoch_state.verifier.address_to_validator_index().clone();
         let shoalpp_dag_round = ledger_info_provider
@@ -155,6 +159,7 @@ impl OrderedNotifierAdapter {
                 current_idx,
             }),
             buffer: Mutex::new(Vec::with_capacity(150)),
+            txn_timestamp_store,
         }
     }
 
@@ -184,6 +189,28 @@ impl OrderedNotifier for OrderedNotifierAdapter {
         mut ordered_nodes: Vec<Arc<CertifiedNode>>,
         failed_author: Vec<(Round, Author)>,
     ) {
+        {
+            let nodes = ordered_nodes.clone();
+            let txn_timestamp_store = self.txn_timestamp_store.clone();
+            tokio::task::spawn_blocking(move || {
+                for node in nodes {
+                    let payload = node.payload();
+                    let txns = match payload {
+                        DirectMempool(txns) => txns,
+                        _ => unreachable!("this should not happen"),
+                    };
+                    let now = SystemTime::now();
+                    txns.par_iter().with_min_len(10).for_each(|txn| {
+                        if let Some((_, insertion_time)) =
+                            txn_timestamp_store.remove(&txn.clone().committed_hash())
+                        {
+                            let duration = now.duration_since(insertion_time).unwrap();
+                            TXN_ORDERED_LATENCY.observe(duration.as_secs_f64());
+                        }
+                    });
+                }
+            });
+        }
         {
             let anchor_round = ordered_nodes.last().unwrap().round();
             let last = self.buffer.lock().last().cloned();

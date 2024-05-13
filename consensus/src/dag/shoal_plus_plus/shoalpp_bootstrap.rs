@@ -24,6 +24,7 @@ use aptos_bounded_executor::BoundedExecutor;
 use aptos_channels::{aptos_channel, message_queues::QueueStyle};
 use aptos_config::config::DagConsensusConfig;
 use aptos_consensus_types::common::Author;
+use aptos_crypto::HashValue;
 use aptos_infallible::RwLock;
 use aptos_logger::{debug, error};
 use aptos_network::application::storage::PeersAndMetadata;
@@ -37,12 +38,13 @@ use aptos_types::{
     validator_signer::ValidatorSigner,
 };
 use arc_swap::ArcSwapOption;
+use dashmap::DashMap;
 use futures::executor::block_on;
 use futures_channel::{mpsc::UnboundedSender, oneshot};
 use std::{
     collections::VecDeque,
     sync::Arc,
-    time::{Duration, Instant},
+    time::{Duration, Instant, SystemTime},
 };
 use tokio::sync::mpsc::{channel, Receiver};
 use tokio_retry::strategy::ExponentialBackoff;
@@ -78,6 +80,7 @@ impl ShoalppBootstrapper {
         executor: BoundedExecutor,
         allow_batches_without_pos_in_proposal: bool,
         peers_and_metadata: Arc<PeersAndMetadata>,
+        txn_timestamp_store: Arc<DashMap<HashValue, SystemTime>>,
     ) -> Self {
         let ledger_info_from_storage = storage
             .get_latest_ledger_info()
@@ -167,6 +170,7 @@ impl ShoalppBootstrapper {
                 dag_store_vec[dag_id as usize].clone(),
                 tx,
                 rx,
+                txn_timestamp_store.clone(),
             );
             dags.push(dag_bootstrapper);
         }

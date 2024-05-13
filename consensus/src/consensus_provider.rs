@@ -19,6 +19,7 @@ use crate::{
 use aptos_bounded_executor::BoundedExecutor;
 use aptos_config::config::NodeConfig;
 use aptos_consensus_notifications::ConsensusNotificationSender;
+use aptos_crypto::HashValue;
 use aptos_event_notifications::{DbBackedOnChainConfig, ReconfigNotificationListener};
 use aptos_executor::block_executor::BlockExecutor;
 use aptos_logger::prelude::*;
@@ -30,8 +31,9 @@ use aptos_network::application::{
 use aptos_storage_interface::DbReaderWriter;
 use aptos_validator_transaction_pool::VTxnPoolState;
 use aptos_vm::AptosVM;
+use dashmap::DashMap;
 use futures::channel::mpsc;
-use std::sync::Arc;
+use std::{sync::Arc, time::SystemTime};
 use tokio::runtime::Runtime;
 
 /// Helper function to start consensus based on configuration and return the runtime
@@ -45,6 +47,7 @@ pub fn start_consensus(
     reconfig_events: ReconfigNotificationListener<DbBackedOnChainConfig>,
     vtxn_pool: VTxnPoolState,
     peers_and_metadata: Arc<PeersAndMetadata>,
+    txn_timestamp_store: Arc<DashMap<HashValue, SystemTime>>,
 ) -> (Runtime, Arc<StorageWriteProxy>, Arc<QuorumStoreDB>) {
     let runtime = aptos_runtimes::spawn_named_runtime("consensus".into(), None);
     let storage = Arc::new(StorageWriteProxy::new(node_config, aptos_db.reader.clone()));
@@ -99,6 +102,7 @@ pub fn start_consensus(
         vtxn_pool,
         rand_storage,
         peers_and_metadata,
+        txn_timestamp_store,
     );
 
     let (network_task, network_receiver) = NetworkTask::new(network_service_events, self_receiver);

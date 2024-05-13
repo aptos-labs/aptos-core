@@ -10,6 +10,7 @@ use aptos_consensus::{
     quorum_store::quorum_store_db::QuorumStoreDB,
 };
 use aptos_consensus_notifications::ConsensusNotifier;
+use aptos_crypto::HashValue;
 use aptos_data_client::client::AptosDataClient;
 use aptos_db_indexer::table_info_reader::TableInfoReader;
 use aptos_event_notifications::{DbBackedOnChainConfig, ReconfigNotificationListener};
@@ -29,8 +30,12 @@ use aptos_storage_interface::{DbReader, DbReaderWriter};
 use aptos_time_service::TimeService;
 use aptos_types::chain_id::ChainId;
 use aptos_validator_transaction_pool::VTxnPoolState;
+use dashmap::DashMap;
 use futures::channel::{mpsc, mpsc::Sender};
-use std::{sync::Arc, time::Instant};
+use std::{
+    sync::Arc,
+    time::{Instant, SystemTime},
+};
 use tokio::runtime::{Handle, Runtime};
 
 const AC_SMP_CHANNEL_BUFFER_SIZE: usize = 1_024;
@@ -116,6 +121,7 @@ pub fn start_consensus_runtime(
     consensus_to_mempool_sender: Sender<QuorumStoreRequest>,
     vtxn_pool: VTxnPoolState,
     peers_and_metadata: Arc<PeersAndMetadata>,
+    txn_timestamp_store: Arc<DashMap<HashValue, SystemTime>>,
 ) -> (Runtime, Arc<StorageWriteProxy>, Arc<QuorumStoreDB>) {
     let instant = Instant::now();
     let consensus = aptos_consensus::consensus_provider::start_consensus(
@@ -129,6 +135,7 @@ pub fn start_consensus_runtime(
             .expect("Consensus requires a reconfiguration subscription!"),
         vtxn_pool,
         peers_and_metadata,
+        txn_timestamp_store,
     );
     debug!("Consensus started in {} ms", instant.elapsed().as_millis());
     consensus
@@ -143,6 +150,7 @@ pub fn start_mempool_runtime_and_get_consensus_sender(
     mempool_listener: MempoolNotificationListener,
     mempool_client_receiver: Receiver<MempoolClientRequest>,
     peers_and_metadata: Arc<PeersAndMetadata>,
+    txn_timestamp_store: Arc<DashMap<HashValue, SystemTime>>,
 ) -> (Runtime, Sender<QuorumStoreRequest>) {
     // Create a communication channel between consensus and mempool
     let (consensus_to_mempool_sender, consensus_to_mempool_receiver) =
@@ -160,6 +168,7 @@ pub fn start_mempool_runtime_and_get_consensus_sender(
         mempool_listener,
         mempool_reconfig_subscription,
         peers_and_metadata,
+        txn_timestamp_store,
     );
     debug!("Mempool started in {} ms", instant.elapsed().as_millis());
 
