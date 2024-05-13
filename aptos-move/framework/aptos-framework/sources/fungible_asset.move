@@ -672,8 +672,8 @@ module aptos_framework::fungible_asset {
 
     /// Mint the specified `amount` of the fungible asset to a destination store.
     public fun mint_to<T: key>(ref: &MintRef, store: Object<T>, amount: u64)
-    acquires FungibleStore, Supply, ConcurrentSupply, DispatchFunctionStore {
-        deposit(store, mint(ref, amount));
+    acquires FungibleStore, Supply, ConcurrentSupply {
+        deposit_internal(store, mint(ref, amount));
     }
 
     /// Enable/disable a store's ability to do direct transfers of the fungible asset.
