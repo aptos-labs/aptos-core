@@ -4,7 +4,9 @@
 
 use crate::{
     block_storage::{
-        block_fetch_manager::{BlockFetchManager, BlockFetchRequest, BlockFetchResponse}, tracing::{observe_block, BlockStage}, BlockStore
+        block_fetch_manager::{BlockFetchManager, BlockFetchRequest, BlockFetchResponse},
+        tracing::{observe_block, BlockStage},
+        BlockStore,
     },
     counters,
     dag::{DagBootstrapper, DagCommitSigner, StorageAdapter},
@@ -58,7 +60,10 @@ use aptos_config::config::{
     SafetyRulesConfig, SecureBackend,
 };
 use aptos_consensus_types::{
-    common::{Author, Round}, delayed_qc_msg::DelayedQcMsg, epoch_retrieval::EpochRetrievalRequest, proof_of_store::ProofCache
+    common::{Author, Round},
+    delayed_qc_msg::DelayedQcMsg,
+    epoch_retrieval::EpochRetrievalRequest,
+    proof_of_store::ProofCache,
 };
 use aptos_crypto::{bls12381, HashValue};
 use aptos_dkg::{
@@ -850,10 +855,12 @@ impl<P: OnChainConfigProvider> EpochManager<P> {
             .config
             .max_blocks_per_receiving_request(onchain_consensus_config.quorum_store_enabled());
 
-        let max_blocks_per_request = self.config
+        let max_blocks_per_request = self
+            .config
             .max_blocks_per_sending_request(onchain_consensus_config.quorum_store_enabled());
-        let (block_fetch_request_tx, block_fetch_response_rx) = self.start_block_fetch_manager(network_sender, max_blocks_per_request).await;
-
+        let (block_fetch_request_tx, block_fetch_response_rx) = self
+            .start_block_fetch_manager(network_sender.clone(), max_blocks_per_request)
+            .await;
 
         let mut round_manager = RoundManager::new(
             epoch_state,
@@ -870,7 +877,7 @@ impl<P: OnChainConfigProvider> EpochManager<P> {
             onchain_randomness_config,
             onchain_jwk_consensus_config,
             fast_rand_config,
-            block_fetch_request_tx
+            block_fetch_request_tx,
         );
 
         round_manager.init(last_vote).await;
@@ -1254,7 +1261,10 @@ impl<P: OnChainConfigProvider> EpochManager<P> {
         &mut self,
         network: Arc<NetworkSender>,
         max_blocks_per_request: u64,
-    ) -> (aptos_channel::Sender<(HashValue, HashValue), BlockFetchRequest>, aptos_channel::Receiver<(HashValue, HashValue), BlockFetchResponse>) {
+    ) -> (
+        aptos_channel::Sender<(HashValue, HashValue), BlockFetchRequest>,
+        aptos_channel::Receiver<(HashValue, HashValue), BlockFetchResponse>,
+    ) {
         let (block_fetch_request_tx, block_fetch_request_rx) = aptos_channel::new(
             QueueStyle::LIFO,
             1,
@@ -1266,7 +1276,8 @@ impl<P: OnChainConfigProvider> EpochManager<P> {
             1,
             Some(&counters::BLOCK_FETCH_MANAGER_RESPONSE_CHANNEL_MSGS),
         );
-        let block_fetch_manager = BlockFetchManager::new(network, max_blocks_per_request, block_fetch_response_tx);
+        let block_fetch_manager =
+            BlockFetchManager::new(network, max_blocks_per_request, block_fetch_response_tx);
 
         tokio::spawn(block_fetch_manager.start(block_fetch_request_rx));
 

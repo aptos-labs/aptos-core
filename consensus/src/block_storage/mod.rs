@@ -8,15 +8,14 @@ use aptos_consensus_types::{
 };
 use aptos_crypto::HashValue;
 pub use block_store::BlockStore;
-use block_retriever::BlockRetriever;
 use std::{sync::Arc, time::Duration};
 
+pub mod block_fetch_manager;
+pub mod block_retriever;
 mod block_store;
 mod block_tree;
-pub mod block_fetch_manager;
-pub mod tracing;
 mod counters;
-pub mod block_retriever;
+pub mod tracing;
 
 pub trait BlockReader: Send + Sync {
     /// Check if a block with the block_id exist in the BlockTree.

@@ -12,7 +12,9 @@ use std::collections::BTreeMap;
 /// it stores a bit mask representing the set of validators participating in the signing process
 /// and the multi-signature/aggregated signature itself,
 /// which was aggregated from these validators' partial BLS signatures.
-#[derive(Clone, Debug, Eq, PartialEq, Serialize, Deserialize, Hash, CryptoHasher, BCSCryptoHash)]
+#[derive(
+    Clone, Debug, Eq, PartialEq, Serialize, Deserialize, Hash, CryptoHasher, BCSCryptoHash,
+)]
 pub struct AggregateSignature {
     validator_bitmask: BitVec,
     sig: Option<bls12381::Signature>,

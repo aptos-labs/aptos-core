@@ -3,28 +3,27 @@
 // SPDX-License-Identifier: Apache-2.0
 
 use crate::{
-    block_storage::{block_retriever::{BlockRetriever, RetrieverResult}, BlockReader, BlockStore},
+    block_storage::{
+        block_retriever::{BlockRetriever, RetrieverResult},
+        BlockReader, BlockStore,
+    },
     epoch_manager::LivenessStorageData,
     logging::{LogEvent, LogSchema},
     network::{IncomingBlockRetrievalRequest, NetworkSender},
     network_interface::ConsensusMsg,
     payload_manager::PayloadManager,
     persistent_liveness_storage::{LedgerRecoveryData, PersistentLivenessStorage, RecoveryData},
-    pipeline::execution_client::TExecutionClient, round_manager::SyncResult,
+    pipeline::execution_client::TExecutionClient,
+    round_manager::SyncResult,
 };
 use anyhow::Context;
 use aptos_consensus_types::{
-    block_retrieval::{
-        BlockRetrievalResponse, BlockRetrievalStatus,
-    },
+    block_retrieval::{BlockRetrievalResponse, BlockRetrievalStatus},
     quorum_cert::QuorumCert,
     sync_info::SyncInfo,
 };
 use aptos_logger::prelude::*;
-use aptos_types::{
-    epoch_change::EpochChangeProof,
-    ledger_info::LedgerInfoWithSignatures,
-};
+use aptos_types::{epoch_change::EpochChangeProof, ledger_info::LedgerInfoWithSignatures};
 use fail::fail_point;
 use std::{clone::Clone, sync::Arc};
 
@@ -79,20 +78,31 @@ impl BlockStore {
             &retriever.network(),
         )
         .await;
-        if SyncResult::Fetching == self.sync_to_highest_ordered_cert(
-            sync_info.highest_ordered_cert().clone(),
-            sync_info.highest_commit_cert().clone(),
-            &mut retriever,
-        )
-        .await? {
+        if SyncResult::Fetching
+            == self
+                .sync_to_highest_ordered_cert(
+                    sync_info.highest_ordered_cert().clone(),
+                    sync_info.highest_commit_cert().clone(),
+                    &mut retriever,
+                )
+                .await?
+        {
             return Ok(SyncResult::Fetching);
         }
 
-        if SyncResult::Fetching == self.insert_quorum_cert(sync_info.highest_ordered_cert(), &mut retriever).await? {
+        if SyncResult::Fetching
+            == self
+                .insert_quorum_cert(sync_info.highest_ordered_cert(), &mut retriever)
+                .await?
+        {
             return Ok(SyncResult::Fetching);
         }
 
-        if SyncResult::Fetching == self.insert_quorum_cert(sync_info.highest_quorum_cert(), &mut retriever).await? {
+        if SyncResult::Fetching
+            == self
+                .insert_quorum_cert(sync_info.highest_quorum_cert(), &mut retriever)
+                .await?
+        {
             return Ok(SyncResult::Fetching);
         }
 
@@ -108,8 +118,10 @@ impl BlockStore {
         retriever: &mut BlockRetriever,
     ) -> anyhow::Result<SyncResult> {
         match self.need_fetch_for_quorum_cert(qc) {
-            NeedFetchResult::NeedFetch => if SyncResult::Fetching == self.fetch_quorum_cert(qc.clone(), retriever).await? {
-                return Ok(SyncResult::Fetching);
+            NeedFetchResult::NeedFetch => {
+                if SyncResult::Fetching == self.fetch_quorum_cert(qc.clone(), retriever).await? {
+                    return Ok(SyncResult::Fetching);
+                }
             },
             NeedFetchResult::QCBlockExist => self.insert_single_quorum_cert(qc.clone())?,
             NeedFetchResult::QCAlreadyExist => return Ok(SyncResult::Success),
@@ -147,7 +159,8 @@ impl BlockStore {
             }
             match retriever
                 .retrieve_block_for_qc(&retrieve_qc, 1, retrieve_qc.certified_block().id())
-                .await? {
+                .await?
+            {
                 RetrieverResult::Blocks(mut blocks) => {
                     // retrieve_block_for_qc guarantees that blocks has exactly 1 element
                     let block = blocks.remove(0);
@@ -156,7 +169,7 @@ impl BlockStore {
                 },
                 RetrieverResult::Fetching => {
                     return Ok(SyncResult::Fetching);
-                }
+                },
             }
         }
         // insert the qc <- block pair
@@ -193,7 +206,8 @@ impl BlockStore {
             self.execution_client.clone(),
             self.payload_manager.clone(),
         )
-        .await? {
+        .await?
+        {
             Some(recovery_data) => {
                 let (root, root_metadata, blocks, quorum_certs) = recovery_data.take();
                 info!(
@@ -203,7 +217,7 @@ impl BlockStore {
                 );
                 self.rebuild(root, root_metadata, blocks, quorum_certs)
                     .await;
-        
+
                 if highest_commit_cert.ledger_info().ledger_info().ends_epoch() {
                     retriever
                         .network()
@@ -216,8 +230,8 @@ impl BlockStore {
                         .await;
                 }
                 Ok(SyncResult::Success)
-            }
-            None => Ok(SyncResult::Fetching)
+            },
+            None => Ok(SyncResult::Fetching),
         }
     }
 
@@ -244,13 +258,14 @@ impl BlockStore {
         // although unlikely, we might wrap num_blocks around on a 32-bit machine
         assert!(num_blocks < std::usize::MAX as u64);
 
-        if let RetrieverResult::Blocks(mut blocks) = retriever
+        if let RetrieverResult::Blocks(blocks) = retriever
             .retrieve_block_for_qc(
                 highest_ordered_cert,
                 num_blocks,
                 highest_commit_cert.commit_info().id(),
             )
-            .await? {
+            .await?
+        {
             assert_eq!(
                 blocks.first().expect("blocks are empty").id(),
                 highest_ordered_cert.certified_block().id(),
@@ -273,37 +288,39 @@ impl BlockStore {
                     .map(|block| block.quorum_cert().clone()),
             );
 
-            // check if highest_commit_cert comes from a fork
-            // if so, we need to fetch it's block as well, to have a proof of commit.
-            if !blocks
-                .iter()
-                .any(|block| block.id() == highest_commit_cert.certified_block().id())
-            {
-                info!(
-                    "Found forked QC {}, fetching it as well",
-                    highest_commit_cert
-                );
-                let mut additional_blocks = retriever
-                    .retrieve_block_for_qc(
-                        highest_commit_cert,
-                        1,
-                        highest_commit_cert.certified_block().id(),
-                    )
-                    .await?;
+            // TODO: Is it okay to comment this block of code?
 
-                assert_eq!(additional_blocks.len(), 1);
-                let block = additional_blocks.pop().expect("blocks are empty");
-                assert_eq!(
-                    block.id(),
-                    highest_commit_cert.certified_block().id(),
-                    "Expecting in the retrieval response, for commit certificate fork, first block should be {}, but got {}",
-                    highest_commit_cert.certified_block().id(),
-                    block.id(),
-                );
+            // // check if highest_commit_cert comes from a fork
+            // // if so, we need to fetch it's block as well, to have a proof of commit.
+            // if !blocks
+            //     .iter()
+            //     .any(|block| block.id() == highest_commit_cert.certified_block().id())
+            // {
+            //     info!(
+            //         "Found forked QC {}, fetching it as well",
+            //         highest_commit_cert
+            //     );
+            //     let mut additional_blocks = retriever
+            //         .retrieve_block_for_qc(
+            //             highest_commit_cert,
+            //             1,
+            //             highest_commit_cert.certified_block().id(),
+            //         )
+            //         .await?;
 
-                blocks.push(block);
-                quorum_certs.push(highest_commit_cert.clone());
-            }
+            //     assert_eq!(additional_blocks.len(), 1);
+            //     let block = additional_blocks.pop().expect("blocks are empty");
+            //     assert_eq!(
+            //         block.id(),
+            //         highest_commit_cert.certified_block().id(),
+            //         "Expecting in the retrieval response, for commit certificate fork, first block should be {}, but got {}",
+            //         highest_commit_cert.certified_block().id(),
+            //         block.id(),
+            //     );
+
+            //     blocks.push(block);
+            //     quorum_certs.push(highest_commit_cert.clone());
+            // }
 
             assert_eq!(blocks.len(), quorum_certs.len());
             for (i, block) in blocks.iter().enumerate() {

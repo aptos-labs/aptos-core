@@ -1,29 +1,39 @@
 // Copyright © Aptos Foundation
 // SPDX-License-Identifier: Apache-2.0
 
-use aptos_crypto::HashValue;
+use crate::{
+    block_storage::counters::BLOCK_FETCH_MANAGER_MAIN_LOOP,
+    logging::{LogEvent, LogSchema},
+    monitor,
+    network::NetworkSender,
+};
+use anyhow::bail;
+use aptos_channels::aptos_channel::{Receiver, Sender};
 use aptos_consensus_types::{
-    block::Block, block_retrieval::{
+    block::Block,
+    block_retrieval::{
         BlockRetrievalRequest, BlockRetrievalResponse, BlockRetrievalStatus, NUM_PEERS_PER_RETRY,
         NUM_RETRIES, RETRY_INTERVAL_MSEC, RPC_TIMEOUT_MSEC,
-    }, common::Author, quorum_cert::QuorumCert, sync_info::SyncInfo,
+    },
 };
-use aptos_types::account_address::AccountAddress;
+use aptos_crypto::HashValue;
 use aptos_logger::prelude::*;
-use anyhow::{bail, Context};
-use crate::{block_storage::counters::BLOCK_FETCH_MANAGER_MAIN_LOOP, monitor, network::NetworkSender, logging::{LogEvent, LogSchema}};
-use std::{collections::HashMap, cmp::{min, max}, sync::Arc, time::Duration};
-use rand::{thread_rng, Rng};
-use tokio::time;
+use aptos_types::account_address::AccountAddress;
 use futures::{stream::FuturesUnordered, StreamExt};
-use aptos_channels::aptos_channel::{Sender, Receiver};
 use lru::LruCache;
+use rand::{thread_rng, Rng};
+use std::{
+    cmp::{max, min},
+    sync::Arc,
+    time::Duration,
+};
+use tokio::time;
 
-#[derive(Debug, PartialEq, Eq, Clone)]
-pub enum BlockFetchContext {
-    ProcessRegular(SyncInfo, Author),
-    InsertQuorumCert(QuorumCert, Author),
-}
+// #[derive(Debug, PartialEq, Eq, Clone)]
+// pub enum BlockFetchContext {
+//     ProcessRegular(SyncInfo, Author),
+//     InsertQuorumCert(QuorumCert, Author),
+// }
 
 #[derive(Debug)]
 pub struct BlockFetchRequest {
@@ -72,7 +82,6 @@ impl BlockFetchResponse {
     // }
 }
 
-
 pub struct BlockFetchManager {
     network: Arc<NetworkSender>,
     // TODO: Consider using a cache
@@ -84,7 +93,11 @@ pub struct BlockFetchManager {
 }
 
 impl BlockFetchManager {
-    pub fn new(network: Arc<NetworkSender>, max_blocks_per_request: u64, response_sender: Sender<(HashValue, HashValue), BlockFetchResponse>) -> Self {
+    pub fn new(
+        network: Arc<NetworkSender>,
+        max_blocks_per_request: u64,
+        response_sender: Sender<(HashValue, HashValue), BlockFetchResponse>,
+    ) -> Self {
         BlockFetchManager {
             network,
             // TODO: Is storing 50 blocks enough even for recovery manager?
@@ -130,27 +143,49 @@ impl BlockFetchManager {
         }
         if blocks.len() == num_blocks as usize {
             let fetch_response = BlockFetchResponse { blocks };
-            self.response_sender.push((initial_block_id, target_block_id), fetch_response);
+            // TODO: Need to handle the result.
+            let _ = self
+                .response_sender
+                .push((initial_block_id, target_block_id), fetch_response);
         } else {
-            // TODO: Optimize this. We are fetching between [target_block_id, current_block_id] even if 
+            // TODO: Optimize this. We are fetching between [target_block_id, current_block_id] even if
             // some of these blocks could be present in block_store.
             let mut peers = peers;
             let peers = self.pick_peers(true, preferred_peer, &mut peers, 2);
-            let retrieve_result = self.retrieve_block_for_id(initial_block_id, target_block_id, preferred_peer, peers, num_blocks).await;
+            let retrieve_result = self
+                .retrieve_block_for_id(
+                    initial_block_id,
+                    target_block_id,
+                    preferred_peer,
+                    peers,
+                    num_blocks,
+                )
+                .await;
             match retrieve_result {
                 Ok(blocks) => {
-                    let blocks: Vec<Arc<Block>> = blocks.into_iter().map(|block| {
-                        let block = Arc::new(block);
-                        self.block_store.push(block.id(), block.clone());
-                        block
-                    }).collect();
-                    info!("Successfully fetched blocks between {:?} {:?}", initial_block_id, target_block_id);
+                    let blocks: Vec<Arc<Block>> = blocks
+                        .into_iter()
+                        .map(|block| {
+                            let block = Arc::new(block);
+                            self.block_store.push(block.id(), block.clone());
+                            block
+                        })
+                        .collect();
+                    info!(
+                        "Successfully fetched blocks between {:?} {:?}",
+                        initial_block_id, target_block_id
+                    );
                     let fetch_response = BlockFetchResponse { blocks };
-                    self.response_sender.push((initial_block_id, target_block_id), fetch_response);
-                }
+                    let _ = self
+                        .response_sender
+                        .push((initial_block_id, target_block_id), fetch_response);
+                },
                 Err(e) => {
-                    error!("Failed to fetch blocks between {:?} {:?}: {:?}", initial_block_id, target_block_id, e);
-                }
+                    error!(
+                        "Failed to fetch blocks between {:?} {:?}: {:?}",
+                        initial_block_id, target_block_id, e
+                    );
+                },
             }
         }
     }
@@ -312,8 +347,12 @@ impl BlockFetchManager {
         })
     }
 
-
-    fn pick_peer(&self, first_atempt: bool, preferred_peer: AccountAddress, peers: &mut Vec<AccountAddress>) -> AccountAddress {
+    fn pick_peer(
+        &self,
+        first_atempt: bool,
+        preferred_peer: AccountAddress,
+        peers: &mut Vec<AccountAddress>,
+    ) -> AccountAddress {
         assert!(!peers.is_empty(), "pick_peer on empty peer list");
 
         if first_atempt {
@@ -331,7 +370,6 @@ impl BlockFetchManager {
         let peer_idx = thread_rng().gen_range(0, peers.len());
         peers.remove(peer_idx)
     }
-
 
     fn pick_peers(
         &self,

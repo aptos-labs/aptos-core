@@ -3,12 +3,13 @@
 // SPDX-License-Identifier: Apache-2.0
 
 use crate::{
-    block_storage::{block_fetch_manager::{BlockFetchContext, BlockFetchRequest}, BlockReader, BlockStore},
+    block_storage::block_fetch_manager::BlockFetchRequest,
     logging::{LogEvent, LogSchema},
     monitor,
     network::NetworkSender,
 };
 use anyhow::bail;
+use aptos_channels::aptos_channel::Sender;
 use aptos_consensus_types::{
     block::Block,
     block_retrieval::{
@@ -17,7 +18,6 @@ use aptos_consensus_types::{
     },
     common::Author,
     quorum_cert::QuorumCert,
-    sync_info::SyncInfo,
 };
 use aptos_crypto::HashValue;
 use aptos_logger::prelude::*;
@@ -26,8 +26,6 @@ use futures::{stream::FuturesUnordered, StreamExt};
 use rand::{prelude::*, Rng};
 use std::{clone::Clone, cmp::min, sync::Arc, time::Duration};
 use tokio::time;
-use aptos_channels::aptos_channel::Sender;
-
 
 pub enum RetrieverResult {
     Blocks(Vec<Block>),
@@ -43,7 +41,7 @@ pub enum RetrieverMode {
     // This mode is used by round manager. The blocks are fetched in a separate thread.
     // The round manager will continue processing the next messages in the queue until
     // the blocks are fetched.
-    Asynchronous
+    Asynchronous,
 }
 
 /// BlockRetriever is used internally to retrieve blocks
@@ -82,7 +80,7 @@ impl BlockRetriever {
     pub fn preferred_peer(&self) -> Author {
         self.preferred_peer
     }
-   
+
     /// Retrieve chain of n blocks for given QC
     pub async fn retrieve_block_for_qc<'a>(
         &'a mut self,
@@ -102,21 +100,24 @@ impl BlockRetriever {
                 self.max_blocks_to_request,
             )
             .await
-            .map(|blocks| RetrieverResult::Blocks(blocks))
+            .map(RetrieverResult::Blocks)
         } else {
             // TODO: Send the request to the block fetch manager
             self.block_fetch_request_tx
-                .expect("block_fetch_request_tx cannot be None when retriever mode is set to Asynchronous")
-                .push((qc.certified_block().id(), target_block_id), 
-                    BlockFetchRequest::new(
-                        qc.certified_block().id(), 
-                        target_block_id, 
-                        self.preferred_peer, 
-                        peers,
-                        num_blocks,
-                        // context
+                .as_ref()
+                .map(|block_fetch_request_tx| {
+                    block_fetch_request_tx.push(
+                        (qc.certified_block().id(), target_block_id),
+                        BlockFetchRequest::new(
+                            qc.certified_block().id(),
+                            target_block_id,
+                            self.preferred_peer,
+                            peers,
+                            num_blocks,
+                            // context
+                        ),
                     )
-                );
+                });
             Ok(RetrieverResult::Fetching)
         }
     }
@@ -161,14 +162,14 @@ async fn retrieve_block_for_id(
         );
 
         let response = retrieve_block_for_id_chunk(
-                network.clone(),
-                last_block_id,
-                target_block_id,
-                retrieve_batch_size,
-                peers.clone(),
-                preferred_peer,
-            )
-            .await;
+            network.clone(),
+            last_block_id,
+            target_block_id,
+            retrieve_batch_size,
+            peers.clone(),
+            preferred_peer,
+        )
+        .await;
         match response {
             Ok(result) if matches!(result.status(), BlockRetrievalStatus::Succeeded) => {
                 // extend the result blocks
@@ -177,9 +178,7 @@ async fn retrieve_block_for_id(
                 last_block_id = batch.last().unwrap().parent_id();
                 result_blocks.extend(batch);
             },
-            Ok(result)
-                if matches!(result.status(), BlockRetrievalStatus::SucceededWithTarget) =>
-            {
+            Ok(result) if matches!(result.status(), BlockRetrievalStatus::SucceededWithTarget) => {
                 // if we found the target, end the loop
                 let batch = result.blocks().clone();
                 result_blocks.extend(batch);
@@ -280,7 +279,11 @@ async fn retrieve_block_for_id_chunk(
     })
 }
 
-fn pick_peer(first_atempt: bool, preferred_peer: AccountAddress, peers: &mut Vec<AccountAddress>) -> AccountAddress {
+fn pick_peer(
+    first_atempt: bool,
+    preferred_peer: AccountAddress,
+    peers: &mut Vec<AccountAddress>,
+) -> AccountAddress {
     assert!(!peers.is_empty(), "pick_peer on empty peer list");
 
     if first_atempt {
@@ -299,7 +302,6 @@ fn pick_peer(first_atempt: bool, preferred_peer: AccountAddress, peers: &mut Vec
     peers.remove(peer_idx)
 }
 
-
 fn pick_peers(
     first_atempt: bool,
     preferred_peer: AccountAddress,
@@ -308,7 +310,11 @@ fn pick_peers(
 ) -> Vec<AccountAddress> {
     let mut result = Vec::new();
     while !peers.is_empty() && result.len() < request_num_peers {
-        result.push(pick_peer(first_atempt && result.is_empty(), preferred_peer, peers));
+        result.push(pick_peer(
+            first_atempt && result.is_empty(),
+            preferred_peer,
+            peers,
+        ));
     }
     result
 }

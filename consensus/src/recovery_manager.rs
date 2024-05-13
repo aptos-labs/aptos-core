@@ -2,7 +2,10 @@
 // SPDX-License-Identifier: Apache-2.0
 
 use crate::{
-    block_storage::{block_retriever::{BlockRetriever, RetrieverMode}, BlockStore},
+    block_storage::{
+        block_retriever::{BlockRetriever, RetrieverMode},
+        BlockStore,
+    },
     counters,
     error::error_kind,
     monitor,
@@ -15,7 +18,7 @@ use crate::{
 use anyhow::{anyhow, ensure, Context, Result};
 use aptos_channels::aptos_channel;
 use aptos_consensus_types::{
-    common::Author, proposal_msg::ProposalMsg, sync_info::SyncInfo, vote_msg::VoteMsg
+    common::Author, proposal_msg::ProposalMsg, sync_info::SyncInfo, vote_msg::VoteMsg,
 };
 use aptos_logger::prelude::*;
 use aptos_types::{block_info::Round, epoch_state::EpochState};
@@ -65,10 +68,7 @@ impl RecoveryManager {
         self.sync_up(sync_info, author).await
     }
 
-    pub async fn process_vote_msg(
-        &mut self,
-        vote_msg: VoteMsg,
-    ) -> Result<Option<RecoveryData>> {
+    pub async fn process_vote_msg(&mut self, vote_msg: VoteMsg) -> Result<Option<RecoveryData>> {
         let author = vote_msg.vote().author();
         let sync_info = vote_msg.sync_info();
         self.sync_up(sync_info, author).await
