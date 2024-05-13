@@ -38,6 +38,10 @@ pub struct AptosUpdateTool {
     /// The name of the repo to download the binary from.
     #[clap(long, default_value = "aptos-core")]
     repo_name: String,
+
+    /// If set, it will check if there are updates for the tool, but not actually update
+    #[clap(long, default_value_t = false)]
+    check: bool,
 }
 
 impl BinaryUpdater for AptosUpdateTool {
@@ -190,6 +194,17 @@ impl CliCommand<String> for AptosUpdateTool {
     }
 
     async fn execute(self) -> CliTypedResult<String> {
+        if self.check {
+            let info = tokio::task::spawn_blocking(move || self.get_update_info())
+                .await
+                .context("Failed to check Aptos CLI version")??;
+            if info.current_version.unwrap_or_default() != info.target_version {
+                return Ok(format!("Update is available ({})", info.target_version));
+            }
+
+            return Ok(format!("Already up to date ({})", info.target_version));
+        }
+
         tokio::task::spawn_blocking(move || self.update())
             .await
             .context("Failed to self-update Aptos CLI")?
