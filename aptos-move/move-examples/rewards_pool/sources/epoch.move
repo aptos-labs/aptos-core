@@ -1,5 +1,5 @@
 module rewards_pool::epoch {
-    use aptos_framework::timestamp;
+    use supra_framework::timestamp;
 
     /// The epoch duration is fixed at 1 day (in seconds).
     const EPOCH_DURATION: u64 = 86400;
@@ -26,6 +26,6 @@ module rewards_pool::epoch {
 
     #[test_only]
     public fun fast_forward(epochs: u64) {
-        aptos_framework::timestamp::fast_forward_seconds(epochs * EPOCH_DURATION);
+        supra_framework::timestamp::fast_forward_seconds(epochs * EPOCH_DURATION);
     }
 }

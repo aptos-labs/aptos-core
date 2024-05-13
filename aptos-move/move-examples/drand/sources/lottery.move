@@ -14,13 +14,13 @@
 
 module drand::lottery {
     use std::signer;
-    use aptos_framework::account;
+    use supra_framework::account;
     use std::vector;
     use std::option::{Self, Option};
-    use aptos_framework::coin;
+    use supra_framework::coin;
     use std::error;
-    use aptos_framework::timestamp;
-    use aptos_framework::aptos_coin::AptosCoin;
+    use supra_framework::timestamp;
+    use supra_framework::supra_coin::SupraCoin;
     use drand::drand;
     //use aptos_std::debug;
 
@@ -76,8 +76,8 @@ module drand::lottery {
         // Acquire a signer for the resource account that stores the coin bounty
         let rsrc_acc_signer = account::create_signer_with_capability(&signer_cap);
 
-        // Initialize an AptosCoin coin store there, which is where the lottery bounty will be kept
-        coin::register<AptosCoin>(&rsrc_acc_signer);
+        // Initialize an SupraCoin coin store there, which is where the lottery bounty will be kept
+        coin::register<SupraCoin>(&rsrc_acc_signer);
 
         // Initialiaze the loterry as 'not started'
         move_to(deployer,
@@ -128,7 +128,7 @@ module drand::lottery {
         let (_, rsrc_acc_addr) = get_rsrc_acc(lottery);
 
         // Charge the price of a lottery ticket from the user's balance, and accumulate it into the lottery's bounty
-        coin::transfer<AptosCoin>(user, rsrc_acc_addr, TICKET_PRICE);
+        coin::transfer<SupraCoin>(user, rsrc_acc_addr, TICKET_PRICE);
 
         // ...and issue a ticket for that user
         vector::push_back(&mut lottery.tickets, signer::address_of(user))
@@ -171,10 +171,10 @@ module drand::lottery {
 
         // Pay the winner
         let (rsrc_acc_signer, rsrc_acc_addr) = get_rsrc_acc(lottery);
-        let balance = coin::balance<AptosCoin>(rsrc_acc_addr);
+        let balance = coin::balance<SupraCoin>(rsrc_acc_addr);
         let winner_addr = *vector::borrow(&lottery.tickets, winner_idx);
 
-        coin::transfer<AptosCoin>(
+        coin::transfer<SupraCoin>(
             &rsrc_acc_signer,
             winner_addr,
             balance);

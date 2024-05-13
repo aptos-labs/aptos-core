@@ -6,5 +6,5 @@ upgrade_policy = "compatible"
 [addresses]
 test_account = "_"
 
-[dependencies.AptosFramework]
-local = "../../framework/aptos-framework"
+[dependencies.SupraFramework]
+local = "../../framework/supra-framework"

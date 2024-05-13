@@ -6,6 +6,6 @@ version = "0.0.0"
 marketplace = "_"
 
 [dependencies]
-AptosFramework = { local = "../../framework/aptos-framework" }
+SupraFramework = { local = "../../framework/supra-framework" }
 AptosToken = { local = "../../framework/aptos-token" }
 AptosTokenObjects = { local = "../../framework/aptos-token-objects" }

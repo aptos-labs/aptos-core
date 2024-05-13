@@ -13,15 +13,15 @@
 /// - In init_module(), we do two things: first, we create the new coin; secondly, we store the resource account's signer capability
 /// and the coin's mint and burn capabilities within `ModuleData`. Storing the signer capability allows the module to programmatically
 /// sign transactions without needing a private key
-/// (2) when exchanging coins, we call `exchange_to` to swap `AptosCoin` to `ChloesCoin`, and `exchange_from` to swap `AptosCoin` from `ChloesCoin`
+/// (2) when exchanging coins, we call `exchange_to` to swap `SupraCoin` to `ChloesCoin`, and `exchange_from` to swap `SupraCoin` from `ChloesCoin`
 module resource_account::simple_defi {
     use std::signer;
     use std::string;
 
-    use aptos_framework::account;
-    use aptos_framework::coin::{Self, Coin, MintCapability, BurnCapability};
-    use aptos_framework::resource_account;
-    use aptos_framework::aptos_coin::{AptosCoin};
+    use supra_framework::account;
+    use supra_framework::coin::{Self, Coin, MintCapability, BurnCapability};
+    use supra_framework::resource_account;
+    use supra_framework::supra_coin::{SupraCoin};
 
     struct ModuleData has key {
         resource_signer_cap: account::SignerCapability,
@@ -30,7 +30,7 @@ module resource_account::simple_defi {
     }
 
     struct ChloesCoin {
-        aptos_coin: AptosCoin
+        supra_coin: SupraCoin
     }
 
     /// initialize the module and store the signer cap, mint cap and burn cap within `ModuleData`
@@ -54,32 +54,32 @@ module resource_account::simple_defi {
         coin::destroy_freeze_cap(freeze_cap);
 
         // regsiter the resource account with both coins so it has a CoinStore to store those coins
-        coin::register<AptosCoin>(account);
+        coin::register<SupraCoin>(account);
         coin::register<ChloesCoin>(account);
     }
 
-    /// Exchange AptosCoin to ChloesCoin
-    public fun exchange_to(a_coin: Coin<AptosCoin>): Coin<ChloesCoin> acquires ModuleData {
+    /// Exchange SupraCoin to ChloesCoin
+    public fun exchange_to(a_coin: Coin<SupraCoin>): Coin<ChloesCoin> acquires ModuleData {
         let coin_cap = borrow_global_mut<ModuleData>(@resource_account);
         let amount = coin::value(&a_coin);
         coin::deposit(@resource_account, a_coin);
         coin::mint<ChloesCoin>(amount, &coin_cap.mint_cap)
     }
 
-    /// Exchange ChloesCoin to AptosCoin
-    public fun exchange_from(c_coin: Coin<ChloesCoin>): Coin<AptosCoin> acquires ModuleData {
+    /// Exchange ChloesCoin to SupraCoin
+    public fun exchange_from(c_coin: Coin<ChloesCoin>): Coin<SupraCoin> acquires ModuleData {
         let amount = coin::value(&c_coin);
         let coin_cap = borrow_global_mut<ModuleData>(@resource_account);
         coin::burn<ChloesCoin>(c_coin, &coin_cap.burn_cap);
 
         let module_data = borrow_global_mut<ModuleData>(@resource_account);
         let resource_signer = account::create_signer_with_capability(&module_data.resource_signer_cap);
-        coin::withdraw<AptosCoin>(&resource_signer, amount)
+        coin::withdraw<SupraCoin>(&resource_signer, amount)
     }
 
     /// Entry function version of exchange_to() for e2e tests only
     public entry fun exchange_to_entry(account: &signer, amount: u64) acquires ModuleData {
-        let a_coin = coin::withdraw<AptosCoin>(account, amount);
+        let a_coin = coin::withdraw<SupraCoin>(account, amount);
         let c_coin = exchange_to(a_coin);
 
         coin::register<ChloesCoin>(account);
@@ -105,29 +105,29 @@ module resource_account::simple_defi {
         init_module(resource_account);
     }
 
-    #[test(origin_account = @0xcafe, resource_account = @0xc3bb8488ab1a5815a9d543d7e41b0e0df46a7396f89b22821f07a4362f75ddc5, framework = @aptos_framework)]
+    #[test(origin_account = @0xcafe, resource_account = @0xc3bb8488ab1a5815a9d543d7e41b0e0df46a7396f89b22821f07a4362f75ddc5, framework = @supra_framework)]
     public entry fun test_exchange_to_and_exchange_from(origin_account: signer, resource_account: signer, framework: signer) acquires ModuleData {
-        use aptos_framework::aptos_coin;
+        use supra_framework::supra_coin;
 
         set_up_test(&origin_account, &resource_account);
-        let (aptos_coin_burn_cap, aptos_coin_mint_cap) = aptos_coin::initialize_for_test(&framework);
+        let (supra_coin_burn_cap, supra_coin_mint_cap) = supra_coin::initialize_for_test(&framework);
 
         // exchange from 5 aptos coins to 5 chloe's coins & assert the results are expected
-        let five_a_coins = coin::mint(5, &aptos_coin_mint_cap);
+        let five_a_coins = coin::mint(5, &supra_coin_mint_cap);
         let c_coins = exchange_to(five_a_coins);
         assert!(coin::value(&c_coins) == 5, 0);
-        assert!(coin::balance<AptosCoin>(signer::address_of(&resource_account)) == 5, 1);
+        assert!(coin::balance<SupraCoin>(signer::address_of(&resource_account)) == 5, 1);
         assert!(coin::balance<ChloesCoin>(signer::address_of(&resource_account)) == 0, 2);
 
         // exchange from 5 chloe's coins to 5 aptos coins & assert the results are expected
         let a_coins = exchange_from(c_coins);
         assert!(coin::value(&a_coins) == 5, 0);
-        assert!(coin::balance<AptosCoin>(signer::address_of(&resource_account)) == 0, 3);
+        assert!(coin::balance<SupraCoin>(signer::address_of(&resource_account)) == 0, 3);
         assert!(coin::balance<ChloesCoin>(signer::address_of(&resource_account)) == 0, 4);
 
         // burn the remaining coins & destroy the capabilities since they aren't droppable
-        coin::burn(a_coins, &aptos_coin_burn_cap);
-        coin::destroy_mint_cap<AptosCoin>(aptos_coin_mint_cap);
-        coin::destroy_burn_cap<AptosCoin>(aptos_coin_burn_cap);
+        coin::burn(a_coins, &supra_coin_burn_cap);
+        coin::destroy_mint_cap<SupraCoin>(supra_coin_mint_cap);
+        coin::destroy_burn_cap<SupraCoin>(supra_coin_burn_cap);
     }
 }

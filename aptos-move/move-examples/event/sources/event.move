@@ -1,7 +1,7 @@
 /// This provides an example shows how to use module events.
 
 module event::event {
-    use aptos_framework::event;
+    use supra_framework::event;
     #[test_only]
     use std::vector;
 

@@ -191,7 +191,7 @@ Account does not have mint capability
 Max supply of Supra Coin to be 100 billion with 8 decimal places fraction
 
 
-<pre><code><b>const</b> <a href="supra_coin.md#0x1_supra_coin_MAX_SUPRA_COIN_SUPPLY">MAX_SUPRA_COIN_SUPPLY</a>: u128 = 10000000000000000000;
+<pre><code><b>const</b> <a href="supra_coin.md#0x1_supra_coin_MAX_SUPRA_COIN_SUPPLY">MAX_SUPRA_COIN_SUPPLY</a>: u128 = 340282366920938463463374607431768211455;
 </code></pre>
 
 

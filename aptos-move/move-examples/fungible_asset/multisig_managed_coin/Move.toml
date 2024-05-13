@@ -7,5 +7,5 @@ aptos_framework = "0x1"
 example_addr = "_"
 
 [dependencies]
-AptosFramework = { local = "../../../framework/aptos-framework" }
+SupraFramework = { local = "../../../framework/supra-framework" }
 ManagedFungibleAsset = { local = "../managed_fungible_asset" }

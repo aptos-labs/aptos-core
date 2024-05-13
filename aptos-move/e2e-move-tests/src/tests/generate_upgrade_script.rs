@@ -31,8 +31,8 @@ module 0x{}::test {{
 
     let mut proposal = PackageBuilder::new("Proposal");
     proposal.add_local_dep(
-        "AptosFramework",
-        &common::framework_dir_path("aptos-framework").to_string_lossy(),
+        "SupraFramework",
+        &common::framework_dir_path("supra-framework").to_string_lossy(),
     );
     let proposal_dir = proposal.write_to_temp().unwrap();
 

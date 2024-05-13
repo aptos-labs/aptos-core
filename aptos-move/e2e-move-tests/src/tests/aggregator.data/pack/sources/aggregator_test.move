@@ -1,8 +1,8 @@
 module 0x1::aggregator_test {
     use std::signer;
 
-    use aptos_framework::aggregator::{Self, Aggregator};
-    use aptos_framework::aggregator_factory;
+    use supra_framework::aggregator::{Self, Aggregator};
+    use supra_framework::aggregator_factory;
     use aptos_std::table::{Self, Table};
 
     /// When checking the value of aggregator fails.

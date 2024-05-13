@@ -2,8 +2,8 @@
 /// functions create the collection and the knight tokens, and the function to feed a
 /// knight token with food tokens to increase the knight's health point.
 module knight::knight {
-    use aptos_framework::event;
-    use aptos_framework::object::{Self, Object};
+    use supra_framework::event;
+    use supra_framework::object::{Self, Object};
     use aptos_token_objects::collection;
     use aptos_token_objects::property_map;
     use aptos_token_objects::token;
@@ -40,7 +40,7 @@ module knight::knight {
     const CONDITION_HUNGRY: vector<u8> = b"Hungry";
     const CONDITION_GOOD: vector<u8> = b"Good";
 
-    #[resource_group_member(group = aptos_framework::object::ObjectGroup)]
+    #[resource_group_member(group = supra_framework::object::ObjectGroup)]
     /// Knight token
     struct KnightToken has key {
         /// Used to mutate the token uri
@@ -51,7 +51,7 @@ module knight::knight {
         base_uri: String,
     }
 
-    #[resource_group_member(group = aptos_framework::object::ObjectGroup)]
+    #[resource_group_member(group = supra_framework::object::ObjectGroup)]
     /// The knight's health point
     struct HealthPoint has key {
         value: u64,

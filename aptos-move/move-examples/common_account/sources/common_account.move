@@ -9,7 +9,7 @@ module common_account::common_account {
 
     use aptos_std::simple_map::{Self, SimpleMap};
 
-    use aptos_framework::account::{Self, SignerCapability};
+    use supra_framework::account::{Self, SignerCapability};
 
     /// Missing the common account Management
     const ENO_MANAGEMENT_RESOURCE_FOUND: u64 = 1;

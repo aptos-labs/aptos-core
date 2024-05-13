@@ -1,8 +1,8 @@
 /// An example combining fungible assets with token as fungible token. In this example, a token object is used as
 /// metadata to create fungible units, aka, fungible tokens.
 module example_addr::managed_fungible_token {
-    use aptos_framework::fungible_asset::Metadata;
-    use aptos_framework::object::{Self, Object};
+    use supra_framework::fungible_asset::Metadata;
+    use supra_framework::object::{Self, Object};
     use std::string::{utf8, String};
     use std::option;
     use aptos_token_objects::token::{create_named_token, create_token_seed};

@@ -1,10 +1,10 @@
 script {
-    use aptos_framework::aptos_governance;
-    use aptos_framework::block;
-    use aptos_framework::staking_config;
+    use supra_framework::aptos_governance;
+    use supra_framework::block;
+    use supra_framework::staking_config;
 
     fun main(proposal_id: u64) {
-        let framework_signer = aptos_governance::resolve(proposal_id, @aptos_framework);
+        let framework_signer = aptos_governance::resolve(proposal_id, @supra_framework);
         let num_seconds_in_a_year = 365 * 24 * 60 * 60;
         let epoch_duration_secs = block::get_epoch_interval_secs();
         let num_epochs_in_a_year = num_seconds_in_a_year / epoch_duration_secs;

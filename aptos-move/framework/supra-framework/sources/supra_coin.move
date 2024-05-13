@@ -15,7 +15,8 @@ module supra_framework::supra_coin {
 
 
 	/// Max supply of Supra Coin to be 100 billion with 8 decimal places fraction
-	const MAX_SUPRA_COIN_SUPPLY: u128 = 100_000_000_000_00_000_000u128;
+	//const MAX_SUPRA_COIN_SUPPLY: u128 = 100_000_000_000_00_000_000u128;
+	const MAX_SUPRA_COIN_SUPPLY: u128 = 340282366920938463463374607431768211455u128; 
     /// Account does not have mint capability
     const ENO_CAPABILITIES: u64 = 1;
     /// Mint capability has already been delegated to this specified address

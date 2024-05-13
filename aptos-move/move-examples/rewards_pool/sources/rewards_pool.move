@@ -15,9 +15,9 @@
 ///
 /// Although claimers have to be signers, this module can be easily modified to support objects (e.g. NFTs) as claimers.
 module rewards_pool::rewards_pool {
-    use aptos_framework::fungible_asset::{Self, FungibleAsset, FungibleStore, Metadata};
-    use aptos_framework::primary_fungible_store;
-    use aptos_framework::object::{Self, Object, ExtendRef};
+    use supra_framework::fungible_asset::{Self, FungibleAsset, FungibleStore, Metadata};
+    use supra_framework::primary_fungible_store;
+    use supra_framework::object::{Self, Object, ExtendRef};
     use aptos_std::pool_u64_unbound::{Self as pool_u64, Pool};
     use aptos_std::simple_map::{Self, SimpleMap};
     use aptos_std::smart_table::{Self, SmartTable};
@@ -48,7 +48,7 @@ module rewards_pool::rewards_pool {
         store_extend_ref: ExtendRef,
     }
 
-    #[resource_group_member(group = aptos_framework::object::ObjectGroup)]
+    #[resource_group_member(group = supra_framework::object::ObjectGroup)]
     struct RewardsPool has key {
         /// A mapping to track per epoch rewards data.
         epoch_rewards: SmartTable<u64, EpochRewards>,

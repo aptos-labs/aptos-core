@@ -1,5 +1,5 @@
 script {
-    use aptos_framework::coin;
+    use supra_framework::coin;
 
     // There are two ways to approach this problem
     // 1. Withdraw the total then distribute the pieces by breaking it up or

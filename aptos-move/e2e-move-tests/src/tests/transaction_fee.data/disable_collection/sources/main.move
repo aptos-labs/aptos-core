@@ -1,9 +1,9 @@
 script {
-    use aptos_framework::aptos_governance;
+    use supra_framework::aptos_governance;
     use std::features;
 
     fun main(core_resources: &signer) {
-        let framework_signer = aptos_governance::get_signer_testnet_only(core_resources, @aptos_framework);
+        let framework_signer = aptos_governance::get_signer_testnet_only(core_resources, @supra_framework);
         let feature = features::get_collect_and_distribute_gas_fees_feature();
 
         // Trigger reconfiguration first, to also sync all the fees to validators.

@@ -15,7 +15,7 @@ module hello_blockchain::message_tests {
     public entry fun sender_can_set_message() {
         let account = get_account();
         let addr = signer::address_of(&account);
-        aptos_framework::account::create_account_for_test(addr);
+        supra_framework::account::create_account_for_test(addr);
         message::set_message(account,  string::utf8(b"Hello, Blockchain"));
 
         assert!(

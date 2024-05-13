@@ -1,5 +1,5 @@
 module dao_platform::nft_dao_events {
-    use aptos_framework::event;
+    use supra_framework::event;
     use aptos_token::property_map::PropertyMap;
     use std::signer;
     use std::string::String;

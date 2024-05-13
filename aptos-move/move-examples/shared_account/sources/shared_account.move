@@ -4,8 +4,8 @@ module shared_account::SharedAccount {
     use std::error;
     use std::signer;
     use std::vector;
-    use aptos_framework::account;
-    use aptos_framework::coin;
+    use supra_framework::account;
+    use supra_framework::coin;
 
     // struct Share records the address of the share_holder and their corresponding number of shares
     struct Share has store {
@@ -87,9 +87,9 @@ module shared_account::SharedAccount {
         let user_addr1 = signer::address_of(&test_user1);
         let user_addr2 = signer::address_of(&test_user2);
 
-        aptos_framework::aptos_account::create_account(user_addr);
-        aptos_framework::aptos_account::create_account(user_addr1);
-        aptos_framework::aptos_account::create_account(user_addr2);
+        supra_framework::aptos_account::create_account(user_addr);
+        supra_framework::aptos_account::create_account(user_addr1);
+        supra_framework::aptos_account::create_account(user_addr2);
 
         vector::push_back(&mut addresses, user_addr1);
         vector::push_back(&mut addresses, user_addr2);
@@ -103,34 +103,34 @@ module shared_account::SharedAccount {
         borrow_global<SharedAccountEvent>(user_addr).resource_addr
     }
 
-    #[test(user = @0x1111, test_user1 = @0x1112, test_user2 = @0x1113, core_framework = @aptos_framework)]
+    #[test(user = @0x1111, test_user1 = @0x1112, test_user2 = @0x1113, core_framework = @supra_framework)]
     public entry fun test_disperse(user: signer, test_user1: signer, test_user2: signer, core_framework: signer) acquires SharedAccount, SharedAccountEvent {
-        use aptos_framework::aptos_coin::{Self, AptosCoin};
+        use supra_framework::supra_coin::{Self, SupraCoin};
         let user_addr1 = signer::address_of(&test_user1);
         let user_addr2 = signer::address_of(&test_user2);
         let resource_addr = set_up(user, test_user1, test_user2);
-        let (burn_cap, mint_cap) = aptos_coin::initialize_for_test(&core_framework);
+        let (burn_cap, mint_cap) = supra_coin::initialize_for_test(&core_framework);
 
         let shared_account = borrow_global<SharedAccount>(resource_addr);
         let resource_signer = account::create_signer_with_capability(&shared_account.signer_capability);
-        coin::register<AptosCoin>(&resource_signer);
+        coin::register<SupraCoin>(&resource_signer);
         coin::deposit(resource_addr, coin::mint(1000, &mint_cap));
-        disperse<AptosCoin>(resource_addr);
-        coin::destroy_mint_cap<AptosCoin>(mint_cap);
-        coin::destroy_burn_cap<AptosCoin>(burn_cap);
+        disperse<SupraCoin>(resource_addr);
+        coin::destroy_mint_cap<SupraCoin>(mint_cap);
+        coin::destroy_burn_cap<SupraCoin>(burn_cap);
 
-        assert!(coin::balance<AptosCoin>(user_addr1) == 200, 0);
-        assert!(coin::balance<AptosCoin>(user_addr2) == 800, 1);
+        assert!(coin::balance<SupraCoin>(user_addr1) == 200, 0);
+        assert!(coin::balance<SupraCoin>(user_addr2) == 800, 1);
     }
 
     #[test(user = @0x1111, test_user1 = @0x1112, test_user2 = @0x1113)]
     #[expected_failure]
     public entry fun test_disperse_insufficient_balance(user: signer, test_user1: signer, test_user2: signer) acquires SharedAccount, SharedAccountEvent {
-        use aptos_framework::aptos_coin::AptosCoin;
+        use supra_framework::supra_coin::SupraCoin;
         let resource_addr = set_up(user, test_user1, test_user2);
         let shared_account = borrow_global<SharedAccount>(resource_addr);
         let resource_signer = account::create_signer_with_capability(&shared_account.signer_capability);
-        coin::register<AptosCoin>(&resource_signer);
-        disperse<AptosCoin>(resource_addr);
+        coin::register<SupraCoin>(&resource_signer);
+        disperse<SupraCoin>(resource_addr);
     }
 }

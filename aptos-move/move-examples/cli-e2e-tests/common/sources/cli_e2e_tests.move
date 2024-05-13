@@ -4,7 +4,7 @@ module addr::cli_e2e_tests {
     use std::signer;
     use std::string::{Self, String};
 
-    use aptos_framework::object::{Self, ConstructorRef, Object};
+    use supra_framework::object::{Self, ConstructorRef, Object};
 
     use aptos_token_objects::collection;
     use aptos_token_objects::token;
@@ -22,7 +22,7 @@ module addr::cli_e2e_tests {
         collection: String,
     }
 
-    #[resource_group_member(group = aptos_framework::object::ObjectGroup)]
+    #[resource_group_member(group = supra_framework::object::ObjectGroup)]
     struct Hero has key {
         armor: Option<Object<Armor>>,
         gender: String,
@@ -32,28 +32,28 @@ module addr::cli_e2e_tests {
         mutator_ref: token::MutatorRef,
     }
 
-    #[resource_group_member(group = aptos_framework::object::ObjectGroup)]
+    #[resource_group_member(group = supra_framework::object::ObjectGroup)]
     struct Armor has key {
         defense: u64,
         gem: Option<Object<Gem>>,
         weight: u64,
     }
 
-    #[resource_group_member(group = aptos_framework::object::ObjectGroup)]
+    #[resource_group_member(group = supra_framework::object::ObjectGroup)]
     struct Gem has key {
         attack_modifier: u64,
         defense_modifier: u64,
         magic_attribute: String,
     }
 
-    #[resource_group_member(group = aptos_framework::object::ObjectGroup)]
+    #[resource_group_member(group = supra_framework::object::ObjectGroup)]
     struct Shield has key {
         defense: u64,
         gem: Option<Object<Gem>>,
         weight: u64,
     }
 
-    #[resource_group_member(group = aptos_framework::object::ObjectGroup)]
+    #[resource_group_member(group = supra_framework::object::ObjectGroup)]
     struct Weapon has key {
         attack: u64,
         gem: Option<Object<Gem>>,

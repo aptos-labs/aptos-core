@@ -1,6 +1,6 @@
 module tic_tac_toe::ttt {
-    use aptos_framework::account;
-    use aptos_framework::event;
+    use supra_framework::account;
+    use supra_framework::event;
     use std::error;
     use std::option::{Self, Option};
     use std::signer;
@@ -314,7 +314,7 @@ module tic_tac_toe::ttt {
 
     //// Tests
     #[test_only]
-    use aptos_framework::account::create_account_for_test;
+    use supra_framework::account::create_account_for_test;
 
     #[test(creator = @0x123)]
     fun test_start_game(creator: &signer) {

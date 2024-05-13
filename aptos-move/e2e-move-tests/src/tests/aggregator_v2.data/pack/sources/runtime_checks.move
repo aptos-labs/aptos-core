@@ -5,7 +5,7 @@ module 0x1::runtime_checks {
     use std::bcs;
     use std::string;
     use aptos_std::string_utils;
-    use aptos_framework::aggregator_v2::{Self, Aggregator, AggregatorSnapshot, DerivedStringSnapshot};
+    use supra_framework::aggregator_v2::{Self, Aggregator, AggregatorSnapshot, DerivedStringSnapshot};
 
     //
     // Structs and constructors.

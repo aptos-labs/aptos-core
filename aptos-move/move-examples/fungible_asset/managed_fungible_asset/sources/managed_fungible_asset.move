@@ -8,9 +8,9 @@
 /// 4. Withdraw the merged fungible assets from fungible stores as the owner of metadata object.
 /// 5. Deposit fungible assets to fungible stores.
 module example_addr::managed_fungible_asset {
-    use aptos_framework::fungible_asset::{Self, MintRef, TransferRef, BurnRef, Metadata, FungibleStore, FungibleAsset};
-    use aptos_framework::object::{Self, Object, ConstructorRef};
-    use aptos_framework::primary_fungible_store;
+    use supra_framework::fungible_asset::{Self, MintRef, TransferRef, BurnRef, Metadata, FungibleStore, FungibleAsset};
+    use supra_framework::object::{Self, Object, ConstructorRef};
+    use supra_framework::primary_fungible_store;
     use std::error;
     use std::signer;
     use std::string::String;
@@ -29,7 +29,7 @@ module example_addr::managed_fungible_asset {
     /// BurnRef error.
     const ERR_BURN_REF: u64 = 6;
 
-    #[resource_group_member(group = aptos_framework::object::ObjectGroup)]
+    #[resource_group_member(group = supra_framework::object::ObjectGroup)]
     /// Hold refs to control the minting, transfer and burning of fungible assets.
     struct ManagingRefs has key {
         mint_ref: Option<MintRef>,
@@ -339,7 +339,7 @@ module example_addr::managed_fungible_asset {
     }
 
     #[test_only]
-    use aptos_framework::object::object_from_constructor_ref;
+    use supra_framework::object::object_from_constructor_ref;
     #[test_only]
     use std::string::utf8;
     use std::vector;

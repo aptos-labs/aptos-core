@@ -5,7 +5,7 @@
 /// - adding unit tests to make sure that our code is working as expected.
 ///
 /// Concept: signature validation
-/// We use signature validation for many reasons. For example, in aptos_framework::account::rotate_authentication_key(),
+/// We use signature validation for many reasons. For example, in supra_framework::account::rotate_authentication_key(),
 /// we asked for two signatures from the user proving that they intend and have the capability to rotate the account's
 /// authentication key.
 ///
@@ -96,14 +96,14 @@ module mint_nft::create_nft_getting_production_ready {
     use std::signer;
     use std::string::{Self, String};
     use std::vector;
-    use aptos_framework::account;
-    use aptos_framework::event;
-    use aptos_framework::timestamp;
+    use supra_framework::account;
+    use supra_framework::event;
+    use supra_framework::timestamp;
     use aptos_std::ed25519;
     use aptos_token::token::{Self, TokenDataId};
-    use aptos_framework::resource_account;
+    use supra_framework::resource_account;
     #[test_only]
-    use aptos_framework::account::create_account_for_test;
+    use supra_framework::account::create_account_for_test;
     use aptos_std::ed25519::ValidatedPublicKey;
 
     #[event]
@@ -313,12 +313,12 @@ module mint_nft::create_nft_getting_production_ready {
         origin_account: signer,
         resource_account: &signer,
         collection_token_minter_public_key: &ValidatedPublicKey,
-        aptos_framework: signer,
+        supra_framework: signer,
         nft_receiver: &signer,
         timestamp: u64
     ) acquires ModuleData {
         // set up global time for testing purpose
-        timestamp::set_time_has_started_for_testing(&aptos_framework);
+        timestamp::set_time_has_started_for_testing(&supra_framework);
         timestamp::update_global_time_for_test_secs(timestamp);
 
         create_account_for_test(signer::address_of(&origin_account));
@@ -340,17 +340,17 @@ module mint_nft::create_nft_getting_production_ready {
         resource_account = @0xc3bb8488ab1a5815a9d543d7e41b0e0df46a7396f89b22821f07a4362f75ddc5,
         nft_receiver = @0x123,
         nft_receiver2 = @0x234,
-        aptos_framework = @aptos_framework
+        supra_framework = @supra_framework
     )]
     public entry fun test_happy_path(
         origin_account: signer,
         resource_account: signer,
         nft_receiver: signer,
         nft_receiver2: signer,
-        aptos_framework: signer
+        supra_framework: signer
     ) acquires ModuleData {
         let (admin_sk, admin_pk) = ed25519::generate_keys();
-        set_up_test(origin_account, &resource_account, &admin_pk, aptos_framework, &nft_receiver, 10);
+        set_up_test(origin_account, &resource_account, &admin_pk, supra_framework, &nft_receiver, 10);
         let receiver_addr = signer::address_of(&nft_receiver);
         let proof_challenge = MintProofChallenge {
             receiver_account_sequence_number: account::get_sequence_number(receiver_addr),
@@ -406,17 +406,17 @@ module mint_nft::create_nft_getting_production_ready {
         origin_account = @0xcafe,
         resource_account = @0xc3bb8488ab1a5815a9d543d7e41b0e0df46a7396f89b22821f07a4362f75ddc5,
         nft_receiver = @0x123,
-        aptos_framework = @aptos_framework
+        supra_framework = @supra_framework
     )]
     #[expected_failure(abort_code = 0x50002, location = mint_nft::create_nft_getting_production_ready)]
     public entry fun test_minting_expired(
         origin_account: signer,
         resource_account: signer,
         nft_receiver: signer,
-        aptos_framework: signer
+        supra_framework: signer
     ) acquires ModuleData {
         let (admin_sk, admin_pk) = ed25519::generate_keys();
-        set_up_test(origin_account, &resource_account, &admin_pk, aptos_framework, &nft_receiver, 100000000001);
+        set_up_test(origin_account, &resource_account, &admin_pk, supra_framework, &nft_receiver, 100000000001);
         let receiver_addr = signer::address_of(&nft_receiver);
         let proof_challenge = MintProofChallenge {
             receiver_account_sequence_number: account::get_sequence_number(receiver_addr),
@@ -432,7 +432,7 @@ module mint_nft::create_nft_getting_production_ready {
         resource_account = @0xc3bb8488ab1a5815a9d543d7e41b0e0df46a7396f89b22821f07a4362f75ddc5,
         admin = @admin_addr,
         nft_receiver = @0x123,
-        aptos_framework = @aptos_framework
+        supra_framework = @supra_framework
     )]
     #[expected_failure(abort_code = 0x50002, location = mint_nft::create_nft_getting_production_ready)]
     public entry fun test_update_expiration_time(
@@ -440,10 +440,10 @@ module mint_nft::create_nft_getting_production_ready {
         resource_account: signer,
         admin: signer,
         nft_receiver: signer,
-        aptos_framework: signer
+        supra_framework: signer
     ) acquires ModuleData {
         let (admin_sk, admin_pk) = ed25519::generate_keys();
-        set_up_test(origin_account, &resource_account, &admin_pk, aptos_framework, &nft_receiver, 10);
+        set_up_test(origin_account, &resource_account, &admin_pk, supra_framework, &nft_receiver, 10);
         let receiver_addr = signer::address_of(&nft_receiver);
         let proof_challenge = MintProofChallenge {
             receiver_account_sequence_number: account::get_sequence_number(receiver_addr),
@@ -463,7 +463,7 @@ module mint_nft::create_nft_getting_production_ready {
         resource_account = @0xc3bb8488ab1a5815a9d543d7e41b0e0df46a7396f89b22821f07a4362f75ddc5,
         admin = @admin_addr,
         nft_receiver = @0x123,
-        aptos_framework = @aptos_framework
+        supra_framework = @supra_framework
     )]
     #[expected_failure(abort_code = 0x50003, location = mint_nft::create_nft_getting_production_ready)]
     public entry fun test_update_minting_enabled(
@@ -471,10 +471,10 @@ module mint_nft::create_nft_getting_production_ready {
         resource_account: signer,
         admin: signer,
         nft_receiver: signer,
-        aptos_framework: signer
+        supra_framework: signer
     ) acquires ModuleData {
         let (admin_sk, admin_pk) = ed25519::generate_keys();
-        set_up_test(origin_account, &resource_account, &admin_pk, aptos_framework, &nft_receiver, 10);
+        set_up_test(origin_account, &resource_account, &admin_pk, supra_framework, &nft_receiver, 10);
         let receiver_addr = signer::address_of(&nft_receiver);
         let proof_challenge = MintProofChallenge {
             receiver_account_sequence_number: account::get_sequence_number(receiver_addr),
@@ -493,17 +493,17 @@ module mint_nft::create_nft_getting_production_ready {
         origin_account = @0xcafe,
         resource_account = @0xc3bb8488ab1a5815a9d543d7e41b0e0df46a7396f89b22821f07a4362f75ddc5,
         nft_receiver = @0x123,
-        aptos_framework = @aptos_framework
+        supra_framework = @supra_framework
     )]
     #[expected_failure(abort_code = 0x10006, location = mint_nft::create_nft_getting_production_ready)]
     public entry fun test_invalid_signature(
         origin_account: signer,
         resource_account: signer,
         nft_receiver: signer,
-        aptos_framework: signer
+        supra_framework: signer
     ) acquires ModuleData {
         let (admin_sk, admin_pk) = ed25519::generate_keys();
-        set_up_test(origin_account, &resource_account, &admin_pk, aptos_framework, &nft_receiver, 10);
+        set_up_test(origin_account, &resource_account, &admin_pk, supra_framework, &nft_receiver, 10);
         let receiver_addr = signer::address_of(&nft_receiver);
         let proof_challenge = MintProofChallenge {
             receiver_account_sequence_number: account::get_sequence_number(receiver_addr),

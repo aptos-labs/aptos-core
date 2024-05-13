@@ -16,11 +16,11 @@ module ambassador::ambassador {
     use std::string::{Self, String};
     use std::signer;
 
-    use aptos_framework::object::{Self, Object};
+    use supra_framework::object::{Self, Object};
     use aptos_token_objects::collection;
     use aptos_token_objects::token;
     use aptos_token_objects::property_map;
-    use aptos_framework::event;
+    use supra_framework::event;
 
     /// The token does not exist
     const ETOKEN_DOES_NOT_EXIST: u64 = 1;
@@ -47,7 +47,7 @@ module ambassador::ambassador {
     const RANK_SILVER: vector<u8> = b"Silver";
     const RANK_BRONZE: vector<u8> = b"Bronze";
 
-    #[resource_group_member(group = aptos_framework::object::ObjectGroup)]
+    #[resource_group_member(group = supra_framework::object::ObjectGroup)]
     /// The ambassador token
     struct AmbassadorToken has key {
         /// Used to mutate the token uri
@@ -60,7 +60,7 @@ module ambassador::ambassador {
         base_uri: String,
     }
 
-    #[resource_group_member(group = aptos_framework::object::ObjectGroup)]
+    #[resource_group_member(group = supra_framework::object::ObjectGroup)]
     /// The ambassador level
     struct AmbassadorLevel has key {
         ambassador_level: u64,

@@ -14,7 +14,7 @@ module guild::guild {
     use std::option;
     use std::signer;
     use std::string::{Self, String};
-    use aptos_framework::object::{Self, Object};
+    use supra_framework::object::{Self, Object};
     use aptos_std::smart_vector::{Self, SmartVector};
     use aptos_token_objects::collection;
     use aptos_token_objects::token;
@@ -41,7 +41,7 @@ module guild::guild {
         extend_ref: object::ExtendRef,
     }
 
-    #[resource_group_member(group = aptos_framework::object::ObjectGroup)]
+    #[resource_group_member(group = supra_framework::object::ObjectGroup)]
     /// Guild token
     struct GuildToken has key {
         /// Used to get the signer of the token
@@ -50,7 +50,7 @@ module guild::guild {
         member_collection_name: String,
     }
 
-    #[resource_group_member(group = aptos_framework::object::ObjectGroup)]
+    #[resource_group_member(group = supra_framework::object::ObjectGroup)]
     /// Member token
     struct MemberToken has key {
         /// Belonging guild

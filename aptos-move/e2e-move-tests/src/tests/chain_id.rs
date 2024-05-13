@@ -14,7 +14,7 @@ struct ChainIdStore {
 fn call_get_chain_id_from_aptos_framework(harness: &mut MoveHarness, account: &Account) -> u8 {
     let status = harness.run_entry_function(
         account,
-        str::parse("0x1::chain_id_test::store_chain_id_from_aptos_framework").unwrap(),
+        str::parse("0x1::chain_id_test::store_chain_id_from_supra_framework").unwrap(),
         vec![],
         vec![],
     );

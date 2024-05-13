@@ -1,8 +1,8 @@
 module todolist_addr::todolist {
 
-    use aptos_framework::account;
+    use supra_framework::account;
     use std::signer;
-    use aptos_framework::event;
+    use supra_framework::event;
     use std::string::String;
     use aptos_std::table::{Self, Table};
     #[test_only]

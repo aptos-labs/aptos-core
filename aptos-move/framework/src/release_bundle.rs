@@ -203,8 +203,8 @@ impl ReleasePackage {
         emitln!(writer, "script {");
         writer.indent();
         emitln!(writer, "use std::vector;");
-        emitln!(writer, "use aptos_framework::aptos_governance;");
-        emitln!(writer, "use aptos_framework::code;\n");
+        emitln!(writer, "use supra_framework::aptos_governance;");
+        emitln!(writer, "use supra_framework::code;\n");
 
         if is_testnet && !is_multi_step {
             emitln!(writer, "fun main(core_resources: &signer){");

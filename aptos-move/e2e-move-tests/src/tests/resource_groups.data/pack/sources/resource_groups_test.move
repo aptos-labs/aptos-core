@@ -1,6 +1,6 @@
 module 0x1::resource_groups_test {
     use std::string::{Self, String};
-    use aptos_framework::account;
+    use supra_framework::account;
     use std::signer;
 
     const ENOT_EQUAL: u64 = 17;

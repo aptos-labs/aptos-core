@@ -6,5 +6,5 @@ version = '1.0.0'
 [addresses]
 upgrade_and_govern = '_'
 
-[dependencies.AptosFramework]
-local = '../../../framework/aptos-framework' # <:!:manifest
+[dependencies.SupraFramework]
+local = '../../../framework/supra-framework' # <:!:manifest

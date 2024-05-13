@@ -3,8 +3,8 @@ module marketplace::events {
     use std::option::{Self, Option};
     use std::string::String;
 
-    use aptos_framework::event;
-    use aptos_framework::object::{Self, Object};
+    use supra_framework::event;
+    use supra_framework::object::{Self, Object};
 
     use aptos_token::token as tokenv1;
     use aptos_token_objects::collection as collectionv2;

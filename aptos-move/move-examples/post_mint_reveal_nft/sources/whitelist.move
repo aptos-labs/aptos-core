@@ -6,7 +6,7 @@
 /// After a whitelisted user successfully mint a token, we will call `deduct_user_minting_amount` to deduct the number
 /// of minted token from the user's minting limit.
 module post_mint_reveal_nft::whitelist {
-    use aptos_framework::timestamp;
+    use supra_framework::timestamp;
     use post_mint_reveal_nft::bucket_table::{Self, BucketTable};
     use std::error;
     use std::signer;

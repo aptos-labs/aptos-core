@@ -8,4 +8,4 @@ deployer = "_"
 swap = "_"
 
 [dependencies]
-AptosFramework = { local = "../../framework/aptos-framework" }
+SupraFramework = { local = "../../framework/supra-framework" }

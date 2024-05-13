@@ -8,7 +8,7 @@ module large_packages::large_packages {
     use std::signer;
     use std::vector;
 
-    use aptos_framework::code;
+    use supra_framework::code;
 
     /// code_indices and code_chunks should be the same length.
     const ECODE_MISMATCH: u64 = 1;

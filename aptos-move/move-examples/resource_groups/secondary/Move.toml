@@ -7,5 +7,5 @@ resource_groups_primary = "_"
 resource_groups_secondary = "_"
 
 [dependencies]
-AptosFramework = { local = "../../../framework/aptos-framework" }
+SupraFramework = { local = "../../../framework/supra-framework" }
 ResourceGroupsPrimary = { local = "../primary" }
