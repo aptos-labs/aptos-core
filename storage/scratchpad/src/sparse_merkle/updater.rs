@@ -246,8 +246,7 @@ impl<'a, V: Clone + CryptoHash + Send + Sync + 'static> SubTreeInfo<'a, V> {
                 PersistedSubTreeInfo::ProofPathInternal { proof } => {
                     let siblings = proof.siblings();
                     assert!(siblings.len() > depth);
-                    let sibling_child =
-                        SubTreeInfo::new_proof_sibling(&siblings[siblings.len() - depth - 1]);
+                    let sibling_child = SubTreeInfo::new_proof_sibling(&siblings[depth]);
                     let on_path_child = SubTreeInfo::new_on_proof_path(proof, depth + 1);
                     swap_if(on_path_child, sibling_child, a_descendent_key.bit(depth))
                 },

@@ -214,11 +214,11 @@ fn test_update_256_siblings_in_proof() {
             .take(255)
             .collect();
     siblings.push(leaf2.into());
-    siblings.reverse();
     let proof_of_key1 = SparseMerkleProofExt::new(Some(leaf1), siblings.clone());
 
     let old_root_hash = siblings
         .iter()
+        .rev()
         .fold(leaf1.hash(), |previous_hash, node_in_proof| {
             hash_internal(previous_hash, node_in_proof.hash())
         });
@@ -237,6 +237,7 @@ fn test_update_256_siblings_in_proof() {
     let new_leaf1_hash = hash_leaf(key1, new_value1_hash);
     let new_root_hash = siblings
         .iter()
+        .rev()
         .fold(new_leaf1_hash, |previous_hash, node_in_proof| {
             hash_internal(previous_hash, node_in_proof.hash())
         });
@@ -300,8 +301,8 @@ fn test_update() {
     let y_hash = hash_internal(x_hash, *SPARSE_MERKLE_PLACEHOLDER_HASH);
     let old_root_hash = hash_internal(y_hash, leaf3.hash());
     let proof = SparseMerkleProofExt::new(None, vec![
-        NodeInProof::Other(x_hash),
         NodeInProof::Leaf(leaf3),
+        NodeInProof::Other(x_hash),
     ]);
     assert!(proof
         .verify::<StateValue>(old_root_hash, key4, None)
@@ -340,9 +341,9 @@ fn test_update() {
 
     // Next, we are going to delete key1. Create a proof for key1.
     let proof = SparseMerkleProofExt::new(Some(leaf1), vec![
-        leaf2.into(),
-        (*SPARSE_MERKLE_PLACEHOLDER_HASH).into(),
         leaf3.into(),
+        (*SPARSE_MERKLE_PLACEHOLDER_HASH).into(),
+        leaf2.into(),
     ]);
     assert!(proof.verify(old_root_hash, key1, Some(&value1)).is_ok());
 
