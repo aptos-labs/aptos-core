@@ -36,7 +36,6 @@ use crate::{
     write_set::{WriteOp, WriteSet, WriteSetMut},
 };
 use aptos_crypto::{
-    bls12381::{self, bls12381_keys},
     ed25519::{self, Ed25519PrivateKey, Ed25519PublicKey},
     test_utils::KeyPair,
     traits::*,
@@ -143,17 +142,14 @@ struct AccountInfo {
     address: AccountAddress,
     private_key: Ed25519PrivateKey,
     public_key: Ed25519PublicKey,
-    consensus_private_key: bls12381::PrivateKey,
+    consensus_private_key: ed25519::PrivateKey,
     sequence_number: u64,
     sent_event_handle: EventHandle,
     received_event_handle: EventHandle,
 }
 
 impl AccountInfo {
-    pub fn new(
-        private_key: Ed25519PrivateKey,
-        consensus_private_key: bls12381::PrivateKey,
-    ) -> Self {
+    pub fn new(private_key: Ed25519PrivateKey, consensus_private_key: ed25519::PrivateKey) -> Self {
         let public_key = private_key.public_key();
         let address = account_address::from_public_key(&public_key);
         Self {
@@ -180,7 +176,7 @@ pub struct AccountInfoUniverse {
 impl AccountInfoUniverse {
     fn new(
         account_private_keys: Vec<Ed25519PrivateKey>,
-        consensus_private_keys: Vec<bls12381::PrivateKey>,
+        consensus_private_keys: Vec<ed25519::PrivateKey>,
         epoch: u64,
         round: Round,
         next_version: Version,
@@ -262,10 +258,7 @@ impl Arbitrary for AccountInfoUniverse {
 
     fn arbitrary_with(num_accounts: Self::Parameters) -> Self::Strategy {
         vec(
-            (
-                ed25519::keypair_strategy(),
-                bls12381_keys::keypair_strategy(),
-            ),
+            (ed25519::keypair_strategy(), ed25519::keypair_strategy()),
             num_accounts,
         )
         .prop_map(|kps| {
@@ -560,8 +553,8 @@ prop_compose! {
     fn arb_validator_for_ledger_info(ledger_info: LedgerInfo)(
         ledger_info in Just(ledger_info),
         account_keypair in ed25519::keypair_strategy(),
-        consensus_keypair in bls12381_keys::keypair_strategy(),
-    ) -> (AccountAddress, ValidatorConsensusInfo,  bls12381::Signature) {
+        consensus_keypair in ed25519::keypair_strategy(),
+    ) -> (AccountAddress, ValidatorConsensusInfo,  ed25519::Signature) {
         let signature = consensus_keypair.private_key.sign(&ledger_info).unwrap();
         let address = account_address::from_public_key(&account_keypair.public_key);
         (address, ValidatorConsensusInfo::new(address, consensus_keypair.public_key, 1), signature)

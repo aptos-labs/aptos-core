@@ -13,7 +13,7 @@ use crate::liveness::{
 };
 use aptos_bitvec::BitVec;
 use aptos_consensus_types::common::{Author, Round};
-use aptos_crypto::{bls12381, HashValue};
+use aptos_crypto::{ed25519, HashValue};
 use aptos_infallible::Mutex;
 use aptos_keygen::KeyGen;
 use aptos_storage_interface::DbReader;
@@ -646,7 +646,7 @@ fn test_extract_epoch_to_proposers_impl() {
     fn create_epoch_state(
         epoch: u64,
         authors: &[Author],
-        public_key: &bls12381::PublicKey,
+        public_key: &ed25519::PublicKey,
     ) -> EpochState {
         EpochState {
             epoch,
@@ -659,8 +659,8 @@ fn test_extract_epoch_to_proposers_impl() {
         }
     }
 
-    let private_key = KeyGen::from_os_rng().generate_bls12381_private_key();
-    let public_key = bls12381::PublicKey::from(&private_key);
+    let private_key = KeyGen::from_os_rng().generate_ed25519_private_key();
+    let public_key = ed25519::PublicKey::from(&private_key);
     let authors: Vec<AccountAddress> = (0..7).map(|_| AccountAddress::random()).sorted().collect();
 
     let epoch_states = (0..7)

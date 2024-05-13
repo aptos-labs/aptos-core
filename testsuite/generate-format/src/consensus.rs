@@ -3,7 +3,7 @@
 // SPDX-License-Identifier: Apache-2.0
 
 use aptos_crypto::{
-    bls12381,
+    ed25519,
     ed25519::Ed25519PrivateKey,
     multi_ed25519::{MultiEd25519PublicKey, MultiEd25519Signature},
     secp256k1_ecdsa, secp256r1_ecdsa,
@@ -46,7 +46,7 @@ fn trace_crypto_values(tracer: &mut Tracer, samples: &mut Samples) -> Result<()>
     let public_key = private_key.public_key();
     let signature = private_key.sign(&message).unwrap();
 
-    let bls_private_key = bls12381::PrivateKey::generate(&mut rng);
+    let bls_private_key = ed25519::PrivateKey::generate(&mut rng);
     let bls_public_key = bls_private_key.public_key();
     let bls_signature = bls_private_key.sign(&message).unwrap();
 

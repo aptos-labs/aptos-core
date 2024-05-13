@@ -13,7 +13,7 @@ use crate::{
 };
 use anyhow::anyhow;
 use aptos_config::config::{InitialSafetyRulesConfig, SafetyRulesConfig, SafetyRulesService};
-use aptos_crypto::bls12381::PrivateKey;
+use aptos_crypto::ed25519::PrivateKey;
 use aptos_global_constants::CONSENSUS_KEY;
 use aptos_infallible::RwLock;
 use aptos_secure_storage::{KVStorage, Storage};

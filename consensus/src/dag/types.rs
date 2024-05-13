@@ -13,7 +13,7 @@ use crate::{
 use anyhow::{bail, ensure};
 use aptos_consensus_types::common::{Author, Payload, Round};
 use aptos_crypto::{
-    bls12381::Signature,
+    ed25519::Signature,
     hash::{CryptoHash, CryptoHasher},
     CryptoMaterialError, HashValue,
 };

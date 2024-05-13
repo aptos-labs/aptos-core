@@ -3,7 +3,7 @@
 
 use aptos_config::{config::IdentityBlob, keys::ConfigKey};
 use aptos_crypto::{
-    bls12381,
+    ed25519,
     ed25519::{Ed25519PrivateKey, Ed25519PublicKey},
     x25519, PrivateKey,
 };
@@ -16,7 +16,7 @@ use serde::{Deserialize, Serialize};
 pub struct PrivateIdentity {
     pub account_address: AccountAddress,
     pub account_private_key: Ed25519PrivateKey,
-    pub consensus_private_key: bls12381::PrivateKey,
+    pub consensus_private_key: ed25519::PrivateKey,
     pub full_node_network_private_key: x25519::PrivateKey,
     pub validator_network_private_key: x25519::PrivateKey,
 }
@@ -26,8 +26,7 @@ pub struct PrivateIdentity {
 pub struct PublicIdentity {
     pub account_address: AccountAddress,
     pub account_public_key: Ed25519PublicKey,
-    pub consensus_public_key: Option<bls12381::PublicKey>,
-    pub consensus_proof_of_possession: Option<bls12381::ProofOfPossession>,
+    pub consensus_public_key: Option<ed25519::PublicKey>,
     pub full_node_network_public_key: Option<x25519::PublicKey>,
     pub validator_network_public_key: Option<x25519::PublicKey>,
 }
@@ -37,7 +36,7 @@ pub fn generate_key_objects(
     keygen: &mut KeyGen,
 ) -> anyhow::Result<(IdentityBlob, IdentityBlob, PrivateIdentity, PublicIdentity)> {
     let account_key = ConfigKey::new(keygen.generate_ed25519_private_key());
-    let consensus_key = ConfigKey::new(keygen.generate_bls12381_private_key());
+    let consensus_key = ConfigKey::new(keygen.generate_ed25519_private_key());
     let validator_network_key = ConfigKey::new(keygen.generate_x25519_private_key()?);
     let full_node_network_key = ConfigKey::new(keygen.generate_x25519_private_key()?);
 
@@ -69,9 +68,6 @@ pub fn generate_key_objects(
         account_address,
         account_public_key: account_key.public_key(),
         consensus_public_key: Some(private_identity.consensus_private_key.public_key()),
-        consensus_proof_of_possession: Some(bls12381::ProofOfPossession::create(
-            &private_identity.consensus_private_key,
-        )),
         full_node_network_public_key: Some(full_node_network_key.public_key()),
         validator_network_public_key: Some(validator_network_key.public_key()),
     };

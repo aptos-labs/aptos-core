@@ -1,7 +1,7 @@
 // Copyright © Aptos Foundation
 
 use crate::pipeline::signing_phase::CommitSignerProvider;
-use aptos_crypto::bls12381;
+use aptos_crypto::ed25519;
 use aptos_types::validator_signer::ValidatorSigner;
 use std::sync::Arc;
 
@@ -20,7 +20,7 @@ impl CommitSignerProvider for DagCommitSigner {
         &self,
         _ledger_info: aptos_types::ledger_info::LedgerInfoWithSignatures,
         new_ledger_info: aptos_types::ledger_info::LedgerInfo,
-    ) -> Result<bls12381::Signature, aptos_safety_rules::Error> {
+    ) -> Result<ed25519::Signature, aptos_safety_rules::Error> {
         let signature = self
             .signer
             .sign(&new_ledger_info)

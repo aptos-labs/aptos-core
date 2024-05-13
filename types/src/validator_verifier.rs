@@ -11,12 +11,7 @@ use crate::{
 };
 use anyhow::{ensure, Result};
 use aptos_bitvec::BitVec;
-use aptos_crypto::{
-    bls12381,
-    bls12381::{bls12381_keys, PublicKey},
-    hash::CryptoHash,
-    Signature, VerifyingKey,
-};
+use aptos_crypto::{ed25519, ed25519::PublicKey, hash::CryptoHash, Signature, VerifyingKey};
 use itertools::Itertools;
 #[cfg(any(test, feature = "fuzzing"))]
 use proptest_derive::Arbitrary;
@@ -120,7 +115,7 @@ impl TryFrom<ValidatorConsensusInfoMoveStruct> for ValidatorConsensusInfo {
             pk_bytes,
             voting_power,
         } = value;
-        let public_key = bls12381_keys::PublicKey::try_from(pk_bytes.as_slice())?;
+        let public_key = PublicKey::try_from(pk_bytes.as_slice())?;
         Ok(Self::new(addr, public_key, voting_power))
     }
 }
@@ -225,7 +220,7 @@ impl ValidatorVerifier {
         &self,
         author: AccountAddress,
         message: &T,
-        signature: &bls12381::Signature,
+        signature: &ed25519::Signature,
     ) -> std::result::Result<(), VerifyError> {
         match self.get_public_key(&author) {
             Some(public_key) => public_key
@@ -253,7 +248,7 @@ impl ValidatorVerifier {
             sigs.push(sig.clone());
         }
         // Perform an optimistic aggregation of the signatures without verification.
-        let aggregated_sig = bls12381::Signature::aggregate(sigs)
+        let aggregated_sig = ed25519::Signature::aggregate(sigs)
             .map_err(|_| VerifyError::FailedToAggregateSignature)?;
 
         Ok(AggregateSignature::new(masks, Some(aggregated_sig)))

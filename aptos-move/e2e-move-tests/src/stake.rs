@@ -3,7 +3,7 @@
 
 use crate::harness::MoveHarness;
 use aptos_cached_packages::aptos_stdlib;
-use aptos_crypto::{bls12381, PrivateKey, Uniform};
+use aptos_crypto::{ed25519, PrivateKey, Uniform};
 use aptos_language_e2e_tests::account::Account;
 use aptos_types::{
     account_address::AccountAddress, account_config::CORE_CODE_ADDRESS,
@@ -76,18 +76,11 @@ pub fn rotate_consensus_key(
     account: &Account,
     pool_address: AccountAddress,
 ) -> TransactionStatus {
-    let consensus_key = bls12381::PrivateKey::generate_for_testing();
+    let consensus_key = ed25519::PrivateKey::generate_for_testing();
     let consensus_pubkey = consensus_key.public_key().to_bytes().to_vec();
-    let proof_of_possession = bls12381::ProofOfPossession::create(&consensus_key)
-        .to_bytes()
-        .to_vec();
     harness.run_transaction_payload(
         account,
-        aptos_stdlib::stake_rotate_consensus_key(
-            pool_address,
-            consensus_pubkey,
-            proof_of_possession,
-        ),
+        aptos_stdlib::stake_rotate_consensus_key(pool_address, consensus_pubkey),
     )
 }
 

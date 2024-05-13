@@ -12,7 +12,7 @@ use crate::{
     MoveHarness,
 };
 use aptos_cached_packages::{aptos_stdlib, aptos_token_sdk_builder};
-use aptos_crypto::{bls12381, PrivateKey, Uniform};
+use aptos_crypto::{ed25519, PrivateKey, Uniform};
 use aptos_gas_profiling::TransactionGasLog;
 use aptos_types::{
     account_address::{default_stake_pool_address, AccountAddress},
@@ -145,20 +145,13 @@ fn test_gas() {
         ),
     );
     let pool_address = default_stake_pool_address(account_1_address, account_2_address);
-    let consensus_key = bls12381::PrivateKey::generate_for_testing();
+    let consensus_key = ed25519::PrivateKey::generate_for_testing();
     let consensus_pubkey = consensus_key.public_key().to_bytes().to_vec();
-    let proof_of_possession = bls12381::ProofOfPossession::create(&consensus_key)
-        .to_bytes()
-        .to_vec();
     run(
         &mut harness,
         "RotateConsensusKey",
         account_2,
-        aptos_stdlib::stake_rotate_consensus_key(
-            pool_address,
-            consensus_pubkey,
-            proof_of_possession,
-        ),
+        aptos_stdlib::stake_rotate_consensus_key(pool_address, consensus_pubkey),
     );
     run(
         &mut harness,

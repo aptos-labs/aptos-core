@@ -2,7 +2,7 @@
 // SPDX-License-Identifier: Apache-2.0
 
 use aptos_crypto::{
-    bls12381,
+    ed25519,
     ed25519::{Ed25519PrivateKey, Ed25519PublicKey},
     hash::{CryptoHasher as _, TestOnlyHasher},
     multi_ed25519::{MultiEd25519PublicKey, MultiEd25519Signature},
@@ -73,8 +73,8 @@ fn trace_crypto_values(tracer: &mut Tracer, samples: &mut Samples) -> Result<()>
     tracer.trace_value(samples, &secp256r1_ecdsa_public_key)?;
     tracer.trace_value(samples, &secp256r1_ecdsa_signature)?;
 
-    let bls12381_private_key = bls12381::PrivateKey::generate(&mut rng);
-    let bls12381_public_key = bls12381::PublicKey::from(&bls12381_private_key);
+    let bls12381_private_key = ed25519::PrivateKey::generate(&mut rng);
+    let bls12381_public_key = ed25519::PublicKey::from(&bls12381_private_key);
     let bls12381_signature = bls12381_private_key.sign(&message).unwrap();
     tracer.trace_value(samples, &bls12381_private_key)?;
     tracer.trace_value(samples, &bls12381_public_key)?;

@@ -12,7 +12,7 @@ use aptos_consensus_types::{
     vote::Vote,
     vote_proposal::VoteProposal,
 };
-use aptos_crypto::bls12381;
+use aptos_crypto::ed25519;
 use aptos_infallible::Mutex;
 use aptos_logger::prelude::info;
 use aptos_safety_rules::{ConsensusState, Error, TSafetyRules};
@@ -93,7 +93,7 @@ impl TSafetyRules for MetricsSafetyRules {
         monitor!("safety_rules", self.inner.initialize(proof))
     }
 
-    fn sign_proposal(&mut self, block_data: &BlockData) -> Result<bls12381::Signature, Error> {
+    fn sign_proposal(&mut self, block_data: &BlockData) -> Result<ed25519::Signature, Error> {
         self.retry(|inner| monitor!("safety_rules", inner.sign_proposal(block_data)))
     }
 
@@ -101,7 +101,7 @@ impl TSafetyRules for MetricsSafetyRules {
         &mut self,
         timeout: &TwoChainTimeout,
         timeout_cert: Option<&TwoChainTimeoutCertificate>,
-    ) -> Result<bls12381::Signature, Error> {
+    ) -> Result<ed25519::Signature, Error> {
         self.retry(|inner| {
             monitor!(
                 "safety_rules",
@@ -127,7 +127,7 @@ impl TSafetyRules for MetricsSafetyRules {
         &mut self,
         ledger_info: LedgerInfoWithSignatures,
         new_ledger_info: LedgerInfo,
-    ) -> Result<bls12381::Signature, Error> {
+    ) -> Result<ed25519::Signature, Error> {
         self.retry(|inner| {
             monitor!(
                 "safety_rules",
@@ -142,7 +142,7 @@ impl CommitSignerProvider for Mutex<MetricsSafetyRules> {
         &self,
         ledger_info: LedgerInfoWithSignatures,
         new_ledger_info: LedgerInfo,
-    ) -> Result<bls12381::Signature, Error> {
+    ) -> Result<ed25519::Signature, Error> {
         self.lock().sign_commit_vote(ledger_info, new_ledger_info)
     }
 }
@@ -156,7 +156,7 @@ mod tests {
         vote::Vote,
         vote_proposal::VoteProposal,
     };
-    use aptos_crypto::bls12381;
+    use aptos_crypto::ed25519;
     use aptos_safety_rules::{ConsensusState, Error, TSafetyRules};
     use aptos_types::{
         epoch_change::EpochChangeProof,
@@ -207,7 +207,7 @@ mod tests {
             self.last_init_result.clone()
         }
 
-        fn sign_proposal(&mut self, _: &BlockData) -> Result<bls12381::Signature, Error> {
+        fn sign_proposal(&mut self, _: &BlockData) -> Result<ed25519::Signature, Error> {
             unimplemented!()
         }
 
@@ -215,7 +215,7 @@ mod tests {
             &mut self,
             _: &TwoChainTimeout,
             _: Option<&TwoChainTimeoutCertificate>,
-        ) -> Result<bls12381::Signature, Error> {
+        ) -> Result<ed25519::Signature, Error> {
             unimplemented!()
         }
 
@@ -231,7 +231,7 @@ mod tests {
             &mut self,
             _: LedgerInfoWithSignatures,
             _: LedgerInfo,
-        ) -> Result<bls12381::Signature, Error> {
+        ) -> Result<ed25519::Signature, Error> {
             unimplemented!()
         }
     }

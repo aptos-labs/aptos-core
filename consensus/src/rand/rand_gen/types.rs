@@ -3,7 +3,7 @@
 
 use anyhow::ensure;
 use aptos_consensus_types::common::{Author, Round};
-use aptos_crypto::bls12381::Signature;
+use aptos_crypto::ed25519::Signature;
 use aptos_crypto_derive::{BCSCryptoHash, CryptoHasher};
 use aptos_types::{
     aggregate_signature::AggregateSignature,

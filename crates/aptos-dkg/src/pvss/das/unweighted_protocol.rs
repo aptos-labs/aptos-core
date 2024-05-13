@@ -18,7 +18,7 @@ use crate::{
     },
 };
 use anyhow::bail;
-use aptos_crypto::{bls12381, CryptoMaterialError, Genesis, SigningKey, ValidCryptoMaterial};
+use aptos_crypto::{ed25519, CryptoMaterialError, Genesis, SigningKey, ValidCryptoMaterial};
 use aptos_crypto_derive::{BCSCryptoHash, CryptoHasher};
 use blstrs::{G1Projective, G2Projective, Gt};
 use group::Group;
@@ -78,8 +78,8 @@ impl traits::Transcript for Transcript {
     type InputSecret = pvss::input_secret::InputSecret;
     type PublicParameters = das::PublicParameters;
     type SecretSharingConfig = ThresholdConfig;
-    type SigningPubKey = bls12381::PublicKey;
-    type SigningSecretKey = bls12381::PrivateKey;
+    type SigningPubKey = ed25519::PublicKey;
+    type SigningSecretKey = ed25519::PrivateKey;
 
     fn scheme_name() -> String {
         DAS_SK_IN_G1.to_string()
@@ -282,7 +282,7 @@ impl traits::Transcript for Transcript {
     where
         R: rand_core::RngCore + rand_core::CryptoRng,
     {
-        let sk = bls12381::PrivateKey::genesis();
+        let sk = ed25519::PrivateKey::genesis();
         Transcript {
             soks: vec![(
                 sc.get_player(0),
@@ -320,11 +320,11 @@ impl MalleableTranscript for Transcript {
 
 impl Transcript {
     pub fn sign_contribution<A: Serialize + Clone>(
-        sk: &bls12381::PrivateKey,
+        sk: &ed25519::PrivateKey,
         player: &Player,
         aux: &A,
         comm: &G2Projective,
-    ) -> bls12381::Signature {
+    ) -> ed25519::Signature {
         sk.sign(&Contribution::<G2Projective, A> {
             comm: *comm,
             player: *player,

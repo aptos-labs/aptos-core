@@ -1899,7 +1899,7 @@ module supra_framework::delegation_pool {
         initialize_delegation_pool(validator, commission_percentage, vector::empty<u8>());
         let pool_address = get_owned_pool_address(validator_address);
 
-        stake::rotate_consensus_key(validator, pool_address, CONSENSUS_KEY_1, CONSENSUS_POP_1);
+        stake::rotate_consensus_key(validator, pool_address, CONSENSUS_KEY_1);
 
         if (amount > 0) {
             stake::mint(validator, amount);
@@ -2058,7 +2058,7 @@ module supra_framework::delegation_pool {
         initialize_delegation_pool(validator, 3735, vector::empty<u8>());
         let pool_address = get_owned_pool_address(validator_address);
 
-        stake::rotate_consensus_key(validator, pool_address, CONSENSUS_KEY_1, CONSENSUS_POP_1);
+        stake::rotate_consensus_key(validator, pool_address, CONSENSUS_KEY_1);
 
         // zero `add_stake` fee as validator is not producing rewards this epoch
         assert!(get_add_stake_fee(pool_address, 1000000 * ONE_APT) == 0, 0);
@@ -3226,7 +3226,7 @@ module supra_framework::delegation_pool {
         assert_delegation(validator_address, pool_address, 0, 0, 0);
 
         // activate validator
-        stake::rotate_consensus_key(validator, pool_address, CONSENSUS_KEY_1, CONSENSUS_POP_1);
+        stake::rotate_consensus_key(validator, pool_address, CONSENSUS_KEY_1);
         stake::join_validator_set(validator, pool_address);
         end_aptos_epoch();
 
@@ -3363,7 +3363,7 @@ module supra_framework::delegation_pool {
         unlock(delegator, pool_address, 100 * ONE_APT);
 
         // activate validator
-        stake::rotate_consensus_key(old_operator, pool_address, CONSENSUS_KEY_1, CONSENSUS_POP_1);
+        stake::rotate_consensus_key(old_operator, pool_address, CONSENSUS_KEY_1);
         stake::join_validator_set(old_operator, pool_address);
         end_aptos_epoch();
 
@@ -3430,7 +3430,7 @@ module supra_framework::delegation_pool {
         unlock(delegator, pool_address, 1000000 * ONE_APT);
 
         // activate validator
-        stake::rotate_consensus_key(operator1, pool_address, CONSENSUS_KEY_1, CONSENSUS_POP_1);
+        stake::rotate_consensus_key(operator1, pool_address, CONSENSUS_KEY_1);
         stake::join_validator_set(operator1, pool_address);
         end_aptos_epoch();
 
@@ -3495,7 +3495,7 @@ module supra_framework::delegation_pool {
         unlock(delegator, pool_address, 100 * ONE_APT);
 
         // activate validator
-        stake::rotate_consensus_key(operator, pool_address, CONSENSUS_KEY_1, CONSENSUS_POP_1);
+        stake::rotate_consensus_key(operator, pool_address, CONSENSUS_KEY_1);
         stake::join_validator_set(operator, pool_address);
         end_aptos_epoch();
 
@@ -3557,7 +3557,7 @@ module supra_framework::delegation_pool {
         unlock(delegator, pool_address, 100 * ONE_APT);
 
         // activate validator
-        stake::rotate_consensus_key(operator, pool_address, CONSENSUS_KEY_1, CONSENSUS_POP_1);
+        stake::rotate_consensus_key(operator, pool_address, CONSENSUS_KEY_1);
         stake::join_validator_set(operator, pool_address);
         end_aptos_epoch();
 

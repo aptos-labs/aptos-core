@@ -2,7 +2,6 @@
 // SPDX-License-Identifier: Apache-2.0
 
 use aptos_crypto::{
-    bls12381,
     ed25519::{Ed25519PrivateKey, Ed25519PublicKey},
     x25519, CryptoMaterialError, PrivateKey, Uniform,
 };
@@ -33,11 +32,6 @@ impl KeyGen {
     /// Generate an Ed25519 private key.
     pub fn generate_ed25519_private_key(&mut self) -> Ed25519PrivateKey {
         Ed25519PrivateKey::generate(&mut self.0)
-    }
-
-    /// Generate a bls12381 private key.
-    pub fn generate_bls12381_private_key(&mut self) -> bls12381::PrivateKey {
-        bls12381::PrivateKey::generate(&mut self.0)
     }
 
     /// Generate an Ed25519 key pair.

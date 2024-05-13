@@ -15,9 +15,7 @@ use crate::{
     CliCommand, CliResult,
 };
 use aptos_config::config::{Peer, PeerRole};
-use aptos_crypto::{
-    bls12381, ed25519, encoding_type::EncodingType, x25519, PrivateKey, ValidCryptoMaterial,
-};
+use aptos_crypto::{ed25519, encoding_type::EncodingType, x25519, PrivateKey, ValidCryptoMaterial};
 use aptos_genesis::config::HostAndPort;
 use aptos_types::account_address::{
     create_multisig_account_address, from_identity_public_key, AccountAddress,
@@ -255,8 +253,8 @@ impl CliCommand<HashMap<&'static str, PathBuf>> for GenerateKey {
                 return Ok(result_map);
             },
             KeyType::Bls12381 => {
-                let private_key = keygen.generate_bls12381_private_key();
-                self.save_params.save_bls_key(&private_key, "bls12381")
+                let private_key = keygen.generate_ed25519_private_key();
+                self.save_params.save_key(&private_key, "ed25519")
             },
         }
     }
@@ -325,11 +323,6 @@ impl SaveKey {
         )
     }
 
-    /// Public key file name
-    fn proof_of_possession_file(&self) -> CliTypedResult<PathBuf> {
-        append_file_extension(self.file_options.output_file.as_path(), "pop")
-    }
-
     /// Check if the key file exists already
     pub fn check_key_file(&self) -> CliTypedResult<()> {
         // Check if file already exists
@@ -358,41 +351,6 @@ impl SaveKey {
         let mut map = HashMap::new();
         map.insert("PrivateKey Path", self.file_options.output_file);
         map.insert("PublicKey Path", public_key_file);
-        Ok(map)
-    }
-
-    /// Saves a key to a file encoded in a string
-    pub fn save_bls_key(
-        self,
-        key: &bls12381::PrivateKey,
-        key_name: &'static str,
-    ) -> CliTypedResult<HashMap<&'static str, PathBuf>> {
-        let encoded_private_key = self.encoding_options.encoding.encode_key(key_name, key)?;
-        let encoded_public_key = self
-            .encoding_options
-            .encoding
-            .encode_key(key_name, &key.public_key())?;
-        let encoded_proof_of_posession = self
-            .encoding_options
-            .encoding
-            .encode_key(key_name, &bls12381::ProofOfPossession::create(key))?;
-
-        // Write private and public keys to files
-        let public_key_file = self.public_key_file()?;
-        let proof_of_possession_file = self.proof_of_possession_file()?;
-        self.file_options
-            .save_to_file_confidential(key_name, &encoded_private_key)?;
-        write_to_file(&public_key_file, key_name, &encoded_public_key)?;
-        write_to_file(
-            &proof_of_possession_file,
-            key_name,
-            &encoded_proof_of_posession,
-        )?;
-
-        let mut map = HashMap::new();
-        map.insert("PrivateKey Path", self.file_options.output_file);
-        map.insert("PublicKey Path", public_key_file);
-        map.insert("Proof of possession Path", proof_of_possession_file);
         Ok(map)
     }
 }

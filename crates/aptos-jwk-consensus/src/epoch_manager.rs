@@ -11,7 +11,7 @@ use anyhow::Result;
 use aptos_bounded_executor::BoundedExecutor;
 use aptos_channels::{aptos_channel, message_queues::QueueStyle};
 use aptos_consensus_types::common::Author;
-use aptos_crypto::bls12381::PrivateKey;
+use aptos_crypto::ed25519::PrivateKey;
 use aptos_event_notifications::{
     EventNotification, EventNotificationListener, ReconfigNotification,
     ReconfigNotificationListener,

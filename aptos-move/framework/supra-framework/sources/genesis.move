@@ -52,7 +52,6 @@ module supra_framework::genesis {
         voter_address: address,
         stake_amount: u64,
         consensus_pubkey: vector<u8>,
-        proof_of_possession: vector<u8>,
         network_addresses: vector<u8>,
         full_node_network_addresses: vector<u8>,
     }
@@ -365,7 +364,6 @@ module supra_framework::genesis {
             operator,
             pool_address,
             validator.consensus_pubkey,
-            validator.proof_of_possession,
         );
         stake::update_network_and_fullnode_addresses(
             operator,

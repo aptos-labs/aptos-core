@@ -884,8 +884,8 @@ module supra_framework::staking_contract {
         assert!(last_recorded_principal(staker_address, operator_address) == INITIAL_BALANCE, 0);
 
         // Operator joins the validator set.
-        let (_sk, pk, pop) = stake::generate_identity();
-        stake::join_validator_set_for_test(&pk, &pop, operator, pool_address, true);
+        let (_sk, pk) = stake::generate_identity();
+        stake::join_validator_set_for_test(&pk, operator, pool_address, true);
         assert!(stake::get_validator_state(pool_address) == VALIDATOR_STATUS_ACTIVE, 1);
 
         // Fast forward to generate rewards.

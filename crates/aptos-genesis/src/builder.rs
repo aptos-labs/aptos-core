@@ -18,7 +18,6 @@ use aptos_config::{
     network_id::NetworkId,
 };
 use aptos_crypto::{
-    bls12381,
     ed25519::{Ed25519PrivateKey, Ed25519PublicKey},
     PrivateKey,
 };
@@ -212,9 +211,6 @@ impl TryFrom<&ValidatorNodeConfig> for ValidatorConfiguration {
             voter_account_address: private_identity.account_address.into(),
             voter_account_public_key: private_identity.account_private_key.public_key(),
             consensus_public_key: Some(private_identity.consensus_private_key.public_key()),
-            proof_of_possession: Some(bls12381::ProofOfPossession::create(
-                &private_identity.consensus_private_key,
-            )),
             validator_network_public_key: Some(
                 private_identity.validator_network_private_key.public_key(),
             ),
