@@ -2,7 +2,6 @@
 // SPDX-License-Identifier: Apache-2.0
 
 use crate::{
-    block_storage::counters::BLOCK_FETCH_MANAGER_MAIN_LOOP,
     logging::{LogEvent, LogSchema},
     monitor,
     network::NetworkSender,
@@ -111,14 +110,10 @@ impl BlockFetchManager {
         mut self,
         mut proposal_rx: Receiver<(HashValue, HashValue), BlockFetchRequest>,
     ) {
-        loop {
-            let _timer = BLOCK_FETCH_MANAGER_MAIN_LOOP.start_timer();
-
-            tokio::select! {
-                Some(request) = proposal_rx.next() => monitor!("block_fetch_manager_handle_proposal", {
-                    self.handle_fetch_request(request).await;
-                })
-            }
+        while let Some(request) = proposal_rx.next().await {
+            monitor!("block_fetch_manager_handle_proposal", {
+                self.handle_fetch_request(request).await;
+            })
         }
     }
 
