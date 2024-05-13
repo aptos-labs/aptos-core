@@ -1,7 +1,9 @@
 // Copyright © Aptos Foundation
 // SPDX-License-Identifier: Apache-2.0
 
-use super::{dag_store::DagStore, health::HealthBackoff, order_rule::TOrderRule};
+use super::{
+    dag_store::DagStore, health::HealthBackoff, order_rule::TOrderRule, types::NodeMetadata,
+};
 use crate::{
     dag::{
         dag_fetcher::TFetchRequester,
@@ -21,10 +23,14 @@ use crate::{
 };
 use anyhow::{bail, ensure};
 use aptos_config::config::DagPayloadConfig;
-use aptos_consensus_types::common::{Author, Round};
+use aptos_consensus_types::{
+    common::{Author, Round},
+    proof_of_store::ProofCache,
+};
 use aptos_infallible::Mutex;
 use aptos_logger::{debug, error};
 use aptos_types::{
+    aggregate_signature::AggregateSignature,
     epoch_state::EpochState,
     on_chain_config::{OnChainJWKConsensusConfig, OnChainRandomnessConfig, ValidatorTxnConfig},
     validator_signer::ValidatorSigner,
@@ -60,6 +66,8 @@ pub(crate) struct NodeBroadcastHandler {
     quorum_store_enabled: bool,
     missing_parent_tx: Option<UnboundedSender<Node>>,
     payload_store: Arc<DashMap<(Round, Author), Node>>,
+    payload_sig_cache: ProofCache,
+    missing_parents_sig_cache: Cache<NodeMetadata, AggregateSignature>,
 }
 
 impl NodeBroadcastHandler {
@@ -104,6 +112,8 @@ impl NodeBroadcastHandler {
             quorum_store_enabled,
             missing_parent_tx: None,
             payload_store,
+            payload_sig_cache: Cache::builder().build(),
+            missing_parents_sig_cache: Cache::builder().max_capacity(500).build(),
         }
     }
 
@@ -198,32 +208,40 @@ impl NodeBroadcastHandler {
         let should_fetch = !missing_parents.is_empty();
         let verifier = self.epoch_state.verifier.clone();
         let quorum_store_enabled = self.quorum_store_enabled;
-        // let node = tokio::task::spawn_blocking(move || {
-        //     if !missing_parents.is_empty() {
-        //         // For each missing parent, verify their signatures and voting power.
-        //         // Otherwise, a malicious node can send bad nodes with fake parents
-        //         // and cause this peer to issue unnecessary fetch requests.
-        //         ensure!(
-        //             missing_parents
-        //                 .par_iter()
-        //                 .with_min_len(2)
-        //                 .all(|parent| { parent.verify(&verifier).is_ok() }),
-        //             NodeBroadcastHandleError::InvalidParent
-        //         );
-        //     }
+        let payload_sig_cache = self.payload_sig_cache.clone();
+        let missing_parents_cache = self.missing_parents_sig_cache.clone();
+        let node = tokio::task::spawn_blocking(move || {
+            if !missing_parents.is_empty() {
+                // For each missing parent, verify their signatures and voting power.
+                // Otherwise, a malicious node can send bad nodes with fake parents
+                // and cause this peer to issue unnecessary fetch requests.
+                ensure!(
+                    missing_parents.par_iter().all(|parent| {
+                        if let Some(ref sig) = missing_parents_cache.get(parent.metadata()) {
+                            return sig == parent.signatures();
+                        }
+                        let result = parent.verify(&verifier).is_ok();
+                        if result {
+                            missing_parents_cache
+                                .insert(parent.metadata().clone(), parent.signatures().clone());
+                        }
+                        result
+                    }),
+                    NodeBroadcastHandleError::InvalidParent
+                );
+            }
 
-        //     let cache = Cache::builder().build();
-        //     ensure!(
-        //         node.payload()
-        //             .verify(&verifier, &cache, quorum_store_enabled)
-        //             .is_ok(),
-        //         "invalid payload"
-        //     );
+            ensure!(
+                node.payload()
+                    .verify(&verifier, &payload_sig_cache, quorum_store_enabled)
+                    .is_ok(),
+                "invalid payload"
+            );
 
-        //     Ok(node)
-        // })
-        // .await
-        // .expect("task must finish")?;
+            Ok(node)
+        })
+        .await
+        .expect("task must finish")?;
 
         if should_fetch {
             // Don't issue fetch requests for parents of the lowest round in the DAG

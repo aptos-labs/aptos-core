@@ -112,7 +112,6 @@ impl NetworkHandler {
             mut missing_parents_rx,
             mut next_dag_tx,
             mut prev_dag_rx,
-            dag_id,
             ..
         } = self;
 

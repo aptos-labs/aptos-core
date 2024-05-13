@@ -94,7 +94,9 @@ impl<'a> From<&'a Node> for NodeWithoutDigest<'a> {
 }
 
 /// Represents the metadata about the node, without payload and parents from Node
-#[derive(Clone, Serialize, Deserialize, Debug, PartialEq, CryptoHasher, BCSCryptoHash)]
+#[derive(
+    Clone, Serialize, Deserialize, Debug, PartialEq, CryptoHasher, BCSCryptoHash, Hash, Eq,
+)]
 pub struct NodeMetadata {
     dag_id: u8,
     node_id: NodeId,
