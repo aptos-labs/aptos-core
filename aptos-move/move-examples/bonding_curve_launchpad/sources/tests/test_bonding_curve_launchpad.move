@@ -21,7 +21,7 @@ module resource_account::test_bonding_curve_launchpad {
     const EUSER_FA_BALANCE_INCORRECT: u64 = 10003;
 
     //---------------------------Test Helpers---------------------------
-    fun test_setup_accounts(aptos_framework: &signer, swap_dex_signer: &signer, bcl_owner_signer: &signer, _resource_signer: &signer, bonding_curve_creator: &signer) {
+    fun test_setup_accounts(aptos_framework: &signer, _swap_dex_signer: &signer, bcl_owner_signer: &signer, _resource_signer: &signer, bonding_curve_creator: &signer) {
         account::create_account_for_test(@0x1);
         account::create_account_for_test(@0xcafe);
         account::create_account_for_test(@0x922a028b0dbd8ff206074977ae4c5f9fb003ce384242b6253c67192cd2a45ee1);
@@ -48,7 +48,7 @@ module resource_account::test_bonding_curve_launchpad {
 
     //---------------------------E2E Tests---------------------------
     #[test(aptos_framework = @0x1, swap_dex_signer = @0xcafe, bcl_owner_signer = @0x922a028b0dbd8ff206074977ae4c5f9fb003ce384242b6253c67192cd2a45ee1, resource_signer = @0x52ddc290f7be79b2583472217af88a8500bdcb16d865e9c2bf4d3c995df0825f, bonding_curve_creator = @0x803)]
-    fun e2e_test_bonding_curve_creation(aptos_framework: &signer, swap_dex_signer: &signer, bcl_owner_signer: &signer, resource_signer: &signer, bonding_curve_creator: &signer){
+    fun test_e2e_bonding_curve_creation(aptos_framework: &signer, swap_dex_signer: &signer, bcl_owner_signer: &signer, resource_signer: &signer, bonding_curve_creator: &signer){
         test_setup_accounts(aptos_framework, swap_dex_signer, bcl_owner_signer, resource_signer, bonding_curve_creator);
         test_setup_initialize_contracts(swap_dex_signer, resource_signer);
         // Create FA and LiquidityPair, w.o Initial Swap.
@@ -71,7 +71,7 @@ module resource_account::test_bonding_curve_launchpad {
     }
 
     #[test(aptos_framework = @0x1, swap_dex_signer = @0xcafe, bcl_owner_signer = @0x922a028b0dbd8ff206074977ae4c5f9fb003ce384242b6253c67192cd2a45ee1, resource_signer = @0x52ddc290f7be79b2583472217af88a8500bdcb16d865e9c2bf4d3c995df0825f, bonding_curve_creator = @0x803)]
-    fun e2e_test_bonding_curve_creation_with_initial_liquidity(aptos_framework: &signer, swap_dex_signer: &signer, bcl_owner_signer: &signer, resource_signer: &signer, bonding_curve_creator: &signer){
+    fun test_e2e_bonding_curve_creation_with_initial_liquidity(aptos_framework: &signer, swap_dex_signer: &signer, bcl_owner_signer: &signer, resource_signer: &signer, bonding_curve_creator: &signer){
         test_setup_accounts(aptos_framework, swap_dex_signer, bcl_owner_signer, resource_signer, bonding_curve_creator);
         test_setup_initialize_contracts(swap_dex_signer, resource_signer);
         // Create FA and LiquidityPair, w/ Initial Swap.
@@ -94,7 +94,7 @@ module resource_account::test_bonding_curve_launchpad {
     }
 
     #[test(aptos_framework = @0x1, swap_dex_signer = @0xcafe, bcl_owner_signer = @0x922a028b0dbd8ff206074977ae4c5f9fb003ce384242b6253c67192cd2a45ee1, resource_signer = @0x52ddc290f7be79b2583472217af88a8500bdcb16d865e9c2bf4d3c995df0825f, bonding_curve_creator = @0x803)]
-    fun e2e_test_bonding_curve_creation_multiple(aptos_framework: &signer, swap_dex_signer: &signer, bcl_owner_signer: &signer, resource_signer: &signer, bonding_curve_creator: &signer){
+    fun test_e2e_bonding_curve_creation_multiple(aptos_framework: &signer, swap_dex_signer: &signer, bcl_owner_signer: &signer, resource_signer: &signer, bonding_curve_creator: &signer){
         test_setup_accounts(aptos_framework, swap_dex_signer, bcl_owner_signer, resource_signer, bonding_curve_creator);
         test_setup_initialize_contracts(swap_dex_signer, resource_signer);
         // Create FA and LiquidityPair, w.o Initial Swap.
@@ -125,8 +125,8 @@ module resource_account::test_bonding_curve_launchpad {
     }
 
     #[test(aptos_framework = @0x1, swap_dex_signer = @0xcafe, bcl_owner_signer = @0x922a028b0dbd8ff206074977ae4c5f9fb003ce384242b6253c67192cd2a45ee1, resource_signer = @0x52ddc290f7be79b2583472217af88a8500bdcb16d865e9c2bf4d3c995df0825f, bonding_curve_creator = @0x803)]
-    fun e2e_test_directional_swaps(aptos_framework: &signer, swap_dex_signer: &signer, bcl_owner_signer: &signer, resource_signer: &signer, bonding_curve_creator: &signer){
-        e2e_test_bonding_curve_creation(aptos_framework, swap_dex_signer, bcl_owner_signer, resource_signer, bonding_curve_creator);
+    fun test_e2e_directional_swaps(aptos_framework: &signer, swap_dex_signer: &signer, bcl_owner_signer: &signer, resource_signer: &signer, bonding_curve_creator: &signer){
+        test_e2e_bonding_curve_creation(aptos_framework, swap_dex_signer, bcl_owner_signer, resource_signer, bonding_curve_creator);
         let user_address = signer::address_of(bonding_curve_creator);
         let name =  string::utf8(b"SheepyCoin");
         let symbol = string::utf8(b"SHEEP");
@@ -142,8 +142,8 @@ module resource_account::test_bonding_curve_launchpad {
     }
 
     #[test(aptos_framework = @0x1, swap_dex_signer = @0xcafe, bcl_owner_signer = @0x922a028b0dbd8ff206074977ae4c5f9fb003ce384242b6253c67192cd2a45ee1, resource_signer = @0x52ddc290f7be79b2583472217af88a8500bdcb16d865e9c2bf4d3c995df0825f, bonding_curve_creator = @0x803)]
-    fun e2e_test_graduation(aptos_framework: &signer, swap_dex_signer: &signer, bcl_owner_signer: &signer, resource_signer: &signer, bonding_curve_creator: &signer){
-        e2e_test_bonding_curve_creation(aptos_framework, swap_dex_signer, bcl_owner_signer, resource_signer, bonding_curve_creator);
+    fun test_e2e_graduation(aptos_framework: &signer, swap_dex_signer: &signer, bcl_owner_signer: &signer, resource_signer: &signer, bonding_curve_creator: &signer){
+        test_e2e_bonding_curve_creation(aptos_framework, swap_dex_signer, bcl_owner_signer, resource_signer, bonding_curve_creator);
         let grad_apt: u64 = 6_000 * math64::pow(10, (8 as u64));
         let name = string::utf8(b"SheepyCoin");
         let symbol = string::utf8(b"SHEEP");
@@ -152,8 +152,8 @@ module resource_account::test_bonding_curve_launchpad {
         assert!(bonding_curve_launchpad::get_is_frozen(name, symbol) == false, EINCORRECT_FROZEN_STATUS);
     }
 
-    fun e2e_test_swap_after_graduation(aptos_framework: &signer, swap_dex_signer: &signer, bcl_owner_signer: &signer, resource_signer: &signer, bonding_curve_creator: &signer){
-        e2e_test_graduation(aptos_framework, swap_dex_signer, bcl_owner_signer, resource_signer, bonding_curve_creator);
+    fun test_e2e_swap_after_graduation(aptos_framework: &signer, swap_dex_signer: &signer, bcl_owner_signer: &signer, resource_signer: &signer, bonding_curve_creator: &signer){
+        test_e2e_graduation(aptos_framework, swap_dex_signer, bcl_owner_signer, resource_signer, bonding_curve_creator);
         let fa_obj_metadata = bonding_curve_launchpad::get_metadata(string::utf8(b"SheepyCoin"), string::utf8(b"SHEEP"));
         primary_fungible_store::transfer(bonding_curve_creator, fa_obj_metadata, @0xcafe, 100);
     }
@@ -162,8 +162,8 @@ module resource_account::test_bonding_curve_launchpad {
     // ----E2E EXPECTED FAILING-----
     #[test(aptos_framework = @0x1, swap_dex_signer = @0xcafe, bcl_owner_signer = @0x922a028b0dbd8ff206074977ae4c5f9fb003ce384242b6253c67192cd2a45ee1, resource_signer = @0x52ddc290f7be79b2583472217af88a8500bdcb16d865e9c2bf4d3c995df0825f, bonding_curve_creator = @0x803)]
     #[expected_failure(abort_code = 10, location = bonding_curve_launchpad)]
-    fun e2e_test_failing_duplicate_FA(aptos_framework: &signer, swap_dex_signer: &signer, bcl_owner_signer: &signer, resource_signer: &signer, bonding_curve_creator: &signer){
-        e2e_test_bonding_curve_creation(aptos_framework, swap_dex_signer, bcl_owner_signer, resource_signer, bonding_curve_creator); // SheepyCoin, SHEEP
+    fun test_e2e_failing_duplicate_FA(aptos_framework: &signer, swap_dex_signer: &signer, bcl_owner_signer: &signer, resource_signer: &signer, bonding_curve_creator: &signer){
+        test_e2e_bonding_curve_creation(aptos_framework, swap_dex_signer, bcl_owner_signer, resource_signer, bonding_curve_creator); // SheepyCoin, SHEEP
         let name =  string::utf8(b"SheepyCoin");
         let symbol = string::utf8(b"SHEEP");
         bonding_curve_launchpad::create_fa_pair(
@@ -180,20 +180,20 @@ module resource_account::test_bonding_curve_launchpad {
 
     #[test(aptos_framework = @0x1, swap_dex_signer = @0xcafe, bcl_owner_signer = @0x922a028b0dbd8ff206074977ae4c5f9fb003ce384242b6253c67192cd2a45ee1, resource_signer = @0x52ddc290f7be79b2583472217af88a8500bdcb16d865e9c2bf4d3c995df0825f, bonding_curve_creator = @0x803)]
     #[expected_failure(abort_code = 102, location = liquidity_pair)]
-    fun e2e_test_failing_apt_swap_after_graduation(aptos_framework: &signer, swap_dex_signer: &signer, bcl_owner_signer: &signer, resource_signer: &signer, bonding_curve_creator: &signer){
-        e2e_test_graduation(aptos_framework, swap_dex_signer, bcl_owner_signer, resource_signer, bonding_curve_creator);
+    fun test_e2e_failing_apt_swap_after_graduation(aptos_framework: &signer, swap_dex_signer: &signer, bcl_owner_signer: &signer, resource_signer: &signer, bonding_curve_creator: &signer){
+        test_e2e_graduation(aptos_framework, swap_dex_signer, bcl_owner_signer, resource_signer, bonding_curve_creator);
         bonding_curve_launchpad::swap_apt_to_fa(bonding_curve_creator, string::utf8(b"SheepyCoin"), string::utf8(b"SHEEP"), 1_000_000); // APT -> FA
     }
     #[test(aptos_framework = @0x1, swap_dex_signer = @0xcafe, bcl_owner_signer = @0x922a028b0dbd8ff206074977ae4c5f9fb003ce384242b6253c67192cd2a45ee1, resource_signer = @0x52ddc290f7be79b2583472217af88a8500bdcb16d865e9c2bf4d3c995df0825f, bonding_curve_creator = @0x803)]
     #[expected_failure(abort_code = 102, location = liquidity_pair)]
-    fun e2e_test_failing_fa_swap_after_graduation(aptos_framework: &signer, swap_dex_signer: &signer, bcl_owner_signer: &signer, resource_signer: &signer, bonding_curve_creator: &signer){
-        e2e_test_graduation(aptos_framework,swap_dex_signer, bcl_owner_signer, resource_signer, bonding_curve_creator);
+    fun test_e2e_failing_fa_swap_after_graduation(aptos_framework: &signer, swap_dex_signer: &signer, bcl_owner_signer: &signer, resource_signer: &signer, bonding_curve_creator: &signer){
+        test_e2e_graduation(aptos_framework,swap_dex_signer, bcl_owner_signer, resource_signer, bonding_curve_creator);
         bonding_curve_launchpad::swap_fa_to_apt(bonding_curve_creator, string::utf8(b"SheepyCoin"), string::utf8(b"SHEEP"), 10); // FA -> APT
     }
 
     #[test(aptos_framework = @0x1, swap_dex_signer = @0xcafe, bcl_owner_signer = @0x922a028b0dbd8ff206074977ae4c5f9fb003ce384242b6253c67192cd2a45ee1, resource_signer = @0x52ddc290f7be79b2583472217af88a8500bdcb16d865e9c2bf4d3c995df0825f, bonding_curve_creator = @0x803)]
     #[expected_failure(abort_code = 11, location = bonding_curve_launchpad)]
-    fun e2e_test_failing_swap_of_nonexistant_fa(aptos_framework: &signer, swap_dex_signer: &signer, bcl_owner_signer: &signer, resource_signer: &signer, bonding_curve_creator: &signer){
+    fun test_e2e_failing_swap_of_nonexistant_fa(aptos_framework: &signer, swap_dex_signer: &signer, bcl_owner_signer: &signer, resource_signer: &signer, bonding_curve_creator: &signer){
         test_setup_accounts(aptos_framework, swap_dex_signer, bcl_owner_signer, resource_signer, bonding_curve_creator);
         test_setup_initialize_contracts(swap_dex_signer, resource_signer);
         bonding_curve_launchpad::swap_apt_to_fa(bonding_curve_creator, string::utf8(b"SheepyCoin"), string::utf8(b"SHEEP"), 1_000_000);
@@ -201,30 +201,30 @@ module resource_account::test_bonding_curve_launchpad {
 
     #[test(aptos_framework = @0x1, swap_dex_signer = @0xcafe, bcl_owner_signer = @0x922a028b0dbd8ff206074977ae4c5f9fb003ce384242b6253c67192cd2a45ee1, resource_signer = @0x52ddc290f7be79b2583472217af88a8500bdcb16d865e9c2bf4d3c995df0825f, bonding_curve_creator = @0x803)]
     #[expected_failure(abort_code = 13, location = bonding_curve_launchpad)]
-    fun e2e_test_failing_transfer_of_frozen_fa(aptos_framework: &signer, swap_dex_signer: &signer, bcl_owner_signer: &signer, resource_signer: &signer, bonding_curve_creator: &signer){
-        e2e_test_bonding_curve_creation_with_initial_liquidity(aptos_framework, swap_dex_signer, bcl_owner_signer, resource_signer, bonding_curve_creator);
+    fun test_e2e_failing_transfer_of_frozen_fa(aptos_framework: &signer, swap_dex_signer: &signer, bcl_owner_signer: &signer, resource_signer: &signer, bonding_curve_creator: &signer){
+        test_e2e_bonding_curve_creation_with_initial_liquidity(aptos_framework, swap_dex_signer, bcl_owner_signer, resource_signer, bonding_curve_creator);
         let fa_obj_metadata = bonding_curve_launchpad::get_metadata(string::utf8(b"SheepyCoin"), string::utf8(b"SHEEP"));
         primary_fungible_store::transfer(bonding_curve_creator, fa_obj_metadata, @0xcafe, 10);
     }
 
     #[test(aptos_framework = @0x1, swap_dex_signer = @0xcafe, bcl_owner_signer = @0x922a028b0dbd8ff206074977ae4c5f9fb003ce384242b6253c67192cd2a45ee1, resource_signer = @0x52ddc290f7be79b2583472217af88a8500bdcb16d865e9c2bf4d3c995df0825f, bonding_curve_creator = @0x803)]
     #[expected_failure(abort_code = 110, location = bonding_curve_launchpad)]
-    fun e2e_test_failing_swap_of_zero_input_apt(aptos_framework: &signer, swap_dex_signer: &signer, bcl_owner_signer: &signer, resource_signer: &signer, bonding_curve_creator: &signer){
-        e2e_test_bonding_curve_creation(aptos_framework, swap_dex_signer, bcl_owner_signer, resource_signer, bonding_curve_creator);
+    fun test_e2e_failing_swap_of_zero_input_apt(aptos_framework: &signer, swap_dex_signer: &signer, bcl_owner_signer: &signer, resource_signer: &signer, bonding_curve_creator: &signer){
+        test_e2e_bonding_curve_creation(aptos_framework, swap_dex_signer, bcl_owner_signer, resource_signer, bonding_curve_creator);
         bonding_curve_launchpad::swap_apt_to_fa(bonding_curve_creator, string::utf8(b"SheepyCoin"), string::utf8(b"SHEEP"), 0); // APT -> FA
     }
 
     #[test(aptos_framework = @0x1, swap_dex_signer = @0xcafe, bcl_owner_signer = @0x922a028b0dbd8ff206074977ae4c5f9fb003ce384242b6253c67192cd2a45ee1, resource_signer = @0x52ddc290f7be79b2583472217af88a8500bdcb16d865e9c2bf4d3c995df0825f, bonding_curve_creator = @0x803)]
     #[expected_failure(abort_code = 110, location = bonding_curve_launchpad)]
-    fun e2e_test_failing_swap_of_zero_input_fa(aptos_framework: &signer, swap_dex_signer: &signer, bcl_owner_signer: &signer, resource_signer: &signer, bonding_curve_creator: &signer){
-        e2e_test_bonding_curve_creation(aptos_framework, swap_dex_signer, bcl_owner_signer, resource_signer, bonding_curve_creator);
+    fun test_e2e_failing_swap_of_zero_input_fa(aptos_framework: &signer, swap_dex_signer: &signer, bcl_owner_signer: &signer, resource_signer: &signer, bonding_curve_creator: &signer){
+        test_e2e_bonding_curve_creation(aptos_framework, swap_dex_signer, bcl_owner_signer, resource_signer, bonding_curve_creator);
         bonding_curve_launchpad::swap_fa_to_apt(bonding_curve_creator, string::utf8(b"SheepyCoin"), string::utf8(b"SHEEP"), 0); // Swap afer graduation, guaranteed to fail. FA -> APT
     }
 
     #[test(aptos_framework = @0x1, swap_dex_signer = @0xcafe, bcl_owner_signer = @0x922a028b0dbd8ff206074977ae4c5f9fb003ce384242b6253c67192cd2a45ee1, resource_signer = @0x52ddc290f7be79b2583472217af88a8500bdcb16d865e9c2bf4d3c995df0825f, bonding_curve_creator = @0x803)]
     #[expected_failure(abort_code = 12, location = liquidity_pair)]
-    fun e2e_test_failing_swap_of_user_without_fa(aptos_framework: &signer, swap_dex_signer: &signer, bcl_owner_signer: &signer, resource_signer: &signer, bonding_curve_creator: &signer){
-        e2e_test_bonding_curve_creation(aptos_framework, swap_dex_signer, bcl_owner_signer, resource_signer, bonding_curve_creator);
+    fun test_e2e_failing_swap_of_user_without_fa(aptos_framework: &signer, swap_dex_signer: &signer, bcl_owner_signer: &signer, resource_signer: &signer, bonding_curve_creator: &signer){
+        test_e2e_bonding_curve_creation(aptos_framework, swap_dex_signer, bcl_owner_signer, resource_signer, bonding_curve_creator);
         bonding_curve_launchpad::swap_fa_to_apt(bonding_curve_creator, string::utf8(b"SheepyCoin"), string::utf8(b"SHEEP"), 10000); // Swap afer graduation, guaranteed to fail. FA -> APT
     }
 

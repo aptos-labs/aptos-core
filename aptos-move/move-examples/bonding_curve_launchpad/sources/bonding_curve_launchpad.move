@@ -12,17 +12,16 @@ module resource_account::bonding_curve_launchpad {
     use aptos_std::math128;
     use aptos_std::string::{String};
     use aptos_std::object::{Object};
-    // Friend
     use resource_account::liquidity_pair;
     use resource_account::resource_signer_holder;
+
+    const INITIAL_NEW_FA_RESERVE_u64: u64 = 8_003_000_000_000;
+    const INITIAL_NEW_FA_RESERVE: u128 = 8_003_000_000_000;
 
     const EFA_EXISTS_ALREADY: u64 = 10;
     const EFA_DOES_NOT_EXIST: u64 = 11;
     const EFA_FROZEN: u64 = 13;
     const ELIQUIDITY_PAIR_SWAP_AMOUNTIN_INVALID: u64 = 110;
-
-    const INITIAL_NEW_FA_RESERVE_u64: u64 = 8_003_000_000_000;
-    const INITIAL_NEW_FA_RESERVE: u128 = 8_003_000_000_000;
 
     //---------------------------Events---------------------------
     #[event]
@@ -58,13 +57,15 @@ module resource_account::bonding_curve_launchpad {
     }
 
     //---------------------------Dispatchable Standard---------------------------
+    //* FA is restricted in transfers, until an APT reserves threshold is met.
+    //* - Since transfer_ref is only available to our permissioned actions, this can't be used by bad actors.
     public fun withdraw<T: key>(
         store: Object<T>,
         amount: u64,
         transfer_ref: &fungible_asset::TransferRef
     ): FungibleAsset {
         let metadata = fungible_asset::transfer_ref_metadata(transfer_ref);
-        assert!(!liquidity_pair::get_is_frozen_metadata(metadata), EFA_FROZEN); // If the pair is enabled, then FA is frozen. Vice versa applies.
+        assert!(!liquidity_pair::get_is_frozen_metadata(metadata), EFA_FROZEN);
         fungible_asset::withdraw_with_ref(transfer_ref, store, amount)
     }
 
@@ -83,11 +84,8 @@ module resource_account::bonding_curve_launchpad {
         let fa_key = FAKey { name, symbol };
         let fa_address = create_fa(fa_key, name, symbol, max_supply, decimals, icon_uri, project_uri);
         let fa_metadata_obj: Object<Metadata> = object::address_to_object(fa_address);
-
         let fa_smartTable = borrow_global_mut<LaunchPad>(@resource_account);
-        assert!(smart_table::contains(&mut fa_smartTable.key_to_fa_data, fa_key), EFA_DOES_NOT_EXIST);
         let transfer_ref = &smart_table::borrow(&mut fa_smartTable.key_to_fa_data, fa_key).transfer_ref;
-
         liquidity_pair::register_liquidity_pair(transfer_ref, account, fa_metadata_obj, apt_initialPurchaseAmountIn, max_supply);
     }
 
@@ -96,8 +94,8 @@ module resource_account::bonding_curve_launchpad {
         let fa_key = FAKey { name, symbol };
         let fa_smartTable = borrow_global_mut<LaunchPad>(@resource_account);
         assert!(smart_table::contains(&mut fa_smartTable.key_to_fa_data, fa_key), EFA_DOES_NOT_EXIST);
-        let fa_metadata_obj:Object<Metadata> = object::address_to_object(get_fa_obj_address(name, symbol));
         let transfer_ref = &smart_table::borrow(&mut fa_smartTable.key_to_fa_data, fa_key).transfer_ref;
+        let fa_metadata_obj:Object<Metadata> = object::address_to_object(get_fa_obj_address(name, symbol));
 
         liquidity_pair::internal_swap_apt_to_fa(transfer_ref, account, fa_metadata_obj, fa_amountIn);
     }
@@ -106,8 +104,8 @@ module resource_account::bonding_curve_launchpad {
         let fa_key = FAKey { name, symbol };
         let fa_smartTable = borrow_global_mut<LaunchPad>(@resource_account);
         assert!(smart_table::contains(&mut fa_smartTable.key_to_fa_data, fa_key), EFA_DOES_NOT_EXIST);
-        let fa_metadata_obj:Object<Metadata> = object::address_to_object(get_fa_obj_address(name, symbol));
         let transfer_ref = &smart_table::borrow(&mut fa_smartTable.key_to_fa_data, fa_key).transfer_ref;
+        let fa_metadata_obj:Object<Metadata> = object::address_to_object(get_fa_obj_address(name, symbol));
 
         liquidity_pair::internal_swap_fa_to_apt(transfer_ref, account, fa_metadata_obj, apt_amountIn);
     }
@@ -124,7 +122,6 @@ module resource_account::bonding_curve_launchpad {
     ): address acquires LaunchPad {
         let fa_smartTable = borrow_global_mut<LaunchPad>(@resource_account);
         assert!(!smart_table::contains(&mut fa_smartTable.key_to_fa_data, fa_key), EFA_EXISTS_ALREADY);
-
         let base_unit_max_supply: option::Option<u128> = option::some(max_supply * math128::pow(10, (decimals as u128)));
         let fa_key_seed: vector<u8> = *string::bytes(&name);
         vector::append(&mut fa_key_seed, b"-");
@@ -142,9 +139,10 @@ module resource_account::bonding_curve_launchpad {
         let mint_ref = fungible_asset::generate_mint_ref(fa_obj_constructor_ref);
         let burn_ref = fungible_asset::generate_burn_ref(fa_obj_constructor_ref);
         let transfer_ref = fungible_asset::generate_transfer_ref(fa_obj_constructor_ref);
-
+        primary_fungible_store::mint(&mint_ref, @resource_account, INITIAL_NEW_FA_RESERVE_u64);
+        // Dispatchable FA
         let permissioned_withdraw = function_info::new_function_info(
-            &resource_signer_holder::get_signer(), // the function needs to be held at, here... so use public views and move withdraw to resource_signer_holder
+            &resource_signer_holder::get_signer(),
             string::utf8(b"bonding_curve_launchpad"),
             string::utf8(b"withdraw")
         );
@@ -155,7 +153,6 @@ module resource_account::bonding_curve_launchpad {
             option::none(),
         );
 
-        primary_fungible_store::mint(&mint_ref, @resource_account, INITIAL_NEW_FA_RESERVE_u64);
         let fa_controller = FAController {
             mint_ref,
             burn_ref,
@@ -176,7 +173,7 @@ module resource_account::bonding_curve_launchpad {
             project_uri: project_uri
         });
 
-        return get_fa_obj_address(name, symbol)
+        get_fa_obj_address(name, symbol)
     }
 
     //---------------------------Views---------------------------
