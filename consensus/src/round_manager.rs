@@ -979,11 +979,13 @@ impl RoundManager {
     /// * save the updated state to consensus DB
     /// * return a VoteMsg with the LedgerInfo to be committed in case the vote gathers QC.
     async fn execute_and_vote(&mut self, proposed_block: Block) -> anyhow::Result<Vote> {
+        let id = proposed_block.id();
+        let round = proposed_block.round();
         let executed_block = self
             .block_store
             .insert_ordered_block(proposed_block)
             .await
-            .context("[RoundManager] Failed to execute_and_insert the block")?;
+            .context(format!("[RoundManager] Failed to execute_and_insert the block id: {:?} round: {:?} sync_info: {:?}", id, round, self.block_store.sync_info()))?;
 
         // Short circuit if already voted.
         ensure!(
@@ -1225,7 +1227,12 @@ impl RoundManager {
         blocks.sort_by_key(|a| (a.epoch(), a.round()));
         for block in blocks {
             // TODO: Should we vote here, or just insert the block?
-            self.execute_and_vote(block.as_ref().clone()).await?;
+            self.execute_and_vote(block.as_ref().clone())
+                .await
+                .context(format!(
+                    "[Round manager] Block fetch context {:?}",
+                    block_fetch_response.context()
+                ))?;
         }
         self.process_failed_events().await;
         Ok(SyncResult::Success)

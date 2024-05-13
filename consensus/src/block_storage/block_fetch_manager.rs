@@ -71,7 +71,7 @@ impl BlockFetchRequest {
 pub struct BlockFetchResponse {
     // TODO: Check if using a Vector is better here.
     blocks: Vec<Arc<Block>>,
-    // context: BlockFetchContext,
+    context: BlockFetchContext,
 }
 
 impl BlockFetchResponse {
@@ -79,9 +79,9 @@ impl BlockFetchResponse {
         &self.blocks
     }
 
-    // pub fn context(&self) -> &BlockFetchContext {
-    //     &self.context
-    // }
+    pub fn context(&self) -> &BlockFetchContext {
+        &self.context
+    }
 }
 
 pub struct BlockFetchManager {
@@ -138,7 +138,7 @@ impl BlockFetchManager {
             }
         }
         if blocks.len() == num_blocks as usize {
-            let fetch_response = BlockFetchResponse { blocks };
+            let fetch_response = BlockFetchResponse { blocks, context };
             // TODO: Need to handle the result.
             let _ = self
                 .response_sender
@@ -171,7 +171,7 @@ impl BlockFetchManager {
                         "Successfully fetched blocks between {:?} {:?}",
                         initial_block_id, target_block_id
                     );
-                    let fetch_response = BlockFetchResponse { blocks };
+                    let fetch_response = BlockFetchResponse { blocks, context };
                     let _ = self
                         .response_sender
                         .push((initial_block_id, target_block_id), fetch_response);
