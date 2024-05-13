@@ -196,13 +196,13 @@ proptest! {
 
         for i in 0..8 {
             prop_assert_eq!(
-                internal_node.get_child_with_siblings::<StateKey, DummyReader>(&internal_node_key, i.into(), None).unwrap(),
+                internal_node.get_child_with_siblings_for_test::<StateKey, DummyReader>(&internal_node_key, i.into(), None).unwrap(),
                 (Some(leaf1_node_key.clone()), vec![hash2.into()])
             );
         }
         for i in 8..16 {
             prop_assert_eq!(
-                internal_node.get_child_with_siblings::<StateKey, DummyReader>(&internal_node_key, i.into(), None).unwrap(),
+                internal_node.get_child_with_siblings_for_test::<StateKey, DummyReader>(&internal_node_key, i.into(), None).unwrap(),
                 (Some(leaf2_node_key.clone()), vec![hash1.into()])
             );
         }
@@ -243,14 +243,14 @@ proptest! {
 
         for i in 0..4 {
             prop_assert_eq!(
-                internal_node.get_child_with_siblings::<StateKey, DummyReader>(&internal_node_key, i.into(), None).unwrap(),
+                internal_node.get_child_with_siblings_for_test::<StateKey, DummyReader>(&internal_node_key, i.into(), None).unwrap(),
                 (None, vec![(*SPARSE_MERKLE_PLACEHOLDER_HASH).into(), hash_x1.into()])
             );
         }
 
         for i in 4..6 {
             prop_assert_eq!(
-                internal_node.get_child_with_siblings::<StateKey, DummyReader>(&internal_node_key, i.into(), None).unwrap(),
+                internal_node.get_child_with_siblings_for_test::<StateKey, DummyReader>(&internal_node_key, i.into(), None).unwrap(),
                 (
                     Some(leaf1_node_key.clone()),
                     vec![
@@ -264,7 +264,7 @@ proptest! {
 
         for i in 6..8 {
             prop_assert_eq!(
-                internal_node.get_child_with_siblings::<StateKey, DummyReader>(&internal_node_key, i.into(), None).unwrap(),
+                internal_node.get_child_with_siblings_for_test::<StateKey, DummyReader>(&internal_node_key, i.into(), None).unwrap(),
                 (
                     Some(leaf2_node_key.clone()),
                     vec![
@@ -278,7 +278,7 @@ proptest! {
 
         for i in 8..16 {
             prop_assert_eq!(
-                internal_node.get_child_with_siblings::<StateKey, DummyReader>(&internal_node_key, i.into(), None).unwrap(),
+                internal_node.get_child_with_siblings_for_test::<StateKey, DummyReader>(&internal_node_key, i.into(), None).unwrap(),
                 (None, vec![hash_x2.into()])
             );
         }
@@ -317,21 +317,21 @@ proptest! {
 
         for i in 0..4 {
             prop_assert_eq!(
-                internal_node.get_child_with_siblings::<StateKey, DummyReader>(&internal_node_key, i.into(), None).unwrap(),
+                internal_node.get_child_with_siblings_for_test::<StateKey, DummyReader>(&internal_node_key, i.into(), None).unwrap(),
                 (Some(leaf1_node_key.clone()),vec![hash3.into(), hash2.into()])
             );
         }
 
         for i in 4..8 {
             prop_assert_eq!(
-                internal_node.get_child_with_siblings::<StateKey, DummyReader>(&internal_node_key, i.into(), None).unwrap(),
+                internal_node.get_child_with_siblings_for_test::<StateKey, DummyReader>(&internal_node_key, i.into(), None).unwrap(),
                 (Some(leaf2_node_key.clone()),vec![hash3.into(), hash1.into()])
             );
         }
 
         for i in 8..16 {
             prop_assert_eq!(
-                internal_node.get_child_with_siblings::<StateKey, DummyReader>(&internal_node_key, i.into(), None).unwrap(),
+                internal_node.get_child_with_siblings_for_test::<StateKey, DummyReader>(&internal_node_key, i.into(), None).unwrap(),
                 (Some(leaf3_node_key.clone()),vec![hash_x.into()])
             );
         }
@@ -382,7 +382,7 @@ proptest! {
 
         for i in 0..2 {
             prop_assert_eq!(
-                internal_node.get_child_with_siblings::<StateKey, DummyReader>(&internal_node_key, i.into(), None).unwrap(),
+                internal_node.get_child_with_siblings_for_test::<StateKey, DummyReader>(&internal_node_key, i.into(), None).unwrap(),
                 (
                     Some(leaf1_node_key.clone()),
                     vec![hash4.into(), hash_x4.into(), hash_x1.into()]
@@ -391,7 +391,7 @@ proptest! {
         }
 
         prop_assert_eq!(
-                internal_node.get_child_with_siblings::<StateKey, DummyReader>(&internal_node_key, 2.into(), None).unwrap(),
+                internal_node.get_child_with_siblings_for_test::<StateKey, DummyReader>(&internal_node_key, 2.into(), None).unwrap(),
             (
                 Some(internal2_node_key),
                 vec![
@@ -404,7 +404,7 @@ proptest! {
         );
 
         prop_assert_eq!(
-                internal_node.get_child_with_siblings::<StateKey, DummyReader>(&internal_node_key, 3.into(), None).unwrap(),
+                internal_node.get_child_with_siblings_for_test::<StateKey, DummyReader>(&internal_node_key, 3.into(), None).unwrap(),
 
             (
                 None,
@@ -414,7 +414,7 @@ proptest! {
 
         for i in 4..6 {
             prop_assert_eq!(
-                internal_node.get_child_with_siblings::<StateKey, DummyReader>(&internal_node_key, i.into(), None).unwrap(),
+                internal_node.get_child_with_siblings_for_test::<StateKey, DummyReader>(&internal_node_key, i.into(), None).unwrap(),
                 (
                     None,
                     vec![hash4.into(), hash_x2.into(), hash_x3.into()]
@@ -423,7 +423,7 @@ proptest! {
         }
 
         prop_assert_eq!(
-                internal_node.get_child_with_siblings::<StateKey, DummyReader>(&internal_node_key, 6.into(), None).unwrap(),
+                internal_node.get_child_with_siblings_for_test::<StateKey, DummyReader>(&internal_node_key, 6.into(), None).unwrap(),
             (
                 None,
                 vec![
@@ -436,7 +436,7 @@ proptest! {
         );
 
         prop_assert_eq!(
-                internal_node.get_child_with_siblings::<StateKey, DummyReader>(&internal_node_key, 7.into(), None).unwrap(),
+                internal_node.get_child_with_siblings_for_test::<StateKey, DummyReader>(&internal_node_key, 7.into(), None).unwrap(),
             (
                 Some(internal3_node_key),
                 vec![
@@ -450,7 +450,7 @@ proptest! {
 
         for i in 8..16 {
             prop_assert_eq!(
-                internal_node.get_child_with_siblings::<StateKey, DummyReader>(&internal_node_key, i.into(), None).unwrap(),
+                internal_node.get_child_with_siblings_for_test::<StateKey, DummyReader>(&internal_node_key, i.into(), None).unwrap(),
                 (Some(leaf4_node_key.clone()), vec![hash_x5.into()])
             );
         }
@@ -525,7 +525,7 @@ fn test_internal_hash_and_proof() {
         for i in 0..4 {
             assert_eq!(
                 internal_node
-                    .get_child_with_siblings::<StateKey, DummyReader>(
+                    .get_child_with_siblings_for_test::<StateKey, DummyReader>(
                         &internal_node_key,
                         i.into(),
                         None
@@ -537,7 +537,11 @@ fn test_internal_hash_and_proof() {
 
         assert_eq!(
             internal_node
-                .get_child_with_siblings::<StateKey, DummyReader>(&internal_node_key, index1, None)
+                .get_child_with_siblings_for_test::<StateKey, DummyReader>(
+                    &internal_node_key,
+                    index1,
+                    None
+                )
                 .unwrap(),
             (Some(child1_node_key), vec![
                 hash_x6.into(),
@@ -549,7 +553,7 @@ fn test_internal_hash_and_proof() {
 
         assert_eq!(
             internal_node
-                .get_child_with_siblings::<StateKey, DummyReader>(
+                .get_child_with_siblings_for_test::<StateKey, DummyReader>(
                     &internal_node_key,
                     5.into(),
                     None
@@ -565,7 +569,7 @@ fn test_internal_hash_and_proof() {
         for i in 6..8 {
             assert_eq!(
                 internal_node
-                    .get_child_with_siblings::<StateKey, DummyReader>(
+                    .get_child_with_siblings_for_test::<StateKey, DummyReader>(
                         &internal_node_key,
                         i.into(),
                         None
@@ -582,7 +586,7 @@ fn test_internal_hash_and_proof() {
         for i in 8..12 {
             assert_eq!(
                 internal_node
-                    .get_child_with_siblings::<StateKey, DummyReader>(
+                    .get_child_with_siblings_for_test::<StateKey, DummyReader>(
                         &internal_node_key,
                         i.into(),
                         None
@@ -595,7 +599,7 @@ fn test_internal_hash_and_proof() {
         for i in 12..14 {
             assert_eq!(
                 internal_node
-                    .get_child_with_siblings::<StateKey, DummyReader>(
+                    .get_child_with_siblings_for_test::<StateKey, DummyReader>(
                         &internal_node_key,
                         i.into(),
                         None
@@ -610,7 +614,7 @@ fn test_internal_hash_and_proof() {
         }
         assert_eq!(
             internal_node
-                .get_child_with_siblings::<StateKey, DummyReader>(
+                .get_child_with_siblings_for_test::<StateKey, DummyReader>(
                     &internal_node_key,
                     14.into(),
                     None
@@ -625,7 +629,11 @@ fn test_internal_hash_and_proof() {
         );
         assert_eq!(
             internal_node
-                .get_child_with_siblings::<StateKey, DummyReader>(&internal_node_key, index2, None)
+                .get_child_with_siblings_for_test::<StateKey, DummyReader>(
+                    &internal_node_key,
+                    index2,
+                    None
+                )
                 .unwrap(),
             (Some(child2_node_key), vec![
                 hash_x3.into(),
@@ -701,7 +709,7 @@ fn test_internal_hash_and_proof() {
 
         assert_eq!(
             internal_node
-                .get_child_with_siblings::<StateKey, DummyReader>(
+                .get_child_with_siblings_for_test::<StateKey, DummyReader>(
                     &internal_node_key,
                     0.into(),
                     None
@@ -717,7 +725,7 @@ fn test_internal_hash_and_proof() {
 
         assert_eq!(
             internal_node
-                .get_child_with_siblings::<StateKey, DummyReader>(
+                .get_child_with_siblings_for_test::<StateKey, DummyReader>(
                     &internal_node_key,
                     1.into(),
                     None
@@ -734,7 +742,7 @@ fn test_internal_hash_and_proof() {
         for i in 2..4 {
             assert_eq!(
                 internal_node
-                    .get_child_with_siblings::<StateKey, DummyReader>(
+                    .get_child_with_siblings_for_test::<StateKey, DummyReader>(
                         &internal_node_key,
                         i.into(),
                         None
@@ -751,7 +759,7 @@ fn test_internal_hash_and_proof() {
         for i in 4..6 {
             assert_eq!(
                 internal_node
-                    .get_child_with_siblings::<StateKey, DummyReader>(
+                    .get_child_with_siblings_for_test::<StateKey, DummyReader>(
                         &internal_node_key,
                         i.into(),
                         None
@@ -767,7 +775,7 @@ fn test_internal_hash_and_proof() {
 
         assert_eq!(
             internal_node
-                .get_child_with_siblings::<StateKey, DummyReader>(
+                .get_child_with_siblings_for_test::<StateKey, DummyReader>(
                     &internal_node_key,
                     6.into(),
                     None
@@ -783,7 +791,7 @@ fn test_internal_hash_and_proof() {
 
         assert_eq!(
             internal_node
-                .get_child_with_siblings::<StateKey, DummyReader>(
+                .get_child_with_siblings_for_test::<StateKey, DummyReader>(
                     &internal_node_key,
                     7.into(),
                     None
@@ -800,7 +808,7 @@ fn test_internal_hash_and_proof() {
         for i in 8..16 {
             assert_eq!(
                 internal_node
-                    .get_child_with_siblings::<StateKey, DummyReader>(
+                    .get_child_with_siblings_for_test::<StateKey, DummyReader>(
                         &internal_node_key,
                         i.into(),
                         None
@@ -984,7 +992,7 @@ proptest! {
     ) {
         for n in 0..16u8 {
             prop_assert_eq!(
-                node.get_child_with_siblings::<StateKey, DummyReader>(&node_key, n.into(), None).unwrap(),
+                node.get_child_with_siblings_for_test::<StateKey, DummyReader>(&node_key, n.into(), None).unwrap(),
                 NaiveInternalNode::from_clever_node(&node).get_child_with_siblings(&node_key, n)
             )
         }

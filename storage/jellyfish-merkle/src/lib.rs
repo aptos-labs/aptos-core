@@ -728,7 +728,7 @@ where
     ) -> Result<(Option<(HashValue, (K, Version))>, SparseMerkleProofExt)> {
         // Empty tree just returns proof with no sibling hash.
         let mut next_node_key = NodeKey::new_empty_path(version);
-        let mut siblings = vec![];
+        let mut out_siblings = vec![];
         let nibble_path = NibblePath::new_even(key.to_vec());
         let mut nibble_iter = nibble_path.nibbles();
 
@@ -759,21 +759,20 @@ where
                     let queried_child_index = nibble_iter
                         .next()
                         .ok_or_else(|| AptosDbError::Other("ran out of nibbles".to_string()))?;
-                    let (child_node_key, mut siblings_in_internal) = internal_node
-                        .get_child_with_siblings(
-                            &next_node_key,
-                            queried_child_index,
-                            Some(self.reader),
-                        )?;
-                    siblings.append(&mut siblings_in_internal);
+                    let child_node_key = internal_node.get_child_with_siblings(
+                        &next_node_key,
+                        queried_child_index,
+                        Some(self.reader),
+                        &mut out_siblings,
+                    )?;
                     next_node_key = match child_node_key {
                         Some(node_key) => node_key,
                         None => {
                             return Ok((
                                 None,
                                 SparseMerkleProofExt::new(None, {
-                                    siblings.reverse();
-                                    siblings
+                                    out_siblings.reverse();
+                                    out_siblings
                                 }),
                             ));
                         },
@@ -787,8 +786,8 @@ where
                             None
                         },
                         SparseMerkleProofExt::new(Some(leaf_node.into()), {
-                            siblings.reverse();
-                            siblings
+                            out_siblings.reverse();
+                            out_siblings
                         }),
                     ));
                 },
