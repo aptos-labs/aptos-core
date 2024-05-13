@@ -777,19 +777,6 @@ pub fn setup_environment_and_start_node(
         _ => None,
     };
 
-    loop {
-        let peers = peers_and_metadata
-            .get_connected_peers_and_metadata()
-            .unwrap();
-        debug!("current peers {}", peers.len());
-        if peers.len() == 99 {
-            thread::sleep(Duration::from_secs(30));
-            break;
-        }
-
-        thread::sleep(Duration::from_secs(1));
-    }
-
     // Create the consensus runtime (this blocks on state sync first)
     let consensus_runtime = consensus_network_interfaces.map(|consensus_network_interfaces| {
         // Wait until state sync has been initialized
