@@ -1,0 +1,28 @@
+comparison between v1 and v2 failed:
+- processed 2 tasks
++ processed 2 tasks
+= 
+- task 0 'publish'. lines 1-10:
+- warning[W09005]: dead or unreachable code
+-   ┌─ TEMPFILE:7:14
+-   │
+- 7 │         add3(abort 0, {abort 14; 0}, 0)
+-   │              ^^^^^^^ Invalid use of a divergent expression. The code following the evaluation of this expression will be dead and should be removed.
+- 
+- warning[W09005]: dead or unreachable code
+-   ┌─ TEMPFILE:7:24
+-   │
+- 7 │         add3(abort 0, {abort 14; 0}, 0)
+-   │                        ^^^^^^^^ Unreachable code. This statement (and any following statements) will not be executed.
+- 
+- 
+- 
+= task 1 'run'. lines 12-12:
+= Error: Function execution failed with VMError: {
+=     major_status: ABORTED,
+=     sub_status: Some(0),
+=     location: 0xc0ffee::m,
+=     indices: redacted,
+=     offsets: redacted,
+= }
+= 

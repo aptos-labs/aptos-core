@@ -68,6 +68,8 @@ pub struct PepperRequest {
     pub epk_blinder: Vec<u8>,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub uid_key: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub derivation_path: Option<String>,
 }
 
 /// The response to `PepperRequest`, which contains either the pepper or a processing error.
@@ -78,6 +80,16 @@ pub struct PepperResponse {
         deserialize_with = "deserialize_bytes_from_hex"
     )]
     pub signature: Vec<u8>, // unique BLS signature
+    #[serde(
+        serialize_with = "serialize_bytes_to_hex",
+        deserialize_with = "deserialize_bytes_from_hex"
+    )]
+    pub pepper: Vec<u8>,
+    #[serde(
+        serialize_with = "serialize_bytes_to_hex",
+        deserialize_with = "deserialize_bytes_from_hex"
+    )]
+    pub address: Vec<u8>,
 }
 
 /// A pepper scheme where:

@@ -91,59 +91,59 @@ fn main() {
         //     data_length: Some(32),
         // }),
         // (, EntryPoints::IncGlobal),
-        (32350, EntryPoints::Loop {
+        (32800, EntryPoints::Loop {
             loop_count: Some(100000),
             loop_type: LoopType::NoOp,
         }),
-        (19152, EntryPoints::Loop {
+        (19880, EntryPoints::Loop {
             loop_count: Some(10000),
             loop_type: LoopType::Arithmetic,
         }),
         // This is a cheap bcs (serializing vec<u8>), so not representative of what BCS native call should cost.
         // (, EntryPoints::Loop { loop_count: Some(1000), loop_type: LoopType::BCS { len: 1024 }}),
-        (135, EntryPoints::CreateObjects {
+        (125, EntryPoints::CreateObjects {
             num_objects: 10,
             object_payload_size: 0,
         }),
-        (6978, EntryPoints::CreateObjects {
+        (7130, EntryPoints::CreateObjects {
             num_objects: 10,
             object_payload_size: 10 * 1024,
         }),
-        (1369, EntryPoints::CreateObjects {
+        (1250, EntryPoints::CreateObjects {
             num_objects: 100,
             object_payload_size: 0,
         }),
-        (8676, EntryPoints::CreateObjects {
+        (8570, EntryPoints::CreateObjects {
             num_objects: 100,
             object_payload_size: 10 * 1024,
         }),
-        (61, EntryPoints::InitializeVectorPicture { length: 40 }),
+        (65, EntryPoints::InitializeVectorPicture { length: 40 }),
         (14, EntryPoints::VectorPicture { length: 40 }),
         (14, EntryPoints::VectorPictureRead { length: 40 }),
-        (27303, EntryPoints::InitializeVectorPicture {
+        (27180, EntryPoints::InitializeVectorPicture {
             length: 30 * 1024,
         }),
-        (4507, EntryPoints::VectorPicture { length: 30 * 1024 }),
-        (4469, EntryPoints::VectorPictureRead { length: 30 * 1024 }),
-        (33129, EntryPoints::SmartTablePicture {
+        (4510, EntryPoints::VectorPicture { length: 30 * 1024 }),
+        (4400, EntryPoints::VectorPictureRead { length: 30 * 1024 }),
+        (33580, EntryPoints::SmartTablePicture {
             length: 30 * 1024,
             num_points_per_txn: 200,
         }),
-        (56464, EntryPoints::SmartTablePicture {
+        (57370, EntryPoints::SmartTablePicture {
             length: 1024 * 1024,
             num_points_per_txn: 300,
         }),
-        (10, EntryPoints::ResourceGroupsSenderWriteTag {
+        (12, EntryPoints::ResourceGroupsSenderWriteTag {
             string_length: 1024,
         }),
-        (24, EntryPoints::ResourceGroupsSenderMultiChange {
+        (26, EntryPoints::ResourceGroupsSenderMultiChange {
             string_length: 1024,
         }),
-        (257, EntryPoints::TokenV1MintAndTransferFT),
-        (412, EntryPoints::TokenV1MintAndTransferNFTSequential),
-        (368, EntryPoints::TokenV2AmbassadorMint { numbered: true }),
-        (494, EntryPoints::LiquidityPoolSwap { is_stable: true }),
-        (463, EntryPoints::LiquidityPoolSwap { is_stable: false }),
+        (287, EntryPoints::TokenV1MintAndTransferFT),
+        (458, EntryPoints::TokenV1MintAndTransferNFTSequential),
+        (401, EntryPoints::TokenV2AmbassadorMint { numbered: true }),
+        (467, EntryPoints::LiquidityPoolSwap { is_stable: true }),
+        (415, EntryPoints::LiquidityPoolSwap { is_stable: false }),
     ];
 
     let mut failures = Vec::new();

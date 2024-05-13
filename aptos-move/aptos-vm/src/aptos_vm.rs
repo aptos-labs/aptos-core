@@ -1636,7 +1636,6 @@ impl AptosVM {
                 self.pvk.as_ref().unwrap(),
                 &keyless_authenticators,
                 self.features(),
-                self.gas_feature_version,
                 resolver,
             )?;
         }

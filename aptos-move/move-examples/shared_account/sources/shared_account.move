@@ -79,7 +79,7 @@ module shared_account::SharedAccount {
     }
 
     #[test_only]
-    public entry fun set_up(user: signer, test_user1: signer, test_user2: signer) : address acquires SharedAccountEvent {
+    public fun set_up(user: signer, test_user1: signer, test_user2: signer) : address acquires SharedAccountEvent {
         let addresses = vector::empty<address>();
         let numerators = vector::empty<u64>();
         let seed = x"01";
