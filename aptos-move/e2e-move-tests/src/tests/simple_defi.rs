@@ -20,7 +20,7 @@ struct ModuleData {
     mint_cap: Vec<u8>, // placeholder for mint capability
 }
 
-const APTOS_COIN_STRUCT_STRING: &str = "0x1::coin::CoinStore<0x1::aptos_coin::AptosCoin>";
+const APTOS_COIN_STRUCT_STRING: &str = "0x1::coin::CoinStore<0x1::supra_coin::SupraCoin>";
 const CHLOE_COIN_STRUCT_STRING: &str ="0x1::coin::CoinStore<0xc3bb8488ab1a5815a9d543d7e41b0e0df46a7396f89b22821f07a4362f75ddc5::simple_defi::ChloesCoin>";
 const EXCHANGE_FROM_FUNCTION: &str = "exchange_from_entry";
 const EXCHANGE_TO_FUNCTION: &str = "exchange_to_entry";

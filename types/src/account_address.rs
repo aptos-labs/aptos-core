@@ -15,9 +15,9 @@ use std::{
     str::FromStr,
 };
 
-const MULTISIG_ACCOUNT_DOMAIN_SEPARATOR: &[u8] = b"aptos_framework::multisig_account";
-const STAKING_CONTRACT_DOMAIN_SEPARATOR: &[u8] = b"aptos_framework::staking_contract";
-const VESTING_POOL_DOMAIN_SEPARATOR: &[u8] = b"aptos_framework::vesting";
+const MULTISIG_ACCOUNT_DOMAIN_SEPARATOR: &[u8] = b"supra_framework::multisig_account";
+const STAKING_CONTRACT_DOMAIN_SEPARATOR: &[u8] = b"supra_framework::staking_contract";
+const VESTING_POOL_DOMAIN_SEPARATOR: &[u8] = b"supra_framework::vesting";
 
 /// A wrapper struct that gives better error messages when the account address
 /// can't be deserialized in a human readable format
