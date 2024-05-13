@@ -4,20 +4,18 @@
 
 use crate::{
     counters,
-    pending_order_votes::{OrderVoteReceptionResult, PendingOrderVotes},
     pending_votes::{PendingVotes, VoteReceptionResult},
     util::time_service::{SendTask, TimeService},
 };
 use aptos_config::config::QcAggregatorType;
 use aptos_consensus_types::{
-    common::Round, delayed_qc_msg::DelayedQcMsg, order_vote::OrderVote, sync_info::SyncInfo,
+    common::Round, delayed_qc_msg::DelayedQcMsg, sync_info::SyncInfo,
     timeout_2chain::TwoChainTimeoutWithPartialSignatures, vote::Vote,
 };
 use aptos_crypto::HashValue;
 use aptos_logger::{prelude::*, Schema};
 use aptos_types::{
-    ledger_info::{LedgerInfo, LedgerInfoWithPartialSignatures},
-    validator_verifier::ValidatorVerifier,
+    ledger_info::LedgerInfoWithPartialSignatures, validator_verifier::ValidatorVerifier,
 };
 use futures::future::AbortHandle;
 use futures_channel::mpsc::UnboundedSender;
@@ -161,8 +159,6 @@ pub struct RoundState {
     timeout_sender: aptos_channels::Sender<Round>,
     // Votes received for the current round.
     pending_votes: PendingVotes,
-    // OrderVotes received for the last 2 rounds.
-    pending_order_votes: PendingOrderVotes,
     // Vote sent locally for the current round.
     vote_sent: Option<Vote>,
     // The handle to cancel previous timeout task when moving to next round.
@@ -212,7 +208,6 @@ impl RoundState {
             delayed_qc_tx.clone(),
             qc_aggregator_type.clone(),
         );
-        let pending_order_votes = PendingOrderVotes::new();
         Self {
             time_interval,
             highest_committed_round: 0,
@@ -221,7 +216,6 @@ impl RoundState {
             time_service,
             timeout_sender,
             pending_votes,
-            pending_order_votes,
             vote_sent: None,
             abort_handle: None,
             delayed_qc_tx,
@@ -237,6 +231,11 @@ impl RoundState {
     /// Return the current round.
     pub fn current_round(&self) -> Round {
         self.current_round
+    }
+
+    /// Return the highest committed round.
+    pub fn highest_committed_round(&self) -> Round {
+        self.highest_committed_round
     }
 
     /// Returns deadline for current round
@@ -259,12 +258,9 @@ impl RoundState {
     /// Notify the RoundState about the potentially new QC, TC, and highest committed round.
     /// Note that some of these values might not be available by the caller.
     pub fn process_certificates(&mut self, sync_info: SyncInfo) -> Option<NewRoundEvent> {
-        // Question: We are comparing ordered round with committed round. Is this accurate?
-        if sync_info.highest_ordered_round() > self.highest_committed_round {
-            self.highest_committed_round = sync_info.highest_ordered_round();
+        if sync_info.highest_commit_round() > self.highest_committed_round {
+            self.highest_committed_round = sync_info.highest_commit_round();
         }
-        self.pending_order_votes
-            .garbage_collect(sync_info.highest_commit_round());
         let new_round = sync_info.highest_round() + 1;
         if new_round > self.current_round {
             let (prev_round_votes, prev_round_timeout_votes) = self.pending_votes.drain_votes();
@@ -311,19 +307,6 @@ impl RoundState {
                 self.current_round,
             )
         }
-    }
-
-    pub fn insert_order_vote(
-        &mut self,
-        order_vote: &OrderVote,
-        verifier: &ValidatorVerifier,
-    ) -> OrderVoteReceptionResult {
-        self.pending_order_votes
-            .insert_order_vote(order_vote, verifier)
-    }
-
-    pub fn has_enough_order_votes(&self, ledger_info: &LedgerInfo) -> bool {
-        self.pending_order_votes.has_enough_order_votes(ledger_info)
     }
 
     pub fn record_vote(&mut self, vote: Vote) {

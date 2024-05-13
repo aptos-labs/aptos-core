@@ -23,7 +23,7 @@ use crate::{
     monitor,
     network::NetworkSender,
     network_interface::ConsensusMsg,
-    pending_order_votes::OrderVoteReceptionResult,
+    pending_order_votes::{OrderVoteReceptionResult, PendingOrderVotes},
     pending_votes::VoteReceptionResult,
     persistent_liveness_storage::PersistentLivenessStorage,
     quorum_store::types::BatchMsg,
@@ -238,6 +238,8 @@ pub struct RoundManager {
     randomness_config: OnChainRandomnessConfig,
     jwk_consensus_config: OnChainJWKConsensusConfig,
     fast_rand_config: Option<RandConfig>,
+    // Stores the order votes from all the rounds above highest_commit_round
+    pending_order_votes: PendingOrderVotes,
 }
 
 impl RoundManager {
@@ -284,6 +286,7 @@ impl RoundManager {
             randomness_config,
             jwk_consensus_config,
             fast_rand_config,
+            pending_order_votes: PendingOrderVotes::new(),
         }
     }
 
@@ -947,7 +950,7 @@ impl RoundManager {
             info!(self.new_log(LogEvent::ReceiveOrderVote), "{}", order_vote);
 
             if self
-                .round_state
+                .pending_order_votes
                 .has_enough_order_votes(order_vote.ledger_info())
             {
                 return Ok(());
@@ -957,7 +960,7 @@ impl RoundManager {
                 > self.block_store.sync_info().highest_commit_round()
             {
                 let vote_reception_result = self
-                    .round_state
+                    .pending_order_votes
                     .insert_order_vote(&order_vote, &self.epoch_state.verifier);
                 self.process_order_vote_reception_result(&order_vote, vote_reception_result)
                     .await?;
@@ -1163,6 +1166,8 @@ impl RoundManager {
             .await
             .context("[RoundManager] Failed to process a newly aggregated QC");
         self.process_certificates().await?;
+        self.pending_order_votes
+            .garbage_collect(self.block_store.sync_info().highest_commit_round());
         result
     }
 
