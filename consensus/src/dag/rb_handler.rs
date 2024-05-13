@@ -250,11 +250,11 @@ impl NodeBroadcastHandler {
                 if let Some(tx) = &self.missing_parent_tx {
                     tx.send(node.clone()).ok();
                 }
-                if let Err(err) = self.fetch_requester.request_for_node(node) {
+                if let Err(err) = self.fetch_requester.request_for_node(node.clone()) {
                     FETCH_ENQUEUE_FAILURES.with_label_values(&[&"node"]).inc();
                     error!("request to fetch failed: {}", err);
                 }
-                bail!(NodeBroadcastHandleError::MissingParents);
+                // bail!(NodeBroadcastHandleError::MissingParents);
             }
         }
 

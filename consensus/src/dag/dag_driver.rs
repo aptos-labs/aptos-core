@@ -162,13 +162,16 @@ impl DagDriver {
             ensure!(node.round() >= dag_reader.lowest_round(), "stale node");
 
             if !dag_reader.all_exists(node.parents_metadata()) {
-                if let Err(err) = self.fetch_requester.request_for_certified_node(node) {
+                if let Err(err) = self
+                    .fetch_requester
+                    .request_for_certified_node(node.clone())
+                {
                     FETCH_ENQUEUE_FAILURES
                         .with_label_values(&[&"cert_node"])
                         .inc();
                     error!("request to fetch failed: {}", err);
                 }
-                bail!(DagDriverError::MissingParents);
+                // bail!(DagDriverError::MissingParents);
             }
         }
 
