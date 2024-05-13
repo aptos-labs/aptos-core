@@ -119,4 +119,4 @@ can be extended, or a new lab created from it.
 [Boogie]: https://github.com/boogie-org/boogie
 [cvc5]: https://cvc5.github.io/
 [Z3]: https://github.com/Z3Prover/z3
-[Tera]: https://tera.netlify.app/docs
+[Tera]: https://tera.netlify.app
