@@ -39,7 +39,11 @@ use aptos_types::{
 use arc_swap::ArcSwapOption;
 use futures::executor::block_on;
 use futures_channel::{mpsc::UnboundedSender, oneshot};
-use std::{collections::VecDeque, sync::Arc, time::Duration};
+use std::{
+    collections::VecDeque,
+    sync::Arc,
+    time::{Duration, Instant},
+};
 use tokio::sync::mpsc::{channel, Receiver};
 use tokio_retry::strategy::ExponentialBackoff;
 
@@ -123,7 +127,7 @@ impl ShoalppBootstrapper {
             txs.push_back(tx);
             rxs.push_back(rx);
         }
-        txs[0].send(());
+        txs[0].send(Instant::now()).unwrap();
         txs.rotate_left(1);
         for dag_id in 0..3 {
             let (order_nodes_tx, ordered_node_rx) = tokio::sync::mpsc::unbounded_channel();

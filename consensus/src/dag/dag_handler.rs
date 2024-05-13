@@ -47,8 +47,8 @@ pub(crate) struct NetworkHandler {
     new_round_event: tokio::sync::mpsc::UnboundedReceiver<Round>,
     verified_msg_processor: Arc<VerifiedMessageProcessor>,
     missing_parents_rx: tokio::sync::mpsc::UnboundedReceiver<Node>,
-    next_dag_tx: tokio::sync::mpsc::UnboundedSender<()>,
-    prev_dag_rx: tokio::sync::mpsc::UnboundedReceiver<()>,
+    next_dag_tx: tokio::sync::mpsc::UnboundedSender<Instant>,
+    prev_dag_rx: tokio::sync::mpsc::UnboundedReceiver<Instant>,
     dag_id: u8,
 }
 
@@ -63,8 +63,8 @@ impl NetworkHandler {
         certified_node_fetch_waiter: FetchWaiter<CertifiedNode>,
         state_sync_trigger: StateSyncTrigger,
         new_round_event: tokio::sync::mpsc::UnboundedReceiver<Round>,
-        next_dag_tx: tokio::sync::mpsc::UnboundedSender<()>,
-        prev_dag_rx: tokio::sync::mpsc::UnboundedReceiver<()>,
+        next_dag_tx: tokio::sync::mpsc::UnboundedSender<Instant>,
+        prev_dag_rx: tokio::sync::mpsc::UnboundedReceiver<Instant>,
         payload_store: Arc<DashMap<(Round, Author), Node>>,
     ) -> Self {
         let (missing_parents_tx, missing_parents_rx) = tokio::sync::mpsc::unbounded_channel();

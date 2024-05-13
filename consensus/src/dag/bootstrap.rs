@@ -65,7 +65,14 @@ use async_trait::async_trait;
 use dashmap::DashMap;
 use enum_dispatch::enum_dispatch;
 use futures_channel::oneshot;
-use std::{cell::RefCell, collections::HashMap, fmt, ops::Deref, sync::Arc, time::Duration};
+use std::{
+    cell::RefCell,
+    collections::HashMap,
+    fmt,
+    ops::Deref,
+    sync::Arc,
+    time::{Duration, Instant},
+};
 use tokio::{
     runtime::Handle,
     select,
@@ -353,8 +360,8 @@ pub struct DagBootstrapper {
     broadcast_sender: Sender<(oneshot::Sender<BoltBCRet>, BoltBCParms)>,
     ledger_info_provider: Arc<RwLock<LedgerInfoProvider>>,
     dag_store: Arc<ArcSwapOption<DagStore>>,
-    next_dag_tx: tokio::sync::mpsc::UnboundedSender<()>,
-    prev_dag_rx: Mutex<Option<tokio::sync::mpsc::UnboundedReceiver<()>>>,
+    next_dag_tx: tokio::sync::mpsc::UnboundedSender<Instant>,
+    prev_dag_rx: Mutex<Option<tokio::sync::mpsc::UnboundedReceiver<Instant>>>,
 }
 
 impl DagBootstrapper {
@@ -387,8 +394,8 @@ impl DagBootstrapper {
         broadcast_sender: Sender<(oneshot::Sender<BoltBCRet>, BoltBCParms)>,
         ledger_info_provider: Arc<RwLock<LedgerInfoProvider>>,
         dag_store: Arc<ArcSwapOption<DagStore>>,
-        next_dag_tx: tokio::sync::mpsc::UnboundedSender<()>,
-        prev_dag_rx: tokio::sync::mpsc::UnboundedReceiver<()>,
+        next_dag_tx: tokio::sync::mpsc::UnboundedSender<Instant>,
+        prev_dag_rx: tokio::sync::mpsc::UnboundedReceiver<Instant>,
     ) -> Self {
         info!("OnChainConfig: {:?}", onchain_config);
         Self {

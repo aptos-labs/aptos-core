@@ -34,7 +34,7 @@ use aptos_config::{
 };
 use aptos_consensus_types::common::{Author, Payload, PayloadFilter};
 use aptos_infallible::{Mutex, RwLock};
-use aptos_logger::{debug, error};
+use aptos_logger::{debug, error, info};
 use aptos_network::application::storage::PeersAndMetadata;
 use aptos_reliable_broadcast::{DropGuard, ReliableBroadcast};
 use aptos_time_service::{TimeService, TimeServiceTrait};
@@ -263,29 +263,29 @@ impl DagDriver {
     pub async fn enter_new_round_ext(
         &self,
         new_round: Round,
-        prev_dag_rx: &mut UnboundedReceiver<()>,
-        next_dag_tx: &mut UnboundedSender<()>,
+        prev_dag_rx: &mut UnboundedReceiver<Instant>,
+        next_dag_tx: &mut UnboundedSender<Instant>,
     ) {
         if let Err(e) = self.round_state.set_current_round(new_round) {
             debug!(error=?e, "cannot enter round");
             return;
         }
 
-        if new_round > 5 && new_round < 10 {
-            tokio::time::sleep(Duration::from_secs(30)).await;
-        }
-
         if new_round > 5 {
-            if tokio::time::timeout(Duration::from_millis(300), prev_dag_rx.recv())
-                .await
-                .is_err()
-            {
-                debug!(
-                    dag_id = self.dag_id,
-                    "{}: timeout waiting for prev dag", self.dag_id
-                );
-            } else {
-                tokio::time::sleep(Duration::from_millis(100)).await;
+            let notif = tokio::time::timeout(Duration::from_millis(300), prev_dag_rx.recv()).await;
+            match notif {
+                Err(_) => {
+                    info!(
+                        dag_id = self.dag_id,
+                        "{}: timeout waiting for prev dag", self.dag_id
+                    );
+                },
+                Ok(Some(start_time)) => {
+                    let sleep_time =
+                        Duration::from_millis(100).saturating_sub(start_time.elapsed());
+                    tokio::time::sleep(sleep_time).await;
+                },
+                Ok(None) => {},
             }
             debug!(
                 dag_id = self.dag_id,
@@ -294,7 +294,7 @@ impl DagDriver {
         }
         defer!(
             if new_round > 5 {
-                let _ = next_dag_tx.send(());
+                let _ = next_dag_tx.send(Instant::now());
             }
         );
 
