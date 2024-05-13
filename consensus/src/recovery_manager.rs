@@ -59,7 +59,7 @@ impl RecoveryManager {
     pub async fn process_proposal_msg(
         &mut self,
         proposal_msg: ProposalMsg,
-    ) -> Result<RecoveryData> {
+    ) -> Result<Option<RecoveryData>> {
         let author = proposal_msg.proposer();
         let sync_info: &SyncInfo = proposal_msg.sync_info();
         self.sync_up(sync_info, author).await
@@ -68,7 +68,7 @@ impl RecoveryManager {
     pub async fn process_vote_msg(
         &mut self,
         vote_msg: VoteMsg,
-    ) -> Result<RecoveryData> {
+    ) -> Result<Option<RecoveryData>> {
         let author = vote_msg.vote().author();
         let sync_info = vote_msg.sync_info();
         self.sync_up(sync_info, author).await
@@ -78,7 +78,7 @@ impl RecoveryManager {
         &mut self,
         sync_info: &SyncInfo,
         peer: Author,
-    ) -> Result<RecoveryData> {
+    ) -> Result<Option<RecoveryData>> {
         sync_info.verify(&self.epoch_state.verifier)?;
         ensure!(
             sync_info.highest_round() > self.last_committed_round,
@@ -99,7 +99,7 @@ impl RecoveryManager {
             RetrieverMode::Synchronous,
             None,
         );
-        let recovery_data = BlockStore::fast_forward_sync(
+        BlockStore::fast_forward_sync(
             sync_info.highest_ordered_cert(),
             sync_info.highest_commit_cert(),
             &mut retriever,
@@ -107,9 +107,7 @@ impl RecoveryManager {
             self.execution_client.clone(),
             self.payload_manager.clone(),
         )
-        .await?;
-
-        Ok(recovery_data)
+        .await
     }
 
     pub async fn start(

@@ -32,7 +32,7 @@ pub struct BlockFetchRequest {
     preferred_peer: AccountAddress,
     peers: Vec<AccountAddress>,
     num_blocks: u64,
-    context: BlockFetchContext,
+    // context: BlockFetchContext,
 }
 
 impl BlockFetchRequest {
@@ -42,7 +42,7 @@ impl BlockFetchRequest {
         preferred_peer: AccountAddress,
         peers: Vec<AccountAddress>,
         num_blocks: u64,
-        context: BlockFetchContext,
+        // context: BlockFetchContext,
     ) -> Self {
         BlockFetchRequest {
             initial_block_id,
@@ -50,7 +50,7 @@ impl BlockFetchRequest {
             preferred_peer,
             peers,
             num_blocks,
-            context,
+            // context,
         }
     }
 }
@@ -58,18 +58,18 @@ impl BlockFetchRequest {
 #[derive(Debug)]
 pub struct BlockFetchResponse {
     // TODO: Check if using a Vector is better here.
-    blocks: HashMap<HashValue, Arc<Block>>,
-    context: BlockFetchContext,
+    blocks: Vec<Arc<Block>>,
+    // context: BlockFetchContext,
 }
 
 impl BlockFetchResponse {
-    pub fn blocks(&self) -> &HashMap<HashValue, Arc<Block>> {
+    pub fn blocks(&self) -> &Vec<Arc<Block>> {
         &self.blocks
     }
 
-    pub fn context(&self) -> &BlockFetchContext {
-        &self.context
-    }
+    // pub fn context(&self) -> &BlockFetchContext {
+    //     &self.context
+    // }
 }
 
 
@@ -103,7 +103,7 @@ impl BlockFetchManager {
 
             tokio::select! {
                 Some(request) = proposal_rx.next() => monitor!("block_fetch_manager_handle_proposal", {
-                    self.handle_fetch_request(request).await,
+                    self.handle_fetch_request(request).await;
                 })
             }
         }
@@ -116,38 +116,40 @@ impl BlockFetchManager {
             preferred_peer,
             peers,
             num_blocks,
-            context,
+            // context,
         } = fetch_request;
-        let blocks = HashMap::new();
+        let mut blocks = Vec::new();
         let mut current_block_id = initial_block_id;
         while current_block_id != target_block_id {
             if let Some(block) = self.block_store.get(&current_block_id) {
-                blocks.insert(block.id(), block.clone());
+                blocks.push(block.clone());
                 current_block_id = block.parent_id();
             } else {
                 break;
             }
         }
         if blocks.len() == num_blocks as usize {
-            let fetch_response = BlockFetchResponse { blocks, context };
-            self.response_sender.push(context, fetch_response);
-            return;
+            let fetch_response = BlockFetchResponse { blocks };
+            self.response_sender.push((initial_block_id, target_block_id), fetch_response);
         } else {
             // TODO: Optimize this. We are fetching between [target_block_id, current_block_id] even if 
             // some of these blocks could be present in block_store.
             let mut peers = peers;
             let peers = self.pick_peers(true, preferred_peer, &mut peers, 2);
-            let blocks = self.retrieve_block_for_id(initial_block_id, target_block_id, preferred_peer, peers, num_blocks).await;
-            for block in blocks {
-                self.block_store.push(block.id(), block);
-            }
-            match blocks {
+            let retrieve_result = self.retrieve_block_for_id(initial_block_id, target_block_id, preferred_peer, peers, num_blocks).await;
+            match retrieve_result {
                 Ok(blocks) => {
-                    info!("Successfully fetched blocks: {:?}", blocks);
-                    let fetch_response = BlockFetchResponse { blocks, context };
-                },
+                    let blocks: Vec<Arc<Block>> = blocks.into_iter().map(|block| {
+                        let block = Arc::new(block);
+                        self.block_store.push(block.id(), block.clone());
+                        block
+                    }).collect();
+                    info!("Successfully fetched blocks between {:?} {:?}", initial_block_id, target_block_id);
+                    let fetch_response = BlockFetchResponse { blocks };
+                    self.response_sender.push((initial_block_id, target_block_id), fetch_response);
+                }
                 Err(e) => {
-                    error!("Failed to fetch blocks: {:?}", e);
+                    error!("Failed to fetch blocks between {:?} {:?}: {:?}", initial_block_id, target_block_id, e);
                 }
             }
         }

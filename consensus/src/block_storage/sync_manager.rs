@@ -3,37 +3,30 @@
 // SPDX-License-Identifier: Apache-2.0
 
 use crate::{
-    block_storage::{block_fetch_manager::{BlockFetchContext, BlockFetchRequest}, block_retriever::{BlockRetriever, RetrieverResult}, BlockReader, BlockStore},
+    block_storage::{block_retriever::{BlockRetriever, RetrieverResult}, BlockReader, BlockStore},
     epoch_manager::LivenessStorageData,
     logging::{LogEvent, LogSchema},
-    monitor,
     network::{IncomingBlockRetrievalRequest, NetworkSender},
     network_interface::ConsensusMsg,
     payload_manager::PayloadManager,
     persistent_liveness_storage::{LedgerRecoveryData, PersistentLivenessStorage, RecoveryData},
     pipeline::execution_client::TExecutionClient, round_manager::SyncResult,
 };
-use anyhow::{bail, Context};
+use anyhow::Context;
 use aptos_consensus_types::{
-    block::Block,
     block_retrieval::{
-        BlockRetrievalRequest, BlockRetrievalResponse, BlockRetrievalStatus,
+        BlockRetrievalResponse, BlockRetrievalStatus,
     },
-    common::Author,
     quorum_cert::QuorumCert,
     sync_info::SyncInfo,
 };
-use aptos_crypto::HashValue;
 use aptos_logger::prelude::*;
 use aptos_types::{
-    account_address::AccountAddress, epoch_change::EpochChangeProof,
+    epoch_change::EpochChangeProof,
     ledger_info::LedgerInfoWithSignatures,
 };
 use fail::fail_point;
-use futures::{stream::FuturesUnordered, StreamExt};
-use rand::{prelude::*, Rng};
-use std::{clone::Clone, cmp::min, sync::Arc, time::Duration};
-use tokio::time;
+use std::{clone::Clone, sync::Arc};
 
 #[derive(Debug, PartialEq, Eq)]
 /// Whether we need to do block retrieval if we want to insert a Quorum Cert.

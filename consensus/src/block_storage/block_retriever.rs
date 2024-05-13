@@ -114,7 +114,7 @@ impl BlockRetriever {
                         self.preferred_peer, 
                         peers,
                         num_blocks,
-                        context
+                        // context
                     )
                 );
             Ok(RetrieverResult::Fetching)
