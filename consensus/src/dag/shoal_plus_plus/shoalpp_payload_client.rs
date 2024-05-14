@@ -4,6 +4,7 @@
 use crate::{
     dag::{adapter::TLedgerInfoProvider, dag_store::DagStore},
     error::QuorumStoreError,
+    monitor,
     payload_client::PayloadClient,
 };
 use aptos_consensus_types::common::{Payload, PayloadFilter};
@@ -12,6 +13,7 @@ use aptos_types::validator_txn::ValidatorTransaction;
 use aptos_validator_transaction_pool::TransactionFilter;
 use arc_swap::ArcSwapOption;
 use futures::future::BoxFuture;
+use rayon::iter::{IndexedParallelIterator, IntoParallelRefIterator, ParallelIterator};
 use std::{ops::Deref, sync::Arc, time::Duration};
 // use crate::state_replication::PayloadClient;
 
@@ -43,11 +45,10 @@ impl ShoalppPayloadClient {
             dag_reader_vec.push(dag.read());
         });
 
-        let mut exclude_payloads = Vec::new();
-        dag_reader_vec
-            .iter()
+        let excludes: Vec<_> = dag_reader_vec
+            .par_iter()
             .enumerate()
-            .for_each(|(dag_id, dag_reader)| {
+            .map(|(dag_id, dag_reader)| {
                 let highest_round_nodes = dag_reader.highest_round_nodes();
                 // TODO: support this for three dags
                 let highest_commit_round = self
@@ -59,15 +60,17 @@ impl ShoalppPayloadClient {
                     dag_reader
                         .reachable(
                             highest_round_nodes.iter().map(|node| node.metadata()),
-                            Some(highest_commit_round.saturating_sub(100)),
+                            Some(highest_commit_round.saturating_sub(self.window_size_config)),
                             |_| true,
                         )
                         .map(|node_status| node_status.as_node().payload())
                         .collect()
                 };
-                exclude_payloads.extend(exclude_payload);
-            });
-        PayloadFilter::from(&exclude_payloads)
+                exclude_payload
+            })
+            .flatten()
+            .collect();
+        PayloadFilter::from(&excludes)
     }
 }
 
@@ -93,7 +96,10 @@ impl PayloadClient for ShoalppPayloadClient {
             .filter_map(|aso_dag| aso_dag.load().deref().clone())
             .collect();
 
-        let payload_filter = self.get_payload_filter(dag_vec);
+        let user_txn_filter = monitor!(
+            "dag_shoal_get_payload_filter",
+            self.get_payload_filter(dag_vec)
+        );
 
         debug!("[Bolt] pulling payload");
         self.payload_client
