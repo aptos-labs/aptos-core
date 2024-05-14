@@ -342,11 +342,12 @@ impl Account {
                 let state_view = self
                     .context
                     .latest_state_view_poem(&self.latest_ledger_info)?;
-                let converted_resources = state_view
+                let converter = state_view
                     .as_converter(
                         self.context.db.clone(),
                         self.context.table_info_reader.clone(),
-                    )
+                    );
+                let converted_resources = converter
                     .try_into_resources(resources.iter().map(|(k, v)| (k.clone(), v.as_slice())))
                     .context("Failed to build move resource response from data in DB")
                     .map_err(|err| {
