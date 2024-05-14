@@ -479,6 +479,7 @@ fn parse_failure_attribute(
                 status_code,
                 sub_status_code,
                 move_binary_format::errors::Location::Module(location),
+                None,
             )))
         },
     }

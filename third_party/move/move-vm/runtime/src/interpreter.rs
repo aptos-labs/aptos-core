@@ -673,10 +673,11 @@ impl Interpreter {
                         traversal_context.referenced_modules,
                         [(arena_id.address(), arena_id.name())],
                     )
-                    .map_err(|err| {
-                        PartialVMError::new(err.major_status())
-                            .with_message(format!("Module {} failed to be charged", module_name))
-                    })?;
+                    .map_err(|err| err
+                        .to_partial()
+                        .append_message_with_separator('.',
+                            format!("Failed to charge transitive dependency for {}. Does this module exists?", module_name)
+                        ))?;
                 resolver
                     .loader()
                     .load_module(&module_name, data_store, module_store)
