@@ -728,7 +728,7 @@ where
     ) -> Result<(Option<(HashValue, (K, Version))>, SparseMerkleProofExt)> {
         // Empty tree just returns proof with no sibling hash.
         let mut next_node_key = NodeKey::new_empty_path(version);
-        let mut out_siblings = vec![];
+        let mut out_siblings = Vec::with_capacity(8);
         let nibble_path = NibblePath::new_even(key.to_vec());
         let mut nibble_iter = nibble_path.nibbles();
 
