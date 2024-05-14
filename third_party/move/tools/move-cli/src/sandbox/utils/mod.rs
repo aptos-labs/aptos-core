@@ -331,7 +331,7 @@ pub(crate) fn explain_publish_error(
         } => {
             println!("Breaking change detected--publishing aborted. Re-run with --ignore-breaking-changes to publish anyway.");
 
-            let old_module = state.view_compiled_module(&module_id)?;
+            let old_module = state.view_compiled_module(&module_id)?.unwrap();
             let old_api = normalized::Module::new(&old_module);
             let new_api = normalized::Module::new(module);
 

@@ -164,12 +164,14 @@ pub struct InMemoryStorage {
 impl CompiledModuleView for InMemoryStorage {
     type Item = CompiledModule;
 
-    fn view_compiled_module(&self, id: &ModuleId) -> anyhow::Result<Self::Item> {
-        let bytes = self.get_module(id)?.unwrap();
-
-        let config = DeserializerConfig::new(VERSION_MAX, IDENTIFIER_SIZE_MAX);
-        let m = CompiledModule::deserialize_with_config(&bytes, &config)?;
-        Ok(m)
+    fn view_compiled_module(&self, id: &ModuleId) -> anyhow::Result<Option<Self::Item>> {
+        Ok(match self.get_module(id)? {
+            Some(bytes) => {
+                let config = DeserializerConfig::new(VERSION_MAX, IDENTIFIER_SIZE_MAX);
+                Some(CompiledModule::deserialize_with_config(&bytes, &config)?)
+            },
+            None => None,
+        })
     }
 }
 

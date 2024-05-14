@@ -43,30 +43,36 @@ impl<'a, S: StateView> ModuleView<'a, S> {
 impl<'a, S: StateView> CompiledModuleView for ModuleView<'a, S> {
     type Item = Arc<CompiledModule>;
 
-    fn view_compiled_module(&self, module_id: &ModuleId) -> anyhow::Result<Self::Item> {
+    fn view_compiled_module(&self, module_id: &ModuleId) -> anyhow::Result<Option<Self::Item>> {
         let mut module_cache = self.module_cache.borrow_mut();
         if let Some(module) = module_cache.get(module_id) {
-            return Ok(module.clone());
+            return Ok(Some(module.clone()));
         }
 
         let state_key = StateKey::module_id(module_id);
-        let module_bytes = self
-            .state_view
-            .get_state_value_bytes(&state_key)
-            .map_err(|e| anyhow!("Error retrieving module {:?}: {:?}", module_id, e))?
-            .ok_or_else(|| anyhow!("Module {:?} can't be found", module_id))?;
-        let compiled_module =
-            CompiledModule::deserialize_with_config(&module_bytes, &self.deserializer_config)
-                .map_err(|status| {
-                    anyhow!(
-                        "Module {:?} deserialize with error code {:?}",
-                        module_id,
-                        status
-                    )
-                })?;
+        Ok(
+            match self
+                .state_view
+                .get_state_value_bytes(&state_key)
+                .map_err(|e| anyhow!("Error retrieving module {:?}: {:?}", module_id, e))?
+            {
+                Some(bytes) => {
+                    let compiled_module =
+                        CompiledModule::deserialize_with_config(&bytes, &self.deserializer_config)
+                            .map_err(|status| {
+                                anyhow!(
+                                    "Module {:?} deserialize with error code {:?}",
+                                    module_id,
+                                    status
+                                )
+                            })?;
 
-        let compiled_module = Arc::new(compiled_module);
-        module_cache.insert(module_id.clone(), compiled_module.clone());
-        Ok(compiled_module)
+                    let compiled_module = Arc::new(compiled_module);
+                    module_cache.insert(module_id.clone(), compiled_module.clone());
+                    Some(compiled_module)
+                },
+                None => None,
+            },
+        )
     }
 }

@@ -422,7 +422,7 @@ impl Context {
         let kvs = kvs
             .into_iter()
             .map(|(tag, value)| {
-                if converter.is_resource_group(&tag)? {
+                if converter.is_resource_group(&tag) {
                     // An error here means a storage invariant has been violated
                     bcs::from_bytes::<ResourceGroup>(&value)
                         .map(|map| map.into_iter().map(|(t, v)| (t, v)).collect::<Vec<_>>())

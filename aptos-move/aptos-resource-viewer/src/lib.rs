@@ -29,13 +29,24 @@ impl<'a, S: StateView> AptosValueAnnotator<'a, S> {
         self.0.view_value(ty_tag, blob)
     }
 
-    pub fn view_module(&self, module_id: &ModuleId) -> anyhow::Result<Arc<CompiledModule>> {
+    pub fn view_module(&self, module_id: &ModuleId) -> anyhow::Result<Option<Arc<CompiledModule>>> {
         self.0.view_module(module_id)
     }
 
-    pub fn view_resource_group_tag(&self, tag: &StructTag) -> anyhow::Result<Option<StructTag>> {
-        let module = self.view_module(&tag.module_id())?;
-        Ok(get_resource_group_from_metadata(tag, &module.metadata))
+    pub fn view_existing_module(
+        &self,
+        module_id: &ModuleId,
+    ) -> anyhow::Result<Arc<CompiledModule>> {
+        self.0.view_existing_module(module_id)
+    }
+
+    pub fn view_resource_group_tag(&self, tag: &StructTag) -> Option<StructTag> {
+        match self.view_module(&tag.module_id()) {
+            Ok(Some(module)) => get_resource_group_from_metadata(tag, &module.metadata),
+            // Even if module does not exist, we do not return an error but instead
+            // say that the group tag does not exist.
+            _ => None,
+        }
     }
 
     pub fn view_resource(

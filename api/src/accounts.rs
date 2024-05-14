@@ -342,11 +342,10 @@ impl Account {
                 let state_view = self
                     .context
                     .latest_state_view_poem(&self.latest_ledger_info)?;
-                let converter = state_view
-                    .as_converter(
-                        self.context.db.clone(),
-                        self.context.table_info_reader.clone(),
-                    );
+                let converter = state_view.as_converter(
+                    self.context.db.clone(),
+                    self.context.table_info_reader.clone(),
+                );
                 let converted_resources = converter
                     .try_into_resources(resources.iter().map(|(k, v)| (k.clone(), v.as_slice())))
                     .context("Failed to build move resource response from data in DB")
@@ -517,7 +516,7 @@ impl Account {
     /// Find a resource associated with an account
     fn find_resource(
         &self,
-        tag: &StructTag,
+        resource_type: &StructTag,
     ) -> Result<Vec<(Identifier, move_core_types::value::MoveValue)>, BasicErrorWith404> {
         let (ledger_info, ledger_version, state_view) =
             self.context.state_view(Some(self.ledger_version))?;
@@ -527,10 +526,10 @@ impl Account {
                 self.context.db.clone(),
                 self.context.table_info_reader.clone(),
             )
-            .find_resource(&state_view, self.address, tag)
+            .find_resource(&state_view, self.address, resource_type)
             .context(format!(
                 "Failed to query DB to check for {} at {}",
-                tag, self.address
+                resource_type, self.address
             ))
             .map_err(|err| {
                 BasicErrorWith404::internal_with_code(
@@ -539,14 +538,16 @@ impl Account {
                     &ledger_info,
                 )
             })?
-            .ok_or_else(|| resource_not_found(self.address, tag, ledger_version, &ledger_info))?;
+            .ok_or_else(|| {
+                resource_not_found(self.address, resource_type, ledger_version, &ledger_info)
+            })?;
 
         state_view
             .as_converter(
                 self.context.db.clone(),
                 self.context.table_info_reader.clone(),
             )
-            .move_struct_fields(tag, &bytes)
+            .move_struct_fields(resource_type, &bytes)
             .context("Failed to convert move structs from storage")
             .map_err(|err| {
                 BasicErrorWith404::internal_with_code(

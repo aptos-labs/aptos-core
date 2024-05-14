@@ -182,7 +182,10 @@ impl<'a, T: CompiledModuleView> SerdeLayoutBuilder<'a, T> {
         // build a human-readable name for the struct type. this should do the same thing as
         // StructTag::display(), but it's not easy to use that code here
 
-        let declaring_module = self.compiled_module_view.view_compiled_module(module_id)?;
+        let declaring_module = self
+            .compiled_module_view
+            .view_compiled_module(module_id)?
+            .expect("Failed to resolve module");
         let def = declaring_module
             .borrow()
             .find_struct_def_by_name(name)
@@ -537,8 +540,8 @@ impl StructLayoutBuilder {
         layout_type: LayoutType,
     ) -> anyhow::Result<MoveStructLayout> {
         let module = match module_viewer.view_compiled_module(declaring_module) {
-            Err(_) => bail!("Could not find module"),
-            Ok(m) => m,
+            Err(_) | Ok(None) => bail!("Could not find module"),
+            Ok(Some(m)) => m,
         };
         let def = module
             .borrow()

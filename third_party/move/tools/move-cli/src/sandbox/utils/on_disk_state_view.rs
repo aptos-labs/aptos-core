@@ -153,7 +153,7 @@ impl OnDiskStateView {
 
     /// Return the name of the function at `idx` in `module_id`
     pub fn resolve_function(&self, module_id: &ModuleId, idx: u16) -> Result<Identifier> {
-        let m = self.view_compiled_module(module_id)?;
+        let m = self.view_compiled_module(module_id)?.unwrap();
         Ok(m.identifier_at(
             m.function_handle_at(m.function_def_at(FunctionDefinitionIndex(idx)).function)
                 .name,
@@ -371,11 +371,11 @@ impl ResourceResolver for OnDiskStateView {
 impl CompiledModuleView for OnDiskStateView {
     type Item = CompiledModule;
 
-    fn view_compiled_module(&self, id: &ModuleId) -> anyhow::Result<Self::Item> {
+    fn view_compiled_module(&self, id: &ModuleId) -> anyhow::Result<Option<Self::Item>> {
         if let Some(bytes) = self.get_module_bytes(id)? {
             let module = CompiledModule::deserialize(&bytes)
                 .map_err(|e| anyhow!("Failure deserializing module {}: {:?}", id, e))?;
-            Ok(module)
+            Ok(Some(module))
         } else {
             bail!("Module {} not found", id)
         }

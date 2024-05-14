@@ -3,7 +3,7 @@
 // SPDX-License-Identifier: Apache-2.0
 
 use crate::fat_type::{FatStructType, FatType, WrappedAbilitySet};
-use anyhow::anyhow;
+use anyhow::{anyhow, bail};
 pub use limit::Limiter;
 use move_binary_format::{
     access::ModuleAccess,
@@ -104,8 +104,15 @@ impl<V: CompiledModuleView> MoveValueAnnotator<V> {
         TypeLayoutBuilder::build_with_types(type_tag, &self.module_viewer)
     }
 
-    pub fn view_module(&self, id: &ModuleId) -> anyhow::Result<V::Item> {
+    pub fn view_module(&self, id: &ModuleId) -> anyhow::Result<Option<V::Item>> {
         self.module_viewer.view_compiled_module(id)
+    }
+
+    pub fn view_existing_module(&self, id: &ModuleId) -> anyhow::Result<V::Item> {
+        match self.view_module(id)? {
+            Some(module) => Ok(module),
+            None => bail!("Module {:?} can't be found", id),
+        }
     }
 
     pub fn view_function_arguments(
@@ -165,7 +172,7 @@ impl<V: CompiledModuleView> MoveValueAnnotator<V> {
         function: &IdentStr,
     ) -> anyhow::Result<Vec<FatType>> {
         let mut limit = Limiter::default();
-        let m = self.module_viewer.view_compiled_module(module)?;
+        let m = self.view_existing_module(module)?;
         let m = m.borrow();
         for def in m.function_defs.iter() {
             let fhandle = m.function_handle_at(def.function);
@@ -229,7 +236,7 @@ impl<V: CompiledModuleView> MoveValueAnnotator<V> {
         limit: &mut Limiter,
     ) -> anyhow::Result<FatStructType> {
         let module_id = ModuleId::new(struct_tag.address, struct_tag.module.clone());
-        let module = self.module_viewer.view_compiled_module(&module_id)?;
+        let module = self.view_existing_module(&module_id)?;
         let module = module.borrow();
 
         let struct_def = find_struct_def_in_module(module, struct_tag.name.as_ident_str())?;
@@ -336,7 +343,7 @@ impl<V: CompiledModuleView> MoveValueAnnotator<V> {
                 *module.address_identifier_at(module_handle.address),
                 module.identifier_at(module_handle.name).to_owned(),
             );
-            self.module_viewer.view_compiled_module(&module_id)?
+            self.view_existing_module(&module_id)?
         };
         let target_module = target_module.borrow();
         let target_idx =
@@ -407,7 +414,7 @@ impl<V: CompiledModuleView> MoveValueAnnotator<V> {
 
     fn get_field_names(&self, ty: &FatStructType) -> anyhow::Result<Vec<Identifier>> {
         let module_id = ModuleId::new(ty.address, ty.module.clone());
-        let module = self.module_viewer.view_compiled_module(&module_id)?;
+        let module = self.view_existing_module(&module_id)?;
         let module = module.borrow();
         let struct_def_idx = find_struct_def_in_module(module, ty.name.as_ident_str())?;
         let struct_def = module.struct_def_at(struct_def_idx);

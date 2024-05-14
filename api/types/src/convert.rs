@@ -93,8 +93,8 @@ impl<'a, S: StateView> MoveConverter<'a, S> {
         self.inner.view_resource(tag, bytes)?.try_into()
     }
 
-    pub fn is_resource_group(&self, tag: &StructTag) -> Result<bool> {
-        Ok(self.inner.view_resource_group_tag(tag)?.is_some())
+    pub fn is_resource_group(&self, tag: &StructTag) -> bool {
+        self.inner.view_resource_group_tag(tag).is_some()
     }
 
     pub fn find_resource(
@@ -103,7 +103,7 @@ impl<'a, S: StateView> MoveConverter<'a, S> {
         address: Address,
         tag: &StructTag,
     ) -> Result<Option<Bytes>> {
-        Ok(match self.inner.view_resource_group_tag(tag)? {
+        Ok(match self.inner.view_resource_group_tag(tag) {
             Some(group_tag) => {
                 let key = StateKey::resource_group(&address.into(), &group_tag);
                 match state_view.get_state_value_bytes(&key)? {
@@ -613,7 +613,8 @@ impl<'a, S: StateView> MoveConverter<'a, S> {
                 } = entry_func_payload;
 
                 let module = function.module.clone();
-                let code = self.inner.view_module(&module.clone().into())? as Arc<dyn Bytecode>;
+                let code =
+                    self.inner.view_existing_module(&module.clone().into())? as Arc<dyn Bytecode>;
                 let func = code
                     .find_entry_function(function.name.0.as_ident_str())
                     .ok_or_else(|| format_err!("could not find entry function by {}", function))?;
@@ -676,7 +677,7 @@ impl<'a, S: StateView> MoveConverter<'a, S> {
                             } = entry_function;
 
                             let module = function.module.clone();
-                            let code = self.inner.view_module(&module.clone().into())?
+                            let code = self.inner.view_existing_module(&module.clone().into())?
                                 as Arc<dyn Bytecode>;
                             let func = code
                                 .find_entry_function(function.name.0.as_ident_str())
@@ -896,7 +897,7 @@ impl<'a, S: StateView> MoveConverter<'a, S> {
 
     pub fn function_return_types(&self, function: &ViewFunction) -> Result<Vec<MoveType>> {
         let module = function.module.clone();
-        let code = self.inner.view_module(&module)? as Arc<dyn Bytecode>;
+        let code = self.inner.view_existing_module(&module)? as Arc<dyn Bytecode>;
         let func = code
             .find_function(function.function.as_ident_str())
             .ok_or_else(|| format_err!("could not find entry function by {:?}", function))?;
@@ -912,7 +913,7 @@ impl<'a, S: StateView> MoveConverter<'a, S> {
         } = view_request;
 
         let module = function.module.clone();
-        let code = self.inner.view_module(&module.clone().into())? as Arc<dyn Bytecode>;
+        let code = self.inner.view_existing_module(&module.clone().into())? as Arc<dyn Bytecode>;
         let func = code
             .find_function(function.name.0.as_ident_str())
             .ok_or_else(|| format_err!("could not find entry function by {}", function))?;
@@ -1012,7 +1013,7 @@ impl<'a, S: StateView> MoveConverter<'a, S> {
     }
 
     fn explain_function_index(&self, module_id: &ModuleId, function: &u16) -> Result<String> {
-        let code = self.inner.view_module(module_id)?;
+        let code = self.inner.view_existing_module(module_id)?;
         let func = code.function_handle_at(FunctionHandleIndex::new(*function));
         let id = code.identifier_at(func.name);
         Ok(id.to_string())
