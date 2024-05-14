@@ -376,7 +376,7 @@ pub fn run_dag_consensus_only_realistic_env_max_tps() -> ForgeConfig {
         .with_emit_job(
             EmitJobRequest::default()
                 .mode(EmitJobMode::MaxLoad {
-                    mempool_backlog: 500_000,
+                    mempool_backlog: 100_000,
                 })
                 .txn_expiration_time_secs(5 * 60),
         )
