@@ -1,7 +1,7 @@
 // Copyright © Aptos Foundation
 // SPDX-License-Identifier: Apache-2.0
 
-use super::{get_additional_binaries_dir, BinaryUpdater, UpdateRequiredInfo};
+use super::{get_additional_binaries_dir, update_binary, BinaryUpdater, UpdateRequiredInfo};
 use crate::common::{
     types::{CliCommand, CliTypedResult},
     utils::cli_build_information,
@@ -51,6 +51,10 @@ pub struct RevelaUpdateTool {
 }
 
 impl BinaryUpdater for RevelaUpdateTool {
+    fn check(&self) -> bool {
+        self.check
+    }
+
     fn pretty_name(&self) -> &'static str {
         "Revela"
     }
@@ -135,19 +139,7 @@ impl CliCommand<String> for RevelaUpdateTool {
     }
 
     async fn execute(self) -> CliTypedResult<String> {
-        if self.check {
-            let info = tokio::task::spawn_blocking(move || self.get_update_info())
-                .await
-                .context("Failed to check Revela version")??;
-            if info.current_version.unwrap_or_default() != info.target_version {
-                return Ok(format!("Update is available ({})", info.target_version));
-            }
-
-            return Ok(format!("Already up to date ({})", info.target_version));
-        }
-        tokio::task::spawn_blocking(move || self.update())
-            .await
-            .context("Failed to install / update Revela")?
+        update_binary(self).await
     }
 }
 

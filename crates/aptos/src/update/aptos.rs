@@ -9,7 +9,7 @@
 // CLI is and which binary to download based on the current OS. Then we can plug
 // that into the library which takes care of the rest.
 
-use super::{BinaryUpdater, UpdateRequiredInfo};
+use super::{update_binary, BinaryUpdater, UpdateRequiredInfo};
 use crate::common::{
     types::{CliCommand, CliTypedResult},
     utils::cli_build_information,
@@ -45,6 +45,10 @@ pub struct AptosUpdateTool {
 }
 
 impl BinaryUpdater for AptosUpdateTool {
+    fn check(&self) -> bool {
+        self.check
+    }
+
     fn pretty_name(&self) -> &'static str {
         "Aptos CLI"
     }
@@ -194,19 +198,6 @@ impl CliCommand<String> for AptosUpdateTool {
     }
 
     async fn execute(self) -> CliTypedResult<String> {
-        if self.check {
-            let info = tokio::task::spawn_blocking(move || self.get_update_info())
-                .await
-                .context("Failed to check Aptos CLI version")??;
-            if info.current_version.unwrap_or_default() != info.target_version {
-                return Ok(format!("Update is available ({})", info.target_version));
-            }
-
-            return Ok(format!("Already up to date ({})", info.target_version));
-        }
-
-        tokio::task::spawn_blocking(move || self.update())
-            .await
-            .context("Failed to self-update Aptos CLI")?
+        update_binary(self).await
     }
 }
