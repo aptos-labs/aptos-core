@@ -8,11 +8,9 @@ module resource_account::liquidity_pair {
     use aptos_framework::event;
     use aptos_framework::fungible_asset::{Self, Metadata};
     use aptos_framework::primary_fungible_store;
-    // FA-supported DEX
     use swap::router;
     use swap::liquidity_pool;
     use swap::coin_wrapper;
-    // Friend.
     use resource_account::resource_signer_holder;
     use resource_account::bonding_curve_launchpad;
 	friend bonding_curve_launchpad;
@@ -30,7 +28,7 @@ module resource_account::liquidity_pair {
     //---------------------------Events---------------------------
     #[event]
     struct LiquidityPairCreated has store, drop {
-        fa_obj: Object<Metadata>,
+        fa_object_metadata: Object<Metadata>,
         initial_fa_reserves: u128,
         initial_apt_reserves: u128,
         k: u256
@@ -50,7 +48,7 @@ module resource_account::liquidity_pair {
     }
     #[event]
     struct LiquidityPairGraduated has store, drop {
-        fa_obj: Object<Metadata>,
+        fa_object_metadata: Object<Metadata>,
         dex_address: address
     }
 
@@ -75,12 +73,11 @@ module resource_account::liquidity_pair {
         move_to(account, liquidity_pair_table);
     }
 
-
     //---------------------------Liquidity Pair---------------------------
-    public(friend) fun register_liquidity_pair(transfer_ref: &fungible_asset::TransferRef, account: &signer, fa_metadata: Object<Metadata>, apt_initialPurchaseAmountIn: u64, fa_initialLiquidity: u128) acquires LiquidityPairSmartTable {
+    public(friend) fun register_liquidity_pair(transfer_ref: &fungible_asset::TransferRef, account: &signer, fa_object_metadata: Object<Metadata>, apt_initialPurchaseAmountIn: u64, fa_initialLiquidity: u128) acquires LiquidityPairSmartTable {
         let liquidity_pair_smartTable = borrow_global_mut<LiquidityPairSmartTable>(@resource_account);
-        assert!(!smart_table::contains(&mut liquidity_pair_smartTable.liquidity_pairs, fa_metadata), ELIQUIDITY_PAIR_EXISTS_ALREADY);
-        //* Initial APT reserves are virtual liquidity, for less extreme initial swaps.
+        assert!(!smart_table::contains(&mut liquidity_pair_smartTable.liquidity_pairs, fa_object_metadata), ELIQUIDITY_PAIR_EXISTS_ALREADY);
+        //* Initial APT reserves are virtual liquidity, for less extreme initial swaps (avoiding early adopter's advantage, for fairness).
         let k_constant: u256 = (fa_initialLiquidity as u256) * (INITIAL_VIRTUAL_APT_LIQUIDITY as u256);
         let initial_liquidity_pair = LiquidityPair {
             is_enabled: true,
@@ -91,26 +88,26 @@ module resource_account::liquidity_pair {
         };
         smart_table::add(
             &mut liquidity_pair_smartTable.liquidity_pairs,
-            fa_metadata,
+            fa_object_metadata,
             initial_liquidity_pair
         );
 
         event::emit(LiquidityPairCreated {
-            fa_obj: fa_metadata,
+            fa_object_metadata: fa_object_metadata,
             initial_fa_reserves: fa_initialLiquidity,
             initial_apt_reserves: INITIAL_VIRTUAL_APT_LIQUIDITY,
             k: k_constant
         });
 
         if(apt_initialPurchaseAmountIn != 0) {
-            internal_swap_apt_to_fa(transfer_ref, account, fa_metadata, apt_initialPurchaseAmountIn);
+            internal_swap_apt_to_fa(transfer_ref, account, fa_object_metadata, apt_initialPurchaseAmountIn);
         }
     }
 
-    public(friend) fun internal_swap_fa_to_apt(transfer_ref: &fungible_asset::TransferRef, account: &signer,  fa_metadata: Object<Metadata>,  amountIn: u64) acquires LiquidityPairSmartTable {
+    public(friend) fun internal_swap_fa_to_apt(transfer_ref: &fungible_asset::TransferRef, account: &signer,  fa_object_metadata: Object<Metadata>,  amountIn: u64) acquires LiquidityPairSmartTable {
         let liquidity_pair_smartTable = borrow_global_mut<LiquidityPairSmartTable>(@resource_account);
-        assert!(smart_table::contains(&mut liquidity_pair_smartTable.liquidity_pairs, fa_metadata), ELIQUIDITY_PAIR_DOES_NOT_EXIST);
-        let liquidity_pair = smart_table::borrow_mut(&mut liquidity_pair_smartTable.liquidity_pairs, fa_metadata);
+        assert!(smart_table::contains(&mut liquidity_pair_smartTable.liquidity_pairs, fa_object_metadata), ELIQUIDITY_PAIR_DOES_NOT_EXIST);
+        let liquidity_pair = smart_table::borrow_mut(&mut liquidity_pair_smartTable.liquidity_pairs, fa_object_metadata);
         assert!(liquidity_pair.is_enabled, ELIQUIDITY_PAIR_DISABLED);
 
         let swapper_address = signer::address_of(account);
@@ -120,7 +117,7 @@ module resource_account::liquidity_pair {
             true,
             amountIn
         );
-        let does_primary_store_exist_for_swapper = primary_fungible_store::primary_store_exists(swapper_address, fa_metadata);
+        let does_primary_store_exist_for_swapper = primary_fungible_store::primary_store_exists(swapper_address, fa_object_metadata);
         assert!(does_primary_store_exist_for_swapper, EFA_PRIMARY_STORE_DOES_NOT_EXIST);
         let account_address = signer::address_of(account);
         primary_fungible_store::transfer_with_ref(transfer_ref, swapper_address, @resource_account, fa_given);
@@ -144,10 +141,10 @@ module resource_account::liquidity_pair {
         });
     }
 
-    public(friend) fun internal_swap_apt_to_fa(transfer_ref: &fungible_asset::TransferRef, account: &signer,  fa_metadata: Object<Metadata>, amountIn: u64) acquires LiquidityPairSmartTable {
+    public(friend) fun internal_swap_apt_to_fa(transfer_ref: &fungible_asset::TransferRef, account: &signer,  fa_object_metadata: Object<Metadata>, amountIn: u64) acquires LiquidityPairSmartTable {
         let liquidity_pair_smartTable = borrow_global_mut<LiquidityPairSmartTable>(@resource_account);
-        assert!(smart_table::contains(&mut liquidity_pair_smartTable.liquidity_pairs, fa_metadata), ELIQUIDITY_PAIR_DOES_NOT_EXIST);
-        let liquidity_pair = smart_table::borrow_mut(&mut liquidity_pair_smartTable.liquidity_pairs, fa_metadata);
+        assert!(smart_table::contains(&mut liquidity_pair_smartTable.liquidity_pairs, fa_object_metadata), ELIQUIDITY_PAIR_DOES_NOT_EXIST);
+        let liquidity_pair = smart_table::borrow_mut(&mut liquidity_pair_smartTable.liquidity_pairs, fa_object_metadata);
         assert!(liquidity_pair.is_enabled, ELIQUIDITY_PAIR_DISABLED);
 
         let swapper_address = signer::address_of(account);
@@ -157,13 +154,12 @@ module resource_account::liquidity_pair {
             false,
             amountIn
         );
-        let does_primary_store_exist_for_swapper = primary_fungible_store::primary_store_exists(swapper_address, fa_metadata);
+        let does_primary_store_exist_for_swapper = primary_fungible_store::primary_store_exists(swapper_address, fa_object_metadata);
         if(!does_primary_store_exist_for_swapper){
-            primary_fungible_store::create_primary_store(swapper_address, fa_metadata);
+            primary_fungible_store::create_primary_store(swapper_address, fa_object_metadata);
         };
         aptos_account::transfer(account, @resource_account, apt_given);
         primary_fungible_store::transfer_with_ref(transfer_ref, @resource_account, swapper_address, fa_gained);
-        // Disable transfers from users.
         let old_fa_reserves = liquidity_pair.fa_reserves;
         let old_apt_reserves = liquidity_pair.apt_reserves;
         liquidity_pair.fa_reserves = fa_updated_reserves;
@@ -186,21 +182,23 @@ module resource_account::liquidity_pair {
             liquidity_pair.is_enabled = false;
             liquidity_pair.is_frozen = false;
             // Offload onto third party, public DEX.
-            router::create_pool_coin<AptosCoin>(fa_metadata, false);
-            add_liquidity_coin_entry_transfer_ref<AptosCoin>(transfer_ref, &resource_signer_holder::get_signer(), fa_metadata, false, ((apt_updated_reserves - (apt_updated_reserves / 10)) as u64), ((fa_updated_reserves - (fa_updated_reserves / 10)) as u64), 0, 0);
+            router::create_pool_coin<AptosCoin>(fa_object_metadata, false);
+            add_liquidity_coin_entry_transfer_ref<AptosCoin>(transfer_ref, &resource_signer_holder::get_signer(), fa_object_metadata, false, ((apt_updated_reserves - (apt_updated_reserves / 10)) as u64), ((fa_updated_reserves - (fa_updated_reserves / 10)) as u64), 0, 0);
             // Send liquidity tokens to dead address.
             let apt_coin_wrapped = coin_wrapper::get_wrapper<AptosCoin>();
-            let liquidity_obj = liquidity_pool::liquidity_pool(apt_coin_wrapped, fa_metadata, false);
+            let liquidity_obj = liquidity_pool::liquidity_pool(apt_coin_wrapped, fa_object_metadata, false);
             liquidity_pool::transfer(&resource_signer_holder::get_signer(), liquidity_obj, @0xdead, primary_fungible_store::balance(@resource_account, liquidity_obj));
 
             event::emit(LiquidityPairGraduated {
-                fa_obj: fa_metadata,
+                fa_object_metadata: fa_object_metadata,
                 dex_address: @swap
             });
         }
     }
 
     //---------------------------DEX-helpers---------------------------
+    //* Transfer_ref avoids circular dependency during graduation that the normal transfer would experience
+    //* from the dispatchable withdraw function.
     fun add_liquidity_coin_entry_transfer_ref<CoinType>(
         transfer_ref: &fungible_asset::TransferRef,
         lp: &signer,
@@ -246,10 +244,10 @@ module resource_account::liquidity_pair {
 
     }
     #[view]
-    public fun get_is_frozen_metadata(fa_metadata: Object<Metadata>):bool acquires LiquidityPairSmartTable {
+    public fun get_is_frozen_metadata(fa_object_metadata: Object<Metadata>):bool acquires LiquidityPairSmartTable {
         let liquidity_pair_smartTable = borrow_global<LiquidityPairSmartTable>(@resource_account);
-        assert!(smart_table::contains(&liquidity_pair_smartTable.liquidity_pairs, fa_metadata), ELIQUIDITY_PAIR_DOES_NOT_EXIST);
-        smart_table::borrow(&liquidity_pair_smartTable.liquidity_pairs, fa_metadata).is_frozen
+        assert!(smart_table::contains(&liquidity_pair_smartTable.liquidity_pairs, fa_object_metadata), ELIQUIDITY_PAIR_DOES_NOT_EXIST);
+        smart_table::borrow(&liquidity_pair_smartTable.liquidity_pairs, fa_object_metadata).is_frozen
     }
 
 

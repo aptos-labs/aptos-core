@@ -1,3 +1,6 @@
+//**
+//* This resource account is used for storing a signer var.
+//* The signer var is re-used during FA creation, to keep the FA on the smart contract platform (rather than on the creator's account).
 module resource_account::resource_signer_holder {
 	use aptos_std::signer;
 	use aptos_std::code;
