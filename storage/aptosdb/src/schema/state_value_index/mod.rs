@@ -30,7 +30,7 @@ define_schema!(StateValueIndexSchema, Key, (), STATE_VALUE_INDEX_CF_NAME);
 impl KeyCodec<StateValueIndexSchema> for Key {
     fn encode_key(&self) -> Result<Vec<u8>> {
         let mut encoded = vec![];
-        encoded.write_all(&self.0.encode()?)?;
+        encoded.write_all(self.0.encoded())?;
         encoded.write_u64::<BigEndian>(!self.1)?;
         Ok(encoded)
     }

@@ -125,6 +125,18 @@ jobs:
         id: determine_file_changes
         uses: ./.github/actions/file-change-determinator
 
+  # This job determines which tests to run
+  test-target-determinator:
+    needs: [permission-check]
+    runs-on: ubuntu-latest
+    outputs:
+      run_framework_upgrade_test: ${{ steps.determine_test_targets.outputs.run_framework_upgrade_test }}
+    steps:
+      - uses: actions/checkout@v3
+      - name: Run the test target determinator
+        id: determine_test_targets
+        uses: ./.github/actions/test-target-determinator
+
   # This is a PR required job.
   rust-images:
     needs: [permission-check, determine-docker-build-metadata]
@@ -315,12 +327,13 @@ jobs:
       - rust-images-failpoints
       - rust-images-performance
       - rust-images-consensus-only-perf-test
-      - file_change_determinator
+      - test-target-determinator
     if: |
       !failure() && !cancelled() && needs.permission-check.result == 'success' && (
         (github.event_name == 'push' && github.ref_name != 'main') ||
         github.event_name == 'workflow_dispatch' ||
-        contains(github.event.pull_request.labels.*.name, 'CICD:run-framework-upgrade-test')
+        contains(github.event.pull_request.labels.*.name, 'CICD:run-framework-upgrade-test') ||
+        github.event.pull_request.auto_merge != null
       )
     uses: aptos-labs/aptos-core/.github/workflows/workflow-run-forge.yaml@main
     secrets: inherit
@@ -331,7 +344,7 @@ jobs:
       FORGE_RUNNER_DURATION_SECS: 3600
       COMMENT_HEADER: forge-framework-upgrade
       FORGE_NAMESPACE: forge-framework-upgrade-${{ needs.determine-docker-build-metadata.outputs.targetCacheId }}
-      SKIP_JOB: ${{ needs.file_change_determinator.outputs.only_docs_changed == 'true' }}
+      SKIP_JOB: ${{ !contains(github.event.pull_request.labels.*.name, 'CICD:run-framework-upgrade-test') && (needs.test-target-determinator.outputs.run_framework_upgrade_test == 'false') }}
 
   forge-consensus-only-perf-test:
     needs:

@@ -87,6 +87,7 @@
 
 # Owners for the `/docker` directory and all its subdirectories.
 /docker/ @aptos-labs/prod-eng
+/docker/builder/docker-bake-rust-all.hcl @aptos-labs/prod-eng @aptos-labs/security
 
 # Owners for the `SDKs`.
 /ecosystem/python/sdk @davidiw @gregnazario @banool @0xmaayan

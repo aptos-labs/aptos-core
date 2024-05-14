@@ -49,7 +49,7 @@ pub fn construct_test_plan(
     Some(
         env.get_modules()
             .filter_map(|module| {
-                if module.is_target() {
+                if module.is_primary_target() {
                     construct_module_test_plan(env, package_filter, module)
                 } else {
                     None

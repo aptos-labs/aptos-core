@@ -18,6 +18,7 @@ fn test_runner(path: &Path, options: ModelBuilderOptions) -> datatest_stable::Re
     let env = run_model_builder_with_options(
         targets,
         vec![],
+        vec![],
         options,
         false,
         KnownAttribute::get_all_attribute_names(),

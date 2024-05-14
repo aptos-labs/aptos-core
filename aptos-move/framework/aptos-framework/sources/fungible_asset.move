@@ -76,6 +76,8 @@ module aptos_framework::fungible_asset {
     const EINVALID_DISPATCHABLE_OPERATIONS: u64 = 28;
     /// Trying to re-register dispatch hook on a fungible asset.
     const EALREADY_REGISTERED: u64 = 29;
+    /// Fungible metadata does not exist on this account.
+    const EFUNGIBLE_METADATA_EXISTENCE: u64 = 30;
 
     //
     // Constants
@@ -119,6 +121,11 @@ module aptos_framework::fungible_asset {
         /// The Uniform Resource Identifier (uri) pointing to the website for the fungible asset.
         project_uri: String,
     }
+
+    #[resource_group_member(group = aptos_framework::object::ObjectGroup)]
+    /// Defines a `FungibleAsset`, such that all `FungibleStore`s stores are untransferable at
+    /// the object layer.
+    struct Untransferable has key {}
 
     #[resource_group_member(group = aptos_framework::object::ObjectGroup)]
     /// The store object that holds fungible assets of a specific type associated with an account.
@@ -232,6 +239,21 @@ module aptos_framework::fungible_asset {
         };
 
         object::object_from_constructor_ref<Metadata>(constructor_ref)
+    }
+
+    /// Set that only untransferable stores can be created for this fungible asset.
+    public fun set_untransferable(constructor_ref: &ConstructorRef) {
+        let metadata_addr = object::address_from_constructor_ref(constructor_ref);
+        assert!(exists<Metadata>(metadata_addr), error::not_found(EFUNGIBLE_METADATA_EXISTENCE));
+        let metadata_signer = &object::generate_signer(constructor_ref);
+        move_to(metadata_signer, Untransferable {});
+    }
+
+
+    #[view]
+    /// Returns true if the FA is untransferable.
+    public fun is_untransferable<T: key>(metadata: Object<T>): bool {
+        exists<Untransferable>(object::object_address(&metadata))
     }
 
     /// Create a fungible asset store whose transfer rule would be overloaded by the provided function.
@@ -553,6 +575,9 @@ module aptos_framework::fungible_asset {
             balance: 0,
             frozen: false,
         });
+        if (is_untransferable(metadata)) {
+            object::set_untransferable(constructor_ref);
+        };
         object::object_from_constructor_ref<FungibleStore>(constructor_ref)
     }
 
@@ -1035,6 +1060,19 @@ module aptos_framework::fungible_asset {
         let fa = mint(&mint_ref, 100);
         set_frozen_flag(&transfer_ref, creator_store, true);
         deposit(creator_store, fa);
+    }
+
+    #[test(creator = @0xcafe)]
+    #[expected_failure(abort_code = 0x50003, location = aptos_framework::object)]
+    fun test_untransferable(
+        creator: &signer
+    ) {
+        let (creator_ref, _) = create_test_token(creator);
+        let (mint_ref, _, _) = init_test_metadata(&creator_ref);
+        set_untransferable(&creator_ref);
+
+        let creator_store = create_test_store(creator, mint_ref.metadata);
+        object::transfer(creator, creator_store, @0x456);
     }
 
     #[test(creator = @0xcafe, aaron = @0xface)]

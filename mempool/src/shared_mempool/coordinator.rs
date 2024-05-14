@@ -18,7 +18,6 @@ use crate::{
 };
 use aptos_bounded_executor::BoundedExecutor;
 use aptos_config::network_id::{NetworkId, PeerNetworkId};
-use aptos_consensus_types::common::TransactionSummary;
 use aptos_event_notifications::ReconfigNotificationListener;
 use aptos_infallible::{Mutex, RwLock};
 use aptos_logger::prelude::*;
@@ -219,17 +218,7 @@ fn handle_commit_notification<TransactionValidator>(
         counters::COMMIT_STATE_SYNC_LABEL,
         msg.transactions.len(),
     );
-    process_committed_transactions(
-        mempool,
-        msg.transactions
-            .iter()
-            .map(|txn| TransactionSummary {
-                sender: txn.sender,
-                sequence_number: txn.sequence_number,
-            })
-            .collect(),
-        msg.block_timestamp_usecs,
-    );
+    process_committed_transactions(mempool, msg.transactions, msg.block_timestamp_usecs);
     mempool_validator.write().notify_commit();
     let latency = start_time.elapsed();
     counters::mempool_service_latency(
