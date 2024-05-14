@@ -524,7 +524,7 @@ impl VMRuntime {
     pub(crate) fn execute_script(
         &self,
         script: impl Borrow<[u8]>,
-        ty_arg_tags: Vec<TypeTag>,
+        ty_args: Vec<TypeTag>,
         serialized_args: Vec<impl Borrow<[u8]>>,
         data_store: &mut TransactionDataCache,
         module_store: &ModuleStorageAdapter,
@@ -542,7 +542,7 @@ impl VMRuntime {
             },
         ) = self
             .loader
-            .load_script(script.borrow(), &ty_arg_tags, data_store, module_store)?;
+            .load_script(script.borrow(), &ty_args, data_store, module_store)?;
         self.execute_function_impl(
             func,
             ty_args,

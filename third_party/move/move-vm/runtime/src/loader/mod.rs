@@ -291,7 +291,7 @@ impl Loader {
     pub(crate) fn load_script(
         &self,
         script_blob: &[u8],
-        ty_arg_tags: &[TypeTag],
+        ty_args: &[TypeTag],
         data_store: &mut TransactionDataCache,
         module_store: &ModuleStorageAdapter,
     ) -> VMResult<(Arc<Function>, LoadedFunctionInstantiation)> {
@@ -315,15 +315,14 @@ impl Loader {
             },
         };
 
-        let mut ty_args = vec![];
-        for ty_arg_tag in ty_arg_tags {
-            ty_args.push(self.load_type(ty_arg_tag, data_store, module_store)?);
-        }
-
+        let ty_args = ty_args
+            .iter()
+            .map(|ty| self.load_type(ty, data_store, module_store))
+            .collect::<VMResult<Vec<_>>>()?;
         if self.vm_config.type_size_limit
             && ty_args
                 .iter()
-                .map(|loaded_ty| self.count_type_nodes(loaded_ty))
+                .map(|ty| self.count_type_nodes(ty))
                 .sum::<u64>()
                 > MAX_TYPE_INSTANTIATION_NODES
         {
@@ -579,7 +578,7 @@ impl Loader {
         &self,
         module_id: &ModuleId,
         function_name: &IdentStr,
-        ty_arg_tags: &[TypeTag],
+        ty_args: &[TypeTag],
         data_store: &mut TransactionDataCache,
         module_store: &ModuleStorageAdapter,
     ) -> VMResult<(Arc<Module>, Arc<Function>, LoadedFunctionInstantiation)> {
@@ -590,9 +589,9 @@ impl Loader {
             module_store,
         )?;
 
-        let ty_args = ty_arg_tags
+        let ty_args = ty_args
             .iter()
-            .map(|ty_arg_tag| self.load_type(ty_arg_tag, data_store, module_store))
+            .map(|ty_arg| self.load_type(ty_arg, data_store, module_store))
             .collect::<VMResult<Vec<_>>>()
             .map_err(|mut err| {
                 // User provided type argument failed to load. Set extra sub status to distinguish from internal type loading error.
@@ -809,10 +808,11 @@ impl Loader {
                         ability: AbilityInfo::struct_(struct_type.abilities),
                     }
                 } else {
-                    let mut ty_args = vec![];
-                    for ty_arg_tag in &struct_tag.type_args {
-                        ty_args.push(self.load_type(ty_arg_tag, data_store, module_store)?);
-                    }
+                    let ty_args = struct_tag
+                        .type_args
+                        .iter()
+                        .map(|ty| self.load_type(ty, data_store, module_store))
+                        .collect::<VMResult<Vec<_>>>()?;
                     self.verify_ty_arg_abilities(struct_type.ty_param_constraints(), &ty_args)
                         .map_err(|e| e.finish(Location::Undefined))?;
                     Type::StructInstantiation {
@@ -1799,7 +1799,7 @@ impl Loader {
 
         let cur_cost = gas_context.cost;
 
-        let ty_arg_tags = ty_args
+        let type_args = ty_args
             .iter()
             .map(|ty| self.type_to_type_tag_impl(ty, gas_context))
             .collect::<PartialVMResult<Vec<_>>>()?;
@@ -1807,7 +1807,7 @@ impl Loader {
             address: *name.module.address(),
             module: name.module.name().to_owned(),
             name: name.name.clone(),
-            type_args: ty_arg_tags,
+            type_args,
         };
 
         let size =
