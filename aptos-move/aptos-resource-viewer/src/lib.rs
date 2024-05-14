@@ -2,6 +2,10 @@
 // Parts of the project are originally copyright © Meta Platforms, Inc.
 // SPDX-License-Identifier: Apache-2.0
 
+//! Allows to view detailed on-chain information from modules and resources.
+//! The library is not supposed to be used for runtime (e.g., in the VM), but
+//! rather in "static" contexts, such as indexer, DB, etc.
+
 pub mod module_view;
 
 use crate::module_view::ModuleView;
