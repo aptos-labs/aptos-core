@@ -536,10 +536,10 @@ pub static SUCCESSFUL_EXECUTED_WITH_ORDER_VOTE_QC: Lazy<IntCounter> = Lazy::new(
     .unwrap()
 });
 
-pub static FAILED_EXECUTION_WITH_ORDER_VOTE_QC: Lazy<IntCounter> = Lazy::new(|| {
+pub static LATE_EXECUTION_WITH_ORDER_VOTE_QC: Lazy<IntCounter> = Lazy::new(|| {
     register_int_counter!(
-        "aptos_consensus_failed_execution_with_order_vote_qc",
-        "Count of the number of blocks failed to execute with order vote QC"
+        "aptos_consensus_late_execution_with_order_vote_qc",
+        "Count of the number of blocks that were executed with order vote QC after the block was already ordered"
     )
     .unwrap()
 });

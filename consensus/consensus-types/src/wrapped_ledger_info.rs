@@ -19,7 +19,7 @@ use std::fmt::{Display, Formatter};
 /// upgrading the consensus to use order votes to execute blocks faster.
 #[derive(Deserialize, Serialize, Clone, Debug, Eq, PartialEq)]
 pub struct WrappedLedgerInfo {
-    /// The vote information certified by the quorum.
+    /// The VoteData here is placeholder for backwards compatibility purpose and should not be used.
     vote_data: VoteData,
     /// The signed LedgerInfo of a committed block that carries the data about the certified block.
     signed_ledger_info: LedgerInfoWithSignatures,

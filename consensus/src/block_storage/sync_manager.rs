@@ -4,7 +4,7 @@
 
 use crate::{
     block_storage::{BlockReader, BlockStore},
-    counters::{FAILED_EXECUTION_WITH_ORDER_VOTE_QC, SUCCESSFUL_EXECUTED_WITH_ORDER_VOTE_QC},
+    counters::{LATE_EXECUTION_WITH_ORDER_VOTE_QC, SUCCESSFUL_EXECUTED_WITH_ORDER_VOTE_QC},
     epoch_manager::LivenessStorageData,
     logging::{LogEvent, LogSchema},
     monitor,
@@ -164,7 +164,7 @@ impl BlockStore {
                     .await;
             }
         } else {
-            FAILED_EXECUTION_WITH_ORDER_VOTE_QC.inc();
+            LATE_EXECUTION_WITH_ORDER_VOTE_QC.inc();
         }
         Ok(())
     }

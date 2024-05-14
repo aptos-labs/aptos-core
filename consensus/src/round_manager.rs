@@ -238,7 +238,7 @@ pub struct RoundManager {
     randomness_config: OnChainRandomnessConfig,
     jwk_consensus_config: OnChainJWKConsensusConfig,
     fast_rand_config: Option<RandConfig>,
-    // Stores the order votes from all the rounds above highest_commit_round
+    // Stores the order votes from all the rounds above highest_ordered_round
     pending_order_votes: PendingOrderVotes,
 }
 
@@ -957,7 +957,7 @@ impl RoundManager {
             }
 
             if order_vote.ledger_info().round()
-                > self.block_store.sync_info().highest_commit_round()
+                > self.block_store.sync_info().highest_ordered_round()
             {
                 let vote_reception_result = self
                     .pending_order_votes
@@ -967,9 +967,9 @@ impl RoundManager {
             } else {
                 ORDER_VOTE_VERY_OLD.inc();
                 info!(
-                    "Received old order vote. Order vote round: {:?}, Highest commit round: {:?}",
+                    "Received old order vote. Order vote round: {:?}, Highest ordered round: {:?}",
                     order_vote.ledger_info().round(),
-                    self.block_store.sync_info().highest_commit_round()
+                    self.block_store.sync_info().highest_ordered_round()
                 );
             }
         }
@@ -998,7 +998,7 @@ impl RoundManager {
                     BlockStage::ORDER_VOTED,
                 );
             }
-            info!(self.new_log(LogEvent::SendOrderVote), "{}", order_vote);
+            info!(self.new_log(LogEvent::BroadcastOrderVote), "{}", order_vote);
             self.network.broadcast_order_vote(order_vote).await;
             ORDER_VOTE_BROADCASTED.inc();
         }
@@ -1134,7 +1134,7 @@ impl RoundManager {
                     if !order_voted_block.block().is_nil_block() {
                         observe_block(
                             order_voted_block.block().timestamp_usecs(),
-                            BlockStage::QC_AGGREGATED,
+                            BlockStage::ORDER_VOTE_QC_CREATED,
                         );
                     }
                 }
@@ -1167,7 +1167,7 @@ impl RoundManager {
             .context("[RoundManager] Failed to process a newly aggregated QC");
         self.process_certificates().await?;
         self.pending_order_votes
-            .garbage_collect(self.block_store.sync_info().highest_commit_round());
+            .garbage_collect(self.block_store.sync_info().highest_ordered_round());
         result
     }
 

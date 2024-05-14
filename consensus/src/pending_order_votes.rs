@@ -29,6 +29,8 @@ pub enum OrderVoteReceptionResult {
     ErrorAddingVote(VerifyError),
     /// Error happens when aggregating signature
     ErrorAggregatingSignature(VerifyError),
+    /// The author of the order vote is unknown
+    UnknownAuthor(Author),
 }
 
 #[derive(Debug, PartialEq, Eq)]
@@ -104,7 +106,8 @@ impl PendingOrderVotes {
         });
         let validator_voting_power = validator_verifier
             .get_voting_power(&order_vote.author())
-            .unwrap_or(0);
+            .ok_or(OrderVoteReceptionResult::UnknownAuthor(order_vote.author()))?;
+            
         if validator_voting_power == 0 {
             warn!(
                 "Received vote with no voting power, from {}",
