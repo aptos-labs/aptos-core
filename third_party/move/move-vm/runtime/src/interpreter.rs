@@ -708,14 +708,14 @@ impl Interpreter {
                     } else {
                         Err(self.set_location(PartialVMError::new(StatusCode::UNKNOWN_INVARIANT_VIOLATION_ERROR)
                                 .with_message(
-                                    format!("Private/Friend function invocation error, caller: {:?}::{:?}, callee: {:?}::{:?}", caller_id, caller.name(), callee_id, callee.name()),
+                                    format!("Private/Friend function invokation error, caller: {:?}::{:?}, callee: {:?}::{:?}", caller_id, caller.name(), callee_id, callee.name()),
                                 )))
                     }
                 },
                 _ => Err(self.set_location(
                     PartialVMError::new(StatusCode::UNKNOWN_INVARIANT_VIOLATION_ERROR)
                         .with_message(format!(
-                            "Private/Friend function invocation error caller: {:?}, callee {:?}",
+                            "Private/Friend function invokation error caller: {:?}, callee {:?}",
                             caller.name(),
                             callee.name()
                         )),
