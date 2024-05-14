@@ -79,6 +79,8 @@ module aptos_framework::fungible_asset {
     const EALREADY_REGISTERED: u64 = 29;
     /// Fungible metadata does not exist on this account.
     const EFUNGIBLE_METADATA_EXISTENCE: u64 = 30;
+    /// Cannot register dispatch hook for APT.
+    const EAPT_NOT_DISPATCHABLE: u64 = 31;
 
     //
     // Constants
@@ -322,7 +324,7 @@ module aptos_framework::fungible_asset {
         // Cannot register hook for APT.
         assert!(
             object::address_from_constructor_ref(constructor_ref) != @aptos_fungible_asset,
-            error::invalid_argument(EALREADY_REGISTERED)
+            error::permission_denied(EAPT_NOT_DISPATCHABLE)
         );
         assert!(
             !object::can_generate_delete_ref(constructor_ref),
@@ -338,7 +340,7 @@ module aptos_framework::fungible_asset {
             exists<Metadata>(
                 object::address_from_constructor_ref(constructor_ref)
             ),
-            error::not_found(ENOT_METADATA_OWNER),
+            error::not_found(EFUNGIBLE_METADATA_EXISTENCE),
         );
 
         let store_obj = &object::generate_signer(constructor_ref);

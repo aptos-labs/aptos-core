@@ -286,7 +286,7 @@ module 0xcafe::deflation_token_tests {
     }
 
     #[test(creator = @0xcafe)]
-    #[expected_failure(abort_code=0x60018, location = aptos_framework::fungible_asset)]
+    #[expected_failure(abort_code=0x6001E, location = aptos_framework::fungible_asset)]
     fun test_register_on_non_metadata_object(
         creator: &signer,
     ) {
