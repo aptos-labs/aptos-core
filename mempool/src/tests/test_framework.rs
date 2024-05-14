@@ -49,6 +49,7 @@ use aptos_types::{
     transaction::SignedTransaction,
 };
 use aptos_vm_validator::mocks::mock_vm_validator::MockVMValidator;
+use dashmap::DashMap;
 use futures::{channel::oneshot, SinkExt};
 use maplit::btreemap;
 use std::{collections::HashMap, hash::Hash, sync::Arc};
@@ -587,7 +588,10 @@ fn setup_mempool(
     let (mempool_notifier, mempool_listener) =
         aptos_mempool_notifications::new_mempool_notifier_listener_pair(100);
 
-    let mempool = Arc::new(Mutex::new(CoreMempool::new(&config)));
+    let mempool = Arc::new(Mutex::new(CoreMempool::new(
+        &config,
+        Arc::new(DashMap::new()),
+    )));
     let vm_validator = Arc::new(RwLock::new(MockVMValidator));
     let db_ro = Arc::new(MockDbReaderWriter);
 

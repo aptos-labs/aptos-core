@@ -36,6 +36,7 @@ use aptos_types::{
 use aptos_vm_validator::{
     mocks::mock_vm_validator::MockVMValidator, vm_validator::TransactionValidation,
 };
+use dashmap::DashMap;
 use futures::channel::mpsc;
 use maplit::hashmap;
 use std::{
@@ -117,7 +118,10 @@ impl MockSharedMempool {
         let mut config = NodeConfig::generate_random_config();
         config.validator_network = Some(NetworkConfig::network_with_id(NetworkId::Validator));
 
-        let mempool = Arc::new(Mutex::new(CoreMempool::new(&config)));
+        let mempool = Arc::new(Mutex::new(CoreMempool::new(
+            &config,
+            Arc::new(DashMap::new()),
+        )));
         let (network_reqs_tx, _network_reqs_rx) = aptos_channel::new(QueueStyle::FIFO, 8, None);
         let (connection_reqs_tx, _) = aptos_channel::new(QueueStyle::FIFO, 8, None);
         let (_network_notifs_tx, network_notifs_rx) = aptos_channel::new(QueueStyle::FIFO, 8, None);

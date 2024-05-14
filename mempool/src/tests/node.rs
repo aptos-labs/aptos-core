@@ -39,6 +39,7 @@ use aptos_types::{
     PeerId,
 };
 use aptos_vm_validator::mocks::mock_vm_validator::MockVMValidator;
+use dashmap::DashMap;
 use enum_dispatch::enum_dispatch;
 use futures::{
     channel::mpsc::{self, unbounded, UnboundedReceiver},
@@ -599,7 +600,10 @@ fn start_node_mempool(
     Runtime,
     UnboundedReceiver<SharedMempoolNotification>,
 ) {
-    let mempool = Arc::new(Mutex::new(CoreMempool::new(&config)));
+    let mempool = Arc::new(Mutex::new(CoreMempool::new(
+        &config,
+        Arc::new(DashMap::new()),
+    )));
     let (sender, subscriber) = unbounded();
     let (_ac_endpoint_sender, ac_endpoint_receiver) = mpsc::channel(1_024);
     let (_quorum_store_sender, quorum_store_receiver) = mpsc::channel(1_024);

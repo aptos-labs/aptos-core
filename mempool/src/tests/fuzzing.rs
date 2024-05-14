@@ -16,6 +16,7 @@ use aptos_network::{
 use aptos_storage_interface::mock::MockDbReaderWriter;
 use aptos_types::transaction::SignedTransaction;
 use aptos_vm_validator::mocks::mock_vm_validator::MockVMValidator;
+use dashmap::DashMap;
 use proptest::{
     arbitrary::any,
     prelude::*,
@@ -48,7 +49,10 @@ pub fn test_mempool_process_incoming_transactions_impl(
         PeersAndMetadata::new(&[NetworkId::Validator]),
     );
     let smp: SharedMempool<NetworkClient<MempoolSyncMsg>, MockVMValidator> = SharedMempool::new(
-        Arc::new(Mutex::new(CoreMempool::new(&config))),
+        Arc::new(Mutex::new(CoreMempool::new(
+            &config,
+            Arc::new(DashMap::new()),
+        ))),
         config.mempool.clone(),
         network_client,
         Arc::new(mock_db),
