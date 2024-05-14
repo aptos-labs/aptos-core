@@ -47,12 +47,12 @@ impl StandardGasAlgebra {
         gas_feature_version: u64,
         vm_gas_params: VMGasParameters,
         storage_gas_params: StorageGasParameters,
-        is_governance_proposal: bool,
+        is_approved_gov_script: bool,
         balance: impl Into<Gas>,
     ) -> Self {
         let balance = balance.into().to_unit_with_params(&vm_gas_params.txn);
 
-        let (max_execution_gas, max_io_gas, max_storage_fee) = if is_governance_proposal
+        let (max_execution_gas, max_io_gas, max_storage_fee) = if is_approved_gov_script
             && gas_feature_version >= gas_feature_versions::RELEASE_V1_13
         {
             (

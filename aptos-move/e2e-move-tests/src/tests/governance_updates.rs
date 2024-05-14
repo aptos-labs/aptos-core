@@ -74,7 +74,7 @@ fn large_transactions() {
 
 #[test]
 fn alt_execution_limit_for_gov_proposals() {
-    // This test validates that approved governance scripts automatically gets the
+    // This test validates that approved governance scripts automatically get the
     // alternate (usually increased) execution limit.
     let max_gas_regular = 10;
     let max_gas_gov = 100;
@@ -88,8 +88,8 @@ fn alt_execution_limit_for_gov_proposals() {
     h.modify_gas_schedule(|gas_params| {
         let txn = &mut gas_params.vm.txn;
 
-        txn.max_execution_gas = Gas::new(10).to_unit_with_params(txn);
-        txn.max_execution_gas_gov = Gas::new(100).to_unit_with_params(txn);
+        txn.max_execution_gas = Gas::new(max_gas_regular).to_unit_with_params(txn);
+        txn.max_execution_gas_gov = Gas::new(max_gas_gov).to_unit_with_params(txn);
     });
     h.set_resource(
         *root.address(),
@@ -117,8 +117,14 @@ fn alt_execution_limit_for_gov_proposals() {
             StatusCode::EXECUTION_LIMIT_REACHED
         ))),
     );
-    let gas_used = output.gas_used();
-    assert!(max_gas_regular - 1 <= gas_used && gas_used <= max_gas_regular + 1);
+    let exec_gas_used = output
+        .try_extract_fee_statement()
+        .ok()
+        .flatten()
+        .expect("should be able to get fee statement")
+        .execution_gas_used();
+    let overshoot = (max_gas_regular.min(max_gas_gov) / 5).max(1);
+    assert!(max_gas_regular <= exec_gas_used && exec_gas_used <= max_gas_regular + overshoot);
 
     // Add the hash of the script to the list of approved hashes.
     h.set_resource(
@@ -139,8 +145,18 @@ fn alt_execution_limit_for_gov_proposals() {
             StatusCode::EXECUTION_LIMIT_REACHED
         ))),
     );
-    let gas_used = output.gas_used();
-    assert!(max_gas_gov - 1 <= gas_used && gas_used <= max_gas_gov + 1);
+    let exec_gas_used = output
+        .try_extract_fee_statement()
+        .ok()
+        .flatten()
+        .expect("should be able to get fee statement")
+        .execution_gas_used();
+    assert!(max_gas_gov <= exec_gas_used && exec_gas_used <= max_gas_gov + overshoot);
+
+    // TODO: Consider adding a successful transaction that costs x amount of gas where
+    //       max_gas_regular < x < max_gas_gov.
+    //       Currently we do not have it as it is hard to have a transaction that costs
+    //       x amount of gas without it being fragile to gas-related changes.
 }
 
 fn run(

@@ -22,6 +22,7 @@ use move_core_types::{
     vm_status::{StatusCode, VMStatus},
 };
 
+/// This is used until gas version 18, which introduces a configurable entry for this.
 const MAXIMUM_APPROVED_TRANSACTION_SIZE_LEGACY: u64 = 1024 * 1024;
 
 pub(crate) fn get_gas_config_from_storage(
@@ -124,14 +125,14 @@ pub fn make_prod_gas_meter(
     gas_feature_version: u64,
     vm_gas_params: VMGasParameters,
     storage_gas_params: StorageGasParameters,
-    is_governance_proposal: bool,
+    is_approved_gov_script: bool,
     meter_balance: Gas,
 ) -> ProdGasMeter {
     MemoryTrackedGasMeter::new(StandardGasMeter::new(StandardGasAlgebra::new(
         gas_feature_version,
         vm_gas_params,
         storage_gas_params,
-        is_governance_proposal,
+        is_approved_gov_script,
         meter_balance,
     )))
 }
@@ -142,36 +143,31 @@ pub(crate) fn check_gas(
     resolver: &impl AptosMoveResolver,
     txn_metadata: &TransactionMetadata,
     features: &Features,
-    is_governance_proposal: bool,
+    is_approved_gov_script: bool,
     log_context: &AdapterLogSchema,
 ) -> Result<(), VMStatus> {
     let txn_gas_params = &gas_params.vm.txn;
     let raw_bytes_len = txn_metadata.transaction_size;
-    // The transaction is too large.
-    if txn_metadata.transaction_size > txn_gas_params.max_transaction_size_in_bytes {
+
+    if is_approved_gov_script {
         let max_txn_size_gov = if gas_feature_version >= RELEASE_V1_13 {
             gas_params.vm.txn.max_transaction_size_in_bytes_gov
         } else {
             MAXIMUM_APPROVED_TRANSACTION_SIZE_LEGACY.into()
         };
 
-        let valid = is_governance_proposal
-            // If it is valid ensure that it is only the approved payload that exceeds the
+        if txn_metadata.transaction_size > max_txn_size_gov
+            // Ensure that it is only the approved payload that exceeds the
             // maximum. The (unknown) user input should be restricted to the original
             // maximum transaction size.
-            && (txn_metadata.script_size + txn_gas_params.max_transaction_size_in_bytes
-                >= txn_metadata.transaction_size)
-            // Since an approved transaction can be sent by anyone, the system is safer by
-            // enforcing an upper limit on governance transactions just so something really
-            // bad doesn't happen.
-            && txn_metadata.transaction_size <= max_txn_size_gov;
-
-        if !valid {
+            || txn_metadata.transaction_size
+                > txn_metadata.script_size + txn_gas_params.max_transaction_size_in_bytes
+        {
             speculative_warn!(
                 log_context,
                 format!(
-                    "[VM] Transaction size too big {} (max {})",
-                    raw_bytes_len, txn_gas_params.max_transaction_size_in_bytes
+                    "[VM] Governance transaction size too big {} payload size {}",
+                    txn_metadata.transaction_size, txn_metadata.script_size,
                 ),
             );
             return Err(VMStatus::error(
@@ -179,6 +175,18 @@ pub(crate) fn check_gas(
                 None,
             ));
         }
+    } else if txn_metadata.transaction_size > txn_gas_params.max_transaction_size_in_bytes {
+        speculative_warn!(
+            log_context,
+            format!(
+                "[VM] Transaction size too big {} (max {})",
+                txn_metadata.transaction_size, txn_gas_params.max_transaction_size_in_bytes
+            ),
+        );
+        return Err(VMStatus::error(
+            StatusCode::EXCEEDED_MAX_TRANSACTION_SIZE,
+            None,
+        ));
     }
 
     // The submitted max gas units that the transaction can consume is greater than the

@@ -39,7 +39,7 @@ use aptos_metrics_core::TimerHelper;
 #[cfg(any(test, feature = "testing"))]
 use aptos_types::state_store::StateViewId;
 use aptos_types::{
-    account_config::{self, new_block_event_key, AccountResource, CORE_CODE_ADDRESS},
+    account_config::{self, new_block_event_key, AccountResource},
     block_executor::{
         config::{BlockExecutorConfig, BlockExecutorConfigFromOnchain, BlockExecutorLocalConfig},
         partitioner::PartitionedTransactions,
@@ -52,8 +52,8 @@ use aptos_types::{
     move_utils::as_move_value::AsMoveValue,
     on_chain_config::{
         new_epoch_event_key, randomness_api_v0_config::RequiredGasDeposit, ApprovedExecutionHashes,
-        ConfigurationResource, FeatureFlag, Features, OnChainConfig, TimedFeatureOverride,
-        TimedFeatures, TimedFeaturesBuilder,
+        ConfigStorage, ConfigurationResource, FeatureFlag, Features, OnChainConfig,
+        TimedFeatureOverride, TimedFeatures, TimedFeaturesBuilder,
     },
     randomness::Randomness,
     state_store::{StateView, TStateView},
@@ -92,7 +92,6 @@ use move_core_types::{
     identifier::Identifier,
     language_storage::{ModuleId, TypeTag},
     move_resource::MoveStructType,
-    resolver::MoveResolver,
     transaction_argument::convert_txn_args,
     value::{serialize_values, MoveValue},
     vm_status::StatusType,
@@ -107,7 +106,6 @@ use once_cell::sync::{Lazy, OnceCell};
 use std::{
     cmp::{max, min},
     collections::{BTreeMap, BTreeSet},
-    fmt::Debug,
     marker::Sync,
     sync::Arc,
 };
@@ -199,27 +197,19 @@ pub(crate) fn get_or_vm_startup_failure<'a, T>(
 
 /// Checks if a given transaction is a governance proposal by checking if it has one of the
 /// approved execution hashes.
-fn is_governance_proposal<R, E>(
-    resolver: &R,
+fn is_approved_gov_script(
+    resolver: &impl ConfigStorage,
     txn: &SignedTransaction,
     txn_metadata: &TransactionMetadata,
-) -> bool
-where
-    R: MoveResolver<E>,
-    E: Debug,
-{
+) -> bool {
     match txn.payload() {
         TransactionPayload::Script(_script) => {
-            match resolver.get_resource(&CORE_CODE_ADDRESS, &ApprovedExecutionHashes::struct_tag())
-            {
-                Ok(Some(bytes)) => match bcs::from_bytes::<ApprovedExecutionHashes>(&bytes) {
-                    Ok(approved_execution_hashes) => approved_execution_hashes
-                        .entries
-                        .iter()
-                        .any(|(_, hash)| hash == &txn_metadata.script_hash),
-                    Err(_) => false,
-                },
-                _ => false,
+            match ApprovedExecutionHashes::fetch_config(resolver) {
+                Some(approved_execution_hashes) => approved_execution_hashes
+                    .entries
+                    .iter()
+                    .any(|(_, hash)| hash == &txn_metadata.script_hash),
+                None => false,
             }
         },
         _ => false,
@@ -1621,7 +1611,7 @@ impl AptosVM {
         transaction: &SignedTransaction,
         transaction_data: &TransactionMetadata,
         log_context: &AdapterLogSchema,
-        is_governance_proposal: bool,
+        is_approved_gov_script: bool,
         traversal_context: &mut TraversalContext,
     ) -> Result<(), VMStatus> {
         // Check transaction format.
@@ -1662,7 +1652,7 @@ impl AptosVM {
             transaction.payload(),
             transaction_data,
             log_context,
-            is_governance_proposal,
+            is_approved_gov_script,
             traversal_context,
         )
     }
@@ -1707,7 +1697,7 @@ impl AptosVM {
         resolver: &impl AptosMoveResolver,
         txn: &SignedTransaction,
         mut txn_data: TransactionMetadata,
-        is_governance_proposal: bool,
+        is_approved_gov_script: bool,
         gas_meter: &mut impl AptosGasMeter,
         log_context: &AdapterLogSchema,
     ) -> (VMStatus, VMOutput) {
@@ -1732,7 +1722,7 @@ impl AptosVM {
                 txn,
                 &txn_data,
                 log_context,
-                is_governance_proposal,
+                is_approved_gov_script,
                 &mut traversal_context,
             )
         }));
@@ -1838,7 +1828,7 @@ impl AptosVM {
     {
         let txn_metadata = TransactionMetadata::new(txn);
 
-        let is_governance_proposal = is_governance_proposal(resolver, txn, &txn_metadata);
+        let is_approved_gov_script = is_approved_gov_script(resolver, txn, &txn_metadata);
 
         let balance = txn.max_gas_amount().into();
         let mut gas_meter = make_gas_meter(
@@ -1847,14 +1837,14 @@ impl AptosVM {
                 .vm
                 .clone(),
             get_or_vm_startup_failure(&self.storage_gas_params, log_context)?.clone(),
-            is_governance_proposal,
+            is_approved_gov_script,
             balance,
         );
         let (status, output) = self.execute_user_transaction_impl(
             resolver,
             txn,
             txn_metadata,
-            is_governance_proposal,
+            is_approved_gov_script,
             &mut gas_meter,
             log_context,
         );
@@ -1885,13 +1875,13 @@ impl AptosVM {
             |gas_feature_version,
              vm_gas_params,
              storage_gas_params,
-             is_governance_proposal,
+             is_approved_gov_script,
              meter_balance| {
                 modify_gas_meter(make_prod_gas_meter(
                     gas_feature_version,
                     vm_gas_params,
                     storage_gas_params,
-                    is_governance_proposal,
+                    is_approved_gov_script,
                     meter_balance,
                 ))
             },
@@ -2232,7 +2222,7 @@ impl AptosVM {
             vm.gas_feature_version,
             vm_gas_params,
             storage_gas_params,
-            false,
+            /* is_approved_gov_script */ false,
             max_gas_amount.into(),
         );
 
@@ -2305,7 +2295,7 @@ impl AptosVM {
         payload: &TransactionPayload,
         txn_data: &TransactionMetadata,
         log_context: &AdapterLogSchema,
-        is_governance_proposal: bool,
+        is_approved_gov_script: bool,
         traversal_context: &mut TraversalContext,
     ) -> Result<(), VMStatus> {
         check_gas(
@@ -2314,7 +2304,7 @@ impl AptosVM {
             resolver,
             txn_data,
             self.features(),
-            is_governance_proposal,
+            is_approved_gov_script,
             log_context,
         )?;
 
@@ -2662,7 +2652,7 @@ impl VMValidator for AptosVM {
         let mut txn_data = TransactionMetadata::new(&txn);
 
         let resolver = self.as_move_resolver(&state_view);
-        let is_governance_proposal = is_governance_proposal(&resolver, &txn, &txn_data);
+        let is_approved_gov_script = is_approved_gov_script(&resolver, &txn, &txn_data);
 
         let mut session = self.new_session(
             &resolver,
@@ -2698,7 +2688,7 @@ impl VMValidator for AptosVM {
             &txn,
             &txn_data,
             &log_context,
-            is_governance_proposal,
+            is_approved_gov_script,
             &mut TraversalContext::new(&storage),
         ) {
             Err(err) if err.status_code() != StatusCode::SEQUENCE_NUMBER_TOO_NEW => (

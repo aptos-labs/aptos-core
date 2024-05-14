@@ -8,6 +8,8 @@
 ///   - Changing how gas is calculated in any way
 ///
 /// Change log:
+/// - V18
+///   - Separate limits for governance scripts
 /// - V17
 ///   - Gas for keyless
 /// - V16
