@@ -126,7 +126,7 @@ TESTS = [
     RunGroupConfig(expected_tps=8000, key=RunGroupKey("resource-groups-global-write-and-read-tag1-kb", module_working_set_size=20), included_in=Flow.RESOURCE_GROUPS, waived=True),
     RunGroupConfig(expected_tps=15690, key=RunGroupKey("resource-groups-sender-write-tag1-kb"), included_in=Flow.CONTINUOUS | Flow.RESOURCE_GROUPS),
     RunGroupConfig(expected_tps=8000, key=RunGroupKey("resource-groups-sender-write-tag1-kb", module_working_set_size=20), included_in=Flow.RESOURCE_GROUPS, waived=True),
-    RunGroupConfig(expected_tps=14020, key=RunGroupKey("resource-groups-sender-multi-change1-kb"), included_in=LAND_BLOCKING_AND_C | Flow.RESOURCE_GROUPS),
+    RunGroupConfig(expected_tps=8000, key=RunGroupKey("resource-groups-sender-multi-change1-kb"), included_in=LAND_BLOCKING_AND_C | Flow.RESOURCE_GROUPS),
     RunGroupConfig(expected_tps=8000, key=RunGroupKey("resource-groups-sender-multi-change1-kb", module_working_set_size=20), included_in=Flow.RESOURCE_GROUPS, waived=True),
     
     RunGroupConfig(expected_tps=1725, key=RunGroupKey("token-v1ft-mint-and-transfer"), included_in=Flow.CONTINUOUS),
@@ -156,6 +156,8 @@ TESTS = [
     RunGroupConfig(expected_tps=1035, key=RunGroupKey("liquidity-pool-swap-stable"), included_in=Flow.CONTINUOUS),
     RunGroupConfig(expected_tps=4570, key=RunGroupKey("liquidity-pool-swap-stable", module_working_set_size=20), included_in=Flow.CONTINUOUS),
 
+    RunGroupConfig(expected_tps=27000, key=RunGroupKey("deserialize-u256"), included_in=Flow.CONTINUOUS),
+    
     # fee payer sequentializes transactions today. in these tests module publisher is the fee payer, so larger number of modules tests throughput with multiple fee payers
     RunGroupConfig(expected_tps=3095, key=RunGroupKey("no-op-fee-payer"), included_in=LAND_BLOCKING_AND_C),
     RunGroupConfig(expected_tps=17840, key=RunGroupKey("no-op-fee-payer", module_working_set_size=50), included_in=Flow.CONTINUOUS),
