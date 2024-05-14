@@ -226,7 +226,6 @@ impl BlockStore {
             self.storage.clone(),
             self.execution_client.clone(),
             self.payload_manager.clone(),
-            self.order_vote_enabled,
         )
         .await?
         .take();
@@ -264,7 +263,6 @@ impl BlockStore {
         storage: Arc<dyn PersistentLivenessStorage>,
         execution_client: Arc<dyn TExecutionClient>,
         payload_manager: Arc<PayloadManager>,
-        order_vote_enabled: bool,
     ) -> anyhow::Result<RecoveryData> {
         info!(
             LogSchema::new(LogEvent::StateSync).remote_peer(retriever.preferred_peer),
@@ -345,7 +343,11 @@ impl BlockStore {
                 )
             })?;
 
-        storage.save_tree(blocks.clone(), quorum_certs.clone())?;
+        storage.save_tree(
+            blocks.clone(),
+            quorum_certs.clone(),
+            Some(highest_ordered_cert.clone()),
+        )?;
 
         execution_client
             .sync_to(highest_commit_cert.ledger_info().clone())
@@ -354,11 +356,10 @@ impl BlockStore {
         // we do not need to update block_tree.highest_commit_decision_ledger_info here
         // because the block_tree is going to rebuild itself.
 
-        let recovery_data =
-            match storage.start(order_vote_enabled.then(|| highest_ordered_cert.clone())) {
-                LivenessStorageData::FullRecoveryData(recovery_data) => recovery_data,
-                _ => panic!("Failed to construct recovery data after fast forward sync"),
-            };
+        let recovery_data = match storage.start() {
+            LivenessStorageData::FullRecoveryData(recovery_data) => recovery_data,
+            _ => panic!("Failed to construct recovery data after fast forward sync"),
+        };
 
         Ok(recovery_data)
     }

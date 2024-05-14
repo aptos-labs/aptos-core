@@ -24,8 +24,13 @@ use std::{cmp::max, collections::HashSet, sync::Arc};
 /// Blocks persisted are proposed but not yet committed.  The committed state is persisted
 /// via StateComputer.
 pub trait PersistentLivenessStorage: Send + Sync {
-    /// Persist the blocks and quorum certs into storage atomically.
-    fn save_tree(&self, blocks: Vec<Block>, quorum_certs: Vec<QuorumCert>) -> Result<()>;
+    /// Persist the blocks, quorum certs and highest ordered cert into storage atomically.
+    fn save_tree(
+        &self,
+        blocks: Vec<Block>,
+        quorum_certs: Vec<QuorumCert>,
+        highest_ordered_cert: Option<WrappedLedgerInfo>,
+    ) -> Result<()>;
 
     /// Delete the corresponding blocks and quorum certs atomically.
     fn prune_tree(&self, block_ids: Vec<HashValue>) -> Result<()>;
@@ -37,7 +42,7 @@ pub trait PersistentLivenessStorage: Send + Sync {
     fn recover_from_ledger(&self) -> LedgerRecoveryData;
 
     /// Construct necessary data to start consensus.
-    fn start(&self, highest_ordered_cert: Option<WrappedLedgerInfo>) -> LivenessStorageData;
+    fn start(&self) -> LivenessStorageData;
 
     /// Persist the highest 2chain timeout certificate for improved liveness - proof for other replicas
     /// to jump to this round
@@ -329,10 +334,26 @@ impl StorageWriteProxy {
 }
 
 impl PersistentLivenessStorage for StorageWriteProxy {
-    fn save_tree(&self, blocks: Vec<Block>, quorum_certs: Vec<QuorumCert>) -> Result<()> {
-        Ok(self
-            .db
-            .save_blocks_and_quorum_certificates(blocks, quorum_certs)?)
+    fn save_tree(
+        &self,
+        blocks: Vec<Block>,
+        quorum_certs: Vec<QuorumCert>,
+        highest_ordered_cert: Option<WrappedLedgerInfo>,
+    ) -> Result<()> {
+        let highest_ordered_cert = highest_ordered_cert.map(|cert| {
+            bcs::to_bytes(&cert).map_err(|e| {
+                format_err!(
+                    "Failed to serialize highest ordered cert in persistent liveness storage: {}",
+                    e
+                )
+            })
+        });
+        let highest_ordered_cert = highest_ordered_cert.transpose()?;
+        Ok(self.db.save_blocks_and_quorum_certificates(
+            blocks,
+            quorum_certs,
+            highest_ordered_cert,
+        )?)
     }
 
     fn prune_tree(&self, block_ids: Vec<HashValue>) -> Result<()> {
@@ -355,7 +376,7 @@ impl PersistentLivenessStorage for StorageWriteProxy {
         LedgerRecoveryData::new(latest_ledger_info)
     }
 
-    fn start(&self, highest_ordered_cert: Option<WrappedLedgerInfo>) -> LivenessStorageData {
+    fn start(&self) -> LivenessStorageData {
         info!("Start consensus recovery.");
         let raw_data = self
             .db
@@ -369,8 +390,11 @@ impl PersistentLivenessStorage for StorageWriteProxy {
         let highest_2chain_timeout_cert = raw_data.1.map(|b| {
             bcs::from_bytes(&b).expect("unable to deserialize highest 2-chain timeout cert")
         });
-        let blocks = raw_data.2;
-        let quorum_certs: Vec<_> = raw_data.3;
+        let highest_ordered_cert = raw_data.2.map(|bytes| {
+            bcs::from_bytes(&bytes).expect("unable to deserialize highest ordered cert")
+        });
+        let blocks = raw_data.3;
+        let quorum_certs: Vec<_> = raw_data.4;
         let blocks_repr: Vec<String> = blocks.iter().map(|b| format!("\n\t{}", b)).collect();
         info!(
             "The following blocks were restored from ConsensusDB : {}",

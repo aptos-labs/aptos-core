@@ -104,10 +104,17 @@ impl PendingOrderVotes {
                 ),
             )
         });
-        let validator_voting_power = validator_verifier
-            .get_voting_power(&order_vote.author())
-            .ok_or(OrderVoteReceptionResult::UnknownAuthor(order_vote.author()))?;
-            
+
+        let validator_voting_power = validator_verifier.get_voting_power(&order_vote.author());
+        if validator_voting_power.is_none() {
+            warn!(
+                "Received order vote from an unknown author: {}",
+                order_vote.author()
+            );
+            return OrderVoteReceptionResult::UnknownAuthor(order_vote.author());
+        }
+        let validator_voting_power = validator_voting_power.unwrap();
+
         if validator_voting_power == 0 {
             warn!(
                 "Received vote with no voting power, from {}",
