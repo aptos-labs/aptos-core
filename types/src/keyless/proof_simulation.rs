@@ -214,13 +214,13 @@ pub fn prove_with_trapdoor<C: ConstraintSynthesizer<E::ScalarField>, R: RngCore>
 }
 
 
-/*fn test_prove_and_verify<E>(n_iters: usize)
+fn test_prove_and_verify<E>(n_iters: usize)
 where
-    E: Pairing,
+    E: Pairing, <E as Pairing>::ScalarField: From<i32>
 {
     let mut rng = ark_std::rand::rngs::StdRng::seed_from_u64(test_rng().next_u64());
 
-    let (pk, vk) = Groth16::<E>::circuit_specific_setup_with_trapdoor(MySillyCircuit { a: None, b: None }, &mut rng).unwrap();
+    let (pk, vk) = Groth16Simulator::<E>::circuit_specific_setup_with_trapdoor(MySillyCircuit { a: None, b: None }, &mut rng).unwrap();
     let pvk = prepare_verifying_key::<E>(&vk);
 
     for _ in 0..n_iters {
@@ -229,7 +229,7 @@ where
         let mut c = a;
         c *= b;
 
-        let proof = Groth16::<E>::prove_with_trapdoor(
+        let proof = Groth16Simulator::<E>::prove_with_trapdoor(
             &pk,
             MySillyCircuit {
                 a: Some(a),
@@ -242,4 +242,11 @@ where
         assert!(Groth16::<E>::verify_with_processed_vk(&pvk, &[c], &proof).unwrap());
         assert!(!Groth16::<E>::verify_with_processed_vk(&pvk, &[a], &proof).unwrap());
     }
+}
+
+/*use ark_bn254::BN254;
+
+#[test]
+fn prove_and_verify() {
+    test_prove_and_verify::<BN254>(n_iters: 100);
 }*/
