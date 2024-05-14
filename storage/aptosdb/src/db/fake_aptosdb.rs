@@ -176,10 +176,10 @@ impl FakeAptosDB {
     pub fn new(db: AptosDB) -> Self {
         Self {
             inner: db,
-            txn_by_version: Arc::new(DashMap::with_capacity(10_000_000)),
-            txn_version_by_hash: Arc::new(DashMap::with_capacity(10_000_000)),
-            txn_info_by_version: Arc::new(DashMap::with_capacity(10_000_000)),
-            txn_hash_by_position: Arc::new(DashMap::with_capacity(10_000_000)),
+            txn_by_version: Arc::new(DashMap::with_capacity(100_000_000)),
+            txn_version_by_hash: Arc::new(DashMap::with_capacity(100_000_000)),
+            txn_info_by_version: Arc::new(DashMap::with_capacity(100_000_000)),
+            txn_hash_by_position: Arc::new(DashMap::with_capacity(100_000_000)),
             account_seq_num: Arc::new(DashMap::with_capacity(10_000)),
             latest_block_timestamp: AtomicU64::new(0),
             latest_version: Mutex::new(None),
@@ -298,7 +298,7 @@ impl FakeAptosDB {
         txns_to_commit
             .into_par_iter()
             .enumerate()
-            .with_min_len(10)
+            .with_min_len(50)
             .try_for_each(|(idx, txn_to_commit)| -> Result<(), anyhow::Error> {
                 let ver = first_version + idx as u64;
                 self.txn_by_version

@@ -154,7 +154,7 @@ impl Default for DagHealthConfig {
     fn default() -> Self {
         Self {
             chain_backoff_config: Vec::new(),
-            voter_pipeline_latency_limit_ms: 300_000,
+            voter_pipeline_latency_limit_ms: 900_000,
             pipeline_backpressure_config: Vec::new(),
         }
     }

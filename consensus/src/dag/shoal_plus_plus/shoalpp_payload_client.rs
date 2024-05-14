@@ -59,7 +59,7 @@ impl ShoalppPayloadClient {
                     dag_reader
                         .reachable(
                             highest_round_nodes.iter().map(|node| node.metadata()),
-                            Some(highest_commit_round.saturating_sub(self.window_size_config)),
+                            Some(highest_commit_round.saturating_sub(100)),
                             |_| true,
                         )
                         .map(|node_status| node_status.as_node().payload())
