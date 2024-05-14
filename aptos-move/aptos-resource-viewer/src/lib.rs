@@ -6,7 +6,7 @@ pub mod module_view;
 
 use crate::module_view::ModuleView;
 use aptos_types::state_store::StateView;
-use aptos_vm::data_cache::get_resource_group_from_metadata;
+use aptos_vm::data_cache::get_resource_group_member_from_metadata;
 use move_binary_format::CompiledModule;
 use move_core_types::{
     identifier::{IdentStr, Identifier},
@@ -40,9 +40,9 @@ impl<'a, S: StateView> AptosValueAnnotator<'a, S> {
         self.0.view_existing_module(module_id)
     }
 
-    pub fn view_resource_group_tag(&self, tag: &StructTag) -> Option<StructTag> {
+    pub fn view_resource_group_member(&self, tag: &StructTag) -> Option<StructTag> {
         match self.view_module(&tag.module_id()) {
-            Ok(Some(module)) => get_resource_group_from_metadata(tag, &module.metadata),
+            Ok(Some(module)) => get_resource_group_member_from_metadata(tag, &module.metadata),
             // Even if module does not exist, we do not return an error but instead
             // say that the group tag does not exist.
             _ => None,

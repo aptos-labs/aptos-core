@@ -49,7 +49,7 @@ use std::{
     sync::Arc,
 };
 
-pub fn get_resource_group_from_metadata(
+pub fn get_resource_group_member_from_metadata(
     struct_tag: &StructTag,
     metadata: &[Metadata],
 ) -> Option<StructTag> {
@@ -121,7 +121,7 @@ impl<'e, E: ExecutorView> StorageAdapter<'e, E> {
         metadata: &[Metadata],
         maybe_layout: Option<&MoveTypeLayout>,
     ) -> PartialVMResult<(Option<Bytes>, usize)> {
-        let resource_group = get_resource_group_from_metadata(struct_tag, metadata);
+        let resource_group = get_resource_group_member_from_metadata(struct_tag, metadata);
         if let Some(resource_group) = resource_group {
             let key = StateKey::resource_group(address, &resource_group);
             let buf =

@@ -94,7 +94,18 @@ impl<'a, S: StateView> MoveConverter<'a, S> {
     }
 
     pub fn is_resource_group(&self, tag: &StructTag) -> bool {
-        self.inner.view_resource_group_tag(tag).is_some()
+        if let Ok(Some(module)) = self.inner.view_module(&tag.module_id()) {
+            if let Some(md) = aptos_framework::get_metadata(&module.metadata) {
+                if let Some(attrs) = md.struct_attributes.get(tag.name.as_ident_str().as_str()) {
+                    return attrs
+                        .iter()
+                        .find(|attr| attr.is_resource_group())
+                        .map(|_| true)
+                        .unwrap_or(false);
+                }
+            }
+        }
+        false
     }
 
     pub fn find_resource(
@@ -103,7 +114,7 @@ impl<'a, S: StateView> MoveConverter<'a, S> {
         address: Address,
         tag: &StructTag,
     ) -> Result<Option<Bytes>> {
-        Ok(match self.inner.view_resource_group_tag(tag) {
+        Ok(match self.inner.view_resource_group_member(tag) {
             Some(group_tag) => {
                 let key = StateKey::resource_group(&address.into(), &group_tag);
                 match state_view.get_state_value_bytes(&key)? {
