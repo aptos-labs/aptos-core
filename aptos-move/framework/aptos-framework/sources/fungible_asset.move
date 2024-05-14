@@ -672,7 +672,8 @@ module aptos_framework::fungible_asset {
 
     /// Mint the specified `amount` of the fungible asset to a destination store.
     public fun mint_to<T: key>(ref: &MintRef, store: Object<T>, amount: u64)
-    acquires FungibleStore, Supply, ConcurrentSupply {
+    acquires FungibleStore, Supply, ConcurrentSupply, DispatchFunctionStore {
+        deposit_sanity_check(store, false);
         deposit_internal(store, mint(ref, amount));
     }
 
@@ -1065,6 +1066,18 @@ module aptos_framework::fungible_asset {
         let fa = mint(&mint_ref, 100);
         set_frozen_flag(&transfer_ref, creator_store, true);
         deposit(creator_store, fa);
+    }
+
+    #[test(creator = @0xcafe)]
+    #[expected_failure(abort_code = 0x50003, location = Self)]
+    fun test_mint_to_frozen(
+        creator: &signer
+    ) acquires FungibleStore, Supply, ConcurrentSupply, DispatchFunctionStore {
+        let (mint_ref, transfer_ref, _burn_ref, _) = create_fungible_asset(creator);
+
+        let creator_store = create_test_store(creator, mint_ref.metadata);
+        set_frozen_flag(&transfer_ref, creator_store, true);
+        mint_to(&mint_ref, creator_store, 100);
     }
 
     #[test(creator = @0xcafe)]

@@ -203,8 +203,7 @@ module aptos_framework::primary_fungible_store {
     /// Mint to the primary store of `owner`.
     public fun mint(mint_ref: &MintRef, owner: address, amount: u64) acquires DeriveRefPod {
         let primary_store = ensure_primary_store_exists(owner, fungible_asset::mint_ref_metadata(mint_ref));
-        let fa = fungible_asset::mint(mint_ref, amount);
-        fungible_asset::deposit_internal(primary_store, fa);
+        fungible_asset::mint_to(mint_ref, primary_store, amount);
     }
 
     /// Burn from the primary store of `owner`.

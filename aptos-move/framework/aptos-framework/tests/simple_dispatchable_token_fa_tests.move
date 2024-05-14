@@ -2,7 +2,7 @@
 module aptos_framework::simple_token_fa_tests {
     use aptos_framework::fungible_asset::{
         amount, balance, burn, destroy_zero, extract, create_test_token, init_test_metadata,
-        supply, create_store, create_test_store, remove_store, deposit_with_ref, mint, merge,
+        supply, create_store, create_test_store, remove_store, deposit_with_ref, mint, mint_to, merge,
         set_frozen_flag, is_frozen, transfer_with_ref, upgrade_to_concurrent, Metadata, TestToken
     };
     use aptos_framework::object;
@@ -94,5 +94,21 @@ module aptos_framework::simple_token_fa_tests {
         assert!(supply(test_token) == option::some(50), 3);
 
         deposit_with_ref(&transfer_ref, creator_store, fb);
+    }
+
+    #[test(creator = @0xcafe)]
+    #[expected_failure(abort_code = 0x50003, location = aptos_framework::fungible_asset)]
+    fun test_mint_to_frozen(
+        creator: &signer
+    ) {
+        let (creator_ref, test_token) = create_test_token(creator);
+        let (mint_ref, transfer_ref, _burn_ref) = init_test_metadata(&creator_ref);
+        let metadata = object::convert<TestToken, Metadata>(test_token);
+        simple_token::initialize(creator, &creator_ref);
+
+        let creator_store = create_test_store(creator, metadata);
+
+        set_frozen_flag(&transfer_ref, creator_store, true);
+        mint_to(&mint_ref, creator_store, 100);
     }
 }
