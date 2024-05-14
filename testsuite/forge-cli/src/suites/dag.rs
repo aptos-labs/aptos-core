@@ -417,7 +417,7 @@ pub fn run_dag_consensus_only_realistic_env_max_tps() -> ForgeConfig {
             optimize_state_sync_for_throughput(config);
             state_sync_config_execute_transactions(&mut config.state_sync);
         }))
-        .with_validator_resource_override(NodeResourceOverride { cpu_cores: Some(30), memory_gib: Some(100) })
+        .with_validator_resource_override(NodeResourceOverride { cpu_cores: Some(60), memory_gib: Some(500) })
         // TODO(ibalajiarun): tune these success critiera after we have a better idea of the test behavior
         .with_success_criteria(
             SuccessCriteria::new(10000)
