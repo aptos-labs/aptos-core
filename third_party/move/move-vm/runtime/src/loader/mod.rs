@@ -415,11 +415,9 @@ impl Loader {
             .resolve_function_by_name(function_name, module_id)
             .map_err(|err| err.finish(Location::Undefined))?;
 
-        let parameters = func.param_tys().to_vec();
-
-        let return_ = func.return_tys().to_vec();
-
-        Ok((module, func, parameters, return_))
+        let param_tys = func.param_tys().to_vec();
+        let return_tys = func.return_tys().to_vec();
+        Ok((module, func, param_tys, return_tys))
     }
 
     // Matches the actual returned type to the expected type, binding any type args to the
