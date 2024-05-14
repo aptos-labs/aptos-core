@@ -134,7 +134,7 @@ error: function does not abort under this condition
     =     at tests/sources/functional/aborts_if.move:146: abort_at_2_or_3_spec_incorrect
     =         <redacted> = <redacted>
     =     at tests/sources/functional/aborts_if.move:146: abort_at_2_or_3_spec_incorrect
-    =     at tests/sources/functional/aborts_if.move:147: abort_at_2_or_3_spec_incorrect
+    =     at tests/sources/functional/aborts_if.move:145: abort_at_2_or_3_spec_incorrect
     =     at tests/sources/functional/aborts_if.move:151: abort_at_2_or_3_spec_incorrect (spec)
 
 error: abort not covered by any of the `aborts_if` clauses

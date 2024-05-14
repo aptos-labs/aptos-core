@@ -28,11 +28,9 @@ error: post-condition does not hold
    =     at ../move-stdlib/sources/fixed_point32.move:69: divide_u64
    =     at ../move-stdlib/sources/fixed_point32.move:71: divide_u64
    =         <redacted> = <redacted>
-   =     at ../move-stdlib/sources/fixed_point32.move:71: divide_u64
    =     at ../move-stdlib/sources/fixed_point32.move:74: divide_u64
    =     at ../move-stdlib/sources/fixed_point32.move:63: divide_u64
    =         result = <redacted>
-   =     at ../move-stdlib/sources/fixed_point32.move:75: divide_u64
    =     at ../move-stdlib/sources/fixed_point32.move:84
    =     at ../move-stdlib/sources/fixed_point32.move:85
    =     at ../move-stdlib/sources/fixed_point32.move:79: divide_u64 (spec)
@@ -75,11 +73,9 @@ error: function does not abort under this condition
    =     at ../move-stdlib/sources/fixed_point32.move:69: divide_u64
    =     at ../move-stdlib/sources/fixed_point32.move:71: divide_u64
    =         <redacted> = <redacted>
-   =     at ../move-stdlib/sources/fixed_point32.move:71: divide_u64
    =     at ../move-stdlib/sources/fixed_point32.move:74: divide_u64
    =     at ../move-stdlib/sources/fixed_point32.move:63: divide_u64
    =         result = <redacted>
-   =     at ../move-stdlib/sources/fixed_point32.move:75: divide_u64
    =     at ../move-stdlib/sources/fixed_point32.move:84
    =     at ../move-stdlib/sources/fixed_point32.move:85
 
@@ -96,11 +92,9 @@ error: post-condition does not hold
     =     at ../move-stdlib/sources/fixed_point32.move:202: create_from_u64
     =     at ../move-stdlib/sources/fixed_point32.move:203: create_from_u64
     =         <redacted> = <redacted>
-    =     at ../move-stdlib/sources/fixed_point32.move:203: create_from_u64
     =     at ../move-stdlib/sources/fixed_point32.move:204: create_from_u64
     =     at ../move-stdlib/sources/fixed_point32.move:201: create_from_u64
     =         result = <redacted>
-    =     at ../move-stdlib/sources/fixed_point32.move:205: create_from_u64
     =     at ../move-stdlib/sources/fixed_point32.move:214
     =     at ../move-stdlib/sources/fixed_point32.move:209: create_from_u64 (spec)
 
