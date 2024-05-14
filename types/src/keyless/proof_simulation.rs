@@ -48,11 +48,13 @@ impl<ConstraintF: Field> ConstraintSynthesizer<ConstraintF> for MySillyCircuit<C
 //use ark_std::rand::RngCore;
 use ark_std::{marker::PhantomData, vec::Vec};
 use ark_groth16::r1cs_to_qap::{LibsnarkReduction, R1CSToQAP};
-use ark_groth16::data_structures::{ProvingKey, VerifyingKey, PreparedVerifyingKey};
+use ark_groth16::data_structures::{ProvingKey, VerifyingKey, Proof};
 use ark_serialize::*;
 use ark_std::rand::Rng;
-use ark_relations::r1cs::Result as R1CSResult;
-use ark_ec::CurveGroup;
+use ark_relations::r1cs::{ConstraintSystem, OptimizationGoal, Result as R1CSResult};
+use ark_ec::{AffineRepr,CurveGroup};
+use ark_ff::PrimeField;
+use std::ops::AddAssign;
 
 /// The SNARK of [[Groth16]](https://eprint.iacr.org/2016/260.pdf).
 pub struct Groth16Simulator<E: Pairing, QAP: R1CSToQAP = LibsnarkReduction> {
@@ -131,14 +133,86 @@ impl<E: Pairing, QAP: R1CSToQAP> Groth16Simulator<E, QAP> {
     }
 
 
-/*pub fn prove_with_trapdoor<C: ConstraintSynthesizer<E::ScalarField>, R: RngCore>(
+pub fn prove_with_trapdoor<C: ConstraintSynthesizer<E::ScalarField>, R: RngCore>(
         pk: &ProvingKeyWithTrapdoor<E>,
         circuit: C,
         rng: &mut R,
     ) -> Result<Proof<E>, SynthesisError> {
         Self::create_random_proof_with_trapdoor(circuit, pk, rng)
-    }*/
+    }
+
+    /// Create a Groth16 proof that is zero-knowledge using the provided
+    /// R1CS-to-QAP reduction.
+    /// This method samples randomness for zero knowledges via `rng`.
+    #[inline]
+    pub fn create_random_proof_with_trapdoor<C>(
+        circuit: C,
+        pk: &ProvingKeyWithTrapdoor<E>,
+        rng: &mut impl Rng,
+    ) -> R1CSResult<Proof<E>>
+    where
+        C: ConstraintSynthesizer<E::ScalarField>,
+    {
+        let a = E::ScalarField::rand(rng);
+        let b = E::ScalarField::rand(rng);
+
+        let cs = ConstraintSystem::new_ref();
+
+        // Set the optimization goal
+        cs.set_optimization_goal(OptimizationGoal::Constraints);
+
+        // Synthesize the circuit.
+        //let synthesis_time = start_timer!(|| "Constraint synthesis");
+        circuit.generate_constraints(cs.clone())?;
+        debug_assert!(cs.is_satisfied().unwrap());
+        //end_timer!(synthesis_time);
+
+        //let lc_time = start_timer!(|| "Inlining LCs");
+        cs.finalize();
+        //end_timer!(lc_time);
+
+        //let witness_map_time = start_timer!(|| "R1CS to QAP witness map");
+        //end_timer!(witness_map_time);
+
+        let prover = cs.borrow().unwrap();
+
+        Self::create_proof_with_trapdoor(pk, a, b, &prover.instance_assignment[1..])
+    }
+
+    /// Creates proof using the trapdoor
+    pub fn create_proof_with_trapdoor(
+        pk: &ProvingKeyWithTrapdoor<E>,
+        a: E::ScalarField,
+        b: E::ScalarField,
+        input_assignment: &[E::ScalarField],
+    ) -> R1CSResult<Proof<E>> {
+        let public_inputs = input_assignment;
+        let mut g_ic = pk.pk.vk.gamma_abc_g1[0].into_group();
+        for (i, b) in public_inputs.iter().zip(pk.pk.vk.gamma_abc_g1.iter().skip(1)) {
+            g_ic.add_assign(&b.mul_bigint(i.into_bigint()));
+        }
+        g_ic = g_ic * pk.gamma;
+
+        let delta_inverse = pk.delta.inverse().unwrap();
+        let ab = a * b;
+        let alpha_beta = pk.alpha * pk.beta;
+
+        let g1_ab = pk.g1 * ab;
+        let g1_alpha_beta = pk.g1 * alpha_beta;
+        
+        let g1_a = pk.g1 * a;
+        let g2_b = pk.g2 * b;
+
+        let g1_c = (g1_ab - g1_alpha_beta - g_ic) * delta_inverse; 
+
+        Ok(Proof {
+            a: g1_a.into_affine(),
+            b: g2_b.into_affine(),
+            c: g1_c.into_affine(),
+        })
+    }
 }
+
 
 /*fn test_prove_and_verify<E>(n_iters: usize)
 where
