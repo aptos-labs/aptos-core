@@ -79,7 +79,7 @@ target "builder-base" {
   context    = "."
   contexts = {
     # Run `docker buildx imagetools inspect rust:1.75.0-bullseye` to find the latest multi-platform hash
-    rust = "docker-image://rust:1.75.0-bullseye@sha256:41e5ac5baf626dcf190cfe6adf9bf3f17c72a677641ae2de6a1f36a6db883aca"
+    rust = "docker-image://rust:1.75.0-bullseye@sha256:2576095c947f6d9cfb5f19d51b822cdeb557c5a5b6de9460f2bf1f913d0434ca"
   }
   args = {
     PROFILE            = "${PROFILE}"

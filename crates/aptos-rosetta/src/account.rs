@@ -3,7 +3,7 @@
 
 //! Rosetta Account API
 //!
-//! See: [Account API Spec](https://www.rosetta-api.org/docs/AccountApi.html)
+//! See: [Account API Spec](https://docs.cloud.coinbase.com/rosetta/docs/models#accountbalanceresponse)
 //!
 
 use crate::{
