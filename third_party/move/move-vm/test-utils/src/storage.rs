@@ -4,7 +4,9 @@
 
 use bytes::Bytes;
 use move_binary_format::{
+    deserializer::DeserializerConfig,
     errors::{PartialVMError, PartialVMResult},
+    file_format_common::{IDENTIFIER_SIZE_MAX, VERSION_MAX},
     CompiledModule,
 };
 use move_bytecode_utils::compiled_module_viewer::CompiledModuleView;
@@ -164,7 +166,9 @@ impl CompiledModuleView for InMemoryStorage {
 
     fn view_compiled_module(&self, id: &ModuleId) -> anyhow::Result<Self::Item> {
         let bytes = self.get_module(id)?.unwrap();
-        let m = CompiledModule::deserialize(&bytes)?;
+
+        let config = DeserializerConfig::new(VERSION_MAX, IDENTIFIER_SIZE_MAX);
+        let m = CompiledModule::deserialize_with_config(&bytes, &config)?;
         Ok(m)
     }
 }
