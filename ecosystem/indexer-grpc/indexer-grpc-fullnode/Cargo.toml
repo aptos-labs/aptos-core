@@ -40,7 +40,6 @@ aptos-mempool = { workspace = true }
 aptos-metrics-core = { workspace = true }
 aptos-moving-average = { workspace = true }
 aptos-protos = { workspace = true }
-aptos-resource-viewer = { workspace = true }
 aptos-runtimes = { workspace = true }
 aptos-storage-interface = { workspace = true }
 aptos-types = { workspace = true }
