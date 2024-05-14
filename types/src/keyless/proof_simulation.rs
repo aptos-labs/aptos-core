@@ -244,9 +244,9 @@ where
     }
 }
 
-/*use ark_bn254::BN254;
+use ark_bn254::Bn254;
 
 #[test]
 fn prove_and_verify() {
-    test_prove_and_verify::<BN254>(n_iters: 100);
-}*/
+    test_prove_and_verify::<Bn254>(100);
+}
