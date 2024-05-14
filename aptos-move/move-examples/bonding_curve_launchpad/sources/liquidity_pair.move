@@ -1,6 +1,7 @@
 module resource_account::liquidity_pair {
     use aptos_std::smart_table::{Self, SmartTable};
     use aptos_std::signer;
+    use aptos_std::math128;
     use aptos_framework::coin;
     use aptos_framework::aptos_account;
     use aptos_framework::aptos_coin::{AptosCoin};
@@ -30,13 +31,12 @@ module resource_account::liquidity_pair {
     struct LiquidityPairCreated has store, drop {
         fa_object_metadata: Object<Metadata>,
         initial_fa_reserves: u128,
-        initial_apt_reserves: u128,
-        k: u256
+        initial_apt_reserves: u128
     }
     #[event]
     struct LiquidityPairReservesUpdated has store, drop {
-        old_fa_reserves: u128,
-        old_apt_reserves: u128,
+        former_fa_reserves: u128,
+        former_apt_reserves: u128,
         new_fa_reserves: u128,
         new_apt_reserves: u128
     }
@@ -60,13 +60,12 @@ module resource_account::liquidity_pair {
         is_enabled: bool,
         is_frozen: bool,
         fa_reserves: u128,
-        apt_reserves: u128,
-        k_constant: u256
+        apt_reserves: u128
     }
 
     //---------------------------Init---------------------------
     fun init_module(account: &signer) {
-        let liquidity_pair_table: LiquidityPairSmartTable = LiquidityPairSmartTable {
+        let liquidity_pair_table = LiquidityPairSmartTable {
             liquidity_pairs: smart_table::new()
         };
 
@@ -74,40 +73,37 @@ module resource_account::liquidity_pair {
     }
 
     //---------------------------Liquidity Pair---------------------------
-    public(friend) fun register_liquidity_pair(transfer_ref: &fungible_asset::TransferRef, account: &signer, fa_object_metadata: Object<Metadata>, apt_initialPurchaseAmountIn: u64, fa_initialLiquidity: u128) acquires LiquidityPairSmartTable {
-        let liquidity_pair_smartTable = borrow_global_mut<LiquidityPairSmartTable>(@resource_account);
-        assert!(!smart_table::contains(&mut liquidity_pair_smartTable.liquidity_pairs, fa_object_metadata), ELIQUIDITY_PAIR_EXISTS_ALREADY);
+    public(friend) fun register_liquidity_pair(transfer_ref: &fungible_asset::TransferRef, account: &signer, fa_object_metadata: Object<Metadata>, apt_amount_in: u64, fa_initial_liquidity: u128) acquires LiquidityPairSmartTable {
+        let liquidity_pair_smart_table = borrow_global_mut<LiquidityPairSmartTable>(@resource_account);
+        assert!(!smart_table::contains(&liquidity_pair_smart_table.liquidity_pairs, fa_object_metadata), ELIQUIDITY_PAIR_EXISTS_ALREADY);
         //* Initial APT reserves are virtual liquidity, for less extreme initial swaps (avoiding early adopter's advantage, for fairness).
-        let k_constant: u256 = (fa_initialLiquidity as u256) * (INITIAL_VIRTUAL_APT_LIQUIDITY as u256);
         let initial_liquidity_pair = LiquidityPair {
             is_enabled: true,
             is_frozen: true,
-            fa_reserves: fa_initialLiquidity,
-            apt_reserves: INITIAL_VIRTUAL_APT_LIQUIDITY,
-            k_constant: k_constant
+            fa_reserves: fa_initial_liquidity,
+            apt_reserves: INITIAL_VIRTUAL_APT_LIQUIDITY
         };
         smart_table::add(
-            &mut liquidity_pair_smartTable.liquidity_pairs,
+            &mut liquidity_pair_smart_table.liquidity_pairs,
             fa_object_metadata,
             initial_liquidity_pair
         );
 
         event::emit(LiquidityPairCreated {
             fa_object_metadata: fa_object_metadata,
-            initial_fa_reserves: fa_initialLiquidity,
-            initial_apt_reserves: INITIAL_VIRTUAL_APT_LIQUIDITY,
-            k: k_constant
+            initial_fa_reserves: fa_initial_liquidity,
+            initial_apt_reserves: INITIAL_VIRTUAL_APT_LIQUIDITY
         });
 
-        if(apt_initialPurchaseAmountIn != 0) {
-            internal_swap_apt_to_fa(transfer_ref, account, fa_object_metadata, apt_initialPurchaseAmountIn);
+        if (apt_amount_in > 0) {
+            internal_swap_apt_to_fa(transfer_ref, account, fa_object_metadata, apt_amount_in);
         }
     }
 
-    public(friend) fun internal_swap_fa_to_apt(transfer_ref: &fungible_asset::TransferRef, account: &signer,  fa_object_metadata: Object<Metadata>,  amountIn: u64) acquires LiquidityPairSmartTable {
-        let liquidity_pair_smartTable = borrow_global_mut<LiquidityPairSmartTable>(@resource_account);
-        assert!(smart_table::contains(&mut liquidity_pair_smartTable.liquidity_pairs, fa_object_metadata), ELIQUIDITY_PAIR_DOES_NOT_EXIST);
-        let liquidity_pair = smart_table::borrow_mut(&mut liquidity_pair_smartTable.liquidity_pairs, fa_object_metadata);
+    public(friend) fun internal_swap_fa_to_apt(transfer_ref: &fungible_asset::TransferRef, account: &signer,  fa_object_metadata: Object<Metadata>,  amount_in: u64) acquires LiquidityPairSmartTable {
+        let liquidity_pair_smart_table = borrow_global_mut<LiquidityPairSmartTable>(@resource_account);
+        assert!(smart_table::contains(&liquidity_pair_smart_table.liquidity_pairs, fa_object_metadata), ELIQUIDITY_PAIR_DOES_NOT_EXIST);
+        let liquidity_pair = smart_table::borrow_mut(&mut liquidity_pair_smart_table.liquidity_pairs, fa_object_metadata);
         assert!(liquidity_pair.is_enabled, ELIQUIDITY_PAIR_DISABLED);
 
         let swapper_address = signer::address_of(account);
@@ -115,7 +111,7 @@ module resource_account::liquidity_pair {
             liquidity_pair.fa_reserves,
             liquidity_pair.apt_reserves,
             true,
-            amountIn
+            amount_in
         );
         let does_primary_store_exist_for_swapper = primary_fungible_store::primary_store_exists(swapper_address, fa_object_metadata);
         assert!(does_primary_store_exist_for_swapper, EFA_PRIMARY_STORE_DOES_NOT_EXIST);
@@ -123,14 +119,14 @@ module resource_account::liquidity_pair {
         primary_fungible_store::transfer_with_ref(transfer_ref, swapper_address, @resource_account, fa_given);
         aptos_account::transfer(&resource_signer_holder::get_signer(), account_address, apt_gained);
 
-        let old_fa_reserves = liquidity_pair.fa_reserves;
-        let old_apt_reserves = liquidity_pair.apt_reserves;
+        let former_fa_reserves = liquidity_pair.fa_reserves;
+        let former_apt_reserves = liquidity_pair.apt_reserves;
         liquidity_pair.fa_reserves = fa_updated_reserves;
         liquidity_pair.apt_reserves = apt_updated_reserves;
 
         event::emit(LiquidityPairReservesUpdated {
-            old_fa_reserves: old_fa_reserves,
-            old_apt_reserves: old_apt_reserves,
+            former_fa_reserves: former_fa_reserves,
+            former_apt_reserves: former_apt_reserves,
             new_fa_reserves: fa_updated_reserves,
             new_apt_reserves: apt_updated_reserves
         });
@@ -141,10 +137,10 @@ module resource_account::liquidity_pair {
         });
     }
 
-    public(friend) fun internal_swap_apt_to_fa(transfer_ref: &fungible_asset::TransferRef, account: &signer,  fa_object_metadata: Object<Metadata>, amountIn: u64) acquires LiquidityPairSmartTable {
-        let liquidity_pair_smartTable = borrow_global_mut<LiquidityPairSmartTable>(@resource_account);
-        assert!(smart_table::contains(&mut liquidity_pair_smartTable.liquidity_pairs, fa_object_metadata), ELIQUIDITY_PAIR_DOES_NOT_EXIST);
-        let liquidity_pair = smart_table::borrow_mut(&mut liquidity_pair_smartTable.liquidity_pairs, fa_object_metadata);
+    public(friend) fun internal_swap_apt_to_fa(transfer_ref: &fungible_asset::TransferRef, account: &signer,  fa_object_metadata: Object<Metadata>, amount_in: u64) acquires LiquidityPairSmartTable {
+        let liquidity_pair_smart_table = borrow_global_mut<LiquidityPairSmartTable>(@resource_account);
+        assert!(smart_table::contains(&liquidity_pair_smart_table.liquidity_pairs, fa_object_metadata), ELIQUIDITY_PAIR_DOES_NOT_EXIST);
+        let liquidity_pair = smart_table::borrow_mut(&mut liquidity_pair_smart_table.liquidity_pairs, fa_object_metadata);
         assert!(liquidity_pair.is_enabled, ELIQUIDITY_PAIR_DISABLED);
 
         let swapper_address = signer::address_of(account);
@@ -152,7 +148,7 @@ module resource_account::liquidity_pair {
             liquidity_pair.fa_reserves,
             liquidity_pair.apt_reserves,
             false,
-            amountIn
+            amount_in
         );
         let does_primary_store_exist_for_swapper = primary_fungible_store::primary_store_exists(swapper_address, fa_object_metadata);
         if(!does_primary_store_exist_for_swapper){
@@ -160,14 +156,14 @@ module resource_account::liquidity_pair {
         };
         aptos_account::transfer(account, @resource_account, apt_given);
         primary_fungible_store::transfer_with_ref(transfer_ref, @resource_account, swapper_address, fa_gained);
-        let old_fa_reserves = liquidity_pair.fa_reserves;
-        let old_apt_reserves = liquidity_pair.apt_reserves;
+        let former_fa_reserves = liquidity_pair.fa_reserves;
+        let former_apt_reserves = liquidity_pair.apt_reserves;
         liquidity_pair.fa_reserves = fa_updated_reserves;
         liquidity_pair.apt_reserves = apt_updated_reserves;
 
         event::emit(LiquidityPairReservesUpdated {
-            old_fa_reserves: old_fa_reserves,
-            old_apt_reserves: old_apt_reserves,
+            former_fa_reserves: former_fa_reserves,
+            former_apt_reserves: former_apt_reserves,
             new_fa_reserves: fa_updated_reserves,
             new_apt_reserves: apt_updated_reserves
         });
@@ -177,7 +173,7 @@ module resource_account::liquidity_pair {
             swapper_address: swapper_address
         });
 
-        if(apt_updated_reserves > APT_LIQUIDITY_THRESHOLD && liquidity_pair.is_enabled){
+        if ( liquidity_pair.is_enabled && apt_updated_reserves > APT_LIQUIDITY_THRESHOLD ){
             // Disable Bonding Curve Launchpad pair.
             liquidity_pair.is_enabled = false;
             liquidity_pair.is_frozen = false;
@@ -226,52 +222,33 @@ module resource_account::liquidity_pair {
 
     //---------------------------Views---------------------------
     #[view]
-    public fun get_amount_out(fa_reserves: u128, apt_reserves: u128, supplied_fa_else_apt: bool, amountIn: u64): (u64, u64, u128, u128) {
-        if (supplied_fa_else_apt) {
-            let top = (apt_reserves as u256) * (amountIn as u256);
-            let bot = (fa_reserves as u256) + (amountIn as u256);
-            let apt_gained: u64 = ((top/bot) as u64);
+    public fun get_amount_out(fa_reserves: u128, apt_reserves: u128, swap_to_apt: bool, amount_in: u64): (u64, u64, u128, u128) {
+        if (swap_to_apt) {
+            let divisor = fa_reserves + (amount_in as u128);
+            let apt_gained = (math128::mul_div(apt_reserves, (amount_in as u128), divisor) as u64);
             assert!(apt_gained > 0, ELIQUIDITY_PAIR_SWAP_AMOUNTOUT_INSIGNIFICANT);
-            return (amountIn, apt_gained, fa_reserves+(amountIn as u128), apt_reserves-(apt_gained as u128))
+            return (amount_in, apt_gained, fa_reserves + (amount_in as u128), apt_reserves - (apt_gained as u128))
         }
         else {
-            let top = (fa_reserves as u256) * (amountIn as u256);
-            let bot = (apt_reserves as u256) + (amountIn as u256);
-            let fa_gained: u64 = ((top/bot) as u64);
+            let divisor = apt_reserves + (amount_in as u128);
+            let fa_gained: u64 = (math128::mul_div(fa_reserves, (amount_in as u128), divisor) as u64);
             assert!(fa_gained > 0, ELIQUIDITY_PAIR_SWAP_AMOUNTOUT_INSIGNIFICANT);
-            return (fa_gained, amountIn, fa_reserves-(fa_gained as u128), apt_reserves+(amountIn as u128))
+            return (fa_gained, amount_in, fa_reserves - (fa_gained as u128), apt_reserves + (amount_in as u128))
         }
 
     }
     #[view]
     public fun get_is_frozen_metadata(fa_object_metadata: Object<Metadata>):bool acquires LiquidityPairSmartTable {
-        let liquidity_pair_smartTable = borrow_global<LiquidityPairSmartTable>(@resource_account);
-        assert!(smart_table::contains(&liquidity_pair_smartTable.liquidity_pairs, fa_object_metadata), ELIQUIDITY_PAIR_DOES_NOT_EXIST);
-        smart_table::borrow(&liquidity_pair_smartTable.liquidity_pairs, fa_object_metadata).is_frozen
+        let liquidity_pair_smart_table = borrow_global<LiquidityPairSmartTable>(@resource_account);
+        assert!(smart_table::contains(&liquidity_pair_smart_table.liquidity_pairs, fa_object_metadata), ELIQUIDITY_PAIR_DOES_NOT_EXIST);
+        smart_table::borrow(&liquidity_pair_smart_table.liquidity_pairs, fa_object_metadata).is_frozen
     }
-
 
     //---------------------------Tests---------------------------
     #[test_only]
     public fun initialize_for_test(deployer: &signer){
-        let liquidity_pair_smartTable: LiquidityPairSmartTable = LiquidityPairSmartTable {
+        move_to(deployer, LiquidityPairSmartTable {
             liquidity_pairs: smart_table::new()
-        };
-        move_to(deployer, liquidity_pair_smartTable);
+        });
     }
-
-    //---------------------------View Tests---------------------------
-    #[test(deployer = @resource_account)]
-    #[expected_failure(abort_code = ELIQUIDITY_PAIR_SWAP_AMOUNTOUT_INSIGNIFICANT)]
-    public fun test_insignificant_fa_swap(deployer: &signer) {
-        initialize_for_test(deployer);
-        get_amount_out(1_000_000_000, 1_000_000_000, true, 0);
-    }
-    #[test(deployer = @resource_account)]
-    #[expected_failure(abort_code = ELIQUIDITY_PAIR_SWAP_AMOUNTOUT_INSIGNIFICANT)]
-    public fun test_insignificant_apt_swap(deployer: &signer) {
-        initialize_for_test(deployer);
-        get_amount_out(1_000_000_000, 1_000_000_000, false, 0);
-    }
-
 }

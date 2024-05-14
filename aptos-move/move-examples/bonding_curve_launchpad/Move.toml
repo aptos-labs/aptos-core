@@ -16,3 +16,8 @@ swap = "0xcafe"
 git = "https://github.com/aptos-labs/aptos-core.git"
 rev = "bbf569abd260d94bc30fe96da297d2aecb193644"
 subdir = "aptos-move/framework/aptos-framework"
+
+[dependencies.swap]
+git = "https://github.com/aptos-labs/aptos-core.git"
+rev = "bbf569abd260d94bc30fe96da297d2aecb193644"
+subdir = "aptos-move/move-examples/swap"

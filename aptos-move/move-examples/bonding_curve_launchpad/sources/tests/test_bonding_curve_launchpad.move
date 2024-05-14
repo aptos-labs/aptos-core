@@ -46,6 +46,24 @@ module resource_account::test_bonding_curve_launchpad {
         bonding_curve_launchpad::initialize_for_test(resource_signer);
     }
 
+    //---------------------------Unit Tests---------------------------
+    #[test(deployer = @resource_account)]
+    #[expected_failure(abort_code = 393218, location=aptos_framework::object)]
+    public fun test_nonexistant_is_frozen(deployer: &signer) {
+        bonding_curve_launchpad::initialize_for_test(deployer);
+        let name =  string::utf8(b"SheepyCoin");
+        let symbol = string::utf8(b"SHEEP");
+        bonding_curve_launchpad::get_is_frozen(name, symbol);
+    }
+    #[test(deployer = @resource_account)]
+    #[expected_failure(abort_code = 393218, location=aptos_framework::object)]
+    public fun test_nonexistant_get_metadata(deployer: &signer) {
+        bonding_curve_launchpad::initialize_for_test(deployer);
+        let name =  string::utf8(b"SheepyCoin");
+        let symbol = string::utf8(b"SHEEP");
+        bonding_curve_launchpad::get_metadata(name, symbol);
+    }
+
     //---------------------------E2E Tests---------------------------
     #[test(aptos_framework = @0x1, swap_dex_signer = @0xcafe, bcl_owner_signer = @0x922a028b0dbd8ff206074977ae4c5f9fb003ce384242b6253c67192cd2a45ee1, resource_signer = @0x52ddc290f7be79b2583472217af88a8500bdcb16d865e9c2bf4d3c995df0825f, bonding_curve_creator = @0x803)]
     fun test_e2e_bonding_curve_creation(aptos_framework: &signer, swap_dex_signer: &signer, bcl_owner_signer: &signer, resource_signer: &signer, bonding_curve_creator: &signer){

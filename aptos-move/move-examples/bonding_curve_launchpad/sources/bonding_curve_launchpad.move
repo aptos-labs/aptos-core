@@ -1,5 +1,5 @@
 module resource_account::bonding_curve_launchpad {
-    use std::string;
+    use std::string::{Self, String};
     use std::option;
     use std::vector;
     use aptos_framework::object::{Self};
@@ -10,7 +10,6 @@ module resource_account::bonding_curve_launchpad {
     use aptos_framework::dispatchable_fungible_asset;
     use aptos_std::smart_table::{Self, SmartTable};
     use aptos_std::math128;
-    use aptos_std::string::{String};
     use aptos_std::object::{Object};
     use resource_account::liquidity_pair;
     use resource_account::resource_signer_holder;
@@ -26,21 +25,21 @@ module resource_account::bonding_curve_launchpad {
     //---------------------------Events---------------------------
     #[event]
     struct FungibleAssetCreated has store, drop {
-        name: string::String,
-        symbol: string::String,
+        name: String,
+        symbol: String,
         max_supply: u128,
         decimals: u8,
-        icon_uri: string::String,
-        project_uri: string::String
+        icon_uri: String,
+        project_uri: String
     }
 
     //---------------------------Structs---------------------------
     struct LaunchPad has key {
-        key_to_fa_data: SmartTable<FAKey, FAController>,
+        key_to_fa_controller: SmartTable<FAKey, FAController>,
     }
     struct FAKey has store, copy, drop {
-        name: string::String,
-        symbol: string::String,
+        name: String,
+        symbol: String,
     }
     struct FAController has key, store {
         mint_ref: fungible_asset::MintRef,
@@ -50,10 +49,10 @@ module resource_account::bonding_curve_launchpad {
 
     //---------------------------Init---------------------------
     fun init_module(account: &signer) {
-        let fa_smartTable: LaunchPad = LaunchPad {
-            key_to_fa_data: smart_table::new()
+        let fa_smart_table = LaunchPad {
+            key_to_fa_controller: smart_table::new()
         };
-        move_to(account, fa_smartTable);
+        move_to(account, fa_smart_table);
     }
 
     //---------------------------Dispatchable Standard---------------------------
@@ -73,38 +72,38 @@ module resource_account::bonding_curve_launchpad {
     // * Creates new FA and store FA owner obj on launchpad.
     public entry fun create_fa_pair(
         account: &signer,
-        apt_initialPurchaseAmountIn: u64,
-        name: string::String,
-        symbol: string::String,
+        apt_amount_in: u64,
+        name: String,
+        symbol: String,
         max_supply: u128,
         decimals: u8,
-        icon_uri: string::String,
-        project_uri: string::String
+        icon_uri: String,
+        project_uri: String
     ) acquires LaunchPad {
         let fa_key = FAKey { name, symbol };
         let fa_address = create_fa(fa_key, name, symbol, max_supply, decimals, icon_uri, project_uri);
-        let fa_metadata_obj: Object<Metadata> = object::address_to_object(fa_address);
-        let fa_smartTable = borrow_global_mut<LaunchPad>(@resource_account);
-        let transfer_ref = &smart_table::borrow(&mut fa_smartTable.key_to_fa_data, fa_key).transfer_ref;
-        liquidity_pair::register_liquidity_pair(transfer_ref, account, fa_metadata_obj, apt_initialPurchaseAmountIn, max_supply);
+        let fa_metadata_obj = object::address_to_object(fa_address);
+        let fa_smart_table = borrow_global<LaunchPad>(@resource_account);
+        let transfer_ref = &smart_table::borrow(&fa_smart_table.key_to_fa_controller, fa_key).transfer_ref;
+        liquidity_pair::register_liquidity_pair(transfer_ref, account, fa_metadata_obj, apt_amount_in, max_supply);
     }
 
-    public entry fun swap_apt_to_fa (account: &signer, name: string::String, symbol: string::String, fa_amountIn: u64) acquires LaunchPad {
+    public entry fun swap_apt_to_fa (account: &signer, name: String, symbol: String, fa_amountIn: u64) acquires LaunchPad {
         assert!(fa_amountIn > 0, ELIQUIDITY_PAIR_SWAP_AMOUNTIN_INVALID);
         let fa_key = FAKey { name, symbol };
-        let fa_smartTable = borrow_global_mut<LaunchPad>(@resource_account);
-        assert!(smart_table::contains(&mut fa_smartTable.key_to_fa_data, fa_key), EFA_DOES_NOT_EXIST);
-        let transfer_ref = &smart_table::borrow(&mut fa_smartTable.key_to_fa_data, fa_key).transfer_ref;
+        let fa_smart_table = borrow_global<LaunchPad>(@resource_account);
+        assert!(smart_table::contains(&fa_smart_table.key_to_fa_controller, fa_key), EFA_DOES_NOT_EXIST);
+        let transfer_ref = &smart_table::borrow(&fa_smart_table.key_to_fa_controller, fa_key).transfer_ref;
         let fa_metadata_obj:Object<Metadata> = object::address_to_object(get_fa_obj_address(name, symbol));
 
         liquidity_pair::internal_swap_apt_to_fa(transfer_ref, account, fa_metadata_obj, fa_amountIn);
     }
-    public entry fun swap_fa_to_apt (account: &signer, name: string::String, symbol: string::String, apt_amountIn: u64) acquires LaunchPad {
+    public entry fun swap_fa_to_apt (account: &signer, name: String, symbol: String, apt_amountIn: u64) acquires LaunchPad {
         assert!(apt_amountIn > 0, ELIQUIDITY_PAIR_SWAP_AMOUNTIN_INVALID);
         let fa_key = FAKey { name, symbol };
-        let fa_smartTable = borrow_global_mut<LaunchPad>(@resource_account);
-        assert!(smart_table::contains(&mut fa_smartTable.key_to_fa_data, fa_key), EFA_DOES_NOT_EXIST);
-        let transfer_ref = &smart_table::borrow(&mut fa_smartTable.key_to_fa_data, fa_key).transfer_ref;
+        let fa_smart_table = borrow_global<LaunchPad>(@resource_account);
+        assert!(smart_table::contains(&fa_smart_table.key_to_fa_controller, fa_key), EFA_DOES_NOT_EXIST);
+        let transfer_ref = &smart_table::borrow(&fa_smart_table.key_to_fa_controller, fa_key).transfer_ref;
         let fa_metadata_obj:Object<Metadata> = object::address_to_object(get_fa_obj_address(name, symbol));
 
         liquidity_pair::internal_swap_fa_to_apt(transfer_ref, account, fa_metadata_obj, apt_amountIn);
@@ -113,15 +112,15 @@ module resource_account::bonding_curve_launchpad {
     //---------------------------Internal---------------------------z
     fun create_fa(
         fa_key: FAKey,
-        name: string::String,
-        symbol: string::String,
+        name: String,
+        symbol: String,
         max_supply: u128,
         decimals: u8,
-        icon_uri: string::String,
-        project_uri: string::String
+        icon_uri: String,
+        project_uri: String
     ): address acquires LaunchPad {
-        let fa_smartTable = borrow_global_mut<LaunchPad>(@resource_account);
-        assert!(!smart_table::contains(&mut fa_smartTable.key_to_fa_data, fa_key), EFA_EXISTS_ALREADY);
+        let fa_smart_table = borrow_global_mut<LaunchPad>(@resource_account);
+        assert!(!smart_table::contains(&fa_smart_table.key_to_fa_controller, fa_key), EFA_EXISTS_ALREADY);
         let base_unit_max_supply: option::Option<u128> = option::some(max_supply * math128::pow(10, (decimals as u128)));
         let fa_key_seed: vector<u8> = *string::bytes(&name);
         vector::append(&mut fa_key_seed, b"-");
@@ -159,7 +158,7 @@ module resource_account::bonding_curve_launchpad {
             transfer_ref,
         };
         smart_table::add(
-            &mut fa_smartTable.key_to_fa_data,
+            &mut fa_smart_table.key_to_fa_controller,
             fa_key,
             fa_controller
         );
@@ -204,35 +203,11 @@ module resource_account::bonding_curve_launchpad {
         liquidity_pair::get_is_frozen_metadata(fa_metadata)
     }
 
-
-
     //---------------------------Tests---------------------------
     #[test_only]
     public fun initialize_for_test(deployer: &signer){
-        let fa_smartTable: LaunchPad = LaunchPad {
-            key_to_fa_data: smart_table::new()
-        };
-
-        move_to(deployer, fa_smartTable);
+        move_to(deployer, LaunchPad {
+            key_to_fa_controller: smart_table::new()
+        });
     }
-
-    //---------------------------Unit Tests---------------------------
-    #[test(deployer = @resource_account)]
-    #[expected_failure(abort_code = 393218, location=aptos_framework::object)]
-    public fun test_nonexistant_is_frozen(deployer: &signer) {
-        initialize_for_test(deployer);
-        let name =  string::utf8(b"SheepyCoin");
-        let symbol = string::utf8(b"SHEEP");
-        get_is_frozen(name, symbol);
-    }
-    #[test(deployer = @resource_account)]
-    #[expected_failure(abort_code = 393218, location=aptos_framework::object)]
-    public fun test_nonexistant_get_metadata(deployer: &signer) {
-        initialize_for_test(deployer);
-        let name =  string::utf8(b"SheepyCoin");
-        let symbol = string::utf8(b"SHEEP");
-        get_metadata(name, symbol);
-    }
-
-
 }
