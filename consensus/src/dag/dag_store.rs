@@ -19,6 +19,7 @@ use aptos_crypto::HashValue;
 use aptos_infallible::RwLock;
 use aptos_logger::{debug, error, warn};
 use aptos_types::{epoch_state::EpochState, validator_verifier::ValidatorVerifier};
+use dashmap::DashMap;
 use futures::executor::block_on;
 use itertools::Itertools;
 use rayon::iter::{IndexedParallelIterator, IntoParallelIterator, ParallelIterator};
@@ -51,6 +52,13 @@ impl NodeStatus {
         *self = NodeStatus::Ordered(self.as_node().clone());
     }
 }
+
+#[derive(Clone)]
+struct NodeVotingPower {
+    aggregated_weak_voting_power: u128,
+    aggregated_strong_voting_power: u128,
+}
+
 /// Data structure that stores the in-memory DAG representation, it maintains round based index.
 #[derive(Clone)]
 pub struct InMemDag {
@@ -61,6 +69,7 @@ pub struct InMemDag {
     epoch_state: Arc<EpochState>,
     /// The window we maintain between highest committed round and initial round
     window_size: u64,
+    voting_power_cache: HashMap<(Round, Author), NodeVotingPower>,
 }
 
 impl InMemDag {
@@ -73,6 +82,7 @@ impl InMemDag {
             start_round,
             epoch_state,
             window_size,
+            voting_power_cache: HashMap::new(),
         }
     }
 
@@ -127,17 +137,29 @@ impl InMemDag {
             round,
             self.lowest_round()
         );
-
         let node = Arc::new(node);
+
+        let (aggregated_weak_voting_power, aggregated_strong_voting_power) =
+            if let Some(power) = self.voting_power_cache.get(&(node.round(), *node.author())) {
+                (
+                    power.aggregated_weak_voting_power,
+                    power.aggregated_strong_voting_power,
+                )
+            } else {
+                (0, 0)
+            };
+
         let round_ref = self
             .get_node_ref_mut(node.round(), node.author())
             .expect("must be present");
         ensure!(round_ref.is_none(), "race during insertion");
         *round_ref = Some(NodeStatus::Unordered {
             node: node.clone(),
-            aggregated_weak_voting_power: 0,
-            aggregated_strong_voting_power: 0,
+            aggregated_weak_voting_power,
+            aggregated_strong_voting_power,
         });
+        self.voting_power_cache
+            .remove(&(node.round(), *node.author()));
         self.update_votes(
             node.metadata(),
             node.parents_metadata().cloned().collect(),
@@ -201,23 +223,36 @@ impl InMemDag {
             .expect("must exist");
 
         for parent in parents_metadata {
-            let node_status = self
-                .get_node_ref_mut(parent.round(), parent.author())
-                .expect("must exist");
-            match node_status {
-                Some(NodeStatus::Unordered {
-                    aggregated_weak_voting_power,
-                    aggregated_strong_voting_power,
-                    ..
-                }) => {
-                    if update_link_power {
-                        *aggregated_strong_voting_power += voting_power as u128;
-                    } else {
-                        *aggregated_weak_voting_power += voting_power as u128;
-                    }
-                },
-                Some(NodeStatus::Ordered(_)) => {},
-                None => unreachable!("parents must exist before voting for a node"),
+            if let Some(Some(node_status)) = self.get_node_ref_mut(parent.round(), parent.author())
+            {
+                match node_status {
+                    NodeStatus::Unordered {
+                        aggregated_weak_voting_power,
+                        aggregated_strong_voting_power,
+                        ..
+                    } => {
+                        if update_link_power {
+                            *aggregated_strong_voting_power += voting_power as u128;
+                        } else {
+                            *aggregated_weak_voting_power += voting_power as u128;
+                        }
+                    },
+                    NodeStatus::Ordered(_) => {},
+                    // None => unreachable!("parents must exist before voting for a node"),
+                }
+            } else {
+                let node_voting_power = self
+                    .voting_power_cache
+                    .entry((parent.round(), *parent.author()))
+                    .or_insert_with(|| NodeVotingPower {
+                        aggregated_weak_voting_power: 0,
+                        aggregated_strong_voting_power: 0,
+                    });
+                if update_link_power {
+                    node_voting_power.aggregated_strong_voting_power += voting_power as u128;
+                } else {
+                    node_voting_power.aggregated_weak_voting_power += voting_power as u128;
+                }
             }
         }
     }
