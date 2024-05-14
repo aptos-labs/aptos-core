@@ -19,10 +19,6 @@ pub enum OrderVoteReceptionResult {
     /// The vote has been added but QC has not been formed yet. Return the amount of voting power
     /// QC currently has.
     VoteAdded(u128),
-    /// The very same vote message has been processed in past.
-    DuplicateVote,
-    /// The very same author has already voted for another proposal in this round (equivocation).
-    EquivocateVote,
     /// This block has just been certified after adding the vote.
     NewLedgerInfoWithSignatures(Arc<LedgerInfoWithSignatures>),
     /// There might be some issues adding a vote
@@ -47,8 +43,6 @@ pub struct PendingOrderVotes {
         HashValue, /* LedgerInfo digest */
         (OrderVoteStatus, LedgerInfoWithPartialSignatures),
     >,
-    /// Map of (Author, round number) to order vote. This is useful to discard multiple votes.
-    author_to_order_vote: HashMap<(Author, u64), OrderVote>,
 }
 
 impl PendingOrderVotes {
@@ -56,7 +50,6 @@ impl PendingOrderVotes {
     pub fn new() -> Self {
         Self {
             li_digest_to_votes: HashMap::new(),
-            author_to_order_vote: HashMap::new(),
         }
     }
 
@@ -67,31 +60,8 @@ impl PendingOrderVotes {
         order_vote: &OrderVote,
         validator_verifier: &ValidatorVerifier,
     ) -> OrderVoteReceptionResult {
-        // derive data from vote
+        // derive data from order vote
         let li_digest = order_vote.ledger_info().hash();
-        let round = order_vote.ledger_info().round();
-
-        if let Some(previously_seen_vote) =
-            self.author_to_order_vote.get(&(order_vote.author(), round))
-        {
-            // is it the same vote?
-            if li_digest == previously_seen_vote.ledger_info().hash() {
-                return OrderVoteReceptionResult::DuplicateVote;
-            } else {
-                // we have seen a different vote for the same round
-                error!(
-                    SecurityEvent::ConsensusEquivocatingOrderVote,
-                    remote_peer = order_vote.author(),
-                    order_vote = order_vote,
-                    previous_vote = previously_seen_vote
-                );
-
-                return OrderVoteReceptionResult::EquivocateVote;
-            }
-        }
-
-        self.author_to_order_vote
-            .insert((order_vote.author(), round), order_vote.clone());
 
         // obtain the ledger info with signatures associated to the order vote's ledger info
         let (status, li_with_sig) = self.li_digest_to_votes.entry(li_digest).or_insert_with(|| {
@@ -122,7 +92,6 @@ impl PendingOrderVotes {
             );
         }
         li_with_sig.add_signature(order_vote.author(), order_vote.signature().clone());
-
         // check if we have enough signatures to create a QC
         match validator_verifier.check_voting_power(li_with_sig.signatures().keys(), true) {
             // a quorum of signature was reached, a new QC is formed
@@ -162,8 +131,6 @@ impl PendingOrderVotes {
     pub fn garbage_collect(&mut self, highest_committed_round: u64) {
         self.li_digest_to_votes
             .retain(|_, (_, li)| li.ledger_info().round() > highest_committed_round);
-        self.author_to_order_vote
-            .retain(|&(_, r), _| r > highest_committed_round);
     }
 
     pub fn has_enough_order_votes(&self, ledger_info: &LedgerInfo) -> bool {
@@ -211,31 +178,20 @@ mod tests {
             signers[0].sign(&li1).expect("Unable to sign ledger info"),
         );
 
-        // first time a new order vote is added -> OrdrVoteAdded
+        // first time a new order vote is added -> OrderVoteAdded
         assert_eq!(
             pending_order_votes.insert_order_vote(&order_vote_1_author_0, &validator),
             OrderVoteReceptionResult::VoteAdded(1)
         );
 
-        // same author voting for the same thing -> DuplicateVote
+        // same author voting for the same thing -> OrderVoteAdded
         assert_eq!(
             pending_order_votes.insert_order_vote(&order_vote_1_author_0, &validator),
-            OrderVoteReceptionResult::DuplicateVote
+            OrderVoteReceptionResult::VoteAdded(1)
         );
 
         // same author voting for a different result -> EquivocateVote
         let li2 = random_ledger_info();
-        let order_vote_2_author_0 = OrderVote::new_with_signature(
-            signers[0].author(),
-            li2.clone(),
-            signers[0].sign(&li2).expect("Unable to sign ledger info"),
-        );
-
-        assert_eq!(
-            pending_order_votes.insert_order_vote(&order_vote_2_author_0, &validator),
-            OrderVoteReceptionResult::EquivocateVote
-        );
-
         let order_vote_2_author_1 = OrderVote::new_with_signature(
             signers[1].author(),
             li2.clone(),

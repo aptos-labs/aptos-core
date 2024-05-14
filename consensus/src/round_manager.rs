@@ -39,6 +39,7 @@ use aptos_consensus_types::{
     common::{Author, Round},
     delayed_qc_msg::DelayedQcMsg,
     order_vote::OrderVote,
+    order_vote_msg::OrderVoteMsg,
     proof_of_store::{ProofCache, ProofOfStoreMsg, SignedBatchInfoMsg},
     proposal_msg::ProposalMsg,
     quorum_cert::QuorumCert,
@@ -77,7 +78,7 @@ use tokio::{
 pub enum UnverifiedEvent {
     ProposalMsg(Box<ProposalMsg>),
     VoteMsg(Box<VoteMsg>),
-    OrderVoteMsg(Box<OrderVote>),
+    OrderVoteMsg(Box<OrderVoteMsg>),
     SyncInfo(Box<SyncInfo>),
     BatchMsg(Box<BatchMsg>),
     SignedBatchInfo(Box<SignedBatchInfoMsg>),
@@ -198,7 +199,7 @@ pub enum VerifiedEvent {
     ProposalMsg(Box<ProposalMsg>),
     VerifiedProposalMsg(Box<Block>),
     VoteMsg(Box<VoteMsg>),
-    OrderVoteMsg(Box<OrderVote>),
+    OrderVoteMsg(Box<OrderVoteMsg>),
     UnverifiedSyncInfo(Box<SyncInfo>),
     BatchMsg(Box<BatchMsg>),
     SignedBatchInfo(Box<SignedBatchInfoMsg>),
@@ -942,33 +943,39 @@ impl RoundManager {
         Ok(vote)
     }
 
-    async fn process_order_vote_msg(&mut self, order_vote: OrderVote) -> anyhow::Result<()> {
+    async fn process_order_vote_msg(&mut self, order_vote_msg: OrderVoteMsg) -> anyhow::Result<()> {
         if self.onchain_config.order_vote_enabled() {
             fail_point!("consensus::process_order_vote_msg", |_| {
                 Err(anyhow::anyhow!("Injected error in process_order_vote_msg"))
             });
-            info!(self.new_log(LogEvent::ReceiveOrderVote), "{}", order_vote);
+            info!(
+                self.new_log(LogEvent::ReceiveOrderVote),
+                "{}", order_vote_msg
+            );
 
             if self
                 .pending_order_votes
-                .has_enough_order_votes(order_vote.ledger_info())
+                .has_enough_order_votes(order_vote_msg.order_vote().ledger_info())
             {
                 return Ok(());
             }
 
-            if order_vote.ledger_info().round()
+            if order_vote_msg.order_vote().ledger_info().round()
                 > self.block_store.sync_info().highest_ordered_round()
             {
                 let vote_reception_result = self
                     .pending_order_votes
-                    .insert_order_vote(&order_vote, &self.epoch_state.verifier);
-                self.process_order_vote_reception_result(&order_vote, vote_reception_result)
-                    .await?;
+                    .insert_order_vote(order_vote_msg.order_vote(), &self.epoch_state.verifier);
+                self.process_order_vote_reception_result(
+                    order_vote_msg.order_vote(),
+                    vote_reception_result,
+                )
+                .await?;
             } else {
                 ORDER_VOTE_VERY_OLD.inc();
                 info!(
                     "Received old order vote. Order vote round: {:?}, Highest ordered round: {:?}",
-                    order_vote.ledger_info().round(),
+                    order_vote_msg.order_vote().ledger_info().round(),
                     self.block_store.sync_info().highest_ordered_round()
                 );
             }
@@ -983,7 +990,7 @@ impl RoundManager {
     ) -> anyhow::Result<()> {
         if let Some(proposed_block) = self.block_store.get_block(vote.vote_data().proposed().id()) {
             // Generate an order vote with ledger_info = proposed_block
-            let order_vote_proposal = proposed_block.order_vote_proposal(qc);
+            let order_vote_proposal = proposed_block.order_vote_proposal(qc.clone());
             let order_vote_result = self
                 .safety_rules
                 .lock()
@@ -998,8 +1005,12 @@ impl RoundManager {
                     BlockStage::ORDER_VOTED,
                 );
             }
-            info!(self.new_log(LogEvent::BroadcastOrderVote), "{}", order_vote);
-            self.network.broadcast_order_vote(order_vote).await;
+            let order_vote_msg = OrderVoteMsg::new(order_vote.clone(), qc.as_ref().clone());
+            info!(
+                self.new_log(LogEvent::BroadcastOrderVote),
+                "{}", order_vote_msg
+            );
+            self.network.broadcast_order_vote(order_vote_msg).await;
             ORDER_VOTE_BROADCASTED.inc();
         }
         Ok(())

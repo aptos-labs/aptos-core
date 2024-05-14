@@ -25,7 +25,7 @@ use aptos_config::network_id::NetworkId;
 use aptos_consensus_types::{
     block_retrieval::{BlockRetrievalRequest, BlockRetrievalResponse},
     common::Author,
-    order_vote::OrderVote,
+    order_vote_msg::OrderVoteMsg,
     pipeline::{commit_decision::CommitDecision, commit_vote::CommitVote},
     proof_of_store::{ProofOfStore, ProofOfStoreMsg, SignedBatchInfo, SignedBatchInfoMsg},
     proposal_msg::ProposalMsg,
@@ -419,7 +419,7 @@ impl NetworkSender {
         self.broadcast(msg).await
     }
 
-    pub async fn broadcast_order_vote(&self, order_vote_msg: OrderVote) {
+    pub async fn broadcast_order_vote(&self, order_vote_msg: OrderVoteMsg) {
         fail_point!("consensus::send::order_vote", |_| ());
         let msg = ConsensusMsg::OrderVoteMsg(Box::new(order_vote_msg));
         self.broadcast(msg).await
