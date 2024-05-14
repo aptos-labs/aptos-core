@@ -225,14 +225,18 @@ impl CachedStateView {
             StateStoreStatus::DoesNotExist => (None, None),
             // No matter it is in db or unknown, we have to query from db since even the
             // former case, we don't have the blob data but only its hash.
-            StateStoreStatus::ExistsInDB | StateStoreStatus::Unknown => match self.snapshot {
-                Some((version, root_hash)) => {
+            StateStoreStatus::UnknownSubtreeRoot {
+                hash: subtree_root_hash,
+                depth: subtree_root_depth,
+            } => match self.snapshot {
+                Some((version, _root_hash)) => {
                     let version_and_value_opt = self
                         .proof_fetcher
                         .fetch_state_value_with_version_and_schedule_proof_read(
                             state_key,
                             version,
-                            Some(root_hash),
+                            subtree_root_depth,
+                            Some(subtree_root_hash),
                         )?;
                     match version_and_value_opt {
                         Some((version, value)) => (Some(version), Some(value)),

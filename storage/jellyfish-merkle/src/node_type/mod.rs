@@ -598,6 +598,8 @@ impl InternalNode {
         n: Nibble,
         reader: Option<&R>,
         out_siblings: &mut Vec<NodeInProof>,
+        root_depth: usize,
+        target_depth: usize,
     ) -> Result<Option<NodeKey>> {
         assert!(self.leaf_count > 1);
 
@@ -610,20 +612,26 @@ impl InternalNode {
             let width = 1 << h;
             let (child_half_start, sibling_half_start) = get_child_and_sibling_half_start(n, h);
             // Compute the root hash of the subtree rooted at the sibling of `r`.
-            if let Some(reader) = reader {
-                out_siblings.push(self.gen_node_in_proof(
-                    sibling_half_start,
-                    width,
-                    (existence_bitmap, leaf_bitmap),
-                    (reader, node_key),
-                )?);
-            } else {
-                out_siblings.push(
-                    self.merkle_hash(sibling_half_start, width, (existence_bitmap, leaf_bitmap))
+            let depth = root_depth + 3 - h as usize;
+            if depth >= target_depth {
+                if let Some(reader) = reader {
+                    out_siblings.push(self.gen_node_in_proof(
+                        sibling_half_start,
+                        width,
+                        (existence_bitmap, leaf_bitmap),
+                        (reader, node_key),
+                    )?);
+                } else {
+                    out_siblings.push(
+                        self.merkle_hash(
+                            sibling_half_start,
+                            width,
+                            (existence_bitmap, leaf_bitmap),
+                        )
                         .into(),
-                );
+                    );
+                }
             }
-
             let (range_existence_bitmap, range_leaf_bitmap) =
                 Self::range_bitmaps(child_half_start, width, (existence_bitmap, leaf_bitmap));
 
@@ -666,7 +674,7 @@ impl InternalNode {
         reader: Option<&R>,
     ) -> Result<(Option<NodeKey>, Vec<NodeInProof>)> {
         let mut sibilings = vec![];
-        self.get_child_with_siblings(node_key, n, reader, &mut sibilings)
+        self.get_child_with_siblings(node_key, n, reader, &mut sibilings, 0, 0)
             .map(|n| (n, sibilings))
     }
 }
