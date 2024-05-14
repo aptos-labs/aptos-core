@@ -24,7 +24,6 @@ use aptos_consensus_types::{
     common::Author,
     quorum_cert::QuorumCert,
     sync_info::SyncInfo,
-    vote_data::VoteData,
     wrapped_ledger_info::WrappedLedgerInfo,
 };
 use aptos_crypto::HashValue;
@@ -140,23 +139,20 @@ impl BlockStore {
         Ok(())
     }
 
-    pub async fn insert_aggregated_order_vote(
+    // Insert the ordered certificate formed by aggregating order votes.
+    pub async fn insert_ordered_cert(
         &self,
-        ledger_info_with_sig: &LedgerInfoWithSignatures,
+        ordered_cert: &WrappedLedgerInfo,
         retriever: &mut BlockRetriever,
     ) -> anyhow::Result<()> {
-        if self.ordered_root().round() < ledger_info_with_sig.ledger_info().round() {
+        if self.ordered_root().round() < ordered_cert.ledger_info().ledger_info().round() {
             SUCCESSFUL_EXECUTED_WITH_ORDER_VOTE_QC.inc();
-            self.send_for_execution(WrappedLedgerInfo::new(
-                VoteData::dummy(),
-                ledger_info_with_sig.clone(),
-            ))
-            .await?;
-            if ledger_info_with_sig.ledger_info().ends_epoch() {
+            self.send_for_execution(ordered_cert.clone()).await?;
+            if ordered_cert.ledger_info().ledger_info().ends_epoch() {
                 retriever
                     .network
                     .broadcast_epoch_change(EpochChangeProof::new(
-                        vec![ledger_info_with_sig.clone()],
+                        vec![ordered_cert.ledger_info().clone()],
                         // TODO: Should more be true/false?
                         /* more = */
                         false,

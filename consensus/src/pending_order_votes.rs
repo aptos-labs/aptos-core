@@ -10,7 +10,7 @@ use aptos_types::{
     ledger_info::{LedgerInfo, LedgerInfoWithPartialSignatures, LedgerInfoWithSignatures},
     validator_verifier::{ValidatorVerifier, VerifyError},
 };
-use std::{collections::HashMap, sync::Arc};
+use std::collections::HashMap;
 
 /// Result of the order vote processing. The failure case (Verification error) is returned
 /// as the Error part of the result.
@@ -20,7 +20,7 @@ pub enum OrderVoteReceptionResult {
     /// QC currently has.
     VoteAdded(u128),
     /// This block has just been certified after adding the vote.
-    NewLedgerInfoWithSignatures(Arc<LedgerInfoWithSignatures>),
+    NewLedgerInfoWithSignatures(LedgerInfoWithSignatures),
     /// There might be some issues adding a vote
     ErrorAddingVote(VerifyError),
     /// Error happens when aggregating signature
@@ -103,9 +103,7 @@ impl PendingOrderVotes {
                 match li_with_sig.aggregate_signatures(validator_verifier) {
                     Ok(ledger_info_with_sig) => {
                         *status = OrderVoteStatus::EnoughVotes;
-                        OrderVoteReceptionResult::NewLedgerInfoWithSignatures(Arc::new(
-                            ledger_info_with_sig,
-                        ))
+                        OrderVoteReceptionResult::NewLedgerInfoWithSignatures(ledger_info_with_sig)
                     },
                     Err(e) => OrderVoteReceptionResult::ErrorAggregatingSignature(e),
                 }

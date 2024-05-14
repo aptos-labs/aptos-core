@@ -46,7 +46,9 @@ use aptos_consensus_types::{
     sync_info::SyncInfo,
     timeout_2chain::TwoChainTimeoutCertificate,
     vote::Vote,
+    vote_data::VoteData,
     vote_msg::VoteMsg,
+    wrapped_ledger_info::WrappedLedgerInfo,
 };
 use aptos_infallible::{checked, Mutex};
 use aptos_logger::prelude::*;
@@ -55,7 +57,6 @@ use aptos_safety_rules::ConsensusState;
 use aptos_safety_rules::TSafetyRules;
 use aptos_types::{
     epoch_state::EpochState,
-    ledger_info::LedgerInfoWithSignatures,
     on_chain_config::{
         OnChainConsensusConfig, OnChainJWKConsensusConfig, OnChainRandomnessConfig,
         ValidatorTxnConfig,
@@ -1149,8 +1150,8 @@ impl RoundManager {
                         );
                     }
                 }
-                self.new_order_vote_aggregated(
-                    ledger_info_with_signatures.clone(),
+                self.new_ordered_cert(
+                    WrappedLedgerInfo::new(VoteData::dummy(), ledger_info_with_signatures),
                     order_vote.author(),
                 )
                 .await
@@ -1182,14 +1183,15 @@ impl RoundManager {
         result
     }
 
-    async fn new_order_vote_aggregated(
+    // Insert ordered certificate formed by aggregating order votes
+    async fn new_ordered_cert(
         &mut self,
-        ledger_info_with_sig: Arc<LedgerInfoWithSignatures>,
+        ordered_cert: WrappedLedgerInfo,
         preferred_peer: Author,
     ) -> anyhow::Result<()> {
         self.block_store
-            .insert_aggregated_order_vote(
-                &ledger_info_with_sig,
+            .insert_ordered_cert(
+                &ordered_cert,
                 &mut self.create_block_retriever(preferred_peer),
             )
             .await
