@@ -305,7 +305,13 @@ impl VMRuntime {
 
         let (layout, has_identifier_mappings) = self
             .loader
-            .type_to_type_layout_with_identifier_mappings(ty, module_store)?;
+            .type_to_type_layout_with_identifier_mappings(ty, module_store)
+            .map_err(|_err| {
+                // TODO: Should we use `err` instead of mapping?
+                PartialVMError::new(StatusCode::VERIFICATION_ERROR).with_message(
+                    "entry point functions cannot have non-serializable return types".to_string(),
+                )
+            })?;
 
         let serialization_error = || -> PartialVMError {
             PartialVMError::new(StatusCode::UNKNOWN_INVARIANT_VIOLATION_ERROR)
