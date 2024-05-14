@@ -12,6 +12,7 @@ use aptos_crypto::{
     hash::{CryptoHash, TransactionAccumulatorHasher, SPARSE_MERKLE_PLACEHOLDER_HASH},
     HashValue,
 };
+use aptos_experimental_runtimes::thread_manager::THREAD_MANAGER;
 use aptos_infallible::Mutex;
 use aptos_logger::debug;
 use aptos_scratchpad::SparseMerkleTree;
@@ -176,36 +177,16 @@ impl FakeAptosDB {
     pub fn new(db: AptosDB) -> Self {
         Self {
             inner: db,
-            txn_by_version: Arc::new(DashMap::with_capacity(100_000_000)),
-            txn_version_by_hash: Arc::new(DashMap::with_capacity(100_000_000)),
-            txn_info_by_version: Arc::new(DashMap::with_capacity(100_000_000)),
-            txn_hash_by_position: Arc::new(DashMap::with_capacity(100_000_000)),
+            txn_by_version: Arc::new(DashMap::with_capacity(1_500_000)),
+            txn_version_by_hash: Arc::new(DashMap::with_capacity(1_500_000)),
+            txn_info_by_version: Arc::new(DashMap::with_capacity(1_500_000)),
+            txn_hash_by_position: Arc::new(DashMap::with_capacity(1_500_000)),
             account_seq_num: Arc::new(DashMap::with_capacity(10_000)),
             latest_block_timestamp: AtomicU64::new(0),
             latest_version: Mutex::new(None),
             ledger_commit_lock: std::sync::Mutex::new(()),
             buffered_state: Mutex::new(FakeBufferedState::new_empty()),
         }
-    }
-
-    fn save_and_compute_root_hash(
-        &self,
-        txns_to_commit: &[impl Borrow<TransactionInfo>],
-        first_version: Version,
-    ) -> Result<HashValue> {
-        let txn_hashes: Vec<_> = txns_to_commit.iter().map(|t| t.borrow().hash()).collect();
-
-        let (root_hash, writes) =
-            MerkleAccumulator::<FakeAptosDB, TransactionAccumulatorHasher>::append(
-                self,
-                first_version, /* num_existing_leaves */
-                &txn_hashes,
-            )?;
-        // Store the transaction hash by position to serve [DbReader::get_latest_executed_trees] calls
-        writes.iter().for_each(|(pos, hash)| {
-            self.txn_hash_by_position.insert(*pos, *hash);
-        });
-        Ok(root_hash)
     }
 
     fn get_frozen_subtree_hashes(&self, num_transactions: u64) -> Result<Vec<HashValue>> {
@@ -284,53 +265,102 @@ impl FakeAptosDB {
         txns_to_commit: &[TransactionToCommit],
         first_version: Version,
     ) -> Result<HashValue> {
-        let new_root_hash = self.save_and_compute_root_hash(
-            &txns_to_commit
-                .par_iter()
-                .with_min_len(10)
-                .map(|txn_to_commit| txn_to_commit.transaction_info())
-                .collect::<Vec<_>>(),
-            first_version,
-        )?;
+        let mut new_root_hash = HashValue::zero();
+        let mut max_timestamp = 0;
         let last_version = first_version + txns_to_commit.len() as u64 - 1;
+        THREAD_MANAGER.get_non_exe_cpu_pool().scope(|s| {
+            s.spawn(|_| {
+                let txn_hashes: Vec<_> = txns_to_commit
+                    .par_iter()
+                    .with_min_len(500)
+                    .map(|t| t.transaction_info().hash())
+                    .collect();
 
-        // Iterate through the transactions and update the in-memory maps
-        txns_to_commit
-            .into_par_iter()
-            .enumerate()
-            .with_min_len(50)
-            .try_for_each(|(idx, txn_to_commit)| -> Result<(), anyhow::Error> {
-                let ver = first_version + idx as u64;
-                self.txn_by_version
-                    .insert(ver, txn_to_commit.transaction().clone());
-                self.txn_info_by_version
-                    .insert(ver, txn_to_commit.transaction_info().clone());
-                self.txn_version_by_hash
-                    .insert(txn_to_commit.transaction().hash(), ver);
+                let (root_hash, writes) =
+                    MerkleAccumulator::<FakeAptosDB, TransactionAccumulatorHasher>::append(
+                        self,
+                        first_version, /* num_existing_leaves */
+                        &txn_hashes,
+                    )
+                    .unwrap();
+                // Store the transaction hash by position to serve [DbReader::get_latest_executed_trees] calls
+                writes.par_iter().with_min_len(100).for_each(|(pos, hash)| {
+                    self.txn_hash_by_position.insert(*pos, *hash);
+                });
+                new_root_hash = root_hash
+            });
 
-                // If it is a user transaction, also update the account sequence number
-                if let Some(user_txn) = txn_to_commit.transaction().try_as_signed_user_txn() {
-                    self.account_seq_num
-                        .entry(user_txn.sender())
-                        .and_modify(|seq_num| {
-                            *seq_num = std::cmp::max(user_txn.sequence_number() + 1, *seq_num);
-                        })
-                        .or_insert(user_txn.sequence_number());
-                }
+            s.spawn(|_| {
+                txns_to_commit
+                    .par_iter()
+                    .enumerate()
+                    .with_min_len(500)
+                    .for_each(|(idx, txn_to_commit)| {
+                        let ver = first_version + idx as u64;
+                        self.txn_by_version
+                            .insert(ver, txn_to_commit.transaction.clone());
+                    });
+            });
 
-                if let Some(txn) = txn_to_commit.transaction().try_as_block_metadata_ext() {
-                    self.latest_block_timestamp
-                        .fetch_max(txn.timestamp_usecs(), Ordering::Relaxed);
-                } else if let Some(txn) = txn_to_commit.transaction().try_as_block_metadata() {
-                    self.latest_block_timestamp
-                        .fetch_max(txn.timestamp_usecs(), Ordering::Relaxed);
-                }
+            s.spawn(|_| {
+                txns_to_commit
+                    .par_iter()
+                    .enumerate()
+                    .with_min_len(500)
+                    .for_each(|(idx, txn_to_commit)| {
+                        let ver = first_version + idx as u64;
+                        self.txn_info_by_version
+                            .insert(ver, txn_to_commit.transaction_info.clone());
+                    });
+            });
 
-                Ok::<(), anyhow::Error>(())
-            })?;
+            s.spawn(|_| {
+                txns_to_commit
+                    .par_iter()
+                    .enumerate()
+                    .with_min_len(500)
+                    .for_each(|(idx, txn_to_commit)| {
+                        let ver = first_version + idx as u64;
+                        let hash: HashValue = txn_to_commit.transaction.hash();
+                        self.txn_version_by_hash.insert(hash, ver);
+                    });
+            });
 
+            s.spawn(|_| {
+                max_timestamp = txns_to_commit
+                    .par_iter()
+                    .with_min_len(500)
+                    .filter_map(|txns_to_commit| match txns_to_commit.transaction() {
+                        Transaction::BlockMetadata(txn) => Some(txn.timestamp_usecs()),
+                        Transaction::BlockMetadataExt(txn) => Some(txn.timestamp_usecs()),
+                        _ => None,
+                    })
+                    .max()
+                    .unwrap_or_default();
+            });
+
+            s.spawn(|_| {
+                txns_to_commit
+                    .par_iter()
+                    .with_min_len(500)
+                    .filter_map(|txns_to_commit| match txns_to_commit.transaction() {
+                        Transaction::UserTransaction(txn) => Some(txn),
+                        _ => None,
+                    })
+                    .for_each(|user_txn| {
+                        self.account_seq_num
+                            .entry(user_txn.sender())
+                            .and_modify(|seq_num| {
+                                *seq_num = std::cmp::max(user_txn.sequence_number() + 1, *seq_num);
+                            })
+                            .or_insert(user_txn.sequence_number());
+                    });
+            });
+        });
+
+        self.latest_block_timestamp
+            .fetch_max(max_timestamp, Ordering::Relaxed);
         *self.latest_version.lock() = Some(last_version);
-
         Ok(new_root_hash)
     }
 
@@ -432,13 +462,17 @@ impl FakeAptosDB {
                 }
             }
 
-            const MAX_RETAIN_VERSIONS: u64 = 1_000_000;
-            if self.txn_by_version.len() as u64 > MAX_RETAIN_VERSIONS {
-                self.txn_by_version
-                    .retain(|k, _| *k >= first_version.saturating_sub(MAX_RETAIN_VERSIONS));
-                self.txn_info_by_version
-                    .retain(|k, _| *k >= first_version.saturating_sub(MAX_RETAIN_VERSIONS));
-            }
+            let txn_by_version = self.txn_by_version.clone();
+            let txn_info_by_version = self.txn_info_by_version.clone();
+            THREAD_MANAGER.get_non_exe_cpu_pool().spawn(move || {
+                const MAX_RETAIN_VERSIONS: u64 = 1_000_000;
+                if txn_by_version.len() as u64 > MAX_RETAIN_VERSIONS {
+                    txn_by_version
+                        .retain(|k, _| *k >= first_version.saturating_sub(MAX_RETAIN_VERSIONS));
+                    txn_info_by_version
+                        .retain(|k, _| *k >= first_version.saturating_sub(MAX_RETAIN_VERSIONS));
+                }
+            });
 
             Ok(())
         })
