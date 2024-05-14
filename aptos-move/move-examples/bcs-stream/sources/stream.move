@@ -243,7 +243,7 @@ module bcs_stream::bcs_stream {
         res
     }
 
-    /// Deserializes a `u512` value from the stream.
+    /// Deserializes a `u256` value from the stream.
     public entry fun deserialize_u256_entry(data: vector<u8>, cursor: u64) {
         let stream = BCSStream {
             data: data,
