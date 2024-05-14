@@ -561,8 +561,8 @@ impl<P: OnChainConfigProvider> EpochManager<P> {
         max_blocks_allowed: u64,
     ) {
         let (request_tx, mut request_rx) = aptos_channel::new::<_, IncomingBlockRetrievalRequest>(
-            QueueStyle::LIFO,
-            1,
+            QueueStyle::KLAST,
+            10,
             Some(&counters::BLOCK_RETRIEVAL_TASK_MSGS),
         );
         let task = async move {
@@ -846,8 +846,8 @@ impl<P: OnChainConfigProvider> EpochManager<P> {
                 .allow_batches_without_pos_in_proposal,
         );
         let (round_manager_tx, round_manager_rx) = aptos_channel::new(
-            QueueStyle::LIFO,
-            10,
+            QueueStyle::KLAST,
+            100,
             Some(&counters::ROUND_MANAGER_CHANNEL_MSGS),
         );
 
