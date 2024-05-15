@@ -165,6 +165,7 @@ transferred to A
 -  [Function `calculate_and_update_voter_total_voting_power`](#0x1_delegation_pool_calculate_and_update_voter_total_voting_power)
 -  [Function `calculate_and_update_remaining_voting_power`](#0x1_delegation_pool_calculate_and_update_remaining_voting_power)
 -  [Function `calculate_and_update_delegator_voter`](#0x1_delegation_pool_calculate_and_update_delegator_voter)
+-  [Function `calculate_and_update_voting_delegation`](#0x1_delegation_pool_calculate_and_update_voting_delegation)
 -  [Function `get_expected_stake_pool_address`](#0x1_delegation_pool_get_expected_stake_pool_address)
 -  [Function `min_remaining_secs_for_commission_change`](#0x1_delegation_pool_min_remaining_secs_for_commission_change)
 -  [Function `allowlisting_enabled`](#0x1_delegation_pool_allowlisting_enabled)
@@ -2572,6 +2573,42 @@ latest state.
 
 </details>
 
+<a id="0x1_delegation_pool_calculate_and_update_voting_delegation"></a>
+
+## Function `calculate_and_update_voting_delegation`
+
+Return the current state of a voting delegation of a delegator in a delegation pool.
+
+
+<pre><code>#[view]
+<b>public</b> <b>fun</b> <a href="delegation_pool.md#0x1_delegation_pool_calculate_and_update_voting_delegation">calculate_and_update_voting_delegation</a>(pool_address: <b>address</b>, delegator_address: <b>address</b>): (<b>address</b>, <b>address</b>, u64)
+</code></pre>
+
+
+
+<details>
+<summary>Implementation</summary>
+
+
+<pre><code><b>public</b> <b>fun</b> <a href="delegation_pool.md#0x1_delegation_pool_calculate_and_update_voting_delegation">calculate_and_update_voting_delegation</a>(
+    pool_address: <b>address</b>,
+    delegator_address: <b>address</b>
+): (<b>address</b>, <b>address</b>, u64) <b>acquires</b> <a href="delegation_pool.md#0x1_delegation_pool_DelegationPool">DelegationPool</a>, <a href="delegation_pool.md#0x1_delegation_pool_GovernanceRecords">GovernanceRecords</a> {
+    <a href="delegation_pool.md#0x1_delegation_pool_assert_partial_governance_voting_enabled">assert_partial_governance_voting_enabled</a>(pool_address);
+    <b>let</b> vote_delegation = <a href="delegation_pool.md#0x1_delegation_pool_update_and_borrow_mut_delegator_vote_delegation">update_and_borrow_mut_delegator_vote_delegation</a>(
+        <b>borrow_global</b>&lt;<a href="delegation_pool.md#0x1_delegation_pool_DelegationPool">DelegationPool</a>&gt;(pool_address),
+        <b>borrow_global_mut</b>&lt;<a href="delegation_pool.md#0x1_delegation_pool_GovernanceRecords">GovernanceRecords</a>&gt;(pool_address),
+        delegator_address
+    );
+
+    (vote_delegation.voter, vote_delegation.pending_voter, vote_delegation.last_locked_until_secs)
+}
+</code></pre>
+
+
+
+</details>
+
 <a id="0x1_delegation_pool_get_expected_stake_pool_address"></a>
 
 ## Function `get_expected_stake_pool_address`
@@ -3529,9 +3566,9 @@ Update VoteDelegation of a delegator to up-to-date then borrow_mut it.
 
     <b>let</b> vote_delegation = <a href="../../aptos-stdlib/doc/smart_table.md#0x1_smart_table_borrow_mut">smart_table::borrow_mut</a>(vote_delegation_table, delegator);
     // A lockup period <b>has</b> passed since last time `vote_delegation` was updated. Pending voter takes effect.
-    <b>if</b> (vote_delegation.last_locked_until_secs &lt; locked_until_secs &&
-        vote_delegation.voter != vote_delegation.pending_voter) {
+    <b>if</b> (vote_delegation.last_locked_until_secs &lt; locked_until_secs) {
         vote_delegation.voter = vote_delegation.pending_voter;
+        vote_delegation.last_locked_until_secs = locked_until_secs;
     };
     vote_delegation
 }
