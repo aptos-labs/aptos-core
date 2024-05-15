@@ -210,5 +210,5 @@ fn view_request(
         FunctionStats::function_to_key(&view_function.module, &view_function.function),
         output.gas_used,
     );
-    result
+    result.map(|r| r.with_gas_used(Some(output.gas_used)))
 }
