@@ -71,6 +71,10 @@ impl AptosGasParameters {
             natives: NativeGasParameters::zeros(),
         }
     }
+
+    pub fn unpack(self) -> (VMGasParameters, NativeGasParameters) {
+        (self.vm, self.natives)
+    }
 }
 
 impl InitialGasSchedule for AptosGasParameters {

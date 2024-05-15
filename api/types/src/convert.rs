@@ -75,6 +75,8 @@ impl<'a, S: StateView> MoveConverter<'a, S> {
         table_info_reader: Option<Arc<dyn TableInfoReader>>,
     ) -> Self {
         Self {
+            // This should be safe to unwrap because gas schedule always exists when
+            // interacting through API.
             inner: AptosValueAnnotator::new(inner).unwrap_or_else(|e| panic!("{}", e)),
             db,
             table_info_reader,
