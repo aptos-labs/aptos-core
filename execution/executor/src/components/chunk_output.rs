@@ -35,6 +35,7 @@ use aptos_types::{
 use aptos_vm::{AptosVM, VMExecutor};
 use fail::fail_point;
 use move_core_types::vm_status::StatusCode;
+use rayon::iter::{IndexedParallelIterator, IntoParallelIterator, ParallelIterator};
 use std::{ops::Deref, sync::Arc, time::Duration};
 
 pub struct ChunkOutput {
@@ -74,7 +75,11 @@ impl ChunkOutput {
         let transaction_outputs = block_output.into_inner();
         // TODO add block_limit_info to ChunkOutput, to add it to StateCheckpoint
         Ok(Self {
-            transactions: transactions.into_iter().map(|t| t.into_inner()).collect(),
+            transactions: transactions
+                .into_par_iter()
+                .with_min_len(500)
+                .map(|t| t.into_inner())
+                .collect(),
             transaction_outputs,
             state_cache: state_view.into_state_cache(),
         })
@@ -223,7 +228,7 @@ impl ChunkOutput {
             _ => BlockOutput::new(
                 transactions
                     .par_iter()
-                    .with_min_len(100)
+                    .with_min_len(500)
                     .map(|_| {
                         TransactionOutput::new(
                             WriteSet::default(),

@@ -12,7 +12,10 @@ use crate::{
     metrics::{APTOS_EXECUTOR_ERRORS, APTOS_EXECUTOR_OTHER_TIMERS_SECONDS},
 };
 use anyhow::{ensure, Result};
-use aptos_crypto::{hash::CryptoHash, HashValue};
+use aptos_crypto::{
+    hash::{self, CryptoHash},
+    HashValue,
+};
 use aptos_executor_types::{
     parsed_transaction_output::TransactionsWithParsedOutput,
     should_forward_to_subscription_service,
@@ -119,21 +122,21 @@ impl ApplyChunkOutput {
 
         let (statuses_for_input_txns, to_commit, to_discard, to_retry) = txns.into_inner();
 
-        update_counters_for_processed_chunk(
-            to_commit.txns(),
-            to_commit.parsed_outputs(),
-            "execution",
-        );
-        update_counters_for_processed_chunk(
-            to_discard.txns(),
-            to_discard.parsed_outputs(),
-            "execution",
-        );
-        update_counters_for_processed_chunk(
-            to_retry.txns(),
-            to_retry.parsed_outputs(),
-            "execution",
-        );
+        // update_counters_for_processed_chunk(
+        //     to_commit.txns(),
+        //     to_commit.parsed_outputs(),
+        //     "execution",
+        // );
+        // update_counters_for_processed_chunk(
+        //     to_discard.txns(),
+        //     to_discard.parsed_outputs(),
+        //     "execution",
+        // );
+        // update_counters_for_processed_chunk(
+        //     to_retry.txns(),
+        //     to_retry.parsed_outputs(),
+        //     "execution",
+        // );
 
         // Calculate TransactionData and TransactionInfo, i.e. the ledger history diff.
         let _timer = APTOS_EXECUTOR_OTHER_TIMERS_SECONDS
@@ -200,17 +203,22 @@ impl ApplyChunkOutput {
         TransactionsWithParsedOutput,
         TransactionsWithParsedOutput,
     )> {
-        let mut transaction_outputs: Vec<ParsedTransactionOutput> =
-            transaction_outputs.into_iter().map(Into::into).collect();
+        let mut transaction_outputs: Vec<ParsedTransactionOutput> = transaction_outputs
+            .into_par_iter()
+            .with_min_len(500)
+            .map(Into::into)
+            .collect();
         // N.B. off-by-1 intentionally, for exclusive index
         let new_epoch_marker = transaction_outputs
-            .iter()
-            .position(|o| o.is_reconfig())
+            .par_iter()
+            .with_min_len(500)
+            .position_first(|o| o.is_reconfig())
             .map(|idx| idx + 1);
 
-        let block_gas_limit_marker = transaction_outputs
-            .iter()
-            .position(|o| matches!(o.status(), TransactionStatus::Retry));
+        // let block_gas_limit_marker = transaction_outputs
+        //     .par_iter()
+        //     .with_min_len(500)
+        //     .position_first(|o| matches!(o.status(), TransactionStatus::Retry));
 
         // Transactions after the epoch ending txn are all to be retried.
         // Transactions after the txn that exceeded per-block gas limit are also to be retried.
@@ -219,29 +227,41 @@ impl ApplyChunkOutput {
                 transactions.drain(pos..).collect(),
                 transaction_outputs.drain(pos..).collect(),
             )
-        } else if let Some(pos) = block_gas_limit_marker {
-            TransactionsWithParsedOutput::new(
-                transactions.drain(pos..).collect(),
-                transaction_outputs.drain(pos..).collect(),
-            )
-        } else {
+        }
+        // else if let Some(pos) = block_gas_limit_marker {
+        //     TransactionsWithParsedOutput::new(
+        //         transactions.drain(pos..).collect(),
+        //         transaction_outputs.drain(pos..).collect(),
+        //     )
+        // }
+        else {
             TransactionsWithParsedOutput::new(vec![], vec![])
         };
 
         let state_checkpoint_to_add =
             new_epoch_marker.map_or_else(|| append_state_checkpoint_to_block, |_| None);
 
-        let keeps_and_discards = transaction_outputs.iter().map(|t| t.status()).cloned();
-        let retries = repeat(TransactionStatus::Retry).take(to_retry.len());
-
-        let status = keeps_and_discards.chain(retries).collect();
+        let status = if to_retry.is_empty() {
+            transaction_outputs
+                .par_iter()
+                .with_min_len(500)
+                .map(|t| t.status())
+                .cloned()
+                .collect()
+        } else {
+            let keeps_and_discards = transaction_outputs.iter().map(|t| t.status()).cloned();
+            let retries = repeat(TransactionStatus::Retry).take(to_retry.len());
+            keeps_and_discards.chain(retries).collect()
+        };
 
         // Separate transactions with the Keep status out.
-        let (mut to_keep, to_discard) = itertools::zip_eq(transactions, transaction_outputs)
-            .partition::<Vec<(Transaction, ParsedTransactionOutput)>, _>(|(_, o)| {
-                matches!(o.status(), TransactionStatus::Keep(_))
-            });
-
+        let (mut to_keep, to_discard) = (
+            transactions
+                .into_par_iter()
+                .zip_eq(transaction_outputs.into_par_iter())
+                .collect::<Vec<_>>(),
+            Vec::new(),
+        );
         // Append the StateCheckpoint transaction to the end of to_keep
         if let Some(block_id) = state_checkpoint_to_add {
             let state_checkpoint_txn = Transaction::StateCheckpoint(block_id);
@@ -256,27 +276,27 @@ impl ApplyChunkOutput {
             to_keep.push((state_checkpoint_txn, state_checkpoint_txn_output));
         }
 
-        // Sanity check transactions with the Discard status:
-        let to_discard = to_discard
-            .into_iter()
-            .map(|(t, o)| {
-                // In case a new status other than Retry, Keep and Discard is added:
-                if !matches!(o.status(), TransactionStatus::Discard(_)) {
-                    error!("Status other than Retry, Keep or Discard; Transaction discarded.");
-                }
-                // VM shouldn't have output anything for discarded transactions, log if it did.
-                if !o.write_set().is_empty() || !o.events().is_empty() {
-                    error!(
-                        "Discarded transaction has non-empty write set or events. \
-                     Transaction: {:?}. Status: {:?}.",
-                        t,
-                        o.status(),
-                    );
-                    APTOS_EXECUTOR_ERRORS.inc();
-                }
-                Ok((t, o))
-            })
-            .collect::<Result<Vec<_>>>()?;
+        // // Sanity check transactions with the Discard status:
+        // let to_discard = to_discard
+        //     .into_iter()
+        //     .map(|(t, o)| {
+        //         // In case a new status other than Retry, Keep and Discard is added:
+        //         if !matches!(o.status(), TransactionStatus::Discard(_)) {
+        //             error!("Status other than Retry, Keep or Discard; Transaction discarded.");
+        //         }
+        //         // VM shouldn't have output anything for discarded transactions, log if it did.
+        //         if !o.write_set().is_empty() || !o.events().is_empty() {
+        //             error!(
+        //                 "Discarded transaction has non-empty write set or events. \
+        //              Transaction: {:?}. Status: {:?}.",
+        //                 t,
+        //                 o.status(),
+        //             );3
+        //             APTOS_EXECUTOR_ERRORS.inc();
+        //         }
+        //         Ok((t, o))
+        //     })
+        //     .collect::<Result<Vec<_>>>()?;
 
         Ok((
             new_epoch_marker.is_some(),
@@ -314,54 +334,56 @@ impl ApplyChunkOutput {
             })
             .collect();
 
-        let mut all_subscribable_events = Vec::new();
+        let all_subscribable_events = Vec::new();
         let (to_commit_txns, to_commit_outputs) = to_commit_from_execution.into_inner();
-        for (
-            txn,
-            txn_output,
-            state_checkpoint_hash,
-            state_updates,
-            (event_root_hash, write_set_hash),
-        ) in itertools::izip!(
-            to_commit_txns,
-            to_commit_outputs,
-            state_checkpoint_hashes,
-            state_updates_vec,
-            hashes_vec
-        ) {
-            let (write_set, events, per_txn_reconfig_events, gas_used, status, auxiliary_data) =
-                txn_output.unpack();
+        to_commit_txns
+            .into_par_iter()
+            .with_min_len(500)
+            .zip(to_commit_outputs.into_par_iter())
+            .zip(state_checkpoint_hashes.into_par_iter())
+            .zip(state_updates_vec.into_par_iter())
+            .zip(hashes_vec.into_par_iter())
+            .map(
+                |(
+                    (((txn, txn_output), state_checkpoint_hash), state_updates),
+                    (event_root_hash, write_set_hash),
+                )| {
+                    let (
+                        write_set,
+                        events,
+                        per_txn_reconfig_events,
+                        gas_used,
+                        status,
+                        auxiliary_data,
+                    ) = txn_output.unpack();
 
-            let subscribable_events: Vec<ContractEvent> = events
-                .iter()
-                .filter(|evt| should_forward_to_subscription_service(evt))
-                .cloned()
-                .collect();
-            let txn_info = match &status {
-                TransactionStatus::Keep(status) => TransactionInfo::new(
-                    txn.hash(),
-                    write_set_hash,
-                    event_root_hash,
-                    state_checkpoint_hash,
-                    gas_used,
-                    status.clone(),
-                ),
-                _ => unreachable!("Transaction sorted by status already."),
-            };
-            let txn_info_hash = txn_info.hash();
-            txn_info_hashes.push(txn_info_hash);
-            let txn_to_commit = TransactionToCommit::new(
-                txn,
-                txn_info,
-                state_updates,
-                write_set,
-                events,
-                !per_txn_reconfig_events.is_empty(),
-                auxiliary_data,
-            );
-            all_subscribable_events.extend(subscribable_events);
-            to_commit.push(txn_to_commit);
-        }
+                    let txn_info = match &status {
+                        TransactionStatus::Keep(status) => TransactionInfo::new(
+                            txn.hash(),
+                            write_set_hash,
+                            event_root_hash,
+                            state_checkpoint_hash,
+                            gas_used,
+                            status.clone(),
+                        ),
+                        _ => unreachable!("Transaction sorted by status already."),
+                    };
+                    let txn_info_hash = txn_info.hash();
+                    let txn_to_commit = TransactionToCommit::new(
+                        txn,
+                        txn_info,
+                        state_updates,
+                        write_set,
+                        events,
+                        !per_txn_reconfig_events.is_empty(),
+                        auxiliary_data,
+                    );
+
+                    (txn_to_commit, txn_info_hash)
+                },
+            )
+            .unzip_into_vecs(&mut to_commit, &mut txn_info_hashes);
+
         (to_commit, txn_info_hashes, all_subscribable_events)
     }
 
