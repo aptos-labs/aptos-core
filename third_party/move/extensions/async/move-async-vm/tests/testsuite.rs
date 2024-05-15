@@ -285,7 +285,7 @@ impl Harness {
                 address,
                 module: module.clone(),
                 name: struct_,
-                type_params: vec![],
+                type_args: vec![],
             };
             let mut messages = vec![];
             for message in &parts[4..] {

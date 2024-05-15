@@ -414,7 +414,7 @@ impl From<StructTag> for MoveStructTag {
             address: tag.address.into(),
             module: tag.module.into(),
             name: tag.name.into(),
-            generic_type_params: tag.type_params.into_iter().map(MoveType::from).collect(),
+            generic_type_params: tag.type_args.into_iter().map(MoveType::from).collect(),
         }
     }
 }
@@ -425,7 +425,7 @@ impl From<&StructTag> for MoveStructTag {
             address: tag.address.into(),
             module: IdentifierWrapper::from(&tag.module),
             name: IdentifierWrapper::from(&tag.name),
-            generic_type_params: tag.type_params.iter().map(MoveType::from).collect(),
+            generic_type_params: tag.type_args.iter().map(MoveType::from).collect(),
         }
     }
 }
@@ -469,7 +469,7 @@ impl TryFrom<MoveStructTag> for StructTag {
             address: tag.address.into(),
             module: tag.module.into(),
             name: tag.name.into(),
-            type_params: tag
+            type_args: tag
                 .generic_type_params
                 .into_iter()
                 .map(|p| p.try_into())
@@ -1469,7 +1469,7 @@ mod tests {
             address: address("0x1"),
             module: identifier("Home"),
             name: identifier("ABC"),
-            type_params: vec![TypeTag::Address, TypeTag::Struct(Box::new(account))],
+            type_args: vec![TypeTag::Address, TypeTag::Struct(Box::new(account))],
         }
     }
 
@@ -1478,7 +1478,7 @@ mod tests {
             address: address("0x1"),
             module: identifier("account"),
             name: identifier("Base"),
-            type_params: vec![
+            type_args: vec![
                 TypeTag::U128,
                 TypeTag::Vector(Box::new(TypeTag::U64)),
                 TypeTag::Vector(Box::new(TypeTag::Struct(Box::new(type_struct("String"))))),
@@ -1492,7 +1492,7 @@ mod tests {
             address: address("0x1"),
             module: identifier("type"),
             name: identifier(t),
-            type_params: vec![],
+            type_args: vec![],
         }
     }
 

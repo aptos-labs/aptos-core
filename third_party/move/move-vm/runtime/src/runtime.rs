@@ -14,6 +14,7 @@ use crate::{
 };
 use move_binary_format::{
     access::ModuleAccess,
+    binary_views::BinaryIndexedView,
     compatibility::Compatibility,
     errors::{verification_error, Location, PartialVMError, PartialVMResult, VMResult},
     normalized, CompiledModule, IndexKind,
@@ -246,15 +247,15 @@ impl VMRuntime {
     fn deserialize_args(
         &self,
         module_store: &ModuleStorageAdapter,
-        arg_tys: Vec<Type>,
+        param_tys: Vec<Type>,
         serialized_args: Vec<impl Borrow<[u8]>>,
     ) -> PartialVMResult<(Locals, Vec<Value>)> {
-        if arg_tys.len() != serialized_args.len() {
+        if param_tys.len() != serialized_args.len() {
             return Err(
                 PartialVMError::new(StatusCode::NUMBER_OF_ARGUMENTS_MISMATCH).with_message(
                     format!(
                         "argument length mismatch: expected {} got {}",
-                        arg_tys.len(),
+                        param_tys.len(),
                         serialized_args.len()
                     ),
                 ),
@@ -263,13 +264,13 @@ impl VMRuntime {
 
         // Create a list of dummy locals. Each value stored will be used be borrowed and passed
         // by reference to the invoked function
-        let mut dummy_locals = Locals::new(arg_tys.len());
+        let mut dummy_locals = Locals::new(param_tys.len());
         // Arguments for the invoked function. These can be owned values or references
-        let deserialized_args = arg_tys
+        let deserialized_args = param_tys
             .into_iter()
             .zip(serialized_args)
             .enumerate()
-            .map(|(idx, (arg_ty, arg_bytes))| match &arg_ty {
+            .map(|(idx, (ty, arg_bytes))| match &ty {
                 Type::MutableReference(inner_t) | Type::Reference(inner_t) => {
                     dummy_locals.store_loc(
                         idx,
@@ -280,7 +281,7 @@ impl VMRuntime {
                     )?;
                     dummy_locals.borrow_loc(idx)
                 },
-                _ => self.deserialize_arg(module_store, &arg_ty, arg_bytes),
+                _ => self.deserialize_arg(module_store, &ty, arg_bytes),
             })
             .collect::<PartialVMResult<Vec<_>>>()?;
         Ok((dummy_locals, deserialized_args))
@@ -357,8 +358,8 @@ impl VMRuntime {
         &self,
         func: Arc<Function>,
         ty_args: Vec<Type>,
-        param_types: Vec<Type>,
-        return_types: Vec<Type>,
+        param_tys: Vec<Type>,
+        return_tys: Vec<Type>,
         serialized_args: Vec<impl Borrow<[u8]>>,
         data_store: &mut TransactionDataCache,
         module_store: &ModuleStorageAdapter,
@@ -366,15 +367,15 @@ impl VMRuntime {
         traversal_context: &mut TraversalContext,
         extensions: &mut NativeContextExtensions,
     ) -> VMResult<SerializedReturnValues> {
-        let arg_types = param_types
+        let param_tys = param_tys
             .into_iter()
             .map(|ty| ty.subst(&ty_args))
             .collect::<PartialVMResult<Vec<_>>>()
             .map_err(|err| err.finish(Location::Undefined))?;
         let (dummy_locals, deserialized_args) = self
-            .deserialize_args(module_store, arg_types, serialized_args)
+            .deserialize_args(module_store, param_tys, serialized_args)
             .map_err(|e| e.finish(Location::Undefined))?;
-        let return_types = return_types
+        let return_tys = return_tys
             .into_iter()
             .map(|ty| ty.subst(&ty_args))
             .collect::<PartialVMResult<Vec<_>>>()
@@ -393,7 +394,7 @@ impl VMRuntime {
         )?;
 
         let serialized_return_values = self
-            .serialize_return_values(module_store, &return_types, return_values)
+            .serialize_return_values(module_store, &return_tys, return_values)
             .map_err(|e| e.finish(Location::Undefined))?;
 
         // locals should not be dropped until all return values are serialized
@@ -415,11 +416,10 @@ impl VMRuntime {
         traversal_context: &mut TraversalContext,
         extensions: &mut NativeContextExtensions,
     ) -> VMResult<SerializedReturnValues> {
-        // load the function
         let LoadedFunctionInstantiation {
-            type_arguments,
-            parameters,
-            return_,
+            ty_args,
+            param_tys,
+            return_tys,
         } = function_instantiation;
 
         let LoadedFunction { module, function } = func;
@@ -430,12 +430,11 @@ impl VMRuntime {
             move_bytecode_verifier::no_additional_script_signature_checks,
         )?;
 
-        // execute the function
         self.execute_function_impl(
             function,
-            type_arguments,
-            parameters,
-            return_,
+            ty_args,
+            param_tys,
+            return_tys,
             serialized_args,
             data_store,
             module_store,
@@ -461,19 +460,18 @@ impl VMRuntime {
         let (
             func,
             LoadedFunctionInstantiation {
-                type_arguments,
-                parameters,
-                return_,
+                ty_args,
+                param_tys,
+                return_tys,
             },
         ) = self
             .loader
             .load_script(script.borrow(), &ty_args, data_store, module_store)?;
-        // execute the function
         self.execute_function_impl(
             func,
-            type_arguments,
-            parameters,
-            return_,
+            ty_args,
+            param_tys,
+            return_tys,
             serialized_args,
             data_store,
             module_store,
