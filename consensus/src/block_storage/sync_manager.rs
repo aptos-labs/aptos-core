@@ -4,7 +4,7 @@
 
 use crate::{
     block_storage::{BlockReader, BlockStore},
-    counters::{LATE_EXECUTION_WITH_ORDER_VOTE_QC, SUCCESSFUL_EXECUTED_WITH_ORDER_VOTE_QC},
+    counters::{LATE_EXECUTION_WITH_ORDER_VOTE_QC, SUCCESSFUL_EXECUTED_WITH_ORDER_VOTE_QC, SUCCESSFUL_EXECUTED_WITH_REGULAR_QC},
     epoch_manager::LivenessStorageData,
     logging::{LogEvent, LogSchema},
     monitor,
@@ -121,6 +121,7 @@ impl BlockStore {
         if self.ordered_root().round() < qc.commit_info().round() {
             self.send_for_execution(qc.into_wrapped_ledger_info())
                 .await?;
+            SUCCESSFUL_EXECUTED_WITH_REGULAR_QC.inc();
             if qc.ends_epoch() {
                 retriever
                     .network
