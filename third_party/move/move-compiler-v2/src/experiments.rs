@@ -17,6 +17,7 @@
 //! turns on or off a bunch of other experiments, unless those are
 //! defined explicitly.
 
+use move_command_line_common::{env::read_bool_env_var, testing::DISABLE_GEN_BINARY_V7};
 use once_cell::sync::Lazy;
 use std::collections::BTreeMap;
 
@@ -182,6 +183,13 @@ pub static EXPERIMENTS: Lazy<BTreeMap<String, Experiment>> = Lazy::new(|| {
             description: "Whether to attach the compiled module to the global env.".to_string(),
             default: Given(false),
         },
+        Experiment {
+            name: Experiment::GEN_BYTECODE_V7.to_string(),
+            description: "Whether to generate bytecode V7 in the file format.\
+             This is currently on by default."
+                .to_string(),
+            default: Given(!read_bool_env_var(DISABLE_GEN_BINARY_V7)),
+        },
     ];
     experiments
         .into_iter()
@@ -202,6 +210,7 @@ impl Experiment {
     pub const DEAD_CODE_ELIMINATION: &'static str = "dead-code-elimination";
     pub const DUPLICATE_STRUCT_PARAMS_CHECK: &'static str = "duplicate-struct-params-check";
     pub const GEN_ACCESS_SPECIFIERS: &'static str = "gen-access-specifiers";
+    pub const GEN_BYTECODE_V7: &'static str = "generate-bytecode-v7";
     pub const INLINING: &'static str = "inlining";
     pub const KEEP_INLINE_FUNS: &'static str = "keep-inline-funs";
     pub const KEEP_UNINIT_ANNOTATIONS: &'static str = "keep-uninit-annotations";

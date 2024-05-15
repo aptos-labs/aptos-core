@@ -18,6 +18,8 @@ pub const UPDATE_BASELINE: &str = "UPDATE_BASELINE";
 pub const UPBL: &str = "UPBL";
 pub const UB: &str = "UB";
 
+/// Env variable to disable generation of V7 in tests
+pub const DISABLE_GEN_BINARY_V7: &str = "DISABLE_GEN_BINARY_V7";
 pub const PRETTY: &str = "PRETTY";
 pub const FILTER: &str = "FILTER";
 

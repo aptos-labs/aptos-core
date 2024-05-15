@@ -34,7 +34,13 @@ impl CompiledScript {
         bytecode_version: Option<u32>,
         binary: &mut Vec<u8>,
     ) -> Result<()> {
-        let version = bytecode_version.unwrap_or(VERSION_DEFAULT);
+        // If the bytecode is V7, do not downgrade it
+        // so that it cannot be deployed on any network unless VM_BINARY_FORMAT_V7 feature flag is set
+        let version = if self.version == VERSION_MAX {
+            VERSION_MAX
+        } else {
+            bytecode_version.unwrap_or(VERSION_DEFAULT)
+        };
         validate_version(version)?;
         let mut binary_data = BinaryData::from(binary.clone());
         let mut ser = ScriptSerializer::new(version);
@@ -243,7 +249,13 @@ impl CompiledModule {
         bytecode_version: Option<u32>,
         binary: &mut Vec<u8>,
     ) -> Result<()> {
-        let version = bytecode_version.unwrap_or(VERSION_DEFAULT);
+        // If the bytecode is V7, do not downgrade it
+        // so that it cannot be deployed on any network unless VM_BINARY_FORMAT_V7 feature flag is set
+        let version = if self.version == VERSION_MAX {
+            VERSION_MAX
+        } else {
+            bytecode_version.unwrap_or(VERSION_DEFAULT)
+        };
         validate_version(version)?;
         let mut binary_data = BinaryData::from(binary.clone());
         let mut ser = ModuleSerializer::new(version);

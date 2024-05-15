@@ -2,15 +2,27 @@
 // SPDX-License-Identifier: Apache-2.0
 
 use crate::{
-    assert_abort, assert_success, assert_vm_status, build_package, tests::common, MoveHarness,
+    assert_abort, assert_success, assert_vm_status, build_package,
+    build_package_with_compiler_version, tests::common, MoveHarness,
 };
-use aptos_framework::natives::code::{PackageRegistry, UpgradePolicy};
+use aptos_cached_packages::aptos_stdlib;
+use aptos_framework::{
+    natives::code::{PackageRegistry, UpgradePolicy},
+    BuildOptions,
+};
 use aptos_package_builder::PackageBuilder;
 use aptos_types::{
     account_address::{create_resource_address, AccountAddress},
     on_chain_config::FeatureFlag,
+    transaction::TransactionStatus,
+};
+use move_binary_format::{
+    deserializer::DeserializerConfig,
+    file_format_common::{IDENTIFIER_SIZE_MAX, VERSION_MAX},
+    CompiledModule,
 };
 use move_core_types::{parser::parse_struct_tag, vm_status::StatusCode};
+use move_model::metadata::CompilerVersion;
 use rstest::rstest;
 use serde::{Deserialize, Serialize};
 
@@ -352,4 +364,65 @@ fn code_publishing_friend_as_private(enabled: Vec<FeatureFlag>, disabled: Vec<Fe
     } else {
         assert_vm_status!(result, StatusCode::BACKWARD_INCOMPATIBLE_MODULE_UPDATE)
     }
+}
+
+fn test_publish_v7_internal(
+    feature_enabled: bool,
+    compiler_version: CompilerVersion,
+) -> TransactionStatus {
+    let mut h = MoveHarness::new();
+    if feature_enabled {
+        h.enable_features(vec![FeatureFlag::VM_BINARY_FORMAT_V7], vec![]);
+    } else {
+        h.enable_features(vec![], vec![FeatureFlag::VM_BINARY_FORMAT_V7]);
+    }
+    let account = h.new_account_at(AccountAddress::from_hex_literal("0xf00d").unwrap());
+    let mut builder = PackageBuilder::new("Package");
+    builder.add_source(
+        "m.move",
+        r#"
+        module 0xf00d::M {
+            #[view]
+            fun foo(value: u64): u64 { value }
+        }
+        "#,
+    );
+    let path = builder.write_to_temp().unwrap();
+    let package = build_package_with_compiler_version(
+        path.path().to_path_buf(),
+        BuildOptions::default(),
+        compiler_version,
+    )
+    .expect("building package must succeed");
+    let origin_code = package.extract_code();
+    let config = DeserializerConfig::new(VERSION_MAX, IDENTIFIER_SIZE_MAX);
+    let mut compiled_module =
+        CompiledModule::deserialize_with_config(&origin_code[0], &config).unwrap();
+    if compiler_version == CompilerVersion::V2_0 {
+        compiled_module.version = VERSION_MAX;
+    }
+    let mut code = vec![];
+    compiled_module.serialize(&mut code).unwrap();
+    let package_metadata = package
+        .extract_metadata()
+        .expect("extracting package metadata must succeed");
+    h.run_transaction_payload(
+        &account,
+        aptos_stdlib::code_publish_package_txn(
+            bcs::to_bytes(&package_metadata).expect("PackageMetadata has BCS"),
+            vec![code],
+        ),
+    )
+}
+
+#[test]
+fn test_publish_v7_code() {
+    assert_success!(test_publish_v7_internal(true, CompilerVersion::V2_0));
+    assert_vm_status!(
+        test_publish_v7_internal(false, CompilerVersion::V2_0),
+        StatusCode::CODE_DESERIALIZATION_ERROR
+    );
+    // V1 generates V6 bytecode
+    assert_success!(test_publish_v7_internal(true, CompilerVersion::V1));
+    assert_success!(test_publish_v7_internal(false, CompilerVersion::V1));
 }

@@ -114,8 +114,14 @@ impl ModuleGenerator {
             value: bcs::to_bytes(&compilation_metadata)
                 .expect("Serialization of CompilationMetadata should succeed"),
         };
+        // Generate V7 bytecode if the experimental flag is set
+        let gen_v7 = options.experiment_on(Experiment::GEN_BYTECODE_V7);
         let module = move_binary_format::CompiledModule {
-            version: file_format_common::VERSION_NEXT,
+            version: if gen_v7 {
+                file_format_common::VERSION_MAX
+            } else {
+                file_format_common::VERSION_DEFAULT
+            },
             self_module_handle_idx: FF::ModuleHandleIndex(0),
             metadata: vec![metadata],
             ..Default::default()
