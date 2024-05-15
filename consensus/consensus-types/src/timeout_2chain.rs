@@ -195,6 +195,10 @@ impl TwoChainTimeoutCertificate {
     pub fn signatures_with_rounds(&self) -> &AggregateSignatureWithRounds {
         &self.signatures_with_rounds
     }
+
+    pub fn timeout(&self) -> &TwoChainTimeout {
+        &self.timeout
+    }
 }
 
 /// Contains two chain timout with partial signatures from the validators. This is only used during

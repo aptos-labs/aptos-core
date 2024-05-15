@@ -81,6 +81,9 @@ impl SafetyRules {
 
         // Record 1-chain data
         self.observe_qc(proposed_block.quorum_cert(), &mut safety_data);
+        if let Some(tc) = timeout_cert {
+            self.observe_highest_timeout_round(tc.timeout(), &mut safety_data);
+        }
         // Construct and sign vote
         let author = self.signer()?.author();
         let ledger_info = self.construct_ledger_info_2chain(proposed_block, vote_data.hash())?;

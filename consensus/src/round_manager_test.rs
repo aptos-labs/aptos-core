@@ -146,7 +146,21 @@ impl NodeSetup {
         onchain_randomness_config: Option<OnChainRandomnessConfig>,
         onchain_jwk_consensus_config: Option<OnChainJWKConsensusConfig>,
     ) -> Vec<Self> {
-        let onchain_consensus_config = onchain_consensus_config.unwrap_or_default();
+        let mut onchain_consensus_config = onchain_consensus_config.unwrap_or_default();
+        // With order votes feature, the validators additionally send order votes.
+        // next_proposal and next_vote functions could potentially break because of it.
+        if let OnChainConsensusConfig::V3 {
+            alg:
+                ConsensusAlgorithmConfig::JolteonV2 {
+                    main: _,
+                    quorum_store_enabled: _,
+                    order_vote_enabled,
+                },
+            vtxn: _,
+        } = &mut onchain_consensus_config
+        {
+            *order_vote_enabled = false;
+        }
         let onchain_randomness_config =
             onchain_randomness_config.unwrap_or_else(OnChainRandomnessConfig::default_if_missing);
         let onchain_jwk_consensus_config = onchain_jwk_consensus_config
