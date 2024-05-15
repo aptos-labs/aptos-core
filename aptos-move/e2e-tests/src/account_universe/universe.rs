@@ -211,25 +211,21 @@ impl AccountPicker {
                 //Self::pick_pair_impl(*num_accounts, indexes)
                 //Self::pick_pair_impl(*num_accounts, indexes)
 
-                if w % 40 <= 10 {
+                /*if w % 40 <= 10 {
                     [2*(w/40)+1,2*(w/40)+2]
                     //Self::pick_pair_impl(w/30+1, w/30+)
                 }
                 else {
                     let temp = Self::pick_pair_impl((*num_accounts)-2000, indexes);
                     [temp[0]+2000,temp[1]+2000]
-                }
-                /*if w < 10 && *num_accounts > 15 {
-                    //let half_accounts = (*num_accounts) / 2;
-                    if w == 0 {
-                         Self::pick_pair_impl(3, indexes)
-                    } else {
-                         let temp = Self::pick_pair_impl((*num_accounts)-3, indexes);
-                         [temp[0]+3,temp[1]+3]
-                    }
-                } else {
-                    Self::pick_pair_impl(*num_accounts, indexes)
                 }*/
+                    //let half_accounts = (*num_accounts) / 2;
+                if w % 45 < 15 {
+                        Self::pick_pair_impl(3, indexes)
+                } else {
+                        let temp = Self::pick_pair_impl((*num_accounts)-3, indexes);
+                        [temp[0]+3,temp[1]+3]
+                }
             },
             AccountPicker::Limited(remaining) => {
                 let [remaining_idx_1, remaining_idx_2] =

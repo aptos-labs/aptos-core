@@ -2210,15 +2210,15 @@ impl AptosVM {
                         // The known Move function failure and type resolution failure could be a result of speculative execution. Use speculative logger.
                         StatusCode::UNEXPECTED_ERROR_FROM_KNOWN_MOVE_FUNCTION
                         | StatusCode::TYPE_RESOLUTION_FAILURE => {
-                           //print!("recorded error on txn_idx={:?}", log_context.get_txn_idx());
-                            speculative_error!(
+                           /*print!("recorded error on txn_idx={:?}", log_context.get_txn_idx());
+                            /speculative_error!(
                                 log_context,
                                 format!(
                                     "[aptos_vm] Transaction breaking invariant violation. txn: {:?}, status: {:?}",
                                     bcs::to_bytes::<SignedTransaction>(txn),
                                     vm_status
                                 ),
-                            );
+                            );*/
                         },
                         // Paranoid mode failure. We need to be alerted about this ASAP.
                         StatusCode::UNKNOWN_INVARIANT_VIOLATION_ERROR

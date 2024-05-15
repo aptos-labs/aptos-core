@@ -273,7 +273,7 @@ impl<'a> ConditionalSuspend for SchedulerHandle<'a> {
         // Otherwise, do not conditional suspend the garage, and update txn status to Suspended(.., None)
         // Return a different status to the caller indicated 'suspended but should re-execute'
         //println!("was in conditional suspend");
-        if txn_idx > self.scheduler.commit_state().0 + 100 {
+        /*if txn_idx > self.scheduler.commit_state().0 + 300 {
            //println!("unresolved suspend called txn_idx={}", txn_idx);
 
             /*if self.garage.unwrap().is_halted() {
@@ -284,18 +284,8 @@ impl<'a> ConditionalSuspend for SchedulerHandle<'a> {
                 return Ok(DependencyStatus::ExecutionHalted);
             }
             return Ok(res);
-        } 
-        /*let thread_id = self.get_thread_id();
-        if thread_id >= 10 {
-            let res = self.scheduler.wait_for_dependency(txn_idx, dep_txn_idx, None)?;
-            if self.garage.unwrap().is_halted() {
-                return Ok(DependencyStatus::ExecutionHalted);
-            }
-            return Ok(res);
-        }*/
-        //println!("got past commit state check");
-        //println!("suspend called txn_idx={}", txn_idx);
-
+        } */
+       
         let suspend_result: Result<SuspendResult<DependencyStatus>, PanicError> = self.garage.unwrap().conditional_suspend(|baton|-> Option<Result<DependencyStatus,PanicError>> {
             let dep_result = self.scheduler.wait_for_dependency(txn_idx, dep_txn_idx, Some(baton));
             match dep_result {

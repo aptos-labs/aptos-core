@@ -48,7 +48,7 @@ impl SpeculativeEvent for VMLogEntry {
             Level::Error => {
                 // TODO: Consider using SpeculativeCounter to increase CRITICAL_ERRORS
                 // on the critical path instead of async dispatching.
-                alert!(self.context, "{}", self.message);
+                //alert!(self.context, "{}", self.message);
             },
             Level::Warn => warn!(self.context, "{}", self.message),
             Level::Info => info!(self.context, "{}", self.message),
@@ -99,7 +99,7 @@ pub fn speculative_log(level: Level, context: &AdapterLogSchema, message: String
         let log_event = VMLogEntry::new(level, context.clone(), message);
         log_event.dispatch();
     } else {
-        panic!("speculation is on");
+        //panic!("speculation is on");
         // Store in speculative log events.
         match &*BUFFERED_LOG_EVENTS.load() {
             Some(log_events) => {

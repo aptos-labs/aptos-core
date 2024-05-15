@@ -267,9 +267,10 @@ impl ThreadGarage {
                 return Ok(SuspendResult::FailedRegisteringHook);
             }
 
-            /*if lock.num_sleeping == 9 {
+            if lock.num_sleeping >= 5 {
                 return Ok(SuspendResult::TooManySleepers);
-            }*/
+            }
+
             lock.asleep[thread_id] = true;
             baton = Baton::new(thread_id, default_value);
         }

@@ -756,6 +756,7 @@ where
         shared_commit_state: &ExplicitSyncWrapper<BlockGasLimitProcessor<T>>,
         final_results: &ExplicitSyncWrapper<Vec<E::Output>>,
         total_validation: &AtomicU64,
+        total_execution: &AtomicU64,
 
     ) -> Result<Option<Baton<DependencyStatus>>, PanicOr<ParallelBlockExecutionError>> {
         // Make executor for each task. TODO: fast concurrent executor.
@@ -832,7 +833,7 @@ where
                     ExecutionTaskType::Execution,
                 ) => {
                     //eprintln!("getting new task thread={}, execution, txn={}", scheduler_handle.get_thread_id(), txn_idx);
-
+                    let start = Instant::now();
                     let updates_outside = Self::execute(
                         txn_idx,
                         incarnation,
@@ -848,6 +849,9 @@ where
                             shared_counter,
                         ),
                     )?;         
+                    let end = Instant::now();
+                    let duration = end-start;                    
+                    total_execution.fetch_add(duration.as_nanos() as u64, Ordering::Relaxed);
 
                     match updates_outside {
                         Some(updates_outside) => scheduler_handle.get_scheduler().finish_execution(txn_idx, incarnation, updates_outside)?,
@@ -993,9 +997,10 @@ where
         let end = Instant::now();
         println!("VM_init_time={:?}", end-start);
 
-        
+        let total_execution = AtomicU64::new(0);
         let total_validation = AtomicU64::new(0);
 
+        let start_2 = Instant::now();
         {
             let executor_vec: Vec<Option<E>> = executor_vec.into_inner();
             
@@ -1018,6 +1023,7 @@ where
                     &shared_commit_state,
                     &final_results,
                     &total_validation,
+                    &total_execution,
                 );
                 match res {
                     Err(err) => {
@@ -1044,7 +1050,11 @@ where
                 }
             });
         }
+        let end_2 = Instant::now();
         println!("total_validation_time={}ms", total_validation.load(Ordering::Relaxed) as f64/1000000.0);
+        println!("total_execution_time={}ms", total_execution.load(Ordering::Relaxed) as f64/1000000.0);
+        println!("total_time={:?}", end_2-start_2);
+
         drop(timer);
 
         counters::update_state_counters(versioned_cache.stats(), true);
