@@ -9,8 +9,8 @@ use crate::{
     },
     counters::{
         self, ORDER_VOTE_ADDED, ORDER_VOTE_BROADCASTED, ORDER_VOTE_OTHER_ERRORS,
-        ORDER_VOTE_VERY_OLD, PROPOSED_VTXN_BYTES, PROPOSED_VTXN_COUNT,
-        SYNC_INFO_RECEIVED_WITH_NEWER_CERT,
+        ORDER_VOTE_VERY_OLD, PROPOSAL_VOTE_ADDED, PROPOSAL_VOTE_BROADCASTED, PROPOSED_VTXN_BYTES,
+        PROPOSED_VTXN_COUNT, QC_AGGREGATED_FROM_VOTES, SYNC_INFO_RECEIVED_WITH_NEWER_CERT,
     },
     error::{error_kind, VerifyError},
     liveness::{
@@ -888,6 +888,7 @@ impl RoundManager {
 
         if self.local_config.broadcast_vote {
             info!(self.new_log(LogEvent::Vote), "{}", vote);
+            PROPOSAL_VOTE_BROADCASTED.inc();
             self.network.broadcast_vote(vote_msg).await;
         } else {
             let recipient = self
@@ -1106,6 +1107,7 @@ impl RoundManager {
                         BlockStage::QC_AGGREGATED,
                     );
                 }
+                QC_AGGREGATED_FROM_VOTES.inc();
                 let result = self.new_qc_aggregated(qc.clone(), vote.author()).await;
                 if self.onchain_config.order_vote_enabled() {
                     if result.is_ok() {
@@ -1126,8 +1128,11 @@ impl RoundManager {
             VoteReceptionResult::EchoTimeout(_) if !self.round_state.is_vote_timeout() => {
                 self.process_local_timeout(round).await
             },
-            VoteReceptionResult::VoteAdded(_)
-            | VoteReceptionResult::VoteAddedQCDelayed(_)
+            VoteReceptionResult::VoteAdded(_) => {
+                PROPOSAL_VOTE_ADDED.inc();
+                Ok(())
+            },
+            VoteReceptionResult::VoteAddedQCDelayed(_)
             | VoteReceptionResult::EchoTimeout(_)
             | VoteReceptionResult::DuplicateVote => Ok(()),
             e => Err(anyhow::anyhow!("{:?}", e)),

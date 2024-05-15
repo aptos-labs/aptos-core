@@ -92,6 +92,34 @@ pub static COMMITTED_TXNS_COUNT: Lazy<IntCounterVec> = Lazy::new(|| {
 });
 
 //////////////////////
+// PROPOSAL VOTE COUNTERS
+//////////////////////
+
+pub static PROPOSAL_VOTE_ADDED: Lazy<IntCounter> = Lazy::new(|| {
+    register_int_counter!(
+        "aptos_consensus_proposal_vote_added",
+        "Count of the number of proposal votes added to pending votes"
+    )
+    .unwrap()
+});
+
+pub static QC_AGGREGATED_FROM_VOTES: Lazy<IntCounter> = Lazy::new(|| {
+    register_int_counter!(
+        "aptos_consensus_qc_aggregated_from_votes",
+        "Count of the number of QC aggregated from votes"
+    )
+    .unwrap()
+});
+
+pub static PROPOSAL_VOTE_BROADCASTED: Lazy<IntCounter> = Lazy::new(|| {
+    register_int_counter!(
+        "aptos_consensus_proposal_vote_broadcasted",
+        "Count of the number of proposal votes broadcasted"
+    )
+    .unwrap()
+});
+
+//////////////////////
 // PROPOSAL ELECTION
 //////////////////////
 
