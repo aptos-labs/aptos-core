@@ -233,11 +233,6 @@ impl RoundState {
         self.current_round
     }
 
-    /// Return the highest ordered round.
-    pub fn highest_ordered_round(&self) -> Round {
-        self.highest_ordered_round
-    }
-
     /// Returns deadline for current round
     pub fn current_round_deadline(&self) -> Duration {
         self.current_round_deadline
