@@ -332,6 +332,13 @@ impl<'r, 'l> Session<'r, 'l> {
             .load_resource(self.move_vm.runtime.loader(), addr, ty, &self.module_store)
     }
 
+    /// Get the serialized format of a `CompiledModule` given a `ModuleId`.
+    pub fn load_module(&self, module_id: &ModuleId) -> VMResult<Bytes> {
+        self.data_cache
+            .load_module(module_id)
+            .map_err(|e| e.finish(Location::Undefined))
+    }
+
     /// Check if this module exists.
     pub fn exists_module(&self, module_id: &ModuleId) -> VMResult<bool> {
         self.data_cache.exists_module(module_id)
