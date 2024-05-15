@@ -94,7 +94,7 @@ pub fn devnet_prepared_vk() -> PreparedVerifyingKey<Bn254> {
     PreparedVerifyingKey::from(vk)
 }
 
-/// Just for printing out the constants.
+/// Just for printing out the constants to be used in `tmp.move`.
 #[test]
 fn new_vk() {
     let alpha_g1 = g1_projective_str_to_affine(
