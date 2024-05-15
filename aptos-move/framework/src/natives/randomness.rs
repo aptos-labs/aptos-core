@@ -55,6 +55,12 @@ pub fn fetch_and_increment_txn_counter(
     _ty_args: Vec<Type>,
     _args: VecDeque<Value>,
 ) -> SafeNativeResult<SmallVec<[Value; 1]>> {
+    if !context.is_stack_unbiasable() {
+        return Err(SafeNativeError::Abort {
+            abort_code: E_API_USE_SUSCEPTIBLE_TO_TEST_AND_ABORT,
+        });
+    }
+
     let ctx = context.extensions_mut().get_mut::<RandomnessContext>();
     if !ctx.is_unbiasable() {
         return Err(SafeNativeError::Abort {

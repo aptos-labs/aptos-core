@@ -1143,6 +1143,14 @@ impl Interpreter {
             .collect();
         ExecutionState::new(stack_trace)
     }
+
+    pub(crate) fn is_stack_unbiasable(&self) -> bool {
+        self
+            .call_stack
+            .0
+            .iter()
+            .all(|frame| frame.function.def_is_friend_or_private)
+    }
 }
 
 // TODO Determine stack size limits based on gas limit

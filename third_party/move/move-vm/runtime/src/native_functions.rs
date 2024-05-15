@@ -185,6 +185,10 @@ impl<'a, 'b, 'c> NativeContext<'a, 'b, 'c> {
         self.interpreter.get_stack_frames(count)
     }
 
+    pub fn is_stack_unbiasable(&self) -> bool {
+        self.interpreter.is_stack_unbiasable()
+    }
+
     pub fn gas_balance(&self) -> InternalGas {
         self.gas_balance
     }
