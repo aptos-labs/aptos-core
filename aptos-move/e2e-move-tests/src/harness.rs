@@ -923,6 +923,7 @@ impl MoveHarness {
             &self.executor.data_store().as_move_resolver(),
             /*override_is_delayed_field_optimization_capable=*/ None,
         )
+        .unwrap()
     }
 
     pub fn set_default_gas_unit_price(&mut self, gas_unit_price: u64) {

@@ -2,7 +2,7 @@
 // Parts of the project are originally copyright © Meta Platforms, Inc.
 // SPDX-License-Identifier: Apache-2.0
 
-use anyhow::Result;
+use anyhow::{bail, Result};
 use aptos_logger::info;
 use aptos_storage_interface::{
     cached_state_view::CachedDbStateView,
@@ -18,6 +18,7 @@ use aptos_types::{
 use aptos_vm::{data_cache::AsMoveResolver, AptosVM};
 use aptos_vm_logging::log_schema::AdapterLogSchema;
 use fail::fail_point;
+use move_core_types::vm_status::VMStatus;
 use rand::{thread_rng, Rng};
 use std::sync::{Arc, Mutex};
 
@@ -41,7 +42,7 @@ pub trait TransactionValidation: Send + Sync + Clone {
 pub struct VMValidator {
     db_reader: Arc<dyn DbReader>,
     state_view: CachedDbStateView,
-    vm: AptosVM,
+    vm: Result<AptosVM, VMStatus>,
 }
 
 impl Clone for VMValidator {
@@ -51,7 +52,7 @@ impl Clone for VMValidator {
 }
 
 impl VMValidator {
-    fn new_vm_for_validation(state_view: &impl StateView) -> AptosVM {
+    fn new_vm_for_validation(state_view: &impl StateView) -> Result<AptosVM, VMStatus> {
         info!(
             AdapterLogSchema::new(state_view.id(), 0),
             "AptosVM created for Validation"
@@ -87,7 +88,10 @@ impl TransactionValidation for VMValidator {
         });
         use aptos_vm::VMValidator;
 
-        Ok(self.vm.validate_transaction(txn, &self.state_view))
+        Ok(match &self.vm {
+            Ok(vm) => vm.validate_transaction(txn, &self.state_view),
+            Err(e) => bail!("Failed to create the VM: {:?}", e),
+        })
     }
 
     fn restart(&mut self) -> Result<()> {

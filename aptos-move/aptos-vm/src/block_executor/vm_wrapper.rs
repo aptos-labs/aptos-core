@@ -30,17 +30,17 @@ impl<'a, S: 'a + StateView + Sync> ExecutorTask for AptosExecutorTask<'a, S> {
     type Output = AptosTransactionOutput;
     type Txn = SignatureVerifiedTransaction;
 
-    fn init(argument: &'a S) -> Self {
+    fn init(argument: &'a S) -> Result<Self, Self::Error> {
         // AptosVM has to be initialized using configs from storage.
         let vm = AptosVM::new(
             &argument.as_move_resolver(),
             /*override_is_delayed_field_optimization_capable=*/ Some(true),
-        );
+        )?;
 
-        Self {
+        Ok(Self {
             vm,
             base_view: argument,
-        }
+        })
     }
 
     // This function is called by the BlockExecutor for each transaction is intends

@@ -735,7 +735,13 @@ where
     ) -> Result<(), PanicOr<ParallelBlockExecutionError>> {
         // Make executor for each task. TODO: fast concurrent executor.
         let init_timer = VM_INIT_SECONDS.start_timer();
-        let executor = E::init(*executor_arguments);
+        let executor = match E::init(*executor_arguments) {
+            Ok(executor) => executor,
+            Err(e) => {
+                error!("Failed to create executor in worker loop: {:?}", e);
+                return Err(PanicOr::Or(ParallelBlockExecutionError::FatalVMError));
+            },
+        };
         drop(init_timer);
 
         let _timer = WORK_WITH_TASK_SECONDS.start_timer();
@@ -1007,7 +1013,9 @@ where
     ) -> Result<BlockOutput<E::Output>, SequentialBlockExecutionError<E::Error>> {
         let num_txns = signature_verified_block.len();
         let init_timer = VM_INIT_SECONDS.start_timer();
-        let executor = E::init(executor_arguments);
+        let executor = E::init(executor_arguments).map_err(|e| {
+            SequentialBlockExecutionError::ErrorToReturn(BlockExecutionError::FatalVMError(e))
+        })?;
         drop(init_timer);
 
         let start_counter = gen_id_start_value(true);

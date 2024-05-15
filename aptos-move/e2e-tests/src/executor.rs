@@ -657,7 +657,8 @@ impl FakeExecutor {
         let resolver = self.data_store.as_move_resolver();
         let vm = AptosVM::new(
             &resolver, /*override_is_delayed_field_optimization_capable=*/ None,
-        );
+        )
+        .unwrap();
 
         let (_status, output, gas_profiler) = vm.execute_user_transaction_with_custom_gas_meter(
             &resolver,
@@ -735,7 +736,8 @@ impl FakeExecutor {
         let vm = AptosVM::new(
             &self.get_state_view().as_move_resolver(),
             /*override_is_delayed_field_optimization_capable=*/ None,
-        );
+        )
+        .unwrap();
         vm.validate_transaction(txn, &self.data_store)
     }
 

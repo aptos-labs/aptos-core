@@ -91,11 +91,12 @@ impl AptosDebugger {
         let vm = AptosVM::new(
             &resolver,
             /*override_is_delayed_field_optimization_capable=*/ Some(false),
-        );
+        )
+        .expect("Should be able to create the VM");
 
         // Module bundle is deprecated!
         if let TransactionPayload::ModuleBundle(_) = txn.payload() {
-            anyhow::bail!("Module bundle payload has been removed")
+            bail!("Module bundle payload has been removed")
         }
 
         let (status, output, gas_profiler) = vm.execute_user_transaction_with_custom_gas_meter(

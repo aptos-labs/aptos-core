@@ -828,8 +828,8 @@ where
     type Output = MockOutput<K, E>;
     type Txn = MockTransaction<K, E>;
 
-    fn init(_argument: Self::Argument) -> Self {
-        Self::new()
+    fn init(_argument: Self::Argument) -> Result<Self, Self::Error> {
+        Ok(Self::new())
     }
 
     fn execute_transaction(

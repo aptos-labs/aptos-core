@@ -239,6 +239,7 @@ impl<'scope, 'view: 'scope, BaseView: StateView + Sync> Worker<'view, BaseView> 
                 &self.base_view.as_move_resolver(),
                 /*override_is_delayed_field_optimization_capable=*/ None,
             )
+            .unwrap()
         };
 
         loop {

@@ -199,13 +199,18 @@ impl AptosVM {
     pub fn new(
         resolver: &impl AptosMoveResolver,
         override_is_delayed_field_optimization_capable: Option<bool>,
-    ) -> Self {
+    ) -> Result<Self, VMStatus> {
         let _timer = TIMER.timer_with(&["AptosVM::new"]);
         let randomness_api_v0_required_deposit = RequiredGasDeposit::fetch_config(resolver)
             .unwrap_or_else(RequiredGasDeposit::default_if_missing);
         let features = Features::fetch_config(resolver).unwrap_or_default();
         let (gas_params, storage_gas_params, gas_feature_version) =
-            get_gas_parameters(&features, resolver).expect("TODO");
+            get_gas_parameters(&features, resolver).map_err(|msg| {
+                VMStatus::error(
+                    StatusCode::VM_STARTUP_FAILURE,
+                    Some(format!("VM Startup Failed. {}", msg)),
+                )
+            })?;
 
         // If no chain ID is in storage, we assume we are in a testing environment and use ChainId::TESTING
         let chain_id = ChainId::fetch_config(resolver).unwrap_or_else(ChainId::test);
@@ -246,7 +251,7 @@ impl AptosVM {
             .ok()
             .and_then(|vk| vk.try_into().ok());
 
-        Self {
+        Ok(Self {
             is_simulation: false,
             move_vm,
             gas_feature_version,
@@ -255,7 +260,7 @@ impl AptosVM {
             timed_features,
             pvk,
             randomness_api_v0_required_deposit,
-        }
+        })
     }
 
     pub fn new_session<'r, S: AptosMoveResolver>(
@@ -2108,10 +2113,18 @@ impl AptosVM {
         max_gas_amount: u64,
     ) -> ViewFunctionOutput {
         let resolver = state_view.as_move_resolver();
-        let vm = AptosVM::new(
+        let vm = match AptosVM::new(
             &resolver,
             /*override_is_delayed_field_optimization_capable=*/ Some(false),
-        );
+        ) {
+            Ok(vm) => vm,
+            Err(e) => {
+                return ViewFunctionOutput::new(
+                    Err(anyhow!("Failed to execute function: {:?}", e)),
+                    0,
+                )
+            },
+        };
         let mut gas_meter = vm.make_standard_gas_meter(max_gas_amount.into());
 
         let mut session = vm.new_session(&resolver, SessionId::Void, None);
@@ -2594,13 +2607,13 @@ impl VMValidator for AptosVM {
 pub struct AptosSimulationVM(AptosVM);
 
 impl AptosSimulationVM {
-    pub fn new(resolver: &impl AptosMoveResolver) -> Self {
+    pub fn new(resolver: &impl AptosMoveResolver) -> Result<Self, VMStatus> {
         let mut vm = AptosVM::new(
             resolver,
             /*override_is_delayed_field_optimization_capable=*/ Some(false),
-        );
+        )?;
         vm.is_simulation = true;
-        Self(vm)
+        Ok(Self(vm))
     }
 
     /// Simulates a signed transaction (i.e., executes it without performing
@@ -2616,7 +2629,15 @@ impl AptosSimulationVM {
         );
 
         let resolver = state_view.as_move_resolver();
-        let vm = Self::new(&resolver);
+        let vm = match Self::new(&resolver) {
+            Ok(vm) => vm,
+            Err(e) => {
+                let output = discarded_output(e.status_code())
+                    .try_materialize_into_transaction_output(&resolver)
+                    .expect("Output materialization succeeds because it is empty");
+                return (e, output);
+            },
+        };
         let log_context = AdapterLogSchema::new(state_view.id(), 0);
 
         let (vm_status, vm_output) =

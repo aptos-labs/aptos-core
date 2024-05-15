@@ -21,7 +21,7 @@ pub fn run_transaction_using_debugger(
     let state_view = debugger.state_view_at_version(version);
     let resolver = state_view.as_move_resolver();
 
-    let vm = AptosVM::new(&resolver, None);
+    let vm = AptosVM::new(&resolver, None).expect("Should be able to create the VM");
     let log_context = AdapterLogSchema::new(resolver.id(), 0);
 
     let (vm_status, vm_output) = vm.execute_user_transaction(&resolver, &transaction, &log_context);
@@ -38,7 +38,7 @@ pub fn benchmark_transaction_using_debugger(
     let state_view = debugger.state_view_at_version(version);
     let resolver = state_view.as_move_resolver();
 
-    let vm = AptosVM::new(&resolver, None);
+    let vm = AptosVM::new(&resolver, None).expect("Should be able to create the VM");
     let log_context = AdapterLogSchema::new(resolver.id(), 0);
 
     let (vm_status, vm_output) = vm.execute_user_transaction(&resolver, &transaction, &log_context);
@@ -50,7 +50,7 @@ pub fn benchmark_transaction_using_debugger(
         for _i in 0..n {
             // Create a new VM each time so to include code loading as part of the
             // total running time.
-            let vm = AptosVM::new(&resolver, None);
+            let vm = AptosVM::new(&resolver, None).expect("Should be able to create the VM");
             let log_context = AdapterLogSchema::new(resolver.id(), 0);
 
             let t1 = Instant::now();
