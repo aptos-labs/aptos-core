@@ -98,11 +98,6 @@ impl BlockStore {
         )
         .await?;
 
-        // TODO: We are syncing till highest_quorum_cert instead of highest_ordered_cert.
-        // Do we still have to insert highest_ordered_cert explicitly here?
-        // self.insert_wrapped_ledger_info(sync_info.highest_ordered_cert(), &mut retriever)
-        //     .await?;
-
         self.insert_quorum_cert(sync_info.highest_quorum_cert(), &mut retriever)
             .await?;
 

@@ -156,7 +156,6 @@ fn test_order_votes_out_of_order_execution(safety_rules: &Callback) {
 
     safety_rules.construct_and_sign_order_vote(&ov2).unwrap();
 
-    // TODO: Safety rules current do not preven this out of order signing. Should we prevent it?
     safety_rules
         .construct_and_sign_vote_two_chain(&p0, None)
         .unwrap();
