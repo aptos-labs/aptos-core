@@ -17,5 +17,8 @@ pub const X_APTOS_OLDEST_BLOCK_HEIGHT: &str = "X-Aptos-Oldest-Block-Height";
 pub const X_APTOS_LEDGER_TIMESTAMP: &str = "X-Aptos-Ledger-TimestampUsec";
 /// Cursor used for pagination.
 pub const X_APTOS_CURSOR: &str = "X-Aptos-Cursor";
+/// The cost of the call in terms of gas. Only applicable to calls that result in
+/// function execution in the VM, e.g. view functions, txn simulation.
+pub const X_APTOS_GAS_USED: &str = "X-Aptos-Gas-Used";
 /// Provided by the client to identify what client it is.
 pub const X_APTOS_CLIENT: &str = "x-aptos-client";

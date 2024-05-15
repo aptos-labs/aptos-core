@@ -73,6 +73,8 @@ use move_core_types::{
 };
 use move_vm_runtime::module_traversal::{TraversalContext, TraversalStorage};
 use move_vm_types::gas::UnmeteredGasMeter;
+#[cfg(any(test, feature = "fuzzing"))]
+use rayon::ThreadPool;
 use serde::Serialize;
 use std::{
     collections::BTreeSet,
@@ -155,6 +157,29 @@ impl FakeExecutor {
                 .build()
                 .unwrap(),
         );
+        let mut executor = FakeExecutor {
+            data_store: FakeDataStore::default(),
+            event_store: Vec::new(),
+            executor_thread_pool,
+            block_time: 0,
+            executed_output: None,
+            trace_dir: None,
+            rng: KeyGen::from_seed(RNG_SEED),
+            executor_mode: None,
+            features: Features::default(),
+            chain_id: chain_id.id(),
+            allow_block_executor_fallback: true,
+        };
+        executor.apply_write_set(write_set);
+        executor
+    }
+
+    #[cfg(any(test, feature = "fuzzing"))]
+    pub fn from_genesis_with_existing_thread_pool(
+        write_set: &WriteSet,
+        chain_id: ChainId,
+        executor_thread_pool: Arc<ThreadPool>,
+    ) -> Self {
         let mut executor = FakeExecutor {
             data_store: FakeDataStore::default(),
             event_store: Vec::new(),

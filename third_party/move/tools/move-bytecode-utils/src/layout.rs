@@ -122,7 +122,7 @@ impl<'a, T: GetModule> SerdeLayoutBuilder<'a, T> {
     /// Add layouts for all types used in `t` to the registry
     pub fn build_struct_layout(&mut self, s: &StructTag) -> Result<Format, T::Error> {
         let serde_type_args = s
-            .type_params
+            .type_args
             .iter()
             .map(|t| self.build_type_layout(t.clone()))
             .collect::<Result<Vec<Format>, T::Error>>()?;
@@ -438,7 +438,7 @@ impl StructLayoutBuilder {
         layout_type: LayoutType,
     ) -> Result<MoveStructLayout> {
         let type_arguments = s
-            .type_params
+            .type_args
             .iter()
             .map(|t| TypeLayoutBuilder::build(t, resolver, layout_type))
             .collect::<Result<Vec<MoveTypeLayout>>>()?;
@@ -491,14 +491,15 @@ impl StructLayoutBuilder {
                     ),
                     LayoutType::WithTypes => {
                         let mid = m.self_id();
-                        let type_param_res: Result<Vec<TypeTag>> =
-                            type_arguments.iter().map(|t| t.try_into()).collect();
-                        let type_params = type_param_res?;
+                        let type_args = type_arguments
+                            .iter()
+                            .map(|t| t.try_into())
+                            .collect::<Result<Vec<TypeTag>>>()?;
                         let type_ = StructTag {
                             address: *mid.address(),
                             module: mid.name().to_owned(),
                             name: m.identifier_at(s_handle.name).to_owned(),
-                            type_params,
+                            type_args,
                         };
                         let fields = fields
                             .iter()

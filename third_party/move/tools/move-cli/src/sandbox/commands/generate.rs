@@ -14,7 +14,7 @@ use std::path::Path;
 pub fn generate_struct_layouts(
     path: &Path,
     struct_opt: &Option<String>,
-    type_params_opt: &Option<Vec<TypeTag>>,
+    type_args_opt: &Option<Vec<TypeTag>>,
     separator: Option<String>,
     omit_addresses: bool,
     ignore_phantom_types: bool,
@@ -24,13 +24,13 @@ pub fn generate_struct_layouts(
     if let Some(module_id) = state.get_module_id(path) {
         if let Some(struct_) = struct_opt {
             // Generate for one struct
-            let type_params = type_params_opt.as_ref().cloned().unwrap_or_default();
+            let type_args = type_args_opt.as_ref().cloned().unwrap_or_default();
             let name = Identifier::new(struct_.as_str())?;
             let struct_tag = StructTag {
                 address: *module_id.address(),
                 module: module_id.name().to_owned(),
                 name,
-                type_params,
+                type_args,
             };
             let mut layout_builder =
                 SerdeLayoutBuilder::new_with_config(&state, SerdeLayoutConfig {

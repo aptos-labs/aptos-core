@@ -351,8 +351,12 @@ impl SharedTestingConfig {
             };
             match exec_result {
                 Err(err) => {
-                    let actual_err =
-                        MoveError(err.major_status(), err.sub_status(), err.location().clone());
+                    let actual_err = MoveError(
+                        err.major_status(),
+                        err.sub_status(),
+                        err.location().clone(),
+                        err.message().cloned(),
+                    );
                     assert!(err.major_status() != StatusCode::EXECUTED);
                     match test_info.expected_failure.as_ref() {
                         Some(ExpectedFailure::Expected) => {

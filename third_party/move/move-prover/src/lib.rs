@@ -73,7 +73,7 @@ pub fn run_move_prover_v2<W: WriteColor>(
     let now = Instant::now();
     let cloned_options = options.clone();
     let compiler_options = move_compiler_v2::Options {
-        dependencies: vec![],
+        dependencies: cloned_options.move_deps,
         named_address_mapping: cloned_options.move_named_address_values,
         output_dir: cloned_options.output_path,
         language_version: cloned_options.language_version,
@@ -83,7 +83,7 @@ pub fn run_move_prover_v2<W: WriteColor>(
         experiments: vec![],
         experiment_cache: Default::default(),
         sources: cloned_options.move_sources,
-        sources_deps: cloned_options.move_deps,
+        sources_deps: vec![],
         warn_unused: false,
         whole_program: false,
         compile_test_code: false,
