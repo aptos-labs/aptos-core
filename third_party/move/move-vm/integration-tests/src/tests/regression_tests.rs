@@ -91,8 +91,7 @@ fn script_large_ty() {
     move_bytecode_verifier::verify_module(&verifier_config, &decompiled_module).unwrap();
 
     let start = Instant::now();
-    move_bytecode_verifier::verify_script_with_config(&verifier_config, &decompiled_script)
-        .unwrap();
+    move_bytecode_verifier::verify_script(&verifier_config, &decompiled_script).unwrap();
     println!("script verification time: {:?}", start.elapsed());
 
     let mut script = vec![];

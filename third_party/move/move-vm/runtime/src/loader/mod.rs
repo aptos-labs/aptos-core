@@ -385,7 +385,7 @@ impl Loader {
     fn verify_script(&self, script: &CompiledScript) -> VMResult<()> {
         fail::fail_point!("verifier-failpoint-3", |_| { Ok(()) });
 
-        move_bytecode_verifier::verify_script_with_config(&self.vm_config.verifier, script)
+        move_bytecode_verifier::verify_script(&self.vm_config.verifier, script)
     }
 
     fn verify_script_dependencies(

@@ -26,7 +26,7 @@ fn compile_script_string_impl(
         .map_err(|e| e.finish(Location::Undefined).into_vm_status())?;
     assert_eq!(script, deserialized_script);
 
-    Ok(match verify_script(&script) {
+    Ok(match verify_script(&VerifierConfig::default(), &script) {
         Ok(_) => (script, None),
         Err(error) => (script, Some(error)),
     })

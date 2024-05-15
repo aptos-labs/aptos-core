@@ -258,7 +258,7 @@ fn verify_module(sm: &SourceMap, loc: Loc, cm: &F::CompiledModule) -> Diagnostic
 }
 
 fn verify_script(sm: &SourceMap, loc: Loc, cs: &F::CompiledScript) -> Diagnostics {
-    match move_bytecode_verifier::verifier::verify_script(cs) {
+    match move_bytecode_verifier::verifier::verify_script(&VerifierConfig::default(), cs) {
         Ok(_) => Diagnostics::new(),
         Err(e) => {
             bytecode_verifier_mismatch_bug(sm, loc, move_binary_format::errors::Location::Script, e)

@@ -60,7 +60,8 @@ fn do_verify_module(module: &CompiledModule, dependencies: &[CompiledModule]) {
 }
 
 fn do_verify_script(script: &CompiledScript, dependencies: &[CompiledModule]) {
-    verify_script(script).unwrap_or_else(|err| print_error_and_exit(&err));
+    verify_script(&VerifierConfig::default(), script)
+        .unwrap_or_else(|err| print_error_and_exit(&err));
     if let Err(err) = dependencies::verify_script(script, dependencies) {
         print_error_and_exit(&err);
     }

@@ -244,7 +244,7 @@ fn mk_invoking_script(use_generic: bool) -> CompiledScript {
         constant_pool: vec![],
         metadata: vec![],
     };
-    move_bytecode_verifier::verify_script(&s).unwrap();
+    move_bytecode_verifier::verify_script(&VerifierConfig::default(), &s).unwrap();
     s
 }
 

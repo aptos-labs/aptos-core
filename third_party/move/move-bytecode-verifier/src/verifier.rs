@@ -89,21 +89,7 @@ pub fn verify_module(config: &VerifierConfig, module: &CompiledModule) -> VMResu
     result
 }
 
-/// Helper for a "canonical" verification of a script.
-///
-/// Clients that rely on verification should call the proper passes
-/// internally rather than using this function.
-///
-/// This function is intended to provide a verification path for clients
-/// that do not require full control over verification. It is advised to
-/// call this umbrella function instead of each individual checkers to
-/// minimize the code locations that need to be updated should a new checker
-/// is introduced.
-pub fn verify_script(script: &CompiledScript) -> VMResult<()> {
-    verify_script_with_config(&VerifierConfig::default(), script)
-}
-
-pub fn verify_script_with_config(config: &VerifierConfig, script: &CompiledScript) -> VMResult<()> {
+pub fn verify_script(config: &VerifierConfig, script: &CompiledScript) -> VMResult<()> {
     let prev_state = move_core_types::state::set_state(VMState::VERIFIER);
     let result = std::panic::catch_unwind(|| {
         BoundsChecker::verify_script(script).map_err(|e| e.finish(Location::Script))?;

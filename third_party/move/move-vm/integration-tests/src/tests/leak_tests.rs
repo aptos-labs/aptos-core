@@ -4,6 +4,7 @@
 use move_binary_format::file_format::{
     Bytecode::*, CodeUnit, CompiledScript, Signature, SignatureIndex, SignatureToken::*,
 };
+use move_bytecode_verifier::VerifierConfig;
 use move_vm_runtime::{module_traversal::*, move_vm::MoveVM};
 use move_vm_test_utils::{gas_schedule::GasStatus, InMemoryStorage};
 
@@ -44,7 +45,7 @@ fn leak_with_abort() {
         parameters: SignatureIndex(0),
     };
 
-    move_bytecode_verifier::verify_script(&cs).expect("verify failed");
+    move_bytecode_verifier::verify_script(&VerifierConfig::default(), &cs).expect("verify failed");
     let vm = MoveVM::new(vec![]).unwrap();
 
     let storage: InMemoryStorage = InMemoryStorage::new();
