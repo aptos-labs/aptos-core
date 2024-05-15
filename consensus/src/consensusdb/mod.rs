@@ -131,7 +131,10 @@ impl ConsensusDB {
         highest_ordered_cert: Option<Vec<u8>>,
     ) -> Result<(), DbError> {
         if block_data.is_empty() && qc_data.is_empty() && highest_ordered_cert.is_none() {
-            return Err(anyhow::anyhow!("Consensus block is empty, qc data and highest ordered cert are empty!").into());
+            return Err(anyhow::anyhow!(
+                "Consensus block is empty, qc data and highest ordered cert are empty!"
+            )
+            .into());
         }
         let batch = SchemaBatch::new();
         block_data
