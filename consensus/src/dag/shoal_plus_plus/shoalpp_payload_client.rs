@@ -45,7 +45,7 @@ impl ShoalppPayloadClient {
             dag_reader_vec.push(dag.read());
         });
 
-        let excludes: Vec<_> = dag_reader_vec
+        let mut excludes: Vec<_> = dag_reader_vec
             .par_iter()
             .enumerate()
             .map(|(dag_id, dag_reader)| {
@@ -70,6 +70,13 @@ impl ShoalppPayloadClient {
             })
             .flatten()
             .collect();
+
+        let proposals: Vec<_> = dag_reader_vec
+            .iter()
+            .flat_map(|dag_reader| &dag_reader.recent_proposal)
+            .collect();
+        excludes.extend_from_slice(&proposals);
+
         PayloadFilter::from(&excludes)
     }
 }

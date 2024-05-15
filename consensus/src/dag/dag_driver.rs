@@ -412,6 +412,7 @@ impl DagDriver {
             self.time_service.now_unix_time().as_micros() as u64,
             highest_parent_timestamp + 1,
         );
+        self.dag.write().recent_proposal = Some(payload.clone());
         let new_node = Node::new(
             self.epoch_state.epoch,
             self.dag_id,

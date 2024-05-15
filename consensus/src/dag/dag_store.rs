@@ -14,7 +14,7 @@ use crate::{
     payload_manager::TPayloadManager,
 };
 use anyhow::{anyhow, ensure};
-use aptos_consensus_types::common::{Author, Round};
+use aptos_consensus_types::common::{Author, Payload, Round};
 use aptos_crypto::HashValue;
 use aptos_infallible::RwLock;
 use aptos_logger::{debug, error, warn};
@@ -70,6 +70,7 @@ pub struct InMemDag {
     /// The window we maintain between highest committed round and initial round
     window_size: u64,
     voting_power_cache: HashMap<(Round, Author), NodeVotingPower>,
+    pub recent_proposal: Option<Payload>,
 }
 
 impl InMemDag {
@@ -83,6 +84,7 @@ impl InMemDag {
             epoch_state,
             window_size,
             voting_power_cache: HashMap::new(),
+            recent_proposal: None,
         }
     }
 
