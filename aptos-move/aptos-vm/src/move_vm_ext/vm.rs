@@ -2,7 +2,7 @@
 // SPDX-License-Identifier: Apache-2.0
 
 use crate::{
-    config::aptos_prod_verifier_config,
+    environment::aptos_prod_vm_config,
     move_vm_ext::{warm_vm_cache::WarmVmCache, AptosMoveResolver, SessionExt, SessionId},
 };
 use aptos_framework::natives::{
@@ -21,13 +21,11 @@ use aptos_native_interface::SafeNativeBuilder;
 use aptos_table_natives::NativeTableContext;
 use aptos_types::{
     chain_id::ChainId,
-    on_chain_config::{Features, TimedFeatureFlag, TimedFeatures},
+    on_chain_config::{Features, TimedFeatures},
     transaction::user_transaction_context::UserTransactionContext,
 };
-use move_binary_format::{deserializer::DeserializerConfig, errors::VMResult};
-use move_vm_runtime::{
-    config::VMConfig, move_vm::MoveVM, native_extensions::NativeContextExtensions,
-};
+use move_binary_format::errors::VMResult;
+use move_vm_runtime::{move_vm::MoveVM, native_extensions::NativeContextExtensions};
 use std::ops::Deref;
 
 pub struct MoveVmExt {
@@ -51,26 +49,12 @@ impl MoveVmExt {
     where
         F: Fn(DynamicExpression) + Send + Sync + 'static,
     {
-        let max_binary_format_version =
-            features.get_max_binary_format_version(Some(gas_feature_version));
-        let max_identifier_size = features.get_max_identifier_size();
-
-        let enable_invariant_violation_check_in_swap_loc =
-            !timed_features.is_enabled(TimedFeatureFlag::DisableInvariantViolationCheckInSwapLoc);
-        let type_size_limit = true;
-
-        let verifier_config = aptos_prod_verifier_config(&features);
-
-        let mut type_max_cost = 0;
-        let mut type_base_cost = 0;
-        let mut type_byte_cost = 0;
-        if timed_features.is_enabled(TimedFeatureFlag::LimitTypeTagSize) {
-            // 5000 limits type tag total size < 5000 bytes and < 50 nodes
-            type_max_cost = 5000;
-            type_base_cost = 100;
-            type_byte_cost = 1;
-        }
-
+        let vm_config = aptos_prod_vm_config(
+            &features,
+            &timed_features,
+            gas_feature_version,
+            aggregator_v2_type_tagging,
+        );
         let mut builder = SafeNativeBuilder::new(
             gas_feature_version,
             native_gas_params,
@@ -84,25 +68,7 @@ impl MoveVmExt {
         }
 
         Ok(Self {
-            inner: WarmVmCache::get_warm_vm(
-                builder,
-                VMConfig {
-                    verifier: verifier_config,
-                    deserializer_config: DeserializerConfig::new(
-                        max_binary_format_version,
-                        max_identifier_size,
-                    ),
-                    paranoid_type_checks: crate::AptosVM::get_paranoid_checks(),
-                    enable_invariant_violation_check_in_swap_loc,
-                    type_size_limit,
-                    max_value_nest_depth: Some(128),
-                    type_max_cost,
-                    type_base_cost,
-                    type_byte_cost,
-                    aggregator_v2_type_tagging,
-                },
-                resolver,
-            )?,
+            inner: WarmVmCache::get_warm_vm(builder, vm_config, resolver)?,
             chain_id,
             features,
         })

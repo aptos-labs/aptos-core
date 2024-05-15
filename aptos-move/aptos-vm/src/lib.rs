@@ -101,7 +101,7 @@
 //!             +-----------------------------+
 //! ```
 
-pub mod config;
+pub mod environment;
 #[macro_use]
 pub mod counters;
 pub mod data_cache;

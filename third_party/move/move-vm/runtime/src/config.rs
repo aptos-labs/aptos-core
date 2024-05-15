@@ -34,7 +34,7 @@ impl Default for VMConfig {
         Self {
             verifier: VerifierConfig::default(),
             deserializer_config: DeserializerConfig::new(VERSION_MAX, IDENTIFIER_SIZE_MAX),
-            paranoid_type_checks: false,
+            paranoid_type_checks: true,
             enable_invariant_violation_check_in_swap_loc: true,
             type_size_limit: false,
             max_value_nest_depth: Some(DEFAULT_MAX_VALUE_NEST_DEPTH),
@@ -42,15 +42,6 @@ impl Default for VMConfig {
             type_base_cost: 0,
             type_byte_cost: 0,
             aggregator_v2_type_tagging: false,
-        }
-    }
-}
-
-impl VMConfig {
-    pub fn production() -> Self {
-        Self {
-            verifier: VerifierConfig::production(),
-            ..Self::default()
         }
     }
 }

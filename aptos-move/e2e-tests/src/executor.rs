@@ -58,7 +58,7 @@ use aptos_vm::{
     block_executor::{AptosTransactionOutput, BlockAptosVM},
     data_cache::AsMoveResolver,
     gas::get_gas_parameters,
-    move_vm_ext::{AptosMoveResolver, MoveVmExt, SessionId},
+    move_vm_ext::{MoveVmExt, SessionId},
     verifier, AptosVM, VMValidator,
 };
 use aptos_vm_genesis::{generate_genesis_change_set_for_testing_with_count, GenesisOptions};
@@ -1122,7 +1122,7 @@ impl FakeExecutor {
         &mut self,
         senders: Vec<AccountAddress>,
         entry_fn: &EntryFunction,
-        state_view: &impl AptosMoveResolver,
+        state_view: &impl StateView,
         features: Features,
     ) -> Result<(WriteSet, Vec<ContractEvent>), VMStatus> {
         let (gas_params, storage_gas_params, gas_feature_version) =
@@ -1140,6 +1140,7 @@ impl FakeExecutor {
             .with_override_profile(TimedFeatureOverride::Testing)
             .build();
         let struct_constructors = features.is_enabled(FeatureFlag::STRUCT_CONSTRUCTORS);
+        let resolver = state_view.as_move_resolver();
         let vm = MoveVmExt::new(
             gas_params.natives.clone(),
             gas_params.vm.misc.clone(),
@@ -1147,11 +1148,12 @@ impl FakeExecutor {
             self.chain_id,
             features,
             timed_features,
-            state_view,
+            &resolver,
             false,
         )
         .unwrap();
-        let mut session = vm.new_session(state_view, SessionId::void(), None);
+
+        let mut session = vm.new_session(&resolver, SessionId::void(), None);
         let function =
             session.load_function(entry_fn.module(), entry_fn.function(), entry_fn.ty_args())?;
         let args = verifier::transaction_arg_validation::validate_combine_signer_and_txn_args(
@@ -1178,7 +1180,7 @@ impl FakeExecutor {
                 LATEST_GAS_FEATURE_VERSION,
             ))
             .expect("Failed to generate txn effects");
-        change_set.try_materialize_aggregator_v1_delta_set(state_view)?;
+        change_set.try_materialize_aggregator_v1_delta_set(&resolver)?;
         let (write_set, events) = change_set
             .try_into_storage_change_set()
             .expect("Failed to convert to ChangeSet")

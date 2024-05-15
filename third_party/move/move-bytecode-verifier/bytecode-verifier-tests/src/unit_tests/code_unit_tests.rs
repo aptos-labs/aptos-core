@@ -55,7 +55,7 @@ fn valid_fallthrough_ret() {
 #[test]
 fn valid_fallthrough_abort() {
     let module = dummy_procedure_module(vec![Bytecode::LdU64(7), Bytecode::Abort]);
-    let result = CodeUnitVerifier::verify_module(&Default::default(), &module);
+    let result = CodeUnitVerifier::verify_module(&VerifierConfig::default(), &module);
     assert!(result.is_ok());
 }
 
@@ -68,7 +68,7 @@ fn test_max_number_of_bytecode() {
     nops.push(Bytecode::Ret);
     let module = dummy_procedure_module(nops);
 
-    let result = CodeUnitVerifier::verify_module(&VerifierConfig::unbounded(), &module);
+    let result = CodeUnitVerifier::verify_module(&VerifierConfig::default(), &module);
     assert!(result.is_ok());
 }
 

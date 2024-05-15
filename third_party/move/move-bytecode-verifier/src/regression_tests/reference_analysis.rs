@@ -314,7 +314,7 @@ fn indirect_code() {
         }],
     };
 
-    let res = crate::verify_module_with_config(&VerifierConfig::unbounded(), &module).unwrap_err();
+    let res = crate::verify_module_with_config(&VerifierConfig::default(), &module).unwrap_err();
     assert_eq!(
         res.major_status(),
         StatusCode::VEC_UPDATE_EXISTS_MUTABLE_BORROW_ERROR

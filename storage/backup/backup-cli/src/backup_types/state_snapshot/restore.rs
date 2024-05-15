@@ -38,7 +38,7 @@ use aptos_types::{
     },
     transaction::Version,
 };
-use aptos_vm::config::aptos_prod_verifier_config;
+use aptos_vm::environment::aptos_prod_verifier_config;
 use clap::Parser;
 use futures::{stream, TryStreamExt};
 use move_binary_format::CompiledModule;

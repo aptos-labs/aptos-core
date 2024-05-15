@@ -17,7 +17,6 @@ use aptos_types::{
     write_set::WriteSet,
 };
 use aptos_validator_interface::AptosValidatorInterface;
-use aptos_vm::data_cache::AsMoveResolver;
 use clap::ValueEnum;
 use itertools::Itertools;
 use move_core_types::{account_address::AccountAddress, language_storage::ModuleId};
@@ -378,7 +377,7 @@ impl Execution {
                     return Some(executor.try_exec_entry_with_state_view(
                         senders,
                         entry_function,
-                        &data_view.as_move_resolver(),
+                        &data_view,
                         features,
                     ));
                 } else {
@@ -388,7 +387,7 @@ impl Execution {
                     return Some(executor.try_exec_entry_with_state_view(
                         senders,
                         entry_function,
-                        &executor.data_store().clone().as_move_resolver(),
+                        &executor.data_store().clone(),
                         features,
                     ));
                 }

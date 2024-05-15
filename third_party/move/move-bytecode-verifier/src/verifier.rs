@@ -219,11 +219,7 @@ impl Default for VerifierConfig {
 impl VerifierConfig {
     /// Returns truly unbounded config, even relaxing metering.
     pub fn unbounded() -> Self {
-        Self {
-            max_per_fun_meter_units: None,
-            max_per_mod_meter_units: None,
-            ..VerifierConfig::default()
-        }
+        todo!()
     }
 
     /// An approximation of what config is used in production.

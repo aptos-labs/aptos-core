@@ -20,7 +20,7 @@ use move_vm_runtime::config::VMConfig;
 //       now everything is per-block because we do not have long-living caches
 //       anyway. Decoupling can help with invalidation based on the lifetime.
 #[allow(dead_code)]
-pub struct BlockVMConfig {
+pub struct Environment {
     // Gas related configs.
     gas_feature_version: u64,
     vm_gas_params: VMGasParameters,
@@ -38,7 +38,7 @@ pub struct BlockVMConfig {
     randomness_deposit: Option<u64>,
 }
 
-impl BlockVMConfig {
+impl Environment {
     pub fn new(
         state_view: &impl StateView,
         is_delayed_field_optimization_capable: bool,

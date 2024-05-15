@@ -76,8 +76,6 @@ pub struct AdapterPublishArgs {
 
 #[derive(Debug, Parser)]
 pub struct AdapterExecuteArgs {
-    #[clap(long, default_value = "true")]
-    pub check_runtime_types: bool,
     /// print more complete information for VMErrors on run
     #[clap(long)]
     pub verbose: bool,
@@ -172,7 +170,7 @@ impl<'a> MoveTestAdapter<'a> for SimpleVMTestAdapter<'a> {
                     }
                     Ok(())
                 },
-                production_vm_config_with_paranoid_type_checks(),
+                VMConfig::default(),
             )
             .unwrap();
         let mut addr_to_name_mapping = BTreeMap::new();
@@ -223,7 +221,7 @@ impl<'a> MoveTestAdapter<'a> for SimpleVMTestAdapter<'a> {
                     compat,
                 )
             },
-            production_vm_config_with_paranoid_type_checks(),
+            VMConfig::default(),
         ) {
             Ok(()) => Ok((None, module)),
             Err(vm_error) => Err(anyhow!(
@@ -277,7 +275,7 @@ impl<'a> MoveTestAdapter<'a> for SimpleVMTestAdapter<'a> {
                     &mut TraversalContext::new(&traversal_storage),
                 )
             },
-            VMConfig::from(extra_args),
+            VMConfig::default(),
         )
         .map_err(|vm_error| {
             anyhow!(
@@ -332,7 +330,7 @@ impl<'a> MoveTestAdapter<'a> for SimpleVMTestAdapter<'a> {
                         &mut TraversalContext::new(&traversal_storage),
                     )
                 },
-                VMConfig::from(extra_args),
+                VMConfig::default(),
             )
             .map_err(|vm_error| {
                 anyhow!(
@@ -539,20 +537,4 @@ pub fn run_test_with_config_and_exp_suffix(
     let v1_lib = precompiled_v1_stdlib_if_needed(&config);
     let v2_lib = precompiled_v2_stdlib_if_needed(&config);
     run_test_impl::<SimpleVMTestAdapter>(config, path, v1_lib, v2_lib, exp_suffix)
-}
-
-impl From<AdapterExecuteArgs> for VMConfig {
-    fn from(arg: AdapterExecuteArgs) -> VMConfig {
-        VMConfig {
-            paranoid_type_checks: arg.check_runtime_types,
-            ..Self::production()
-        }
-    }
-}
-
-fn production_vm_config_with_paranoid_type_checks() -> VMConfig {
-    VMConfig {
-        paranoid_type_checks: true,
-        ..VMConfig::production()
-    }
 }
