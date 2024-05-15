@@ -31,18 +31,15 @@ pub enum OrderVoteReceptionResult {
 
 #[derive(Debug, PartialEq, Eq)]
 enum OrderVoteStatus {
-    EnoughVotes,
-    NotEnoughVotes,
+    EnoughVotes(LedgerInfoWithSignatures),
+    NotEnoughVotes(LedgerInfoWithPartialSignatures),
 }
 
 /// A PendingVotes structure keep track of order votes for the last few rounds
 pub struct PendingOrderVotes {
     /// Maps LedgerInfo digest to associated signatures (contained in a partial LedgerInfoWithSignatures).
     /// Order vote status stores caches the information on whether the votes are enough to form a QC.
-    li_digest_to_votes: HashMap<
-        HashValue, /* LedgerInfo digest */
-        (OrderVoteStatus, LedgerInfoWithPartialSignatures),
-    >,
+    li_digest_to_votes: HashMap<HashValue /* LedgerInfo digest */, OrderVoteStatus>,
 }
 
 impl PendingOrderVotes {
@@ -64,79 +61,93 @@ impl PendingOrderVotes {
         let li_digest = order_vote.ledger_info().hash();
 
         // obtain the ledger info with signatures associated to the order vote's ledger info
-        let (status, li_with_sig) = self.li_digest_to_votes.entry(li_digest).or_insert_with(|| {
+        let status = self.li_digest_to_votes.entry(li_digest).or_insert_with(|| {
             // if the ledger info with signatures doesn't exist yet, create it
-            (
-                OrderVoteStatus::NotEnoughVotes,
-                LedgerInfoWithPartialSignatures::new(
-                    order_vote.ledger_info().clone(),
-                    PartialSignatures::empty(),
-                ),
-            )
+            OrderVoteStatus::NotEnoughVotes(LedgerInfoWithPartialSignatures::new(
+                order_vote.ledger_info().clone(),
+                PartialSignatures::empty(),
+            ))
         });
 
-        let validator_voting_power = validator_verifier.get_voting_power(&order_vote.author());
-        if validator_voting_power.is_none() {
-            warn!(
-                "Received order vote from an unknown author: {}",
-                order_vote.author()
-            );
-            return OrderVoteReceptionResult::UnknownAuthor(order_vote.author());
-        }
-        let validator_voting_power = validator_voting_power.unwrap();
-
-        if validator_voting_power == 0 {
-            warn!(
-                "Received vote with no voting power, from {}",
-                order_vote.author()
-            );
-        }
-        li_with_sig.add_signature(order_vote.author(), order_vote.signature().clone());
-        // check if we have enough signatures to create a QC
-        match validator_verifier.check_voting_power(li_with_sig.signatures().keys(), true) {
-            // a quorum of signature was reached, a new QC is formed
-            Ok(aggregated_voting_power) => {
-                assert!(
-                    aggregated_voting_power >= validator_verifier.quorum_voting_power(),
-                    "QC aggregation should not be triggered if we don't have enough votes to form a QC"
-                );
-                match li_with_sig.aggregate_signatures(validator_verifier) {
-                    Ok(ledger_info_with_sig) => {
-                        *status = OrderVoteStatus::EnoughVotes;
-                        OrderVoteReceptionResult::NewLedgerInfoWithSignatures(ledger_info_with_sig)
-                    },
-                    Err(e) => OrderVoteReceptionResult::ErrorAggregatingSignature(e),
+        match status {
+            OrderVoteStatus::EnoughVotes(li_with_sig) => {
+                // we already have enough votes for this ledger info
+                OrderVoteReceptionResult::NewLedgerInfoWithSignatures(li_with_sig.clone())
+            },
+            OrderVoteStatus::NotEnoughVotes(li_with_sig) => {
+                // we don't have enough votes for this ledger info yet
+                let validator_voting_power =
+                    validator_verifier.get_voting_power(&order_vote.author());
+                if validator_voting_power.is_none() {
+                    warn!(
+                        "Received order vote from an unknown author: {}",
+                        order_vote.author()
+                    );
+                    return OrderVoteReceptionResult::UnknownAuthor(order_vote.author());
                 }
-            },
+                let validator_voting_power = validator_voting_power.unwrap();
 
-            // not enough votes
-            Err(VerifyError::TooLittleVotingPower { voting_power, .. }) => {
-                OrderVoteReceptionResult::VoteAdded(voting_power)
-            },
+                if validator_voting_power == 0 {
+                    warn!(
+                        "Received vote with no voting power, from {}",
+                        order_vote.author()
+                    );
+                }
+                li_with_sig.add_signature(order_vote.author(), order_vote.signature().clone());
+                // check if we have enough signatures to create a QC
+                match validator_verifier.check_voting_power(li_with_sig.signatures().keys(), true) {
+                    // a quorum of signature was reached, a new QC is formed
+                    Ok(aggregated_voting_power) => {
+                        assert!(
+                            aggregated_voting_power >= validator_verifier.quorum_voting_power(),
+                            "QC aggregation should not be triggered if we don't have enough votes to form a QC"
+                        );
+                        match li_with_sig.aggregate_signatures(validator_verifier) {
+                            Ok(ledger_info_with_sig) => {
+                                *status =
+                                    OrderVoteStatus::EnoughVotes(ledger_info_with_sig.clone());
+                                OrderVoteReceptionResult::NewLedgerInfoWithSignatures(
+                                    ledger_info_with_sig,
+                                )
+                            },
+                            Err(e) => OrderVoteReceptionResult::ErrorAggregatingSignature(e),
+                        }
+                    },
 
-            // error
-            Err(error) => {
-                error!(
-                    "MUST_FIX: order vote received could not be added: {}, order vote: {}",
-                    error, order_vote
-                );
-                OrderVoteReceptionResult::ErrorAddingVote(error)
+                    // not enough votes
+                    Err(VerifyError::TooLittleVotingPower { voting_power, .. }) => {
+                        OrderVoteReceptionResult::VoteAdded(voting_power)
+                    },
+
+                    // error
+                    Err(error) => {
+                        error!(
+                            "MUST_FIX: order vote received could not be added: {}, order vote: {}",
+                            error, order_vote
+                        );
+                        OrderVoteReceptionResult::ErrorAddingVote(error)
+                    },
+                }
             },
         }
     }
 
-    // Removes votes older than highest_committed_round
-    pub fn garbage_collect(&mut self, highest_committed_round: u64) {
-        self.li_digest_to_votes
-            .retain(|_, (_, li)| li.ledger_info().round() > highest_committed_round);
+    // Removes votes older than highest_ordered_round
+    pub fn garbage_collect(&mut self, highest_ordered_round: u64) {
+        self.li_digest_to_votes.retain(|_, status| match status {
+            OrderVoteStatus::EnoughVotes(li_with_sig) => {
+                li_with_sig.ledger_info().round() > highest_ordered_round
+            },
+            OrderVoteStatus::NotEnoughVotes(li_with_sig) => {
+                li_with_sig.ledger_info().round() > highest_ordered_round
+            },
+        });
     }
 
     pub fn has_enough_order_votes(&self, ledger_info: &LedgerInfo) -> bool {
         let li_digest = ledger_info.hash();
-        if let Some((status, _)) = self.li_digest_to_votes.get(&li_digest) {
-            if *status == OrderVoteStatus::EnoughVotes {
-                return true;
-            }
+        if let Some(OrderVoteStatus::EnoughVotes(_)) = self.li_digest_to_votes.get(&li_digest) {
+            return true;
         }
         false
     }
