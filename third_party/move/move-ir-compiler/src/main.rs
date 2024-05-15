@@ -10,7 +10,7 @@ use move_binary_format::{
     errors::VMError,
     file_format::{CompiledModule, CompiledScript},
 };
-use move_bytecode_verifier::{dependencies, verify_module, verify_script};
+use move_bytecode_verifier::{dependencies, verify_module, verify_script, VerifierConfig};
 use move_command_line_common::files::{
     MOVE_COMPILED_EXTENSION, MOVE_IR_EXTENSION, SOURCE_MAP_EXTENSION,
 };
@@ -52,7 +52,8 @@ fn print_error_and_exit(verification_error: &VMError) -> ! {
 }
 
 fn do_verify_module(module: &CompiledModule, dependencies: &[CompiledModule]) {
-    verify_module(module).unwrap_or_else(|err| print_error_and_exit(&err));
+    verify_module(&VerifierConfig::default(), module)
+        .unwrap_or_else(|err| print_error_and_exit(&err));
     if let Err(err) = dependencies::verify_module(module, dependencies) {
         print_error_and_exit(&err);
     }
@@ -118,7 +119,8 @@ fn main() {
                 .map(|module_bytes| {
                     let module = CompiledModule::deserialize(module_bytes.as_slice())
                         .expect("Downloaded module blob can't be deserialized");
-                    verify_module(&module).expect("Downloaded module blob failed verifier");
+                    verify_module(&VerifierConfig::default(), &module)
+                        .expect("Downloaded module blob failed verifier");
                     module
                 })
                 .collect()

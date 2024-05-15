@@ -6,6 +6,7 @@ use crate::sandbox::utils::on_disk_state_view::OnDiskStateView;
 use anyhow::{bail, Result};
 use move_binary_format::{access::ModuleAccess, errors::PartialVMError};
 use move_bytecode_utils::Modules;
+use move_bytecode_verifier::VerifierConfig;
 use move_core_types::vm_status::StatusCode;
 use std::{ffi::OsStr, path::Path};
 
@@ -26,7 +27,7 @@ pub fn doctor(state: &OnDiskStateView) -> Result<()> {
     let all_modules = state.get_all_modules()?;
     let code_cache = Modules::new(&all_modules);
     for module in &all_modules {
-        if move_bytecode_verifier::verify_module(module).is_err() {
+        if move_bytecode_verifier::verify_module(&VerifierConfig::default(), module).is_err() {
             bail!("Failed to verify module {:?}", module.self_id())
         }
 

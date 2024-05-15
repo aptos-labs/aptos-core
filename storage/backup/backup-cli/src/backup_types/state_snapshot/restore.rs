@@ -42,7 +42,7 @@ use aptos_vm::environment::aptos_prod_verifier_config;
 use clap::Parser;
 use futures::{stream, TryStreamExt};
 use move_binary_format::CompiledModule;
-use move_bytecode_verifier::verify_module_with_config;
+use move_bytecode_verifier::verify_module;
 use std::sync::Arc;
 use tokio::time::Instant;
 
@@ -238,7 +238,7 @@ impl StateSnapshotRestoreController {
             if let StateKeyInner::AccessPath(p) = key.inner() {
                 if let Path::Code(module_id) = p.get_path() {
                     if let Ok(module) = CompiledModule::deserialize(value.bytes()) {
-                        if let Err(err) = verify_module_with_config(&config, &module) {
+                        if let Err(err) = verify_module(&config, &module) {
                             error!("Module {:?} failed validation: {:?}", module_id, err);
                         }
                     } else {

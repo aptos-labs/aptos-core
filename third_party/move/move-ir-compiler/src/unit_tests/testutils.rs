@@ -7,7 +7,7 @@ use move_binary_format::{
     errors::{Location, VMError},
     file_format::{CompiledModule, CompiledScript},
 };
-use move_bytecode_verifier::{verify_module, verify_script};
+use move_bytecode_verifier::{verify_module, verify_script, VerifierConfig};
 use move_ir_to_bytecode::{
     compiler::{compile_module, compile_script},
     parser::{parse_module, parse_script},
@@ -60,10 +60,12 @@ fn compile_module_string_impl(
 
     // Always return a CompiledModule because some callers explicitly care about unverified
     // modules.
-    Ok(match verify_module(&compiled_module) {
-        Ok(_) => (compiled_module, None),
-        Err(error) => (compiled_module, Some(error)),
-    })
+    Ok(
+        match verify_module(&VerifierConfig::default(), &compiled_module) {
+            Ok(_) => (compiled_module, None),
+            Err(error) => (compiled_module, Some(error)),
+        },
+    )
 }
 
 fn compile_module_string_and_assert_no_error(

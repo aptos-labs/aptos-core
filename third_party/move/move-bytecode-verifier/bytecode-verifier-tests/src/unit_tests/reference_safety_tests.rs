@@ -2,6 +2,7 @@
 // Copyright (c) The Move Contributors
 // SPDX-License-Identifier: Apache-2.0
 
+use crate::unit_tests::verify_module_and_measure_verification_time;
 use move_binary_format::file_format::{
     empty_module, Bytecode, CodeUnit, FunctionDefinition, FunctionHandle, FunctionHandleIndex,
     IdentifierIndex, ModuleHandleIndex, Signature, SignatureIndex, SignatureToken,
@@ -125,9 +126,9 @@ fn test_bicliques() {
         code.push(Bytecode::Ret);
     }
 
-    let result = move_bytecode_verifier::verify_module_with_config_for_test(
+    let result = verify_module_and_measure_verification_time(
         "test_bicliques",
-        &VerifierConfig::production(),
+        &VerifierConfig::bounded(),
         &m,
     );
     assert_eq!(
@@ -248,9 +249,9 @@ fn test_merge_state_large_graph() {
         code.push(Bytecode::Ret);
     }
 
-    let res = move_bytecode_verifier::verify_module_with_config_for_test(
+    let res = verify_module_and_measure_verification_time(
         "test_merge_state_large_graph",
-        &VerifierConfig::production(),
+        &VerifierConfig::bounded(),
         &m,
     );
     assert_eq!(
@@ -338,9 +339,9 @@ fn test_merge_state() {
         code.push(Bytecode::Ret);
     }
 
-    let res = move_bytecode_verifier::verify_module_with_config_for_test(
+    let res = verify_module_and_measure_verification_time(
         "test_merge_state",
-        &VerifierConfig::production(),
+        &VerifierConfig::bounded(),
         &m,
     );
     assert_eq!(
@@ -421,9 +422,9 @@ fn test_copyloc_pop() {
         code.push(Bytecode::Ret);
     }
 
-    let result = move_bytecode_verifier::verify_module_with_config_for_test(
+    let result = verify_module_and_measure_verification_time(
         "test_copyloc_pop",
-        &VerifierConfig::production(),
+        &VerifierConfig::bounded(),
         &m,
     );
     assert_eq!(

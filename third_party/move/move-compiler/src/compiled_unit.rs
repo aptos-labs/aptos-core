@@ -13,6 +13,7 @@ use crate::{
 };
 use move_binary_format::file_format as F;
 use move_bytecode_source_map::source_map::SourceMap;
+use move_bytecode_verifier::VerifierConfig;
 use move_core_types::{
     account_address::AccountAddress, identifier::Identifier as MoveCoreIdentifier,
     language_storage::ModuleId,
@@ -245,7 +246,7 @@ fn bytecode_verifier_mismatch_bug(
 }
 
 fn verify_module(sm: &SourceMap, loc: Loc, cm: &F::CompiledModule) -> Diagnostics {
-    match move_bytecode_verifier::verifier::verify_module(cm) {
+    match move_bytecode_verifier::verifier::verify_module(&VerifierConfig::default(), cm) {
         Ok(_) => Diagnostics::new(),
         Err(e) => bytecode_verifier_mismatch_bug(
             sm,

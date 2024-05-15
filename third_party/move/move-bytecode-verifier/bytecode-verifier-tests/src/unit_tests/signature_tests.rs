@@ -2,13 +2,12 @@
 // Copyright (c) The Move Contributors
 // SPDX-License-Identifier: Apache-2.0
 
+use crate::unit_tests::verify_module_and_measure_verification_time;
 use invalid_mutations::signature::{FieldRefMutation, SignatureRefMutation};
 use move_binary_format::file_format::{
     Bytecode::*, CompiledModule, SignatureToken::*, Visibility::Public, *,
 };
-use move_bytecode_verifier::{
-    verify_module, verify_module_with_config_for_test, SignatureChecker, VerifierConfig,
-};
+use move_bytecode_verifier::{verify_module, SignatureChecker, VerifierConfig};
 use move_core_types::{
     account_address::AccountAddress, identifier::Identifier, vm_status::StatusCode,
 };
@@ -128,7 +127,7 @@ fn no_verify_locals_good() {
             },
         ],
     };
-    assert!(verify_module(&compiled_module_good).is_ok());
+    assert!(verify_module(&VerifierConfig::default(), &compiled_module_good).is_ok());
 }
 
 #[test]
@@ -218,9 +217,9 @@ fn big_signature_test() {
     module.serialize(&mut mvbytes).unwrap();
     let module = CompiledModule::deserialize(&mvbytes).unwrap();
 
-    let res = verify_module_with_config_for_test(
+    let res = verify_module_and_measure_verification_time(
         "big_signature_test",
-        &VerifierConfig::production(),
+        &VerifierConfig::bounded(),
         &module,
     )
     .unwrap_err();

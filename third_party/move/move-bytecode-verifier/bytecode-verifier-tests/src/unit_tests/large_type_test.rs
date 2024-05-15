@@ -1,6 +1,7 @@
 // Copyright (c) The Move Contributors
 // SPDX-License-Identifier: Apache-2.0
 
+use crate::unit_tests::verify_module_and_measure_verification_time;
 use move_binary_format::file_format::{
     empty_module, Bytecode, CodeUnit, FunctionDefinition, FunctionHandle, FunctionHandleIndex,
     IdentifierIndex, ModuleHandleIndex, Signature, SignatureIndex, SignatureToken,
@@ -148,9 +149,9 @@ fn test_large_types() {
         code.push(Bytecode::Ret);
     }
 
-    let result = move_bytecode_verifier::verify_module_with_config_for_test(
+    let result = verify_module_and_measure_verification_time(
         "test_large_types",
-        &VerifierConfig::production(),
+        &VerifierConfig::bounded(),
         &m,
     );
     assert_eq!(

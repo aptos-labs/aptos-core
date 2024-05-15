@@ -35,10 +35,7 @@ pub use script_signature::{
 };
 pub use signature::SignatureChecker;
 pub use struct_defs::RecursiveStructDefChecker;
-pub use verifier::{
-    verify_module, verify_module_with_config, verify_module_with_config_for_test, verify_script,
-    verify_script_with_config, VerifierConfig,
-};
+pub use verifier::{verify_module, verify_script, verify_script_with_config, VerifierConfig};
 
 mod acquires_list_verifier;
 mod locals_safety;

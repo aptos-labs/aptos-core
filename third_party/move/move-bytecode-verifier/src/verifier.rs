@@ -18,7 +18,6 @@ use move_binary_format::{
 };
 use move_core_types::{state::VMState, vm_status::StatusCode};
 use serde::Serialize;
-use std::time::Instant;
 
 #[derive(Debug, Clone, Serialize)]
 pub struct VerifierConfig {
@@ -28,7 +27,9 @@ pub struct VerifierConfig {
     pub max_basic_blocks: Option<usize>,
     pub max_value_stack_size: usize,
     pub max_type_nodes: Option<usize>,
+    // Max number of pushes in one function.
     pub max_push_size: Option<usize>,
+    // Max depth in dependency tree for both direct and friend dependencies.
     pub max_dependency_depth: Option<usize>,
     pub max_struct_definitions: Option<usize>,
     pub max_fields_in_struct: Option<usize>,
@@ -36,58 +37,16 @@ pub struct VerifierConfig {
     pub max_back_edges_per_function: Option<usize>,
     pub max_back_edges_per_module: Option<usize>,
     pub max_basic_blocks_in_script: Option<usize>,
+
+    // General metering for the verifier.
     pub max_per_fun_meter_units: Option<u128>,
     pub max_per_mod_meter_units: Option<u128>,
+
     pub use_signature_checker_v2: bool,
     pub sig_checker_v2_fix_script_ty_param_count: bool,
 }
 
-/// Helper for a "canonical" verification of a module.
-///
-/// Clients that rely on verification should call the proper passes
-/// internally rather than using this function.
-///
-/// This function is intended to provide a verification path for clients
-/// that do not require full control over verification. It is advised to
-/// call this umbrella function instead of each individual checkers to
-/// minimize the code locations that need to be updated should a new checker
-/// is introduced.
-pub fn verify_module(module: &CompiledModule) -> VMResult<()> {
-    verify_module_with_config(&VerifierConfig::default(), module)
-}
-
-pub fn verify_module_with_config_for_test(
-    name: &str,
-    config: &VerifierConfig,
-    module: &CompiledModule,
-) -> VMResult<()> {
-    const MAX_MODULE_SIZE: usize = 65355;
-    let mut bytes = vec![];
-    module.serialize(&mut bytes).unwrap();
-    let now = Instant::now();
-    let result = verify_module_with_config(config, module);
-    eprintln!(
-        "--> {}: verification time: {:.3}ms, result: {}, size: {}kb",
-        name,
-        (now.elapsed().as_micros() as f64) / 1000.0,
-        if let Err(e) = &result {
-            format!("{:?}", e.major_status())
-        } else {
-            "Ok".to_string()
-        },
-        bytes.len() / 1000
-    );
-    // Also check whether the module actually fits into our payload size
-    assert!(
-        bytes.len() <= MAX_MODULE_SIZE,
-        "test module exceeds size limit {} (given size {})",
-        MAX_MODULE_SIZE,
-        bytes.len()
-    );
-    result
-}
-
-pub fn verify_module_with_config(config: &VerifierConfig, module: &CompiledModule) -> VMResult<()> {
+pub fn verify_module(config: &VerifierConfig, module: &CompiledModule) -> VMResult<()> {
     let prev_state = move_core_types::state::set_state(VMState::VERIFIER);
     let result = std::panic::catch_unwind(|| {
         BoundsChecker::verify_module(module).map_err(|e| {
@@ -176,6 +135,13 @@ pub fn verify_script_with_config(config: &VerifierConfig, script: &CompiledScrip
 
 impl Default for VerifierConfig {
     fn default() -> Self {
+        VerifierConfig::unbounded()
+    }
+}
+
+impl VerifierConfig {
+    /// Returns truly unbounded config, even relaxing metering.
+    pub fn unbounded() -> Self {
         Self {
             max_loop_depth: None,
             max_function_parameters: None,
@@ -184,46 +150,25 @@ impl Default for VerifierConfig {
             max_type_nodes: None,
             // Max size set to 1024 to match the size limit in the interpreter.
             max_value_stack_size: 1024,
-            // Max number of pushes in one function
             max_push_size: None,
-            // Max depth in dependency tree for both direct and friend dependencies
             max_dependency_depth: None,
-            // Max count of structs in a module
             max_struct_definitions: None,
-            // Max count of fields in a struct
             max_fields_in_struct: None,
-            // Max count of functions in a module
             max_function_definitions: None,
-            // Max size set to 10000 to restrict number of pushes in one function
-            // max_push_size: Some(10000),
-            // max_dependency_depth: Some(100),
-            // max_struct_definitions: Some(200),
-            // max_fields_in_struct: Some(30),
-            // max_function_definitions: Some(1000),
             max_back_edges_per_function: None,
             max_back_edges_per_module: None,
             max_basic_blocks_in_script: None,
-            // General metering for the verifier.
-            // max_per_fun_meter_units: Some(1000 * 8000),
-            // max_per_mod_meter_units: Some(1000 * 8000),
+
             max_per_fun_meter_units: None,
             max_per_mod_meter_units: None,
 
             use_signature_checker_v2: true,
-
             sig_checker_v2_fix_script_ty_param_count: true,
         }
     }
-}
-
-impl VerifierConfig {
-    /// Returns truly unbounded config, even relaxing metering.
-    pub fn unbounded() -> Self {
-        todo!()
-    }
 
     /// An approximation of what config is used in production.
-    pub fn production() -> Self {
+    pub fn bounded() -> Self {
         Self {
             max_loop_depth: Some(5),
             max_generic_instantiation_length: Some(32),
@@ -238,16 +183,14 @@ impl VerifierConfig {
             max_fields_in_struct: Some(30),
             max_function_definitions: Some(1000),
 
-            // Do not use back edge constraints as they are superseded by metering
+            // Do not use back edge constraints as they are superseded by metering.
             max_back_edges_per_function: None,
             max_back_edges_per_module: None,
 
-            // Same as the default.
             max_per_fun_meter_units: Some(1000 * 8000),
             max_per_mod_meter_units: Some(1000 * 8000),
 
             use_signature_checker_v2: true,
-
             sig_checker_v2_fix_script_ty_param_count: true,
         }
     }

@@ -11,7 +11,7 @@ use aptos_types::transaction::{
 };
 use claims::assert_matches;
 use move_binary_format::CompiledModule;
-use move_bytecode_verifier::verify_module;
+use move_bytecode_verifier::{verify_module, VerifierConfig};
 use move_ir_compiler::Compiler;
 
 #[test]
@@ -248,7 +248,7 @@ fn add_module(data_store: &mut FakeDataStore, sender: &AccountData) -> CompiledM
     let module = compiler
         .into_compiled_module(code.as_str())
         .expect("Module compilation failed");
-    verify_module(&module).expect("Module must verify");
+    verify_module(&VerifierConfig::default(), &module).expect("Module must verify");
 
     let mut module_bytes = vec![];
     module

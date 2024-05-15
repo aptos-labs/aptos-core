@@ -21,6 +21,7 @@ use move_binary_format::{
     access::ModuleAccess,
     file_format::{CompiledModule, CompiledScript, FunctionDefinitionIndex, SignatureToken},
 };
+use move_bytecode_verifier::VerifierConfig;
 use move_core_types::{
     language_storage::{ModuleId, TypeTag},
     value::MoveValue,
@@ -219,7 +220,8 @@ fn run_case(mut input: RunnableState) -> Result<(), Corpus> {
     }
     for module in input.dep_modules.iter() {
         // reject bad modules fast
-        move_bytecode_verifier::verify_module(module).map_err(|_| Corpus::Keep)?;
+        move_bytecode_verifier::verify_module(&VerifierConfig::default(), module)
+            .map_err(|_| Corpus::Keep)?;
     }
 
     // check no duplicates

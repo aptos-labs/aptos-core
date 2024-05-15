@@ -25,7 +25,7 @@ use move_binary_format::{
         AbilitySet, CompiledModule, FunctionDefinitionIndex, SignatureToken, StructHandleIndex,
     },
 };
-use move_bytecode_verifier::verify_module;
+use move_bytecode_verifier::{verify_module, VerifierConfig};
 use move_compiler::{
     compiled_unit::AnnotatedCompiledUnit,
     shared::{known_attributes::KnownAttribute, Flags},
@@ -49,7 +49,7 @@ use tracing::{debug, error, info};
 
 /// This function calls the Bytecode verifier to test it
 fn run_verifier(module: CompiledModule) -> Result<CompiledModule, String> {
-    match panic::catch_unwind(|| verify_module(&module)) {
+    match panic::catch_unwind(|| verify_module(&VerifierConfig::default(), &module)) {
         Ok(res) => match res {
             Ok(_) => Ok(module),
             Err(err) => Err(format!("Module verification failed: {:#?}", err)),

@@ -2,7 +2,7 @@
 // SPDX-License-Identifier: Apache-2.0
 
 use move_binary_format::file_format::*;
-use move_bytecode_verifier::dependencies;
+use move_bytecode_verifier::{dependencies, VerifierConfig};
 use move_core_types::{
     account_address::AccountAddress, identifier::Identifier, vm_status::StatusCode,
 };
@@ -83,7 +83,7 @@ fn mk_script_function_module() -> CompiledModule {
         function_instantiations: vec![],
         field_instantiations: vec![],
     };
-    move_bytecode_verifier::verify_module(&m).unwrap();
+    move_bytecode_verifier::verify_module(&VerifierConfig::default(), &m).unwrap();
     m
 }
 
@@ -178,7 +178,7 @@ fn mk_invoking_module(use_generic: bool, valid: bool) -> CompiledModule {
         struct_def_instantiations: vec![],
         field_instantiations: vec![],
     };
-    move_bytecode_verifier::verify_module(&m).unwrap();
+    move_bytecode_verifier::verify_module(&VerifierConfig::default(), &m).unwrap();
     m
 }
 

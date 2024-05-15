@@ -13,6 +13,7 @@ use move_binary_format::file_format::{
     StructDefinition, StructFieldInformation, StructHandle, StructHandleIndex, TypeSignature,
     Visibility,
 };
+use move_bytecode_verifier::VerifierConfig;
 use move_core_types::{account_address::AccountAddress, ident_str};
 mod utils;
 
@@ -95,6 +96,6 @@ fuzz_target!(|mix: Mixed| {
 
     module.function_defs.push(fun_def);
     if utils::compiled_module_serde(&module).is_ok() {
-        let _ = move_bytecode_verifier::verify_module(&module);
+        let _ = move_bytecode_verifier::verify_module(&VerifierConfig::default(), &module);
     }
 });

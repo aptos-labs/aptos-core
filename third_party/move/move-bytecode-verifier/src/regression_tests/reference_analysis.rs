@@ -102,7 +102,7 @@ fn unbalanced_stack_crash() {
     };
 
     module.function_defs.push(fun_def);
-    match crate::verify_module(&module) {
+    match crate::verify_module(&VerifierConfig::default(), &module) {
         Ok(_) => {},
         Err(e) => assert_eq!(e.major_status(), StatusCode::GLOBAL_REFERENCE_ERROR),
     }
@@ -157,7 +157,7 @@ fn too_many_locals() {
         }],
     };
 
-    let res = crate::verify_module(&module);
+    let res = crate::verify_module(&VerifierConfig::default(), &module);
 
     match res {
         Ok(_) => {},
@@ -209,7 +209,7 @@ fn borrow_graph() {
         }],
     };
 
-    let res = crate::verify_module(&module);
+    let res = crate::verify_module(&VerifierConfig::default(), &module);
     assert!(res.is_ok());
 }
 
@@ -314,7 +314,7 @@ fn indirect_code() {
         }],
     };
 
-    let res = crate::verify_module_with_config(&VerifierConfig::default(), &module).unwrap_err();
+    let res = crate::verify_module(&VerifierConfig::default(), &module).unwrap_err();
     assert_eq!(
         res.major_status(),
         StatusCode::VEC_UPDATE_EXISTS_MUTABLE_BORROW_ERROR

@@ -88,8 +88,7 @@ fn script_large_ty() {
     }
     script_code.push(Bytecode::Ret);
 
-    move_bytecode_verifier::verify_module_with_config(&verifier_config, &decompiled_module)
-        .unwrap();
+    move_bytecode_verifier::verify_module(&verifier_config, &decompiled_module).unwrap();
 
     let start = Instant::now();
     move_bytecode_verifier::verify_script_with_config(&verifier_config, &decompiled_script)

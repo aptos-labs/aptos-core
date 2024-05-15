@@ -6,14 +6,15 @@
 //! Right now the serve to calibrate the metering working as expected. Those tests represent
 //! cases which we want to continue to succeed.
 
+use crate::unit_tests::verify_module_and_measure_verification_time;
 use move_binary_format::{errors::VMResult, CompiledModule};
-use move_bytecode_verifier::{verifier, VerifierConfig};
+use move_bytecode_verifier::VerifierConfig;
 
 #[allow(unused)]
 fn run_binary_test(name: &str, bytes: &str) -> VMResult<()> {
     let bytes = hex::decode(bytes).expect("invalid hex string");
     let m = CompiledModule::deserialize(&bytes).expect("invalid module");
-    verifier::verify_module_with_config_for_test(name, &VerifierConfig::production(), &m)
+    verify_module_and_measure_verification_time(name, &VerifierConfig::bounded(), &m)
 }
 
 #[test]

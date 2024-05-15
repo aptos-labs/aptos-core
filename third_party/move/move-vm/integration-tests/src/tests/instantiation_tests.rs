@@ -8,6 +8,7 @@ use move_binary_format::file_format::{
     StructDefinition, StructFieldInformation, StructHandle, StructHandleIndex, StructTypeParameter,
     TypeSignature,
 };
+use move_bytecode_verifier::VerifierConfig;
 use move_core_types::{
     account_address::AccountAddress,
     ident_str,
@@ -99,7 +100,7 @@ fn instantiation_err() {
         }],
     };
 
-    move_bytecode_verifier::verify_module(&cm).expect("verify failed");
+    move_bytecode_verifier::verify_module(&VerifierConfig::default(), &cm).expect("verify failed");
     let vm = MoveVM::new(vec![]).unwrap();
 
     let storage: InMemoryStorage = InMemoryStorage::new();

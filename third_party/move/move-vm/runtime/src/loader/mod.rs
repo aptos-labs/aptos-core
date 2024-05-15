@@ -670,7 +670,7 @@ impl Loader {
         // module will NOT show up in `module_cache`. In the module republishing case, it means
         // that the old module is still in the `module_cache`, unless a new Loader is created,
         // which means that a new MoveVM instance needs to be created.
-        move_bytecode_verifier::verify_module_with_config(&self.vm_config.verifier, module)?;
+        move_bytecode_verifier::verify_module(&self.vm_config.verifier, module)?;
         self.check_natives(module)?;
 
         let mut visited = BTreeSet::new();
@@ -1028,7 +1028,7 @@ impl Loader {
 
         // Verify the module if it hasn't been verified before.
         if VERIFIED_MODULES.lock().get(&hash_value).is_none() {
-            move_bytecode_verifier::verify_module_with_config(&self.vm_config.verifier, &module)
+            move_bytecode_verifier::verify_module(&self.vm_config.verifier, &module)
                 .map_err(expect_no_verification_errors)?;
 
             VERIFIED_MODULES.lock().put(hash_value, ());

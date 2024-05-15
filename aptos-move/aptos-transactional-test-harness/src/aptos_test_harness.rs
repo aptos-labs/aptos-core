@@ -30,7 +30,7 @@ use aptos_vm::{AptosVM, VMExecutor};
 use aptos_vm_genesis::GENESIS_KEYPAIR;
 use clap::Parser;
 use move_binary_format::file_format::{CompiledModule, CompiledScript};
-use move_bytecode_verifier::verify_module;
+use move_bytecode_verifier::{verify_module, VerifierConfig};
 use move_command_line_common::{
     address::ParsedAddress,
     env::{get_move_compiler_block_v1_from_env, get_move_compiler_v2_from_env},
@@ -719,7 +719,7 @@ impl<'a> MoveTestAdapter<'a> for AptosTestAdapter<'a> {
         // TODO: HACK! This allows us to publish a module without any checks and bypassing publishing
         //  through native context. Implement in a cleaner way, and simply run the bytecode verifier
         //  for now.
-        verify_module(&module)?;
+        verify_module(&VerifierConfig::default(), &module)?;
         self.storage.add_module(&module_id, module_blob);
         Ok((None, module))
     }
