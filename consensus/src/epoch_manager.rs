@@ -562,7 +562,7 @@ impl<P: OnChainConfigProvider> EpochManager<P> {
     ) {
         let (request_tx, mut request_rx) = aptos_channel::new::<_, IncomingBlockRetrievalRequest>(
             QueueStyle::LIFO,
-            1,
+            10,
             Some(&counters::BLOCK_RETRIEVAL_TASK_MSGS),
         );
         let task = async move {
