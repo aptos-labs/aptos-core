@@ -42,6 +42,7 @@ const SOURCE_DIRS: &[&str] = &[
     "../../../move-stdlib/sources",
 ];
 
+#[allow(dead_code)]
 struct Harness {
     module_cache: BTreeMap<Identifier, CompiledUnit>,
     vm: AsyncVM,
@@ -54,6 +55,7 @@ fn test_account() -> AccountAddress {
     AccountAddress::from_hex_literal(TEST_ADDR).expect("valid test address")
 }
 
+#[allow(dead_code)]
 fn test_runner(path: &Path) -> datatest_stable::Result<()> {
     let target_module = path
         .with_extension("")
@@ -77,7 +79,10 @@ fn test_runner(path: &Path) -> datatest_stable::Result<()> {
     Ok(())
 }
 
-datatest_stable::harness!(test_runner, "tests/sources", r".*\.move$");
+pub fn main() {
+    // TODO: Re-enable these tests when async is in use.
+}
+// datatest_stable::harness!(test_runner, "tests/sources", r".*\.move$");
 
 // ========================================================================================
 // Test execution

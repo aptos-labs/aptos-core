@@ -15,8 +15,12 @@ use move_core_types::{
     language_storage::{StructTag, TypeTag},
     vm_status::StatusCode,
 };
-use move_vm_runtime::move_vm::MoveVM;
-use move_vm_test_utils::{gas_schedule::GasStatus, InMemoryStorage};
+use move_vm_runtime::{
+    module_traversal::{TraversalContext, TraversalStorage},
+    move_vm::MoveVM,
+};
+use move_vm_test_utils::InMemoryStorage;
+use move_vm_types::gas::UnmeteredGasMeter;
 
 #[test]
 fn instantiation_err() {
@@ -106,9 +110,10 @@ fn instantiation_err() {
     let mut session = vm.new_session(&storage);
     let mut mod_bytes = vec![];
     cm.serialize(&mut mod_bytes).unwrap();
+    let traversal_storage = TraversalStorage::new();
 
     session
-        .publish_module(mod_bytes, addr, &mut GasStatus::new_unmetered())
+        .publish_module(mod_bytes, addr, &mut UnmeteredGasMeter)
         .expect("Module must publish");
 
     let mut ty_arg = TypeTag::U128;
@@ -122,7 +127,17 @@ fn instantiation_err() {
         }));
     }
 
-    let err = session.load_function(&cm.self_id(), ident_str!("f"), &[ty_arg]);
+    let res = session.load_function(&cm.self_id(), ident_str!("f"), &[ty_arg]);
+    assert!(res.is_ok());
+
+    let (function, instantiation) = res.unwrap();
+    let err = session.execute_entry_function(
+        function,
+        instantiation,
+        Vec::<Vec<u8>>::new(),
+        &mut UnmeteredGasMeter,
+        &mut TraversalContext::new(&traversal_storage),
+    );
     assert!(err.is_err(), "Instantiation must fail at runtime");
     assert_eq!(
         err.err().unwrap().major_status(),

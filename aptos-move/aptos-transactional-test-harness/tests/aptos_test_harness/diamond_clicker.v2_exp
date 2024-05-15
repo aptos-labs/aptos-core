@@ -77,5 +77,4 @@ B5:
 }
 
 task 3 'run'. lines 70-70:
-mutable inputs after call: local#0: 0
 return values: 0

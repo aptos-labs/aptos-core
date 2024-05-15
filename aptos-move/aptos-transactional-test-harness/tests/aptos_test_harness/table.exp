@@ -11,8 +11,7 @@ Events:
 {
     type:    0x1::transaction_fee::FeeStatement
     data:    "64000000000000000400000000000000020000000000000028720100000000000000000000000000"
-}mutable inputs after call: local#0: 0
-return values: 0
+}return values: 0
 
 task 2 'run'. lines 9-9:
 Events:
@@ -37,8 +36,7 @@ Events:
 {
     type:    0x1::transaction_fee::FeeStatement
     data:    "9b0000000000000006000000000000000300000000000000c83a0200000000000000000000000000"
-}mutable inputs after call: local#0: 0
-return values: 0
+}return values: 0
 
 task 3 'view'. lines 11-11:
 key 0x3::token::Collections {
@@ -97,8 +95,7 @@ Events:
 {
     type:    0x1::transaction_fee::FeeStatement
     data:    "6b000000000000000500000000000000030000000000000018820100000000000000000000000000"
-}mutable inputs after call: local#0: 0
-return values: 0
+}return values: 0
 
 task 6 'run'. lines 19-19:
 Events:
@@ -117,8 +114,7 @@ Events:
 {
     type:    0x1::transaction_fee::FeeStatement
     data:    "6b0000000000000005000000000000000300000000000000b88201000000000058bb000000000000"
-}mutable inputs after call: local#0: 0
-return values: 0
+}return values: 0
 
 task 7 'view_table'. lines 21-21:
 {"default_properties":{"map":{"data":[]}},"description":"","largest_property_version":"0","maximum":"100","mutability_config":{"description":false,"maximum":false,"properties":false,"royalty":false,"uri":false},"name":"geek_token","royalty":{"payee_address":"0xf75daa73fc071f93593335eb9033da804777eb94491650dd3f095ce6f778acb6","royalty_points_denominator":"1","royalty_points_numerator":"0"},"supply":"10","uri":""}
