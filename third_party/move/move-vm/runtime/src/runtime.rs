@@ -14,7 +14,6 @@ use crate::{
 };
 use move_binary_format::{
     access::ModuleAccess,
-    binary_views::BinaryIndexedView,
     compatibility::Compatibility,
     errors::{verification_error, Location, PartialVMError, PartialVMResult, VMResult},
     normalized, CompiledModule, IndexKind,
