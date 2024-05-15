@@ -57,7 +57,6 @@ module supra_framework::dora_committee {
         committee_map: SimpleMap<u64, CommitteeInfo>,
         // map from node address to committee to which the node belongs
         node_to_committee_map: SimpleMap<address, u64>,
-        aggregator_probability: u64,
     }
 
     struct CommitteeInfo has store, drop, copy {
@@ -152,8 +151,7 @@ module supra_framework::dora_committee {
         let (resource_signer, _) = account::create_resource_account(owner_signer, SEED_COMMITTEE);
         move_to(&resource_signer, CommitteeInfoStore {
             committee_map: simple_map::new(),
-            node_to_committee_map: simple_map::new(),
-            aggregator_probability: 1000000,
+            node_to_committee_map: simple_map::new()
         });
         resource_signer
     }
@@ -296,25 +294,6 @@ module supra_framework::dora_committee {
         let committee_store = borrow_global<CommitteeInfoStore>(com_store_addr);
         let committee = simple_map::borrow(&committee_store.committee_map, &com_id);
         committee.has_valid_dkg
-    }
-
-    #[view]
-    /// Get the probability of the aggregator
-    public fun get_aggregator_probability(com_store_addr: address): u64 acquires CommitteeInfoStore {
-        let committee_store = borrow_global<CommitteeInfoStore>(com_store_addr);
-        committee_store.aggregator_probability
-    }
-
-    /// Update the probability of the aggregator
-    public fun update_aggregator_probability(
-        com_store_addr: address,
-        owner_signer: &signer,
-        probability: u64
-    ) acquires CommitteeInfoStore {
-        // Only the OwnerCap capability can access it
-        let _acquire = &capability::acquire(owner_signer, &OwnerCap {});
-        let committee_store = borrow_global_mut<CommitteeInfoStore>(com_store_addr);
-        committee_store.aggregator_probability = probability;
     }
 
     /// Update the dkg flag
