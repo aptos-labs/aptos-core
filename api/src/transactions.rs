@@ -1431,7 +1431,7 @@ impl TransactionsApi {
             changes: output.write_set().clone(),
         };
 
-        match accept_type {
+        let result = match accept_type {
             AcceptType::Json => {
                 let transactions = self
                     .context
@@ -1477,7 +1477,9 @@ impl TransactionsApi {
             AcceptType::Bcs => {
                 BasicResponse::try_from_bcs((simulated_txn, &ledger_info, BasicResponseStatus::Ok))
             },
-        }
+        };
+
+        result.map(|r| r.with_gas_used(Some(output.gas_used())))
     }
 
     /// Encode message as BCS

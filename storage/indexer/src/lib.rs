@@ -229,10 +229,10 @@ impl<'a, R: StateView> TableInfoParser<'a, R> {
             AnnotatedMoveValue::Struct(struct_value) => {
                 let struct_tag = &struct_value.ty_tag;
                 if Self::is_table(struct_tag) {
-                    assert_eq!(struct_tag.type_params.len(), 2);
+                    assert_eq!(struct_tag.type_args.len(), 2);
                     let table_info = TableInfo {
-                        key_type: struct_tag.type_params[0].clone(),
-                        value_type: struct_tag.type_params[1].clone(),
+                        key_type: struct_tag.type_args[0].clone(),
+                        value_type: struct_tag.type_args[1].clone(),
                     };
                     let table_handle = match &struct_value.value[0] {
                         (name, AnnotatedMoveValue::Address(handle)) => {

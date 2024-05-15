@@ -417,7 +417,7 @@ impl ToString for StructID {
             tag.address.to_hex(),
             tag.module,
             tag.name,
-            Generics(tag.type_params.clone()).to_string()
+            Generics(tag.type_args.clone()).to_string()
         )
     }
 }

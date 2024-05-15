@@ -357,7 +357,7 @@ impl<'a> MoveTestAdapter<'a> for SimpleVMTestAdapter<'a> {
             address: *module.address(),
             module: module.name().to_owned(),
             name: resource.to_owned(),
-            type_params: type_args,
+            type_args,
         };
         match self.storage.get_resource(&address, &tag).unwrap() {
             None => Ok("[No Resource Exists]".to_owned()),

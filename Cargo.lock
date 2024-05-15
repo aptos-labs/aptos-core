@@ -7976,6 +7976,8 @@ version = "0.1.0"
 name = "fuzzer-fuzz"
 version = "0.0.0"
 dependencies = [
+ "aptos-cached-packages",
+ "aptos-framework",
  "aptos-language-e2e-tests",
  "aptos-types",
  "aptos-vm",
@@ -7985,8 +7987,10 @@ dependencies = [
  "move-binary-format",
  "move-bytecode-verifier",
  "move-core-types",
+ "move-vm-runtime",
  "move-vm-types",
  "once_cell",
+ "rayon",
 ]
 
 [[package]]

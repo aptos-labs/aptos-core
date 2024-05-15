@@ -3,7 +3,7 @@
 
 use crate::{
     convert::convert_transaction,
-    counters::{FETCHED_TRANSACTION, UNABLE_TO_FETCH_TRANSACTION},
+    counters::UNABLE_TO_FETCH_TRANSACTION,
     runtime::{DEFAULT_NUM_RETRIES, RETRY_TIME_MILLIS},
 };
 use aptos_api::context::Context;
@@ -447,7 +447,6 @@ impl IndexerStreamCoordinator {
             "[Indexer Fullnode] Successfully converted transactions",
         );
 
-        FETCHED_TRANSACTION.inc();
         transactions
     }
 

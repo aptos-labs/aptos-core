@@ -22,7 +22,7 @@ pub trait MoveStructType {
         Self::STRUCT_NAME.to_owned()
     }
 
-    fn type_params() -> Vec<TypeTag> {
+    fn type_args() -> Vec<TypeTag> {
         vec![]
     }
 
@@ -31,7 +31,7 @@ pub trait MoveStructType {
             address: Self::ADDRESS,
             name: Self::struct_identifier(),
             module: Self::module_identifier(),
-            type_params: Self::type_params(),
+            type_args: Self::type_args(),
         }
     }
 }

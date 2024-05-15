@@ -1231,7 +1231,7 @@ impl Type {
                     panic!("Invariant violation: couldn't resolve struct {:?}", s)
                 });
                 let type_args = s
-                    .type_params
+                    .type_args
                     .iter()
                     .map(|arg| Self::from_type_tag(arg, env))
                     .collect();
