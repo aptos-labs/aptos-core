@@ -252,8 +252,12 @@ impl<K: Hash + Clone + Debug + Eq, V: TransactionWrite> VersionedData<K, V> {
     pub fn remove(&self, key: &K, txn_idx: TxnIndex) {
         // TODO: investigate logical deletion.
         let mut v = self.values.get_mut(key).expect("Path must exist");
+        let temp = v.versioned_map.remove(&ShiftedTxnIndex::new(txn_idx));
+        if temp.is_none() {
+            println!("entry does not exist, transaction={}", txn_idx);       
+        }
         assert_some!(
-            v.versioned_map.remove(&ShiftedTxnIndex::new(txn_idx)),
+            temp,
             "Entry for key / idx must exist to be deleted"
         );
     }

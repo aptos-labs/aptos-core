@@ -894,10 +894,14 @@ where
                 for (key, inner_ops) in behavior.group_writes.iter() {
                     let mut new_inner_ops = HashMap::new();
                     for (tag, inner_op) in inner_ops.iter() {
-                        let exists = view
-                            .get_resource_from_group(key, tag, None)
-                            .unwrap()
-                            .is_some();
+                        let temp_exists = view
+                            .get_resource_from_group(key, tag, None);
+
+                        if temp_exists.is_err() {
+                            return ExecutionStatus::Abort(txn_idx as usize);
+                        }
+
+                        let exists = temp_exists.unwrap().is_some();
 
                         // inner op is either deletion or creation.
                         assert!(!inner_op.is_modification());
@@ -1182,6 +1186,7 @@ impl TransactionEvent for MockEvent {
     fn get_event_data(&self) -> &[u8] {
         &self.event_data
     }
+
 
     fn set_event_data(&mut self, event_data: Vec<u8>) {
         self.event_data = event_data;

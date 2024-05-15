@@ -131,7 +131,7 @@ static TIMED_FEATURE_OVERRIDE: OnceCell<TimedFeatureOverride> = OnceCell::new();
 
 pub static THREAD_GARAGE_EXECUTOR: Lazy<Arc<ThreadGarageExecutor>> = Lazy::new(|| {
     Arc::new(
-        ThreadGarageExecutor::new(10, 15, 0)
+        ThreadGarageExecutor::new(10, 20, 0)
     )
 });
 
@@ -2210,6 +2210,7 @@ impl AptosVM {
                         // The known Move function failure and type resolution failure could be a result of speculative execution. Use speculative logger.
                         StatusCode::UNEXPECTED_ERROR_FROM_KNOWN_MOVE_FUNCTION
                         | StatusCode::TYPE_RESOLUTION_FAILURE => {
+                           //print!("recorded error on txn_idx={:?}", log_context.get_txn_idx());
                             speculative_error!(
                                 log_context,
                                 format!(

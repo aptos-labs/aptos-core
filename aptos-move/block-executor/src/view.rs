@@ -205,10 +205,19 @@ fn get_delayed_field_value_impl<T: Transaction>(
                 return Ok(value);
             },
             Err(PanicOr::Or(MVDelayedFieldsError::Dependency(dep_idx))) => {
-                if let DependencyStatus::ExecutionHalted = wait_for_dependency(wait_for, txn_idx, dep_idx)? {
+                match wait_for_dependency(wait_for, txn_idx, dep_idx)? {
                     // TODO[agg_v2](cleanup): think of correct return type
-                    return Err(PanicOr::Or(DelayedFieldsSpeculativeError::InconsistentRead));
+                    DependencyStatus::ExecutionHalted => {
+                        return Err(PanicOr::Or(DelayedFieldsSpeculativeError::InconsistentRead));
+                    },
+                    DependencyStatus::Unresolved => {
+                        captured_reads.borrow_mut().set_unresolved_dependency(true);
+
+                        return Err(PanicOr::Or(DelayedFieldsSpeculativeError::InconsistentRead));
+                    }
+                    _ => {},
                 }
+
             },
             Err(e) => {
                 captured_reads
@@ -525,11 +534,21 @@ impl<'a, T: Transaction, X: Executable> ParallelState<'a, T, X> {
                     unreachable!("Reading group size does not require a specific tag look-up");
                 },
                 Err(Dependency(dep_idx)) => {
-                    if let DependencyStatus::ExecutionHalted = wait_for_dependency(self.scheduler_handle, txn_idx, dep_idx)? {
-                        return Err(PartialVMError::new(
-                            StatusCode::SPECULATIVE_EXECUTION_ABORT_ERROR,
-                        )
-                        .with_message("Interrupted as block execution was halted".to_string()));
+                    match wait_for_dependency(self.scheduler_handle, txn_idx, dep_idx)? {
+                        DependencyStatus::ExecutionHalted => {
+                            return Err(PartialVMError::new(
+                                StatusCode::SPECULATIVE_EXECUTION_ABORT_ERROR,
+                            )
+                            .with_message("Interrupted as block execution was halted".to_string()));
+                        },
+                        DependencyStatus::Unresolved => {
+                            self.captured_reads.borrow_mut().set_unresolved_dependency(true);
+                            return Err(PartialVMError::new(
+                                StatusCode::SPECULATIVE_EXECUTION_ABORT_ERROR,
+                            )
+                            .with_message("not able to sleep 1".to_string()));
+                        },
+                        _ => {},
                     }
                 },
                 Err(TagSerializationError(e)) => {
@@ -672,8 +691,9 @@ impl<'a, T: Transaction, X: Executable> ResourceState<T> for ParallelState<'a, T
                         },
                         Ok(DependencyStatus::Unresolved) => {
                             self.captured_reads.borrow_mut().set_unresolved_dependency(true);
+                            //println!("Unresoved dependency txn={}", txn_idx);
                             return ReadResult::HaltSpeculativeExecution(
-                                "not able to sleep".to_string(),
+                                "not able to sleep 2".to_string(),
                             );
                         }
                     }
@@ -785,6 +805,13 @@ impl<'a, T: Transaction, X: Executable> ResourceGroupState<T> for ParallelState<
                             )
                             .with_message("Interrupted as block execution was halted".to_string()));
                         },
+                        DependencyStatus::Unresolved => {
+                            self.captured_reads.borrow_mut().set_unresolved_dependency(true);
+                            return Err(PartialVMError::new(
+                                StatusCode::SPECULATIVE_EXECUTION_ABORT_ERROR,
+                            )
+                            .with_message("not able to sleep 3".to_string()));
+                        }
                         _ => {
                         }    
                     }

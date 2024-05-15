@@ -24,6 +24,7 @@ pub enum SuspendResult<T>
         WokenUpToHaltedGarage,
  //       ErrorNoAvailableThreads,
         FailedRegisteringHook,
+        TooManySleepers,
         //FailedDueToMaxSleeping,
         NotHalted(T),
 }
@@ -266,6 +267,9 @@ impl ThreadGarage {
                 return Ok(SuspendResult::FailedRegisteringHook);
             }
 
+            /*if lock.num_sleeping == 9 {
+                return Ok(SuspendResult::TooManySleepers);
+            }*/
             lock.asleep[thread_id] = true;
             baton = Baton::new(thread_id, default_value);
         }
@@ -570,7 +574,7 @@ impl ThreadGarageExecutor {
             lock.halting_cleanup_idx = 0;
             lock.total_time_sleeping = Duration::default();
         }
-        self.garage.halted.store(false, Ordering::Release);
+        self.garage.halted.store(false, Ordering::SeqCst);
         
         //worker threads are waiting on barrier, hence it is safe to modify worker function vector 
         {

@@ -114,7 +114,7 @@ where
         executor: &E,
         base_view: &S,
         latest_view: ParallelState<T, X>,
-    ) -> Result<bool, PanicOr<ParallelBlockExecutionError>> {
+    ) -> Result<Option<bool>, PanicOr<ParallelBlockExecutionError>> {
         //add artificial sleep here to extend running time of transaction
         
         let _timer = TASK_EXECUTE_SECONDS.start_timer();
@@ -124,6 +124,19 @@ where
         let sync_view = LatestView::new(base_view, ViewState::Sync(latest_view), idx_to_execute);
         let execute_result = executor.execute_transaction(&sync_view, txn, idx_to_execute);
 
+        let mut read_set = sync_view.take_parallel_reads();
+
+        /*let read_set = last_input_output
+                        .read_set(idx_to_execute)
+                        .expect("[BlockSTM]: Prior read-set must be recorded");*/
+        
+        if read_set.is_unresolved_dependency() {
+            //println!("returned none txn_idx={}", idx_to_execute);
+            return Ok(None);
+            //panic!("retry again");
+        }
+
+
         let mut prev_modified_keys = last_input_output
             .modified_keys(idx_to_execute)
             .map_or(HashMap::new(), |keys| keys.collect());
@@ -132,7 +145,7 @@ where
             .delayed_field_keys(idx_to_execute)
             .map_or(HashSet::new(), |keys| keys.collect());
 
-        let mut read_set = sync_view.take_parallel_reads();
+        //let mut read_set = sync_view.take_parallel_reads();
 
         // For tracking whether the recent execution wrote outside of the previous write/delta set.
         let mut updates_outside = false;
@@ -307,7 +320,7 @@ where
                 ParallelBlockExecutionError::ModulePathReadWriteError,
             ));
         }
-        Ok(updates_outside)
+        Ok(Some(updates_outside))
     }
 
     fn validate(
@@ -835,19 +848,16 @@ where
                             shared_counter,
                         ),
                     )?;         
-                      
-                    let read_set = last_input_output
-                        .read_set(txn_idx)
-                        .expect("[BlockSTM]: Prior read-set must be recorded");
 
-        
-                    if read_set.is_unresolved_dependency() {
-                        println!("was here A txn={}", txn_idx);
-                        //panic!("retry again");
-                        SchedulerTask::Retry
-                    } else {
-                        scheduler_handle.get_scheduler().finish_execution(txn_idx, incarnation, updates_outside)?
+                    match updates_outside {
+                        Some(updates_outside) => scheduler_handle.get_scheduler().finish_execution(txn_idx, incarnation, updates_outside)?,
+                        None => {
+                            //println!("Cleared logs, txn_idx={}", txn_idx);
+                            clear_speculative_txn_logs(txn_idx as usize);
+                            SchedulerTask::Retry
+                        },
                     }
+        
                     //scheduler_handle.get_scheduler().finish_execution(txn_idx, incarnation, updates_outside)?
                 },
                 SchedulerTask::ExecutionTask(_, _, ExecutionTaskType::Wakeup(baton)) => {
@@ -888,7 +898,7 @@ where
             "Must use sequential execution"
         );
 
-        println!("I was here");
+        //println!("I was here");
 
         let versioned_cache = MVHashMap::new();
         let start_shared_counter = gen_id_start_value(false);
@@ -1416,6 +1426,8 @@ where
         base_view: &S,
     ) -> BlockExecutionResult<BlockOutput<E::Output>, E::Error> {
         if self.config.local.concurrency_level > 1 {
+            init_speculative_logs(signature_verified_block.len());
+
             let parallel_result = self.execute_transactions_parallel(
                 executor_arguments,
                 signature_verified_block,
@@ -1460,7 +1472,7 @@ where
                 // and whether clearing them below is needed at all.
                 // All logs from the first pass of sequential execution should be cleared and not reported.
                 // Clear by re-initializing the speculative logs.
-                init_speculative_logs(signature_verified_block.len());
+                //init_speculative_logs(signature_verified_block.len());
 
                 let sequential_result = self.execute_transactions_sequential(
                     executor_arguments,

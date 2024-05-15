@@ -72,6 +72,7 @@ static DISABLE_SPECULATION: AtomicBool = AtomicBool::new(false);
 /// Note: THIS SHOULD NOT BE USED (other than one case in sharded block-stm prototype).
 /// TODO: more proper solution.
 pub fn disable_speculative_logging() {
+    //panic!("disabled speculation");
     DISABLE_SPECULATION.store(true, Ordering::Relaxed);
 }
 
@@ -98,6 +99,7 @@ pub fn speculative_log(level: Level, context: &AdapterLogSchema, message: String
         let log_event = VMLogEntry::new(level, context.clone(), message);
         log_event.dispatch();
     } else {
+        panic!("speculation is on");
         // Store in speculative log events.
         match &*BUFFERED_LOG_EVENTS.load() {
             Some(log_events) => {

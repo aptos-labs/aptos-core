@@ -68,7 +68,7 @@ impl AdapterLogSchema {
         matches!(self.name, LogEntry::Execution)
     }
 
-    pub(crate) fn get_txn_idx(&self) -> usize {
+    pub fn get_txn_idx(&self) -> usize {
         self.txn_idx
     }
 }

@@ -10,6 +10,7 @@ use aptos_infallible::Mutex;
 use aptos_mvhashmap::types::{Incarnation, TxnIndex};
 use aptos_types::delayed_fields::PanicError;
 use concurrent_queue::{ConcurrentQueue, PopError};
+use crossbeam::thread;
 use crossbeam::utils::CachePadded;
 use parking_lot::{RwLock, RwLockUpgradableReadGuard};
 use std::{
@@ -271,8 +272,10 @@ impl<'a> ConditionalSuspend for SchedulerHandle<'a> {
         // if it's not too far, then as before;
         // Otherwise, do not conditional suspend the garage, and update txn status to Suspended(.., None)
         // Return a different status to the caller indicated 'suspended but should re-execute'
-        println!("was in conditional suspend");
+        //println!("was in conditional suspend");
         if txn_idx > self.scheduler.commit_state().0 + 100 {
+           //println!("unresolved suspend called txn_idx={}", txn_idx);
+
             /*if self.garage.unwrap().is_halted() {
                 return Ok(DependencyStatus::ExecutionHalted);
             }*/
@@ -282,7 +285,16 @@ impl<'a> ConditionalSuspend for SchedulerHandle<'a> {
             }
             return Ok(res);
         } 
-        println!("got past commit state check");
+        /*let thread_id = self.get_thread_id();
+        if thread_id >= 10 {
+            let res = self.scheduler.wait_for_dependency(txn_idx, dep_txn_idx, None)?;
+            if self.garage.unwrap().is_halted() {
+                return Ok(DependencyStatus::ExecutionHalted);
+            }
+            return Ok(res);
+        }*/
+        //println!("got past commit state check");
+        //println!("suspend called txn_idx={}", txn_idx);
 
         let suspend_result: Result<SuspendResult<DependencyStatus>, PanicError> = self.garage.unwrap().conditional_suspend(|baton|-> Option<Result<DependencyStatus,PanicError>> {
             let dep_result = self.scheduler.wait_for_dependency(txn_idx, dep_txn_idx, Some(baton));
@@ -301,15 +313,21 @@ impl<'a> ConditionalSuspend for SchedulerHandle<'a> {
         }, 
         DependencyStatus::Unresolved);  
 
-        println!("got past actual suspend");
+        //println!("got past actual suspend");
         //here return unresolved if 
         match suspend_result {
             Ok(suspend_result) => {
-                if let  SuspendResult::NotHalted(dependency_status) = suspend_result {
-                    return Ok(dependency_status);
-                } 
-                else {
-                    return Ok(DependencyStatus::ExecutionHalted);
+                match suspend_result {
+                    SuspendResult::NotHalted(dependency_status) => {
+                        return Ok(dependency_status);
+                    },
+                    SuspendResult::TooManySleepers => {
+                        let res = self.scheduler.wait_for_dependency(txn_idx, dep_txn_idx, None)?;
+                        return Ok(res);
+                    },
+                    _ => {
+                        return Ok(DependencyStatus::ExecutionHalted);    
+                    }, 
                 }
             }
             Err(e) => return Err(e),
@@ -1042,6 +1060,7 @@ impl Scheduler {
         match *status {
             ExecutionStatus::Executing(incarnation, _) => {
                 *status = ExecutionStatus::Suspended(incarnation, baton);            
+                //println!("suspended txn_idx={}", txn_idx);
                 Ok(()) 
             },
             //ExecutionStatus::ExecutionHalted => Ok(false),
@@ -1098,10 +1117,10 @@ impl Scheduler {
                 // The execution is already halted.
                 Ok(())
             },
-            _ => {  Err(code_invariant_error(format!(
+            _ => { Err(code_invariant_error(format!(
                 "Expected Executing incarnation {incarnation}, got {:?}",
-                &*status,
-            ))) },
+                &*status,)))
+            },
         }
     }
 
@@ -1147,7 +1166,7 @@ mod tests {
     #[test]
     fn scheduler_halt() {
         let s = Scheduler::new(5);   
-        let garage = ThreadGarageExecutor::new(10, 10, 10);
+        let garage = ThreadGarageExecutor::new(1, 1, 1);
 
         garage.spawn_n(|handle| -> ReturnType {
             assert!(!handle.is_halted());
@@ -1163,7 +1182,7 @@ mod tests {
         let s = Scheduler::new(5);
 
 
-        let garage = ThreadGarageExecutor::new(10, 10, 10);
+        let garage = ThreadGarageExecutor::new(1, 1, 1);
         let generate_baton = || -> Baton<DependencyStatus>  { Baton::new(0, DependencyStatus::Unresolved) };
 
         garage.spawn_n(|handle| -> ReturnType {
