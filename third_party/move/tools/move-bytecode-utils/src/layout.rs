@@ -513,7 +513,7 @@ impl StructLayoutBuilder {
                         let type_args = type_arguments
                             .iter()
                             .map(|t| t.try_into())
-                            .collect::<Result<Vec<TypeTag>>>()?;
+                            .collect::<anyhow::Result<Vec<TypeTag>>>()?;
                         let type_ = StructTag {
                             address: *mid.address(),
                             module: mid.name().to_owned(),

@@ -901,7 +901,7 @@ impl<'a> MoveTestAdapter<'a> for AptosTestAdapter<'a> {
             address: *module.address(),
             module: module.name().to_owned(),
             name: resource.to_owned(),
-            type_params: type_args,
+            type_args,
         };
         let state_key = StateKey::resource(&address, &struct_tag)?;
         match self.storage.get_state_value_bytes(&state_key).unwrap() {
