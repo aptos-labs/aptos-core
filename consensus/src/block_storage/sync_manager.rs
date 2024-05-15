@@ -4,7 +4,10 @@
 
 use crate::{
     block_storage::{BlockReader, BlockStore},
-    counters::{LATE_EXECUTION_WITH_ORDER_VOTE_QC, SUCCESSFUL_EXECUTED_WITH_ORDER_VOTE_QC},
+    counters::{
+        BLOCKS_FETCHED_FROM_NETWORK_WHILE_SYNCING, LATE_EXECUTION_WITH_ORDER_VOTE_QC,
+        SUCCESSFUL_EXECUTED_WITH_ORDER_VOTE_QC, SUCCESSFUL_EXECUTED_WITH_REGULAR_QC,
+    },
     epoch_manager::LivenessStorageData,
     logging::{LogEvent, LogSchema},
     monitor,
@@ -119,6 +122,7 @@ impl BlockStore {
             _ => (),
         }
         if self.ordered_root().round() < qc.commit_info().round() {
+            SUCCESSFUL_EXECUTED_WITH_REGULAR_QC.inc();
             self.send_for_execution(qc.into_wrapped_ledger_info())
                 .await?;
             if qc.ends_epoch() {
@@ -598,6 +602,7 @@ impl BlockRetriever {
         num_blocks: u64,
         target_block_id: HashValue,
     ) -> anyhow::Result<Vec<Block>> {
+        BLOCKS_FETCHED_FROM_NETWORK_WHILE_SYNCING.inc_by(num_blocks);
         let peers = qc.ledger_info().get_voters(&self.validator_addresses);
         self.retrieve_block_for_id(
             qc.certified_block().id(),

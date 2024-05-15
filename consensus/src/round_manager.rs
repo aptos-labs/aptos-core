@@ -10,6 +10,7 @@ use crate::{
     counters::{
         self, ORDER_VOTE_ADDED, ORDER_VOTE_BROADCASTED, ORDER_VOTE_OTHER_ERRORS,
         ORDER_VOTE_VERY_OLD, PROPOSED_VTXN_BYTES, PROPOSED_VTXN_COUNT,
+        SYNC_INFO_RECEIVED_WITH_NEWER_CERT,
     },
     error::{error_kind, VerifyError},
     liveness::{
@@ -546,6 +547,7 @@ impl RoundManager {
                     );
                     VerifyError::from(e)
                 })?;
+            SYNC_INFO_RECEIVED_WITH_NEWER_CERT.inc();
             let result = self
                 .block_store
                 .add_certs(sync_info, self.create_block_retriever(author))
