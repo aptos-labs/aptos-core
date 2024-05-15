@@ -3,6 +3,7 @@
 // Copyright © Aptos Foundation
 // SPDX-License-Identifier: Apache-2.0
 
+use aptos_cached_packages::aptos_stdlib::code_publish_package_txn;
 use aptos_framework::natives::code::{
     ModuleMetadata, MoveOption, PackageDep, PackageMetadata, UpgradePolicy,
 };
@@ -24,15 +25,13 @@ use move_binary_format::{
     access::ModuleAccess,
     errors::VMError,
     file_format::{CompiledModule, CompiledScript, FunctionDefinitionIndex, SignatureToken},
-    file_format_common::VERSION_MAX,
 };
-use move_bytecode_verifier::VerifierConfig;
 use move_core_types::{
-    ident_str,
     language_storage::{ModuleId, TypeTag},
     value::MoveValue,
     vm_status::{StatusCode, StatusType, VMStatus},
 };
+use move_vm_runtime::config::VMConfig;
 use once_cell::sync::Lazy;
 use std::{
     collections::{BTreeMap, BTreeSet, HashSet},
@@ -234,27 +233,6 @@ fn filter_modules(input: &RunnableState) -> Result<(), Corpus> {
     Ok(())
 }
 
-pub fn code_publish_package_txn(
-    metadata_serialized: Vec<u8>,
-    code: Vec<Vec<u8>>,
-) -> TransactionPayload {
-    TransactionPayload::EntryFunction(EntryFunction::new(
-        ModuleId::new(
-            move_core_types::account_address::AccountAddress::new([
-                0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
-                0, 0, 0, 1,
-            ]),
-            ident_str!("code").to_owned(),
-        ),
-        ident_str!("publish_package_txn").to_owned(),
-        vec![],
-        vec![
-            bcs::to_bytes(&metadata_serialized).unwrap(),
-            bcs::to_bytes(&code).unwrap(),
-        ],
-    ))
-}
-
 fn publish_transaction_payload(modules: &[CompiledModule]) -> TransactionPayload {
     let modules_metadatas: Vec<_> = modules
         .iter()
@@ -306,19 +284,24 @@ fn run_case(mut input: RunnableState) -> Result<(), Corpus> {
     // filter modules
     filter_modules(&input)?;
 
+    let vm_config = VMConfig::production();
+
     for m in input.dep_modules.iter_mut() {
         // m.metadata = vec![]; // we could optimize metadata to only contain aptos metadata
-        m.version = VERSION_MAX;
+        // m.version = VERSION_MAX;
 
         // reject bad modules fast
         let mut module_code: Vec<u8> = vec![];
         m.serialize(&mut module_code).map_err(|_| Corpus::Keep)?;
-        let m_de = CompiledModule::deserialize(&module_code).map_err(|_| Corpus::Keep)?;
-        move_bytecode_verifier::verify_module_with_config(&VerifierConfig::production(), &m_de)
-            .map_err(|e| {
+        let m_de =
+            CompiledModule::deserialize_with_config(&module_code, &vm_config.deserializer_config)
+                .map_err(|_| Corpus::Keep)?;
+        move_bytecode_verifier::verify_module_with_config(&vm_config.verifier, &m_de).map_err(
+            |e| {
                 check_for_invariant_violation_vmerror(e);
                 Corpus::Keep
-            })?
+            },
+        )?
     }
 
     if let ExecVariant::Script {
@@ -330,12 +313,15 @@ fn run_case(mut input: RunnableState) -> Result<(), Corpus> {
         // reject bad scripts fast
         let mut script_code: Vec<u8> = vec![];
         s.serialize(&mut script_code).map_err(|_| Corpus::Keep)?;
-        let s_de = CompiledScript::deserialize(&script_code).map_err(|_| Corpus::Keep)?;
-        move_bytecode_verifier::verify_script_with_config(&VerifierConfig::production(), &s_de)
-            .map_err(|e| {
+        let s_de =
+            CompiledScript::deserialize_with_config(&script_code, &vm_config.deserializer_config)
+                .map_err(|_| Corpus::Keep)?;
+        move_bytecode_verifier::verify_script_with_config(&vm_config.verifier, &s_de).map_err(
+            |e| {
                 check_for_invariant_violation_vmerror(e);
                 Corpus::Keep
-            })?
+            },
+        )?
     }
 
     // check no duplicates
