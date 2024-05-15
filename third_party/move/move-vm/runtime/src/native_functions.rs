@@ -185,8 +185,8 @@ impl<'a, 'b, 'c> NativeContext<'a, 'b, 'c> {
         self.interpreter.get_stack_frames(count)
     }
 
-    pub fn is_stack_unbiasable(&self) -> bool {
-        self.interpreter.is_stack_unbiasable()
+    pub fn is_stack_unbiasable(&self, skip_module: ModuleId) -> (u64, bool) {
+        self.interpreter.is_stack_unbiasable(skip_module)
     }
 
     pub fn gas_balance(&self) -> InternalGas {

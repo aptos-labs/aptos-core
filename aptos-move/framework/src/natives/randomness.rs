@@ -1,10 +1,19 @@
 // Copyright © Aptos Foundation
 // SPDX-License-Identifier: Apache-2.0
 
+use aptos_gas_algebra::NumArgs;
+use aptos_gas_schedule::{
+    gas_feature_versions::RELEASE_V1_13,
+    gas_params::natives::aptos_framework::{
+        RANDOMNESS_FETCH_AND_INCREMENT_BASE, RANDOMNESS_UNBIASABLE_CHECK_PER_STACK,
+    },
+};
 use aptos_native_interface::{
     RawSafeNative, SafeNativeBuilder, SafeNativeContext, SafeNativeError, SafeNativeResult,
 };
+use aptos_types::account_address::AccountAddress;
 use better_any::{Tid, TidAble};
+use move_core_types::{ident_str, language_storage::ModuleId};
 use move_vm_runtime::native_functions::NativeFunction;
 use move_vm_types::{loaded_data::runtime_types::Type, values::Value};
 use smallvec::{smallvec, SmallVec};
@@ -55,7 +64,21 @@ pub fn fetch_and_increment_txn_counter(
     _ty_args: Vec<Type>,
     _args: VecDeque<Value>,
 ) -> SafeNativeResult<SmallVec<[Value; 1]>> {
-    if !context.is_stack_unbiasable() {
+    if context.gas_feature_version() >= RELEASE_V1_13 {
+        context.charge(RANDOMNESS_FETCH_AND_INCREMENT_BASE)?;
+    }
+
+    let (visited, is_stack_unbiasable) = context.is_stack_unbiasable(ModuleId::new(
+        AccountAddress::ONE,
+        ident_str!("randomness").to_owned(),
+    ));
+
+    if context.gas_feature_version() >= RELEASE_V1_13 {
+        context.charge(RANDOMNESS_UNBIASABLE_CHECK_PER_STACK * NumArgs::new(visited))?;
+    }
+
+    if !is_stack_unbiasable {
+        println!("Stack is biasable {:?}", context.stack_frames(usize::MAX));
         return Err(SafeNativeError::Abort {
             abort_code: E_API_USE_SUSCEPTIBLE_TO_TEST_AND_ABORT,
         });
@@ -68,7 +91,6 @@ pub fn fetch_and_increment_txn_counter(
         });
     }
 
-    // TODO: charge gas?
     let ret = ctx.txn_local_state.to_vec();
     ctx.increment();
     Ok(smallvec![Value::vector_u8(ret)])

@@ -46,23 +46,41 @@ fn test_and_abort_defense_is_sound_and_correct() {
     h.set_default_gas_unit_price(100);
     h.set_max_gas_per_txn(10000); // Should match the default required gas amount.
 
-    // This is a safe call that the randomness API should allow through.
-    let status = run_entry_func(
-        &mut h,
-        "0xa11ce",
-        "0x1::some_randapp::safe_private_entry_call",
-    );
-    assert_success!(status);
+    for fun_name in [
+        // This is a safe call that the randomness API should allow through.
+        "safe_private_entry_call",
+        // This is a safe call that the randomness API should allow through.
+        // (I suppose that, since TXNs with private entry function payloads are okay, increasing the
+        // visibility to public(friend) should not create any problems.)
+        "safe_friend_entry_call",
+        // nested calls through only private / friend functions is fine
+        "safe_nested_private_entry_call",
+        "safe_nested_friend_entry_call",
+    ] {
+        let status = run_entry_func(
+            &mut h,
+            "0xa11ce",
+            &format!("0x1::some_randapp::{}", fun_name),
+        );
+        assert_success!(status, "failed on {}", fun_name);
+    }
 
-    // This is a safe call that the randomness API should allow through.
-    // (I suppose that, since TXNs with private entry function payloads are okay, increasing the
-    // visibility to public(friend) should not create any problems.)
-    let status = run_entry_func(
-        &mut h,
-        "0xa11ce",
-        "0x1::some_randapp::safe_friend_entry_call",
-    );
-    assert_success!(status);
+    for fun_name in [
+        "unsafe_nested_private_entry_call",
+        "unsafe_public_entry_call",
+    ] {
+        let status = run_entry_func(
+            &mut h,
+            "0xa11ce",
+            &format!("0x1::some_randapp::{}", fun_name),
+        );
+        assert_abort!(
+            status,
+            E_API_USE_SUSCEPTIBLE_TO_TEST_AND_ABORT,
+            "failed on {}",
+            fun_name
+        );
+    }
 }
 
 #[test]

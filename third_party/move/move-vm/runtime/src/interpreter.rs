@@ -1144,12 +1144,17 @@ impl Interpreter {
         ExecutionState::new(stack_trace)
     }
 
-    pub(crate) fn is_stack_unbiasable(&self) -> bool {
-        self
-            .call_stack
-            .0
-            .iter()
-            .all(|frame| frame.function.def_is_friend_or_private)
+    pub(crate) fn is_stack_unbiasable(&self, skip_module: ModuleId) -> (u64, bool) {
+        let mut visited = 0;
+        for frame in self.call_stack.0.iter() {
+            visited += 1;
+            if frame.function.module_id() != Some(&skip_module)
+                && !frame.function.def_is_friend_or_private
+            {
+                return (visited, false);
+            }
+        }
+        (visited, true)
     }
 }
 
