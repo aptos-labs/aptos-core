@@ -181,13 +181,20 @@ pub enum EntryPoints {
         max_offset: u64,
         max_count: u64,
     },
-    /// Increment global (publisher) resource - COUNTER_STEP
+    /// Increment global (publisher) resource
     IncGlobal,
-    /// Increment global (publisher) AggregatorV2 resource - COUNTER_STEP
+    /// Increment global (publisher) AggregatorV2 resource
     IncGlobalAggV2,
     /// Modify (try_add(step) or try_sub(step)) AggregatorV2 bounded counter (counter with max_value=100)
     ModifyGlobalBoundedAggV2 {
         step: u64,
+    },
+    /// Increment global (publisher) AggregatorV2 resource with Milestone (and conflict) every `milestone_every` increments.
+    IncGlobalMilestoneAggV2 {
+        milestone_every: u64,
+    },
+    CreateGlobalMilestoneAggV2 {
+        milestone_every: u64,
     },
 
     /// Modifying a single random tag in a resource group (which contains 8 tags),
@@ -313,6 +320,8 @@ impl EntryPoints {
             | EntryPoints::VectorPictureRead { .. }
             | EntryPoints::InitializeSmartTablePicture
             | EntryPoints::SmartTablePicture { .. } => "complex",
+            EntryPoints::IncGlobalMilestoneAggV2 { .. }
+            | EntryPoints::CreateGlobalMilestoneAggV2 { .. } => "aggregator_examples",
             EntryPoints::DeserializeU256 => "bcs_stream",
         }
     }
@@ -370,6 +379,8 @@ impl EntryPoints {
             EntryPoints::InitializeSmartTablePicture | EntryPoints::SmartTablePicture { .. } => {
                 "smart_table_picture"
             },
+            EntryPoints::IncGlobalMilestoneAggV2 { .. }
+            | EntryPoints::CreateGlobalMilestoneAggV2 { .. } => "counter_with_milestone",
             EntryPoints::DeserializeU256 => "bcs_stream",
         }
     }
@@ -479,7 +490,25 @@ impl EntryPoints {
             EntryPoints::IncGlobal => inc_global(module_id),
             EntryPoints::IncGlobalAggV2 => inc_global_agg_v2(module_id),
             EntryPoints::ModifyGlobalBoundedAggV2 { step } => {
-                modify_bounded_agg_v2(module_id, rng.expect("Must provide RNG"), *step)
+                let rng = rng.expect("Must provide RNG");
+                get_payload(
+                    module_id,
+                    ident_str!("modify_bounded_agg_v2").to_owned(),
+                    vec![
+                        bcs::to_bytes(&rng.gen::<bool>()).unwrap(),
+                        bcs::to_bytes(&step).unwrap(),
+                    ],
+                )
+            },
+            EntryPoints::IncGlobalMilestoneAggV2 { .. } => get_payload(
+                module_id,
+                ident_str!("increment_milestone").to_owned(),
+                vec![],
+            ),
+            EntryPoints::CreateGlobalMilestoneAggV2 { milestone_every } => {
+                get_payload(module_id, ident_str!("create").to_owned(), vec![
+                    bcs::to_bytes(&milestone_every).unwrap(),
+                ])
             },
             EntryPoints::CreateObjects {
                 num_objects,
@@ -711,6 +740,11 @@ impl EntryPoints {
                 Some(EntryPoints::InitializeVectorPicture { length: *length })
             },
             EntryPoints::SmartTablePicture { .. } => Some(EntryPoints::InitializeSmartTablePicture),
+            EntryPoints::IncGlobalMilestoneAggV2 { milestone_every } => {
+                Some(EntryPoints::CreateGlobalMilestoneAggV2 {
+                    milestone_every: *milestone_every,
+                })
+            },
             _ => None,
         }
     }
@@ -729,6 +763,7 @@ impl EntryPoints {
                 MultiSigConfig::Publisher
             },
             EntryPoints::LiquidityPoolSwap { .. } => MultiSigConfig::Publisher,
+            EntryPoints::CreateGlobalMilestoneAggV2 { .. } => MultiSigConfig::Publisher,
             _ => MultiSigConfig::None,
         }
     }
@@ -788,6 +823,8 @@ impl EntryPoints {
             EntryPoints::InitializeSmartTablePicture => AutomaticArgs::Signer,
             EntryPoints::SmartTablePicture { .. } => AutomaticArgs::None,
             EntryPoints::DeserializeU256 => AutomaticArgs::None,
+            EntryPoints::IncGlobalMilestoneAggV2 { .. } => AutomaticArgs::None,
+            EntryPoints::CreateGlobalMilestoneAggV2 { .. } => AutomaticArgs::Signer,
         }
     }
 }
@@ -886,17 +923,6 @@ fn inc_global(module_id: ModuleId) -> TransactionPayload {
 
 fn inc_global_agg_v2(module_id: ModuleId) -> TransactionPayload {
     get_payload(module_id, ident_str!("increment_agg_v2").to_owned(), vec![])
-}
-
-fn modify_bounded_agg_v2(module_id: ModuleId, rng: &mut StdRng, step: u64) -> TransactionPayload {
-    get_payload(
-        module_id,
-        ident_str!("modify_bounded_agg_v2").to_owned(),
-        vec![
-            bcs::to_bytes(&rng.gen::<bool>()).unwrap(),
-            bcs::to_bytes(&step).unwrap(),
-        ],
-    )
 }
 
 fn mint_new_token(module_id: ModuleId, other: AccountAddress) -> TransactionPayload {

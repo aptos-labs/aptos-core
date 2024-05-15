@@ -52,6 +52,9 @@ require adding the field original_name.
 -  [Function `check_collection_exists`](#0x4_collection_check_collection_exists)
 -  [Function `borrow`](#0x4_collection_borrow)
 -  [Function `count`](#0x4_collection_count)
+-  [Function `is_count_at_least`](#0x4_collection_is_count_at_least)
+-  [Function `total_minted`](#0x4_collection_total_minted)
+-  [Function `is_total_minted_at_least`](#0x4_collection_is_total_minted_at_least)
 -  [Function `creator`](#0x4_collection_creator)
 -  [Function `description`](#0x4_collection_description)
 -  [Function `name`](#0x4_collection_name)
@@ -1491,10 +1494,11 @@ Creates a MutatorRef, which gates the ability to mutate any fields that support 
 
 ## Function `count`
 
-Provides the count of the current selection if supply tracking is used
+Provides the count of the current collection if supply tracking is used
 
 Note: Calling this method from transaction that also mints/burns, prevents
-it from being parallelized.
+transaction from being parallelized, prefer <code>is_count_at_least</code> where
+only comparison is needed.
 
 
 <pre><code>#[view]
@@ -1524,6 +1528,142 @@ it from being parallelized.
         <a href="../../aptos-framework/../aptos-stdlib/../move-stdlib/doc/option.md#0x1_option_some">option::some</a>(supply.current_supply)
     } <b>else</b> {
         <a href="../../aptos-framework/../aptos-stdlib/../move-stdlib/doc/option.md#0x1_option_none">option::none</a>()
+    }
+}
+</code></pre>
+
+
+
+</details>
+
+<a id="0x4_collection_is_count_at_least"></a>
+
+## Function `is_count_at_least`
+
+
+
+<pre><code><b>public</b> <b>fun</b> <a href="collection.md#0x4_collection_is_count_at_least">is_count_at_least</a>&lt;T: key&gt;(<a href="collection.md#0x4_collection">collection</a>: <a href="../../aptos-framework/doc/object.md#0x1_object_Object">object::Object</a>&lt;T&gt;, min_amount: u64): bool
+</code></pre>
+
+
+
+<details>
+<summary>Implementation</summary>
+
+
+<pre><code><b>public</b> <b>fun</b> <a href="collection.md#0x4_collection_is_count_at_least">is_count_at_least</a>&lt;T: key&gt;(
+    <a href="collection.md#0x4_collection">collection</a>: Object&lt;T&gt;,
+    min_amount: u64,
+): bool <b>acquires</b> <a href="collection.md#0x4_collection_FixedSupply">FixedSupply</a>, <a href="collection.md#0x4_collection_UnlimitedSupply">UnlimitedSupply</a>, <a href="collection.md#0x4_collection_ConcurrentSupply">ConcurrentSupply</a> {
+    <b>let</b> collection_address = <a href="../../aptos-framework/doc/object.md#0x1_object_object_address">object::object_address</a>(&<a href="collection.md#0x4_collection">collection</a>);
+    <a href="collection.md#0x4_collection_check_collection_exists">check_collection_exists</a>(collection_address);
+
+    <b>if</b> (<b>exists</b>&lt;<a href="collection.md#0x4_collection_ConcurrentSupply">ConcurrentSupply</a>&gt;(collection_address)) {
+        <b>let</b> supply = <b>borrow_global_mut</b>&lt;<a href="collection.md#0x4_collection_ConcurrentSupply">ConcurrentSupply</a>&gt;(collection_address);
+        <a href="../../aptos-framework/doc/aggregator_v2.md#0x1_aggregator_v2_is_at_least">aggregator_v2::is_at_least</a>(&supply.current_supply, min_amount)
+    } <b>else</b> <b>if</b> (<b>exists</b>&lt;<a href="collection.md#0x4_collection_FixedSupply">FixedSupply</a>&gt;(collection_address)) {
+        <b>let</b> supply = <b>borrow_global_mut</b>&lt;<a href="collection.md#0x4_collection_FixedSupply">FixedSupply</a>&gt;(collection_address);
+        supply.current_supply &gt;= min_amount
+    } <b>else</b> <b>if</b> (<b>exists</b>&lt;<a href="collection.md#0x4_collection_UnlimitedSupply">UnlimitedSupply</a>&gt;(collection_address)) {
+        <b>let</b> supply = <b>borrow_global_mut</b>&lt;<a href="collection.md#0x4_collection_UnlimitedSupply">UnlimitedSupply</a>&gt;(collection_address);
+        supply.current_supply &gt;= min_amount
+    } <b>else</b> {
+        <b>false</b>
+    }
+}
+</code></pre>
+
+
+
+</details>
+
+<a id="0x4_collection_total_minted"></a>
+
+## Function `total_minted`
+
+Provides the count minted of the current collection (including burned tokens)
+if supply tracking is used.
+Token minting afterwards would have index of <code><a href="collection.md#0x4_collection_total_minted">total_minted</a>() + 1</code>.
+
+Note: Calling this method from transaction that also mints/burns, prevents
+transaction from being parallelized, prefer <code>is_total_minted_at_least</code> where
+only comparison is needed.
+
+
+<pre><code>#[view]
+<b>public</b> <b>fun</b> <a href="collection.md#0x4_collection_total_minted">total_minted</a>&lt;T: key&gt;(<a href="collection.md#0x4_collection">collection</a>: <a href="../../aptos-framework/doc/object.md#0x1_object_Object">object::Object</a>&lt;T&gt;): <a href="../../aptos-framework/../aptos-stdlib/../move-stdlib/doc/option.md#0x1_option_Option">option::Option</a>&lt;u64&gt;
+</code></pre>
+
+
+
+<details>
+<summary>Implementation</summary>
+
+
+<pre><code><b>public</b> <b>fun</b> <a href="collection.md#0x4_collection_total_minted">total_minted</a>&lt;T: key&gt;(
+    <a href="collection.md#0x4_collection">collection</a>: Object&lt;T&gt;
+): Option&lt;u64&gt; <b>acquires</b> <a href="collection.md#0x4_collection_FixedSupply">FixedSupply</a>, <a href="collection.md#0x4_collection_UnlimitedSupply">UnlimitedSupply</a>, <a href="collection.md#0x4_collection_ConcurrentSupply">ConcurrentSupply</a> {
+    <b>let</b> collection_address = <a href="../../aptos-framework/doc/object.md#0x1_object_object_address">object::object_address</a>(&<a href="collection.md#0x4_collection">collection</a>);
+    <a href="collection.md#0x4_collection_check_collection_exists">check_collection_exists</a>(collection_address);
+
+    <b>if</b> (<b>exists</b>&lt;<a href="collection.md#0x4_collection_ConcurrentSupply">ConcurrentSupply</a>&gt;(collection_address)) {
+        <b>let</b> supply = <b>borrow_global_mut</b>&lt;<a href="collection.md#0x4_collection_ConcurrentSupply">ConcurrentSupply</a>&gt;(collection_address);
+        <a href="../../aptos-framework/../aptos-stdlib/../move-stdlib/doc/option.md#0x1_option_some">option::some</a>(<a href="../../aptos-framework/doc/aggregator_v2.md#0x1_aggregator_v2_read">aggregator_v2::read</a>(&supply.total_minted))
+    } <b>else</b> <b>if</b> (<b>exists</b>&lt;<a href="collection.md#0x4_collection_FixedSupply">FixedSupply</a>&gt;(collection_address)) {
+        <b>let</b> supply = <b>borrow_global_mut</b>&lt;<a href="collection.md#0x4_collection_FixedSupply">FixedSupply</a>&gt;(collection_address);
+        <a href="../../aptos-framework/../aptos-stdlib/../move-stdlib/doc/option.md#0x1_option_some">option::some</a>(supply.total_minted)
+    } <b>else</b> <b>if</b> (<b>exists</b>&lt;<a href="collection.md#0x4_collection_UnlimitedSupply">UnlimitedSupply</a>&gt;(collection_address)) {
+        <b>let</b> supply = <b>borrow_global_mut</b>&lt;<a href="collection.md#0x4_collection_UnlimitedSupply">UnlimitedSupply</a>&gt;(collection_address);
+        <a href="../../aptos-framework/../aptos-stdlib/../move-stdlib/doc/option.md#0x1_option_some">option::some</a>(supply.total_minted)
+    } <b>else</b> {
+        <a href="../../aptos-framework/../aptos-stdlib/../move-stdlib/doc/option.md#0x1_option_none">option::none</a>()
+    }
+}
+</code></pre>
+
+
+
+</details>
+
+<a id="0x4_collection_is_total_minted_at_least"></a>
+
+## Function `is_total_minted_at_least`
+
+Checks if total minted of the current collection is at least the given min_amount.
+If supply is not tracked, returns false.
+Token minting afterwards would have index of <code><a href="collection.md#0x4_collection_total_minted">total_minted</a>() + 1</code>.
+
+This operation affects parallelism minimally, unlike the count() function, so should
+be prefered where only comparison is needed.
+
+
+<pre><code><b>public</b> <b>fun</b> <a href="collection.md#0x4_collection_is_total_minted_at_least">is_total_minted_at_least</a>&lt;T: key&gt;(<a href="collection.md#0x4_collection">collection</a>: <a href="../../aptos-framework/doc/object.md#0x1_object_Object">object::Object</a>&lt;T&gt;, min_amount: u64): bool
+</code></pre>
+
+
+
+<details>
+<summary>Implementation</summary>
+
+
+<pre><code><b>public</b> <b>fun</b> <a href="collection.md#0x4_collection_is_total_minted_at_least">is_total_minted_at_least</a>&lt;T: key&gt;(
+    <a href="collection.md#0x4_collection">collection</a>: Object&lt;T&gt;,
+    min_amount: u64,
+): bool <b>acquires</b> <a href="collection.md#0x4_collection_FixedSupply">FixedSupply</a>, <a href="collection.md#0x4_collection_UnlimitedSupply">UnlimitedSupply</a>, <a href="collection.md#0x4_collection_ConcurrentSupply">ConcurrentSupply</a> {
+    <b>let</b> collection_address = <a href="../../aptos-framework/doc/object.md#0x1_object_object_address">object::object_address</a>(&<a href="collection.md#0x4_collection">collection</a>);
+    <a href="collection.md#0x4_collection_check_collection_exists">check_collection_exists</a>(collection_address);
+
+    <b>if</b> (<b>exists</b>&lt;<a href="collection.md#0x4_collection_ConcurrentSupply">ConcurrentSupply</a>&gt;(collection_address)) {
+        <b>let</b> supply = <b>borrow_global_mut</b>&lt;<a href="collection.md#0x4_collection_ConcurrentSupply">ConcurrentSupply</a>&gt;(collection_address);
+        <a href="../../aptos-framework/doc/aggregator_v2.md#0x1_aggregator_v2_is_at_least">aggregator_v2::is_at_least</a>(&supply.total_minted, min_amount)
+    } <b>else</b> <b>if</b> (<b>exists</b>&lt;<a href="collection.md#0x4_collection_FixedSupply">FixedSupply</a>&gt;(collection_address)) {
+        <b>let</b> supply = <b>borrow_global_mut</b>&lt;<a href="collection.md#0x4_collection_FixedSupply">FixedSupply</a>&gt;(collection_address);
+        supply.total_minted &gt;= min_amount
+    } <b>else</b> <b>if</b> (<b>exists</b>&lt;<a href="collection.md#0x4_collection_UnlimitedSupply">UnlimitedSupply</a>&gt;(collection_address)) {
+        <b>let</b> supply = <b>borrow_global_mut</b>&lt;<a href="collection.md#0x4_collection_UnlimitedSupply">UnlimitedSupply</a>&gt;(collection_address);
+        supply.total_minted &gt;= min_amount
+    } <b>else</b> {
+        <b>false</b>
     }
 }
 </code></pre>

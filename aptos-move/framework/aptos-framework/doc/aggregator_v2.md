@@ -16,6 +16,14 @@ operation that also reduced parallelism, and should be avoided as much as possib
 If you need to capture the value, without revealing it, use snapshot function instead,
 which has no parallelism impact.
 
+From paralellism considerations, there are three different levels of effects:
+* enables full parallelism (cannot create conflicts):
+max_value, create_*, snapshot, derive_string_concat
+* enable speculative parallelism (generally parallel via branch prediction)
+try_add, add, try_sub, sub, is_at_least
+* create read/write conflicts, as if you were using a regular field
+read, read_snapshot, read_derived_string
+
 
 -  [Struct `Aggregator`](#0x1_aggregator_v2_Aggregator)
 -  [Struct `AggregatorSnapshot`](#0x1_aggregator_v2_AggregatorSnapshot)
@@ -374,6 +382,8 @@ EAGGREGATOR_ELEMENT_TYPE_NOT_SUPPORTED raised if called with a different type.
 Adds <code>value</code> to aggregator.
 If addition would exceed the max_value, <code><b>false</b></code> is returned, and aggregator value is left unchanged.
 
+Parallelism info: This operation enables speculative parallelism.
+
 
 <pre><code><b>public</b> <b>fun</b> <a href="aggregator_v2.md#0x1_aggregator_v2_try_add">try_add</a>&lt;IntElement&gt;(<a href="aggregator.md#0x1_aggregator">aggregator</a>: &<b>mut</b> <a href="aggregator_v2.md#0x1_aggregator_v2_Aggregator">aggregator_v2::Aggregator</a>&lt;IntElement&gt;, value: IntElement): bool
 </code></pre>
@@ -395,6 +405,10 @@ If addition would exceed the max_value, <code><b>false</b></code> is returned, a
 
 ## Function `add`
 
+Adds <code>value</code> to aggregator, uncoditionally.
+If addition would exceed the max_value, EAGGREGATOR_OVERFLOW exception will be thrown.
+
+Parallelism info: This operation enables speculative parallelism.
 
 
 <pre><code><b>public</b> <b>fun</b> <a href="aggregator_v2.md#0x1_aggregator_v2_add">add</a>&lt;IntElement&gt;(<a href="aggregator.md#0x1_aggregator">aggregator</a>: &<b>mut</b> <a href="aggregator_v2.md#0x1_aggregator_v2_Aggregator">aggregator_v2::Aggregator</a>&lt;IntElement&gt;, value: IntElement)
@@ -422,6 +436,8 @@ If addition would exceed the max_value, <code><b>false</b></code> is returned, a
 Subtracts <code>value</code> from aggregator.
 If subtraction would result in a negative value, <code><b>false</b></code> is returned, and aggregator value is left unchanged.
 
+Parallelism info: This operation enables speculative parallelism.
+
 
 <pre><code><b>public</b> <b>fun</b> <a href="aggregator_v2.md#0x1_aggregator_v2_try_sub">try_sub</a>&lt;IntElement&gt;(<a href="aggregator.md#0x1_aggregator">aggregator</a>: &<b>mut</b> <a href="aggregator_v2.md#0x1_aggregator_v2_Aggregator">aggregator_v2::Aggregator</a>&lt;IntElement&gt;, value: IntElement): bool
 </code></pre>
@@ -443,6 +459,8 @@ If subtraction would result in a negative value, <code><b>false</b></code> is re
 
 ## Function `sub`
 
+
+Parallelism info: This operation enables speculative parallelism.
 
 
 <pre><code><b>public</b> <b>fun</b> <a href="aggregator_v2.md#0x1_aggregator_v2_sub">sub</a>&lt;IntElement&gt;(<a href="aggregator.md#0x1_aggregator">aggregator</a>: &<b>mut</b> <a href="aggregator_v2.md#0x1_aggregator_v2_Aggregator">aggregator_v2::Aggregator</a>&lt;IntElement&gt;, value: IntElement)
@@ -489,6 +507,14 @@ If subtraction would result in a negative value, <code><b>false</b></code> is re
 
 ## Function `is_at_least`
 
+Returns true if aggregator value is larger or equal to the given <code>min_amount</code>, false otherwise.
+
+This operation is more efficient and much more parallelization friendly than calling .
+Until traits are deployed, <code>is_at_most</code>/<code>is_equal</code> utility methods can be derived from this one (assuming +1 doesn't overflow):
+- for <code>is_at_most(agg, max_amount)</code>, you can do <code>!<a href="aggregator_v2.md#0x1_aggregator_v2_is_at_least">is_at_least</a>(max_amount + 1)</code>
+- for <code>is_equal(agg, value)</code>, you can do <code><a href="aggregator_v2.md#0x1_aggregator_v2_is_at_least">is_at_least</a>(value) && !<a href="aggregator_v2.md#0x1_aggregator_v2_is_at_least">is_at_least</a>(value + 1)</code>
+
+Parallelism info: This operation enables speculative parallelism.
 
 
 <pre><code><b>public</b> <b>fun</b> <a href="aggregator_v2.md#0x1_aggregator_v2_is_at_least">is_at_least</a>&lt;IntElement&gt;(<a href="aggregator.md#0x1_aggregator">aggregator</a>: &<a href="aggregator_v2.md#0x1_aggregator_v2_Aggregator">aggregator_v2::Aggregator</a>&lt;IntElement&gt;, min_amount: IntElement): bool
@@ -523,6 +549,8 @@ it will sequentialize that transaction. (i.e. up to concurrency_level times slow
 If called in a separate transaction (i.e. after transaction that modifies aggregator), it might be
 up to two times slower.
 
+Parallelism info: This operation *prevents* speculative parallelism.
+
 
 <pre><code><b>public</b> <b>fun</b> <a href="aggregator_v2.md#0x1_aggregator_v2_read">read</a>&lt;IntElement&gt;(<a href="aggregator.md#0x1_aggregator">aggregator</a>: &<a href="aggregator_v2.md#0x1_aggregator_v2_Aggregator">aggregator_v2::Aggregator</a>&lt;IntElement&gt;): IntElement
 </code></pre>
@@ -546,6 +574,8 @@ up to two times slower.
 
 Returns a wrapper of a current value of an aggregator
 Unlike read(), it is fast and avoids sequential dependencies.
+
+Parallelism info: This operation enables parallelism.
 
 
 <pre><code><b>public</b> <b>fun</b> <a href="aggregator_v2.md#0x1_aggregator_v2_snapshot">snapshot</a>&lt;IntElement&gt;(<a href="aggregator.md#0x1_aggregator">aggregator</a>: &<a href="aggregator_v2.md#0x1_aggregator_v2_Aggregator">aggregator_v2::Aggregator</a>&lt;IntElement&gt;): <a href="aggregator_v2.md#0x1_aggregator_v2_AggregatorSnapshot">aggregator_v2::AggregatorSnapshot</a>&lt;IntElement&gt;
@@ -597,6 +627,8 @@ Note: This operation is resource-intensive, and reduces parallelism.
 (Especially if called in a transaction that also modifies the aggregator,
 or has other read/write conflicts)
 
+Parallelism info: This operation *prevents* speculative parallelism.
+
 
 <pre><code><b>public</b> <b>fun</b> <a href="aggregator_v2.md#0x1_aggregator_v2_read_snapshot">read_snapshot</a>&lt;IntElement&gt;(snapshot: &<a href="aggregator_v2.md#0x1_aggregator_v2_AggregatorSnapshot">aggregator_v2::AggregatorSnapshot</a>&lt;IntElement&gt;): IntElement
 </code></pre>
@@ -622,6 +654,8 @@ Returns a value stored in this DerivedStringSnapshot.
 Note: This operation is resource-intensive, and reduces parallelism.
 (Especially if called in a transaction that also modifies the aggregator,
 or has other read/write conflicts)
+
+Parallelism info: This operation *prevents* speculative parallelism.
 
 
 <pre><code><b>public</b> <b>fun</b> <a href="aggregator_v2.md#0x1_aggregator_v2_read_derived_string">read_derived_string</a>(snapshot: &<a href="aggregator_v2.md#0x1_aggregator_v2_DerivedStringSnapshot">aggregator_v2::DerivedStringSnapshot</a>): <a href="../../aptos-stdlib/../move-stdlib/doc/string.md#0x1_string_String">string::String</a>
@@ -672,6 +706,8 @@ Concatenates <code>before</code>, <code>snapshot</code> and <code>after</code> i
 snapshot passed needs to have integer type - currently supported types are u64 and u128.
 Raises EUNSUPPORTED_AGGREGATOR_SNAPSHOT_TYPE if called with another type.
 If length of prefix and suffix together exceed 256 bytes, ECONCAT_STRING_LENGTH_TOO_LARGE is raised.
+
+Parallelism info: This operation enables parallelism.
 
 
 <pre><code><b>public</b> <b>fun</b> <a href="aggregator_v2.md#0x1_aggregator_v2_derive_string_concat">derive_string_concat</a>&lt;IntElement&gt;(before: <a href="../../aptos-stdlib/../move-stdlib/doc/string.md#0x1_string_String">string::String</a>, snapshot: &<a href="aggregator_v2.md#0x1_aggregator_v2_AggregatorSnapshot">aggregator_v2::AggregatorSnapshot</a>&lt;IntElement&gt;, after: <a href="../../aptos-stdlib/../move-stdlib/doc/string.md#0x1_string_String">string::String</a>): <a href="aggregator_v2.md#0x1_aggregator_v2_DerivedStringSnapshot">aggregator_v2::DerivedStringSnapshot</a>

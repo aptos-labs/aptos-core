@@ -621,10 +621,11 @@ module aptos_token_objects::collection {
     }
 
     #[view]
-    /// Provides the count of the current selection if supply tracking is used
+    /// Provides the count of the current collection if supply tracking is used
     ///
     /// Note: Calling this method from transaction that also mints/burns, prevents
-    /// it from being parallelized.
+    /// transaction from being parallelized, prefer `is_count_at_least` where
+    /// only comparison is needed.
     public fun count<T: key>(
         collection: Object<T>
     ): Option<u64> acquires FixedSupply, UnlimitedSupply, ConcurrentSupply {
@@ -644,6 +645,92 @@ module aptos_token_objects::collection {
             option::none()
         }
     }
+
+    // Checks if count of the current collection is at least the given min_amount.
+    // If supply is not tracked, returns false.
+    // If min_amount passed is collection's max supply, then this function would return
+    // whether minting of token would be allowed or not, based on the supply.
+    //
+    // This operation affects parallelism minimally, unlike the count() function, so should
+    // be prefered where only comparison is needed.
+    public fun is_count_at_least<T: key>(
+        collection: Object<T>,
+        min_amount: u64,
+    ): bool acquires FixedSupply, UnlimitedSupply, ConcurrentSupply {
+        let collection_address = object::object_address(&collection);
+        check_collection_exists(collection_address);
+
+        if (exists<ConcurrentSupply>(collection_address)) {
+            let supply = borrow_global_mut<ConcurrentSupply>(collection_address);
+            aggregator_v2::is_at_least(&supply.current_supply, min_amount)
+        } else if (exists<FixedSupply>(collection_address)) {
+            let supply = borrow_global_mut<FixedSupply>(collection_address);
+            supply.current_supply >= min_amount
+        } else if (exists<UnlimitedSupply>(collection_address)) {
+            let supply = borrow_global_mut<UnlimitedSupply>(collection_address);
+            supply.current_supply >= min_amount
+        } else {
+            false
+        }
+    }
+
+    #[view]
+    /// Provides the count minted of the current collection (including burned tokens)
+    /// if supply tracking is used.
+    /// Token minting afterwards would have index of `total_minted() + 1`.
+    ///
+    /// Note: Calling this method from transaction that also mints/burns, prevents
+    /// transaction from being parallelized, prefer `is_total_minted_at_least` where
+    /// only comparison is needed.
+    public fun total_minted<T: key>(
+        collection: Object<T>
+    ): Option<u64> acquires FixedSupply, UnlimitedSupply, ConcurrentSupply {
+        let collection_address = object::object_address(&collection);
+        check_collection_exists(collection_address);
+
+        if (exists<ConcurrentSupply>(collection_address)) {
+            let supply = borrow_global_mut<ConcurrentSupply>(collection_address);
+            option::some(aggregator_v2::read(&supply.total_minted))
+        } else if (exists<FixedSupply>(collection_address)) {
+            let supply = borrow_global_mut<FixedSupply>(collection_address);
+            option::some(supply.total_minted)
+        } else if (exists<UnlimitedSupply>(collection_address)) {
+            let supply = borrow_global_mut<UnlimitedSupply>(collection_address);
+            option::some(supply.total_minted)
+        } else {
+            option::none()
+        }
+    }
+
+    /// Checks if total minted of the current collection is at least the given min_amount.
+    /// If supply is not tracked, returns false.
+    /// Token minting afterwards would have index of `total_minted() + 1`.
+    ///
+    /// This operation affects parallelism minimally, unlike the count() function, so should
+    /// be prefered where only comparison is needed.
+    public fun is_total_minted_at_least<T: key>(
+        collection: Object<T>,
+        min_amount: u64,
+    ): bool acquires FixedSupply, UnlimitedSupply, ConcurrentSupply {
+        let collection_address = object::object_address(&collection);
+        check_collection_exists(collection_address);
+
+        if (exists<ConcurrentSupply>(collection_address)) {
+            let supply = borrow_global_mut<ConcurrentSupply>(collection_address);
+            aggregator_v2::is_at_least(&supply.total_minted, min_amount)
+        } else if (exists<FixedSupply>(collection_address)) {
+            let supply = borrow_global_mut<FixedSupply>(collection_address);
+            supply.total_minted >= min_amount
+        } else if (exists<UnlimitedSupply>(collection_address)) {
+            let supply = borrow_global_mut<UnlimitedSupply>(collection_address);
+            supply.total_minted >= min_amount
+        } else {
+            false
+        }
+    }
+
+
+
 
     #[view]
     public fun creator<T: key>(collection: Object<T>): address acquires Collection {
