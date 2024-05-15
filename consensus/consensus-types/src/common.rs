@@ -523,17 +523,22 @@ impl From<&Vec<&Payload>> for PayloadFilter {
         let direct_mode = exclude_payloads.iter().any(|payload| payload.is_direct());
 
         if direct_mode {
-            let mut exclude_txns = Vec::new();
-            for payload in exclude_payloads {
-                if let Payload::DirectMempool(txns) = payload {
-                    for txn in txns {
-                        exclude_txns.push(TransactionSummary {
-                            sender: txn.sender(),
-                            sequence_number: txn.sequence_number(),
-                        });
+            let exclude_txns = exclude_payloads
+                .par_iter()
+                .with_min_len(100)
+                .filter_map(|payload| {
+                    if let Payload::DirectMempool(txns) = payload {
+                        Some(txns)
+                    } else {
+                        None
                     }
-                }
-            }
+                })
+                .flatten()
+                .map(|txn| TransactionSummary {
+                    sender: txn.sender(),
+                    sequence_number: txn.sequence_number(),
+                })
+                .collect();
             PayloadFilter::DirectMempool(exclude_txns)
         } else {
             let mut exclude_proofs = HashSet::new();

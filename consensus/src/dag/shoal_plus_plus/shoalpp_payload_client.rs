@@ -2,7 +2,10 @@
 // SPDX-License-Identifier: Apache-2.0
 
 use crate::{
-    dag::{adapter::TLedgerInfoProvider, dag_store::DagStore},
+    dag::{
+        adapter::TLedgerInfoProvider, dag_store::DagStore,
+        observability::counters::PAYLOAD_FILTER_COUNT,
+    },
     error::QuorumStoreError,
     monitor,
     payload_client::PayloadClient,
@@ -76,6 +79,8 @@ impl ShoalppPayloadClient {
             .flat_map(|dag_reader| &dag_reader.recent_proposal)
             .collect();
         excludes.extend_from_slice(&proposals);
+
+        PAYLOAD_FILTER_COUNT.observe(excludes.len() as f64);
 
         PayloadFilter::from(&excludes)
     }

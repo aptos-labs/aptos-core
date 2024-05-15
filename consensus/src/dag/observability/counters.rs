@@ -172,3 +172,11 @@ pub static TXN_ORDERED_LATENCY: Lazy<Histogram> = Lazy::new(|| {
     )
     .unwrap()
 });
+
+pub static PAYLOAD_FILTER_COUNT: Lazy<Histogram> = Lazy::new(|| {
+    register_histogram!(
+        "aptos_consensus_dag_payload_filter_count",
+        "payload filter count",
+    )
+    .unwrap()
+});
