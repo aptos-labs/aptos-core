@@ -862,23 +862,6 @@ impl RoundManager {
         self.round_state.record_vote(vote.clone());
         let vote_msg = VoteMsg::new(vote.clone(), self.block_store.sync_info());
 
-        // generate and multicast randomness share for the fast path
-        if let Some(fast_config) = &self.fast_rand_config {
-            let ledger_info = vote.ledger_info();
-            if !ledger_info.is_dummy() {
-                let metadata = RandMetadata {
-                    epoch: ledger_info.epoch(),
-                    round: ledger_info.round(),
-                };
-                let self_share = Share::generate(fast_config, metadata);
-                let fast_share = FastShare::new(self_share);
-                info!(LogSchema::new(LogEvent::BroadcastRandShareFastPath)
-                    .epoch(fast_share.epoch())
-                    .round(fast_share.round()));
-                self.network.broadcast_fast_share(fast_share).await;
-            }
-        }
-
         if self.local_config.broadcast_vote {
             info!(self.new_log(LogEvent::Vote), "{}", vote);
             self.network.broadcast_vote(vote_msg).await;
@@ -994,6 +977,22 @@ impl RoundManager {
                     proposed_block.block().timestamp_usecs(),
                     BlockStage::ORDER_VOTED,
                 );
+            }
+            // generate and multicast randomness share for the fast path
+            if let Some(fast_config) = &self.fast_rand_config {
+                let ledger_info = order_vote.ledger_info();
+                if !ledger_info.is_dummy() {
+                    let metadata = RandMetadata {
+                        epoch: ledger_info.epoch(),
+                        round: ledger_info.round(),
+                    };
+                    let self_share = Share::generate(fast_config, metadata);
+                    let fast_share = FastShare::new(self_share);
+                    info!(LogSchema::new(LogEvent::BroadcastRandShareFastPath)
+                        .epoch(fast_share.epoch())
+                        .round(fast_share.round()));
+                    self.network.broadcast_fast_share(fast_share).await;
+                }
             }
             info!(self.new_log(LogEvent::SendOrderVote), "{}", order_vote);
             self.network.broadcast_order_vote(order_vote).await;
