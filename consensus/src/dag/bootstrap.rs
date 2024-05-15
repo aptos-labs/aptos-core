@@ -617,6 +617,7 @@ impl DagBootstrapper {
                 commit_events,
             )))
         );
+        self.dag_store.store(Some(dag.clone()));
 
         BootstrapBaseState {
             dag_id: self.dag_id,
