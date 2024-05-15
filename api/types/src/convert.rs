@@ -75,7 +75,7 @@ impl<'a, S: StateView> MoveConverter<'a, S> {
         table_info_reader: Option<Arc<dyn TableInfoReader>>,
     ) -> Self {
         Self {
-            inner: AptosValueAnnotator::new(inner),
+            inner: AptosValueAnnotator::new(inner).unwrap_or_else(|e| panic!("{}", e)),
             db,
             table_info_reader,
         }

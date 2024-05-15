@@ -24,9 +24,9 @@ use std::sync::Arc;
 pub struct AptosValueAnnotator<'a, S>(MoveValueAnnotator<ModuleView<'a, S>>);
 
 impl<'a, S: StateView> AptosValueAnnotator<'a, S> {
-    pub fn new(state_view: &'a S) -> Self {
-        let view = ModuleView::new(state_view);
-        Self(MoveValueAnnotator::new(view))
+    pub fn new(state_view: &'a S) -> anyhow::Result<Self> {
+        let view = ModuleView::new(state_view)?;
+        Ok(Self(MoveValueAnnotator::new(view)))
     }
 
     pub fn view_value(&self, ty_tag: &TypeTag, blob: &[u8]) -> anyhow::Result<AnnotatedMoveValue> {

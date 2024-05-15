@@ -434,7 +434,7 @@ impl<'a> AptosTestAdapter<'a> {
                 )
             })?;
 
-        let annotated = AptosValueAnnotator::new(&self.storage)
+        let annotated = AptosValueAnnotator::new(&self.storage)?
             .view_resource(&aptos_coin_tag, &balance_blob)?;
 
         // Filter the Coin resource and return the resouce value
@@ -908,7 +908,7 @@ impl<'a> MoveTestAdapter<'a> for AptosTestAdapter<'a> {
             None => Ok("[No Resource Exists]".to_owned()),
             Some(data) => {
                 let annotated =
-                    AptosValueAnnotator::new(&self.storage).view_resource(&struct_tag, &data)?;
+                    AptosValueAnnotator::new(&self.storage)?.view_resource(&struct_tag, &data)?;
                 Ok(format!("{}", annotated))
             },
         }

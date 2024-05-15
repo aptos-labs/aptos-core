@@ -241,13 +241,10 @@ impl AptosVM {
         .expect("should be able to create Move VM; check if there are duplicated natives");
 
         // We use an `Option` to handle the VK not being set on-chain, or an incorrect VK being set
-        // via governance (although, currently, we do check for that in `keyless_account.move`).
+        // via governance.
         let pvk = keyless_validation::get_groth16_vk_onchain(resolver)
             .ok()
-            .and_then(|vk| {
-                // println!("[aptos-vm][groth16] PVK cached in VM: {}", vk.hash());
-                vk.try_into().ok()
-            });
+            .and_then(|vk| vk.try_into().ok());
 
         Self {
             is_simulation: false,

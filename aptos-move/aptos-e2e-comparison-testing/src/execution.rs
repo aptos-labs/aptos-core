@@ -373,8 +373,7 @@ impl Execution {
                 if let Some(debugger) = debugger_opt {
                     let data_view =
                         DataStateView::new(debugger, version, executor.data_store().clone());
-                    let mut features =
-                        Features::fetch_config(&data_view.as_move_resolver()).unwrap_or_default();
+                    let mut features = Features::fetch_config(&data_view).unwrap_or_default();
                     enable_v7(&mut features);
                     return Some(executor.try_exec_entry_with_state_view(
                         senders,
@@ -384,8 +383,7 @@ impl Execution {
                     ));
                 } else {
                     let mut features =
-                        Features::fetch_config(&executor.data_store().clone().as_move_resolver())
-                            .unwrap_or_default();
+                        Features::fetch_config(&executor.data_store()).unwrap_or_default();
                     enable_v7(&mut features);
                     return Some(executor.try_exec_entry_with_state_view(
                         senders,
