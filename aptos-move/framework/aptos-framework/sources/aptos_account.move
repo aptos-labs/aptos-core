@@ -205,9 +205,9 @@ module aptos_framework::aptos_account {
     public fun test_transfer_to_resource_account(alice: &signer, core: &signer) {
         let (resource_account, _) = account::create_resource_account(alice, vector[]);
         let resource_acc_addr = signer::address_of(&resource_account);
+        let (burn_cap, mint_cap) = aptos_framework::aptos_coin::initialize_for_test(core);
         assert!(!coin::is_account_registered<AptosCoin>(resource_acc_addr), 0);
 
-        let (burn_cap, mint_cap) = aptos_framework::aptos_coin::initialize_for_test(core);
         create_account(signer::address_of(alice));
         coin::deposit(signer::address_of(alice), coin::mint(10000, &mint_cap));
         transfer(alice, resource_acc_addr, 500);

@@ -129,6 +129,7 @@ spec aptos_framework::storage_gas {
     /// and exists after the function is executed.
     spec initialize(aptos_framework: &signer) {
         include system_addresses::AbortsIfNotAptosFramework{ account: aptos_framework };
+        pragma verify_duration_estimate = 120;
         aborts_if exists<StorageGasConfig>(@aptos_framework);
         aborts_if exists<StorageGas>(@aptos_framework);
 
