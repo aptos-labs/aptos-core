@@ -390,7 +390,7 @@ ConsensusMsg:
     18:
       OrderVoteMsg:
         NEWTYPE:
-          TYPENAME: OrderVote
+          TYPENAME: OrderVoteMsg
 ContractEvent:
   ENUM:
     0:
@@ -1042,6 +1042,12 @@ OrderVote:
         TYPENAME: LedgerInfo
     - signature:
         TYPENAME: Signature
+OrderVoteMsg:
+  STRUCT:
+    - order_vote:
+        TYPENAME: OrderVote
+    - quorum_cert:
+        TYPENAME: QuorumCert
 Vote:
   STRUCT:
     - vote_data:
