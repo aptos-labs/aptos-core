@@ -1195,7 +1195,7 @@ impl RoundManager {
                 &mut self.create_block_retriever(preferred_peer),
             )
             .await
-            .context("[RoundManager] Failed to process a new OrderVoteAggregate")
+            .context("[RoundManager] Failed to process a new OrderCert formed by order votes")
     }
 
     async fn new_2chain_tc_aggregated(
