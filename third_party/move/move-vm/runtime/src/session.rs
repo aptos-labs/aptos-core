@@ -542,7 +542,7 @@ impl<'r, 'l> Session<'r, 'l> {
 }
 
 pub struct LoadedFunctionInstantiation {
-    pub type_arguments: Vec<Type>,
-    pub parameters: Vec<Type>,
-    pub return_: Vec<Type>,
+    pub ty_args: Vec<Type>,
+    pub param_tys: Vec<Type>,
+    pub return_tys: Vec<Type>,
 }

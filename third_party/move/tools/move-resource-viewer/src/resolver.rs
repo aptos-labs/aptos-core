@@ -137,7 +137,7 @@ impl<'a, T: ModuleResolver + ?Sized> Resolver<'a, T> {
         let module = self.get_module(&struct_tag.address, &struct_tag.module)?;
         let struct_def = find_struct_def_in_module(module.clone(), struct_tag.name.as_ident_str())?;
         let ty_args = struct_tag
-            .type_params
+            .type_args
             .iter()
             .map(|ty| self.resolve_type_impl(ty, limit))
             .collect::<Result<Vec<_>>>()?;
