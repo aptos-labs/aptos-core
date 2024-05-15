@@ -4,7 +4,10 @@
 
 use crate::{
     block_storage::{BlockReader, BlockStore},
-    counters::{FAILED_EXECUTION_WITH_ORDER_VOTE_QC, SUCCESSFUL_EXECUTED_WITH_ORDER_VOTE_QC},
+    counters::{
+        BLOCKS_FETCHED_FROM_NETWORK_WHILE_SYNCING, LATE_EXECUTION_WITH_ORDER_VOTE_QC,
+        SUCCESSFUL_EXECUTED_WITH_ORDER_VOTE_QC, SUCCESSFUL_EXECUTED_WITH_REGULAR_QC,
+    },
     epoch_manager::LivenessStorageData,
     logging::{LogEvent, LogSchema},
     monitor,
@@ -24,7 +27,6 @@ use aptos_consensus_types::{
     common::Author,
     quorum_cert::QuorumCert,
     sync_info::SyncInfo,
-    vote_data::VoteData,
     wrapped_ledger_info::WrappedLedgerInfo,
 };
 use aptos_crypto::HashValue;
@@ -99,11 +101,6 @@ impl BlockStore {
         )
         .await?;
 
-        // TODO: We are syncing till highest_quorum_cert instead of highest_ordered_cert.
-        // Do we still have to insert highest_ordered_cert explicitly here?
-        // self.insert_wrapped_ledger_info(sync_info.highest_ordered_cert(), &mut retriever)
-        //     .await?;
-
         self.insert_quorum_cert(sync_info.highest_quorum_cert(), &mut retriever)
             .await?;
 
@@ -125,6 +122,7 @@ impl BlockStore {
             _ => (),
         }
         if self.ordered_root().round() < qc.commit_info().round() {
+            SUCCESSFUL_EXECUTED_WITH_REGULAR_QC.inc();
             self.send_for_execution(qc.into_wrapped_ledger_info())
                 .await?;
             if qc.ends_epoch() {
@@ -140,23 +138,20 @@ impl BlockStore {
         Ok(())
     }
 
-    pub async fn insert_aggregated_order_vote(
+    // Insert the ordered certificate formed by aggregating order votes.
+    pub async fn insert_ordered_cert(
         &self,
-        ledger_info_with_sig: &LedgerInfoWithSignatures,
+        ordered_cert: &WrappedLedgerInfo,
         retriever: &mut BlockRetriever,
     ) -> anyhow::Result<()> {
-        if self.ordered_root().round() < ledger_info_with_sig.ledger_info().round() {
+        if self.ordered_root().round() < ordered_cert.ledger_info().ledger_info().round() {
             SUCCESSFUL_EXECUTED_WITH_ORDER_VOTE_QC.inc();
-            self.send_for_execution(WrappedLedgerInfo::new(
-                VoteData::dummy(),
-                ledger_info_with_sig.clone(),
-            ))
-            .await?;
-            if ledger_info_with_sig.ledger_info().ends_epoch() {
+            self.send_for_execution(ordered_cert.clone()).await?;
+            if ordered_cert.ledger_info().ledger_info().ends_epoch() {
                 retriever
                     .network
                     .broadcast_epoch_change(EpochChangeProof::new(
-                        vec![ledger_info_with_sig.clone()],
+                        vec![ordered_cert.ledger_info().clone()],
                         // TODO: Should more be true/false?
                         /* more = */
                         false,
@@ -164,7 +159,7 @@ impl BlockStore {
                     .await;
             }
         } else {
-            FAILED_EXECUTION_WITH_ORDER_VOTE_QC.inc();
+            LATE_EXECUTION_WITH_ORDER_VOTE_QC.inc();
         }
         Ok(())
     }
@@ -226,7 +221,6 @@ impl BlockStore {
             self.storage.clone(),
             self.execution_client.clone(),
             self.payload_manager.clone(),
-            self.order_vote_enabled,
         )
         .await?
         .take();
@@ -264,7 +258,6 @@ impl BlockStore {
         storage: Arc<dyn PersistentLivenessStorage>,
         execution_client: Arc<dyn TExecutionClient>,
         payload_manager: Arc<PayloadManager>,
-        order_vote_enabled: bool,
     ) -> anyhow::Result<RecoveryData> {
         info!(
             LogSchema::new(LogEvent::StateSync).remote_peer(retriever.preferred_peer),
@@ -345,7 +338,11 @@ impl BlockStore {
                 )
             })?;
 
-        storage.save_tree(blocks.clone(), quorum_certs.clone())?;
+        storage.save_tree(
+            blocks.clone(),
+            quorum_certs.clone(),
+            Some(highest_ordered_cert.clone()),
+        )?;
 
         execution_client
             .sync_to(highest_commit_cert.ledger_info().clone())
@@ -354,11 +351,10 @@ impl BlockStore {
         // we do not need to update block_tree.highest_commit_decision_ledger_info here
         // because the block_tree is going to rebuild itself.
 
-        let recovery_data =
-            match storage.start(order_vote_enabled.then(|| highest_ordered_cert.clone())) {
-                LivenessStorageData::FullRecoveryData(recovery_data) => recovery_data,
-                _ => panic!("Failed to construct recovery data after fast forward sync"),
-            };
+        let recovery_data = match storage.start() {
+            LivenessStorageData::FullRecoveryData(recovery_data) => recovery_data,
+            _ => panic!("Failed to construct recovery data after fast forward sync"),
+        };
 
         Ok(recovery_data)
     }
@@ -606,6 +602,7 @@ impl BlockRetriever {
         num_blocks: u64,
         target_block_id: HashValue,
     ) -> anyhow::Result<Vec<Block>> {
+        BLOCKS_FETCHED_FROM_NETWORK_WHILE_SYNCING.inc_by(num_blocks);
         let peers = qc.ledger_info().get_voters(&self.validator_addresses);
         self.retrieve_block_for_id(
             qc.certified_block().id(),

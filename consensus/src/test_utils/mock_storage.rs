@@ -30,6 +30,7 @@ pub struct MockSharedStorage {
     pub qc: Mutex<HashMap<HashValue, QuorumCert>>,
     pub lis: Mutex<HashMap<u64, LedgerInfoWithSignatures>>,
     pub last_vote: Mutex<Option<Vote>>,
+    pub highest_ordered_cert: Mutex<Option<WrappedLedgerInfo>>,
 
     // Liveness state
     pub highest_2chain_timeout_certificate: Mutex<Option<TwoChainTimeoutCertificate>>,
@@ -43,6 +44,7 @@ impl MockSharedStorage {
             qc: Mutex::new(HashMap::new()),
             lis: Mutex::new(HashMap::new()),
             last_vote: Mutex::new(None),
+            highest_ordered_cert: Mutex::new(None),
             highest_2chain_timeout_certificate: Mutex::new(None),
             validator_set,
         }
@@ -143,7 +145,7 @@ impl MockStorage {
         let shared_storage = Arc::new(MockSharedStorage::new(validator_set.clone()));
         let genesis_li = LedgerInfo::mock_genesis(Some(validator_set));
         let storage = Self::new_with_ledger_info(shared_storage, genesis_li);
-        let recovery_data = match storage.start(None) {
+        let recovery_data = match storage.start() {
             LivenessStorageData::FullRecoveryData(recovery_data) => recovery_data,
             _ => panic!("Mock storage should never fail constructing recovery data"),
         };
@@ -154,7 +156,12 @@ impl MockStorage {
 
 // A impl that always start from genesis.
 impl PersistentLivenessStorage for MockStorage {
-    fn save_tree(&self, blocks: Vec<Block>, quorum_certs: Vec<QuorumCert>) -> Result<()> {
+    fn save_tree(
+        &self,
+        blocks: Vec<Block>,
+        quorum_certs: Vec<QuorumCert>,
+        highest_ordered_cert: Option<WrappedLedgerInfo>,
+    ) -> Result<()> {
         // When the shared storage is empty, we are expected to not able to construct an block tree
         // from it. During test we will intentionally clear shared_storage to simulate the situation
         // of restarting from an empty consensusDB
@@ -170,6 +177,12 @@ impl PersistentLivenessStorage for MockStorage {
                 .qc
                 .lock()
                 .insert(qc.certified_block().id(), qc);
+        }
+        if let Some(highest_ordered_cert) = highest_ordered_cert {
+            self.shared_storage
+                .highest_ordered_cert
+                .lock()
+                .replace(highest_ordered_cert);
         }
         // info!("step 1.3.4.2.3.3");
         if should_check_for_consistency {
@@ -203,7 +216,7 @@ impl PersistentLivenessStorage for MockStorage {
         self.get_ledger_recovery_data()
     }
 
-    fn start(&self, _highest_ordered_cert: Option<WrappedLedgerInfo>) -> LivenessStorageData {
+    fn start(&self) -> LivenessStorageData {
         match self.try_start() {
             Ok(recovery_data) => LivenessStorageData::FullRecoveryData(recovery_data),
             Err(_) => LivenessStorageData::PartialRecoveryData(self.recover_from_ledger()),
@@ -251,7 +264,7 @@ impl EmptyStorage {
 
     pub fn start_for_testing() -> (RecoveryData, Arc<Self>) {
         let storage = Arc::new(EmptyStorage::new());
-        let recovery_data = match storage.start(None) {
+        let recovery_data = match storage.start() {
             LivenessStorageData::FullRecoveryData(recovery_data) => recovery_data,
             _ => panic!("Mock storage should never fail constructing recovery data"),
         };
@@ -260,7 +273,12 @@ impl EmptyStorage {
 }
 
 impl PersistentLivenessStorage for EmptyStorage {
-    fn save_tree(&self, _: Vec<Block>, _: Vec<QuorumCert>) -> Result<()> {
+    fn save_tree(
+        &self,
+        _: Vec<Block>,
+        _: Vec<QuorumCert>,
+        _: Option<WrappedLedgerInfo>,
+    ) -> Result<()> {
         Ok(())
     }
 
@@ -279,7 +297,7 @@ impl PersistentLivenessStorage for EmptyStorage {
         ))
     }
 
-    fn start(&self, highest_ordered_cert: Option<WrappedLedgerInfo>) -> LivenessStorageData {
+    fn start(&self) -> LivenessStorageData {
         match RecoveryData::new(
             None,
             self.recover_from_ledger(),
@@ -287,7 +305,7 @@ impl PersistentLivenessStorage for EmptyStorage {
             RootMetadata::new_empty(),
             vec![],
             None,
-            highest_ordered_cert,
+            None,
         ) {
             Ok(recovery_data) => LivenessStorageData::FullRecoveryData(recovery_data),
             Err(e) => {

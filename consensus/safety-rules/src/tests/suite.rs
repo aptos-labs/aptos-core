@@ -2,7 +2,10 @@
 // Parts of the project are originally copyright © Meta Platforms, Inc.
 // SPDX-License-Identifier: Apache-2.0
 
-use crate::{test_utils, test_utils::make_timeout_cert, Error, TSafetyRules};
+use crate::{
+    test_utils::{self, make_timeout_cert},
+    Error, TSafetyRules,
+};
 use aptos_consensus_types::{
     block::block_test_utils::random_payload,
     common::{Payload, Round},
@@ -75,7 +78,7 @@ pub fn run_test_suite(safety_rules: &Callback) {
     test_order_votes_correct_execution(safety_rules);
     test_order_votes_out_of_order_execution(safety_rules);
     test_order_votes_incorrect_qc(safety_rules);
-    test_order_votes_bad_execution_output(safety_rules);
+    test_order_votes_with_timeout(safety_rules);
 }
 
 fn test_order_votes_correct_execution(safety_rules: &Callback) {
@@ -153,7 +156,6 @@ fn test_order_votes_out_of_order_execution(safety_rules: &Callback) {
 
     safety_rules.construct_and_sign_order_vote(&ov2).unwrap();
 
-    // TODO: Safety rules current do not preven this out of order signing. Should we prevent it?
     safety_rules
         .construct_and_sign_vote_two_chain(&p0, None)
         .unwrap();
@@ -206,6 +208,81 @@ fn test_order_votes_incorrect_qc(safety_rules: &Callback) {
     assert_err!(safety_rules.construct_and_sign_order_vote(&ov3));
 }
 
+fn test_order_votes_with_timeout(safety_rules: &Callback) {
+    let (mut safety_rules, signer) = safety_rules();
+
+    let (proof, genesis_qc) = test_utils::make_genesis(&signer);
+    let round = genesis_qc.certified_block().round();
+    let epoch = genesis_qc.certified_block().epoch();
+
+    let data = random_payload(2048);
+    //               __ tc1 __   __ tc3 __ p4b
+    //              /         \ /
+    // genesis --- p0          p2 -- p3 -- p4a
+
+    // ov1 orders p0
+    // ov3 orders p2
+    // ov4 orders p3
+
+    let p0 = test_utils::make_proposal_with_qc(round + 1, genesis_qc.clone(), &signer);
+    let p1 = test_utils::make_proposal_with_parent(data.clone(), round + 2, &p0, None, &signer);
+    let tc1 = test_utils::make_timeout_cert(round + 2, p1.block().quorum_cert(), &signer);
+    let p2 = test_utils::make_proposal_with_parent(data.clone(), round + 3, &p0, None, &signer);
+    let p3 = test_utils::make_proposal_with_parent(data.clone(), round + 4, &p2, None, &signer);
+    let tc3 = test_utils::make_timeout_cert(round + 4, p3.block().quorum_cert(), &signer);
+    let p4a = test_utils::make_proposal_with_parent(data.clone(), round + 5, &p3, None, &signer);
+    let p4b = test_utils::make_proposal_with_parent(data, round + 5, &p2, None, &signer);
+
+    let ov1 = OrderVoteProposal::new(
+        p0.block().clone(),
+        p1.block().quorum_cert().certified_block().clone(),
+        Arc::new(p1.block().quorum_cert().clone()),
+    );
+    let ov3 = OrderVoteProposal::new(
+        p2.block().clone(),
+        p3.block().quorum_cert().certified_block().clone(),
+        Arc::new(p3.block().quorum_cert().clone()),
+    );
+    let ov4 = OrderVoteProposal::new(
+        p3.block().clone(),
+        p4a.block().quorum_cert().certified_block().clone(),
+        Arc::new(p4a.block().quorum_cert().clone()),
+    );
+
+    safety_rules.initialize(&proof).unwrap();
+
+    safety_rules
+        .construct_and_sign_vote_two_chain(&p0, None)
+        .unwrap();
+
+    safety_rules
+        .construct_and_sign_vote_two_chain(&p2, Some(&tc1))
+        .unwrap();
+
+    // Cannot sign order vote for round 1 after receiving timeout certificate for round 2
+    assert_err!(safety_rules.construct_and_sign_order_vote(&ov1));
+
+    safety_rules
+        .sign_timeout_with_qc(
+            &TwoChainTimeout::new(epoch, round + 4, p3.block().quorum_cert().clone()),
+            Some(&tc3),
+        )
+        .unwrap();
+
+    // Cannot sign order vote for round 3 after signing timeout for round 4
+    assert_err!(safety_rules.construct_and_sign_order_vote(&ov3));
+
+    // Cannot sign vote for round 4 after signing timeout for round 4
+    assert_err!(safety_rules.construct_and_sign_vote_two_chain(&p3, None));
+
+    safety_rules
+        .construct_and_sign_vote_two_chain(&p4b, Some(&tc3))
+        .unwrap();
+
+    // Cannot sign order vote for round 4 after signing timeoiut for round 4
+    assert_err!(safety_rules.construct_and_sign_order_vote(&ov4));
+}
+
 fn test_bad_execution_output(safety_rules: &Callback) {
     // build a tree of the following form:
     //                 _____
@@ -256,89 +333,6 @@ fn test_bad_execution_output(safety_rules: &Callback) {
 
     let a3_block = safety_rules.construct_and_sign_vote_two_chain(&a3, None);
     a3_block.unwrap();
-}
-
-fn test_order_votes_bad_execution_output(safety_rules: &Callback) {
-    // build a tree of the following form:
-    //                 __________
-    //                /          \
-    // genesis---a1--a2--a3--a4  evil_a3--evil_a4
-    //
-    // evil_a3 attempts to append to a1 but fails append only check
-    // a3 works as it properly extends a2
-    let (mut safety_rules, signer) = safety_rules();
-
-    let (proof, genesis_qc) = test_utils::make_genesis(&signer);
-    let round = genesis_qc.certified_block().round();
-
-    let a1 = test_utils::make_proposal_with_qc(round + 1, genesis_qc, &signer);
-    let a2 = make_proposal_with_parent(round + 2, &a1, None, &signer);
-    let a3 = make_proposal_with_parent(round + 3, &a2, None, &signer);
-    let a4 = make_proposal_with_parent(round + 4, &a3, None, &signer);
-
-    let ov1 = OrderVoteProposal::new(
-        a1.block().clone(),
-        a2.block().quorum_cert().certified_block().clone(),
-        Arc::new(a2.block().quorum_cert().clone()),
-    );
-    let ov2 = OrderVoteProposal::new(
-        a2.block().clone(),
-        a3.block().quorum_cert().certified_block().clone(),
-        Arc::new(a3.block().quorum_cert().clone()),
-    );
-    let ov3 = OrderVoteProposal::new(
-        a3.block().clone(),
-        a4.block().quorum_cert().certified_block().clone(),
-        Arc::new(a4.block().quorum_cert().clone()),
-    );
-
-    safety_rules.initialize(&proof).unwrap();
-    let a1_output = a1
-        .accumulator_extension_proof()
-        .verify(
-            a2.block()
-                .quorum_cert()
-                .certified_block()
-                .executed_state_id(),
-        )
-        .unwrap();
-
-    let evil_proof = Proof::new(
-        a1_output.frozen_subtree_roots().clone(),
-        a1_output.num_leaves(),
-        vec![],
-    );
-
-    let evil_a3 = make_proposal_with_qc_and_proof(
-        round + 3,
-        evil_proof,
-        a3.block().quorum_cert().clone(),
-        &signer,
-    );
-    let evil_a4 = make_proposal_with_parent(round + 4, &evil_a3, None, &signer);
-    let evil_ov3 = OrderVoteProposal::new(
-        evil_a3.block().clone(),
-        evil_a4.block().quorum_cert().certified_block().clone(),
-        Arc::new(evil_a4.block().quorum_cert().clone()),
-    );
-
-    safety_rules
-        .construct_and_sign_vote_two_chain(&a1, None)
-        .unwrap();
-    safety_rules.construct_and_sign_order_vote(&ov1).unwrap();
-    safety_rules
-        .construct_and_sign_vote_two_chain(&a2, None)
-        .unwrap();
-    safety_rules.construct_and_sign_order_vote(&ov2).unwrap();
-    safety_rules
-        .construct_and_sign_vote_two_chain(&a3, None)
-        .unwrap();
-    safety_rules.construct_and_sign_order_vote(&ov3).unwrap();
-
-    // TODO: This works without any errors. Should we prevent this?
-    safety_rules
-        .construct_and_sign_order_vote(&evil_ov3)
-        .unwrap();
 }
 
 fn test_end_to_end(safety_rules: &Callback) {

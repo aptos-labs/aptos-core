@@ -84,9 +84,6 @@ impl SafetyRules {
         order_vote_proposal: &OrderVoteProposal,
     ) -> Result<(), Error> {
         let proposed_block = order_vote_proposal.block();
-        let safety_data = self.persistent_storage.safety_data()?;
-        self.verify_epoch(proposed_block.epoch(), &safety_data)?;
-
         let qc = order_vote_proposal.quorum_cert();
         if qc.certified_block() != order_vote_proposal.block_info() {
             return Err(Error::InvalidOneChainQuorumCertificate(
@@ -94,21 +91,13 @@ impl SafetyRules {
                 order_vote_proposal.block_info().id(),
             ));
         }
-
         if qc.certified_block().id() != proposed_block.id() {
             return Err(Error::InvalidOneChainQuorumCertificate(
                 qc.certified_block().id(),
                 proposed_block.id(),
             ));
         }
-
         self.verify_qc(qc)?;
-        proposed_block
-            .validate_signature(&self.epoch_state()?.verifier)
-            .map_err(|error| Error::InvalidProposal(error.to_string()))?;
-        proposed_block
-            .verify_well_formed()
-            .map_err(|error| Error::InvalidProposal(error.to_string()))?;
         Ok(())
     }
 
@@ -157,7 +146,7 @@ impl SafetyRules {
         updated
     }
 
-    pub(crate) fn verify_and_update_highest_timeout_round(
+    pub(crate) fn observe_highest_timeout_round(
         &self,
         timeout: &TwoChainTimeout,
         safety_data: &mut SafetyData,

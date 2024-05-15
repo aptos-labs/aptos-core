@@ -92,6 +92,34 @@ pub static COMMITTED_TXNS_COUNT: Lazy<IntCounterVec> = Lazy::new(|| {
 });
 
 //////////////////////
+// PROPOSAL VOTE COUNTERS
+//////////////////////
+
+pub static PROPOSAL_VOTE_ADDED: Lazy<IntCounter> = Lazy::new(|| {
+    register_int_counter!(
+        "aptos_consensus_proposal_vote_added",
+        "Count of the number of proposal votes added to pending votes"
+    )
+    .unwrap()
+});
+
+pub static QC_AGGREGATED_FROM_VOTES: Lazy<IntCounter> = Lazy::new(|| {
+    register_int_counter!(
+        "aptos_consensus_qc_aggregated_from_votes",
+        "Count of the number of QC aggregated from votes"
+    )
+    .unwrap()
+});
+
+pub static PROPOSAL_VOTE_BROADCASTED: Lazy<IntCounter> = Lazy::new(|| {
+    register_int_counter!(
+        "aptos_consensus_proposal_vote_broadcasted",
+        "Count of the number of proposal votes broadcasted"
+    )
+    .unwrap()
+});
+
+//////////////////////
 // PROPOSAL ELECTION
 //////////////////////
 
@@ -536,10 +564,10 @@ pub static SUCCESSFUL_EXECUTED_WITH_ORDER_VOTE_QC: Lazy<IntCounter> = Lazy::new(
     .unwrap()
 });
 
-pub static FAILED_EXECUTION_WITH_ORDER_VOTE_QC: Lazy<IntCounter> = Lazy::new(|| {
+pub static LATE_EXECUTION_WITH_ORDER_VOTE_QC: Lazy<IntCounter> = Lazy::new(|| {
     register_int_counter!(
-        "aptos_consensus_failed_execution_with_order_vote_qc",
-        "Count of the number of blocks failed to execute with order vote QC"
+        "aptos_consensus_late_execution_with_order_vote_qc",
+        "Count of the number of blocks that were executed with order vote QC after the block was already ordered"
     )
     .unwrap()
 });
@@ -600,6 +628,24 @@ pub static SYNC_INFO_MSGS_SENT_COUNT: Lazy<IntCounter> = Lazy::new(|| {
     register_int_counter!(
         "aptos_consensus_sync_info_msg_sent_count",
         "Counts the number of times the sync info message has been set since last restart."
+    )
+    .unwrap()
+});
+
+/// Received sync info with a newer cert
+pub static SYNC_INFO_RECEIVED_WITH_NEWER_CERT: Lazy<IntCounter> = Lazy::new(|| {
+    register_int_counter!(
+        "aptos_consensus_sync_info_received_with_newer_cert",
+        "Received sync info with a newer cert"
+    )
+    .unwrap()
+});
+
+/// Number of blocks being fetched from the network when syncing
+pub static BLOCKS_FETCHED_FROM_NETWORK_WHILE_SYNCING: Lazy<IntCounter> = Lazy::new(|| {
+    register_int_counter!(
+        "aptos_consensus_blocks_fetched_from_network_while_syncing",
+        "Number of blocks being fetched from the network when syncing"
     )
     .unwrap()
 });
