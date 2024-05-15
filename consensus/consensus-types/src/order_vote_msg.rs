@@ -1,3 +1,7 @@
+// Copyright © Aptos Foundation
+// Parts of the project are originally copyright © Meta Platforms, Inc.
+// SPDX-License-Identifier: Apache-2.0
+
 use crate::{order_vote::OrderVote, quorum_cert::QuorumCert};
 use anyhow::{ensure, Context};
 use aptos_types::validator_verifier::ValidatorVerifier;
@@ -49,6 +53,9 @@ impl OrderVoteMsg {
         self.order_vote
             .verify(validator)
             .context("[OrderVoteMsg] OrderVote verification failed")?;
+
+        // TODO: As we receive many order votes with the same quroum cert, we could cache it 
+        // without verifying it every time.
         self.quorum_cert
             .verify(validator)
             .context("[OrderVoteMsg QuorumCert verification failed")?;
