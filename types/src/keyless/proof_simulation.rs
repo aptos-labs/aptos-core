@@ -213,11 +213,16 @@ pub fn prove_with_trapdoor<C: ConstraintSynthesizer<E::ScalarField>, R: RngCore>
     }
 }
 
+use ark_circom::CircomConfig;
 
 fn test_prove_and_verify<E>(n_iters: usize)
 where
     E: Pairing, <E as Pairing>::ScalarField: From<i32>
 {
+    let cfg = CircomConfig::<Bn254>::new(
+    "./circuit-files/keyless-main.wasm",
+    "./circuit-files/keyless-main.r1cs",
+).unwrap();
     let mut rng = ark_std::rand::rngs::StdRng::seed_from_u64(test_rng().next_u64());
 
     let (pk, vk) = Groth16Simulator::<E>::circuit_specific_setup_with_trapdoor(MySillyCircuit { a: None, b: None }, &mut rng).unwrap();
