@@ -18,7 +18,7 @@ use aptos_types::{
     transaction::Version,
 };
 use proptest::prelude::*;
-use std::{io::Cursor, panic, rc::Rc};
+use std::{collections::BTreeMap, io::Cursor, panic, rc::Rc};
 
 type Node = super::Node<crate::test_helper::ValueBlob>;
 
@@ -86,7 +86,7 @@ fn test_encode_decode() {
         (ValueBlob::from(vec![0x01]), 0),
     );
 
-    let mut children = Children::default();
+    let mut children = BTreeMap::new();
     children.insert(
         Nibble::from(1),
         Child::new(leaf1_node.hash(), 0 /* version */, NodeType::Leaf),
@@ -98,7 +98,7 @@ fn test_encode_decode() {
 
     let account_key = HashValue::random();
     let nodes = vec![
-        Node::new_internal(children),
+        Node::new_internal(Children::from_sorted(children)),
         Node::new_leaf(
             account_key,
             HashValue::random(),
@@ -143,19 +143,16 @@ proptest! {
 
 #[test]
 fn test_internal_validity() {
-    let result = panic::catch_unwind(|| {
-        let children = Children::default();
-        InternalNode::new(children)
-    });
+    let result = panic::catch_unwind(|| InternalNode::new(Children::from_sorted(BTreeMap::new())));
     assert!(result.is_err());
 
     let result = panic::catch_unwind(|| {
-        let mut children = Children::default();
+        let mut children = BTreeMap::new();
         children.insert(
             Nibble::from(1),
             Child::new(HashValue::random(), 0 /* version */, NodeType::Leaf),
         );
-        InternalNode::new(children);
+        InternalNode::new(Children::from_sorted(children));
     });
     assert!(result.is_ok());
 }
@@ -176,7 +173,7 @@ proptest! {
     #[test]
     fn two_leaves_test1(index1 in (0..8u8).prop_map(Nibble::from), index2 in (8..16u8).prop_map(Nibble::from)) {
         let internal_node_key = random_63nibbles_node_key();
-        let mut children = Children::default();
+        let mut children = BTreeMap::new();
 
         let leaf1_node_key = gen_leaf_keys(0 /* version */, internal_node_key.nibble_path(), index1).0;
         let leaf2_node_key = gen_leaf_keys(1 /* version */, internal_node_key.nibble_path(), index2).0;
@@ -185,7 +182,7 @@ proptest! {
 
         children.insert(index1, Child::new(hash1, 0 /* version */, NodeType::Leaf));
         children.insert(index2, Child::new(hash2, 1 /* version */, NodeType::Leaf));
-        let internal_node = InternalNode::new(children);
+        let internal_node = InternalNode::new(Children::from_sorted(children));
 
         // Internal node will have a structure below
         //
@@ -215,7 +212,7 @@ proptest! {
     #[test]
     fn two_leaves_test2(index1 in (4..6u8).prop_map(Nibble::from), index2 in (6..8u8).prop_map(Nibble::from)) {
         let internal_node_key = random_63nibbles_node_key();
-        let mut children = Children::default();
+        let mut children = BTreeMap::new();
 
         let leaf1_node_key = gen_leaf_keys(0 /* version */, internal_node_key.nibble_path(), index1).0;
         let leaf2_node_key = gen_leaf_keys(1 /* version */, internal_node_key.nibble_path(), index2).0;
@@ -224,7 +221,7 @@ proptest! {
 
         children.insert(index1, Child::new(hash1, 0 /* version */, NodeType::Leaf));
         children.insert(index2, Child::new(hash2, 1 /* version */, NodeType::Leaf));
-        let internal_node = InternalNode::new(children);
+        let internal_node = InternalNode::new(Children::from_sorted(children));
 
         // Internal node will have a structure below
         //
@@ -291,7 +288,7 @@ proptest! {
     #[test]
     fn three_leaves_test1(index1 in (0..4u8).prop_map(Nibble::from), index2 in (4..8u8).prop_map(Nibble::from), index3 in (8..16u8).prop_map(Nibble::from)) {
         let internal_node_key = random_63nibbles_node_key();
-        let mut children = Children::default();
+        let mut children = BTreeMap::new();
 
         let leaf1_node_key = gen_leaf_keys(0 /* version */, internal_node_key.nibble_path(), index1).0;
         let leaf2_node_key = gen_leaf_keys(1 /* version */, internal_node_key.nibble_path(), index2).0;
@@ -304,7 +301,7 @@ proptest! {
         children.insert(index1, Child::new(hash1, 0 /* version */, NodeType::Leaf));
         children.insert(index2, Child::new(hash2, 1 /* version */, NodeType::Leaf));
         children.insert(index3, Child::new(hash3, 2 /* version */, NodeType::Leaf));
-        let internal_node = InternalNode::new(children);
+        let internal_node = InternalNode::new(Children::from_sorted(children));
         // Internal node will have a structure below
         //
         //               root
@@ -343,7 +340,7 @@ proptest! {
     #[test]
     fn mixed_nodes_test(index1 in (0..2u8).prop_map(Nibble::from), index2 in (8..16u8).prop_map(Nibble::from)) {
         let internal_node_key = random_63nibbles_node_key();
-        let mut children = Children::default();
+        let mut children = BTreeMap::new();
 
         let leaf1_node_key = gen_leaf_keys(0 /* version */, internal_node_key.nibble_path(), index1).0;
         let internal2_node_key = gen_leaf_keys(1 /* version */, internal_node_key.nibble_path(), 2.into()).0;
@@ -358,7 +355,7 @@ proptest! {
         children.insert(2.into(), Child::new(hash2, 1, NodeType::Internal {leaf_count: 2}));
         children.insert(7.into(), Child::new(hash3, 2, NodeType::Internal {leaf_count: 3}));
         children.insert(index2, Child::new(hash4, 3, NodeType::Leaf));
-        let internal_node = InternalNode::new(children);
+        let internal_node = InternalNode::new(Children::from_sorted(children));
         // Internal node (B) will have a structure below
         //
         //                   B (root hash)
@@ -465,7 +462,7 @@ fn test_internal_hash_and_proof() {
     // non-leaf case 1
     {
         let internal_node_key = random_63nibbles_node_key();
-        let mut children = Children::default();
+        let mut children = BTreeMap::new();
 
         let index1 = Nibble::from(4);
         let index2 = Nibble::from(15);
@@ -499,7 +496,7 @@ fn test_internal_hash_and_proof() {
                 NodeType::Internal { leaf_count: 1 },
             ),
         );
-        let internal_node = InternalNode::new(children);
+        let internal_node = InternalNode::new(Children::from_sorted(children));
         // Internal node (B) will have a structure below
         //
         //              root
@@ -642,7 +639,7 @@ fn test_internal_hash_and_proof() {
     // non-leaf case 2
     {
         let internal_node_key = random_63nibbles_node_key();
-        let mut children = Children::default();
+        let mut children = BTreeMap::new();
 
         let index1 = Nibble::from(0);
         let index2 = Nibble::from(7);
@@ -677,7 +674,7 @@ fn test_internal_hash_and_proof() {
                 NodeType::Internal { leaf_count: 1 },
             ),
         );
-        let internal_node = InternalNode::new(children);
+        let internal_node = InternalNode::new(Children::from_sorted(children));
         // Internal node will have a structure below
         //
         //                     root
