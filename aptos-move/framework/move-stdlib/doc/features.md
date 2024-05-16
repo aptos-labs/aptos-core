@@ -364,14 +364,14 @@ Lifetime: transient
 
 
 
-<a id="0x1_features_CONCURRENT_FUNGIBLE_ASSETS"></a>
+<a id="0x1_features_CONCURRENT_FUNGIBLE_ASSET_SUPPLY"></a>
 
 Whether enable Fungible Asset creation
 to create higher throughput concurrent variants.
 Lifetime: transient
 
 
-<pre><code><b>const</b> <a href="features.md#0x1_features_CONCURRENT_FUNGIBLE_ASSETS">CONCURRENT_FUNGIBLE_ASSETS</a>: u64 = 50;
+<pre><code><b>const</b> <a href="features.md#0x1_features_CONCURRENT_FUNGIBLE_ASSET_SUPPLY">CONCURRENT_FUNGIBLE_ASSET_SUPPLY</a>: u64 = 50;
 </code></pre>
 
 
@@ -2324,7 +2324,7 @@ Lifetime: transient
 <summary>Implementation</summary>
 
 
-<pre><code><b>public</b> <b>fun</b> <a href="features.md#0x1_features_get_concurrent_fungible_assets_feature">get_concurrent_fungible_assets_feature</a>(): u64 { <a href="features.md#0x1_features_CONCURRENT_FUNGIBLE_ASSETS">CONCURRENT_FUNGIBLE_ASSETS</a> }
+<pre><code><b>public</b> <b>fun</b> <a href="features.md#0x1_features_get_concurrent_fungible_assets_feature">get_concurrent_fungible_assets_feature</a>(): u64 { <a href="features.md#0x1_features_CONCURRENT_FUNGIBLE_ASSET_SUPPLY">CONCURRENT_FUNGIBLE_ASSET_SUPPLY</a> }
 </code></pre>
 
 
@@ -2335,6 +2335,7 @@ Lifetime: transient
 
 ## Function `concurrent_fungible_assets_enabled`
 
+Whether concurrent FungibleAsset Supply is enabled
 
 
 <pre><code><b>public</b> <b>fun</b> <a href="features.md#0x1_features_concurrent_fungible_assets_enabled">concurrent_fungible_assets_enabled</a>(): bool
@@ -2348,7 +2349,7 @@ Lifetime: transient
 
 <pre><code><b>public</b> <b>fun</b> <a href="features.md#0x1_features_concurrent_fungible_assets_enabled">concurrent_fungible_assets_enabled</a>(): bool <b>acquires</b> <a href="features.md#0x1_features_Features">Features</a> {
     // concurrent fungible assets cannot be used <b>if</b> aggregator v2 api is not enabled.
-    <a href="features.md#0x1_features_is_enabled">is_enabled</a>(<a href="features.md#0x1_features_CONCURRENT_FUNGIBLE_ASSETS">CONCURRENT_FUNGIBLE_ASSETS</a>) && <a href="features.md#0x1_features_aggregator_v2_api_enabled">aggregator_v2_api_enabled</a>()
+    <a href="features.md#0x1_features_is_enabled">is_enabled</a>(<a href="features.md#0x1_features_CONCURRENT_FUNGIBLE_ASSET_SUPPLY">CONCURRENT_FUNGIBLE_ASSET_SUPPLY</a>) && <a href="features.md#0x1_features_aggregator_v2_api_enabled">aggregator_v2_api_enabled</a>()
 }
 </code></pre>
 

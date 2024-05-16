@@ -410,13 +410,14 @@ module std::features {
     /// Whether enable Fungible Asset creation
     /// to create higher throughput concurrent variants.
     /// Lifetime: transient
-    const CONCURRENT_FUNGIBLE_ASSETS: u64 = 50;
+    const CONCURRENT_FUNGIBLE_ASSET_SUPPLY: u64 = 50;
 
-    public fun get_concurrent_fungible_assets_feature(): u64 { CONCURRENT_FUNGIBLE_ASSETS }
+    public fun get_concurrent_fungible_assets_feature(): u64 { CONCURRENT_FUNGIBLE_ASSET_SUPPLY }
 
+    /// Whether concurrent FungibleAsset Supply is enabled
     public fun concurrent_fungible_assets_enabled(): bool acquires Features {
         // concurrent fungible assets cannot be used if aggregator v2 api is not enabled.
-        is_enabled(CONCURRENT_FUNGIBLE_ASSETS) && aggregator_v2_api_enabled()
+        is_enabled(CONCURRENT_FUNGIBLE_ASSET_SUPPLY) && aggregator_v2_api_enabled()
     }
 
     /// Whether deploying to objects is enabled.

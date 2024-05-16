@@ -61,7 +61,7 @@ pub enum FeatureFlag {
     KEYLESS_BUT_ZKLESS_ACCOUNTS = 47,
     REMOVE_DETAILED_ERROR_FROM_HASH = 48,
     JWK_CONSENSUS = 49,
-    CONCURRENT_FUNGIBLE_ASSETS = 50,
+    CONCURRENT_FUNGIBLE_ASSET_SUPPLY = 50,
     REFUNDABLE_BYTES = 51,
     OBJECT_CODE_DEPLOYMENT = 52,
     MAX_OBJECT_NESTING_CHECK = 53,
@@ -123,6 +123,7 @@ impl FeatureFlag {
             FeatureFlag::KEYLESS_ACCOUNTS,
             FeatureFlag::KEYLESS_BUT_ZKLESS_ACCOUNTS,
             FeatureFlag::JWK_CONSENSUS,
+            FeatureFlag::CONCURRENT_FUNGIBLE_ASSET_SUPPLY,
             FeatureFlag::REFUNDABLE_BYTES,
             FeatureFlag::OBJECT_CODE_DEPLOYMENT,
             FeatureFlag::MAX_OBJECT_NESTING_CHECK,
@@ -136,7 +137,6 @@ impl FeatureFlag {
             FeatureFlag::OBJECT_NATIVE_DERIVED_ADDRESS,
             FeatureFlag::DISPATCHABLE_FUNGIBLE_ASSET,
             FeatureFlag::REMOVE_DETAILED_ERROR_FROM_HASH,
-            FeatureFlag::CONCURRENT_FUNGIBLE_ASSETS,
         ]
     }
 }

@@ -100,7 +100,7 @@ pub enum FeatureFlag {
     KeylessButZklessAccounts,
     RemoveDetailedError,
     JwkConsensus,
-    ConcurrentFungibleAssets,
+    ConcurrentFungibleAssetSupply,
     RefundableBytes,
     ObjectCodeDeployment,
     MaxObjectNestingCheck,
@@ -266,7 +266,9 @@ impl From<FeatureFlag> for AptosFeatureFlag {
             FeatureFlag::KeylessButZklessAccounts => AptosFeatureFlag::KEYLESS_BUT_ZKLESS_ACCOUNTS,
             FeatureFlag::RemoveDetailedError => AptosFeatureFlag::REMOVE_DETAILED_ERROR_FROM_HASH,
             FeatureFlag::JwkConsensus => AptosFeatureFlag::JWK_CONSENSUS,
-            FeatureFlag::ConcurrentFungibleAssets => AptosFeatureFlag::CONCURRENT_FUNGIBLE_ASSETS,
+            FeatureFlag::ConcurrentFungibleAssetSupply => {
+                AptosFeatureFlag::CONCURRENT_FUNGIBLE_ASSET_SUPPLY
+            },
             FeatureFlag::RefundableBytes => AptosFeatureFlag::REFUNDABLE_BYTES,
             FeatureFlag::ObjectCodeDeployment => AptosFeatureFlag::OBJECT_CODE_DEPLOYMENT,
             FeatureFlag::MaxObjectNestingCheck => AptosFeatureFlag::MAX_OBJECT_NESTING_CHECK,
@@ -373,7 +375,9 @@ impl From<AptosFeatureFlag> for FeatureFlag {
             AptosFeatureFlag::KEYLESS_BUT_ZKLESS_ACCOUNTS => FeatureFlag::KeylessButZklessAccounts,
             AptosFeatureFlag::REMOVE_DETAILED_ERROR_FROM_HASH => FeatureFlag::RemoveDetailedError,
             AptosFeatureFlag::JWK_CONSENSUS => FeatureFlag::JwkConsensus,
-            AptosFeatureFlag::CONCURRENT_FUNGIBLE_ASSETS => FeatureFlag::ConcurrentFungibleAssets,
+            AptosFeatureFlag::CONCURRENT_FUNGIBLE_ASSET_SUPPLY => {
+                FeatureFlag::ConcurrentFungibleAssetSupply
+            },
             AptosFeatureFlag::REFUNDABLE_BYTES => FeatureFlag::RefundableBytes,
             AptosFeatureFlag::OBJECT_CODE_DEPLOYMENT => FeatureFlag::ObjectCodeDeployment,
             AptosFeatureFlag::MAX_OBJECT_NESTING_CHECK => FeatureFlag::MaxObjectNestingCheck,
