@@ -4344,7 +4344,7 @@ dependencies = [
 [[package]]
 name = "ark-circom"
 version = "0.1.0"
-source = "git+https://github.com/aptos-labs/circom-compat#91c77b02c426fa3193acc29037ae3af716934ebe"
+source = "git+https://github.com/aptos-labs/circom-compat?rev=e3d686641a3dd9d66087a74acdc20dc2a3c24f63#e3d686641a3dd9d66087a74acdc20dc2a3c24f63"
 dependencies = [
  "ark-bn254",
  "ark-crypto-primitives",
@@ -17077,8 +17077,7 @@ dependencies = [
 [[package]]
 name = "wasmer"
 version = "2.3.0"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "ea8d8361c9d006ea3d7797de7bd6b1492ffd0f91a22430cfda6c1658ad57bedf"
+source = "git+https://github.com/aptos-labs/wasmer?rev=a8789e29775da1348694b29c00c7fc505bf344e8#a8789e29775da1348694b29c00c7fc505bf344e8"
 dependencies = [
  "cfg-if",
  "indexmap 1.9.3",
@@ -17104,8 +17103,7 @@ dependencies = [
 [[package]]
 name = "wasmer-artifact"
 version = "2.3.0"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "7aaf9428c29c1d8ad2ac0e45889ba8a568a835e33fd058964e5e500f2f7ce325"
+source = "git+https://github.com/aptos-labs/wasmer?rev=a8789e29775da1348694b29c00c7fc505bf344e8#a8789e29775da1348694b29c00c7fc505bf344e8"
 dependencies = [
  "enumset",
  "loupe",
@@ -17117,8 +17115,7 @@ dependencies = [
 [[package]]
 name = "wasmer-compiler"
 version = "2.3.0"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "e67a6cd866aed456656db2cfea96c18baabbd33f676578482b85c51e1ee19d2c"
+source = "git+https://github.com/aptos-labs/wasmer?rev=a8789e29775da1348694b29c00c7fc505bf344e8#a8789e29775da1348694b29c00c7fc505bf344e8"
 dependencies = [
  "enumset",
  "loupe",
@@ -17135,8 +17132,7 @@ dependencies = [
 [[package]]
 name = "wasmer-compiler-cranelift"
 version = "2.3.0"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "48be2f9f6495f08649e4f8b946a2cbbe119faf5a654aa1457f9504a99d23dae0"
+source = "git+https://github.com/aptos-labs/wasmer?rev=a8789e29775da1348694b29c00c7fc505bf344e8#a8789e29775da1348694b29c00c7fc505bf344e8"
 dependencies = [
  "cranelift-codegen",
  "cranelift-entity",
@@ -17155,8 +17151,7 @@ dependencies = [
 [[package]]
 name = "wasmer-derive"
 version = "2.3.0"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "00e50405cc2a2f74ff574584710a5f2c1d5c93744acce2ca0866084739284b51"
+source = "git+https://github.com/aptos-labs/wasmer?rev=a8789e29775da1348694b29c00c7fc505bf344e8#a8789e29775da1348694b29c00c7fc505bf344e8"
 dependencies = [
  "proc-macro-error",
  "proc-macro2",
@@ -17167,8 +17162,7 @@ dependencies = [
 [[package]]
 name = "wasmer-engine"
 version = "2.3.0"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "3f98f010978c244db431b392aeab0661df7ea0822343334f8f2a920763548e45"
+source = "git+https://github.com/aptos-labs/wasmer?rev=a8789e29775da1348694b29c00c7fc505bf344e8#a8789e29775da1348694b29c00c7fc505bf344e8"
 dependencies = [
  "backtrace",
  "enumset",
@@ -17190,8 +17184,7 @@ dependencies = [
 [[package]]
 name = "wasmer-engine-dylib"
 version = "2.3.0"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "ad0358af9c154724587731175553805648d9acb8f6657880d165e378672b7e53"
+source = "git+https://github.com/aptos-labs/wasmer?rev=a8789e29775da1348694b29c00c7fc505bf344e8#a8789e29775da1348694b29c00c7fc505bf344e8"
 dependencies = [
  "cfg-if",
  "enum-iterator",
@@ -17216,8 +17209,7 @@ dependencies = [
 [[package]]
 name = "wasmer-engine-universal"
 version = "2.3.0"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "440dc3d93c9ca47865a4f4edd037ea81bf983b5796b59b3d712d844b32dbef15"
+source = "git+https://github.com/aptos-labs/wasmer?rev=a8789e29775da1348694b29c00c7fc505bf344e8#a8789e29775da1348694b29c00c7fc505bf344e8"
 dependencies = [
  "cfg-if",
  "enumset",
@@ -17236,8 +17228,7 @@ dependencies = [
 [[package]]
 name = "wasmer-engine-universal-artifact"
 version = "2.3.0"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "68f1db3f54152657eb6e86c44b66525ff7801dad8328fe677da48dd06af9ad41"
+source = "git+https://github.com/aptos-labs/wasmer?rev=a8789e29775da1348694b29c00c7fc505bf344e8#a8789e29775da1348694b29c00c7fc505bf344e8"
 dependencies = [
  "enum-iterator",
  "enumset",
@@ -17252,8 +17243,7 @@ dependencies = [
 [[package]]
 name = "wasmer-object"
 version = "2.3.0"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "8d831335ff3a44ecf451303f6f891175c642488036b92ceceb24ac8623a8fa8b"
+source = "git+https://github.com/aptos-labs/wasmer?rev=a8789e29775da1348694b29c00c7fc505bf344e8#a8789e29775da1348694b29c00c7fc505bf344e8"
 dependencies = [
  "object 0.28.4",
  "thiserror",
@@ -17264,8 +17254,7 @@ dependencies = [
 [[package]]
 name = "wasmer-types"
 version = "2.3.0"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "39df01ea05dc0a9bab67e054c7cb01521e53b35a7bb90bd02eca564ed0b2667f"
+source = "git+https://github.com/aptos-labs/wasmer?rev=a8789e29775da1348694b29c00c7fc505bf344e8#a8789e29775da1348694b29c00c7fc505bf344e8"
 dependencies = [
  "backtrace",
  "enum-iterator",
@@ -17280,8 +17269,7 @@ dependencies = [
 [[package]]
 name = "wasmer-vm"
 version = "2.3.0"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "30d965fa61f4dc4cdb35a54daaf7ecec3563fbb94154a6c35433f879466247dd"
+source = "git+https://github.com/aptos-labs/wasmer?rev=a8789e29775da1348694b29c00c7fc505bf344e8#a8789e29775da1348694b29c00c7fc505bf344e8"
 dependencies = [
  "backtrace",
  "cc",

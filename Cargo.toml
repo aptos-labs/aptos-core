@@ -462,7 +462,7 @@ arc-swap = "1.6.0"
 arr_macro = "0.2.1"
 ark-bls12-381 = "0.4.0"
 ark-bn254 = "0.4.0"
-ark-circom = { git = "https://github.com/aptos-labs/circom-compat" }
+ark-circom = { git = "https://github.com/aptos-labs/circom-compat", rev = "e3d686641a3dd9d66087a74acdc20dc2a3c24f63" }
 ark-crypto-primitives = "0.4.0"
 ark-ec = "0.4.0"
 ark-ff = "0.4.0"

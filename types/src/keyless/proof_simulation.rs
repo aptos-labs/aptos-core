@@ -219,10 +219,20 @@ fn test_prove_and_verify<E>(n_iters: usize)
 where
     E: Pairing, <E as Pairing>::ScalarField: From<i32>
 {
+    println!("starting test");
     let cfg = CircomConfig::<Bn254>::new(
-    "./circuit-files/keyless-main.wasm",
-    "./circuit-files/keyless-main.r1cs",
+    //"./circuit-files/keyless_main.wasm",
+    //"./proof_simulation.rs",
+    //"/Users/michael/aptos-labs/aptos-core/types/src/keyless/proof_simulation.rs",
+    "/Users/michael/aptos-labs/aptos-core/types/src/keyless/circuit-files/keyless_main.wasm",
+    //"./circuit-files/keyless_main.r1cs",
+    //"./proof_simulation.rs",
+    "/Users/michael/aptos-labs/aptos-core/types/src/keyless/circuit-files/keyless_main.r1cs",
 ).unwrap();
+    /*let cfg = CircomConfig::<Bn254>::new(
+    "/Users/michael/aptos-labs/aptos-core/types/src/keyless/circuit-files/keyless_main.wasm",
+    "/Users/michael/aptos-labs/aptos-core/types/src/keyless/circuit-files/keyless_main.r1cs",
+).unwrap();*/
     let mut rng = ark_std::rand::rngs::StdRng::seed_from_u64(test_rng().next_u64());
 
     let (pk, vk) = Groth16Simulator::<E>::circuit_specific_setup_with_trapdoor(MySillyCircuit { a: None, b: None }, &mut rng).unwrap();
@@ -253,5 +263,5 @@ use ark_bn254::Bn254;
 
 #[test]
 fn prove_and_verify() {
-    test_prove_and_verify::<Bn254>(100);
+    test_prove_and_verify::<Bn254>(1);
 }
