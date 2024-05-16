@@ -3,6 +3,9 @@
 
 use crate::{account_address::AccountAddress, event::EventHandle};
 use serde::{Deserialize, Serialize};
+use move_core_types::ident_str;
+use move_core_types::identifier::IdentStr;
+use move_core_types::move_resource::{MoveResource, MoveStructType};
 
 #[derive(Debug, Serialize, Deserialize)]
 pub struct StakePool {
@@ -27,6 +30,13 @@ pub struct StakePool {
     pub withdraw_stake_events: EventHandle,
     pub leave_validator_set_events: EventHandle,
 }
+
+impl MoveStructType for StakePool {
+    const MODULE_NAME: &'static IdentStr = ident_str!("stake");
+    const STRUCT_NAME: &'static IdentStr = ident_str!("StakePool");
+}
+
+impl MoveResource for StakePool {}
 
 impl StakePool {
     pub fn get_total_staked_amount(&self) -> u64 {
