@@ -109,6 +109,10 @@ pub struct BuildConfig {
     #[clap(name = "test-mode", long = "test", global = true)]
     pub test_mode: bool,
 
+    /// Whether to override the standard library with the given version.
+    #[clap(long = "override-std", global = true, value_parser)]
+    pub override_std: Option<String>,
+
     /// Generate documentation for packages
     #[clap(name = "generate-docs", long = "doc", global = true)]
     pub generate_docs: bool,
