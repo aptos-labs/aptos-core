@@ -10,10 +10,10 @@ use crate::{
     monitor,
     payload_client::PayloadClient,
 };
-use aptos_consensus_types::common::{Payload, PayloadFilter, Round, TransactionSummary};
+use aptos_consensus_types::common::{Author, Payload, PayloadFilter, Round, TransactionSummary};
 use aptos_infallible::Mutex;
-use aptos_logger::debug;
-use aptos_types::validator_txn::ValidatorTransaction;
+use aptos_logger::{debug, info};
+use aptos_types::{epoch_state::EpochState, validator_txn::ValidatorTransaction};
 use aptos_validator_transaction_pool::TransactionFilter;
 use arc_swap::ArcSwapOption;
 use futures::future::BoxFuture;
@@ -33,6 +33,7 @@ pub(crate) struct ShoalppPayloadClient {
     ledger_info_provider: Arc<dyn TLedgerInfoProvider>,
     window_size_config: u64,
     exclude_state: Vec<Mutex<ExcludesState>>,
+    self_author: Author,
 }
 
 #[derive(Default)]
@@ -48,6 +49,7 @@ impl ShoalppPayloadClient {
         payload_client: Arc<dyn PayloadClient>,
         ledger_info_provider: Arc<dyn TLedgerInfoProvider>,
         window_size_config: u64,
+        self_author: Author,
     ) -> Self {
         Self {
             dag_store_vec,
@@ -59,6 +61,7 @@ impl ShoalppPayloadClient {
                 Mutex::new(ExcludesState::default()),
                 Mutex::new(ExcludesState::default()),
             ],
+            self_author,
         }
     }
 
@@ -78,39 +81,35 @@ impl ShoalppPayloadClient {
                 let mut state = self.exclude_state[dag_id].lock();
 
                 if !state.txns.is_empty() {
-                    let reminder = state.txn_len_by_round.split_off(&current_highest_committed);
+                    let reminder = state
+                        .txn_len_by_round
+                        .split_off(&(current_highest_committed + 1));
                     let to_remove = state.txn_len_by_round.iter().map(|(_, count)| count).sum();
-
+                    info!("exclude payload to_remove {}", to_remove);
+                    info!("exclude payload remaining_rounds {}", reminder.len());
                     state.txn_len_by_round = reminder;
                     state.txns.drain(0..to_remove);
                 }
 
                 let highest_round_nodes = dag_reader.highest_round_nodes();
                 let excludes = if !highest_round_nodes.is_empty() {
+                    let target_round = highest_round_nodes.last().unwrap().metadata().round();
                     let upto_round = if state.txns.is_empty() {
                         current_highest_committed.saturating_sub(self.window_size_config)
                     } else {
-                        highest_round_nodes
-                            .last()
-                            .unwrap()
-                            .metadata()
-                            .round()
-                            .min(state.last_highest)
+                        target_round.min(state.last_highest)
                     };
-                    dag_reader
-                        .reachable(
-                            highest_round_nodes.iter().map(|node| node.metadata()),
-                            Some(upto_round),
-                            |_| true,
-                        )
-                        .filter_map(|node_status| {
-                            let node = node_status.as_node();
-                            let _ = state
-                                .txn_len_by_round
-                                .entry(node.round())
-                                .or_default()
-                                .add(node.payload().len());
+
+                    (upto_round..=target_round)
+                        .flat_map(|round| {
+                            let Some(node) =
+                                dag_reader.get_node_by_round_author(round, &self.self_author)
+                            else {
+                                return None;
+                            };
+                            let entry = state.txn_len_by_round.entry(node.round()).or_default();
                             let payload = node.payload();
+                            *entry = *entry + payload.len();
 
                             if let Payload::DirectMempool(txns) = payload {
                                 Some(txns)
@@ -127,6 +126,7 @@ impl ShoalppPayloadClient {
                 } else {
                     Vec::new()
                 };
+                info!("exclude payload len {}", excludes.len());
 
                 for e in excludes {
                     state.txns.push_back(e);

@@ -104,6 +104,7 @@ impl ShoalppBootstrapper {
             payload_client,
             ledger_info_provider.clone(),
             onchain_config.dag_ordering_causal_history_window as u64,
+            self_peer,
         ));
         let validators = epoch_state.verifier.get_ordered_account_addresses();
         let rb_config = config.rb_config.clone();
