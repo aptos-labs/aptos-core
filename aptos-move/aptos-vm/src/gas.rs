@@ -25,7 +25,7 @@ use move_core_types::{
 /// This is used until gas version 18, which introduces a configurable entry for this.
 const MAXIMUM_APPROVED_TRANSACTION_SIZE_LEGACY: u64 = 1024 * 1024;
 
-pub(crate) fn get_gas_config_from_storage(
+pub fn get_gas_config_from_storage(
     config_storage: &impl ConfigStorage,
 ) -> (Result<AptosGasParameters, String>, u64) {
     match GasScheduleV2::fetch_config(config_storage) {

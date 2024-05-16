@@ -39,7 +39,7 @@ use aptos_types::{
     vm_status::StatusCode,
     APTOS_COIN_TYPE,
 };
-use aptos_vm::{data_cache::AsMoveResolver, AptosSimulationVM, AptosVM};
+use aptos_vm::{AptosSimulationVM, AptosVM};
 use move_core_types::{ident_str, language_storage::ModuleId, vm_status::VMStatus};
 use poem_openapi::{
     param::{Path, Query},
@@ -891,12 +891,11 @@ impl TransactionsApi {
         match accept_type {
             AcceptType::Json => {
                 let state_view = self.context.latest_state_view_poem(ledger_info)?;
-                let resolver = state_view.as_move_resolver();
                 let transaction = match transaction_data {
                     TransactionData::OnChain(txn) => {
                         let timestamp =
                             self.context.get_block_timestamp(ledger_info, txn.version)?;
-                        resolver
+                        state_view
                             .as_converter(
                                 self.context.db.clone(),
                                 self.context.table_info_reader.clone(),
@@ -911,7 +910,7 @@ impl TransactionsApi {
                                 )
                             })?
                     },
-                    TransactionData::Pending(txn) => resolver
+                    TransactionData::Pending(txn) => state_view
                         .as_converter(
                             self.context.db.clone(),
                             self.context.table_info_reader.clone(),
@@ -1093,7 +1092,6 @@ impl TransactionsApi {
             SubmitTransactionPost::Json(data) => self
                 .context
                 .latest_state_view_poem(ledger_info)?
-                .as_move_resolver()
                 .as_converter(
                     self.context.db.clone(),
                     self.context.table_info_reader.clone(),
@@ -1174,8 +1172,7 @@ impl TransactionsApi {
                 .into_iter()
                 .enumerate()
                 .map(|(index, txn)| {
-                    self.context
-                        .latest_state_view_poem(ledger_info)?.as_move_resolver()
+                    self.context.latest_state_view_poem(ledger_info)?
                         .as_converter(self.context.db.clone(), self.context.table_info_reader.clone())
                         .try_into_signed_transaction_poem(txn, self.context.chain_id())
                         .context(format!("Failed to create SignedTransaction from SubmitTransactionRequest at position {}", index))
@@ -1264,10 +1261,9 @@ impl TransactionsApi {
                                 ledger_info,
                             )
                         })?;
-                    let resolver = state_view.as_move_resolver();
 
                     // We provide the pending transaction so that users have the hash associated
-                    let pending_txn = resolver
+                    let pending_txn = state_view
                             .as_converter(self.context.db.clone(), self.context.table_info_reader.clone())
                             .try_into_pending_transaction_poem(txn)
                             .context("Failed to build PendingTransaction from mempool response, even though it said the request was accepted")
@@ -1503,8 +1499,7 @@ impl TransactionsApi {
 
         let ledger_info = self.context.get_latest_ledger_info()?;
         let state_view = self.context.latest_state_view_poem(&ledger_info)?;
-        let resolver = state_view.as_move_resolver();
-        let raw_txn: RawTransaction = resolver
+        let raw_txn: RawTransaction = state_view
             .as_converter(
                 self.context.db.clone(),
                 self.context.table_info_reader.clone(),
