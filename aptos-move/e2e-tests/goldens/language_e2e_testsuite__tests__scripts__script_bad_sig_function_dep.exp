@@ -18,9 +18,7 @@ Ok(
             gas_used: 3,
             status: Keep(
                 MiscellaneousError(
-                    Some(
-                        TYPE_MISMATCH,
-                    ),
+                    None,
                 ),
             ),
             auxiliary_data: V1(
