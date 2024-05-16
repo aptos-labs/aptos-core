@@ -27,7 +27,7 @@ error: type `&mut signer` is not supported as a parameter type
 8 │     fun view(_:&mut signer,value: u64): u64 { value }
   │         ^^^^
 
-error: view function cannot use the & signer paremter
+error: view function cannot use `signer` parameter
   ┌─ TEMPFILE:8:9
   │
 8 │     fun view(_:&mut signer,value: u64): u64 { value }
