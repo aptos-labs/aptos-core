@@ -954,7 +954,7 @@ impl RoundManager {
     async fn process_vote(&mut self, vote: &Vote) -> anyhow::Result<()> {
         let round = vote.vote_data().proposed().round();
 
-        info!(
+        debug!(
             self.new_log(LogEvent::ReceiveVote)
                 .remote_peer(vote.author()),
             vote = %vote,

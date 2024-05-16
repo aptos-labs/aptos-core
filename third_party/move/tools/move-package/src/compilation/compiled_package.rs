@@ -631,9 +631,6 @@ impl CompiledPackage {
         }
 
         // invoke the compiler
-        let mut paths = src_deps;
-        paths.push(sources_package_paths.clone());
-
         let effective_compiler_version = config.compiler_version.unwrap_or_default();
         let effective_language_version = config.language_version.unwrap_or_default();
         effective_compiler_version.check_language_support(effective_language_version)?;
@@ -643,6 +640,8 @@ impl CompiledPackage {
             .unwrap_or_default()
         {
             CompilerVersion::V1 => {
+                let mut paths = src_deps;
+                paths.push(sources_package_paths.clone());
                 let compiler =
                     Compiler::from_package_paths(paths, bytecode_deps, flags, &known_attributes);
                 compiler_driver_v1(compiler)?
@@ -654,7 +653,10 @@ impl CompiledPackage {
                         .collect::<Vec<_>>()
                 };
                 let mut global_address_map = BTreeMap::new();
-                for pack in paths.iter().chain(bytecode_deps.iter()) {
+                for pack in std::iter::once(&sources_package_paths)
+                    .chain(src_deps.iter())
+                    .chain(bytecode_deps.iter())
+                {
                     for (name, val) in &pack.named_address_map {
                         if let Some(old) = global_address_map.insert(name.as_str().to_owned(), *val)
                         {
@@ -673,7 +675,12 @@ impl CompiledPackage {
                     }
                 }
                 let mut options = move_compiler_v2::Options {
-                    sources: paths.iter().flat_map(|x| to_str_vec(&x.paths)).collect(),
+                    sources: sources_package_paths
+                        .paths
+                        .iter()
+                        .map(|path| path.as_str().to_owned())
+                        .collect(),
+                    sources_deps: src_deps.iter().flat_map(|x| to_str_vec(&x.paths)).collect(),
                     dependencies: bytecode_deps
                         .iter()
                         .flat_map(|x| to_str_vec(&x.paths))
@@ -749,20 +756,18 @@ impl CompiledPackage {
                 flags = flags.set_skip_attribute_checks(true)
             }
 
-            let model = match (
-                resolution_graph.build_options.generate_docs,
-                resolution_graph.build_options.generate_abis,
-                optional_global_env,
-            ) {
-                (false, false, Some(env)) => env, // Use V2 generated model if not for docgen or abigen
-                _ => run_model_builder_with_options_and_compilation_flags(
+            let model = if let Some(env) = optional_global_env {
+                env
+            } else {
+                run_model_builder_with_options_and_compilation_flags(
                     // Otherwise, use V1 generated model
                     vec![sources_package_paths],
+                    vec![],
                     deps_package_paths.into_iter().map(|(p, _)| p).collect_vec(),
                     ModelBuilderOptions::default(),
                     flags,
                     &known_attributes,
-                )?,
+                )?
             };
 
             if resolution_graph.build_options.generate_docs {

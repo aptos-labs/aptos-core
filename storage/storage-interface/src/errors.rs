@@ -45,12 +45,6 @@ impl From<bcs::Error> for AptosDbError {
     }
 }
 
-impl From<rocksdb::Error> for AptosDbError {
-    fn from(error: rocksdb::Error) -> Self {
-        Self::RocksDbError(format!("{}", error))
-    }
-}
-
 impl From<RecvError> for AptosDbError {
     fn from(error: RecvError) -> Self {
         Self::RecvError(format!("{}", error))

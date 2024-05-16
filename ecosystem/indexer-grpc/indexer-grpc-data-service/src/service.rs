@@ -3,9 +3,8 @@
 
 use crate::metrics::{
     BYTES_READY_TO_TRANSFER_FROM_SERVER, CONNECTION_COUNT, ERROR_COUNT,
-    LATEST_PROCESSED_VERSION as LATEST_PROCESSED_VERSION_OLD, PROCESSED_BATCH_SIZE,
-    PROCESSED_LATENCY_IN_SECS, PROCESSED_LATENCY_IN_SECS_ALL, PROCESSED_VERSIONS_COUNT,
-    SHORT_CONNECTION_COUNT,
+    LATEST_PROCESSED_VERSION_PER_PROCESSOR, PROCESSED_LATENCY_IN_SECS_PER_PROCESSOR,
+    PROCESSED_VERSIONS_COUNT_PER_PROCESSOR, SHORT_CONNECTION_COUNT,
 };
 use anyhow::{Context, Result};
 use aptos_indexer_grpc_utils::{
@@ -535,35 +534,26 @@ async fn data_fetcher_task(
             .await
         {
             Ok(_) => {
-                PROCESSED_BATCH_SIZE
-                    .with_label_values(&[
-                        request_metadata.request_identifier.as_str(),
-                        request_metadata.processor_name.as_str(),
-                    ])
-                    .set(current_batch_size as i64);
                 // TODO: Reasses whether this metric useful
-                LATEST_PROCESSED_VERSION_OLD
+                LATEST_PROCESSED_VERSION_PER_PROCESSOR
                     .with_label_values(&[
                         request_metadata.request_identifier.as_str(),
                         request_metadata.processor_name.as_str(),
                     ])
                     .set(end_of_batch_version as i64);
-                PROCESSED_VERSIONS_COUNT
+                PROCESSED_VERSIONS_COUNT_PER_PROCESSOR
                     .with_label_values(&[
                         request_metadata.request_identifier.as_str(),
                         request_metadata.processor_name.as_str(),
                     ])
                     .inc_by(current_batch_size as u64);
                 if let Some(data_latency_in_secs) = data_latency_in_secs {
-                    PROCESSED_LATENCY_IN_SECS
+                    PROCESSED_LATENCY_IN_SECS_PER_PROCESSOR
                         .with_label_values(&[
                             request_metadata.request_identifier.as_str(),
                             request_metadata.processor_name.as_str(),
                         ])
                         .set(data_latency_in_secs);
-                    PROCESSED_LATENCY_IN_SECS_ALL
-                        .with_label_values(&[])
-                        .observe(data_latency_in_secs);
                 }
             },
             Err(SendTimeoutError::Timeout(_)) => {

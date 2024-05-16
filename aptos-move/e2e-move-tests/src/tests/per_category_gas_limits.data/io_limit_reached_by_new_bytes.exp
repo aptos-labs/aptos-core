@@ -38,7 +38,7 @@ Ok(
                 ),
             ),
             events: [
-                ModuleEvent { type: Struct(StructTag { address: 0000000000000000000000000000000000000000000000000000000000000001, module: Identifier("transaction_fee"), name: Identifier("FeeStatement"), type_params: [] }), event_data: "3f0800000000000005000000000000006600000000000000340f0300000000000000000000000000" },
+                ModuleEvent { type: Struct(StructTag { address: 0000000000000000000000000000000000000000000000000000000000000001, module: Identifier("transaction_fee"), name: Identifier("FeeStatement"), type_args: [] }), event_data: "3f0800000000000005000000000000006600000000000000340f0300000000000000000000000000" },
             ],
             gas_used: 2111,
             status: Keep(
@@ -71,7 +71,7 @@ Ok(
                 ),
             ),
             events: [
-                ModuleEvent { type: Struct(StructTag { address: 0000000000000000000000000000000000000000000000000000000000000001, module: Identifier("transaction_fee"), name: Identifier("FeeStatement"), type_params: [] }), event_data: "7e0000000000000005000000000000007a0000000000000000000000000000000000000000000000" },
+                ModuleEvent { type: Struct(StructTag { address: 0000000000000000000000000000000000000000000000000000000000000001, module: Identifier("transaction_fee"), name: Identifier("FeeStatement"), type_args: [] }), event_data: "7e0000000000000005000000000000007a0000000000000000000000000000000000000000000000" },
             ],
             gas_used: 126,
             status: Keep(
@@ -108,7 +108,7 @@ Ok(
                 ),
             ),
             events: [
-                ModuleEvent { type: Struct(StructTag { address: 0000000000000000000000000000000000000000000000000000000000000001, module: Identifier("transaction_fee"), name: Identifier("FeeStatement"), type_params: [] }), event_data: "740000000000000005000000000000006f0000000000000000000000000000000000000000000000" },
+                ModuleEvent { type: Struct(StructTag { address: 0000000000000000000000000000000000000000000000000000000000000001, module: Identifier("transaction_fee"), name: Identifier("FeeStatement"), type_args: [] }), event_data: "740000000000000005000000000000006f0000000000000000000000000000000000000000000000" },
             ],
             gas_used: 116,
             status: Keep(
