@@ -146,8 +146,8 @@ pub struct SparseMerkleProof {
     ///       empty.
     leaf: Option<SparseMerkleLeafNode>,
 
-    /// All siblings in this proof, including the default ones. Siblings are ordered from the bottom
-    /// level to the root level.
+    /// All siblings in this proof, including the default ones. Siblings are ordered from the root
+    /// level to the bottom level.
     siblings: Vec<HashValue>,
 }
 
@@ -183,8 +183,8 @@ impl NodeInProof {
 #[derive(Clone, Debug, Eq, PartialEq, Serialize, Deserialize)]
 pub struct SparseMerkleProofExt {
     leaf: Option<SparseMerkleLeafNode>,
-    /// All siblings in this proof, including the default ones. Siblings are ordered from the bottom
-    /// level to the root level.
+    /// All siblings in this proof, including the default ones. Siblings are ordered from the root
+    /// level to the bottom level.
     siblings: Vec<NodeInProof>,
 }
 
@@ -349,6 +349,7 @@ impl SparseMerkleProof {
         let actual_root_hash = self
             .siblings
             .iter()
+            .rev()
             .zip(
                 element_key
                     .iter_bits()
