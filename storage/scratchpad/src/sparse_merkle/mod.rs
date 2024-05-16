@@ -448,6 +448,9 @@ pub enum StateStoreStatus<V> {
     /// Tree nodes only exist until `depth` on the route from the root to the leaf address, needs
     /// to check the DB for the rest.
     UnknownSubtreeRoot { hash: HashValue, depth: usize },
+
+    /// Found leaf node, but the value is only in the DB.
+    UnknownValue,
 }
 
 /// In the entire lifetime of this, in-mem nodes won't be dropped because a reference to the oldest
@@ -552,10 +555,7 @@ where
                                         Some(value) => StateStoreStatus::ExistsInScratchPad(
                                             value.as_ref().clone(),
                                         ),
-                                        None => StateStoreStatus::UnknownSubtreeRoot {
-                                            hash,
-                                            depth: next_depth - 1,
-                                        },
+                                        None => StateStoreStatus::UnknownValue,
                                     }
                                 } else {
                                     StateStoreStatus::DoesNotExist
