@@ -247,7 +247,10 @@ fn test_update_256_siblings_in_proof() {
         new_smt.get(key1),
         StateStoreStatus::ExistsInScratchPad(new_value1)
     );
-    assert_eq!(new_smt.get(key2), StateStoreStatus::ExistsInDB);
+    assert_eq!(new_smt.get(key2), StateStoreStatus::UnknownSubtreeRoot {
+        hash: leaf2.hash(),
+        depth: 256
+    });
 }
 
 #[test]
@@ -320,9 +323,18 @@ fn test_update() {
     //           y      key3 (unknown)
     //          / \
     //         x   key4
-    assert_eq!(smt1.get(key1), StateStoreStatus::Unknown);
-    assert_eq!(smt1.get(key2), StateStoreStatus::Unknown);
-    assert_eq!(smt1.get(key3), StateStoreStatus::ExistsInDB);
+    assert_eq!(smt1.get(key1), StateStoreStatus::UnknownSubtreeRoot {
+        hash: x_hash,
+        depth: 2
+    });
+    assert_eq!(smt1.get(key2), StateStoreStatus::UnknownSubtreeRoot {
+        hash: x_hash,
+        depth: 2
+    });
+    assert_eq!(smt1.get(key3), StateStoreStatus::UnknownSubtreeRoot {
+        hash: leaf3.hash(),
+        depth: 1
+    });
     assert_eq!(
         smt1.get(key4),
         StateStoreStatus::ExistsInScratchPad(value4.clone())
@@ -359,8 +371,14 @@ fn test_update() {
     //             / \
     //    key2(indb)  key4 (weak data)
     assert_eq!(smt2.get(key1), StateStoreStatus::DoesNotExist,);
-    assert_eq!(smt2.get(key2), StateStoreStatus::ExistsInDB);
-    assert_eq!(smt2.get(key3), StateStoreStatus::ExistsInDB);
+    assert_eq!(smt2.get(key2), StateStoreStatus::UnknownSubtreeRoot {
+        hash: leaf2.hash(),
+        depth: 2
+    });
+    assert_eq!(smt2.get(key3), StateStoreStatus::UnknownSubtreeRoot {
+        hash: leaf3.hash(),
+        depth: 1
+    });
     assert_eq!(smt2.get(key4), StateStoreStatus::ExistsInScratchPad(value4));
 
     // Verify root hash.
@@ -383,8 +401,14 @@ fn test_update() {
     //           y'      key3 (indb, weak)
     //          / \
     // (weak) x   key4
-    assert_eq!(smt22.get(key2), StateStoreStatus::Unknown);
-    assert_eq!(smt22.get(key3), StateStoreStatus::ExistsInDB);
+    assert_eq!(smt22.get(key2), StateStoreStatus::UnknownSubtreeRoot {
+        hash: x_hash,
+        depth: 2
+    });
+    assert_eq!(smt22.get(key3), StateStoreStatus::UnknownSubtreeRoot {
+        hash: leaf3.hash(),
+        depth: 1
+    });
     assert_eq!(
         smt22.get(key4),
         StateStoreStatus::ExistsInScratchPad(value4.clone())
@@ -396,15 +420,33 @@ fn test_update() {
 
     // For smt2, no key should be available since smt2 was constructed by deleting key1.
     assert_eq!(smt2.get(key1), StateStoreStatus::DoesNotExist);
-    assert_eq!(smt2.get(key2), StateStoreStatus::ExistsInDB);
-    assert_eq!(smt2.get(key3), StateStoreStatus::ExistsInDB);
-    assert_eq!(smt2.get(key4), StateStoreStatus::ExistsInDB);
+    assert_eq!(smt2.get(key2), StateStoreStatus::UnknownSubtreeRoot {
+        hash: leaf2.hash(),
+        depth: 2
+    });
+    assert_eq!(smt2.get(key3), StateStoreStatus::UnknownSubtreeRoot {
+        hash: leaf3.hash(),
+        depth: 1
+    });
+    assert_eq!(smt2.get(key4), StateStoreStatus::UnknownSubtreeRoot {
+        hash: leaf4_hash,
+        depth: 2
+    });
 
     // For smt22, only key4 should be available since smt22 was constructed by updating smt1 with
     // key4.
-    assert_eq!(smt22.get(key1), StateStoreStatus::Unknown);
-    assert_eq!(smt22.get(key2), StateStoreStatus::Unknown);
-    assert_eq!(smt22.get(key3), StateStoreStatus::ExistsInDB);
+    assert_eq!(smt22.get(key1), StateStoreStatus::UnknownSubtreeRoot {
+        hash: x_hash,
+        depth: 2
+    });
+    assert_eq!(smt22.get(key2), StateStoreStatus::UnknownSubtreeRoot {
+        hash: x_hash,
+        depth: 2
+    });
+    assert_eq!(smt22.get(key3), StateStoreStatus::UnknownSubtreeRoot {
+        hash: leaf3.hash(),
+        depth: 1
+    });
     assert_eq!(
         smt22.get(key4),
         StateStoreStatus::ExistsInScratchPad(value4)

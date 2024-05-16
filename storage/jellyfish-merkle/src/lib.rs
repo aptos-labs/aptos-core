@@ -717,7 +717,7 @@ where
         key: HashValue,
         version: Version,
     ) -> Result<(Option<(HashValue, (K, Version))>, SparseMerkleProof)> {
-        self.get_with_proof_ext(key, version)
+        self.get_with_proof_ext(key, version, 0)
             .map(|(value, proof_ext)| (value, proof_ext.into()))
     }
 
@@ -725,6 +725,7 @@ where
         &self,
         key: HashValue,
         version: Version,
+        target_root_depth: usize,
     ) -> Result<(Option<(HashValue, (K, Version))>, SparseMerkleProofExt)> {
         // Empty tree just returns proof with no sibling hash.
         let mut next_node_key = NodeKey::new_empty_path(version);
@@ -764,11 +765,20 @@ where
                         queried_child_index,
                         Some(self.reader),
                         &mut out_siblings,
+                        nibble_depth * 4,
+                        target_root_depth,
                     )?;
                     next_node_key = match child_node_key {
                         Some(node_key) => node_key,
                         None => {
-                            return Ok((None, SparseMerkleProofExt::new(None, out_siblings)));
+                            return Ok((
+                                None,
+                                SparseMerkleProofExt::new_partial(
+                                    None,
+                                    out_siblings,
+                                    target_root_depth,
+                                ),
+                            ));
                         },
                     };
                 },
@@ -779,7 +789,11 @@ where
                         } else {
                             None
                         },
-                        SparseMerkleProofExt::new(Some(leaf_node.into()), out_siblings),
+                        SparseMerkleProofExt::new_partial(
+                            Some(leaf_node.into()),
+                            out_siblings,
+                            target_root_depth,
+                        ),
                     ));
                 },
                 Node::Null => {
