@@ -191,7 +191,7 @@ Account does not have mint capability
 Max supply of Supra Coin to be 100 billion with 8 decimal places fraction
 
 
-<pre><code><b>const</b> <a href="supra_coin.md#0x1_supra_coin_MAX_SUPRA_COIN_SUPPLY">MAX_SUPRA_COIN_SUPPLY</a>: u128 = 340282366920938463463374607431768211455;
+<pre><code><b>const</b> <a href="supra_coin.md#0x1_supra_coin_MAX_SUPRA_COIN_SUPPLY">MAX_SUPRA_COIN_SUPPLY</a>: u128 = 10000000000000000000;
 </code></pre>
 
 
@@ -316,7 +316,7 @@ accounts.
     // Mint the core resource <a href="account.md#0x1_account">account</a> <a href="supra_coin.md#0x1_supra_coin_SupraCoin">SupraCoin</a> for gas so it can execute system transactions.
     <a href="coin.md#0x1_coin_register">coin::register</a>&lt;<a href="supra_coin.md#0x1_supra_coin_SupraCoin">SupraCoin</a>&gt;(core_resources);
     <b>let</b> coins = <a href="coin.md#0x1_coin_mint">coin::mint</a>&lt;<a href="supra_coin.md#0x1_supra_coin_SupraCoin">SupraCoin</a>&gt;(
-        18446744073709551615,
+        ((<a href="supra_coin.md#0x1_supra_coin_MAX_SUPRA_COIN_SUPPLY">MAX_SUPRA_COIN_SUPPLY</a>)/10 <b>as</b> u64),
         &mint_cap,
     );
     <a href="coin.md#0x1_coin_deposit">coin::deposit</a>&lt;<a href="supra_coin.md#0x1_supra_coin_SupraCoin">SupraCoin</a>&gt;(<a href="../../aptos-stdlib/../move-stdlib/doc/signer.md#0x1_signer_address_of">signer::address_of</a>(core_resources), coins);

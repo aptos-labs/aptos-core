@@ -22,7 +22,7 @@ fn mint_to_new_account() {
     let mint_amount = 1_000_000;
     let txn = root
         .transaction()
-        .payload(aptos_stdlib::aptos_coin_mint(
+        .payload(aptos_stdlib::supra_coin_mint(
             *new_account.address(),
             mint_amount,
         ))

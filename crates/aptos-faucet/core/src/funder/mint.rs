@@ -173,7 +173,7 @@ impl MintFunder {
             let faucet_account = self.faucet_account.write().await;
             client
                 .submit_and_wait(&faucet_account.sign_with_transaction_builder(
-                    transaction_factory.payload(aptos_stdlib::aptos_coin_delegate_mint_capability(
+                    transaction_factory.payload(aptos_stdlib::supra_coin_delegate_mint_capability(
                         delegated_account.address(),
                     )),
                 ))
@@ -184,7 +184,7 @@ impl MintFunder {
         // Claim the capability!
         client
             .submit_and_wait(&delegated_account.sign_with_transaction_builder(
-                transaction_factory.payload(aptos_stdlib::aptos_coin_claim_mint_capability()),
+                transaction_factory.payload(aptos_stdlib::supra_coin_claim_mint_capability()),
             ))
             .await
             .context("Failed to claim the minting capability")?;

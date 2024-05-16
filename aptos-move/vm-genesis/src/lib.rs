@@ -136,7 +136,7 @@ pub fn encode_aptos_mainnet_genesis_transaction(
         &gas_schedule,
     );
     initialize_features(&mut session);
-    initialize_aptos_coin(&mut session);
+    initialize_supra_coin(&mut session);
     initialize_on_chain_governance(&mut session, genesis_config);
     create_accounts(&mut session, accounts);
     create_employee_validators(&mut session, employees, genesis_config);
@@ -248,7 +248,7 @@ pub fn encode_genesis_change_set(
     if genesis_config.is_test {
         initialize_core_resources_and_supra_coin(&mut session, core_resources_key);
     } else {
-        initialize_aptos_coin(&mut session);
+        initialize_supra_coin(&mut session);
     }
     initialize_on_chain_governance(&mut session, genesis_config);
     create_and_initialize_validators(&mut session, validators);
@@ -482,11 +482,11 @@ fn initialize_features(session: &mut SessionExt) {
     );
 }
 
-fn initialize_aptos_coin(session: &mut SessionExt) {
+fn initialize_supra_coin(session: &mut SessionExt) {
     exec_function(
         session,
         GENESIS_MODULE_NAME,
-        "initialize_aptos_coin",
+        "initialize_supra_coin",
         vec![],
         serialize_values(&vec![MoveValue::Signer(CORE_CODE_ADDRESS)]),
     );

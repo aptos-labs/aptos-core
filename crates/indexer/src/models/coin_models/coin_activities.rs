@@ -19,7 +19,7 @@ use aptos_api_types::{
     Event as APIEvent, Transaction as APITransaction, TransactionInfo as APITransactionInfo,
     TransactionPayload, UserTransactionRequest, WriteSetChange as APIWriteSetChange,
 };
-use aptos_types::APTOS_COIN_TYPE;
+use aptos_types::SUPRA_COIN_TYPE;
 use bigdecimal::BigDecimal;
 use field_count::FieldCount;
 use serde::{Deserialize, Serialize};
