@@ -110,7 +110,7 @@ module aptos_framework::dispatchable_fungible_asset {
                 func
             )
         } else {
-            fungible_asset::deposit_internal(store, fa)
+            fungible_asset::deposit_internal(object::object_address(&store), fa)
         }
     }
 
