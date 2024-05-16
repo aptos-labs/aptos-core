@@ -2,10 +2,11 @@
 remote_endpoint: ~
 name: "enable-randomness"
 proposals:
-  - name: step_1_increase_max_txn_gas
+  - name: step_1_enable_randomness
     metadata:
-      title: "Increase max txn gas temporarily for framework upgrade"
-      description: "Increase max txn gas temporarily for framework upgrade"
+      title: "Randomness"
+      description: "Enable randomness API v0 and then randomness infrastructure. AIP: https://github.com/aptos-foundation/AIPs/blob/main/aips/aip-79.md"
+      discussion_url: "https://github.com/aptos-foundation/AIPs/issues/407"
     execution_mode: MultiStep
     update_sequence:
       - RawScript: aptos-move/aptos-release-builder/data/proposals/enable_randomness_api_v0.move
