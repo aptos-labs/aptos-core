@@ -911,6 +911,9 @@ impl AptosVM {
     ) -> Result<EpilogueSession<'r, 'l>, VMStatus> {
         let mut change_set = user_session.finish(change_set_configs)?;
 
+
+        println!("inside charge change set, length={:?}", change_set.resource_write_set().len());
+
         let storage_refund =
             self.charge_change_set(&mut change_set, gas_meter, txn_data, resolver)?;
 

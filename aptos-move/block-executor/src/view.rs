@@ -205,14 +205,20 @@ fn get_delayed_field_value_impl<T: Transaction>(
                 return Ok(value);
             },
             Err(PanicOr::Or(MVDelayedFieldsError::Dependency(dep_idx))) => {
+                if captured_reads.borrow().is_unresolved_dependency() {
+                    panic!("Unresolved dependency on the same txn={} 209", txn_idx);
+                }
                 match wait_for_dependency(wait_for, txn_idx, dep_idx)? {
                     // TODO[agg_v2](cleanup): think of correct return type
                     DependencyStatus::ExecutionHalted => {
                         return Err(PanicOr::Or(DelayedFieldsSpeculativeError::InconsistentRead));
                     },
                     DependencyStatus::Unresolved => {
+                        if captured_reads.borrow().is_unresolved_dependency() {
+                            panic!("Unresolved dependency on the same txn={} 215", txn_idx);
+                        }
                         captured_reads.borrow_mut().set_unresolved_dependency(true);
-
+                        println!("returned inconsistentread panicor error {:?}", txn_idx);
                         return Err(PanicOr::Or(DelayedFieldsSpeculativeError::InconsistentRead));
                     }
                     _ => {},
@@ -534,6 +540,9 @@ impl<'a, T: Transaction, X: Executable> ParallelState<'a, T, X> {
                     unreachable!("Reading group size does not require a specific tag look-up");
                 },
                 Err(Dependency(dep_idx)) => {
+                    if self.captured_reads.borrow().is_unresolved_dependency() {
+                        panic!("Unresolved dependency on the same txn={} 544", txn_idx);
+                    }
                     match wait_for_dependency(self.scheduler_handle, txn_idx, dep_idx)? {
                         DependencyStatus::ExecutionHalted => {
                             return Err(PartialVMError::new(
@@ -542,7 +551,12 @@ impl<'a, T: Transaction, X: Executable> ParallelState<'a, T, X> {
                             .with_message("Interrupted as block execution was halted".to_string()));
                         },
                         DependencyStatus::Unresolved => {
+                            if self.captured_reads.borrow().is_unresolved_dependency() {
+                                panic!("Unresolved dependency on the same txn={} 550", txn_idx);
+                            }
                             self.captured_reads.borrow_mut().set_unresolved_dependency(true);
+                            println!("returned SPECULATIVE_EXECUTION_ABORT_ERROR {:?}", txn_idx);
+
                             return Err(PartialVMError::new(
                                 StatusCode::SPECULATIVE_EXECUTION_ABORT_ERROR,
                             )
@@ -576,6 +590,7 @@ impl<'a, T: Transaction, X: Executable> ResourceState<T> for ParallelState<'a, T
     ) -> ReadResult {
         use MVDataError::*;
         use MVDataOutput::*;
+
 
         if let Some(data) = self
             .captured_reads
@@ -670,6 +685,9 @@ impl<'a, T: Transaction, X: Executable> ResourceState<T> for ParallelState<'a, T
                 },
                 Err(Dependency(dep_idx)) => {
                     //self.captured_reads.borrow_mut().set_unresolved_dependency(false);
+                    if self.captured_reads.borrow().is_unresolved_dependency() {
+                        panic!("Unresolved dependency on the same txn={} 683", txn_idx);
+                    }
 
                     match wait_for_dependency(self.scheduler_handle, txn_idx, dep_idx) {
                         Err(e) => {
@@ -690,10 +708,16 @@ impl<'a, T: Transaction, X: Executable> ResourceState<T> for ParallelState<'a, T
                             //dependency resolved
                         },
                         Ok(DependencyStatus::Unresolved) => {
+                            
+                            if self.captured_reads.borrow().is_unresolved_dependency() {
+                                panic!("Unresolved dependency on the same txn={} 714", txn_idx);
+                            }
+
                             self.captured_reads.borrow_mut().set_unresolved_dependency(true);
-                            //println!("Unresoved dependency txn={}", txn_idx);
+                    
+                            println!("HaltSpeculativeExecution Unresoved dependency txn={}", txn_idx);
                             return ReadResult::HaltSpeculativeExecution(
-                                "not able to sleep 2".to_string(),
+                               format!("txn={:?} not able to sleep 2", txn_idx)
                             );
                         }
                     }
@@ -796,6 +820,9 @@ impl<'a, T: Transaction, X: Executable> ResourceGroupState<T> for ParallelState<
                     return Ok(GroupReadResult::Value(None, None));
                 },
                 Err(Dependency(dep_idx)) => {
+                    if self.captured_reads.borrow().is_unresolved_dependency() {
+                        panic!("Unresolved dependency on the same txn={} 815", txn_idx);
+                    }
                     match wait_for_dependency(self.scheduler_handle, txn_idx, dep_idx)? {
                         // TODO[agg_v2](cleanup): consider changing from PartialVMResult<GroupReadResult> to GroupReadResult
                         // like in ReadResult for resources.
@@ -806,6 +833,9 @@ impl<'a, T: Transaction, X: Executable> ResourceGroupState<T> for ParallelState<
                             .with_message("Interrupted as block execution was halted".to_string()));
                         },
                         DependencyStatus::Unresolved => {
+                            if self.captured_reads.borrow().is_unresolved_dependency() {
+                                panic!("Unresolved dependency on the same txn={} 818", txn_idx);
+                            }
                             self.captured_reads.borrow_mut().set_unresolved_dependency(true);
                             return Err(PartialVMError::new(
                                 StatusCode::SPECULATIVE_EXECUTION_ABORT_ERROR,
@@ -1401,10 +1431,10 @@ impl<'a, T: Transaction, S: TStateView<Key = T::Key>, X: Executable> LatestView<
             // will not log the speculative error,
             // so no actual error will be logged once the execution is halted and
             // the speculative logging is flushed.
-            ReadResult::HaltSpeculativeExecution(msg) => Err(PartialVMError::new(
+            ReadResult::HaltSpeculativeExecution(msg) => { println!("created VM error ={}", msg); Err(PartialVMError::new(
                 StatusCode::SPECULATIVE_EXECUTION_ABORT_ERROR,
             )
-            .with_message(msg)),
+            .with_message(msg)) },
             ReadResult::Uninitialized => Err(code_invariant_error(
                 "base value must already be recorded in the MV data structure",
             )
@@ -1472,7 +1502,7 @@ impl<'a, T: Transaction, S: TStateView<Key = T::Key>, X: Executable> TResourceVi
         &self,
         state_key: &Self::Key,
     ) -> PartialVMResult<Option<StateValueMetadata>> {
-        self.get_resource_state_value_impl(state_key, UnknownOrLayout::Unknown, ReadKind::Metadata)
+       self.get_resource_state_value_impl(state_key, UnknownOrLayout::Unknown, ReadKind::Metadata)
             .map(|res| {
                 if let ReadResult::Metadata(v) = res {
                     v

@@ -48,6 +48,7 @@ use std::{
         Arc,
     },
 };
+use move_core_types::vm_status::StatusCode;
 
 // Should not be possible to overflow or underflow, as each delta is at most 100 in the tests.
 // TODO: extend to delta failures.
@@ -860,11 +861,28 @@ where
                     match k.module_path() {
                         Some(_) => match view.get_module_bytes(k) {
                             Ok(v) => read_results.push(v.map(Into::into)),
-                            Err(_) => read_results.push(None),
+                            Err(e) => {
+                                println!("got final error {:?}", e);
+                                if e.major_status() == StatusCode::SPECULATIVE_EXECUTION_ABORT_ERROR {
+                                    //TODO make separate execution status
+
+                                    return ExecutionStatus::Abort(txn_idx as usize);
+                                }
+
+                                read_results.push(None)
+                            }
                         },
                         None => match view.get_resource_bytes(k, None) {
                             Ok(v) => read_results.push(v.map(Into::into)),
-                            Err(_) => read_results.push(None),
+                            Err(e) => {
+                                println!("got final error 2 {:?}", e);
+                                if e.major_status() == StatusCode::SPECULATIVE_EXECUTION_ABORT_ERROR {
+                                    //TODO make separate execution status
+
+                                    return ExecutionStatus::Abort(txn_idx as usize);
+                                }
+                                read_results.push(None)
+                            },
                         },
                     }
                 }
@@ -873,23 +891,33 @@ where
                 for (group_key, resource_tag) in behavior.group_reads.iter() {
                     match view.get_resource_from_group(group_key, resource_tag, None) {
                         Ok(v) => read_results.push(v.map(Into::into)),
-                        Err(_) => read_results.push(None),
+                        Err(e) => {
+                            if e.major_status() == StatusCode::SPECULATIVE_EXECUTION_ABORT_ERROR {
+                                //TODO make separate execution status
+
+                                return ExecutionStatus::Abort(txn_idx as usize);
+                            }
+                            read_results.push(None)
+                        },
                     }
                 }
 
-                let read_group_sizes = behavior
-                    .group_sizes
-                    .iter()
-                    .map(|group_key| {
+                let mut read_group_sizes = vec![];
+
+
+                for group_key in behavior.group_sizes.iter() {
+                        let temp = view.resource_group_size(group_key);
+                        if temp.is_err() {
+                            return ExecutionStatus::Abort(txn_idx as usize);
+                        }
+                        read_group_sizes.push(
                         (
                             group_key.clone(),
-                            view.resource_group_size(group_key)
-                                .expect("Group must exist and size computation must succeed")
+                            temp.expect("Group must exist and size computation must succeed")
                                 .get(),
-                        )
-                    })
-                    .collect();
-
+                        ));
+                }
+                
                 let mut group_writes = vec![];
                 for (key, inner_ops) in behavior.group_writes.iter() {
                     let mut new_inner_ops = HashMap::new();

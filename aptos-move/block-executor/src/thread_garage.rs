@@ -257,7 +257,7 @@ impl ThreadGarage {
         where T : PartialEq + Copy + Debug, F: Fn(Baton<T>)->Option<Result<T,E>> {
         //println!("{thread_id}");
         
-        //eprintln!("suspend called on thread={}", thread_id);
+        println!("conditional suspend called on thread={}", thread_id);
         //create new baton for current_thread, using default_value
         let baton: Baton<T>;
         {
@@ -267,9 +267,9 @@ impl ThreadGarage {
                 return Ok(SuspendResult::FailedRegisteringHook);
             }
 
-            if lock.num_sleeping >= 5 {
+            /*if lock.num_sleeping >= 5 {
                 return Ok(SuspendResult::TooManySleepers);
-            }
+            }*/
 
             lock.asleep[thread_id] = true;
             baton = Baton::new(thread_id, default_value);

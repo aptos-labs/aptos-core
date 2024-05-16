@@ -273,21 +273,24 @@ impl<'a> ConditionalSuspend for SchedulerHandle<'a> {
         // Otherwise, do not conditional suspend the garage, and update txn status to Suspended(.., None)
         // Return a different status to the caller indicated 'suspended but should re-execute'
         //println!("was in conditional suspend");
-        /*if txn_idx > self.scheduler.commit_state().0 + 300 {
+        if txn_idx > self.scheduler.commit_state().0 + 5 {
            //println!("unresolved suspend called txn_idx={}", txn_idx);
 
             /*if self.garage.unwrap().is_halted() {
                 return Ok(DependencyStatus::ExecutionHalted);
             }*/
+            println!("thread_id={} trying to suspend txn={}", self.get_thread_id(), txn_idx);
+
             let res = self.scheduler.wait_for_dependency(txn_idx, dep_txn_idx, None)?;
-            if self.garage.unwrap().is_halted() {
+            /*if self.garage.unwrap().is_halted() {
                 return Ok(DependencyStatus::ExecutionHalted);
-            }
+            }*/
+            println!("thread_id={} trying to suspend txn={} suspend result={:?}", self.get_thread_id(), txn_idx, res);
             return Ok(res);
-        } */
+        } 
        
         let suspend_result: Result<SuspendResult<DependencyStatus>, PanicError> = self.garage.unwrap().conditional_suspend(|baton|-> Option<Result<DependencyStatus,PanicError>> {
-            let dep_result = self.scheduler.wait_for_dependency(txn_idx, dep_txn_idx, Some(baton));
+            let dep_result: Result<DependencyStatus, PanicError> = self.scheduler.wait_for_dependency(txn_idx, dep_txn_idx, Some(baton));
             match dep_result {
                 Ok(dep_result) => {
                     match dep_result {
@@ -1047,6 +1050,7 @@ impl Scheduler {
         baton: Option<Baton<DependencyStatus>>,
     ) -> Result<(), PanicError> {
         let mut status = self.txn_status[txn_idx as usize].0.write();
+        println!("suspend called on {:?}", txn_idx);
         match *status {
             ExecutionStatus::Executing(incarnation, _) => {
                 *status = ExecutionStatus::Suspended(incarnation, baton);            
@@ -1054,10 +1058,10 @@ impl Scheduler {
                 Ok(()) 
             },
             //ExecutionStatus::ExecutionHalted => Ok(false),
-            _ => Err(code_invariant_error(format!(
+            _ =>{ Err(code_invariant_error(format!(
                 "Unexpected status {:?} in suspend",
                 &*status,
-            ))),
+            ))) },
         } 
     }
 

@@ -121,8 +121,12 @@ where
         let txn = &signature_verified_block[idx_to_execute as usize];
 
         // VM execution.
+        println!("started execution txn_idx={}", idx_to_execute);
+
         let sync_view = LatestView::new(base_view, ViewState::Sync(latest_view), idx_to_execute);
         let execute_result = executor.execute_transaction(&sync_view, txn, idx_to_execute);
+
+        println!("returned from execution txn_idx={}", idx_to_execute);
 
         let mut read_set = sync_view.take_parallel_reads();
 
@@ -131,7 +135,7 @@ where
                         .expect("[BlockSTM]: Prior read-set must be recorded");*/
         
         if read_set.is_unresolved_dependency() {
-            //println!("returned none txn_idx={}", idx_to_execute);
+            println!("returned none txn_idx={}", idx_to_execute);
             return Ok(None);
             //panic!("retry again");
         }
