@@ -218,7 +218,7 @@ fn is_approved_gov_script(
 
 struct AptosVMRandomnessConfig {
     randomness_api_v0_required_deposit: Option<u64>,
-    allow_rand_txn_custom_max_gas: bool,
+    allow_rand_contract_custom_max_gas: bool,
 }
 
 pub struct AptosVM {
@@ -242,12 +242,12 @@ impl AptosVM {
         let randomness_api_v0_required_deposit = RequiredGasDeposit::fetch_config(resolver)
             .unwrap_or_else(RequiredGasDeposit::default_if_missing)
             .gas_amount;
-        let allow_rand_txn_custom_max_gas = AllowCustomMaxGasFlag::fetch_config(resolver)
+        let allow_rand_contract_custom_max_gas = AllowCustomMaxGasFlag::fetch_config(resolver)
             .unwrap_or_else(AllowCustomMaxGasFlag::default_if_missing)
             .value;
         let randomness_config = AptosVMRandomnessConfig {
             randomness_api_v0_required_deposit,
-            allow_rand_txn_custom_max_gas,
+            allow_rand_contract_custom_max_gas,
         };
         let features = Features::fetch_config(resolver).unwrap_or_default();
         let (
@@ -2516,7 +2516,7 @@ impl AptosVM {
                         self.randomness_config.randomness_api_v0_required_deposit
                     {
                         let required_gas_amount =
-                            if self.randomness_config.allow_rand_txn_custom_max_gas {
+                            if self.randomness_config.allow_rand_contract_custom_max_gas {
                                 annotation.max_gas.unwrap_or(default_gas_amount)
                             } else {
                                 default_gas_amount
