@@ -180,15 +180,7 @@
     "state_change_hash": "",
     "event_root_hash": "",
     "state_checkpoint_hash": null,
-<<<<<<< HEAD
     "gas_used": "9",
-=======
-<<<<<<< HEAD
-    "gas_used": "6",
-=======
-    "gas_used": "8",
->>>>>>> 62fc27894a (goldens)
->>>>>>> 3c2ca0fd5f (goldens)
     "success": true,
     "vm_status": "Executed successfully",
     "accumulator_root_hash": "",
@@ -350,27 +342,11 @@
         "sequence_number": "0",
         "type": "0x1::transaction_fee::FeeStatement",
         "data": {
-<<<<<<< HEAD
           "execution_gas_units": "5",
           "io_gas_units": "4",
           "storage_fee_octas": "0",
           "storage_fee_refund_octas": "0",
           "total_charge_gas_units": "9"
-=======
-<<<<<<< HEAD
-          "execution_gas_units": "4",
-          "io_gas_units": "3",
-          "storage_fee_octas": "0",
-          "storage_fee_refund_octas": "0",
-          "total_charge_gas_units": "6"
-=======
-          "execution_gas_units": "5",
-          "io_gas_units": "3",
-          "storage_fee_octas": "0",
-          "storage_fee_refund_octas": "0",
-          "total_charge_gas_units": "8"
->>>>>>> 62fc27894a (goldens)
->>>>>>> 3c2ca0fd5f (goldens)
         }
       }
     ],
@@ -558,15 +534,7 @@
     "state_change_hash": "",
     "event_root_hash": "",
     "state_checkpoint_hash": null,
-<<<<<<< HEAD
     "gas_used": "9",
-=======
-<<<<<<< HEAD
-    "gas_used": "6",
-=======
-    "gas_used": "8",
->>>>>>> 62fc27894a (goldens)
->>>>>>> 3c2ca0fd5f (goldens)
     "success": true,
     "vm_status": "Executed successfully",
     "accumulator_root_hash": "",
@@ -728,27 +696,11 @@
         "sequence_number": "0",
         "type": "0x1::transaction_fee::FeeStatement",
         "data": {
-<<<<<<< HEAD
           "execution_gas_units": "5",
           "io_gas_units": "4",
           "storage_fee_octas": "0",
           "storage_fee_refund_octas": "0",
           "total_charge_gas_units": "9"
-=======
-<<<<<<< HEAD
-          "execution_gas_units": "4",
-          "io_gas_units": "3",
-          "storage_fee_octas": "0",
-          "storage_fee_refund_octas": "0",
-          "total_charge_gas_units": "6"
-=======
-          "execution_gas_units": "5",
-          "io_gas_units": "3",
-          "storage_fee_octas": "0",
-          "storage_fee_refund_octas": "0",
-          "total_charge_gas_units": "8"
->>>>>>> 62fc27894a (goldens)
->>>>>>> 3c2ca0fd5f (goldens)
         }
       }
     ],
@@ -936,15 +888,7 @@
     "state_change_hash": "",
     "event_root_hash": "",
     "state_checkpoint_hash": null,
-<<<<<<< HEAD
     "gas_used": "9",
-=======
-<<<<<<< HEAD
-    "gas_used": "6",
-=======
-    "gas_used": "8",
->>>>>>> 62fc27894a (goldens)
->>>>>>> 3c2ca0fd5f (goldens)
     "success": true,
     "vm_status": "Executed successfully",
     "accumulator_root_hash": "",
@@ -1106,27 +1050,11 @@
         "sequence_number": "0",
         "type": "0x1::transaction_fee::FeeStatement",
         "data": {
-<<<<<<< HEAD
           "execution_gas_units": "5",
           "io_gas_units": "4",
           "storage_fee_octas": "0",
           "storage_fee_refund_octas": "0",
           "total_charge_gas_units": "9"
-=======
-<<<<<<< HEAD
-          "execution_gas_units": "4",
-          "io_gas_units": "3",
-          "storage_fee_octas": "0",
-          "storage_fee_refund_octas": "0",
-          "total_charge_gas_units": "6"
-=======
-          "execution_gas_units": "5",
-          "io_gas_units": "3",
-          "storage_fee_octas": "0",
-          "storage_fee_refund_octas": "0",
-          "total_charge_gas_units": "8"
->>>>>>> 62fc27894a (goldens)
->>>>>>> 3c2ca0fd5f (goldens)
         }
       }
     ],
@@ -1314,15 +1242,7 @@
     "state_change_hash": "",
     "event_root_hash": "",
     "state_checkpoint_hash": null,
-<<<<<<< HEAD
     "gas_used": "9",
-=======
-<<<<<<< HEAD
-    "gas_used": "6",
-=======
-    "gas_used": "8",
->>>>>>> 62fc27894a (goldens)
->>>>>>> 3c2ca0fd5f (goldens)
     "success": true,
     "vm_status": "Executed successfully",
     "accumulator_root_hash": "",
@@ -1484,27 +1404,11 @@
         "sequence_number": "0",
         "type": "0x1::transaction_fee::FeeStatement",
         "data": {
-<<<<<<< HEAD
           "execution_gas_units": "5",
           "io_gas_units": "4",
           "storage_fee_octas": "0",
           "storage_fee_refund_octas": "0",
           "total_charge_gas_units": "9"
-=======
-<<<<<<< HEAD
-          "execution_gas_units": "4",
-          "io_gas_units": "3",
-          "storage_fee_octas": "0",
-          "storage_fee_refund_octas": "0",
-          "total_charge_gas_units": "6"
-=======
-          "execution_gas_units": "5",
-          "io_gas_units": "3",
-          "storage_fee_octas": "0",
-          "storage_fee_refund_octas": "0",
-          "total_charge_gas_units": "8"
->>>>>>> 62fc27894a (goldens)
->>>>>>> 3c2ca0fd5f (goldens)
         }
       }
     ],
@@ -1692,15 +1596,7 @@
     "state_change_hash": "",
     "event_root_hash": "",
     "state_checkpoint_hash": null,
-<<<<<<< HEAD
     "gas_used": "9",
-=======
-<<<<<<< HEAD
-    "gas_used": "6",
-=======
-    "gas_used": "8",
->>>>>>> 62fc27894a (goldens)
->>>>>>> 3c2ca0fd5f (goldens)
     "success": true,
     "vm_status": "Executed successfully",
     "accumulator_root_hash": "",
@@ -1862,27 +1758,11 @@
         "sequence_number": "0",
         "type": "0x1::transaction_fee::FeeStatement",
         "data": {
-<<<<<<< HEAD
           "execution_gas_units": "5",
           "io_gas_units": "4",
           "storage_fee_octas": "0",
           "storage_fee_refund_octas": "0",
           "total_charge_gas_units": "9"
-=======
-<<<<<<< HEAD
-          "execution_gas_units": "4",
-          "io_gas_units": "3",
-          "storage_fee_octas": "0",
-          "storage_fee_refund_octas": "0",
-          "total_charge_gas_units": "6"
-=======
-          "execution_gas_units": "5",
-          "io_gas_units": "3",
-          "storage_fee_octas": "0",
-          "storage_fee_refund_octas": "0",
-          "total_charge_gas_units": "8"
->>>>>>> 62fc27894a (goldens)
->>>>>>> 3c2ca0fd5f (goldens)
         }
       }
     ],
@@ -2070,15 +1950,7 @@
     "state_change_hash": "",
     "event_root_hash": "",
     "state_checkpoint_hash": null,
-<<<<<<< HEAD
     "gas_used": "9",
-=======
-<<<<<<< HEAD
-    "gas_used": "6",
-=======
-    "gas_used": "8",
->>>>>>> 62fc27894a (goldens)
->>>>>>> 3c2ca0fd5f (goldens)
     "success": true,
     "vm_status": "Executed successfully",
     "accumulator_root_hash": "",
@@ -2240,27 +2112,11 @@
         "sequence_number": "0",
         "type": "0x1::transaction_fee::FeeStatement",
         "data": {
-<<<<<<< HEAD
           "execution_gas_units": "5",
           "io_gas_units": "4",
           "storage_fee_octas": "0",
           "storage_fee_refund_octas": "0",
           "total_charge_gas_units": "9"
-=======
-<<<<<<< HEAD
-          "execution_gas_units": "4",
-          "io_gas_units": "3",
-          "storage_fee_octas": "0",
-          "storage_fee_refund_octas": "0",
-          "total_charge_gas_units": "6"
-=======
-          "execution_gas_units": "5",
-          "io_gas_units": "3",
-          "storage_fee_octas": "0",
-          "storage_fee_refund_octas": "0",
-          "total_charge_gas_units": "8"
->>>>>>> 62fc27894a (goldens)
->>>>>>> 3c2ca0fd5f (goldens)
         }
       }
     ],
@@ -2448,15 +2304,7 @@
     "state_change_hash": "",
     "event_root_hash": "",
     "state_checkpoint_hash": null,
-<<<<<<< HEAD
     "gas_used": "9",
-=======
-<<<<<<< HEAD
-    "gas_used": "6",
-=======
-    "gas_used": "8",
->>>>>>> 62fc27894a (goldens)
->>>>>>> 3c2ca0fd5f (goldens)
     "success": true,
     "vm_status": "Executed successfully",
     "accumulator_root_hash": "",
@@ -2618,27 +2466,11 @@
         "sequence_number": "0",
         "type": "0x1::transaction_fee::FeeStatement",
         "data": {
-<<<<<<< HEAD
           "execution_gas_units": "5",
           "io_gas_units": "4",
           "storage_fee_octas": "0",
           "storage_fee_refund_octas": "0",
           "total_charge_gas_units": "9"
-=======
-<<<<<<< HEAD
-          "execution_gas_units": "4",
-          "io_gas_units": "3",
-          "storage_fee_octas": "0",
-          "storage_fee_refund_octas": "0",
-          "total_charge_gas_units": "6"
-=======
-          "execution_gas_units": "5",
-          "io_gas_units": "3",
-          "storage_fee_octas": "0",
-          "storage_fee_refund_octas": "0",
-          "total_charge_gas_units": "8"
->>>>>>> 62fc27894a (goldens)
->>>>>>> 3c2ca0fd5f (goldens)
         }
       }
     ],
@@ -2826,15 +2658,7 @@
     "state_change_hash": "",
     "event_root_hash": "",
     "state_checkpoint_hash": null,
-<<<<<<< HEAD
     "gas_used": "9",
-=======
-<<<<<<< HEAD
-    "gas_used": "6",
-=======
-    "gas_used": "8",
->>>>>>> 62fc27894a (goldens)
->>>>>>> 3c2ca0fd5f (goldens)
     "success": true,
     "vm_status": "Executed successfully",
     "accumulator_root_hash": "",
@@ -2996,27 +2820,11 @@
         "sequence_number": "0",
         "type": "0x1::transaction_fee::FeeStatement",
         "data": {
-<<<<<<< HEAD
           "execution_gas_units": "5",
           "io_gas_units": "4",
           "storage_fee_octas": "0",
           "storage_fee_refund_octas": "0",
           "total_charge_gas_units": "9"
-=======
-<<<<<<< HEAD
-          "execution_gas_units": "4",
-          "io_gas_units": "3",
-          "storage_fee_octas": "0",
-          "storage_fee_refund_octas": "0",
-          "total_charge_gas_units": "6"
-=======
-          "execution_gas_units": "5",
-          "io_gas_units": "3",
-          "storage_fee_octas": "0",
-          "storage_fee_refund_octas": "0",
-          "total_charge_gas_units": "8"
->>>>>>> 62fc27894a (goldens)
->>>>>>> 3c2ca0fd5f (goldens)
         }
       }
     ],
