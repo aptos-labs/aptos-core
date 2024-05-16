@@ -43,10 +43,10 @@ fn get_pepper_service_url() -> String {
         Err(_) => {
             println!();
             println!("Pepper service url not found from envvar OIDB_PEPPER_SERVICE_URL.");
-            println!("Enter the URL of the targeted pepper service deployment (default: http://localhost:8000):");
+            println!("Enter the URL of the targeted pepper service deployment (default: http://localhost:8082):");
             let raw = read_line_from_stdin().trim().to_string();
             if raw.is_empty() {
-                "http://localhost:8000".to_string()
+                "http://localhost:8082".to_string()
             } else {
                 raw
             }
