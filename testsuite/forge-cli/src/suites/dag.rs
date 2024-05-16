@@ -375,7 +375,7 @@ pub fn run_dag_consensus_only_realistic_env_max_tps() -> ForgeConfig {
         .with_initial_validator_count(NonZeroUsize::new(100).unwrap())
         .with_emit_job(
             EmitJobRequest::default()
-                .mode(EmitJobMode::MaxLoad { mempool_backlog: 1_000_000 })
+                .mode(EmitJobMode::ConstTps { tps: 100_000 })
                 .txn_expiration_time_secs(5 * 60),
         )
         .add_network_test(PerformanceBenchmark)
