@@ -17,6 +17,7 @@ use crate::{
         },
         AptosMoveResolver, MoveVmExt, SessionExt, SessionId, UserTransactionContext,
     },
+    randomness_config::AptosVMRandomnessConfig,
     sharded_block_executor::{executor_client::ExecutorClient, ShardedBlockExecutor},
     system_module_names::*,
     transaction_metadata::TransactionMetadata,
@@ -51,10 +52,9 @@ use aptos_types::{
     invalid_signature,
     move_utils::as_move_value::AsMoveValue,
     on_chain_config::{
-        new_epoch_event_key,
-        randomness_api_v0_config::{AllowCustomMaxGasFlag, RequiredGasDeposit},
-        ApprovedExecutionHashes, ConfigStorage, ConfigurationResource, FeatureFlag, Features,
-        OnChainConfig, TimedFeatureOverride, TimedFeatures, TimedFeaturesBuilder,
+        new_epoch_event_key, ApprovedExecutionHashes, ConfigStorage, ConfigurationResource,
+        FeatureFlag, Features, OnChainConfig, TimedFeatureOverride, TimedFeatures,
+        TimedFeaturesBuilder,
     },
     randomness::Randomness,
     state_store::{StateView, TStateView},
@@ -217,11 +217,6 @@ fn is_approved_gov_script(
     }
 }
 
-struct AptosVMRandomnessConfig {
-    randomness_api_v0_required_deposit: Option<u64>,
-    allow_rand_contract_custom_max_gas: bool,
-}
-
 pub struct AptosVM {
     is_simulation: bool,
     move_vm: MoveVmExt,
@@ -240,17 +235,8 @@ impl AptosVM {
         override_is_delayed_field_optimization_capable: Option<bool>,
     ) -> Self {
         let _timer = TIMER.timer_with(&["AptosVM::new"]);
-        let randomness_api_v0_required_deposit = RequiredGasDeposit::fetch_config(resolver)
-            .unwrap_or_else(RequiredGasDeposit::default_if_missing)
-            .gas_amount;
-        let allow_rand_contract_custom_max_gas = AllowCustomMaxGasFlag::fetch_config(resolver)
-            .unwrap_or_else(AllowCustomMaxGasFlag::default_if_missing)
-            .value;
-        let randomness_config = AptosVMRandomnessConfig {
-            randomness_api_v0_required_deposit,
-            allow_rand_contract_custom_max_gas,
-        };
         let features = Features::fetch_config(resolver).unwrap_or_default();
+        let randomness_config = AptosVMRandomnessConfig::fetch(resolver);
         let (
             gas_params,
             storage_gas_params,
