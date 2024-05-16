@@ -1,0 +1,16 @@
+---
+remote_endpoint: ~
+name: keyless
+proposals:
+  - name: enable_keyless
+    metadata:
+      title: "Enable privacy-preserving keyless accounts"
+      description: "Enables the changes in AIP-61 https://github.com/aptos-foundation/AIPs/blob/main/aips/aip-61.md and related AIPs (75, 81)"
+      source_code_url: ""
+      discussion_url: "https://github.com/aptos-foundation/AIPs/issues/297"
+    execution_mode: RootSigner
+    update_sequence:
+      - FeatureFlag:
+          enabled:
+            - keyless_accounts
+
