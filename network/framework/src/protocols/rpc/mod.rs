@@ -44,20 +44,14 @@
 //! [AptosNet wire protocol v1]: https://github.com/aptos-labs/aptos-core/blob/main/specifications/network/messaging-v1.md
 //! [`Peer`]: crate::peer::Peer
 
-use crate::{
-    counters::{
-        self, network_application_inbound_traffic, network_application_outbound_traffic,
-        CANCELED_LABEL, DECLINED_LABEL, EXPIRED_LABEL, FAILED_LABEL, INBOUND_LABEL, OUTBOUND_LABEL,
-        RECEIVED_LABEL, REQUEST_LABEL, RESPONSE_LABEL, SENT_LABEL,
-    },
-    logging::NetworkSchema,
-    peer::PeerNotification,
-    protocols::{
-        network::SerializedRequest,
-        wire::messaging::v1::{NetworkMessage, Priority, RequestId, RpcRequest, RpcResponse},
-    },
-    ProtocolId,
-};
+use crate::{counters::{
+    self, network_application_inbound_traffic, network_application_outbound_traffic,
+    CANCELED_LABEL, DECLINED_LABEL, EXPIRED_LABEL, FAILED_LABEL, INBOUND_LABEL, OUTBOUND_LABEL,
+    RECEIVED_LABEL, REQUEST_LABEL, RESPONSE_LABEL, SENT_LABEL,
+}, logging::NetworkSchema, peer::PeerNotification, protocols::{
+    network::SerializedRequest,
+    wire::messaging::v1::{NetworkMessage, Priority, RequestId, RpcRequest, RpcResponse},
+}, ProtocolId, maul};
 use anyhow::anyhow;
 use aptos_channels::aptos_channel;
 use aptos_config::network_id::NetworkContext;
@@ -266,7 +260,7 @@ impl InboundRpcs {
                         let rpc_response = RpcResponse {
                             request_id,
                             priority,
-                            raw_response: Vec::from(response_bytes.as_ref()),
+                            raw_response: maul(Vec::from(response_bytes.as_ref())),
                         };
                         Ok((rpc_response, protocol_id))
                     },

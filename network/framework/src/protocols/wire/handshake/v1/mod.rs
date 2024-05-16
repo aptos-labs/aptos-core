@@ -29,6 +29,7 @@ use std::{
 };
 use thiserror::Error;
 
+
 #[cfg(test)]
 mod test;
 
@@ -213,7 +214,6 @@ impl ProtocolId {
         if result.is_ok() {
             serialization_timer.observe_duration();
         }
-
         result
     }
 

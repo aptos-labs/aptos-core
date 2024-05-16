@@ -16,6 +16,7 @@ rust-version = { workspace = true }
 aptos-channels = { workspace = true }
 aptos-crypto = { workspace = true }
 aptos-infallible = { workspace = true }
+aptos-logger = { workspace = true }
 aptos-types = { workspace = true }
 futures-util = { workspace = true }
 tokio = { workspace = true }

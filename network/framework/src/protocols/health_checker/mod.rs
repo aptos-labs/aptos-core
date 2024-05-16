@@ -330,7 +330,6 @@ impl<NetworkClient: NetworkClientInterface<HealthCheckerMsg> + Unpin> HealthChec
                         pong.0,
                         req_nonce
                     );
-                    debug_assert!(false, "Pong nonce doesn't match our challenge Ping nonce");
                 }
             },
             Err(err) => {

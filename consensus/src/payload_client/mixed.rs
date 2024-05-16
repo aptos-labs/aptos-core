@@ -12,14 +12,12 @@ use crate::{
 use aptos_consensus_types::common::{Payload, PayloadFilter};
 use aptos_logger::debug;
 use aptos_types::{
-    dkg::{DKGTranscript, DKGTranscriptMetadata},
     on_chain_config::ValidatorTxnConfig,
     validator_txn::ValidatorTransaction,
 };
 use aptos_validator_transaction_pool as vtxn_pool;
 use fail::fail_point;
 use futures::future::BoxFuture;
-use move_core_types::account_address::AccountAddress;
 #[cfg(test)]
 use std::collections::HashSet;
 use std::{
@@ -27,6 +25,10 @@ use std::{
     sync::Arc,
     time::{Duration, Instant},
 };
+#[cfg(feature = "failpoints")]
+use move_core_types::account_address::AccountAddress;
+#[cfg(feature = "failpoints")]
+use aptos_types::dkg::{DKGTranscript, DKGTranscriptMetadata};
 
 pub struct MixedPayloadClient {
     validator_txn_config: ValidatorTxnConfig,

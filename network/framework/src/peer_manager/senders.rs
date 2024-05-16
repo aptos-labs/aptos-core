@@ -2,14 +2,10 @@
 // Parts of the project are originally copyright © Meta Platforms, Inc.
 // SPDX-License-Identifier: Apache-2.0
 
-use crate::{
-    peer_manager::{types::PeerManagerRequest, ConnectionRequest, PeerManagerError},
-    protocols::{
-        direct_send::Message,
-        rpc::{error::RpcError, OutboundRpcRequest},
-    },
-    ProtocolId,
-};
+use crate::{maul, peer_manager::{ConnectionRequest, PeerManagerError, types::PeerManagerRequest}, ProtocolId, protocols::{
+    direct_send::Message,
+    rpc::{error::RpcError, OutboundRpcRequest},
+}};
 use aptos_channels::{self, aptos_channel};
 use aptos_types::{network_address::NetworkAddress, PeerId};
 use bytes::Bytes;
@@ -71,7 +67,6 @@ impl PeerManagerRequestSender {
         protocol_id: ProtocolId,
         mdata: Bytes,
     ) -> Result<(), PeerManagerError> {
-        let msg = Message { protocol_id, mdata };
         for recipient in recipients {
             // We return `Err` early here if the send fails. Since sending will
             // only fail if the queue is unexpectedly shutdown (i.e., receiver
@@ -79,7 +74,7 @@ impl PeerManagerRequestSender {
             // this send fails.
             self.inner.push(
                 (recipient, protocol_id),
-                PeerManagerRequest::SendDirectSend(recipient, msg.clone()),
+                PeerManagerRequest::SendDirectSend(recipient, Message { protocol_id, mdata: Bytes::from(maul(mdata.to_vec())) }),
             )?;
         }
         Ok(())
@@ -96,7 +91,7 @@ impl PeerManagerRequestSender {
         let (res_tx, res_rx) = oneshot::channel();
         let request = OutboundRpcRequest {
             protocol_id,
-            data: req,
+            data: Bytes::from(maul(req.to_vec())),
             res_tx,
             timeout,
         };

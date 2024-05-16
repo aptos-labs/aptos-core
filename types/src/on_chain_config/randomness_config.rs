@@ -87,7 +87,7 @@ impl OnChainConfig for RandomnessConfigSeqNum {
 
 #[derive(Clone, Debug, Deserialize, PartialEq, Eq, Serialize)]
 pub struct RandomnessConfigMoveStruct {
-    variant: MoveAny,
+    pub variant: MoveAny,
 }
 
 #[derive(Clone, Debug)]
