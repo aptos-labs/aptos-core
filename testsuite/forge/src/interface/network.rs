@@ -2,6 +2,7 @@
 // Parts of the project are originally copyright © Meta Platforms, Inc.
 // SPDX-License-Identifier: Apache-2.0
 
+use std::sync::{Arc, Mutex};
 use super::Test;
 use crate::{
     prometheus_metrics::LatencyBreakdown,
@@ -17,7 +18,21 @@ use tokio::runtime::Runtime;
 /// nodes which comprise the network.
 pub trait NetworkTest: Test {
     /// Executes the test against the given context.
-    fn run(&self, ctx: &mut NetworkContext<'_>) -> Result<()>;
+    fn run(&self, ctx: NetworkContextSynchronizer) -> Result<()>;
+}
+
+#[derive(Clone)]
+pub struct NetworkContextSynchronizer<'t> {
+    pub ctx: Arc<Mutex<NetworkContext<'t>>>,
+}
+
+// TODO: some useful things that don't need to hold the lock or make a copy
+impl<'t> NetworkContextSynchronizer<'t> {
+    pub fn new(ctx: NetworkContext<'t>) -> Self {
+        Self{
+            ctx: Arc::new(Mutex::new(ctx)),
+        }
+    }
 }
 
 pub struct NetworkContext<'t> {

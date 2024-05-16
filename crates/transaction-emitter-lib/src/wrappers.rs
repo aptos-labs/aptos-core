@@ -18,6 +18,7 @@ use aptos_sdk::transaction_builder::TransactionFactory;
 use aptos_transaction_generator_lib::{args::TransactionTypeArg, WorkflowProgress};
 use rand::{rngs::StdRng, Rng, SeedableRng};
 use std::time::{Duration, Instant};
+use std::sync::{Arc, Mutex};
 
 pub async fn emit_transactions(
     cluster_args: &ClusterArgs,
@@ -157,9 +158,10 @@ pub async fn emit_transactions_with_cluster(
         emit_job_request = emit_job_request.skip_minting_accounts();
     }
 
+    let coin_source_account = std::sync::Arc::new(std::sync::Mutex::new(coin_source_account));
     let stats = emitter
         .emit_txn_for_with_stats(
-            &coin_source_account,
+            coin_source_account,
             emit_job_request,
             duration,
             (args.duration / 10).clamp(1, 10),
@@ -177,6 +179,7 @@ pub async fn create_accounts_command(
         .context("Failed to build cluster")?;
     let client = cluster.random_instance().rest_client();
     let coin_source_account = cluster.load_coin_source_account(&client).await?;
+    let coin_source_account = Arc::new(Mutex::new(coin_source_account));
     let txn_factory = TransactionFactory::new(cluster.chain_id)
         .with_transaction_expiration_time(60)
         .with_max_gas_amount(create_accounts_args.max_gas_per_txn);
@@ -194,7 +197,7 @@ pub async fn create_accounts_command(
     };
 
     create_accounts(
-        &coin_source_account,
+        coin_source_account,
         &txn_factory,
         Box::new(PrivateKeyAccountGenerator),
         &emit_job_request,

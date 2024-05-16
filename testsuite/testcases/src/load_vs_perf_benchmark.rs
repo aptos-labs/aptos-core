@@ -3,16 +3,11 @@
 
 use crate::{create_emitter_and_request, LoadDestination, NetworkLoadTest};
 use anyhow::Context;
-use aptos_forge::{
-    args::TransactionTypeArg,
-    prometheus_metrics::{LatencyBreakdown, LatencyBreakdownSlice},
-    success_criteria::{SuccessCriteria, SuccessCriteriaChecker},
-    EmitJobMode, EmitJobRequest, NetworkContext, NetworkTest, Result, Test, TxnStats,
-    WorkflowProgress,
-};
+use aptos_forge::{args::TransactionTypeArg, prometheus_metrics::{LatencyBreakdown, LatencyBreakdownSlice}, success_criteria::{SuccessCriteria, SuccessCriteriaChecker}, EmitJobMode, EmitJobRequest, NetworkContext, NetworkTest, Result, Test, TxnStats, WorkflowProgress, NetworkContextSynchronizer};
 use aptos_logger::info;
 use rand::SeedableRng;
 use std::{fmt::Debug, time::Duration};
+use std::ops::DerefMut;
 use tokio::runtime::Runtime;
 
 // add larger warmup, as when we are exceeding the max load,
@@ -215,7 +210,7 @@ impl LoadVsPerfBenchmark {
 }
 
 impl NetworkTest for LoadVsPerfBenchmark {
-    fn run(&self, ctx: &mut NetworkContext<'_>) -> Result<()> {
+    fn run(&self, ctx: NetworkContextSynchronizer) -> Result<()> {
         assert!(
             self.criteria.is_empty() || self.criteria.len() == self.workloads.len(),
             "Invalid config, {} criteria and {} workloads given",
@@ -223,6 +218,8 @@ impl NetworkTest for LoadVsPerfBenchmark {
             self.workloads.len(),
         );
 
+        let mut ctx_locker = ctx.ctx.lock().unwrap();
+        let mut ctx = ctx_locker.deref_mut();
         let rt = Runtime::new().unwrap();
 
         let mut continous_job = if let Some(continuous_traffic) = &self.continuous_traffic {
@@ -265,7 +262,7 @@ impl NetworkTest for LoadVsPerfBenchmark {
             info!("Starting for {:?}", self.workloads);
             results.push(
                 self.evaluate_single(
-                    ctx,
+                    &mut ctx,
                     &self.workloads,
                     index,
                     phase_duration

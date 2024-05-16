@@ -20,7 +20,7 @@ use tokio::runtime::Runtime;
 
 /// Trait used to represent a running network comprised of Validators and FullNodes
 #[async_trait::async_trait]
-pub trait Swarm: Sync {
+pub trait Swarm: Sync + Send {
     /// Performs a health check on the entire swarm, ensuring all Nodes are Live and that no forks
     /// have occurred
     async fn health_check(&mut self) -> Result<()>;
@@ -79,7 +79,7 @@ pub trait Swarm: Sync {
     fn versions<'a>(&'a self) -> Box<dyn Iterator<Item = Version> + 'a>;
 
     /// Construct a ChainInfo from this Swarm
-    fn chain_info(&mut self) -> ChainInfo<'_>;
+    fn chain_info(&mut self) -> ChainInfo;
 
     fn logs_location(&mut self) -> String;
 
@@ -107,13 +107,13 @@ pub trait Swarm: Sync {
         timeout: Option<i64>,
     ) -> Result<Vec<Sample>>;
 
-    fn aptos_public_info(&mut self) -> AptosPublicInfo<'_> {
+    fn aptos_public_info(&mut self) -> AptosPublicInfo {
         self.chain_info().into_aptos_public_info()
     }
 
-    fn chain_info_for_node(&mut self, idx: usize) -> ChainInfo<'_>;
+    fn chain_info_for_node(&mut self, idx: usize) -> ChainInfo;
 
-    fn aptos_public_info_for_node(&mut self, idx: usize) -> AptosPublicInfo<'_> {
+    fn aptos_public_info_for_node(&mut self, idx: usize) -> AptosPublicInfo {
         self.chain_info_for_node(idx).into_aptos_public_info()
     }
 

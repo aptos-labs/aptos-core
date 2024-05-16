@@ -2,8 +2,9 @@
 // Parts of the project are originally copyright © Meta Platforms, Inc.
 // SPDX-License-Identifier: Apache-2.0
 
+use std::ops::DerefMut;
 use crate::generate_traffic;
-use aptos_forge::{NetworkContext, NetworkTest, Result, Test};
+use aptos_forge::{NetworkContextSynchronizer, NetworkTest, Result, Test};
 use std::thread;
 use tokio::{runtime::Runtime, time::Duration};
 
@@ -16,7 +17,9 @@ impl Test for PartialNodesDown {
 }
 
 impl NetworkTest for PartialNodesDown {
-    fn run(&self, ctx: &mut NetworkContext<'_>) -> Result<()> {
+    fn run(&self, ctx: NetworkContextSynchronizer) -> Result<()> {
+        let mut ctx_locker = ctx.ctx.lock().unwrap();
+        let mut ctx = ctx_locker.deref_mut();
         let runtime = Runtime::new()?;
         let duration = Duration::from_secs(120);
         let all_validators = ctx
@@ -34,7 +37,7 @@ impl NetworkTest for PartialNodesDown {
         thread::sleep(Duration::from_secs(5));
 
         // Generate some traffic
-        let txn_stat = generate_traffic(ctx, &up_nodes, duration)?;
+        let txn_stat = generate_traffic(&mut ctx, &up_nodes, duration)?;
         ctx.report
             .report_txn_stats(self.name().to_string(), &txn_stat);
         for n in &down_nodes {

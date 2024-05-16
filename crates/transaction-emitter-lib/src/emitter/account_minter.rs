@@ -29,9 +29,11 @@ use std::{
     sync::Arc,
     time::{Duration, Instant},
 };
+use std::ops::Deref;
+use aptos_types::account_address::AccountAddress;
 
 pub struct SourceAccountManager<'t> {
-    pub source_account: &'t LocalAccount,
+    pub source_account: Arc<std::sync::Mutex<LocalAccount>>,
     pub txn_executor: &'t dyn ReliableTransactionSubmitter,
     pub req: &'t EmitJobRequest,
     pub txn_factory: TransactionFactory,
@@ -43,17 +45,21 @@ impl<'t> RootAccountHandle for SourceAccountManager<'t> {
         self.check_approve_funds(amount, reason).await.unwrap();
     }
 
-    fn get_root_account(&self) -> &LocalAccount {
-        self.source_account
+    fn get_root_account(&self) -> Arc<std::sync::Mutex<LocalAccount>> {
+        self.source_account.clone()
     }
 }
 
 impl<'t> SourceAccountManager<'t> {
+    fn source_account_address(&self) -> AccountAddress {
+        self.source_account.lock().unwrap().address()
+    }
+
     // returns true if we might want to recheck the volume, as it was auto-approved.
     async fn check_approve_funds(&self, amount: u64, reason: &str) -> Result<bool> {
         let balance = self
             .txn_executor
-            .get_account_balance(self.source_account.address())
+            .get_account_balance(self.source_account_address())
             .await?;
         Ok(if self.req.mint_to_root {
             // We have a root account, so amount of funds minted is not a problem
@@ -63,7 +69,7 @@ impl<'t> SourceAccountManager<'t> {
             if balance < amount.checked_mul(100).unwrap_or(u64::MAX / 2) {
                 info!(
                     "Mint account {} current balance is {}, needing {} for {}, minting to refil it fully",
-                    self.source_account.address(),
+                    self.source_account_address(),
                     balance,
                     amount,
                     reason,
@@ -74,7 +80,7 @@ impl<'t> SourceAccountManager<'t> {
             } else {
                 info!(
                     "Mint account {} current balance is {}, needing {} for {}. Proceeding without minting, as balance would overflow otherwise",
-                    self.source_account.address(),
+                    self.source_account_address(),
                     balance,
                     amount,
                     reason,
@@ -85,7 +91,7 @@ impl<'t> SourceAccountManager<'t> {
         } else {
             info!(
                 "Source account {} current balance is {}, needed {} coins for {}, or {:.3}% of its balance",
-                self.source_account.address(),
+                self.source_account_address(),
                 balance,
                 amount,
                 reason,
@@ -95,7 +101,7 @@ impl<'t> SourceAccountManager<'t> {
             if balance < amount {
                 return Err(anyhow!(
                     "Source ({}) doesn't have enough coins, balance {} < needed {} for {}",
-                    self.source_account.address(),
+                    self.source_account_address(),
                     balance,
                     amount,
                     reason
@@ -126,9 +132,9 @@ impl<'t> SourceAccountManager<'t> {
         info!("Minting new coins to root");
 
         let txn = self
-            .source_account
+            .source_account.lock().unwrap()
             .sign_with_transaction_builder(self.txn_factory.payload(
-                aptos_stdlib::aptos_coin_mint(self.source_account.address(), amount),
+                aptos_stdlib::aptos_coin_mint(self.source_account_address(), amount),
             ));
 
         if let Err(e) = txn_executor.execute_transactions(&[txn]).await {
@@ -136,7 +142,7 @@ impl<'t> SourceAccountManager<'t> {
             // so check on failure if another emitter has refilled it instead
 
             let balance = txn_executor
-                .get_account_balance(self.source_account.address())
+                .get_account_balance(self.source_account_address())
                 .await?;
             if balance > u64::MAX / 2 {
                 Ok(())
@@ -417,16 +423,21 @@ impl<'t> AccountMinter<'t> {
             let create_requests: Vec<_> = batch
                 .iter()
                 .map(|account| {
-                    create_and_fund_account_request(
                         if let Some(account) = &mut new_source_account {
-                            account
+                            create_and_fund_account_request(
+                                account,
+                                coins_per_seed_account,
+                                account.public_key(),
+                                txn_factory,
+                            )
                         } else {
-                            self.source_account.get_root_account()
-                        },
-                        coins_per_seed_account,
-                        account.public_key(),
-                        txn_factory,
-                    )
+                            create_and_fund_account_request(
+                                self.source_account.get_root_account().lock().unwrap().deref(),
+                                coins_per_seed_account,
+                                account.public_key(),
+                                txn_factory,
+                            )
+                        }
                 })
                 .collect();
             txn_executor
@@ -471,15 +482,15 @@ impl<'t> AccountMinter<'t> {
     ) -> Result<LocalAccount> {
         const NUM_TRIES: usize = 3;
         for i in 0..NUM_TRIES {
-            self.source_account.get_root_account().set_sequence_number(
+            self.source_account.get_root_account().lock().unwrap().set_sequence_number(
                 txn_executor
-                    .query_sequence_number(self.source_account.get_root_account().address())
+                    .query_sequence_number(self.source_account.get_root_account().lock().unwrap().address())
                     .await?,
             );
 
             let new_source_account = LocalAccount::generate(self.rng());
             let txn = create_and_fund_account_request(
-                self.source_account.get_root_account(),
+                self.source_account.get_root_account().lock().unwrap().deref(),
                 coins_for_source,
                 new_source_account.public_key(),
                 &self.txn_factory,

@@ -1,6 +1,8 @@
 // Copyright © Aptos Foundation
 // SPDX-License-Identifier: Apache-2.0
 
+use std::ops::DerefMut;
+use std::sync::{Arc, Mutex};
 use super::Test;
 use crate::{CoreContext, Result, TestReport};
 use anyhow::anyhow;
@@ -34,14 +36,14 @@ pub trait AptosTest: Test {
 
 pub struct AptosContext<'t> {
     core: CoreContext,
-    public_info: AptosPublicInfo<'t>,
+    public_info: AptosPublicInfo,
     pub report: &'t mut TestReport,
 }
 
 impl<'t> AptosContext<'t> {
     pub fn new(
         core: CoreContext,
-        public_info: AptosPublicInfo<'t>,
+        public_info: AptosPublicInfo,
         report: &'t mut TestReport,
     ) -> Self {
         Self {
@@ -107,26 +109,26 @@ impl<'t> AptosContext<'t> {
         self.public_info.get_balance(address).await
     }
 
-    pub fn root_account(&mut self) -> &mut LocalAccount {
-        self.public_info.root_account
+    pub fn root_account(&mut self) -> Arc<Mutex<LocalAccount>> {
+        self.public_info.root_account.clone()
     }
 }
 
-pub struct AptosPublicInfo<'t> {
+pub struct AptosPublicInfo {
     chain_id: ChainId,
     inspection_service_url: Url,
     rest_api_url: Url,
     rest_client: RestClient,
-    root_account: &'t mut LocalAccount,
+    root_account: Arc<Mutex<LocalAccount>>,
     rng: ::rand::rngs::StdRng,
 }
 
-impl<'t> AptosPublicInfo<'t> {
+impl AptosPublicInfo {
     pub fn new(
         chain_id: ChainId,
         inspection_service_url_str: String,
         rest_api_url_str: String,
-        root_account: &'t mut LocalAccount,
+        root_account: Arc<Mutex<LocalAccount>>,
     ) -> Self {
         let rest_api_url = Url::parse(&rest_api_url_str).unwrap();
         let inspection_service_url = Url::parse(&inspection_service_url_str).unwrap();
@@ -152,14 +154,14 @@ impl<'t> AptosPublicInfo<'t> {
         self.inspection_service_url.as_str()
     }
 
-    pub fn root_account(&mut self) -> &mut LocalAccount {
-        self.root_account
+    pub fn root_account(&mut self) -> Arc<Mutex<LocalAccount>> {
+        self.root_account.clone()
     }
 
     pub async fn create_user_account(&mut self, pubkey: &Ed25519PublicKey) -> Result<()> {
         let auth_key = AuthenticationKey::ed25519(pubkey);
         let create_account_txn =
-            self.root_account
+            self.root_account.lock().unwrap()
                 .sign_with_transaction_builder(self.transaction_factory().payload(
                     aptos_stdlib::aptos_account_create_account(auth_key.account_address()),
                 ));
@@ -175,7 +177,7 @@ impl<'t> AptosPublicInfo<'t> {
     ) -> Result<AccountAddress> {
         let auth_key = AuthenticationKey::any_key(pubkey.clone());
         let create_account_txn =
-            self.root_account
+            self.root_account.lock().unwrap()
                 .sign_with_transaction_builder(self.transaction_factory().payload(
                     aptos_stdlib::aptos_account_create_account(auth_key.account_address()),
                 ));
@@ -186,7 +188,7 @@ impl<'t> AptosPublicInfo<'t> {
     }
 
     pub async fn mint(&mut self, addr: AccountAddress, amount: u64) -> Result<()> {
-        let mint_txn = self.root_account.sign_with_transaction_builder(
+        let mint_txn = self.root_account.lock().unwrap().sign_with_transaction_builder(
             self.transaction_factory()
                 .payload(aptos_stdlib::aptos_coin_mint(addr, amount)),
         );
@@ -305,14 +307,14 @@ impl<'t> AptosPublicInfo<'t> {
         reconfig(
             &self.rest_client,
             &self.transaction_factory(),
-            self.root_account,
+            self.root_account.lock().unwrap().deref_mut(),
         )
         .await
     }
 
     /// Syncs the root account to it's sequence number in the event that a faucet changed it's value
     pub async fn sync_root_account_sequence_number(&mut self) {
-        let root_address = self.root_account().address();
+        let root_address = self.root_account().lock().unwrap().address();
         let root_sequence_number = self
             .client()
             .get_account_bcs(root_address)
@@ -320,7 +322,7 @@ impl<'t> AptosPublicInfo<'t> {
             .unwrap()
             .into_inner()
             .sequence_number();
-        self.root_account()
+        self.root_account().lock().unwrap()
             .set_sequence_number(root_sequence_number);
     }
 }

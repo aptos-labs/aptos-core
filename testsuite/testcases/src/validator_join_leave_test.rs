@@ -1,12 +1,10 @@
 // Copyright © Aptos Foundation
 // SPDX-License-Identifier: Apache-2.0
 
+use std::ops::DerefMut;
 use crate::{LoadDestination, NetworkLoadTest};
 use aptos::{account::create::DEFAULT_FUNDED_COINS, test::CliTestFramework};
-use aptos_forge::{
-    reconfig, NetworkContext, NetworkTest, NodeExt, Result, Swarm, SwarmExt, Test, TestReport,
-    FORGE_KEY_SEED,
-};
+use aptos_forge::{reconfig, NetworkContext, NetworkTest, NodeExt, Result, Swarm, SwarmExt, Test, TestReport, FORGE_KEY_SEED, NetworkContextSynchronizer};
 use aptos_keygen::KeyGen;
 use aptos_logger::info;
 use aptos_sdk::crypto::{ed25519::Ed25519PrivateKey, PrivateKey};
@@ -131,20 +129,26 @@ impl NetworkLoadTest for ValidatorJoinLeaveTest {
                     .await
                     .unwrap();
 
+                let root_account_arcmutex = swarm.chain_info().root_account();
+                let mut root_account_locker = root_account_arcmutex.lock().unwrap();
                 reconfig(
                     &rest_client,
                     &transaction_factory,
-                    swarm.chain_info().root_account(),
+                    root_account_locker.deref_mut(),
                 )
                 .await;
             }
 
-            reconfig(
-                &rest_client,
-                &transaction_factory,
-                swarm.chain_info().root_account(),
-            )
-            .await;
+            {
+                let root_account_arcmutex = swarm.chain_info().root_account();
+                let mut root_account_locker = root_account_arcmutex.lock().unwrap();
+                reconfig(
+                    &rest_client,
+                    &transaction_factory,
+                    root_account_locker.deref_mut(),
+                )
+                    .await;
+            }
         });
 
         // Wait for 1/3 of the test duration.
@@ -156,20 +160,26 @@ impl NetworkLoadTest for ValidatorJoinLeaveTest {
             for operator_index in validator_cli_indices.iter().rev().take(num_validators / 3) {
                 cli.join_validator_set(*operator_index, None).await.unwrap();
 
+                let root_account_arcmutex = swarm.chain_info().root_account();
+                let mut root_account_locker = root_account_arcmutex.lock().unwrap();
                 reconfig(
                     &rest_client,
                     &transaction_factory,
-                    swarm.chain_info().root_account(),
+                    root_account_locker.deref_mut(),
                 )
                 .await;
             }
 
-            reconfig(
-                &rest_client,
-                &transaction_factory,
-                swarm.chain_info().root_account(),
-            )
-            .await;
+            {
+                let root_account_arcmutex = swarm.chain_info().root_account();
+                let mut root_account_locker = root_account_arcmutex.lock().unwrap();
+                reconfig(
+                    &rest_client,
+                    &transaction_factory,
+                    root_account_locker.deref_mut(),
+                )
+                    .await;
+            }
         });
 
         // Wait for all nodes to synchronize and stabilize.
@@ -185,7 +195,7 @@ impl NetworkLoadTest for ValidatorJoinLeaveTest {
 }
 
 impl NetworkTest for ValidatorJoinLeaveTest {
-    fn run(&self, ctx: &mut NetworkContext<'_>) -> Result<()> {
+    fn run(&self, ctx: NetworkContextSynchronizer) -> Result<()> {
         <dyn NetworkLoadTest>::run(self, ctx)
     }
 }

@@ -2,9 +2,7 @@
 // SPDX-License-Identifier: Apache-2.0
 
 use crate::{LoadDestination, NetworkLoadTest};
-use aptos_forge::{
-    GroupNetworkBandwidth, NetworkContext, NetworkTest, SwarmChaos, SwarmNetworkBandwidth, Test,
-};
+use aptos_forge::{GroupNetworkBandwidth, NetworkContext, NetworkContextSynchronizer, NetworkTest, SwarmChaos, SwarmNetworkBandwidth, Test};
 
 pub struct NetworkBandwidthTest;
 
@@ -65,7 +63,7 @@ impl NetworkLoadTest for NetworkBandwidthTest {
 }
 
 impl NetworkTest for NetworkBandwidthTest {
-    fn run(&self, ctx: &mut NetworkContext<'_>) -> anyhow::Result<()> {
+    fn run(&self, ctx: NetworkContextSynchronizer) -> anyhow::Result<()> {
         <dyn NetworkLoadTest>::run(self, ctx)
     }
 }

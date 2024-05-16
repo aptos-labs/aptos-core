@@ -16,6 +16,7 @@ use std::{
     cmp::{max, min},
     sync::Arc,
 };
+use std::ops::Deref;
 
 pub enum SamplingMode {
     /// See `BasicSampler`.
@@ -249,7 +250,7 @@ impl Distribution<InvalidTransactionType> for Standard {
 impl TransactionGenerator for P2PTransactionGenerator {
     fn generate_transactions(
         &mut self,
-        account: &LocalAccount,
+        account: Arc<std::sync::Mutex<LocalAccount>>,
         num_to_create: usize,
     ) -> Vec<SignedTransaction> {
         let mut requests = Vec::with_capacity(num_to_create);
@@ -277,11 +278,13 @@ impl TransactionGenerator for P2PTransactionGenerator {
             let receiver = receivers.get(i).expect("all_addresses can't be empty");
             let request = if num_valid_tx > 0 {
                 num_valid_tx -= 1;
-                self.gen_single_txn(account, receiver, self.send_amount, &self.txn_factory)
+                let account = account.lock().unwrap();
+                self.gen_single_txn(account.deref(), receiver, self.send_amount, &self.txn_factory)
             } else {
+                let account = account.lock().unwrap();
                 self.generate_invalid_transaction(
                     &mut self.rng.clone(),
-                    account,
+                    account.deref(),
                     receiver,
                     &requests,
                 )

@@ -123,7 +123,7 @@ impl Default for TransactionType {
 pub trait TransactionGenerator: Sync + Send {
     fn generate_transactions(
         &mut self,
-        account: &LocalAccount,
+        account: Arc<std::sync::Mutex<LocalAccount>>,
         num_to_create: usize,
     ) -> Vec<SignedTransaction>;
 }
@@ -213,15 +213,15 @@ impl CounterState {
 pub trait RootAccountHandle: Send + Sync {
     async fn approve_funds(&self, amount: u64, reason: &str);
 
-    fn get_root_account(&self) -> &LocalAccount;
+    fn get_root_account(&self) -> Arc<std::sync::Mutex<LocalAccount>>;
 }
 
-pub struct AlwaysApproveRootAccountHandle<'t> {
-    pub root_account: &'t LocalAccount,
+pub struct AlwaysApproveRootAccountHandle{
+    pub root_account: Arc<std::sync::Mutex<LocalAccount>>,
 }
 
 #[async_trait::async_trait]
-impl<'t> RootAccountHandle for AlwaysApproveRootAccountHandle<'t> {
+impl RootAccountHandle for AlwaysApproveRootAccountHandle {
     async fn approve_funds(&self, amount: u64, reason: &str) {
         println!(
             "Consuming funds from root/source account: up to {} for {}",
@@ -229,8 +229,8 @@ impl<'t> RootAccountHandle for AlwaysApproveRootAccountHandle<'t> {
         );
     }
 
-    fn get_root_account(&self) -> &LocalAccount {
-        self.root_account
+    fn get_root_account(&self) -> Arc<std::sync::Mutex<LocalAccount>> {
+        self.root_account.clone()
     }
 }
 
@@ -519,12 +519,12 @@ impl<T: Clone> ObjectPool<T> {
 }
 
 pub fn create_account_transaction(
-    from: &LocalAccount,
+    from: Arc<std::sync::Mutex<LocalAccount>>,
     to: AccountAddress,
     txn_factory: &TransactionFactory,
     creation_balance: u64,
 ) -> SignedTransaction {
-    from.sign_with_transaction_builder(txn_factory.payload(
+    from.lock().unwrap().sign_with_transaction_builder(txn_factory.payload(
         if creation_balance > 0 {
             aptos_stdlib::aptos_account_transfer(to, creation_balance)
         } else {

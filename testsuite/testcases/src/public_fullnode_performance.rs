@@ -8,10 +8,7 @@ use crate::{
 };
 use anyhow::Error;
 use aptos_config::config::{NodeConfig, OverrideNodeConfig};
-use aptos_forge::{
-    NetworkContext, NetworkTest, OverrideNodeConfigFn, Result, Swarm, SwarmChaos, SwarmCpuStress,
-    SwarmNetEm, Test,
-};
+use aptos_forge::{NetworkContext, NetworkContextSynchronizer, NetworkTest, OverrideNodeConfigFn, Result, Swarm, SwarmChaos, SwarmCpuStress, SwarmNetEm, Test};
 use aptos_logger::info;
 use aptos_sdk::move_types::account_address::AccountAddress;
 use aptos_types::PeerId;
@@ -125,7 +122,7 @@ impl Test for PFNPerformance {
 }
 
 impl NetworkTest for PFNPerformance {
-    fn run(&self, ctx: &mut NetworkContext<'_>) -> Result<()> {
+    fn run(&self, ctx: NetworkContextSynchronizer) -> Result<()> {
         <dyn NetworkLoadTest>::run(self, ctx)
     }
 }

@@ -27,11 +27,7 @@ pub mod validator_join_leave_test;
 pub mod validator_reboot_stress_test;
 
 use anyhow::Context;
-use aptos_forge::{
-    prometheus_metrics::{fetch_latency_breakdown, LatencyBreakdown},
-    EmitJobRequest, NetworkContext, NetworkTest, NodeExt, Result, Swarm, SwarmExt, Test,
-    TestReport, TxnEmitter, TxnStats, Version,
-};
+use aptos_forge::{prometheus_metrics::{fetch_latency_breakdown, LatencyBreakdown}, EmitJobRequest, NetworkContext, NetworkTest, NodeExt, Result, Swarm, SwarmExt, Test, TestReport, TxnEmitter, TxnStats, Version, NetworkContextSynchronizer};
 use aptos_logger::info;
 use aptos_rest_client::Client as RestClient;
 use aptos_sdk::{transaction_builder::TransactionFactory, types::PeerId};
@@ -41,6 +37,7 @@ use std::{
     fmt::Write,
     time::{Duration, Instant, SystemTime, UNIX_EPOCH},
 };
+use std::ops::DerefMut;
 use tokio::runtime::Runtime;
 
 const WARMUP_DURATION_FRACTION: f32 = 0.07;
@@ -69,25 +66,26 @@ async fn batch_update(
 }
 
 async fn batch_update_gradually(
-    ctx: &mut NetworkContext<'_>,
+    ctxa: NetworkContextSynchronizer<'_>,
     validators_to_update: &[PeerId],
     version: &Version,
     wait_until_healthy: bool,
     delay: Duration,
     max_wait: Duration,
 ) -> Result<()> {
+    // let mut swarm = ctx.swarm();
     for validator in validators_to_update {
-        ctx.swarm().upgrade_validator(*validator, version).await?;
+        ctxa.ctx.lock().unwrap().swarm().upgrade_validator(*validator, version).await?;
         if wait_until_healthy {
             let deadline = Instant::now() + max_wait;
-            ctx.swarm().validator_mut(*validator).unwrap().wait_until_healthy(deadline).await?;
+            ctxa.ctx.lock().unwrap().swarm().validator_mut(*validator).unwrap().wait_until_healthy(deadline).await?;
         }
         if !delay.is_zero() {
             tokio::time::sleep(delay).await;
         }
     }
 
-    ctx.swarm().health_check().await?;
+    ctxa.ctx.lock().unwrap().swarm().health_check().await?;
 
     Ok(())
 }
@@ -133,6 +131,34 @@ pub fn generate_traffic(
     ))?;
 
     Ok(stats)
+}
+
+#[cfg(unused)]
+pub fn spawn_generate_traffic_setup<'a>(
+    ctx: &mut NetworkContext<'a>,
+    nodes: &[PeerId],
+) -> Result<(TxnEmitter, EmitJobRequest, &'a mut LocalAccount)> {
+    let emit_job_request = ctx.emit_job.clone();
+    let rng = SeedableRng::from_rng(ctx.core().rng())?;
+    let (emitter, emit_job_request) =
+        create_emitter_and_request(ctx.swarm(), emit_job_request, nodes, rng)?;
+    let root_account = ctx.swarm().chain_info().root_account;
+    return Ok((emitter, emit_job_request, root_account));
+}
+
+#[cfg(unused)]
+pub fn spawn_generate_traffic(
+    emitter: TxnEmitter,
+    emit_job_request: EmitJobRequest,
+    root_account: &LocalAccount,
+    duration: Duration,
+    handle: Handle,
+) -> JoinHandle<Result<TxnStats>> {
+    handle.spawn(emitter.emit_txn_for(
+        root_account,
+        emit_job_request,
+        duration,
+    ))
 }
 
 pub enum LoadDestination {
@@ -189,7 +215,9 @@ pub trait NetworkLoadTest: Test {
 }
 
 impl NetworkTest for dyn NetworkLoadTest {
-    fn run(&self, ctx: &mut NetworkContext<'_>) -> Result<()> {
+    fn run(&self, ctx: NetworkContextSynchronizer) -> Result<()> {
+        let mut ctx_locker = ctx.ctx.lock().unwrap();
+        let mut ctx = ctx_locker.deref_mut();
         let runtime = Runtime::new().unwrap();
         let start_timestamp = SystemTime::now()
             .duration_since(UNIX_EPOCH)
@@ -202,7 +230,7 @@ impl NetworkTest for dyn NetworkLoadTest {
         let rng = SeedableRng::from_rng(ctx.core().rng())?;
         let duration = ctx.global_duration;
         let stats_by_phase = self.network_load_test(
-            ctx,
+            &mut ctx,
             emit_job_request,
             duration,
             WARMUP_DURATION_FRACTION,
@@ -247,7 +275,7 @@ impl NetworkTest for dyn NetworkLoadTest {
             .block_on(ctx.swarm().get_client_with_newest_ledger_version())
             .context("no clients replied for end version")?;
 
-        self.finish(ctx).context("finish NetworkLoadTest ")?;
+        self.finish(&mut ctx).context("finish NetworkLoadTest ")?;
 
         for phase_stats in stats_by_phase.into_iter() {
             ctx.check_for_success(
@@ -516,13 +544,21 @@ impl CompositeNetworkTest {
 }
 
 impl NetworkTest for CompositeNetworkTest {
-    fn run(&self, ctx: &mut NetworkContext<'_>) -> anyhow::Result<()> {
-        for wrapper in &self.wrappers {
-            wrapper.setup(ctx)?;
+    fn run(&self, ctxa: NetworkContextSynchronizer) -> Result<()> {
+        {
+            let mut ctx_locker = ctxa.ctx.lock().unwrap();
+            let mut ctx = ctx_locker.deref_mut();
+            for wrapper in &self.wrappers {
+                wrapper.setup(&mut ctx)?;
+            }
         }
-        self.test.run(ctx)?;
-        for wrapper in &self.wrappers {
-            wrapper.finish(ctx)?;
+        self.test.run(ctxa.clone())?;
+        {
+            let mut ctx_locker = ctxa.ctx.lock().unwrap();
+            let mut ctx = ctx_locker.deref_mut();
+            for wrapper in &self.wrappers {
+                wrapper.finish(&mut ctx)?;
+            }
         }
         Ok(())
     }

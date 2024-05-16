@@ -2,9 +2,7 @@
 // SPDX-License-Identifier: Apache-2.0
 
 use crate::{multi_region_network_test::chunk_peers, LoadDestination, NetworkLoadTest};
-use aptos_forge::{
-    GroupCpuStress, NetworkContext, NetworkTest, Swarm, SwarmChaos, SwarmCpuStress, SwarmExt, Test,
-};
+use aptos_forge::{GroupCpuStress, NetworkContext, NetworkContextSynchronizer, NetworkTest, Swarm, SwarmChaos, SwarmCpuStress, SwarmExt, Test};
 use aptos_logger::info;
 use aptos_types::PeerId;
 use rand::Rng;
@@ -102,7 +100,7 @@ impl NetworkLoadTest for ExecutionDelayTest {
 }
 
 impl NetworkTest for ExecutionDelayTest {
-    fn run(&self, ctx: &mut NetworkContext<'_>) -> anyhow::Result<()> {
+    fn run(&self, ctx: NetworkContextSynchronizer) -> anyhow::Result<()> {
         <dyn NetworkLoadTest>::run(self, ctx)
     }
 }
@@ -187,7 +185,7 @@ impl NetworkLoadTest for NetworkUnreliabilityTest {
 }
 
 impl NetworkTest for NetworkUnreliabilityTest {
-    fn run(&self, ctx: &mut NetworkContext<'_>) -> anyhow::Result<()> {
+    fn run(&self, ctx: NetworkContextSynchronizer) -> anyhow::Result<()> {
         <dyn NetworkLoadTest>::run(self, ctx)
     }
 }
@@ -302,7 +300,7 @@ impl NetworkLoadTest for CpuChaosTest {
 }
 
 impl NetworkTest for CpuChaosTest {
-    fn run(&self, ctx: &mut NetworkContext<'_>) -> anyhow::Result<()> {
+    fn run(&self, ctx: NetworkContextSynchronizer) -> anyhow::Result<()> {
         <dyn NetworkLoadTest>::run(self, ctx)
     }
 }

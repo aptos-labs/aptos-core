@@ -1,6 +1,7 @@
 // Copyright © Aptos Foundation
 // SPDX-License-Identifier: Apache-2.0
 
+use std::ops::Deref;
 use super::{publishing::publish_util::Package, ReliableTransactionSubmitter};
 use crate::{
     create_account_transaction, publishing::publish_util::PackageHandler, RootAccountHandle,
@@ -82,15 +83,16 @@ impl CustomModulesDelegationGenerator {
 impl TransactionGenerator for CustomModulesDelegationGenerator {
     fn generate_transactions(
         &mut self,
-        account: &LocalAccount,
+        account: Arc<std::sync::Mutex<LocalAccount>>,
         num_to_create: usize,
     ) -> Vec<SignedTransaction> {
         let mut requests = Vec::with_capacity(num_to_create);
 
         for _ in 0..num_to_create {
             let (package, publisher) = self.packages.choose(&mut self.rng).unwrap();
+            let account = account.lock().unwrap();
             let request = (self.txn_generator)(
-                account,
+                account.deref(),
                 package,
                 publisher,
                 &self.txn_factory,

@@ -76,6 +76,7 @@ use std::{
     thread,
     time::Duration,
 };
+use std::ops::DerefMut;
 use suites::dag::get_dag_test;
 use tokio::{runtime::Runtime, select};
 use url::Url;
@@ -2660,9 +2661,11 @@ impl Test for RestartValidator {
 }
 
 impl NetworkTest for RestartValidator {
-    fn run(&self, ctx: &mut NetworkContext<'_>) -> Result<()> {
+    fn run(&self, ctxa: NetworkContextSynchronizer) -> Result<()> {
         let runtime = Runtime::new()?;
         runtime.block_on(async {
+            let mut ctx_locker = ctxa.ctx.lock().unwrap();
+            let mut ctx = ctx_locker.deref_mut();
             let node = ctx.swarm().validators_mut().next().unwrap();
             node.health_check().await.expect("node health check failed");
             node.stop().await.unwrap();
@@ -2685,7 +2688,9 @@ impl Test for EmitTransaction {
 }
 
 impl NetworkTest for EmitTransaction {
-    fn run(&self, ctx: &mut NetworkContext<'_>) -> Result<()> {
+    fn run(&self, ctx: NetworkContextSynchronizer) -> Result<()> {
+        let mut ctx_locker = ctx.ctx.lock().unwrap();
+        let mut ctx = ctx_locker.deref_mut();
         let duration = Duration::from_secs(10);
         let all_validators = ctx
             .swarm()
@@ -2717,7 +2722,7 @@ impl Test for Delay {
 }
 
 impl NetworkTest for Delay {
-    fn run(&self, _ctx: &mut NetworkContext<'_>) -> Result<()> {
+    fn run(&self, ctx: NetworkContextSynchronizer) -> Result<()> {
         info!("forge sleep {}", self.seconds);
         std::thread::sleep(Duration::from_secs(self.seconds));
         Ok(())
@@ -2734,7 +2739,9 @@ impl Test for GatherMetrics {
 }
 
 impl NetworkTest for GatherMetrics {
-    fn run(&self, ctx: &mut NetworkContext<'_>) -> Result<()> {
+    fn run(&self, ctx: NetworkContextSynchronizer) -> Result<()> {
+        let mut ctx_locker = ctx.ctx.lock().unwrap();
+        let mut ctx = ctx_locker.deref_mut();
         let runtime = ctx.runtime.handle();
         runtime.block_on(gather_metrics_one(ctx));
         Ok(())

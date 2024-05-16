@@ -37,7 +37,7 @@ impl AccountsPoolWrapperGenerator {
 impl TransactionGenerator for AccountsPoolWrapperGenerator {
     fn generate_transactions(
         &mut self,
-        _account: &LocalAccount,
+        _account: Arc<std::sync::Mutex<LocalAccount>>,
         num_to_create: usize,
     ) -> Vec<SignedTransaction> {
         let mut accounts_to_use =
@@ -46,11 +46,23 @@ impl TransactionGenerator for AccountsPoolWrapperGenerator {
         if accounts_to_use.is_empty() {
             return Vec::new();
         }
-        let txns = accounts_to_use
-            .iter_mut()
-            .flat_map(|account| self.generator.generate_transactions(account, 1))
-            .collect();
+        // Wrap LocalAccount in Arc+Mutex
+        let account_arcs : Vec<Arc<std::sync::Mutex<LocalAccount>>> = accounts_to_use.into_iter().map(|account| Arc::new(std::sync::Mutex::new(account))).collect();
+        // get txns
+        let txns = account_arcs.iter().flat_map(|account| self.generator.generate_transactions(account.clone(), 1)).collect();
+        // let txns = accounts_to_use
+        //     .iter_mut()
+        //     .flat_map(|account| {
+        //
+        //         self.generator.generate_transactions(account, 1)
+        //     })
+        //     .collect();
 
+        // back to plain LocalAccount, add to accounts
+        let accounts_to_use = account_arcs.into_iter().map(|account| {
+            let account_mutex = Arc::into_inner(account).unwrap();
+            account_mutex.into_inner().unwrap()
+        }).collect();
         if let Some(destination_accounts_pool) = &self.destination_accounts_pool {
             destination_accounts_pool.add_to_pool(accounts_to_use);
         }

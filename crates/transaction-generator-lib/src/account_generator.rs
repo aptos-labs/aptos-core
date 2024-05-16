@@ -43,7 +43,7 @@ impl AccountGenerator {
 impl TransactionGenerator for AccountGenerator {
     fn generate_transactions(
         &mut self,
-        account: &LocalAccount,
+        account: Arc<std::sync::Mutex<LocalAccount>>,
         num_to_create: usize,
     ) -> Vec<SignedTransaction> {
         let mut requests = Vec::with_capacity(num_to_create);
@@ -53,7 +53,7 @@ impl TransactionGenerator for AccountGenerator {
             let receiver = LocalAccount::generate(&mut self.rng);
             let receiver_address = receiver.address();
             let request = create_account_transaction(
-                account,
+                account.clone(),
                 receiver_address,
                 &self.txn_factory,
                 self.creation_balance,

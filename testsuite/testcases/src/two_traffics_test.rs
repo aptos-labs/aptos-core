@@ -4,10 +4,7 @@
 use crate::{
     create_emitter_and_request, traffic_emitter_runtime, LoadDestination, NetworkLoadTest,
 };
-use aptos_forge::{
-    success_criteria::{SuccessCriteria, SuccessCriteriaChecker},
-    EmitJobRequest, NetworkContext, NetworkTest, Result, Swarm, Test, TestReport,
-};
+use aptos_forge::{success_criteria::{SuccessCriteria, SuccessCriteriaChecker}, EmitJobRequest, NetworkTest, Result, Swarm, Test, TestReport, NetworkContextSynchronizer};
 use aptos_logger::info;
 use rand::{rngs::OsRng, Rng, SeedableRng};
 use std::time::{Duration, Instant};
@@ -78,7 +75,7 @@ impl NetworkLoadTest for TwoTrafficsTest {
 }
 
 impl NetworkTest for TwoTrafficsTest {
-    fn run(&self, ctx: &mut NetworkContext<'_>) -> Result<()> {
+    fn run(&self, ctx: NetworkContextSynchronizer) -> Result<()> {
         <dyn NetworkLoadTest>::run(self, ctx)
     }
 }

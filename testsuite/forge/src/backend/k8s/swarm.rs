@@ -42,12 +42,13 @@ use std::{
     env, str,
     sync::Arc,
 };
+use std::sync::Mutex;
 use tokio::{runtime::Runtime, time::Duration};
 
 pub struct K8sSwarm {
     validators: HashMap<PeerId, K8sNode>,
     fullnodes: HashMap<PeerId, K8sNode>,
-    root_account: LocalAccount,
+    root_account: Arc<Mutex<LocalAccount>>,
     kube_client: K8sClient,
     versions: Arc<HashMap<Version, String>>,
     pub chain_id: ChainId,
@@ -86,6 +87,7 @@ impl K8sSwarm {
             )
         })?;
         let root_account = LocalAccount::new(address, account_key, sequence_number);
+        let root_account = Arc::new(Mutex::new(root_account));
 
         let mut versions = HashMap::new();
         let cur_version = Version::new(0, image_tag.to_string());
@@ -337,11 +339,11 @@ impl Swarm for K8sSwarm {
         Box::new(self.versions.keys().cloned())
     }
 
-    fn chain_info(&mut self) -> ChainInfo<'_> {
+    fn chain_info(&mut self) -> ChainInfo {
         let rest_api_url = self.get_rest_api_url(0);
         let inspection_service_url = self.get_inspection_service_url(0);
         ChainInfo::new(
-            &mut self.root_account,
+            self.root_account.clone(),
             rest_api_url,
             inspection_service_url,
             self.chain_id,
@@ -457,11 +459,11 @@ impl Swarm for K8sSwarm {
         bail!("No prom client");
     }
 
-    fn chain_info_for_node(&mut self, idx: usize) -> ChainInfo<'_> {
+    fn chain_info_for_node(&mut self, idx: usize) -> ChainInfo {
         let rest_api_url = self.get_rest_api_url(idx);
         let inspection_service_url = self.get_inspection_service_url(idx);
         ChainInfo::new(
-            &mut self.root_account,
+            self.root_account.clone(),
             rest_api_url,
             inspection_service_url,
             self.chain_id,

@@ -1,6 +1,7 @@
 // Copyright © Aptos Foundation
 // SPDX-License-Identifier: Apache-2.0
 
+use std::sync::Arc;
 use crate::{TransactionGenerator, TransactionGeneratorCreator};
 use aptos_sdk::types::{transaction::SignedTransaction, LocalAccount};
 
@@ -12,7 +13,7 @@ struct BoundedBatchWrapperTransactionGenerator {
 impl TransactionGenerator for BoundedBatchWrapperTransactionGenerator {
     fn generate_transactions(
         &mut self,
-        account: &LocalAccount,
+        account: Arc<std::sync::Mutex<LocalAccount>>,
         num_to_create: usize,
     ) -> Vec<SignedTransaction> {
         self.generator

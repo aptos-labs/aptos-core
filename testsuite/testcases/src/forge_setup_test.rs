@@ -4,7 +4,7 @@
 use crate::generate_traffic;
 use anyhow::Context;
 use aptos_config::config::OverrideNodeConfig;
-use aptos_forge::{NetworkContext, NetworkTest, Result, Test};
+use aptos_forge::{NetworkContextSynchronizer, NetworkTest, Result, Test};
 use aptos_logger::info;
 use rand::{
     rngs::{OsRng, StdRng},
@@ -12,6 +12,7 @@ use rand::{
     Rng, SeedableRng,
 };
 use std::{thread, time::Duration};
+use std::ops::DerefMut;
 use tokio::runtime::Runtime;
 
 const STATE_SYNC_VERSION_COUNTER_NAME: &str = "aptos_state_sync_version";
@@ -25,9 +26,11 @@ impl Test for ForgeSetupTest {
 }
 
 impl NetworkTest for ForgeSetupTest {
-    fn run(&self, ctx: &mut NetworkContext<'_>) -> Result<()> {
+    fn run(&self, ctx: NetworkContextSynchronizer) -> Result<()> {
         let mut rng = StdRng::from_seed(OsRng.gen());
         let runtime = Runtime::new().unwrap();
+        let mut ctx_locker = ctx.ctx.lock().unwrap();
+        let mut ctx = ctx_locker.deref_mut();
 
         let swarm = ctx.swarm();
 
@@ -75,7 +78,7 @@ impl NetworkTest for ForgeSetupTest {
         }
 
         let duration = Duration::from_secs(10 * num_pfns);
-        let txn_stat = generate_traffic(ctx, &pfns, duration)?;
+        let txn_stat = generate_traffic(&mut ctx, &pfns, duration)?;
 
         ctx.report
             .report_txn_stats(self.name().to_string(), &txn_stat);

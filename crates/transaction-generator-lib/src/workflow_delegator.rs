@@ -113,7 +113,7 @@ impl WorkflowTxnGenerator {
 impl TransactionGenerator for WorkflowTxnGenerator {
     fn generate_transactions(
         &mut self,
-        account: &LocalAccount,
+        account: Arc<std::sync::Mutex<LocalAccount>>,
         mut num_to_create: usize,
     ) -> Vec<SignedTransaction> {
         assert_ne!(num_to_create, 0);

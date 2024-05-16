@@ -1,3 +1,4 @@
+use std::ops::DerefMut;
 // Copyright © Aptos Foundation
 // SPDX-License-Identifier: Apache-2.0
 use crate::{
@@ -34,9 +35,11 @@ impl PublishPackageGenerator {
 impl TransactionGenerator for PublishPackageGenerator {
     fn generate_transactions(
         &mut self,
-        account: &LocalAccount,
+        account: Arc<std::sync::Mutex<LocalAccount>>,
         num_to_create: usize,
     ) -> Vec<SignedTransaction> {
+        let mut account_locker = account.lock().unwrap();
+        let account = account_locker.deref_mut();
         let mut requests = Vec::with_capacity(num_to_create);
 
         // First publish the module and then use it

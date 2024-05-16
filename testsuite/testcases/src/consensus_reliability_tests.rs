@@ -3,12 +3,9 @@
 
 use crate::{LoadDestination, NetworkLoadTest};
 use anyhow::{anyhow, bail, Context};
-use aptos_forge::{
-    test_utils::consensus_utils::{
-        test_consensus_fault_tolerance, FailPointFailureInjection, NodeState,
-    },
-    NetworkContext, NetworkTest, Result, Swarm, SwarmExt, Test, TestReport,
-};
+use aptos_forge::{test_utils::consensus_utils::{
+    test_consensus_fault_tolerance, FailPointFailureInjection, NodeState,
+}, NetworkContext, NetworkTest, Result, Swarm, SwarmExt, Test, TestReport, NetworkContextSynchronizer};
 use aptos_logger::{info, warn};
 use rand::Rng;
 use std::{collections::HashSet, time::Duration};
@@ -296,7 +293,7 @@ impl NetworkLoadTest for ChangingWorkingQuorumTest {
 }
 
 impl NetworkTest for ChangingWorkingQuorumTest {
-    fn run(&self, ctx: &mut NetworkContext<'_>) -> Result<()> {
+    fn run(&self, ctx: NetworkContextSynchronizer) -> Result<()> {
         <dyn NetworkLoadTest>::run(self, ctx)
     }
 }

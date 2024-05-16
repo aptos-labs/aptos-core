@@ -2,7 +2,7 @@
 // SPDX-License-Identifier: Apache-2.0
 
 use crate::{LoadDestination, NetworkLoadTest};
-use aptos_forge::{GroupNetEm, NetworkContext, NetworkTest, Swarm, SwarmChaos, SwarmNetEm, Test};
+use aptos_forge::{GroupNetEm, NetworkContext, NetworkContextSynchronizer, NetworkTest, Swarm, SwarmChaos, SwarmNetEm, Test};
 use aptos_logger::info;
 use aptos_types::PeerId;
 use itertools::{self, EitherOrBoth, Itertools};
@@ -313,7 +313,7 @@ impl NetworkLoadTest for MultiRegionNetworkEmulationTest {
 }
 
 impl NetworkTest for MultiRegionNetworkEmulationTest {
-    fn run(&self, ctx: &mut NetworkContext<'_>) -> anyhow::Result<()> {
+    fn run(&self, ctx: NetworkContextSynchronizer) -> anyhow::Result<()> {
         <dyn NetworkLoadTest>::run(self, ctx)
     }
 }

@@ -587,7 +587,7 @@ impl<'cfg, F: Factory> Forge<'cfg, F> {
             }
 
             for test in self.filter_tests(&self.tests.network_tests) {
-                let mut network_ctx = NetworkContext::new(
+                let network_ctx = NetworkContext::new(
                     CoreContext::from_rng(&mut rng),
                     &mut *swarm,
                     &mut report,
@@ -595,7 +595,9 @@ impl<'cfg, F: Factory> Forge<'cfg, F> {
                     self.tests.emit_job_request.clone(),
                     self.tests.success_criteria.clone(),
                 );
-                let result = run_test(|| test.run(&mut network_ctx));
+                // let network_ctx = Arc::new(Mutex::new(network_ctx));
+                let network_ctx = NetworkContextSynchronizer::new(network_ctx);
+                let result = run_test(|| test.run(network_ctx));
                 report.report_text(result.to_string());
                 summary.handle_result(test.name().to_owned(), result)?;
             }

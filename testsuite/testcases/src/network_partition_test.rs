@@ -2,7 +2,7 @@
 // SPDX-License-Identifier: Apache-2.0
 
 use crate::{LoadDestination, NetworkLoadTest};
-use aptos_forge::{NetworkContext, NetworkTest, SwarmChaos, SwarmNetworkPartition, Test};
+use aptos_forge::{NetworkContext, NetworkContextSynchronizer, NetworkTest, SwarmChaos, SwarmNetworkPartition, Test};
 
 pub struct NetworkPartitionTest;
 
@@ -53,7 +53,7 @@ impl NetworkLoadTest for NetworkPartitionTest {
 }
 
 impl NetworkTest for NetworkPartitionTest {
-    fn run(&self, ctx: &mut NetworkContext<'_>) -> anyhow::Result<()> {
+    fn run(&self, ctx: NetworkContextSynchronizer) -> anyhow::Result<()> {
         <dyn NetworkLoadTest>::run(self, ctx)
     }
 }

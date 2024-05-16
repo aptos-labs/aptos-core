@@ -1,11 +1,10 @@
 // Copyright © Aptos Foundation
 // SPDX-License-Identifier: Apache-2.0
 
+use std::ops::DerefMut;
 use crate::{batch_update, generate_traffic};
 use anyhow::bail;
-use aptos_forge::{
-    NetworkContext, NetworkTest, Result, SwarmExt, Test, DEFAULT_ROOT_PRIV_KEY, FORGE_KEY_SEED,
-};
+use aptos_forge::{NetworkTest, Result, SwarmExt, Test, DEFAULT_ROOT_PRIV_KEY, FORGE_KEY_SEED, NetworkContextSynchronizer};
 use aptos_keygen::KeyGen;
 use aptos_logger::info;
 use aptos_sdk::crypto::{ed25519::Ed25519PrivateKey, PrivateKey};
@@ -26,7 +25,9 @@ impl Test for FrameworkUpgrade {
 }
 
 impl NetworkTest for FrameworkUpgrade {
-    fn run(&self, ctx: &mut NetworkContext<'_>) -> Result<()> {
+    fn run(&self, ctx: NetworkContextSynchronizer) -> Result<()> {
+        let mut ctx_locker = ctx.ctx.lock().unwrap();
+        let mut ctx = ctx_locker.deref_mut();
         let runtime = Runtime::new()?;
 
         let epoch_duration = Duration::from_secs(Self::EPOCH_DURATION_SECS);
@@ -60,11 +61,11 @@ impl NetworkTest for FrameworkUpgrade {
         let msg = format!("Upgrade the nodes to version: {}", new_version);
         info!("{}", msg);
         ctx.report.report_text(msg);
-        runtime.block_on(batch_update(ctx, first_half, &new_version))?;
+        runtime.block_on(batch_update(&mut ctx, first_half, &new_version))?;
 
         // Generate some traffic
         let duration = Duration::from_secs(30);
-        let txn_stat = generate_traffic(ctx, &all_validators, duration)?;
+        let txn_stat = generate_traffic(&mut ctx, &all_validators, duration)?;
         ctx.report.report_txn_stats(
             format!("{}::full-framework-upgrade", self.name()),
             &txn_stat,
@@ -115,7 +116,7 @@ impl NetworkTest for FrameworkUpgrade {
         ))?;
 
         // Update the sequence number for the root account
-        let root_account = ctx.swarm().chain_info().root_account().address();
+        let root_account = ctx.swarm().chain_info().root_account().lock().unwrap().address();
         // Test the module publishing workflow
         let sequence_number = runtime
             .block_on(
@@ -130,11 +131,11 @@ impl NetworkTest for FrameworkUpgrade {
         ctx.swarm()
             .chain_info()
             .root_account()
-            .set_sequence_number(sequence_number);
+            .lock().unwrap().set_sequence_number(sequence_number);
 
         // Generate some traffic
         let duration = Duration::from_secs(30);
-        let txn_stat = generate_traffic(ctx, &all_validators, duration)?;
+        let txn_stat = generate_traffic(&mut ctx, &all_validators, duration)?;
         ctx.report.report_txn_stats(
             format!("{}::full-framework-upgrade", self.name()),
             &txn_stat,
@@ -156,10 +157,10 @@ impl NetworkTest for FrameworkUpgrade {
         let msg = format!("Upgrade the remaining nodes to version: {}", new_version);
         info!("{}", msg);
         ctx.report.report_text(msg);
-        runtime.block_on(batch_update(ctx, second_half, &new_version))?;
+        runtime.block_on(batch_update(&mut ctx, second_half, &new_version))?;
 
         let duration = Duration::from_secs(30);
-        let txn_stat = generate_traffic(ctx, &all_validators, duration)?;
+        let txn_stat = generate_traffic(&mut ctx, &all_validators, duration)?;
         ctx.report.report_txn_stats(
             format!("{}::full-framework-upgrade", self.name()),
             &txn_stat,

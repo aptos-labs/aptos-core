@@ -96,7 +96,7 @@ pub struct LocalSwarm {
     fullnodes: HashMap<PeerId, LocalNode>,
     public_networks: HashMap<PeerId, NetworkConfig>,
     dir: SwarmDirectory,
-    root_account: LocalAccount,
+    root_account: Arc<std::sync::Mutex<LocalAccount>>,
     chain_id: ChainId,
     root_key: ConfigKey<Ed25519PrivateKey>,
 
@@ -245,6 +245,7 @@ impl LocalSwarm {
             AccountKey::from_private_key(root_key.private_key()),
             0,
         );
+        let root_account = Arc::new(std::sync::Mutex::new(root_account));
 
         Ok(LocalSwarm {
             node_name_counter: validators.len(),
@@ -589,7 +590,7 @@ impl Swarm for LocalSwarm {
         Box::new(self.versions.keys().cloned())
     }
 
-    fn chain_info(&mut self) -> ChainInfo<'_> {
+    fn chain_info(&mut self) -> ChainInfo {
         let rest_api_url = self
             .validators()
             .next()
@@ -604,7 +605,7 @@ impl Swarm for LocalSwarm {
             .to_string();
 
         ChainInfo::new(
-            &mut self.root_account,
+            self.root_account.clone(),
             rest_api_url,
             inspection_service_url,
             self.chain_id,
@@ -655,7 +656,7 @@ impl Swarm for LocalSwarm {
         todo!()
     }
 
-    fn chain_info_for_node(&mut self, idx: usize) -> ChainInfo<'_> {
+    fn chain_info_for_node(&mut self, idx: usize) -> ChainInfo {
         let rest_api_url = self
             .validators()
             .nth(idx)
@@ -669,7 +670,7 @@ impl Swarm for LocalSwarm {
             .inspection_service_endpoint()
             .to_string();
         ChainInfo::new(
-            &mut self.root_account,
+            self.root_account.clone(),
             rest_api_url,
             inspection_service_url,
             self.chain_id,
