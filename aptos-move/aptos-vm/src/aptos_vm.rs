@@ -51,7 +51,8 @@ use aptos_types::{
     invalid_signature,
     move_utils::as_move_value::AsMoveValue,
     on_chain_config::{
-        new_epoch_event_key, randomness_api_v0_config::{AllowCustomMaxGasFlag, RequiredGasDeposit},
+        new_epoch_event_key,
+        randomness_api_v0_config::{AllowCustomMaxGasFlag, RequiredGasDeposit},
         ApprovedExecutionHashes, ConfigStorage, ConfigurationResource, FeatureFlag, Features,
         OnChainConfig, TimedFeatureOverride, TimedFeatures, TimedFeaturesBuilder,
     },
