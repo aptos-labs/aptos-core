@@ -379,7 +379,8 @@ impl SparseMerkleProof {
                     leaf.key,
                 );
                 ensure!(
-                    element_key.common_prefix_bits_len(leaf.key) >= self.siblings.len(),
+                    element_key.common_prefix_bits_len(leaf.key)
+                        >= root_depth + self.siblings.len(),
                     "Key would not have ended up in the subtree where the provided key in proof \
                      is the only existing key, if it existed. So this is not a valid \
                      non-inclusion proof. Key: {:x}. Key in proof: {:x}.",
