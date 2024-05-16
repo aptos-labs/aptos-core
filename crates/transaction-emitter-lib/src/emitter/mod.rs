@@ -196,7 +196,7 @@ impl Default for EmitJobRequest {
             num_accounts_mode: NumAccountsMode::TransactionsPerAccount(20),
             expected_max_txns: MAX_TXNS,
             expected_gas_per_txn: None,
-            expected_gas_per_transfer: 7,
+            expected_gas_per_transfer: 10,
             expected_gas_per_account_create: 2000 + 5,
             prompt_before_spending: false,
             coordination_delay_between_instances: Duration::from_secs(0),

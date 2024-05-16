@@ -14,9 +14,9 @@ Ok(
             ),
             events: [
                 ContractEvent { key: EventKey { creation_number: 0, account_address: f5b9d6f01a99e74c790e2f330c092fa05455a8193f1dfc1b113ecc54d067afe1 }, index: 0, type: Struct(StructTag { address: 0000000000000000000000000000000000000000000000000000000000000001, module: Identifier("account"), name: Identifier("CoinRegisterEvent"), type_args: [] }), event_data: "00000000000000000000000000000000000000000000000000000000000000010a6170746f735f636f696e094170746f73436f696e" },
-                ModuleEvent { type: Struct(StructTag { address: 0000000000000000000000000000000000000000000000000000000000000001, module: Identifier("transaction_fee"), name: Identifier("FeeStatement"), type_args: [] }), event_data: "06000000000000000400000000000000030000000000000000000000000000000000000000000000" },
+                ModuleEvent { type: Struct(StructTag { address: 0000000000000000000000000000000000000000000000000000000000000001, module: Identifier("transaction_fee"), name: Identifier("FeeStatement"), type_args: [] }), event_data: "09000000000000000500000000000000040000000000000000000000000000000000000000000000" },
             ],
-            gas_used: 6,
+            gas_used: 9,
             status: Keep(
                 Success,
             ),
