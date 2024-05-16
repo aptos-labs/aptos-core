@@ -33,6 +33,11 @@ impl<'t> NetworkContextSynchronizer<'t> {
             ctx: Arc::new(Mutex::new(ctx)),
         }
     }
+
+    pub fn report_text(&self, text: String) {
+        let mut locker = self.ctx.lock().unwrap();
+        locker.report.report_text(text);
+    }
 }
 
 pub struct NetworkContext<'t> {
