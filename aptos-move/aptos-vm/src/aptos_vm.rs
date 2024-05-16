@@ -17,11 +17,12 @@ use crate::{
         },
         AptosMoveResolver, MoveVmExt, SessionExt, SessionId, UserTransactionContext,
     },
+    randomness_config::AptosVMRandomnessConfig,
     sharded_block_executor::{executor_client::ExecutorClient, ShardedBlockExecutor},
     system_module_names::*,
     transaction_metadata::TransactionMetadata,
-    transaction_validation,
-    verifier::{self, randomness::has_randomness_attribute},
+    transaction_validation, verifier,
+    verifier::randomness::get_randomness_annotation,
     VMExecutor, VMValidator,
 };
 use anyhow::anyhow;
@@ -51,9 +52,9 @@ use aptos_types::{
     invalid_signature,
     move_utils::as_move_value::AsMoveValue,
     on_chain_config::{
-        new_epoch_event_key, randomness_api_v0_config::RequiredGasDeposit, ApprovedExecutionHashes,
-        ConfigStorage, ConfigurationResource, FeatureFlag, Features, OnChainConfig,
-        TimedFeatureOverride, TimedFeatures, TimedFeaturesBuilder,
+        new_epoch_event_key, ApprovedExecutionHashes, ConfigStorage, ConfigurationResource,
+        FeatureFlag, Features, OnChainConfig, TimedFeatureOverride, TimedFeatures,
+        TimedFeaturesBuilder,
     },
     randomness::Randomness,
     state_store::{StateView, TStateView},
@@ -225,7 +226,7 @@ pub struct AptosVM {
     timed_features: TimedFeatures,
     /// For a new chain, or even mainnet, the VK might not necessarily be set.
     pvk: Option<PreparedVerifyingKey<Bn254>>,
-    randomness_api_v0_required_deposit: RequiredGasDeposit,
+    randomness_config: AptosVMRandomnessConfig,
 }
 
 impl AptosVM {
@@ -234,9 +235,8 @@ impl AptosVM {
         override_is_delayed_field_optimization_capable: Option<bool>,
     ) -> Self {
         let _timer = TIMER.timer_with(&["AptosVM::new"]);
-        let randomness_api_v0_required_deposit = RequiredGasDeposit::fetch_config(resolver)
-            .unwrap_or_else(RequiredGasDeposit::default_if_missing);
         let features = Features::fetch_config(resolver).unwrap_or_default();
+        let randomness_config = AptosVMRandomnessConfig::fetch(resolver);
         let (
             gas_params,
             storage_gas_params,
@@ -295,7 +295,7 @@ impl AptosVM {
             storage_gas_params,
             timed_features,
             pvk,
-            randomness_api_v0_required_deposit,
+            randomness_config,
         }
     }
 
@@ -822,7 +822,8 @@ impl AptosVM {
         )?;
 
         // The `has_randomness_attribute()` should have been feature-gated in 1.11...
-        if is_friend_or_private && has_randomness_attribute(resolver, session, entry_fn)? {
+        if is_friend_or_private && get_randomness_annotation(resolver, session, entry_fn)?.is_some()
+        {
             let txn_context = session
                 .get_native_extensions()
                 .get_mut::<RandomnessContext>();
@@ -2495,9 +2496,20 @@ impl AptosVM {
     ) -> Result<Option<u64>, VMStatus> {
         match payload {
             TransactionPayload::EntryFunction(entry_func) => {
-                if let Some(gas_amount) = self.randomness_api_v0_required_deposit.gas_amount {
-                    if has_randomness_attribute(resolver, session, entry_func).unwrap_or(false) {
-                        if gas_amount != u64::from(txn_metadata.max_gas_amount) {
+                if let Some(annotation) =
+                    get_randomness_annotation(resolver, session, entry_func).unwrap_or(None)
+                {
+                    if let Some(default_gas_amount) =
+                        self.randomness_config.randomness_api_v0_required_deposit
+                    {
+                        let required_gas_amount =
+                            if self.randomness_config.allow_rand_contract_custom_max_gas {
+                                annotation.max_gas.unwrap_or(default_gas_amount)
+                            } else {
+                                default_gas_amount
+                            };
+                        let txn_max_gas = u64::from(txn_metadata.max_gas_amount);
+                        if required_gas_amount != txn_max_gas {
                             return Err(VMStatus::error(
                                 StatusCode::REQUIRED_DEPOSIT_INCONSISTENT_WITH_TXN_MAX_GAS,
                                 None,
