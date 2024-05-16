@@ -10,14 +10,21 @@ use crate::{
     monitor,
     payload_client::PayloadClient,
 };
-use aptos_consensus_types::common::{Payload, PayloadFilter};
+use aptos_consensus_types::common::{Payload, PayloadFilter, Round, TransactionSummary};
+use aptos_infallible::Mutex;
 use aptos_logger::debug;
 use aptos_types::validator_txn::ValidatorTransaction;
 use aptos_validator_transaction_pool::TransactionFilter;
 use arc_swap::ArcSwapOption;
 use futures::future::BoxFuture;
 use rayon::iter::{IndexedParallelIterator, IntoParallelRefIterator, ParallelIterator};
-use std::{ops::Deref, sync::Arc, time::Duration};
+use std::{
+    collections::{BTreeMap, VecDeque},
+    iter,
+    ops::{Add, Deref},
+    sync::Arc,
+    time::Duration,
+};
 // use crate::state_replication::PayloadClient;
 
 pub(crate) struct ShoalppPayloadClient {
@@ -25,6 +32,14 @@ pub(crate) struct ShoalppPayloadClient {
     payload_client: Arc<dyn PayloadClient>,
     ledger_info_provider: Arc<dyn TLedgerInfoProvider>,
     window_size_config: u64,
+    exclude_state: Vec<Mutex<ExcludesState>>,
+}
+
+#[derive(Default)]
+struct ExcludesState {
+    txn_len_by_round: BTreeMap<Round, usize>,
+    txns: VecDeque<TransactionSummary>,
+    last_highest: Round,
 }
 
 impl ShoalppPayloadClient {
@@ -39,6 +54,11 @@ impl ShoalppPayloadClient {
             payload_client,
             ledger_info_provider,
             window_size_config,
+            exclude_state: vec![
+                Mutex::new(ExcludesState::default()),
+                Mutex::new(ExcludesState::default()),
+                Mutex::new(ExcludesState::default()),
+            ],
         }
     }
 
@@ -52,37 +72,94 @@ impl ShoalppPayloadClient {
             .par_iter()
             .enumerate()
             .map(|(dag_id, dag_reader)| {
-                let highest_round_nodes = dag_reader.highest_round_nodes();
-                // TODO: support this for three dags
-                let highest_commit_round = self
+                let current_highest_committed = self
                     .ledger_info_provider
                     .get_highest_committed_anchor_round(dag_id as u8);
-                let exclude_payload = if highest_round_nodes.is_empty() {
-                    Vec::new()
-                } else {
+                let mut state = self.exclude_state[dag_id].lock();
+
+                if !state.txns.is_empty() {
+                    let reminder = state.txn_len_by_round.split_off(&current_highest_committed);
+                    let to_remove = state.txn_len_by_round.iter().map(|(_, count)| count).sum();
+
+                    state.txn_len_by_round = reminder;
+                    state.txns.drain(0..to_remove);
+                }
+
+                let highest_round_nodes = dag_reader.highest_round_nodes();
+                let excludes = if !highest_round_nodes.is_empty() {
+                    let upto_round = if state.txns.is_empty() {
+                        current_highest_committed.saturating_sub(self.window_size_config)
+                    } else {
+                        highest_round_nodes
+                            .last()
+                            .unwrap()
+                            .metadata()
+                            .round()
+                            .min(state.last_highest)
+                    };
                     dag_reader
                         .reachable(
                             highest_round_nodes.iter().map(|node| node.metadata()),
-                            Some(highest_commit_round.saturating_sub(self.window_size_config)),
+                            Some(upto_round),
                             |_| true,
                         )
-                        .map(|node_status| node_status.as_node().payload())
+                        .filter_map(|node_status| {
+                            let node = node_status.as_node();
+                            let _ = state
+                                .txn_len_by_round
+                                .entry(node.round())
+                                .or_default()
+                                .add(node.payload().len());
+                            let payload = node.payload();
+
+                            if let Payload::DirectMempool(txns) = payload {
+                                Some(txns)
+                            } else {
+                                None
+                            }
+                        })
+                        .flatten()
+                        .map(|txn| TransactionSummary {
+                            sender: txn.sender(),
+                            sequence_number: txn.sequence_number(),
+                        })
                         .collect()
+                } else {
+                    Vec::new()
                 };
-                exclude_payload
+
+                for e in excludes {
+                    state.txns.push_back(e);
+                }
+
+                state.last_highest = state.last_highest + 1;
+                state.txns.clone()
             })
             .flatten()
             .collect();
 
-        let proposals: Vec<_> = dag_reader_vec
-            .iter()
+        let last_proposals: Vec<_> = dag_reader_vec
+            .par_iter()
             .flat_map(|dag_reader| &dag_reader.recent_proposal)
+            .filter_map(|payload| {
+                if let Payload::DirectMempool(txns) = payload {
+                    Some(txns)
+                } else {
+                    None
+                }
+            })
+            .flatten()
+            .map(|txn| TransactionSummary {
+                sender: txn.sender(),
+                sequence_number: txn.sequence_number(),
+            })
             .collect();
-        excludes.extend_from_slice(&proposals);
+
+        excludes.extend_from_slice(&last_proposals);
 
         PAYLOAD_FILTER_COUNT.observe(excludes.len() as f64);
 
-        PayloadFilter::from(&excludes)
+        PayloadFilter::DirectMempool(excludes)
     }
 }
 
