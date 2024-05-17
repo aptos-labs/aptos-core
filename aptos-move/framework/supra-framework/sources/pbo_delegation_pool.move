@@ -208,6 +208,12 @@ module supra_framework::pbo_delegation_pool {
     /// Coin value is not the same with principle stake.
     const COIN_VALUE_NOT_SAME_AS_PRINCIPAL_STAKE:u64 = 24;
 
+    /// Balance below principle stake after unlock
+    const BALANCE_BELOW_PRINCIPLE_STAKE:u64 = 25;
+
+    /// Active share is not the same in stake pool and delegation pool
+    const ACTIVE_COIN_VALUE_NOT_SAME_STAKE_DELEGATION_POOL:u64 = 26;
+
     const MAX_U64: u64 = 18446744073709551615;
 
     /// Maximum operator percentage fee(of double digit precision): 22.85% is represented as 2285
@@ -753,7 +759,7 @@ module supra_framework::pbo_delegation_pool {
         };
         let (active_stake, _, _, _)= stake::get_stake(pool_address);
         // fail if coin in StakePool.active does not match with the balance in active_shares pool.
-        assert!( active_stake == pool_u64::total_coins(&borrow_global<DelegationPool>(pool_address).active_shares), error::invalid_state(0));
+        assert!( active_stake == pool_u64::total_coins(&borrow_global<DelegationPool>(pool_address).active_shares), error::invalid_state(ACTIVE_COIN_VALUE_NOT_SAME_STAKE_DELEGATION_POOL));
         // All delegation pool enable partial governace voting by default once the feature flag is enabled.
         if (features::partial_governance_voting_enabled() && features::delegation_pool_partial_governance_voting_enabled()) {
             enable_partial_governance_voting(pool_address);
@@ -1304,8 +1310,8 @@ module supra_framework::pbo_delegation_pool {
         let pool = borrow_global_mut<DelegationPool>(pool_address);
         let delegator_address = signer::address_of(delegator);
         // fail if the amount after withdraw is less than the principle stake and the lockup time is not expired
-        if (pool.principle_lockup_time > timestamp::now_seconds()) {
-            assert!(pool_u64::balance(&pool.active_shares,delegator_address) - amount >= *table::borrow(&pool.principle_stake, delegator_address), error::invalid_argument(0));
+        if (table::contains(&pool.principle_stake, delegator_address) && pool.principle_lockup_time > timestamp::now_seconds()) {
+            assert!(pool_u64::balance(&pool.active_shares,delegator_address) - amount >= *table::borrow(&pool.principle_stake, delegator_address), error::invalid_argument(BALANCE_BELOW_PRINCIPLE_STAKE));
         };
         amount = coins_to_transfer_to_ensure_min_stake(
             &pool.active_shares,
@@ -1329,7 +1335,7 @@ module supra_framework::pbo_delegation_pool {
         );
         let (active_stake, _, _, _)= stake::get_stake(pool_address);
         // fail if coin in StakePool.active does not match with the balance in active_shares pool.
-        assert!( active_stake == pool_u64::total_coins(&borrow_global<DelegationPool>(pool_address).active_shares), error::invalid_state(0));
+        assert!( active_stake == pool_u64::total_coins(&borrow_global<DelegationPool>(pool_address).active_shares), error::invalid_state(ACTIVE_COIN_VALUE_NOT_SAME_STAKE_DELEGATION_POOL));
     }
 
     /// Move `amount` of coins from pending_inactive to active.
@@ -2091,33 +2097,33 @@ module supra_framework::pbo_delegation_pool {
         withdraw(validator, get_owned_pool_address(signer::address_of(validator)), 0);
     }
 
-    // #[test(supra_framework = @supra_framework, validator = @0x123)]
-    // public entry fun test_initialize_delegation_pool(
-    //     supra_framework: &signer,
-    //     validator: &signer,
-    // ) acquires DelegationPoolOwnership, DelegationPool, GovernanceRecords, BeneficiaryForOperator, NextCommissionPercentage {
-    //     initialize_for_test(supra_framework);
-    //     let delegator_address = vector[@0x111];
-    //     let principle_stake = vector[100 * ONE_APT];
-    //     let coin = stake::mint_coins(100 * ONE_APT);
-    //     let principle_lockup_time = 0;
-    //     let validator_address = signer::address_of(validator);
-    //     initialize_delegation_pool(validator, 1234, vector::empty<u8>(), delegator_address, principle_stake, coin, principle_lockup_time);
-    //
-    //     assert_owner_cap_exists(validator_address);
-    //     let pool_address = get_owned_pool_address(validator_address);
-    //     assert_delegation_pool_exists(pool_address);
-    //
-    //     assert!(stake::stake_pool_exists(pool_address), 0);
-    //     assert!(stake::get_operator(pool_address) == validator_address, 0);
-    //     assert!(stake::get_delegated_voter(pool_address) == validator_address, 0);
-    //
-    //     assert!(observed_lockup_cycle(pool_address) == 0, 0);
-    //     assert!(total_coins_inactive(pool_address) == 0, 0);
-    //     assert!(operator_commission_percentage(pool_address) == 1234, 0);
-    //     assert_inactive_shares_pool(pool_address, 0, true, 0);
-    //     stake::assert_stake_pool(pool_address, 0, 0, 0, 0);
-    // }
+    #[test(supra_framework = @supra_framework, validator = @0x123)]
+    public entry fun test_initialize_delegation_pool(
+        supra_framework: &signer,
+        validator: &signer,
+    ) acquires DelegationPoolOwnership, DelegationPool, GovernanceRecords, BeneficiaryForOperator, NextCommissionPercentage {
+        initialize_for_test(supra_framework);
+        let delegator_address = vector[];
+        let principle_stake = vector[];
+        let coin = stake::mint_coins(0);
+        let principle_lockup_time = 0;
+        let validator_address = signer::address_of(validator);
+        initialize_delegation_pool(validator, 1234, vector::empty<u8>(), delegator_address, principle_stake, coin, principle_lockup_time);
+
+        assert_owner_cap_exists(validator_address);
+        let pool_address = get_owned_pool_address(validator_address);
+        assert_delegation_pool_exists(pool_address);
+
+        assert!(stake::stake_pool_exists(pool_address), 0);
+        assert!(stake::get_operator(pool_address) == validator_address, 0);
+        assert!(stake::get_delegated_voter(pool_address) == validator_address, 0);
+
+        assert!(observed_lockup_cycle(pool_address) == 0, 0);
+        assert!(total_coins_inactive(pool_address) == 0, 0);
+        assert!(operator_commission_percentage(pool_address) == 1234, 0);
+        assert_inactive_shares_pool(pool_address, 0, true, 0);
+        stake::assert_stake_pool(pool_address, 0, 0, 0, 0);
+    }
 
     // #[test(supra_framework = @supra_framework, validator = @0x123, delegator = @0x010)]
     // public entry fun test_never_create_pending_withdrawal_if_no_shares_bought(
@@ -2126,8 +2132,8 @@ module supra_framework::pbo_delegation_pool {
     //     delegator: &signer,
     // ) acquires DelegationPoolOwnership, DelegationPool, GovernanceRecords, BeneficiaryForOperator, NextCommissionPercentage {
     //     initialize_for_test(supra_framework);
-    //     let delegator_address = vector[@0x111];
-    //             let principle_stake = vector[100 * ONE_APT];
+    //     let delegator_address = vector[@0x010];
+    //     let principle_stake = vector[100 * ONE_APT];
     //     let coin = stake::mint_coins(100 * ONE_APT);
     //     let principle_lockup_time = 0;
     //     initialize_test_validator(validator, 1000 * ONE_APT, true, false, delegator_address, principle_stake, coin, principle_lockup_time);
@@ -2138,9 +2144,6 @@ module supra_framework::pbo_delegation_pool {
     //     let delegator_address = signer::address_of(delegator);
     //     account::create_account_for_test(delegator_address);
     //
-    //     // add stake without fees as validator is not active yet
-    //     stake::mint(delegator, 10 * ONE_APT);
-    //     add_stake(delegator, pool_address, 10 * ONE_APT);
     //     end_aptos_epoch();
     //
     //     unlock(validator, pool_address, 100 * ONE_APT);
@@ -2200,539 +2203,237 @@ module supra_framework::pbo_delegation_pool {
         initialize_test_validator(validator, MIN_COINS_ON_SHARES_POOL - 1, false, false, delegator_address, principle_stake, coin, principle_lockup_time);
     }
 
-    // #[test(supra_framework = @supra_framework, validator = @0x123)]
-    // public entry fun test_add_stake_single(
-    //     supra_framework: &signer,
-    //     validator: &signer,
-    // ) acquires DelegationPoolOwnership, DelegationPool, GovernanceRecords, BeneficiaryForOperator, NextCommissionPercentage {
-    //     initialize_for_test(supra_framework);
-    //     let delegator_address = vector[@0x111];
-    //     let principle_stake = vector[100 * ONE_APT];
-    //     let coin = stake::mint_coins(100 * ONE_APT);
-    //     let principle_lockup_time = 0;
-    //     initialize_test_validator(validator, 1000 * ONE_APT, false, false, delegator_address, principle_stake, coin, principle_lockup_time);
-    //
-    //     let validator_address = signer::address_of(validator);
-    //     let pool_address = get_owned_pool_address(validator_address);
-    //
-    //     // validator is inactive => added stake is `active` by default
-    //     stake::assert_stake_pool(pool_address, 1000 * ONE_APT, 0, 0, 0);
-    //     assert_delegation(validator_address, pool_address, 1000 * ONE_APT, 0, 0);
-    //
-    //     // zero `add_stake` fee as validator is not producing rewards this epoch
-    //     assert!(get_add_stake_fee(pool_address, 250 * ONE_APT) == 0, 0);
-    //
-    //     // check `add_stake` increases `active` stakes of delegator and stake pool
-    //     stake::mint(validator, 300 * ONE_APT);
-    //     let balance = coin::balance<SupraCoin>(validator_address);
-    //     add_stake(validator, pool_address, 250 * ONE_APT);
-    //
-    //     // check added stake have been transferred out of delegator account
-    //     assert!(coin::balance<SupraCoin>(validator_address) == balance - 250 * ONE_APT, 0);
-    //     // zero `add_stake` fee charged from added stake
-    //     assert_delegation(validator_address, pool_address, 1250 * ONE_APT, 0, 0);
-    //     // zero `add_stake` fee transferred to null shareholder
-    //     assert_delegation(NULL_SHAREHOLDER, pool_address, 0, 0, 0);
-    //     // added stake is automatically `active` on inactive validator
-    //     stake::assert_stake_pool(pool_address, 1250 * ONE_APT, 0, 0, 0);
-    //
-    //     // activate validator
-    //     stake::join_validator_set(validator, pool_address);
-    //     end_aptos_epoch();
-    //
-    //     // add 250 coins being pending_active until next epoch
-    //     stake::mint(validator, 250 * ONE_APT);
-    //     add_stake(validator, pool_address, 250 * ONE_APT);
-    //
-    //     let fee1 = get_add_stake_fee(pool_address, 250 * ONE_APT);
-    //     assert_delegation(validator_address, pool_address, 1500 * ONE_APT - fee1, 0, 0);
-    //     // check `add_stake` fee has been transferred to the null shareholder
-    //     assert_delegation(NULL_SHAREHOLDER, pool_address, fee1, 0, 0);
-    //     stake::assert_stake_pool(pool_address, 1250 * ONE_APT, 0, 250 * ONE_APT, 0);
-    //
-    //     // add 100 additional coins being pending_active until next epoch
-    //     stake::mint(validator, 100 * ONE_APT);
-    //     add_stake(validator, pool_address, 100 * ONE_APT);
-    //
-    //     let fee2 = get_add_stake_fee(pool_address, 100 * ONE_APT);
-    //     assert_delegation(validator_address, pool_address, 1600 * ONE_APT - fee1 - fee2, 0, 0);
-    //     // check `add_stake` fee has been transferred to the null shareholder
-    //     assert_delegation(NULL_SHAREHOLDER, pool_address, fee1 + fee2, 0, 0);
-    //     stake::assert_stake_pool(pool_address, 1250 * ONE_APT, 0, 350 * ONE_APT, 0);
-    //
-    //     end_aptos_epoch();
-    //     // delegator got its `add_stake` fees back + 1250 * 1% * (100% - 0%) active rewards
-    //     assert_delegation(validator_address, pool_address, 161250000000, 0, 0);
-    //     stake::assert_stake_pool(pool_address, 161250000000, 0, 0, 0);
-    //
-    //     // check that shares of null shareholder have been released
-    //     assert_delegation(NULL_SHAREHOLDER, pool_address, 0, 0, 0);
-    //     synchronize_delegation_pool(pool_address);
-    //     assert!(pool_u64::shares(&borrow_global<DelegationPool>(pool_address).active_shares, NULL_SHAREHOLDER) == 0, 0);
-    //     assert_delegation(NULL_SHAREHOLDER, pool_address, 0, 0, 0);
-    //
-    //     // add 200 coins being pending_active until next epoch
-    //     stake::mint(validator, 200 * ONE_APT);
-    //     add_stake(validator, pool_address, 200 * ONE_APT);
-    //
-    //     fee1 = get_add_stake_fee(pool_address, 200 * ONE_APT);
-    //     assert_delegation(validator_address, pool_address, 181250000000 - fee1, 0, 0);
-    //     // check `add_stake` fee has been transferred to the null shareholder
-    //     assert_delegation(NULL_SHAREHOLDER, pool_address, fee1 - 1, 0, 0);
-    //     stake::assert_stake_pool(pool_address, 161250000000, 0, 20000000000, 0);
-    //
-    //     end_aptos_epoch();
-    //     // delegator got its `add_stake` fee back + 161250000000 * 1% active rewards
-    //     assert_delegation(validator_address, pool_address, 182862500000, 0, 0);
-    //     stake::assert_stake_pool(pool_address, 182862500000, 0, 0, 0);
-    //
-    //     // check that shares of null shareholder have been released
-    //     assert_delegation(NULL_SHAREHOLDER, pool_address, 0, 0, 0);
-    //     synchronize_delegation_pool(pool_address);
-    //     assert!(pool_u64::shares(&borrow_global<DelegationPool>(pool_address).active_shares, NULL_SHAREHOLDER) == 0, 0);
-    //     assert_delegation(NULL_SHAREHOLDER, pool_address, 0, 0, 0);
-    // }
+    #[test(supra_framework = @supra_framework, validator = @0x123)]
+    public entry fun test_reactivate_stake_single(
+        supra_framework: &signer,
+        validator: &signer,
+    ) acquires DelegationPoolOwnership, DelegationPool, GovernanceRecords, BeneficiaryForOperator, NextCommissionPercentage {
+        initialize_for_test(supra_framework);
+        let delegator_address = vector[];
+        let principle_stake = vector[];
+        let coin = stake::mint_coins(0);
+        let principle_lockup_time = 0;
+        initialize_test_validator(validator, 200 * ONE_APT, true, true, delegator_address, principle_stake, coin, principle_lockup_time);
 
-    // #[test(supra_framework = @supra_framework, validator = @0x123, delegator = @0x010)]
-    // public entry fun test_add_stake_many(
-    //     supra_framework: &signer,
-    //     validator: &signer,
-    //     delegator: &signer,
-    // ) acquires DelegationPoolOwnership, DelegationPool, GovernanceRecords, BeneficiaryForOperator, NextCommissionPercentage {
-    //     initialize_for_test(supra_framework);
-    //     let delegator_address = vector[@0x111];
-    //     let principle_stake = vector[100 * ONE_APT];
-    //     let coin = stake::mint_coins(100 * ONE_APT);
-    //     let principle_lockup_time = 0;
-    //     initialize_test_validator(validator, 1000 * ONE_APT, true, true, delegator_address, principle_stake, coin, principle_lockup_time);
-    //
-    //     let validator_address = signer::address_of(validator);
-    //     let pool_address = get_owned_pool_address(validator_address);
-    //
-    //     let delegator_address = signer::address_of(delegator);
-    //     account::create_account_for_test(delegator_address);
-    //
-    //     stake::assert_stake_pool(pool_address, 1000 * ONE_APT, 0, 0, 0);
-    //     assert_delegation(validator_address, pool_address, 1000 * ONE_APT, 0, 0);
-    //
-    //     // add 250 coins from second account
-    //     stake::mint(delegator, 250 * ONE_APT);
-    //     add_stake(delegator, pool_address, 250 * ONE_APT);
-    //
-    //     let fee1 = get_add_stake_fee(pool_address, 250 * ONE_APT);
-    //     assert_delegation(delegator_address, pool_address, 250 * ONE_APT - fee1, 0, 0);
-    //     assert_delegation(validator_address, pool_address, 1000 * ONE_APT, 0, 0);
-    //     stake::assert_stake_pool(pool_address, 1000 * ONE_APT, 0, 250 * ONE_APT, 0);
-    //
-    //     end_aptos_epoch();
-    //     // 1000 * 1.01 active stake + 250 pending_active stake
-    //     stake::assert_stake_pool(pool_address, 1260 * ONE_APT, 0, 0, 0);
-    //     // delegator got its `add_stake` fee back
-    //     assert_delegation(delegator_address, pool_address, 250 * ONE_APT, 0, 0);
-    //     // actual active rewards have been distributed to their earner(s)
-    //     assert_delegation(validator_address, pool_address, 100999999999, 0, 0);
-    //
-    //     // add another 250 coins from first account
-    //     stake::mint(validator, 250 * ONE_APT);
-    //     add_stake(validator, pool_address, 250 * ONE_APT);
-    //
-    //     fee1 = get_add_stake_fee(pool_address, 250 * ONE_APT);
-    //     assert_delegation(validator_address, pool_address, 125999999999 - fee1, 0, 0);
-    //     assert_delegation(delegator_address, pool_address, 250 * ONE_APT, 0, 0);
-    //     stake::assert_stake_pool(pool_address, 1260 * ONE_APT, 0, 250 * ONE_APT, 0);
-    //
-    //     // add another 100 coins from second account
-    //     stake::mint(delegator, 100 * ONE_APT);
-    //     add_stake(delegator, pool_address, 100 * ONE_APT);
-    //
-    //     let fee2 = get_add_stake_fee(pool_address, 100 * ONE_APT);
-    //     assert_delegation(delegator_address, pool_address, 350 * ONE_APT - fee2, 0, 0);
-    //     assert_delegation(validator_address, pool_address, 125999999999 - fee1, 0, 0);
-    //     stake::assert_stake_pool(pool_address, 1260 * ONE_APT, 0, 350 * ONE_APT, 0);
-    //
-    //     end_aptos_epoch();
-    //     // both delegators got their `add_stake` fees back
-    //     // 250 * 1.01 active stake + 100 pending_active stake
-    //     assert_delegation(delegator_address, pool_address, 35250000001, 0, 0);
-    //     // 1010 * 1.01 active stake + 250 pending_active stake
-    //     assert_delegation(validator_address, pool_address, 127009999998, 0, 0);
-    //     stake::assert_stake_pool(pool_address, 162260000000, 0, 0, 0);
-    // }
+        let validator_address = signer::address_of(validator);
+        let pool_address = get_owned_pool_address(validator_address);
 
-    // #[test(supra_framework = @supra_framework, validator = @0x123, delegator1 = @0x010, delegator2 = @0x020)]
-    // public entry fun test_total_coins_inactive(
-    //     supra_framework: &signer,
-    //     validator: &signer,
-    //     delegator1: &signer,
-    //     delegator2: &signer,
-    // ) acquires DelegationPoolOwnership, DelegationPool, GovernanceRecords, BeneficiaryForOperator, NextCommissionPercentage {
-    //     initialize_for_test(supra_framework);
-    //     let delegator_address = vector[@0x111];
-    //     let principle_stake = vector[100 * ONE_APT];
-    //     let coin = stake::mint_coins(100 * ONE_APT);
-    //     let principle_lockup_time = 0;
-    //     initialize_test_validator(validator, 200 * ONE_APT, true, true, delegator_address, principle_stake, coin, principle_lockup_time);
-    //
-    //     let validator_address = signer::address_of(validator);
-    //     let pool_address = get_owned_pool_address(validator_address);
-    //
-    //     let delegator1_address = signer::address_of(delegator1);
-    //     account::create_account_for_test(delegator1_address);
-    //
-    //     let delegator2_address = signer::address_of(delegator2);
-    //     account::create_account_for_test(delegator2_address);
-    //
-    //     stake::mint(delegator1, 100 * ONE_APT);
-    //     stake::mint(delegator2, 200 * ONE_APT);
-    //     add_stake(delegator1, pool_address, 100 * ONE_APT);
-    //     add_stake(delegator2, pool_address, 200 * ONE_APT);
-    //     end_aptos_epoch();
-    //
-    //     assert_delegation(delegator1_address, pool_address, 100 * ONE_APT, 0, 0);
-    //     assert_delegation(delegator2_address, pool_address, 200 * ONE_APT, 0, 0);
-    //
-    //     // unlock some stake from delegator 1
-    //     unlock(delegator1, pool_address, 50 * ONE_APT);
-    //     assert_delegation(delegator1_address, pool_address, 5000000000, 0, 4999999999);
-    //
-    //     // move to lockup cycle 1
-    //     timestamp::fast_forward_seconds(LOCKUP_CYCLE_SECONDS);
-    //     end_aptos_epoch();
-    //
-    //     // delegator 1 pending_inactive stake has been inactivated
-    //     assert_delegation(delegator1_address, pool_address, 5050000000, 5049999998, 0);
-    //     assert_delegation(delegator2_address, pool_address, 202 * ONE_APT, 0, 0);
-    //
-    //     synchronize_delegation_pool(pool_address);
-    //     assert!(total_coins_inactive(pool_address) == 5049999998, 0);
-    //
-    //     // unlock some stake from delegator 2
-    //     unlock(delegator2, pool_address, 50 * ONE_APT);
-    //     assert_delegation(delegator2_address, pool_address, 15200000001, 0, 4999999999);
-    //
-    //     // withdraw some of inactive stake of delegator 1
-    //     withdraw(delegator1, pool_address, 2049999998);
-    //     assert_delegation(delegator1_address, pool_address, 5050000000, 3000000001, 0);
-    //     assert!(total_coins_inactive(pool_address) == 3000000001, 0);
-    //
-    //     // move to lockup cycle 2
-    //     let (_, inactive, _, pending_inactive) = stake::get_stake(pool_address);
-    //     timestamp::fast_forward_seconds(LOCKUP_CYCLE_SECONDS);
-    //     end_aptos_epoch();
-    //
-    //     // delegator 2 pending_inactive stake has been inactivated
-    //     assert_delegation(delegator1_address, pool_address, 5100500000, 3000000001, 0);
-    //     assert_delegation(delegator2_address, pool_address, 15352000001, 5049999998, 0);
-    //
-    //     // total_coins_inactive remains unchanged in the absence of user operations
-    //     assert!(total_coins_inactive(pool_address) == inactive, 0);
-    //     synchronize_delegation_pool(pool_address);
-    //     // total_coins_inactive == previous inactive stake + previous pending_inactive stake and its rewards
-    //     assert!(total_coins_inactive(pool_address) == inactive + pending_inactive + pending_inactive / 100, 0);
-    //
-    //     // withdraw some of inactive stake of delegator 2
-    //     let total_coins_inactive = total_coins_inactive(pool_address);
-    //     withdraw(delegator2, pool_address, 3049999998);
-    //     assert!(total_coins_inactive(pool_address) == total_coins_inactive - 3049999997, 0);
-    //
-    //     // unlock some stake from delegator `validator`
-    //     unlock(validator, pool_address, 50 * ONE_APT);
-    //
-    //     // create dummy validator to ensure the existing validator can leave the set
-    //     let coin = stake::mint_coins(100 * ONE_APT);
-    //     initialize_test_validator(delegator1, 100 * ONE_APT, true, true, delegator_address, principle_stake, coin, principle_lockup_time);
-    //     // inactivate validator
-    //     stake::leave_validator_set(validator, pool_address);
-    //     end_aptos_epoch();
-    //
-    //     // move to lockup cycle 3
-    //     (_, inactive, _, pending_inactive) = stake::get_stake(pool_address);
-    //     timestamp::fast_forward_seconds(LOCKUP_CYCLE_SECONDS);
-    //     end_aptos_epoch();
-    //
-    //     // pending_inactive stake has not been inactivated as validator is inactive
-    //     let (_, inactive_now, _, pending_inactive_now) = stake::get_stake(pool_address);
-    //     assert!(inactive_now == inactive, inactive_now);
-    //     assert!(pending_inactive_now == pending_inactive, pending_inactive_now);
-    //
-    //     // total_coins_inactive remains unchanged in the absence of a new OLC
-    //     synchronize_delegation_pool(pool_address);
-    //     assert!(total_coins_inactive(pool_address) == inactive, 0);
-    //
-    //     // withdraw entire pending_inactive stake
-    //     withdraw(validator, pool_address, MAX_U64);
-    //     assert!(total_coins_inactive(pool_address) == inactive, 0);
-    //     (_, _, _, pending_inactive) = stake::get_stake(pool_address);
-    //     assert!(pending_inactive == 0, pending_inactive);
-    //
-    //     // withdraw entire inactive stake
-    //     withdraw(delegator1, pool_address, MAX_U64);
-    //     withdraw(delegator2, pool_address, MAX_U64);
-    //     assert!(total_coins_inactive(pool_address) == 0, 0);
-    //     (_, inactive, _, _) = stake::get_stake(pool_address);
-    //     assert!(inactive == 0, inactive);
-    // }
+        // unlock some stake from the active one
+        unlock(validator, pool_address, 100 * ONE_APT);
+        assert_delegation(validator_address, pool_address, 100 * ONE_APT, 0, 100 * ONE_APT);
+        stake::assert_stake_pool(pool_address, 100 * ONE_APT, 0, 0, 100 * ONE_APT);
+        assert_pending_withdrawal(validator_address, pool_address, true, 0, false, 100 * ONE_APT);
 
-    // #[test(supra_framework = @supra_framework, validator = @0x123)]
-    // public entry fun test_reactivate_stake_single(
-    //     supra_framework: &signer,
-    //     validator: &signer,
-    // ) acquires DelegationPoolOwnership, DelegationPool, GovernanceRecords, BeneficiaryForOperator, NextCommissionPercentage {
-    //     initialize_for_test(supra_framework);
-    //     let delegator_address = vector[@0x111];
-    //     let principle_stake = vector[100 * ONE_APT];
-    //     let coin = stake::mint_coins(100 * ONE_APT);
-    //     let principle_lockup_time = 0;
-    //     initialize_test_validator(validator, 200 * ONE_APT, true, true, delegator_address, principle_stake, coin, principle_lockup_time);
-    //
-    //     let validator_address = signer::address_of(validator);
-    //     let pool_address = get_owned_pool_address(validator_address);
-    //
-    //     // unlock some stake from the active one
-    //     unlock(validator, pool_address, 100 * ONE_APT);
-    //     assert_delegation(validator_address, pool_address, 100 * ONE_APT, 0, 100 * ONE_APT);
-    //     stake::assert_stake_pool(pool_address, 100 * ONE_APT, 0, 0, 100 * ONE_APT);
-    //     assert_pending_withdrawal(validator_address, pool_address, true, 0, false, 100 * ONE_APT);
-    //
-    //     // add some stake to pending_active state
-    //     stake::mint(validator, 150 * ONE_APT);
-    //     add_stake(validator, pool_address, 150 * ONE_APT);
-    //
-    //     let fee = get_add_stake_fee(pool_address, 150 * ONE_APT);
-    //     assert_delegation(validator_address, pool_address, 250 * ONE_APT - fee, 0, 100 * ONE_APT);
-    //     stake::assert_stake_pool(pool_address, 100 * ONE_APT, 0, 150 * ONE_APT, 100 * ONE_APT);
-    //
-    //     // can reactivate only pending_inactive stake
-    //     reactivate_stake(validator, pool_address, 150 * ONE_APT);
-    //
-    //     assert_delegation(validator_address, pool_address, 350 * ONE_APT - fee, 0, 0);
-    //     stake::assert_stake_pool(pool_address, 200 * ONE_APT, 0, 150 * ONE_APT, 0);
-    //     assert_pending_withdrawal(validator_address, pool_address, false, 0, false, 0);
-    //
-    //     end_aptos_epoch();
-    //     // 20000000000 active stake * 1.01 + 15000000000 pending_active stake
-    //     assert_delegation(validator_address, pool_address, 35200000000, 0, 0);
-    //
-    //     // unlock stake added at previous epoch (expect some imprecision when moving shares)
-    //     unlock(validator, pool_address, 150 * ONE_APT);
-    //     assert_delegation(validator_address, pool_address, 20200000001, 0, 14999999999);
-    //     stake::assert_stake_pool(pool_address, 20200000001, 0, 0, 14999999999);
-    //
-    //     // inactivate pending_inactive stake
-    //     timestamp::fast_forward_seconds(LOCKUP_CYCLE_SECONDS);
-    //     end_aptos_epoch();
-    //
-    //     // 20200000001 active stake * 1.01 + 14999999999 pending_inactive stake * 1.01
-    //     assert_delegation(validator_address, pool_address, 20402000001, 15149999998, 0);
-    //     assert_pending_withdrawal(validator_address, pool_address, true, 0, true, 15149999998);
-    //
-    //     // cannot reactivate inactive stake
-    //     reactivate_stake(validator, pool_address, 15149999998);
-    //     assert_delegation(validator_address, pool_address, 20402000001, 15149999998, 0);
-    //
-    //     // unlock stake in the new lockup cycle (the pending withdrawal is executed)
-    //     unlock(validator, pool_address, 100 * ONE_APT);
-    //     assert!(coin::balance<SupraCoin>(validator_address) == 15149999998, 0);
-    //     assert_delegation(validator_address, pool_address, 10402000002, 0, 9999999999);
-    //     assert_pending_withdrawal(validator_address, pool_address, true, 1, false, 9999999999);
-    //
-    //     // reactivate the new pending withdrawal almost entirely
-    //     reactivate_stake(validator, pool_address, 8999999999);
-    //     assert_pending_withdrawal(validator_address, pool_address, true, 1, false, 1000000000);
-    //     // reactivate remaining stake of the new pending withdrawal
-    //     reactivate_stake(validator, pool_address, 1000000000);
-    //     assert_pending_withdrawal(validator_address, pool_address, false, 0, false, 0);
-    // }
+        // add some stake to pending_active state
+        stake::mint(validator, 150 * ONE_APT);
+        add_stake(validator, pool_address, 150 * ONE_APT);
 
-    // #[test(supra_framework = @supra_framework, validator = @0x123)]
-    // public entry fun test_active_stake_rewards(
-    //     supra_framework: &signer,
-    //     validator: &signer,
-    // ) acquires DelegationPoolOwnership, DelegationPool, GovernanceRecords, BeneficiaryForOperator, NextCommissionPercentage {
-    //     initialize_for_test(supra_framework);
-    //     let delegator_address = vector[@0x111];
-    //     let principle_stake = vector[100 * ONE_APT];
-    //     let coin = stake::mint_coins(100 * ONE_APT);
-    //     let principle_lockup_time = 0;
-    //     initialize_test_validator(validator, 1000 * ONE_APT, true, true, delegator_address, principle_stake, coin, principle_lockup_time);
-    //
-    //     let validator_address = signer::address_of(validator);
-    //     let pool_address = get_owned_pool_address(validator_address);
-    //
-    //     end_aptos_epoch();
-    //     // 100000000000 active stake * 1.01
-    //     assert_delegation(validator_address, pool_address, 1010 * ONE_APT, 0, 0);
-    //
-    //     // add stake in pending_active state
-    //     stake::mint(validator, 200 * ONE_APT);
-    //     add_stake(validator, pool_address, 200 * ONE_APT);
-    //
-    //     let fee = get_add_stake_fee(pool_address, 200 * ONE_APT);
-    //     assert_delegation(validator_address, pool_address, 1210 * ONE_APT - fee, 0, 0);
-    //
-    //     end_aptos_epoch();
-    //     // 101000000000 active stake * 1.01 + 20000000000 pending_active stake with no rewards
-    //     assert_delegation(validator_address, pool_address, 122010000000, 0, 0);
-    //
-    //     end_aptos_epoch();
-    //     // 122010000000 active stake * 1.01
-    //     assert_delegation(validator_address, pool_address, 123230100000, 0, 0);
-    //
-    //     // 123230100000 active stake * 1.01
-    //     end_aptos_epoch();
-    //     // 124462401000 active stake * 1.01
-    //     end_aptos_epoch();
-    //     // 125707025010 active stake * 1.01
-    //     end_aptos_epoch();
-    //     // 126964095260 active stake * 1.01
-    //     end_aptos_epoch();
-    //     // 128233736212 active stake * 1.01
-    //     end_aptos_epoch();
-    //     assert_delegation(validator_address, pool_address, 129516073574, 0, 0);
-    //
-    //     // unlock 200 coins from delegator `validator`
-    //     unlock(validator, pool_address, 200 * ONE_APT);
-    //     assert_delegation(validator_address, pool_address, 109516073575, 0, 19999999999);
-    //
-    //     // end this lockup cycle
-    //     timestamp::fast_forward_seconds(LOCKUP_CYCLE_SECONDS);
-    //     end_aptos_epoch();
-    //     // 109516073575 active stake * 1.01 + 19999999999 pending_inactive stake * 1.01
-    //     assert_delegation(validator_address, pool_address, 110611234310, 20199999998, 0);
-    //
-    //     end_aptos_epoch();
-    //     // 110611234310 active stake * 1.01 + 20199999998 inactive stake
-    //     assert_delegation(validator_address, pool_address, 111717346653, 20199999998, 0);
-    //
-    //     // add stake in pending_active state
-    //     stake::mint(validator, 1000 * ONE_APT);
-    //     add_stake(validator, pool_address, 1000 * ONE_APT);
-    //
-    //     fee = get_add_stake_fee(pool_address, 1000 * ONE_APT);
-    //     assert_delegation(validator_address, pool_address, 211717346653 - fee, 20199999998, 0);
-    //
-    //     end_aptos_epoch();
-    //     // 111717346653 active stake * 1.01 + 100000000000 pending_active stake + 20199999998 inactive stake
-    //     assert_delegation(validator_address, pool_address, 212834520119, 20199999998, 0);
-    //
-    //     end_aptos_epoch();
-    //     // 212834520119 active stake * 1.01 + 20199999998 inactive stake
-    //     assert_delegation(validator_address, pool_address, 214962865320, 20199999998, 0);
-    // }
-    //
-    // #[test(supra_framework = @supra_framework, validator = @0x123, delegator = @0x010)]
-    // public entry fun test_active_stake_rewards_multiple(
-    //     supra_framework: &signer,
-    //     validator: &signer,
-    //     delegator: &signer,
-    // ) acquires DelegationPoolOwnership, DelegationPool, GovernanceRecords, BeneficiaryForOperator, NextCommissionPercentage {
-    //     initialize_for_test(supra_framework);
-    //     let delegator_address = vector[@0x111];
-    //     let principle_stake = vector[100 * ONE_APT];
-    //     let coin = stake::mint_coins(100 * ONE_APT);
-    //     let principle_lockup_time = 0;
-    //     initialize_test_validator(validator, 200 * ONE_APT, true, true, delegator_address, principle_stake, coin, principle_lockup_time);
-    //
-    //     let validator_address = signer::address_of(validator);
-    //     let pool_address = get_owned_pool_address(validator_address);
-    //
-    //     let delegator_address = signer::address_of(delegator);
-    //     account::create_account_for_test(delegator_address);
-    //
-    //     // add stake in pending_active state
-    //     stake::mint(delegator, 300 * ONE_APT);
-    //     add_stake(delegator, pool_address, 300 * ONE_APT);
-    //
-    //     let fee = get_add_stake_fee(pool_address, 300 * ONE_APT);
-    //     assert_delegation(delegator_address, pool_address, 300 * ONE_APT - fee, 0, 0);
-    //     assert_delegation(validator_address, pool_address, 200 * ONE_APT, 0, 0);
-    //     stake::assert_stake_pool(pool_address, 200 * ONE_APT, 0, 300 * ONE_APT, 0);
-    //
-    //     end_aptos_epoch();
-    //     // `delegator` got its `add_stake` fee back and `validator` its active stake rewards
-    //     assert_delegation(delegator_address, pool_address, 300 * ONE_APT, 0, 0);
-    //     assert_delegation(validator_address, pool_address, 20199999999, 0, 0);
-    //     stake::assert_stake_pool(pool_address, 502 * ONE_APT, 0, 0, 0);
-    //
-    //     // delegators earn their own rewards from now on
-    //     end_aptos_epoch();
-    //     assert_delegation(delegator_address, pool_address, 303 * ONE_APT, 0, 0);
-    //     assert_delegation(validator_address, pool_address, 20401999999, 0, 0);
-    //     stake::assert_stake_pool(pool_address, 50702000000, 0, 0, 0);
-    //
-    //     end_aptos_epoch();
-    //     assert_delegation(delegator_address, pool_address, 30603000000, 0, 0);
-    //     assert_delegation(validator_address, pool_address, 20606019999, 0, 0);
-    //     stake::assert_stake_pool(pool_address, 51209020000, 0, 0, 0);
-    //
-    //     end_aptos_epoch();
-    //     assert_delegation(delegator_address, pool_address, 30909030000, 0, 0);
-    //     assert_delegation(validator_address, pool_address, 20812080199, 0, 0);
-    //     stake::assert_stake_pool(pool_address, 51721110200, 0, 0, 0);
-    //
-    //     // add more stake in pending_active state than currently active
-    //     stake::mint(delegator, 1000 * ONE_APT);
-    //     add_stake(delegator, pool_address, 1000 * ONE_APT);
-    //
-    //     fee = get_add_stake_fee(pool_address, 1000 * ONE_APT);
-    //     assert_delegation(delegator_address, pool_address, 130909030000 - fee, 0, 0);
-    //     assert_delegation(validator_address, pool_address, 20812080199, 0, 0);
-    //
-    //     end_aptos_epoch();
-    //     // `delegator` got its `add_stake` fee back and `validator` its active stake rewards
-    //     assert_delegation(delegator_address, pool_address, 131218120300, 0, 0);
-    //     assert_delegation(validator_address, pool_address, 21020201001, 0, 0);
-    //     stake::assert_stake_pool(pool_address, 152238321302, 0, 0, 0);
-    // }
+        let fee = get_add_stake_fee(pool_address, 150 * ONE_APT);
+        assert_delegation(validator_address, pool_address, 250 * ONE_APT - fee, 0, 100 * ONE_APT);
+        stake::assert_stake_pool(pool_address, 100 * ONE_APT, 0, 150 * ONE_APT, 100 * ONE_APT);
 
-    // #[test(supra_framework = @supra_framework, validator = @0x123)]
-    // public entry fun test_pending_inactive_stake_rewards(
-    //     supra_framework: &signer,
-    //     validator: &signer,
-    // ) acquires DelegationPoolOwnership, DelegationPool, GovernanceRecords, BeneficiaryForOperator, NextCommissionPercentage {
-    //     initialize_for_test(supra_framework);
-    //     let delegator_address = vector[@0x111];
-    //     let principle_stake = vector[100 * ONE_APT];
-    //     let coin = stake::mint_coins(100 * ONE_APT);
-    //     let principle_lockup_time = 0;
-    //     initialize_test_validator(validator, 1000 * ONE_APT, true, true, delegator_address, principle_stake, coin, principle_lockup_time);
-    //
-    //     let validator_address = signer::address_of(validator);
-    //     let pool_address = get_owned_pool_address(validator_address);
-    //
-    //     end_aptos_epoch();
-    //     assert_delegation(validator_address, pool_address, 1010 * ONE_APT, 0, 0);
-    //
-    //     // unlock 200 coins from delegator `validator`
-    //     unlock(validator, pool_address, 200 * ONE_APT);
-    //     assert_delegation(validator_address, pool_address, 81000000001, 0, 19999999999);
-    //
-    //     end_aptos_epoch(); // 81000000001 active stake * 1.01 + 19999999999 pending_inactive stake * 1.01
-    //     end_aptos_epoch(); // 81810000001 active stake * 1.01 + 20199999998 pending_inactive stake * 1.01
-    //
-    //     timestamp::fast_forward_seconds(LOCKUP_CYCLE_SECONDS);
-    //     end_aptos_epoch(); // 82628100001 active stake * 1.01 + 20401999997 pending_inactive stake * 1.01
-    //     end_aptos_epoch(); // 83454381001 active stake * 1.01 + 20606019996 pending_inactive stake(now inactive)
-    //     assert_delegation(validator_address, pool_address, 84288924811, 20606019996, 0);
-    //
-    //     // unlock 200 coins from delegator `validator` which implicitly executes its pending withdrawal
-    //     unlock(validator, pool_address, 200 * ONE_APT);
-    //     assert!(coin::balance<SupraCoin>(validator_address) == 20606019996, 0);
-    //     assert_delegation(validator_address, pool_address, 64288924812, 0, 19999999999);
-    //
-    //     // lockup cycle is not ended, pending_inactive stake is still earning
-    //     end_aptos_epoch(); // 64288924812 active stake * 1.01 + 19999999999 pending_inactive stake * 1.01
-    //     end_aptos_epoch(); // 64931814060 active stake * 1.01 + 20199999998 pending_inactive stake * 1.01
-    //     end_aptos_epoch(); // 65581132200 active stake * 1.01 + 20401999997 pending_inactive stake * 1.01
-    //     end_aptos_epoch(); // 66236943522 active stake * 1.01 + 20606019996 pending_inactive stake * 1.01
-    //     assert_delegation(validator_address, pool_address, 66899312957, 0, 20812080195);
-    //
-    //     timestamp::fast_forward_seconds(LOCKUP_CYCLE_SECONDS);
-    //     end_aptos_epoch(); // 66899312957 active stake * 1.01 + 20812080195 pending_inactive stake * 1.01
-    //     end_aptos_epoch(); // 67568306086 active stake * 1.01 + 21020200996 pending_inactive stake(now inactive)
-    //     end_aptos_epoch(); // 68243989147 active stake * 1.01 + 21020200996 inactive stake
-    //     assert_delegation(validator_address, pool_address, 68926429037, 21020200996, 0);
-    // }
+        // can reactivate only pending_inactive stake
+        reactivate_stake(validator, pool_address, 150 * ONE_APT);
+
+        assert_delegation(validator_address, pool_address, 350 * ONE_APT - fee, 0, 0);
+        stake::assert_stake_pool(pool_address, 200 * ONE_APT, 0, 150 * ONE_APT, 0);
+        assert_pending_withdrawal(validator_address, pool_address, false, 0, false, 0);
+
+        end_aptos_epoch();
+        // 20000000000 active stake * 1.01 + 15000000000 pending_active stake
+        assert_delegation(validator_address, pool_address, 35200000000, 0, 0);
+
+        // unlock stake added at previous epoch (expect some imprecision when moving shares)
+        unlock(validator, pool_address, 150 * ONE_APT);
+        assert_delegation(validator_address, pool_address, 20200000001, 0, 14999999999);
+        stake::assert_stake_pool(pool_address, 20200000001, 0, 0, 14999999999);
+
+        // inactivate pending_inactive stake
+        timestamp::fast_forward_seconds(LOCKUP_CYCLE_SECONDS);
+        end_aptos_epoch();
+
+        // 20200000001 active stake * 1.01 + 14999999999 pending_inactive stake * 1.01
+        assert_delegation(validator_address, pool_address, 20402000001, 15149999998, 0);
+        assert_pending_withdrawal(validator_address, pool_address, true, 0, true, 15149999998);
+
+        // cannot reactivate inactive stake
+        reactivate_stake(validator, pool_address, 15149999998);
+        assert_delegation(validator_address, pool_address, 20402000001, 15149999998, 0);
+
+        // unlock stake in the new lockup cycle (the pending withdrawal is executed)
+        unlock(validator, pool_address, 100 * ONE_APT);
+        assert!(coin::balance<SupraCoin>(validator_address) == 15149999998, 0);
+        assert_delegation(validator_address, pool_address, 10402000002, 0, 9999999999);
+        assert_pending_withdrawal(validator_address, pool_address, true, 1, false, 9999999999);
+
+        // reactivate the new pending withdrawal almost entirely
+        reactivate_stake(validator, pool_address, 8999999999);
+        assert_pending_withdrawal(validator_address, pool_address, true, 1, false, 1000000000);
+        // reactivate remaining stake of the new pending withdrawal
+        reactivate_stake(validator, pool_address, 1000000000);
+        assert_pending_withdrawal(validator_address, pool_address, false, 0, false, 0);
+    }
+
+    #[test(supra_framework = @supra_framework, validator = @0x123)]
+    public entry fun test_active_stake_rewards(
+        supra_framework: &signer,
+        validator: &signer,
+    ) acquires DelegationPoolOwnership, DelegationPool, GovernanceRecords, BeneficiaryForOperator, NextCommissionPercentage {
+        initialize_for_test(supra_framework);
+        let delegator_address = vector[];
+        let principle_stake = vector[];
+        let coin = stake::mint_coins(0);
+        let principle_lockup_time = 0;
+        initialize_test_validator(validator, 1000 * ONE_APT, true, true, delegator_address, principle_stake, coin, principle_lockup_time);
+
+        let validator_address = signer::address_of(validator);
+        let pool_address = get_owned_pool_address(validator_address);
+
+        end_aptos_epoch();
+        // 100000000000 active stake * 1.01
+        assert_delegation(validator_address, pool_address, 1010 * ONE_APT, 0, 0);
+
+        // add stake in pending_active state
+        stake::mint(validator, 200 * ONE_APT);
+        add_stake(validator, pool_address, 200 * ONE_APT);
+
+        let fee = get_add_stake_fee(pool_address, 200 * ONE_APT);
+        assert_delegation(validator_address, pool_address, 1210 * ONE_APT - fee, 0, 0);
+
+        end_aptos_epoch();
+        // 101000000000 active stake * 1.01 + 20000000000 pending_active stake with no rewards
+        assert_delegation(validator_address, pool_address, 122010000000, 0, 0);
+
+        end_aptos_epoch();
+        // 122010000000 active stake * 1.01
+        assert_delegation(validator_address, pool_address, 123230100000, 0, 0);
+
+        // 123230100000 active stake * 1.01
+        end_aptos_epoch();
+        // 124462401000 active stake * 1.01
+        end_aptos_epoch();
+        // 125707025010 active stake * 1.01
+        end_aptos_epoch();
+        // 126964095260 active stake * 1.01
+        end_aptos_epoch();
+        // 128233736212 active stake * 1.01
+        end_aptos_epoch();
+        assert_delegation(validator_address, pool_address, 129516073574, 0, 0);
+
+        // unlock 200 coins from delegator `validator`
+        unlock(validator, pool_address, 200 * ONE_APT);
+        assert_delegation(validator_address, pool_address, 109516073575, 0, 19999999999);
+
+        // end this lockup cycle
+        timestamp::fast_forward_seconds(LOCKUP_CYCLE_SECONDS);
+        end_aptos_epoch();
+        // 109516073575 active stake * 1.01 + 19999999999 pending_inactive stake * 1.01
+        assert_delegation(validator_address, pool_address, 110611234310, 20199999998, 0);
+
+        end_aptos_epoch();
+        // 110611234310 active stake * 1.01 + 20199999998 inactive stake
+        assert_delegation(validator_address, pool_address, 111717346653, 20199999998, 0);
+
+        // add stake in pending_active state
+        stake::mint(validator, 1000 * ONE_APT);
+        add_stake(validator, pool_address, 1000 * ONE_APT);
+
+        fee = get_add_stake_fee(pool_address, 1000 * ONE_APT);
+        assert_delegation(validator_address, pool_address, 211717346653 - fee, 20199999998, 0);
+
+        end_aptos_epoch();
+        // 111717346653 active stake * 1.01 + 100000000000 pending_active stake + 20199999998 inactive stake
+        assert_delegation(validator_address, pool_address, 212834520119, 20199999998, 0);
+
+        end_aptos_epoch();
+        // 212834520119 active stake * 1.01 + 20199999998 inactive stake
+        assert_delegation(validator_address, pool_address, 214962865320, 20199999998, 0);
+    }
+
+    #[test(supra_framework = @supra_framework, validator = @0x123, delegator = @0x010)]
+    public entry fun test_active_stake_rewards_multiple(
+        supra_framework: &signer,
+        validator: &signer,
+        delegator: &signer,
+    ) acquires DelegationPoolOwnership, DelegationPool, GovernanceRecords, BeneficiaryForOperator, NextCommissionPercentage {
+        initialize_for_test(supra_framework);
+        let delegator_address = vector[@0x010];
+        let principle_stake = vector[300 * ONE_APT];
+        let coin = stake::mint_coins(300 * ONE_APT);
+        let principle_lockup_time = 0;
+        initialize_test_validator(validator, 200 * ONE_APT, true, true, delegator_address, principle_stake, coin, principle_lockup_time);
+
+        let validator_address = signer::address_of(validator);
+        let pool_address = get_owned_pool_address(validator_address);
+
+        let delegator_address = signer::address_of(delegator);
+        account::create_account_for_test(delegator_address);
+
+        assert_delegation(delegator_address, pool_address, 300 * ONE_APT, 0, 0);
+        assert_delegation(validator_address, pool_address, 200 * ONE_APT, 0, 0);
+        stake::assert_stake_pool(pool_address, 500 * ONE_APT, 0, 0, 0);
+
+        end_aptos_epoch();
+        // `delegator` got its `add_stake` fee back and `validator` its active stake rewards
+        assert_delegation(delegator_address, pool_address, 303 * ONE_APT, 0, 0);
+        assert_delegation(validator_address, pool_address, 202 * ONE_APT, 0, 0);
+        stake::assert_stake_pool(pool_address, 505 * ONE_APT, 0, 0, 0);
+
+        // delegators earn their own rewards from now on
+        end_aptos_epoch();
+        assert_delegation(delegator_address, pool_address, 30603000000, 0, 0);
+        assert_delegation(validator_address, pool_address, 20402000000, 0, 0);
+        stake::assert_stake_pool(pool_address, 51005000000, 0, 0, 0);
+    }
+
+    #[test(supra_framework = @supra_framework, validator = @0x123)]
+    public entry fun test_pending_inactive_stake_rewards(
+        supra_framework: &signer,
+        validator: &signer,
+    ) acquires DelegationPoolOwnership, DelegationPool, GovernanceRecords, BeneficiaryForOperator, NextCommissionPercentage {
+        initialize_for_test(supra_framework);
+        let delegator_address = vector[];
+        let principle_stake = vector[];
+        let coin = stake::mint_coins(0);
+        let principle_lockup_time = 0;
+        initialize_test_validator(validator, 1000 * ONE_APT, true, true, delegator_address, principle_stake, coin, principle_lockup_time);
+
+        let validator_address = signer::address_of(validator);
+        let pool_address = get_owned_pool_address(validator_address);
+
+        end_aptos_epoch();
+        assert_delegation(validator_address, pool_address, 1010 * ONE_APT, 0, 0);
+
+        // unlock 200 coins from delegator `validator`
+        unlock(validator, pool_address, 200 * ONE_APT);
+        assert_delegation(validator_address, pool_address, 81000000001, 0, 19999999999);
+
+        end_aptos_epoch(); // 81000000001 active stake * 1.01 + 19999999999 pending_inactive stake * 1.01
+        end_aptos_epoch(); // 81810000001 active stake * 1.01 + 20199999998 pending_inactive stake * 1.01
+
+        timestamp::fast_forward_seconds(LOCKUP_CYCLE_SECONDS);
+        end_aptos_epoch(); // 82628100001 active stake * 1.01 + 20401999997 pending_inactive stake * 1.01
+        end_aptos_epoch(); // 83454381001 active stake * 1.01 + 20606019996 pending_inactive stake(now inactive)
+        assert_delegation(validator_address, pool_address, 84288924811, 20606019996, 0);
+
+        // unlock 200 coins from delegator `validator` which implicitly executes its pending withdrawal
+        unlock(validator, pool_address, 200 * ONE_APT);
+        assert!(coin::balance<SupraCoin>(validator_address) == 20606019996, 0);
+        assert_delegation(validator_address, pool_address, 64288924812, 0, 19999999999);
+
+        // lockup cycle is not ended, pending_inactive stake is still earning
+        end_aptos_epoch(); // 64288924812 active stake * 1.01 + 19999999999 pending_inactive stake * 1.01
+        end_aptos_epoch(); // 64931814060 active stake * 1.01 + 20199999998 pending_inactive stake * 1.01
+        end_aptos_epoch(); // 65581132200 active stake * 1.01 + 20401999997 pending_inactive stake * 1.01
+        end_aptos_epoch(); // 66236943522 active stake * 1.01 + 20606019996 pending_inactive stake * 1.01
+        assert_delegation(validator_address, pool_address, 66899312957, 0, 20812080195);
+
+        timestamp::fast_forward_seconds(LOCKUP_CYCLE_SECONDS);
+        end_aptos_epoch(); // 66899312957 active stake * 1.01 + 20812080195 pending_inactive stake * 1.01
+        end_aptos_epoch(); // 67568306086 active stake * 1.01 + 21020200996 pending_inactive stake(now inactive)
+        end_aptos_epoch(); // 68243989147 active stake * 1.01 + 21020200996 inactive stake
+        assert_delegation(validator_address, pool_address, 68926429037, 21020200996, 0);
+    }
 
     #[test(supra_framework = @supra_framework, validator = @0x123, delegator1 = @0x010, delegator2 = @0x020)]
     public entry fun test_out_of_order_redeem(
@@ -3185,7 +2886,6 @@ module supra_framework::pbo_delegation_pool {
         delegator: &signer,
     ) acquires DelegationPoolOwnership, DelegationPool, GovernanceRecords, BeneficiaryForOperator, NextCommissionPercentage {
         initialize_for_test(supra_framework);
-
         let operator_address = signer::address_of(operator);
         account::create_account_for_test(operator_address);
         let delegator_address = vector[@0x111];
@@ -3611,11 +3311,14 @@ module supra_framework::pbo_delegation_pool {
         voter1: &signer,
         voter2: &signer,
     ) acquires DelegationPoolOwnership, DelegationPool, GovernanceRecords, BeneficiaryForOperator, NextCommissionPercentage {
+        initialize_for_test_no_reward(supra_framework);
         let delegator_address = vector[@0x111];
         let principle_stake = vector[100 * ONE_APT];
         let principle_lockup_time = 0;
+        let coin = stake::mint_coins(100 * ONE_APT);
+
         // partial voing hasn't been enabled yet. A proposal has been created by the validator.
-        let proposal1_id = setup_vote(supra_framework, validator, false, delegator_address, principle_stake, principle_lockup_time);
+        let proposal1_id = setup_vote(supra_framework, validator, false, delegator_address, principle_stake, coin, principle_lockup_time);
 
         let validator_address = signer::address_of(validator);
         let pool_address = get_owned_pool_address(validator_address);
@@ -3691,11 +3394,15 @@ module supra_framework::pbo_delegation_pool {
         delegator1: &signer,
         voter1: &signer,
     ) acquires DelegationPoolOwnership, DelegationPool, GovernanceRecords, BeneficiaryForOperator, NextCommissionPercentage {
+        initialize_for_test_no_reward(supra_framework);
+
         let delegator_address = vector[@0x111];
-                let principle_stake = vector[100 * ONE_APT];
+        let principle_stake = vector[100 * ONE_APT];
         let principle_lockup_time = 0;
+        let coin = stake::mint_coins(100 * ONE_APT);
+
         // partial voing hasn't been enabled yet. A proposal has been created by the validator.
-        let proposal1_id = setup_vote(supra_framework, validator, false, delegator_address, principle_stake, principle_lockup_time);
+        let proposal1_id = setup_vote(supra_framework, validator, false, delegator_address, principle_stake, coin, principle_lockup_time);
 
         let validator_address = signer::address_of(validator);
         let pool_address = get_owned_pool_address(validator_address);
@@ -3730,11 +3437,13 @@ module supra_framework::pbo_delegation_pool {
         delegator1: &signer,
         voter1: &signer,
     ) acquires DelegationPoolOwnership, DelegationPool, GovernanceRecords, BeneficiaryForOperator, NextCommissionPercentage {
+        initialize_for_test_no_reward(supra_framework);
         let delegator_address = vector[@0x111];
         let principle_stake = vector[100 * ONE_APT];
         let principle_lockup_time = 0;
+        let coin = stake::mint_coins(100 * ONE_APT);
         // partial voing hasn't been enabled yet. A proposal has been created by the validator.
-        let proposal1_id = setup_vote(supra_framework, validator, false, delegator_address, principle_stake, principle_lockup_time);
+        let proposal1_id = setup_vote(supra_framework, validator, false, delegator_address, principle_stake, coin, principle_lockup_time);
 
         let validator_address = signer::address_of(validator);
         let pool_address = get_owned_pool_address(validator_address);
@@ -3771,11 +3480,14 @@ module supra_framework::pbo_delegation_pool {
         validator: &signer,
         delegator1: &signer,
     ) acquires DelegationPoolOwnership, DelegationPool, GovernanceRecords, BeneficiaryForOperator, NextCommissionPercentage {
-        let delegator_address = vector[@0x111];
-        let principle_stake = vector[100 * ONE_APT];
+        initialize_for_test_no_reward(supra_framework);
+        let delegator_address = vector[@0x010];
+        let principle_stake = vector[0];
         let principle_lockup_time = 0;
+        let coin = stake::mint_coins(0);
+
         // partial voing hasn't been enabled yet. A proposal has been created by the validator.
-        let proposal1_id = setup_vote(supra_framework, validator, true, delegator_address, principle_stake, principle_lockup_time);
+        let proposal1_id = setup_vote(supra_framework, validator, true, delegator_address, principle_stake, coin, principle_lockup_time);
 
         let validator_address = signer::address_of(validator);
         let pool_address = get_owned_pool_address(validator_address);
@@ -3793,11 +3505,13 @@ module supra_framework::pbo_delegation_pool {
         delegator1: &signer,
         voter1: &signer,
     ) acquires DelegationPoolOwnership, DelegationPool, GovernanceRecords, BeneficiaryForOperator, NextCommissionPercentage {
-        let delegator_address = vector[@0x111];
-                let principle_stake = vector[100 * ONE_APT];
+        initialize_for_test_no_reward(supra_framework);
+        let delegator_address = vector[@0x010];
+        let principle_stake = vector[0];
         let principle_lockup_time = 0;
+        let coin = stake::mint_coins(0);
         // partial voing hasn't been enabled yet. A proposal has been created by the validator.
-        setup_vote(supra_framework, validator, true, delegator_address, principle_stake, principle_lockup_time);
+        setup_vote(supra_framework, validator, true, delegator_address, principle_stake, coin, principle_lockup_time);
 
         let validator_address = signer::address_of(validator);
         let pool_address = get_owned_pool_address(validator_address);
@@ -3872,9 +3586,9 @@ module supra_framework::pbo_delegation_pool {
         enable_partial_voting: bool,
         delegator_address: vector<address>,
         principle_stake: vector<u64>,
+        coin: Coin<SupraCoin>,
         principle_lockup_time: u64,
     ): u64 acquires DelegationPoolOwnership, DelegationPool, GovernanceRecords, BeneficiaryForOperator, NextCommissionPercentage {
-        initialize_for_test_no_reward(supra_framework);
         aptos_governance::initialize_for_test(
             supra_framework,
             (10 * ONE_APT as u128),
@@ -3882,7 +3596,6 @@ module supra_framework::pbo_delegation_pool {
             1000,
         );
         aptos_governance::initialize_partial_voting(supra_framework);
-        let coin = stake::mint_coins(100 * ONE_APT);
 
         initialize_test_validator(validator, 100 * ONE_APT, true, false, delegator_address, principle_stake, coin, principle_lockup_time);
 
@@ -3920,34 +3633,36 @@ module supra_framework::pbo_delegation_pool {
         borrow_global<DelegationPool>(pool_address).total_coins_inactive
     }
 
-    #[test(supra_framework = @supra_framework, validator = @0x123)]
-    #[expected_failure(abort_code=65536, location = Self)]
+    #[test(supra_framework = @supra_framework, validator = @0x123, delegator = @0x010)]
+    #[expected_failure(abort_code=65561, location = Self)]
     public entry fun test_withdraw_before_principle_lockup_time_fail(
         supra_framework: &signer,
         validator: &signer,
+        delegator: &signer,
     ) acquires DelegationPoolOwnership, DelegationPool, GovernanceRecords, BeneficiaryForOperator, NextCommissionPercentage {
         initialize_for_test(supra_framework);
-        let delegator_address = vector[@0x123];
+        let delegator_address = vector[@0x010];
         let principle_stake = vector[100 * ONE_APT];
         let coin = stake::mint_coins(100 * ONE_APT);
         let principle_lockup_time = 1000000;
-        initialize_test_validator(validator, 0, true, true, delegator_address, principle_stake, coin, principle_lockup_time);
+        initialize_test_validator(validator, 1000 * ONE_APT, true, true, delegator_address, principle_stake, coin, principle_lockup_time);
 
         let validator_address = signer::address_of(validator);
         let pool_address = get_owned_pool_address(validator_address);
-        // validator has 100 APT active stake.
-        unlock(validator, pool_address, 10 * ONE_APT);
-        // Expected an error as the active share will fall below the principle stake.
-        unlock(validator, pool_address,  801* ONE_APT);
+        // validator has 1000 APT active stake and it is not in the table.
+        unlock(validator, pool_address, 1000 * ONE_APT);
+        // Expected an error as the active share will fall below the principle stake for delegator.
+        unlock(delegator, pool_address,  10 * ONE_APT);
     }
 
-    #[test(supra_framework = @supra_framework, validator = @0x123)]
+    #[test(supra_framework = @supra_framework, validator = @0x123, delegator = @0x010)]
     public entry fun test_withdraw_after_principle_lockup_time(
         supra_framework: &signer,
         validator: &signer,
+        delegator: &signer,
     ) acquires DelegationPoolOwnership, DelegationPool, GovernanceRecords, BeneficiaryForOperator, NextCommissionPercentage {
         initialize_for_test(supra_framework);
-        let delegator_address = vector[@0x123];
+        let delegator_address = vector[@0x010];
         let principle_stake = vector[100 * ONE_APT];
         let coin = stake::mint_coins(100 * ONE_APT);
         let principle_lockup_time = 1000000;
@@ -3957,7 +3672,7 @@ module supra_framework::pbo_delegation_pool {
         let pool_address = get_owned_pool_address(validator_address);
         timestamp::fast_forward_seconds(1000000);
         // after the principle lockup_time, unlock all the stake is fine
-        unlock(validator, pool_address, 1000 * ONE_APT);
+        unlock(delegator, pool_address, 100 * ONE_APT);
     }
 
     #[test(supra_framework = @supra_framework, validator = @0x123, delegator1 = @0x010, delegator2 = @0x020)]
@@ -3972,7 +3687,7 @@ module supra_framework::pbo_delegation_pool {
         let principle_stake = vector[100 * ONE_APT, 200 * ONE_APT];
         let coin = stake::mint_coins(300 * ONE_APT);
         let principle_lockup_time = 0;
-        initialize_test_validator(validator, 1000 * ONE_APT, true, true, delegator_address, principle_stake, coin, principle_lockup_time);
+        initialize_test_validator(validator, 0, true, true, delegator_address, principle_stake, coin, principle_lockup_time);
         let validator_address = signer::address_of(validator);
         let pool_address = get_owned_pool_address(validator_address);
         unlock(delegator1, pool_address, 11 * ONE_APT);
