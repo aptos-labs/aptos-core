@@ -144,6 +144,8 @@ impl FeatureFlag {
             FeatureFlag::DISPATCHABLE_FUNGIBLE_ASSET,
             FeatureFlag::REMOVE_DETAILED_ERROR_FROM_HASH,
             FeatureFlag::CONCURRENT_FUNGIBLE_ASSETS,
+            FeatureFlag::NEW_ACCOUNTS_DEFAULT_TO_FA_APT_STORE,
+            FeatureFlag::OPERATIONS_DEFAULT_TO_FA_APT_STORE,
         ]
     }
 }
