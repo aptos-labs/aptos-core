@@ -297,7 +297,7 @@ module supra_framework::committee_map {
     }
 
     /// Update the dkg flag
-    public fun update_dkg_flag(
+    public entry fun update_dkg_flag(
         owner_signer: &signer,
         com_store_addr: address,
         com_id: u64,
