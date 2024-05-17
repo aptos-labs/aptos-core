@@ -413,6 +413,14 @@ impl<'t> AccountMinter<'t> {
         );
         let mut i = 0;
         let mut seed_accounts = vec![];
+        let source_account = match new_source_account {
+            None => {
+                self.source_account.get_root_account().clone()
+            },
+            Some(param_account) => {
+                Arc::new(std::sync::Mutex::new(param_account))
+            },
+        };
         while i < seed_account_num {
             let batch_size = min(max_submit_batch_size, seed_account_num - i);
             let mut rng = StdRng::from_rng(self.rng()).unwrap();
@@ -423,21 +431,12 @@ impl<'t> AccountMinter<'t> {
             let create_requests: Vec<_> = batch
                 .iter()
                 .map(|account| {
-                        if let Some(account) = &mut new_source_account {
-                            create_and_fund_account_request(
-                                account,
-                                coins_per_seed_account,
-                                account.public_key(),
-                                txn_factory,
-                            )
-                        } else {
-                            create_and_fund_account_request(
-                                self.source_account.get_root_account().lock().unwrap().deref(),
-                                coins_per_seed_account,
-                                account.public_key(),
-                                txn_factory,
-                            )
-                        }
+                    create_and_fund_account_request(
+                            source_account.clone(),
+                            coins_per_seed_account,
+                            account.public_key(),
+                            txn_factory,
+                        )
                 })
                 .collect();
             txn_executor
@@ -481,16 +480,19 @@ impl<'t> AccountMinter<'t> {
         coins_for_source: u64,
     ) -> Result<LocalAccount> {
         const NUM_TRIES: usize = 3;
+        let root_account = self.source_account.get_root_account();
+        let root_address = root_account.lock().unwrap().address();
         for i in 0..NUM_TRIES {
-            self.source_account.get_root_account().lock().unwrap().set_sequence_number(
-                txn_executor
-                    .query_sequence_number(self.source_account.get_root_account().lock().unwrap().address())
-                    .await?,
-            );
+            {
+                let new_sequence_number = txn_executor
+                    .query_sequence_number(root_address)
+                    .await?;
+                root_account.lock().unwrap().set_sequence_number(new_sequence_number);
+            }
 
             let new_source_account = LocalAccount::generate(self.rng());
             let txn = create_and_fund_account_request(
-                self.source_account.get_root_account().lock().unwrap().deref(),
+                root_account.clone(),
                 coins_for_source,
                 new_source_account.public_key(),
                 &self.txn_factory,
@@ -541,12 +543,14 @@ async fn create_and_fund_new_accounts(
         .chunks(max_num_accounts_per_batch)
         .map(|chunk| chunk.to_vec())
         .collect::<Vec<_>>();
+    let source_address = source_account.address();
+    let source_account = Arc::new(std::sync::Mutex::new(source_account));
     for batch in accounts_by_batch {
         let creation_requests: Vec<_> = batch
             .iter()
             .map(|account| {
                 create_and_fund_account_request(
-                    &source_account,
+                    source_account.clone(),
                     coins_per_new_account,
                     account.public_key(),
                     txn_factory,
@@ -557,19 +561,19 @@ async fn create_and_fund_new_accounts(
         txn_executor
             .execute_transactions_with_counter(&creation_requests, counters)
             .await
-            .with_context(|| format!("Account {} couldn't mint", source_account.address()))?;
+            .with_context(|| format!("Account {} couldn't mint", source_address))?;
     }
     Ok(())
 }
 
 pub fn create_and_fund_account_request(
-    creation_account: &LocalAccount,
+    creation_account: Arc<std::sync::Mutex<LocalAccount>>,
     amount: u64,
     pubkey: &Ed25519PublicKey,
     txn_factory: &TransactionFactory,
 ) -> SignedTransaction {
     let auth_key = AuthenticationKey::ed25519(pubkey);
-    creation_account.sign_with_transaction_builder(txn_factory.payload(
+    creation_account.lock().unwrap().sign_with_transaction_builder(txn_factory.payload(
         aptos_stdlib::aptos_account_transfer(auth_key.account_address(), amount),
     ))
 }
