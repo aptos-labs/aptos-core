@@ -337,6 +337,8 @@ impl RoundManager {
             self.new_log(LogEvent::NewRound),
             reason = new_round_event.reason
         );
+        self.pending_order_votes
+            .garbage_collect(self.block_store.sync_info().highest_ordered_round());
 
         if self
             .proposer_election
@@ -1108,19 +1110,23 @@ impl RoundManager {
                     );
                 }
                 QC_AGGREGATED_FROM_VOTES.inc();
-                let result = self.new_qc_aggregated(qc.clone(), vote.author()).await;
+                self.new_qc_aggregated(qc.clone(), vote.author())
+                    .await
+                    .context(format!(
+                        "[RoundManager] Unable to process the created QC {:?}",
+                        qc
+                    ))?;
                 if self.onchain_config.order_vote_enabled() {
-                    if result.is_ok() {
-                        let _ = self.broadcast_order_vote(vote, qc.clone()).await;
-                    } else {
+                    // Broadcast order vote if the QC is successfully aggregated
+                    // Even if broadcast order vote fails, the function will return Ok
+                    if let Err(e) = self.broadcast_order_vote(vote, qc.clone()).await {
                         warn!(
-                            "OrderVoteBrodcastFailed. Round = {}. Block id = {}",
-                            round,
-                            vote.vote_data().proposed().id()
+                            "Failed to broadcast order vote for QC {:?}. Error: {:?}",
+                            qc, e
                         );
                     }
                 }
-                result
+                Ok(())
             },
             VoteReceptionResult::New2ChainTimeoutCertificate(tc) => {
                 self.new_2chain_tc_aggregated(tc).await
@@ -1185,8 +1191,6 @@ impl RoundManager {
             .await
             .context("[RoundManager] Failed to process a newly aggregated QC");
         self.process_certificates().await?;
-        self.pending_order_votes
-            .garbage_collect(self.block_store.sync_info().highest_ordered_round());
         result
     }
 
