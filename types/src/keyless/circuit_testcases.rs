@@ -88,7 +88,7 @@ pub(crate) static SAMPLE_JWT_EXTRA_FIELD: Lazy<String> =
 pub(crate) static SAMPLE_JWT_PARSED: Lazy<Claims> =
     Lazy::new(|| serde_json::from_str(SAMPLE_JWT_PAYLOAD_JSON.as_str()).unwrap());
 
-pub(crate) static SAMPLE_JWK: Lazy<RSA_JWK> = Lazy::new(|| insecure_test_rsa_jwk());
+pub(crate) static SAMPLE_JWK: Lazy<RSA_JWK> = Lazy::new(insecure_test_rsa_jwk);
 
 /// This is the SK from https://token.dev/.
 /// To convert it into a JSON, you can use https://irrte.ch/jwt-js-decode/pem2jwk.html
