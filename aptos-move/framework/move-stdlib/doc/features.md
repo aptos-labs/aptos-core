@@ -118,8 +118,10 @@ return true.
 -  [Function `object_native_derived_address_enabled`](#0x1_features_object_native_derived_address_enabled)
 -  [Function `get_dispatchable_fungible_asset_feature`](#0x1_features_get_dispatchable_fungible_asset_feature)
 -  [Function `dispatchable_fungible_asset_enabled`](#0x1_features_dispatchable_fungible_asset_enabled)
+-  [Function `get_new_accounts_default_to_fa_apt_store_feature`](#0x1_features_get_new_accounts_default_to_fa_apt_store_feature)
 -  [Function `new_accounts_default_to_fa_apt_store_enabled`](#0x1_features_new_accounts_default_to_fa_apt_store_enabled)
--  [Function `operations_default_to_fa_apt_store`](#0x1_features_operations_default_to_fa_apt_store)
+-  [Function `get_operations_default_to_fa_apt_store_feature`](#0x1_features_get_operations_default_to_fa_apt_store_feature)
+-  [Function `operations_default_to_fa_apt_store_enabled`](#0x1_features_operations_default_to_fa_apt_store_enabled)
 -  [Function `change_feature_flags`](#0x1_features_change_feature_flags)
 -  [Function `change_feature_flags_internal`](#0x1_features_change_feature_flags_internal)
 -  [Function `change_feature_flags_for_next_epoch`](#0x1_features_change_feature_flags_for_next_epoch)
@@ -2858,6 +2860,28 @@ Lifetime: transient
 
 </details>
 
+<a id="0x1_features_get_new_accounts_default_to_fa_apt_store_feature"></a>
+
+## Function `get_new_accounts_default_to_fa_apt_store_feature`
+
+
+
+<pre><code><b>public</b> <b>fun</b> <a href="features.md#0x1_features_get_new_accounts_default_to_fa_apt_store_feature">get_new_accounts_default_to_fa_apt_store_feature</a>(): u64
+</code></pre>
+
+
+
+<details>
+<summary>Implementation</summary>
+
+
+<pre><code><b>public</b> <b>fun</b> <a href="features.md#0x1_features_get_new_accounts_default_to_fa_apt_store_feature">get_new_accounts_default_to_fa_apt_store_feature</a>(): u64 { <a href="features.md#0x1_features_NEW_ACCOUNTS_DEFAULT_TO_FA_APT_STORE">NEW_ACCOUNTS_DEFAULT_TO_FA_APT_STORE</a> }
+</code></pre>
+
+
+
+</details>
+
 <a id="0x1_features_new_accounts_default_to_fa_apt_store_enabled"></a>
 
 ## Function `new_accounts_default_to_fa_apt_store_enabled`
@@ -2882,13 +2906,13 @@ Lifetime: transient
 
 </details>
 
-<a id="0x1_features_operations_default_to_fa_apt_store"></a>
+<a id="0x1_features_get_operations_default_to_fa_apt_store_feature"></a>
 
-## Function `operations_default_to_fa_apt_store`
+## Function `get_operations_default_to_fa_apt_store_feature`
 
 
 
-<pre><code><b>public</b> <b>fun</b> <a href="features.md#0x1_features_operations_default_to_fa_apt_store">operations_default_to_fa_apt_store</a>(): bool
+<pre><code><b>public</b> <b>fun</b> <a href="features.md#0x1_features_get_operations_default_to_fa_apt_store_feature">get_operations_default_to_fa_apt_store_feature</a>(): u64
 </code></pre>
 
 
@@ -2897,7 +2921,29 @@ Lifetime: transient
 <summary>Implementation</summary>
 
 
-<pre><code><b>public</b> <b>fun</b> <a href="features.md#0x1_features_operations_default_to_fa_apt_store">operations_default_to_fa_apt_store</a>(): bool <b>acquires</b> <a href="features.md#0x1_features_Features">Features</a> {
+<pre><code><b>public</b> <b>fun</b> <a href="features.md#0x1_features_get_operations_default_to_fa_apt_store_feature">get_operations_default_to_fa_apt_store_feature</a>(): u64 { <a href="features.md#0x1_features_OPERATIONS_DEFAULT_TO_FA_APT_STORE">OPERATIONS_DEFAULT_TO_FA_APT_STORE</a> }
+</code></pre>
+
+
+
+</details>
+
+<a id="0x1_features_operations_default_to_fa_apt_store_enabled"></a>
+
+## Function `operations_default_to_fa_apt_store_enabled`
+
+
+
+<pre><code><b>public</b> <b>fun</b> <a href="features.md#0x1_features_operations_default_to_fa_apt_store_enabled">operations_default_to_fa_apt_store_enabled</a>(): bool
+</code></pre>
+
+
+
+<details>
+<summary>Implementation</summary>
+
+
+<pre><code><b>public</b> <b>fun</b> <a href="features.md#0x1_features_operations_default_to_fa_apt_store_enabled">operations_default_to_fa_apt_store_enabled</a>(): bool <b>acquires</b> <a href="features.md#0x1_features_Features">Features</a> {
     <a href="features.md#0x1_features_is_enabled">is_enabled</a>(<a href="features.md#0x1_features_OPERATIONS_DEFAULT_TO_FA_APT_STORE">OPERATIONS_DEFAULT_TO_FA_APT_STORE</a>)
 }
 </code></pre>

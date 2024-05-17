@@ -56,4 +56,22 @@ module aptos_framework::apt_primary_fungible_store {
         fungible_asset::deposit_internal(recipient_store, fungible_asset::withdraw_internal(sender_store, amount));
     }
 
+    // tests
+
+    #[test(user = @0xcafe)]
+    fun test_store_address(
+        user: &signer,
+    ) {
+        use aptos_framework::fungible_asset::Metadata;
+        use aptos_framework::aptos_coin;
+
+        aptos_coin::ensure_initialized_with_apt_fa_metadata_for_test();
+
+        let apt_metadata = object::address_to_object<Metadata>(@aptos_fungible_asset);
+        let user_addr = signer::address_of(user);
+        assert!(store_address(user_addr) == primary_fungible_store::primary_store_address(user_addr, apt_metadata), 1);
+
+        ensure_primary_store_exists(user_addr);
+        assert!(primary_fungible_store::primary_store_exists(user_addr, apt_metadata), 2);
+    }
 }

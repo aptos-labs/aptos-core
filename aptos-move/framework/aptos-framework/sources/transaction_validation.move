@@ -152,7 +152,7 @@ module aptos_framework::transaction_validation {
         };
 
         let max_transaction_fee = txn_gas_price * txn_max_gas_units;
-        if (features::operations_default_to_fa_apt_store()) {
+        if (features::operations_default_to_fa_apt_store_enabled()) {
             assert!(
                 apt_primary_fungible_store::is_balance_at_least(gas_payer, max_transaction_fee),
                 error::invalid_argument(PROLOGUE_ECANT_PAY_GAS_DEPOSIT)
@@ -380,7 +380,7 @@ module aptos_framework::transaction_validation {
 
         // it's important to maintain the error code consistent with vm
         // to do failed transaction cleanup.
-        if (features::operations_default_to_fa_apt_store()) {
+        if (features::operations_default_to_fa_apt_store_enabled()) {
             assert!(
                 apt_primary_fungible_store::is_balance_at_least(gas_payer, transaction_fee_amount),
                 error::out_of_range(PROLOGUE_ECANT_PAY_GAS_DEPOSIT),

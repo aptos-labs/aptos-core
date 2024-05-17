@@ -165,7 +165,6 @@ pub enum EntryFunctionCall {
         amounts: Vec<u64>,
     },
 
-    /// Basic account creation methods.
     AptosAccountCreateAccount {
         auth_key: AccountAddress,
     },
@@ -1939,7 +1938,6 @@ pub fn aptos_account_batch_transfer_coins(
     ))
 }
 
-/// Basic account creation methods.
 pub fn aptos_account_create_account(auth_key: AccountAddress) -> TransactionPayload {
     TransactionPayload::EntryFunction(EntryFunction::new(
         ModuleId::new(

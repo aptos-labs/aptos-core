@@ -48,14 +48,17 @@ module aptos_framework::aptos_account {
     /// Basic account creation methods.
     ///////////////////////////////////////////////////////////////////////////
 
+    public(friend) fun register_apt(account_signer: &signer) {
+        if (features::new_accounts_default_to_fa_apt_store_enabled()) {
+            apt_primary_fungible_store::ensure_primary_store_exists(signer::address_of(account_signer));
+        } else {
+            coin::register<AptosCoin>(account_signer);
+        }
+    }
 
     public entry fun create_account(auth_key: address) {
         let account_signer = account::create_account(auth_key);
-        if (features::new_accounts_default_to_fa_apt_store_enabled()) {
-            apt_primary_fungible_store::ensure_primary_store_exists(signer::address_of(&account_signer));
-        } else {
-            coin::register<AptosCoin>(&account_signer);
-        }
+        register_apt(&account_signer);
     }
 
     /// Batch version of APT transfer.
@@ -79,7 +82,7 @@ module aptos_framework::aptos_account {
             create_account(to)
         };
 
-        if (features::operations_default_to_fa_apt_store()) {
+        if (features::operations_default_to_fa_apt_store_enabled()) {
             apt_primary_fungible_store::transfer(source, to, amount)
         } else {
             // Resource accounts can be created without registering them to receive APT.
