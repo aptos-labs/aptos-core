@@ -217,7 +217,7 @@ impl BlockStore {
                 break;
             }
             let mut blocks = retriever
-                .retrieve_block_in_range(
+                .retrieve_blocks_in_range(
                     retrieve_qc.certified_block().id(),
                     1,
                     retrieve_qc.certified_block().id(),
@@ -225,7 +225,7 @@ impl BlockStore {
                         .get_voters(&retriever.validator_addresses()),
                 )
                 .await?;
-            // retrieve_block_in_range guarantees that blocks has exactly 1 element
+            // retrieve_blocks_in_range guarantees that blocks has exactly 1 element
             let block = blocks.remove(0);
             retrieve_qc = block.quorum_cert().clone();
             pending.push(block);
@@ -254,9 +254,9 @@ impl BlockStore {
                 break;
             }
             let mut blocks = retriever
-                .retrieve_block_in_range(retrieve_block_id, 1, retrieve_block_id, voters)
+                .retrieve_blocks_in_range(retrieve_block_id, 1, retrieve_block_id, voters)
                 .await?;
-            // retrieve_block_in_range guarantees that blocks has exactly 1 element
+            // retrieve_blocks_in_range guarantees that blocks has exactly 1 element
             let block = blocks.remove(0);
 
             // We need to fetch the parent of block to ensure we have the parent in the tree.
@@ -355,7 +355,7 @@ impl BlockStore {
         assert!(num_blocks < std::usize::MAX as u64);
 
         let blocks = retriever
-            .retrieve_block_in_range(
+            .retrieve_blocks_in_range(
                 highest_quorum_cert.certified_block().id(),
                 num_blocks,
                 highest_commit_cert.commit_info().id(),
@@ -679,7 +679,7 @@ impl BlockRetriever {
     }
 
     /// Retrieve chain of n blocks for given QC
-    async fn retrieve_block_in_range(
+    async fn retrieve_blocks_in_range(
         &mut self,
         initial_block_id: HashValue,
         num_blocks: u64,
