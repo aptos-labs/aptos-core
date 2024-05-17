@@ -24,10 +24,10 @@ spec:
           {FORGE_ARGS}
       resources:
         limits:
-          cpu: 15.5 
+          cpu: 30.0 
           memory: 50Gi
         requests:
-          cpu: 15.5
+          cpu: 30.0
           memory: 50Gi
       env:
         - name: FORGE_TRIGGERED_BY
