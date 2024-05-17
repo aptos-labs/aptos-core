@@ -1191,10 +1191,20 @@ impl RoundManager {
         quorum_cert: &QuorumCert,
         preferred_peer: Author,
     ) -> anyhow::Result<()> {
+        ensure!(
+            ordered_cert.commit_info().id() == quorum_cert.certified_block().id(),
+            "QuorumCert attached to order votes doesn't match"
+        );
+        self.block_store
+            .insert_quorum_cert(
+                quorum_cert,
+                &mut self.create_block_retriever(preferred_peer),
+            )
+            .await
+            .context("RoundManager] Failed to process QC in order Cert")?;
         self.block_store
             .insert_ordered_cert(
                 &ordered_cert,
-                Some(quorum_cert),
                 &mut self.create_block_retriever(preferred_peer),
             )
             .await
