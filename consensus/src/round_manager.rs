@@ -533,7 +533,7 @@ impl RoundManager {
             info!(
                 self.new_log(LogEvent::ReceiveNewCertificate)
                     .remote_peer(author),
-                "Local state {}, remote state {}", local_sync_info, sync_info
+                "Local state {},\n remote state {}", local_sync_info, sync_info
             );
             // Some information in SyncInfo is ahead of what we have locally.
             // First verify the SyncInfo (didn't verify it in the yet).
@@ -580,7 +580,7 @@ impl RoundManager {
         self.sync_up(sync_info, author).await?;
         ensure!(
             message_round == self.round_state.current_round(),
-            "After sync, round {} doesn't match local {}. Input sync info: {:?}, Local Sync Info {:?}, Current sync info {:?}",
+            "After sync, round {} doesn't match local {}.\n Input sync info: {:?},\n Local Sync Info {:?},\n Current sync info {:?}",
             message_round,
             self.round_state.current_round(),
             sync_info,
@@ -1191,10 +1191,20 @@ impl RoundManager {
         quorum_cert: &QuorumCert,
         preferred_peer: Author,
     ) -> anyhow::Result<()> {
+        ensure!(
+            ordered_cert.commit_info().id() == quorum_cert.certified_block().id(),
+            "QuorumCert attached to order votes doesn't match"
+        );
+        self.block_store
+            .insert_quorum_cert(
+                quorum_cert,
+                &mut self.create_block_retriever(preferred_peer),
+            )
+            .await
+            .context("RoundManager] Failed to process QC in order Cert")?;
         self.block_store
             .insert_ordered_cert(
                 &ordered_cert,
-                Some(quorum_cert),
                 &mut self.create_block_retriever(preferred_peer),
             )
             .await
