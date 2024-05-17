@@ -57,7 +57,7 @@ fn print_keyless_sizes(ty: &str, sig: KeylessSignature, pk: KeylessPublicKey, de
 
 // TODO(keyless): Add instructions on how to produce this test case.
 #[test]
-fn test_keylesfs_groth16_proof_verification() {
+fn test_keyless_groth16_proof_verification() {
     let config = Configuration::new_for_devnet();
 
     let (zk_sig, zk_pk) = get_sample_groth16_sig_and_pk();
