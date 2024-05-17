@@ -31,10 +31,10 @@ use aptos_types::{
     },
     move_utils::as_move_value::AsMoveValue,
     on_chain_config::{
-        randomness_api_v0_config::RequiredGasDeposit, FeatureFlag, Features, GasScheduleV2,
-        OnChainConsensusConfig, OnChainExecutionConfig, OnChainJWKConsensusConfig,
-        OnChainRandomnessConfig, RandomnessConfigMoveStruct, TimedFeaturesBuilder,
-        APTOS_MAX_KNOWN_VERSION,
+        randomness_api_v0_config::{AllowCustomMaxGasFlag, RequiredGasDeposit},
+        FeatureFlag, Features, GasScheduleV2, OnChainConsensusConfig, OnChainExecutionConfig,
+        OnChainJWKConsensusConfig, OnChainRandomnessConfig, RandomnessConfigMoveStruct,
+        TimedFeaturesBuilder, APTOS_MAX_KNOWN_VERSION,
     },
     transaction::{authenticator::AuthenticationKey, ChangeSet, Transaction, WriteSetPayload},
     write_set::TransactionWrite,
@@ -532,6 +532,7 @@ fn initialize_randomness_api_v0_config(session: &mut SessionExt) {
         serialize_values(&vec![
             MoveValue::Signer(CORE_CODE_ADDRESS),
             RequiredGasDeposit::default_for_genesis().as_move_value(),
+            AllowCustomMaxGasFlag::default_for_genesis().as_move_value(),
         ]),
     );
 }
