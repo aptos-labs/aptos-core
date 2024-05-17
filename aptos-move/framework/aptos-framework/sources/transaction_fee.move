@@ -214,7 +214,7 @@ module aptos_framework::transaction_fee {
             apt_primary_fungible_store::burn_from(burn_ref, account, fee);
         } else {
             let burn_cap = &borrow_global<AptosCoinCapabilities>(@aptos_framework).burn_cap;
-            if (features::operations_default_to_fa_apt_store()) {
+            if (features::operations_default_to_fa_apt_store_enabled()) {
                 let (burn_ref, burn_receipt) = coin::get_paired_burn_ref(burn_cap);
                 apt_primary_fungible_store::burn_from(&burn_ref, account, fee);
                 coin::return_paired_burn_ref(burn_ref, burn_receipt);
@@ -250,7 +250,7 @@ module aptos_framework::transaction_fee {
     public(friend) fun store_aptos_coin_burn_cap(aptos_framework: &signer, burn_cap: BurnCapability<AptosCoin>) {
         system_addresses::assert_aptos_framework(aptos_framework);
 
-        if (features::operations_default_to_fa_apt_store()) {
+        if (features::operations_default_to_fa_apt_store_enabled()) {
             let burn_ref = coin::convert_and_take_paired_burn_ref(burn_cap);
             move_to(aptos_framework, AptosFABurnCapabilities { burn_ref });
         } else {
@@ -259,7 +259,7 @@ module aptos_framework::transaction_fee {
     }
 
     public entry fun convert_to_aptos_fa_burn_ref(aptos_framework: &signer) acquires AptosCoinCapabilities {
-        assert!(features::operations_default_to_fa_apt_store(), EFA_GAS_CHARGING_NOT_ENABLED);
+        assert!(features::operations_default_to_fa_apt_store_enabled(), EFA_GAS_CHARGING_NOT_ENABLED);
         system_addresses::assert_aptos_framework(aptos_framework);
         let AptosCoinCapabilities {
             burn_cap,

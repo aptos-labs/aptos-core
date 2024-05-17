@@ -904,7 +904,10 @@ module aptos_framework::coin {
         metadata: Object<Metadata>
     ): bool {
         let primary_store_address = primary_fungible_store::primary_store_address<Metadata>(account_address, metadata);
-        fungible_asset::store_exists(primary_store_address) && exists<MigrationFlag>(primary_store_address)
+        fungible_asset::store_exists(primary_store_address) && (
+            // migration flag is needed, until we start defaulting new accounts to APT PFS
+            features::new_accounts_default_to_fa_apt_store_enabled() || exists<MigrationFlag>(primary_store_address)
+        )
     }
 
     /// Deposit the coin balance into the recipient's account without checking if the account is frozen.

@@ -535,6 +535,8 @@ module std::features {
     /// Lifetime: transient
     const NEW_ACCOUNTS_DEFAULT_TO_FA_APT_STORE: u64 = 64;
 
+    public fun get_new_accounts_default_to_fa_apt_store_feature(): u64 { NEW_ACCOUNTS_DEFAULT_TO_FA_APT_STORE }
+
     public fun new_accounts_default_to_fa_apt_store_enabled(): bool acquires Features {
         is_enabled(NEW_ACCOUNTS_DEFAULT_TO_FA_APT_STORE)
     }
@@ -542,7 +544,9 @@ module std::features {
     /// Lifetime: transient
     const OPERATIONS_DEFAULT_TO_FA_APT_STORE: u64 = 65;
 
-    public fun operations_default_to_fa_apt_store(): bool acquires Features {
+    public fun get_operations_default_to_fa_apt_store_feature(): u64 { OPERATIONS_DEFAULT_TO_FA_APT_STORE }
+
+    public fun operations_default_to_fa_apt_store_enabled(): bool acquires Features {
         is_enabled(OPERATIONS_DEFAULT_TO_FA_APT_STORE)
     }
 
