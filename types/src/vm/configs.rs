@@ -66,21 +66,11 @@ pub fn aptos_prod_verifier_config(features: &Features) -> VerifierConfig {
 }
 
 pub fn aptos_prod_vm_config(
-<<<<<<< HEAD
     timed_features: &TimedFeatures,
     delayed_field_optimization_enabled: bool,
     paranoid_type_checks: bool,
 ) -> VMConfig {
     let check_invariant_in_swap_loc =
-=======
-    features: &Features,
-    timed_features: &TimedFeatures,
-    gas_feature_version: u64,
-    aggregator_v2_type_tagging: bool,
-    paranoid_type_checks: bool,
-) -> VMConfig {
-    let enable_invariant_violation_check_in_swap_loc =
->>>>>>> c98a7ea632 (use prod configs for aptos)
         !timed_features.is_enabled(TimedFeatureFlag::DisableInvariantViolationCheckInSwapLoc);
 
     let mut type_max_cost = 0;
@@ -93,26 +83,14 @@ pub fn aptos_prod_vm_config(
         type_byte_cost = 1;
     }
 
-<<<<<<< HEAD
     VMConfig {
         paranoid_type_checks,
         check_invariant_in_swap_loc,
-=======
-    let deserializer_config = aptos_prod_deserializer_config(features, gas_feature_version);
-    let verifier = aptos_prod_verifier_config(features);
-
-    VMConfig {
-        verifier,
-        deserializer_config,
-        paranoid_type_checks,
-        enable_invariant_violation_check_in_swap_loc,
->>>>>>> c98a7ea632 (use prod configs for aptos)
         type_size_limit: true,
         max_value_nest_depth: Some(128),
         type_max_cost,
         type_base_cost,
         type_byte_cost,
-<<<<<<< HEAD
         delayed_field_optimization_enabled,
     }
 }
@@ -135,8 +113,26 @@ impl RandomnessConfig {
             randomness_api_v0_required_deposit,
             allow_rand_contract_custom_max_gas,
         }
-=======
-        aggregator_v2_type_tagging,
->>>>>>> c98a7ea632 (use prod configs for aptos)
+    }
+}
+
+/// A collection of on-chain randomness API configs that VM needs to be aware of.
+pub struct RandomnessConfig {
+    pub randomness_api_v0_required_deposit: Option<u64>,
+    pub allow_rand_contract_custom_max_gas: bool,
+}
+
+impl RandomnessConfig {
+    pub fn fetch(storage: &impl ConfigStorage) -> Self {
+        let randomness_api_v0_required_deposit = RequiredGasDeposit::fetch_config(storage)
+            .unwrap_or_else(RequiredGasDeposit::default_if_missing)
+            .gas_amount;
+        let allow_rand_contract_custom_max_gas = AllowCustomMaxGasFlag::fetch_config(storage)
+            .unwrap_or_else(AllowCustomMaxGasFlag::default_if_missing)
+            .value;
+        Self {
+            randomness_api_v0_required_deposit,
+            allow_rand_contract_custom_max_gas,
+        }
     }
 }

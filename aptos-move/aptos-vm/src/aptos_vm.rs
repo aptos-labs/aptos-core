@@ -236,7 +236,6 @@ impl AptosVM {
     //       configs to the environment.
     pub(crate) fn new_with_environment(env: Arc<Environment>, state_view: &impl StateView) -> Self {
         let _timer = TIMER.timer_with(&["AptosVM::new"]);
-
         let (
             gas_params,
             storage_gas_params,
