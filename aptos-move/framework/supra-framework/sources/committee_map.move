@@ -298,8 +298,8 @@ module supra_framework::committee_map {
 
     /// Update the dkg flag
     public fun update_dkg_flag(
-        com_store_addr: address,
         owner_signer: &signer,
+        com_store_addr: address,
         com_id: u64,
         flag_value: bool
     ) acquires CommitteeInfoStore, SupraCommitteeEventHandler {
@@ -320,8 +320,8 @@ module supra_framework::committee_map {
 
     /// This function is used to add a new committee to the store
     public entry fun upsert_committee(
-        com_store_addr: address,
         owner_signer: &signer,
+        com_store_addr: address,
         id: u64,
         node_addresses: vector<address>,
         ip_public_address: vector<vector<u8>>,
@@ -414,8 +414,8 @@ module supra_framework::committee_map {
 
     /// Add the committee in bulk
     public entry fun upsert_committee_bulk(
-        com_store_addr: address,
         owner_signer: &signer,
+        com_store_addr: address,
         ids: vector<u64>,
         node_addresses_bulk: vector<vector<address>>,
         ip_public_address_bulk: vector<vector<vector<u8>>>,
@@ -467,8 +467,8 @@ module supra_framework::committee_map {
             let rpc_port = vector::pop_back(&mut rpc_por_bulkt);
             let committee_type = vector::pop_back(&mut committee_types);
             upsert_committee(
-                com_store_addr,
                 owner_signer,
+                com_store_addr,
                 id,
                 node_addresses,
                 ip_public_address,
@@ -484,8 +484,8 @@ module supra_framework::committee_map {
 
     /// Remove the committee from the store
     public entry fun remove_committee(
-        com_store_addr: address,
         owner_signer: &signer,
+        com_store_addr: address,
         id: u64
     ) acquires CommitteeInfoStore, SupraCommitteeEventHandler {
         // Only the OwnerCap capability can access it
@@ -518,20 +518,20 @@ module supra_framework::committee_map {
 
     /// Remove the committee in bulk
     public entry fun remove_committee_bulk(
-        com_store_addr: address,
         owner_signer: &signer,
+        com_store_addr: address,
         ids: vector<u64>
     ) acquires CommitteeInfoStore, SupraCommitteeEventHandler {
         while (vector::length(&ids) > 0) {
             let id = vector::pop_back(&mut ids);
-            remove_committee(com_store_addr, owner_signer, id);
+            remove_committee(owner_signer, com_store_addr, id);
         }
     }
 
     /// Upsert the node to the committee
     public entry fun upsert_committee_member(
-        com_store_addr: address,
         owner_signer: &signer,
+        com_store_addr: address,
         id: u64,
         node_address: address,
         ip_public_address: vector<u8>,
@@ -578,8 +578,8 @@ module supra_framework::committee_map {
 
     /// Upsert nodes to the committee
     public entry fun upsert_committee_member_bulk(
-        com_store_addr: address,
         owner_signer: &signer,
+        com_store_addr: address,
         ids: vector<u64>,
         node_addresses: vector<address>,
         ip_public_address: vector<vector<u8>>,
@@ -628,8 +628,8 @@ module supra_framework::committee_map {
             let network_port = vector::pop_back(&mut network_port);
             let rpc_port = vector::pop_back(&mut rpc_port);
             upsert_committee_member(
-                com_store_addr,
                 owner_signer,
+                com_store_addr,
                 id,
                 node_address,
                 ip_public_address,
@@ -644,8 +644,8 @@ module supra_framework::committee_map {
 
     /// Remove the node from the committee
     public entry fun remove_committee_member(
-        com_store_addr: address,
         owner_signer: &signer,
+        com_store_addr: address,
         id: u64,
         node_address: address
     ) acquires CommitteeInfoStore, SupraCommitteeEventHandler {
@@ -722,8 +722,8 @@ module supra_framework::committee_map {
         // Add node to the committee
         let resource_address = account::create_resource_address(&@0xCEFEF, SEED_COMMITTEE);
         upsert_committee(
-            resource_address,
             owner_signer,
+            resource_address,
             1,
             vector[@0x1, @0x2],
             vector[vector[123], vector[123]],
@@ -734,7 +734,7 @@ module supra_framework::committee_map {
             vector[123, 123],
             1
         );
-        remove_committee(resource_address, owner_signer, 1);
+        remove_committee(owner_signer,resource_address,1);
     }
 
     #[test(owner_signer = @0xCEFEF)]
@@ -744,8 +744,8 @@ module supra_framework::committee_map {
         set_up_test(owner_signer);
         let resource_address = account::create_resource_address(&@0xCEFEF, SEED_COMMITTEE);
         upsert_committee(
-            resource_address,
             owner_signer,
+            resource_address,
             1,
             vector[@0x1, @0x2],
             vector[vector[123], vector[123]],
@@ -757,8 +757,8 @@ module supra_framework::committee_map {
             1
         );
         upsert_committee_member(
-            resource_address,
             owner_signer,
+            resource_address,
             1,
             @0x1,
             vector[123],
@@ -777,8 +777,8 @@ module supra_framework::committee_map {
         set_up_test(owner_signer);
         let resource_address = account::create_resource_address(&@0xCEFEF, SEED_COMMITTEE);
         upsert_committee(
-            resource_address,
             owner_signer,
+            resource_address,
             1,
             vector[@0x1, @0x2],
             vector[vector[123], vector[123]],
@@ -790,8 +790,8 @@ module supra_framework::committee_map {
             1
         );
         upsert_committee_member(
-            resource_address,
             owner_signer,
+            resource_address,
             1,
             @0x1,
             vector[123],
@@ -801,7 +801,7 @@ module supra_framework::committee_map {
             123,
             123
         );
-        remove_committee_member(resource_address, owner_signer, 1, @0x1);
+        remove_committee_member(owner_signer, resource_address, 1, @0x1);
     }
 
     #[test(owner_signer = @0xCEFEF)]
@@ -811,8 +811,8 @@ module supra_framework::committee_map {
         set_up_test(owner_signer);
         let resource_address = account::create_resource_address(&@0xCEFEF, SEED_COMMITTEE);
         upsert_committee_bulk(
-            resource_address,
             owner_signer,
+            resource_address,
             vector[1, 1],
             vector[vector[@0x1, @0x2], vector[@0x1, @0x2]],
             vector[vector[vector[123], vector[124]], vector[vector[125], vector[126]]],
@@ -832,8 +832,8 @@ module supra_framework::committee_map {
         set_up_test(owner_signer);
         let resource_address = account::create_resource_address(&@0xCEFEF, SEED_COMMITTEE);
         upsert_committee(
-            resource_address,
             owner_signer,
+            resource_address,
             1,
             vector[@0x1, @0x2],
             vector[vector[123], vector[123]],
@@ -844,7 +844,7 @@ module supra_framework::committee_map {
             vector[123, 123],
             1
         );
-        remove_committee_bulk(resource_address, owner_signer, vector[1]);
+        remove_committee_bulk(owner_signer, resource_address, vector[1]);
     }
 
     #[test(owner_signer = @0xCEFEF)]
@@ -854,8 +854,8 @@ module supra_framework::committee_map {
         set_up_test(owner_signer);
         let resource_address = account::create_resource_address(&@0xCEFEF, SEED_COMMITTEE);
         upsert_committee(
-            resource_address,
             owner_signer,
+            resource_address,
             1,
             vector[@0x1, @0x2],
             vector[vector[123], vector[123]],
@@ -867,8 +867,8 @@ module supra_framework::committee_map {
             1
         );
         upsert_committee_member_bulk(
-            resource_address,
             owner_signer,
+            resource_address,
             vector[1],
             vector[@0x1],
             vector[vector[123]],
@@ -887,8 +887,8 @@ module supra_framework::committee_map {
         set_up_test(owner_signer);
         let resource_address = account::create_resource_address(&@0xCEFEF, SEED_COMMITTEE);
         upsert_committee(
-            resource_address,
             owner_signer,
+            resource_address,
             1,
             vector[@0x1, @0x2],
             vector[vector[123], vector[123]],
@@ -899,7 +899,7 @@ module supra_framework::committee_map {
             vector[123, 123],
             1
         );
-        update_dkg_flag(resource_address, owner_signer, 1, true);
+        update_dkg_flag(owner_signer, resource_address, 1, true);
     }
 
     #[test(owner_signer = @0xCEFEF)]
@@ -909,8 +909,8 @@ module supra_framework::committee_map {
         set_up_test(owner_signer);
         let resource_address = account::create_resource_address(&@0xCEFEF, SEED_COMMITTEE);
         upsert_committee(
-            resource_address,
             owner_signer,
+            resource_address,
             1,
             vector[@0x1, @0x2],
             vector[vector[123], vector[123]],
@@ -932,8 +932,8 @@ module supra_framework::committee_map {
         set_up_test(owner_signer);
         let resource_address = account::create_resource_address(&@0xCEFEF, SEED_COMMITTEE);
         upsert_committee(
-            resource_address,
             owner_signer,
+            resource_address,
             1,
             vector[@0x1, @0x2],
             vector[vector[123], vector[123]],
@@ -956,8 +956,8 @@ module supra_framework::committee_map {
         set_up_test(owner_signer);
         let resource_address = account::create_resource_address(&@0xCEFEF, SEED_COMMITTEE);
         upsert_committee(
-            resource_address,
             owner_signer,
+            resource_address,
             1,
             vector[@0x1, @0x2],
             vector[vector[123], vector[123]],
@@ -979,8 +979,8 @@ module supra_framework::committee_map {
         set_up_test(owner_signer);
         let resource_address = account::create_resource_address(&@0xCEFEF, SEED_COMMITTEE);
         upsert_committee(
-            resource_address,
             owner_signer,
+            resource_address,
             1,
             vector[@0x1, @0x2],
             vector[vector[123], vector[123]],
@@ -1002,8 +1002,8 @@ module supra_framework::committee_map {
         set_up_test(owner_signer);
         let resource_address = account::create_resource_address(&@0xCEFEF, SEED_COMMITTEE);
         upsert_committee(
-            resource_address,
             owner_signer,
+            resource_address,
             1,
             vector[@0x1, @0x2],
             vector[vector[123], vector[123]],
@@ -1025,8 +1025,8 @@ module supra_framework::committee_map {
         set_up_test(owner_signer);
         let resource_address = account::create_resource_address(&@0xCEFEF, SEED_COMMITTEE);
         upsert_committee(
-            resource_address,
             owner_signer,
+            resource_address,
             1,
             vector[@0x1, @0x2],
             vector[vector[123], vector[123]],
