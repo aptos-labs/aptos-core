@@ -271,16 +271,14 @@ impl BlockStore {
             .expect("Failed to persist commit");
 
         self.inner.write().update_ordered_root(block_to_commit.id());
-        if self.order_vote_enabled {
-            self.inner
-                .write()
-                .insert_ordered_cert(finality_proof_clone.clone());
-            if let Err(err) = self
-                .storage
-                .save_tree(vec![], vec![], vec![finality_proof_clone])
-            {
-                error!("Failed to save ordered cert to storage: {:?}", err);
-            }
+        self.inner
+            .write()
+            .insert_ordered_cert(finality_proof_clone.clone());
+        if let Err(err) = self
+            .storage
+            .save_tree(vec![], vec![], vec![finality_proof_clone])
+        {
+            error!("Failed to save ordered cert to storage: {:?}", err);
         }
         update_counters_for_ordered_blocks(&blocks_to_commit);
 
