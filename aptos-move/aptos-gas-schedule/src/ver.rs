@@ -10,6 +10,7 @@
 /// Change log:
 /// - V18
 ///   - Separate limits for governance scripts
+///   - Function info & dispatchable token gas params
 /// - V17
 ///   - Gas for keyless
 /// - V16
