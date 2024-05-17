@@ -259,8 +259,10 @@ fn test_order_votes_with_timeout(safety_rules: &Callback) {
         .construct_and_sign_vote_two_chain(&p2, Some(&tc1))
         .unwrap();
 
-    // Cannot sign order vote for round 1 after receiving timeout certificate for round 2
-    assert_err!(safety_rules.construct_and_sign_order_vote(&ov1));
+    // The validator hasn't signed timeout for round 2, but has received timeout certificate for round 2.
+    // The validator can still sign order vote for round 1. But all the 2f+1 validators who signed timeout certificate
+    // can't order vote for round 1. So, 2f+1 order votes can't be formed for round 1.
+    safety_rules.construct_and_sign_order_vote(&ov1).unwrap();
 
     safety_rules
         .sign_timeout_with_qc(

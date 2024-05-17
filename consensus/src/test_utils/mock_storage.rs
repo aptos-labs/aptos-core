@@ -28,9 +28,9 @@ pub struct MockSharedStorage {
     // Safety state
     pub block: Mutex<HashMap<HashValue, Block>>,
     pub qc: Mutex<HashMap<HashValue, QuorumCert>>,
+    pub wlis: Mutex<HashMap<HashValue, WrappedLedgerInfo>>,
     pub lis: Mutex<HashMap<u64, LedgerInfoWithSignatures>>,
     pub last_vote: Mutex<Option<Vote>>,
-    pub highest_ordered_cert: Mutex<Option<WrappedLedgerInfo>>,
 
     // Liveness state
     pub highest_2chain_timeout_certificate: Mutex<Option<TwoChainTimeoutCertificate>>,
@@ -42,9 +42,9 @@ impl MockSharedStorage {
         MockSharedStorage {
             block: Mutex::new(HashMap::new()),
             qc: Mutex::new(HashMap::new()),
+            wlis: Mutex::new(HashMap::new()),
             lis: Mutex::new(HashMap::new()),
             last_vote: Mutex::new(None),
-            highest_ordered_cert: Mutex::new(None),
             highest_2chain_timeout_certificate: Mutex::new(None),
             validator_set,
         }
@@ -133,7 +133,7 @@ impl MockStorage {
             RootMetadata::new_empty(),
             quorum_certs,
             qc,
-            None,
+            vec![],
         )
     }
 
@@ -160,7 +160,7 @@ impl PersistentLivenessStorage for MockStorage {
         &self,
         blocks: Vec<Block>,
         quorum_certs: Vec<QuorumCert>,
-        highest_ordered_cert: Option<WrappedLedgerInfo>,
+        wrapped_ledger_infos: Vec<WrappedLedgerInfo>,
     ) -> Result<()> {
         // When the shared storage is empty, we are expected to not able to construct an block tree
         // from it. During test we will intentionally clear shared_storage to simulate the situation
@@ -178,11 +178,11 @@ impl PersistentLivenessStorage for MockStorage {
                 .lock()
                 .insert(qc.certified_block().id(), qc);
         }
-        if let Some(highest_ordered_cert) = highest_ordered_cert {
+        for wli in wrapped_ledger_infos {
             self.shared_storage
-                .highest_ordered_cert
+                .wlis
                 .lock()
-                .replace(highest_ordered_cert);
+                .insert(wli.ledger_info().ledger_info().consensus_block_id(), wli);
         }
         // info!("step 1.3.4.2.3.3");
         if should_check_for_consistency {
@@ -277,7 +277,7 @@ impl PersistentLivenessStorage for EmptyStorage {
         &self,
         _: Vec<Block>,
         _: Vec<QuorumCert>,
-        _: Option<WrappedLedgerInfo>,
+        _: Vec<WrappedLedgerInfo>,
     ) -> Result<()> {
         Ok(())
     }
@@ -305,7 +305,7 @@ impl PersistentLivenessStorage for EmptyStorage {
             RootMetadata::new_empty(),
             vec![],
             None,
-            None,
+            vec![],
         ) {
             Ok(recovery_data) => LivenessStorageData::FullRecoveryData(recovery_data),
             Err(e) => {

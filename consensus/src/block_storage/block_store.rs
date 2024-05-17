@@ -277,7 +277,7 @@ impl BlockStore {
                 .insert_ordered_cert(finality_proof_clone.clone());
             if let Err(err) = self
                 .storage
-                .save_tree(vec![], vec![], Some(finality_proof_clone))
+                .save_tree(vec![], vec![], vec![finality_proof_clone])
             {
                 error!("Failed to save ordered cert to storage: {:?}", err);
             }
@@ -359,7 +359,7 @@ impl BlockStore {
                 .prefetch_payload_data(payload, pipelined_block.block().timestamp_usecs());
         }
         self.storage
-            .save_tree(vec![pipelined_block.block().clone()], vec![], None)
+            .save_tree(vec![pipelined_block.block().clone()], vec![], vec![])
             .context("Insert block failed when saving block")?;
         self.inner.write().insert_block(pipelined_block)
     }
@@ -392,7 +392,7 @@ impl BlockStore {
         };
 
         self.storage
-            .save_tree(vec![], vec![qc.clone()], None)
+            .save_tree(vec![], vec![qc.clone()], vec![])
             .context("Insert block failed when saving quorum")?;
         self.inner.write().insert_quorum_cert(qc)
     }

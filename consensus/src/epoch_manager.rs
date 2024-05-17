@@ -561,7 +561,7 @@ impl<P: OnChainConfigProvider> EpochManager<P> {
         max_blocks_allowed: u64,
     ) {
         let (request_tx, mut request_rx) = aptos_channel::new::<_, IncomingBlockRetrievalRequest>(
-            QueueStyle::LIFO,
+            QueueStyle::KLAST,
             10,
             Some(&counters::BLOCK_RETRIEVAL_TASK_MSGS),
         );
@@ -641,8 +641,8 @@ impl<P: OnChainConfigProvider> EpochManager<P> {
         network_sender: Arc<NetworkSender>,
     ) {
         let (recovery_manager_tx, recovery_manager_rx) = aptos_channel::new(
-            QueueStyle::LIFO,
-            100,
+            QueueStyle::KLAST,
+            10,
             Some(&counters::ROUND_MANAGER_CHANNEL_MSGS),
         );
         self.round_manager_tx = Some(recovery_manager_tx);
@@ -845,14 +845,14 @@ impl<P: OnChainConfigProvider> EpochManager<P> {
                 .allow_batches_without_pos_in_proposal,
         );
         let (round_manager_tx, round_manager_rx) = aptos_channel::new(
-            QueueStyle::LIFO,
-            100,
+            QueueStyle::KLAST,
+            10,
             Some(&counters::ROUND_MANAGER_CHANNEL_MSGS),
         );
 
         let (buffered_proposal_tx, buffered_proposal_rx) = aptos_channel::new(
             QueueStyle::KLAST,
-            100,
+            10,
             Some(&counters::ROUND_MANAGER_CHANNEL_MSGS),
         );
         self.round_manager_tx = Some(round_manager_tx.clone());
@@ -1342,7 +1342,7 @@ impl<P: OnChainConfigProvider> EpochManager<P> {
                 .allow_batches_without_pos_in_proposal,
         );
 
-        let (dag_rpc_tx, dag_rpc_rx) = aptos_channel::new(QueueStyle::FIFO, 100, None);
+        let (dag_rpc_tx, dag_rpc_rx) = aptos_channel::new(QueueStyle::FIFO, 10, None);
         self.dag_rpc_tx = Some(dag_rpc_tx);
         let (dag_shutdown_tx, dag_shutdown_rx) = oneshot::channel();
         self.dag_shutdown_tx = Some(dag_shutdown_tx);

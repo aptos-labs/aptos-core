@@ -24,12 +24,12 @@ use std::{cmp::max, collections::HashSet, sync::Arc};
 /// Blocks persisted are proposed but not yet committed.  The committed state is persisted
 /// via StateComputer.
 pub trait PersistentLivenessStorage: Send + Sync {
-    /// Persist the blocks, quorum certs and highest ordered cert into storage atomically.
+    /// Persist the blocks, quorum certs and wrapped ledger infos into storage atomically.
     fn save_tree(
         &self,
         blocks: Vec<Block>,
         quorum_certs: Vec<QuorumCert>,
-        highest_ordered_cert: Option<WrappedLedgerInfo>,
+        wraped_ledger_infos: Vec<WrappedLedgerInfo>,
     ) -> Result<()>;
 
     /// Delete the corresponding blocks and quorum certs atomically.
@@ -93,7 +93,7 @@ impl LedgerRecoveryData {
         &self,
         blocks: &mut Vec<Block>,
         quorum_certs: &mut Vec<QuorumCert>,
-        highest_ordered_cert: Option<WrappedLedgerInfo>,
+        wrapped_ledger_infos: &mut [WrappedLedgerInfo],
     ) -> Result<RootInfo> {
         info!(
             "The last committed block id as recorded in storage: {}",
@@ -134,14 +134,16 @@ impl LedgerRecoveryData {
             .find(|qc| qc.certified_block().id() == root_block.id())
             .ok_or_else(|| format_err!("No QC found for root: {}", root_id))?
             .clone();
-        // TODO: The earlier assertion could fail when executing blocks based on order votes.
-        // A commit certificate may not have a QC with ledger info that matches with the
-        // commit certificate.
         let root_ordered_cert = quorum_certs
             .iter()
             .find(|qc| qc.commit_info().id() == root_block.id())
             .map(|qc| qc.into_wrapped_ledger_info())
-            .or_else(|| highest_ordered_cert.filter(|cert| cert.commit_info().id() == root_id))
+            .or_else(|| {
+                wrapped_ledger_infos
+                    .iter()
+                    .find(|wli| wli.ledger_info().ledger_info().consensus_block_id() == root_id)
+                    .cloned()
+            })
             .ok_or_else(|| format_err!("No LI found for root: {}", root_id))?
             .clone();
 
@@ -215,10 +217,10 @@ impl RecoveryData {
         root_metadata: RootMetadata,
         mut quorum_certs: Vec<QuorumCert>,
         highest_2chain_timeout_cert: Option<TwoChainTimeoutCertificate>,
-        highest_ordered_cert: Option<WrappedLedgerInfo>,
+        mut wrapped_ledger_infos: Vec<WrappedLedgerInfo>,
     ) -> Result<Self> {
         let root = ledger_recovery_data
-            .find_root(&mut blocks, &mut quorum_certs, highest_ordered_cert)
+            .find_root(&mut blocks, &mut quorum_certs, &mut wrapped_ledger_infos)
             .with_context(|| {
                 // for better readability
                 blocks.sort_by_key(|block| block.round());
@@ -338,21 +340,12 @@ impl PersistentLivenessStorage for StorageWriteProxy {
         &self,
         blocks: Vec<Block>,
         quorum_certs: Vec<QuorumCert>,
-        highest_ordered_cert: Option<WrappedLedgerInfo>,
+        wrapped_ledger_infos: Vec<WrappedLedgerInfo>,
     ) -> Result<()> {
-        let highest_ordered_cert = highest_ordered_cert.map(|cert| {
-            bcs::to_bytes(&cert).map_err(|e| {
-                format_err!(
-                    "Failed to serialize highest ordered cert in persistent liveness storage: {}",
-                    e
-                )
-            })
-        });
-        let highest_ordered_cert = highest_ordered_cert.transpose()?;
         Ok(self.db.save_blocks_and_quorum_certificates(
             blocks,
             quorum_certs,
-            highest_ordered_cert,
+            wrapped_ledger_infos,
         )?)
     }
 
@@ -390,11 +383,9 @@ impl PersistentLivenessStorage for StorageWriteProxy {
         let highest_2chain_timeout_cert = raw_data.1.map(|b| {
             bcs::from_bytes(&b).expect("unable to deserialize highest 2-chain timeout cert")
         });
-        let highest_ordered_cert = raw_data.2.map(|bytes| {
-            bcs::from_bytes(&bytes).expect("unable to deserialize highest ordered cert")
-        });
-        let blocks = raw_data.3;
-        let quorum_certs: Vec<_> = raw_data.4;
+        let blocks = raw_data.2;
+        let quorum_certs: Vec<_> = raw_data.3;
+        let wrapped_ledger_infos = raw_data.4;
         let blocks_repr: Vec<String> = blocks.iter().map(|b| format!("\n\t{}", b)).collect();
         info!(
             "The following blocks were restored from ConsensusDB : {}",
@@ -408,7 +399,14 @@ impl PersistentLivenessStorage for StorageWriteProxy {
             "The following quorum certs were restored from ConsensusDB: {}",
             qc_repr.concat()
         );
-
+        let wli_repr: Vec<String> = wrapped_ledger_infos
+            .iter()
+            .map(|wli| format!("\n\t{}", wli))
+            .collect();
+        info!(
+            "The following wrapped ledger infos were restored from ConsensusDB: {}",
+            wli_repr.concat()
+        );
         // find the block corresponding to storage latest ledger info
         let latest_ledger_info = self
             .aptos_db
@@ -427,7 +425,7 @@ impl PersistentLivenessStorage for StorageWriteProxy {
             accumulator_summary.into(),
             quorum_certs,
             highest_2chain_timeout_cert,
-            highest_ordered_cert,
+            wrapped_ledger_infos,
         ) {
             Ok(mut initial_data) => {
                 (self as &dyn PersistentLivenessStorage)

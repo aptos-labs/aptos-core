@@ -15,9 +15,9 @@ impl BlockStage {
     pub const EPOCH_MANAGER_VERIFIED: &'static str = "epoch_manager_verified";
     pub const EXECUTED: &'static str = "executed";
     pub const NETWORK_RECEIVED: &'static str = "network_received";
+    pub const OC_ADDED: &'static str = "ordered_cert_created";
     pub const ORDERED: &'static str = "ordered";
     pub const ORDER_VOTED: &'static str = "order_voted";
-    pub const ORDER_VOTE_QC_CREATED: &'static str = "order_vote_qc_created";
     pub const QC_ADDED: &'static str = "qc_added";
     pub const QC_AGGREGATED: &'static str = "qc_aggregated";
     pub const RAND_ADD_DECISION: &'static str = "rand_add_decision";
