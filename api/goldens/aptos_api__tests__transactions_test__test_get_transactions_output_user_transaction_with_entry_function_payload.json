@@ -175,7 +175,7 @@
     "state_change_hash": "",
     "event_root_hash": "",
     "state_checkpoint_hash": null,
-    "gas_used": "6",
+    "gas_used": "9",
     "success": true,
     "vm_status": "Executed successfully",
     "accumulator_root_hash": "",
@@ -337,11 +337,11 @@
         "sequence_number": "0",
         "type": "0x1::transaction_fee::FeeStatement",
         "data": {
-          "execution_gas_units": "4",
-          "io_gas_units": "3",
+          "execution_gas_units": "5",
+          "io_gas_units": "4",
           "storage_fee_octas": "0",
           "storage_fee_refund_octas": "0",
-          "total_charge_gas_units": "6"
+          "total_charge_gas_units": "9"
         }
       }
     ],

@@ -6,7 +6,7 @@
 
 use crate::{
     gas_schedule::VMGasParameters,
-    ver::gas_feature_versions::{RELEASE_V1_11, RELEASE_V1_12},
+    ver::gas_feature_versions::{RELEASE_V1_11, RELEASE_V1_12, RELEASE_V1_13},
 };
 use aptos_gas_algebra::{
     AbstractValueSize, Fee, FeePerByte, FeePerGasUnit, FeePerSlot, Gas, GasExpression,
@@ -70,6 +70,11 @@ crate::gas_schedule::macros::define_gas_parameters!(
             max_transaction_size_in_bytes: NumBytes,
             "max_transaction_size_in_bytes",
             64 * 1024
+        ],
+        [
+            max_transaction_size_in_bytes_gov: NumBytes,
+            { RELEASE_V1_13.. => "max_transaction_size_in_bytes.gov" },
+            1024 * 1024
         ],
         [
             gas_unit_scaling_factor: GasScalingFactor,
@@ -205,14 +210,29 @@ crate::gas_schedule::macros::define_gas_parameters!(
             920_000_000, // 92ms of execution at 10k gas per ms
         ],
         [
+            max_execution_gas_gov: InternalGas,
+            { RELEASE_V1_13.. => "max_execution_gas.gov" },
+            4_000_000_000,
+        ],
+        [
             max_io_gas: InternalGas,
             { 7.. => "max_io_gas" },
             1_000_000_000, // 100ms of IO at 10k gas per ms
         ],
         [
+            max_io_gas_gov: InternalGas,
+            { RELEASE_V1_13.. => "max_io_gas.gov" },
+            2_000_000_000,
+        ],
+        [
             max_storage_fee: Fee,
             { 7.. => "max_storage_fee" },
             2_0000_0000, // 2 APT
+        ],
+        [
+            max_storage_fee_gov: Fee,
+            { RELEASE_V1_13.. => "max_storage_fee.gov" },
+            2_0000_0000,
         ],
         [
             dependency_per_module: InternalGas,

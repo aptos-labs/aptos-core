@@ -597,10 +597,12 @@ impl InternalNode {
         node_key: &NodeKey,
         n: Nibble,
         reader: Option<&R>,
-    ) -> Result<(Option<NodeKey>, Vec<NodeInProof>)> {
+        out_siblings: &mut Vec<NodeInProof>,
+        root_depth: usize,
+        target_depth: usize,
+    ) -> Result<Option<NodeKey>> {
         assert!(self.leaf_count > 1);
 
-        let mut siblings = vec![];
         let (existence_bitmap, leaf_bitmap) = self.generate_bitmaps();
 
         // Nibble height from 3 to 0.
@@ -610,26 +612,32 @@ impl InternalNode {
             let width = 1 << h;
             let (child_half_start, sibling_half_start) = get_child_and_sibling_half_start(n, h);
             // Compute the root hash of the subtree rooted at the sibling of `r`.
-            if let Some(reader) = reader {
-                siblings.push(self.gen_node_in_proof(
-                    sibling_half_start,
-                    width,
-                    (existence_bitmap, leaf_bitmap),
-                    (reader, node_key),
-                )?);
-            } else {
-                siblings.push(
-                    self.merkle_hash(sibling_half_start, width, (existence_bitmap, leaf_bitmap))
+            let depth = root_depth + 3 - h as usize;
+            if depth >= target_depth {
+                if let Some(reader) = reader {
+                    out_siblings.push(self.gen_node_in_proof(
+                        sibling_half_start,
+                        width,
+                        (existence_bitmap, leaf_bitmap),
+                        (reader, node_key),
+                    )?);
+                } else {
+                    out_siblings.push(
+                        self.merkle_hash(
+                            sibling_half_start,
+                            width,
+                            (existence_bitmap, leaf_bitmap),
+                        )
                         .into(),
-                );
+                    );
+                }
             }
-
             let (range_existence_bitmap, range_leaf_bitmap) =
                 Self::range_bitmaps(child_half_start, width, (existence_bitmap, leaf_bitmap));
 
             if range_existence_bitmap == 0 {
                 // No child in this range.
-                return Ok((None, siblings));
+                return Ok(None);
             } else if width == 1
                 || (range_existence_bitmap.count_ones() == 1 && range_leaf_bitmap != 0)
             {
@@ -638,27 +646,36 @@ impl InternalNode {
                 // `None` because it's existence indirectly proves the n-th child doesn't exist.
                 // Please read proof format for details.
                 let only_child_index = Nibble::from(range_existence_bitmap.trailing_zeros() as u8);
-                return Ok((
-                    {
-                        let only_child_version = self
-                            .child(only_child_index)
-                            // Should be guaranteed by the self invariants, but these are not easy to express at the moment
-                            .with_context(|| {
-                                format!(
-                                    "Corrupted internal node: child_bitmap indicates \
-                                     the existence of a non-exist child at index {:x}",
-                                    only_child_index
-                                )
-                            })
-                            .unwrap()
-                            .version;
-                        Some(node_key.gen_child_node_key(only_child_version, only_child_index))
-                    },
-                    siblings,
+                let only_child_version = self
+                    .child(only_child_index)
+                    // Should be guaranteed by the self invariants, but these are not easy to express at the moment
+                    .with_context(|| {
+                        format!(
+                            "Corrupted internal node: child_bitmap indicates \
+                                 the existence of a non-exist child at index {:x}",
+                            only_child_index
+                        )
+                    })
+                    .unwrap()
+                    .version;
+                return Ok(Some(
+                    node_key.gen_child_node_key(only_child_version, only_child_index),
                 ));
             }
         }
         unreachable!("Impossible to get here without returning even at the lowest level.")
+    }
+
+    #[cfg(test)]
+    pub(crate) fn get_child_with_siblings_for_test<K: crate::Key, R: TreeReader<K>>(
+        &self,
+        node_key: &NodeKey,
+        n: Nibble,
+        reader: Option<&R>,
+    ) -> Result<(Option<NodeKey>, Vec<NodeInProof>)> {
+        let mut sibilings = vec![];
+        self.get_child_with_siblings(node_key, n, reader, &mut sibilings, 0, 0)
+            .map(|n| (n, sibilings))
     }
 }
 

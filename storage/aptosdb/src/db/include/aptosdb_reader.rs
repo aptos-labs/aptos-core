@@ -457,12 +457,13 @@ impl DbReader for AptosDB {
         &self,
         state_key: &StateKey,
         version: Version,
+        root_depth: usize,
     ) -> Result<SparseMerkleProofExt> {
         gauged_api("get_state_proof_by_version_ext", || {
             self.error_if_state_merkle_pruned("State merkle", version)?;
 
             self.state_store
-                .get_state_proof_by_version_ext(state_key, version)
+                .get_state_proof_by_version_ext(state_key, version, root_depth)
         })
     }
 
@@ -470,12 +471,13 @@ impl DbReader for AptosDB {
         &self,
         state_store_key: &StateKey,
         version: Version,
+        root_depth: usize,
     ) -> Result<(Option<StateValue>, SparseMerkleProofExt)> {
         gauged_api("get_state_value_with_proof_by_version_ext", || {
             self.error_if_state_merkle_pruned("State merkle", version)?;
 
             self.state_store
-                .get_state_value_with_proof_by_version_ext(state_store_key, version)
+                .get_state_value_with_proof_by_version_ext(state_store_key, version, root_depth)
         })
     }
 
@@ -886,7 +888,7 @@ impl AptosDB {
     ) -> Result<TransactionWithProof> {
         self.error_if_ledger_pruned("Transaction", version)?;
 
-        let proof = self
+        let mut proof = self
             .ledger_db
             .transaction_info_db()
             .get_transaction_info_with_proof(
@@ -894,6 +896,11 @@ impl AptosDB {
                 ledger_version,
                 self.ledger_db.transaction_accumulator_db(),
             )?;
+
+        let aux_data_opt = self.get_transaction_auxiliary_data_by_version(version).ok();
+        proof.inject_auxiliary_error_data(aux_data_opt);
+
+
         let transaction = self.ledger_db.transaction_db().get_transaction(version)?;
 
         // If events were requested, also fetch those.

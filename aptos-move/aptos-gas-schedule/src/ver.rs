@@ -8,6 +8,8 @@
 ///   - Changing how gas is calculated in any way
 ///
 /// Change log:
+/// - V18
+///   - Separate limits for governance scripts
 /// - V17
 ///   - Gas for keyless
 /// - V16
@@ -56,7 +58,7 @@
 ///       global operations.
 /// - V1
 ///   - TBA
-pub const LATEST_GAS_FEATURE_VERSION: u64 = 17;
+pub const LATEST_GAS_FEATURE_VERSION: u64 = 18;
 
 #[allow(dead_code)]
 pub mod gas_feature_versions {

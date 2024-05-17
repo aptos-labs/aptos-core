@@ -11,7 +11,7 @@ use move_binary_format::{
     errors::PartialVMError,
     file_format::{CompiledModule, CompiledScript, FunctionDefinitionIndex},
 };
-use move_bytecode_utils::module_cache::GetModule;
+use move_bytecode_utils::compiled_module_viewer::CompiledModuleView;
 use move_command_line_common::files::MOVE_COMPILED_EXTENSION;
 use move_core_types::{
     account_address::AccountAddress,
@@ -40,7 +40,7 @@ pub const MODULES_DIR: &str = "modules";
 /// file under `DEFAULT_BUILD_DIR` where a registry of generated struct layouts are stored
 pub const STRUCT_LAYOUTS_FILE: &str = "struct_layouts.yaml";
 
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub struct OnDiskStateView {
     build_dir: PathBuf,
     storage_dir: PathBuf,
@@ -152,18 +152,13 @@ impl OnDiskStateView {
     }
 
     /// Return the name of the function at `idx` in `module_id`
-    pub fn resolve_function(&self, module_id: &ModuleId, idx: u16) -> Result<Option<Identifier>> {
-        if let Some(m) = self.get_module_by_id(module_id)? {
-            Ok(Some(
-                m.identifier_at(
-                    m.function_handle_at(m.function_def_at(FunctionDefinitionIndex(idx)).function)
-                        .name,
-                )
-                .to_owned(),
-            ))
-        } else {
-            Ok(None)
-        }
+    pub fn resolve_function(&self, module_id: &ModuleId, idx: u16) -> Result<Identifier> {
+        let m = self.view_compiled_module(module_id)?.unwrap();
+        Ok(m.identifier_at(
+            m.function_handle_at(m.function_def_at(FunctionDefinitionIndex(idx)).function)
+                .name,
+        )
+        .to_owned())
     }
 
     fn get_bytes(path: &Path) -> Result<Option<Bytes>> {
@@ -194,9 +189,9 @@ impl OnDiskStateView {
                     t => bail!("Expected to parse struct tag, but got {}", t),
                 };
                 match Self::get_bytes(resource_path)? {
-                    Some(resource_data) => {
-                        Some(MoveValueAnnotator::new(self).view_resource(&id, &resource_data)?)
-                    },
+                    Some(resource_data) => Some(
+                        MoveValueAnnotator::new(self.clone()).view_resource(&id, &resource_data)?,
+                    ),
                     None => None,
                 }
             }),
@@ -373,17 +368,16 @@ impl ResourceResolver for OnDiskStateView {
     }
 }
 
-impl GetModule for &OnDiskStateView {
-    type Error = anyhow::Error;
+impl CompiledModuleView for OnDiskStateView {
     type Item = CompiledModule;
 
-    fn get_module_by_id(&self, id: &ModuleId) -> Result<Option<CompiledModule>, Self::Error> {
+    fn view_compiled_module(&self, id: &ModuleId) -> anyhow::Result<Option<Self::Item>> {
         if let Some(bytes) = self.get_module_bytes(id)? {
             let module = CompiledModule::deserialize(&bytes)
-                .map_err(|e| anyhow!("Failure deserializing module {:?}: {:?}", id, e))?;
+                .map_err(|e| anyhow!("Failure deserializing module {}: {:?}", id, e))?;
             Ok(Some(module))
         } else {
-            Ok(None)
+            bail!("Module {} not found", id)
         }
     }
 }
