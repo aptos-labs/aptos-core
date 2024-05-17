@@ -55,6 +55,19 @@ impl AsyncProofFetcher {
         }
     }
 
+    pub fn fetch_state_value(
+        &self,
+        state_key: &StateKey,
+        version: Version,
+    ) -> Result<Option<(Version, StateValue)>> {
+        let _timer = TIMER
+            .with_label_values(&["async_proof_fetcher_fetch"])
+            .start_timer();
+        Ok(self
+            .reader
+            .get_state_value_with_version_by_version(state_key, version)?)
+    }
+
     pub fn fetch_state_value_with_version_and_schedule_proof_read(
         &self,
         state_key: &StateKey,
@@ -62,12 +75,7 @@ impl AsyncProofFetcher {
         subtree_root_depth: usize,
         subtree_root_hash: Option<HashValue>,
     ) -> Result<Option<(Version, StateValue)>> {
-        let _timer = TIMER
-            .with_label_values(&["async_proof_fetcher_fetch"])
-            .start_timer();
-        let version_and_value_opt = self
-            .reader
-            .get_state_value_with_version_by_version(state_key, version)?;
+        let version_and_value_opt = self.fetch_state_value(state_key, version)?;
         self.schedule_proof_read(
             state_key.clone(),
             version,
