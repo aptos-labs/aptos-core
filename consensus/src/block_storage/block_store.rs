@@ -112,11 +112,15 @@ impl BlockStore {
 
     async fn try_send_for_execution(&self) {
         // reproduce the same batches (important for the commit phase)
-
         let mut certs = self.inner.read().get_all_quorum_certs_with_commit_info();
         certs.sort_unstable_by_key(|qc| qc.commit_info().round());
-
+        info!("Try_send_for_execution with {} quorum certs. self.commit_root().round() {:?}, certs {:?}", certs.len(), self.commit_root().round(), certs);
         for qc in certs {
+            info!(
+                "try_send_for_execution with qc round {:?}, self round {:?}",
+                qc.commit_info().round(),
+                self.commit_root().round()
+            );
             if qc.commit_info().round() > self.commit_root().round() {
                 info!(
                     "trying to commit to round {} with ledger info {}",
@@ -293,6 +297,15 @@ impl BlockStore {
         quorum_certs: Vec<QuorumCert>,
         order_vote_enabled: bool,
     ) {
+        info!(
+            "Rebuilding block tree. root {:?}, blocks {:?}, qcs {:?}",
+            root,
+            blocks.iter().map(|b| b.id()).collect::<Vec<_>>(),
+            quorum_certs
+                .iter()
+                .map(|qc| qc.certified_block().id())
+                .collect::<Vec<_>>()
+        );
         let max_pruned_blocks_in_mem = self.inner.read().max_pruned_blocks_in_mem();
         // Rollover the previous highest TC from the old tree to the new one.
         let prev_2chain_htc = self

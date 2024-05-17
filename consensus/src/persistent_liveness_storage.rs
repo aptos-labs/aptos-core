@@ -16,7 +16,7 @@ use aptos_types::{
     block_info::Round, epoch_change::EpochChangeProof, ledger_info::LedgerInfoWithSignatures,
     proof::TransactionAccumulatorSummary, transaction::Version,
 };
-use std::{cmp::max, collections::HashSet, sync::Arc};
+use std::{cmp::max, collections::HashSet, fmt::Debug, sync::Arc};
 
 /// PersistentLivenessStorage is essential for maintaining liveness when a node crashes.  Specifically,
 /// upon a restart, a correct node will recover.  Even if all nodes crash, liveness is
@@ -69,6 +69,16 @@ pub struct RootInfo(
     pub WrappedLedgerInfo,
     pub WrappedLedgerInfo,
 );
+
+impl Debug for RootInfo {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(
+            f,
+            "RootInfo: [block: {}, quorum_cert: {}, ordered_cert: {}, commit_cert: {}]",
+            self.0, self.1, self.2, self.3
+        )
+    }
+}
 
 /// LedgerRecoveryData is a subset of RecoveryData that we can get solely from ledger info.
 #[derive(Clone)]
