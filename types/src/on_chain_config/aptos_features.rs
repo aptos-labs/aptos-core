@@ -149,6 +149,8 @@ impl FeatureFlag {
             FeatureFlag::CONCURRENT_FUNGIBLE_ASSETS,
             FeatureFlag::AGGREGATOR_V2_IS_AT_LEAST_API,
             FeatureFlag::CONCURRENT_FUNGIBLE_BALANCE,
+            FeatureFlag::NEW_ACCOUNTS_DEFAULT_TO_FA_APT_STORE,
+            FeatureFlag::OPERATIONS_DEFAULT_TO_FA_APT_STORE,
         ]
     }
 }

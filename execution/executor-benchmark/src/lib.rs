@@ -767,10 +767,7 @@ mod tests {
         AptosVM::set_concurrency_level_once(4);
         AptosVM::set_processed_transactions_detailed_counters();
         NativeExecutor::set_concurrency_level_once(4);
-        test_generic_benchmark::<AptosVM>(
-            Some(TransactionTypeArg::ResourceGroupsGlobalWriteTag1KB),
-            true,
-        );
+        test_generic_benchmark::<AptosVM>(Some(TransactionTypeArg::CoinTransfer), true);
     }
 
     #[test]
