@@ -2,12 +2,17 @@
 // SPDX-License-Identifier: Apache-2.0
 
 use crate::on_chain_config::OnChainConfig;
+use move_binary_format::{
+    file_format_common,
+    file_format_common::{IDENTIFIER_SIZE_MAX, LEGACY_IDENTIFIER_SIZE_MAX},
+};
 use move_core_types::{
     effects::{ChangeSet, Op},
     language_storage::CORE_CODE_ADDRESS,
 };
 use serde::{Deserialize, Serialize};
 use strum_macros::FromRepr;
+
 /// The feature flags define in the Move source. This must stay aligned with the constants there.
 #[derive(Clone, Copy, Debug, PartialEq, Eq, PartialOrd, Ord, FromRepr)]
 #[allow(non_camel_case_types)]
@@ -273,6 +278,29 @@ impl Features {
 
     pub fn is_refundable_bytes_enabled(&self) -> bool {
         self.is_enabled(FeatureFlag::REFUNDABLE_BYTES)
+    }
+
+    pub fn get_max_identifier_size(&self) -> u64 {
+        if self.is_enabled(FeatureFlag::LIMIT_MAX_IDENTIFIER_LENGTH) {
+            IDENTIFIER_SIZE_MAX
+        } else {
+            LEGACY_IDENTIFIER_SIZE_MAX
+        }
+    }
+
+    pub fn get_max_binary_format_version(&self, gas_feature_version_opt: Option<u64>) -> u32 {
+        // For historical reasons, we support still < gas version 5, but if a new caller don't specify
+        // the gas version, we default to 5, which was introduced in late '22.
+        let gas_feature_version = gas_feature_version_opt.unwrap_or(5);
+        if gas_feature_version < 5 {
+            file_format_common::VERSION_5
+        } else if self.is_enabled(FeatureFlag::VM_BINARY_FORMAT_V7) {
+            file_format_common::VERSION_7
+        } else if self.is_enabled(FeatureFlag::VM_BINARY_FORMAT_V6) {
+            file_format_common::VERSION_6
+        } else {
+            file_format_common::VERSION_5
+        }
     }
 }
 

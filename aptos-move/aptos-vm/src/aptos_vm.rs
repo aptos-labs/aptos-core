@@ -10,7 +10,6 @@ use crate::{
     gas::{check_gas, get_gas_parameters, make_prod_gas_meter, ProdGasMeter},
     keyless_validation,
     move_vm_ext::{
-        get_max_binary_format_version, get_max_identifier_size,
         session::user_transaction_sessions::{
             abort_hook::AbortHookSession, epilogue::EpilogueSession, prologue::PrologueSession,
             user::UserSession,
@@ -65,6 +64,7 @@ use aptos_types::{
         TransactionAuxiliaryData, TransactionOutput, TransactionPayload, TransactionStatus,
         VMValidatorResult, ViewFunctionOutput, WriteSetPayload,
     },
+    vm::configs::aptos_prod_deserializer_config,
     vm_status::{AbortLocation, StatusCode, VMStatus},
 };
 use aptos_utils::{aptos_try, return_on_failure};
@@ -83,7 +83,6 @@ use fail::fail_point;
 use move_binary_format::{
     access::ModuleAccess,
     compatibility::Compatibility,
-    deserializer::DeserializerConfig,
     errors::{Location, PartialVMError, PartialVMResult, VMError, VMResult},
     CompiledModule,
 };
@@ -1388,12 +1387,13 @@ impl AptosVM {
 
     /// Deserialize a module bundle.
     fn deserialize_module_bundle(&self, modules: &ModuleBundle) -> VMResult<Vec<CompiledModule>> {
-        let max_version = get_max_binary_format_version(self.features(), None);
-        let max_identifier_size = get_max_identifier_size(self.features());
-        let config = DeserializerConfig::new(max_version, max_identifier_size);
+        let deserializer_config =
+            aptos_prod_deserializer_config(self.features(), self.gas_feature_version);
+
         let mut result = vec![];
         for module_blob in modules.iter() {
-            match CompiledModule::deserialize_with_config(module_blob.code(), &config) {
+            match CompiledModule::deserialize_with_config(module_blob.code(), &deserializer_config)
+            {
                 Ok(module) => {
                     result.push(module);
                 },
