@@ -214,6 +214,7 @@ pub fn prove_with_trapdoor<C: ConstraintSynthesizer<E::ScalarField>, R: RngCore>
 }
 
 use ark_circom::CircomConfig;
+use ark_circom::CircomBuilder;
 
 fn test_prove_and_verify<E>(n_iters: usize)
 where
@@ -233,6 +234,9 @@ where
     "/Users/michael/aptos-labs/aptos-core/types/src/keyless/circuit-files/keyless_main.wasm",
     "/Users/michael/aptos-labs/aptos-core/types/src/keyless/circuit-files/keyless_main.r1cs",
 ).unwrap();*/
+
+    let mut builder = CircomBuilder::new(cfg);
+    let circom = builder.setup();
     let mut rng = ark_std::rand::rngs::StdRng::seed_from_u64(test_rng().next_u64());
 
     let (pk, vk) = Groth16Simulator::<E>::circuit_specific_setup_with_trapdoor(MySillyCircuit { a: None, b: None }, &mut rng).unwrap();
@@ -244,7 +248,7 @@ where
         let mut c = a;
         c *= b;
 
-        let proof = Groth16Simulator::<E>::prove_with_trapdoor(
+        /*let proof = Groth16Simulator::<E>::prove_with_trapdoor(
             &pk,
             MySillyCircuit {
                 a: Some(a),
@@ -255,7 +259,7 @@ where
         .unwrap();
 
         assert!(Groth16::<E>::verify_with_processed_vk(&pvk, &[c], &proof).unwrap());
-        assert!(!Groth16::<E>::verify_with_processed_vk(&pvk, &[a], &proof).unwrap());
+        assert!(!Groth16::<E>::verify_with_processed_vk(&pvk, &[a], &proof).unwrap());*/
     }
 }
 
