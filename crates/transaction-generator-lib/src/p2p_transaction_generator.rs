@@ -177,9 +177,9 @@ impl P2PTransactionGenerator {
         num_coins: u64,
         txn_factory: &TransactionFactory,
     ) -> SignedTransaction {
-        from.sign_with_transaction_builder(
-            txn_factory.payload(aptos_stdlib::aptos_coin_transfer(*to, num_coins)),
-        )
+        from.sign_with_transaction_builder(txn_factory.payload(
+            aptos_stdlib::apt_primary_fungible_store_transfer(*to, num_coins),
+        ))
     }
 
     fn generate_invalid_transaction(
