@@ -576,12 +576,16 @@ impl RoundManager {
         if message_round < self.round_state.current_round() {
             return Ok(false);
         }
+        let local_sync_info = self.block_store.sync_info();
         self.sync_up(sync_info, author).await?;
         ensure!(
             message_round == self.round_state.current_round(),
-            "After sync, round {} doesn't match local {}",
+            "After sync, round {} doesn't match local {}. Input sync info: {:?}, Local Sync Info {:?}, Current sync info {:?}",
             message_round,
             self.round_state.current_round()
+            sync_info,
+            local_sync_info,
+            self.block_store.sync_info(),
         );
         Ok(true)
     }

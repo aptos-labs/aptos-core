@@ -110,6 +110,9 @@ impl BlockStore {
         )
         .await?;
 
+        info!("Synced to highest quorum cert: input sync info: {:?}, current sync info {:?}", sync_info, self.sync_info());
+        info!("Current block hashes in block_store: {:?}. Current quorum certs in block_store: {:?}", self.inner.id_to_block.keys(), self.inner.id_to_quorum_cert.keys());
+
         // There could be a block that is orderd by aggregating order votes, but doesn't have the
         // regular 2-chain QC yet. In such a case, the block won't be ordered in the above call to
         // sync_to_highest_quorum_cert. So, we explicitly order by inserting the ordered cert.
