@@ -7,6 +7,7 @@ use crate::{
     state_sync_config_execute_transactions, wrap_with_realistic_env, TestCommand,
 };
 use aptos_forge::{
+    emitter::NumAccountsMode,
     success_criteria::{LatencyType, StateProgressThreshold, SuccessCriteria},
     EmitJobMode, EmitJobRequest, ForgeConfig, NodeResourceOverride,
 };
@@ -375,8 +376,9 @@ pub fn run_dag_consensus_only_realistic_env_max_tps() -> ForgeConfig {
         .with_initial_validator_count(NonZeroUsize::new(100).unwrap())
         .with_emit_job(
             EmitJobRequest::default()
-                .mode(EmitJobMode::ConstTps { tps: 100_000 })
+                .mode(EmitJobMode::ConstTps { tps: 200_000 })
                 .txn_expiration_time_secs(5 * 60),
+                // .num_accounts_mode(NumAccountsMode::NumAccounts(100)),
         )
         .add_network_test(PerformanceBenchmark)
         .with_genesis_helm_config_fn(Arc::new(|helm_values| {

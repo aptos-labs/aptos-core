@@ -407,7 +407,7 @@ impl EmitJobRequest {
                     transactions_per_account,
                     max_submit_batch_size: DEFAULT_MAX_SUBMIT_TRANSACTION_BATCH_SIZE,
                     worker_offset_mode: WorkerOffsetMode::Jitter {
-                        jitter_millis: 5000,
+                        jitter_millis: 1000,
                     },
                     endpoints: clients_count,
                     check_account_sequence_only_once_fraction: 0.0,
@@ -433,7 +433,7 @@ impl EmitJobRequest {
                 // That's why we set wait_seconds conservativelly, to make sure all processing and
                 // client calls finish within that time.
 
-                let wait_seconds = self.txn_expiration_time_secs + 180;
+                let wait_seconds = 1;
                 // In case we set a very low TPS, we need to still be able to spread out
                 // transactions, at least to the seconds granularity, so we reduce transactions_per_account
                 // if needed.
@@ -471,8 +471,7 @@ impl EmitJobRequest {
                 );
 
                 // sample latency on 2% of requests, or at least once every 5s.
-                let sample_latency_fraction =
-                    1.0_f32.min(0.02_f32.max(wait_seconds as f32 / num_accounts as f32 / 5.0_f32));
+                let sample_latency_fraction = 0.0;
 
                 info!(
                     " Will use {} clients and {} accounts, sampling latency on {}",
@@ -499,7 +498,7 @@ impl EmitJobRequest {
                         WorkerOffsetMode::Spread
                     },
                     endpoints: clients_count,
-                    check_account_sequence_only_once_fraction: 1.0 - sample_latency_fraction,
+                    check_account_sequence_only_once_fraction: 0.0,
                     check_account_sequence_sleep: self.latency_polling_interval,
                 }
             },
