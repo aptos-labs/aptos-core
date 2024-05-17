@@ -97,6 +97,7 @@ impl ConsensusDB {
         opts.set_max_background_jobs(8);
         opts.set_enable_write_thread_adaptive_yield(true);
         opts.set_allow_concurrent_memtable_write(true);
+        opts.set_enable_pipelined_write(true);
 
         let mut table_options = BlockBasedOptions::default();
         table_options.set_block_size(32 * (1 << 10)); // 4KB
@@ -232,16 +233,16 @@ impl ConsensusDB {
     }
 
     pub fn put<S: Schema>(&self, key: &S::Key, value: &S::Value) -> Result<(), DbError> {
-        // let batch = SchemaBatch::new();
-        // batch.put::<S>(key, value)?;
-        // self.commit(batch)?;
+        let batch = SchemaBatch::new();
+        batch.put::<S>(key, value)?;
+        self.commit(batch)?;
         Ok(())
     }
 
     pub fn delete<S: Schema>(&self, keys: Vec<S::Key>) -> Result<(), DbError> {
-        // let batch = SchemaBatch::new();
-        // keys.iter().try_for_each(|key| batch.delete::<S>(key))?;
-        // self.commit(batch)
+        let batch = SchemaBatch::new();
+        keys.iter().try_for_each(|key| batch.delete::<S>(key))?;
+        self.commit(batch)?;
         Ok(())
     }
 

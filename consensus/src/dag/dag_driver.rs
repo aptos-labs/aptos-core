@@ -24,6 +24,7 @@ use crate::{
         },
         DAGRpcResult, RpcHandler,
     },
+    monitor,
     payload_client::PayloadClient,
 };
 use anyhow::{bail, ensure};
@@ -371,24 +372,25 @@ impl DagDriver {
             .health_backoff
             .calculate_payload_limits(new_round, &self.payload_config);
 
-        let (validator_txns, payload) = match self
-            .payload_client
-            .pull_payload(
-                Duration::from_millis(self.payload_config.payload_pull_max_poll_time_ms),
-                max_txns,
-                max_size_bytes,
-                // TODO: Set max_inline_items and max_inline_bytes correctly
-                100,
-                100 * 1024,
-                sys_payload_filter,
-                payload_filter,
-                Box::pin(async {}),
-                true,
-                0,
-                0.0,
-            )
-            .await
-        {
+        let (validator_txns, payload) = match monitor!(
+            "dag_pull_payload",
+            self.payload_client
+                .pull_payload(
+                    Duration::from_millis(self.payload_config.payload_pull_max_poll_time_ms),
+                    max_txns,
+                    max_size_bytes,
+                    // TODO: Set max_inline_items and max_inline_bytes correctly
+                    100,
+                    100 * 1024,
+                    sys_payload_filter,
+                    payload_filter,
+                    Box::pin(async {}),
+                    true,
+                    0,
+                    0.0,
+                )
+                .await
+        ) {
             Ok(payload) => payload,
             Err(e) => {
                 error!("error pulling payload: {}", e);
