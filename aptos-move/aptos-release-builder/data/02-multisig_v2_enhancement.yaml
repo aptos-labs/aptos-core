@@ -1,0 +1,14 @@
+---
+remote_endpoint: ~
+name: "v1.11"
+proposals:
+  - name: enable_multisig_v2_enhancement
+    metadata:
+      title: "AIP-77: Multisig V2 Enhancement"
+      description: "AIP-77: This AIP proposes to enhance the Multisig V2."
+      discussion_url: "https://github.com/aptos-foundation/AIPs/issues/409"
+    execution_mode: MultiStep
+    update_sequence:
+      - FeatureFlag:
+          enabled:
+            - multisig_v2_enhancement
