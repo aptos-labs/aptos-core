@@ -470,27 +470,26 @@ impl AptosVM {
         change_set_configs: &ChangeSetConfigs,
         traversal_context: &mut TraversalContext,
     ) -> (VMStatus, VMOutput) {
-        if self.gas_feature_version >= 12 {
-            // Check if the gas meter's internal counters are consistent.
-            //
-            // Since we are already in the failure epilogue, there is not much we can do
-            // other than logging the inconsistency.
-            //
-            // This is a tradeoff. We have to either
-            //   1. Continue to calculate the gas cost based on the numbers we have.
-            //   2. Discard the transaction.
-            //
-            // Option (2) does not work, since it would enable DoS attacks.
-            // Option (1) is not ideal, but optimistically, it should allow the network
-            // to continue functioning, less the transactions that run into this problem.
-            if let Err(err) = gas_meter.algebra().check_consistency() {
-                println!(
-                    "[aptos-vm][gas-meter][failure-epilogue] {}",
-                    err.message()
-                        .unwrap_or("No message found -- this should not happen.")
-                );
-            }
+        // Check if the gas meter's internal counters are consistent.
+        //
+        // Since we are already in the failure epilogue, there is not much we can do
+        // other than logging the inconsistency.
+        //
+        // This is a tradeoff. We have to either
+        //   1. Continue to calculate the gas cost based on the numbers we have.
+        //   2. Discard the transaction.
+        //
+        // Option (2) does not work, since it would enable DoS attacks.
+        // Option (1) is not ideal, but optimistically, it should allow the network
+        // to continue functioning, less the transactions that run into this problem.
+        if let Err(err) = gas_meter.algebra().check_consistency() {
+            println!(
+                "[aptos-vm][gas-meter][failure-epilogue] {}",
+                err.message()
+                    .unwrap_or("No message found -- this should not happen.")
+            );
         }
+
         let (txn_status, txn_aux_data) = TransactionStatus::from_vm_status(
             error_vm_status.clone(),
             self.features()
@@ -703,19 +702,17 @@ impl AptosVM {
         change_set_configs: &ChangeSetConfigs,
         traversal_context: &mut TraversalContext,
     ) -> Result<(VMStatus, VMOutput), VMStatus> {
-        if self.gas_feature_version >= 12 {
-            // Check if the gas meter's internal counters are consistent.
-            //
-            // It's better to fail the transaction due to invariant violation than to allow
-            // potentially bogus states to be committed.
-            if let Err(err) = gas_meter.algebra().check_consistency() {
-                println!(
-                    "[aptos-vm][gas-meter][success-epilogue] {}",
-                    err.message()
-                        .unwrap_or("No message found -- this should not happen.")
-                );
-                return Err(err.finish(Location::Undefined).into());
-            }
+        // Check if the gas meter's internal counters are consistent.
+        //
+        // It's better to fail the transaction due to invariant violation than to allow
+        // potentially bogus states to be committed.
+        if let Err(err) = gas_meter.algebra().check_consistency() {
+            println!(
+                "[aptos-vm][gas-meter][success-epilogue] {}",
+                err.message()
+                    .unwrap_or("No message found -- this should not happen.")
+            );
+            return Err(err.finish(Location::Undefined).into());
         }
 
         let fee_statement = AptosVM::fee_statement_from_gas_meter(
@@ -755,16 +752,11 @@ impl AptosVM {
         senders: Vec<AccountAddress>,
         script: &Script,
     ) -> Result<(), VMStatus> {
-        // Note: Feature gating is needed here because the traversal of the dependencies could
-        //       result in shallow-loading of the modules and therefore subtle changes in
-        //       the error semantics.
-        if self.gas_feature_version >= 15 {
-            session.check_script_dependencies_and_check_gas(
-                gas_meter,
-                traversal_context,
-                script.code(),
-            )?;
-        }
+        session.check_script_dependencies_and_check_gas(
+            gas_meter,
+            traversal_context,
+            script.code(),
+        )?;
 
         let loaded_func = session.load_script(script.code(), script.ty_args().to_vec())?;
 
@@ -802,18 +794,13 @@ impl AptosVM {
         entry_fn: &EntryFunction,
         _txn_data: &TransactionMetadata,
     ) -> Result<(), VMStatus> {
-        // Note: Feature gating is needed here because the traversal of the dependencies could
-        //       result in shallow-loading of the modules and therefore subtle changes in
-        //       the error semantics.
-        if self.gas_feature_version >= 15 {
-            let module_id = traversal_context
-                .referenced_module_ids
-                .alloc(entry_fn.module().clone());
-            session.check_dependencies_and_charge_gas(gas_meter, traversal_context, [(
-                module_id.address(),
-                module_id.name(),
-            )])?;
-        }
+        let module_id = traversal_context
+            .referenced_module_ids
+            .alloc(entry_fn.module().clone());
+        session.check_dependencies_and_charge_gas(gas_meter, traversal_context, [(
+            module_id.address(),
+            module_id.name(),
+        )])?;
 
         let (function, is_friend_or_private) = session.load_function_and_is_friend_or_private_def(
             entry_fn.module(),
@@ -1430,56 +1417,50 @@ impl AptosVM {
             let modules: &Vec<CompiledModule> =
                 traversal_context.referenced_module_bundles.alloc(modules);
 
-            // Note: Feature gating is needed here because the traversal of the dependencies could
-            //       result in shallow-loading of the modules and therefore subtle changes in
-            //       the error semantics.
-            if self.gas_feature_version >= 15 {
-                // Charge old versions of the modules, in case of upgrades.
-                session.check_dependencies_and_charge_gas_non_recursive_optional(
-                    gas_meter,
-                    traversal_context,
-                    modules
-                        .iter()
-                        .map(|module| (module.self_addr(), module.self_name())),
-                )?;
-
-                // Charge all modules in the bundle that is about to be published.
-                for (module, blob) in modules.iter().zip(bundle.iter()) {
-                    let module_id = &module.self_id();
-                    gas_meter
-                        .charge_dependency(
-                            true,
-                            module_id.address(),
-                            module_id.name(),
-                            NumBytes::new(blob.code().len() as u64),
-                        )
-                        .map_err(|err| err.finish(Location::Undefined))?;
-                }
-
-                // Charge all dependencies.
-                //
-                // Must exclude the ones that are in the current bundle because they have not
-                // been published yet.
-                let module_ids_in_bundle = modules
+            // Charge old versions of the modules, in case of upgrades.
+            session.check_dependencies_and_charge_gas_non_recursive_optional(
+                gas_meter,
+                traversal_context,
+                modules
                     .iter()
-                    .map(|module| (module.self_addr(), module.self_name()))
-                    .collect::<BTreeSet<_>>();
+                    .map(|module| (module.self_addr(), module.self_name())),
+            )?;
 
-                session.check_dependencies_and_charge_gas(
-                    gas_meter,
-                    traversal_context,
-                    modules
-                        .iter()
-                        .flat_map(|module| {
-                            module
-                                .immediate_dependencies_iter()
-                                .chain(module.immediate_friends_iter())
-                        })
-                        .filter(|addr_and_name| !module_ids_in_bundle.contains(addr_and_name)),
-                )?;
-
-                // TODO: Revisit the order of traversal. Consider switching to alphabetical order.
+            // Charge all modules in the bundle that is about to be published.
+            for (module, blob) in modules.iter().zip(bundle.iter()) {
+                let module_id = &module.self_id();
+                gas_meter
+                    .charge_dependency(
+                        true,
+                        module_id.address(),
+                        module_id.name(),
+                        NumBytes::new(blob.code().len() as u64),
+                    )
+                    .map_err(|err| err.finish(Location::Undefined))?;
             }
+
+            // Charge all dependencies.
+            //
+            // Must exclude the ones that are in the current bundle because they have not
+            // been published yet.
+            let module_ids_in_bundle = modules
+                .iter()
+                .map(|module| (module.self_addr(), module.self_name()))
+                .collect::<BTreeSet<_>>();
+
+            // TODO: Revisit the order of traversal. Consider switching to alphabetical order.
+            session.check_dependencies_and_charge_gas(
+                gas_meter,
+                traversal_context,
+                modules
+                    .iter()
+                    .flat_map(|module| {
+                        module
+                            .immediate_dependencies_iter()
+                            .chain(module.immediate_friends_iter())
+                    })
+                    .filter(|addr_and_name| !module_ids_in_bundle.contains(addr_and_name)),
+            )?;
 
             // Validate the module bundle
             self.validate_publish_request(session, modules, expected_modules, allowed_deps)?;
