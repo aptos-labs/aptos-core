@@ -301,9 +301,13 @@ pub trait AsMoveResolver<S> {
 impl<S: StateView> AsMoveResolver<S> for S {
     fn as_move_resolver(&self) -> StorageAdapter<S> {
         let features = Features::fetch_config(self).unwrap_or_default();
+<<<<<<< HEAD
         let deserializer_config = aptos_prod_deserializer_config(&features);
 
         let (_, gas_feature_version) = get_gas_config_from_storage(self);
+=======
+        let deserializer_config = aptos_prod_deserializer_config(&features, gas_feature_version);
+>>>>>>> c98a7ea632 (use prod configs for aptos)
         let resource_group_adapter = ResourceGroupAdapter::new(
             None,
             self,
@@ -365,8 +369,14 @@ pub(crate) mod tests {
             resource_groups_split_in_vm_change_set_enabled,
         );
 
+<<<<<<< HEAD
         let features = Features::fetch_config(state_view).unwrap_or_default();
         let deserializer_config = aptos_prod_deserializer_config(&features);
+=======
+        let (_, gas_feature_version) = get_gas_config_from_storage(state_view);
+        let features = Features::fetch_config(state_view).unwrap_or_default();
+        let deserializer_config = aptos_prod_deserializer_config(&features, gas_feature_version);
+>>>>>>> c98a7ea632 (use prod configs for aptos)
         StorageAdapter::new(state_view, deserializer_config, group_adapter)
     }
 }
