@@ -181,9 +181,9 @@ pub(crate) static SAMPLE_PK: Lazy<KeylessPublicKey> = Lazy::new(|| {
 /// https://github.com/aptos-labs/devnet-groth16-keys/commit/02e5675f46ce97f8b61a4638e7a0aaeaa4351f76
 pub(crate) static SAMPLE_PROOF: Lazy<Groth16Proof> = Lazy::new(|| {
     Groth16Proof::new(
-        G1Bytes::new_from_vec(hex::decode("0093f692e4b0fb2e04acf52b862abf7d629a729cc1cd888ff46843dd4ced0d2e").unwrap()).unwrap(),
-        G2Bytes::new_from_vec(hex::decode("2e8deaf247490013eef4d8bbb1a407e72bf932cd141ef9347b1b49c0c4cc5a12b1ffd67e3b1119b384f4c821df35f9d3540f027c3766a4a4acc67cc0d804ff28").unwrap()).unwrap(),
-        G1Bytes::new_from_vec(hex::decode("a94683ea56b099fafb157321a52ddd7578f1ba5dc85acef3e231d1b5f1c03713").unwrap()).unwrap(),
+        G1Bytes::new_from_vec(hex::decode("95030afdb785624d3f305655579775fe216a4780496ccb7abe899dc8a7bcf798").unwrap()).unwrap(),
+        G2Bytes::new_from_vec(hex::decode("08d5814954cb04ac1f80771f783585162abb2cd673203f7ee22ec87a783f431cc649ca449bc1d2d93ba4aaecd382f94306c23003ed1e1c0592a46c64e5cf6504").unwrap()).unwrap(),
+        G1Bytes::new_from_vec(hex::decode("117177343a361982883579c3f49eb30b05d79b7ca1e96556be7ccb2ee88ea391").unwrap()).unwrap(),
     )
 });
 
@@ -194,9 +194,9 @@ pub(crate) static SAMPLE_PROOF: Lazy<Groth16Proof> = Lazy::new(|| {
 /// https://github.com/aptos-labs/devnet-groth16-keys/commit/02e5675f46ce97f8b61a4638e7a0aaeaa4351f76
 pub(crate) static SAMPLE_PROOF_NO_EXTRA_FIELD: Lazy<Groth16Proof> = Lazy::new(|| {
     Groth16Proof::new(
-        G1Bytes::new_from_vec(hex::decode("6bfcb02a4a0c4aaefa70b3d5a535d1a306c2b23cc6bb23f0c25992e5e3839324").unwrap()).unwrap(),
-        G2Bytes::new_from_vec(hex::decode("55af188580d37264a4876560bbe763b608be566849697778830aa0d47ab27129434d02b33179a6c39c648f1bf0c3074e48c5b58a63aba83b3567a7fc6de87202").unwrap()).unwrap(),
-        G1Bytes::new_from_vec(hex::decode("49513acd5cf07b77d1558387d14b69ebe55a95a886ebb735dc73d456b1116113").unwrap()).unwrap(),
+        G1Bytes::new_from_vec(hex::decode("62b167d43c33169b96c018deaa4efdc5223e095016dc6ee2cd1ad1e61755d8a5").unwrap()).unwrap(),
+        G2Bytes::new_from_vec(hex::decode("2dd8fcc64014ab9f877c7ba03618cf59c49c69204b981be297dc835f60d4f923192e0f894ad947bd4aee96fd19305eb79ff359e8c341a17e8f6ba470be655e12").unwrap()).unwrap(),
+        G1Bytes::new_from_vec(hex::decode("5e6e3e076e632f1440327758c634a311d83244ad7d32edcdf66458d7e0ed5619").unwrap()).unwrap(),
     )
 });
 
