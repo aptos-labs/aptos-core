@@ -29,6 +29,8 @@ module std::features {
 
     const EINVALID_FEATURE: u64 = 1;
     const EAPI_DISABLED: u64 = 2;
+    /// Deployed to production, and disabling is deprecated.
+    const EFEATURE_CANNOT_BE_DISABLED: u64 = 3;
 
     // --------------------------------------------------------------------------------------------
     // Code Publishing
@@ -223,8 +225,7 @@ module std::features {
     const APTOS_UNIQUE_IDENTIFIERS: u64 = 23;
 
     public fun get_auids(): u64 {
-        // Deployed to production, and disabling deprecated.
-        error::invalid_argument(EINVALID_FEATURE)
+        error::invalid_argument(EFEATURE_CANNOT_BE_DISABLED)
      }
 
     public fun auids_enabled(): bool {
@@ -268,8 +269,7 @@ module std::features {
     const SIGNATURE_CHECKER_V2_SCRIPT_FIX: u64 = 29;
 
     public fun get_aggregator_v2_api_feature(): u64 {
-        // API fully rolled out, cannot be reverted any more
-        abort error::invalid_argument(EINVALID_FEATURE)
+        abort error::invalid_argument(EFEATURE_CANNOT_BE_DISABLED)
     }
 
     public fun aggregator_v2_api_enabled(): bool {
@@ -305,8 +305,7 @@ module std::features {
     const FEE_PAYER_ACCOUNT_OPTIONAL: u64 = 35;
 
     public fun get_concurrent_token_v2_feature(): u64 {
-        // Deployed to production, and disabling deprecated.
-        error::invalid_argument(EINVALID_FEATURE)
+        error::invalid_argument(EFEATURE_CANNOT_BE_DISABLED)
     }
 
     public fun concurrent_token_v2_enabled(): bool {
@@ -315,12 +314,12 @@ module std::features {
 
     #[deprecated]
     public fun get_concurrent_assets_feature(): u64 {
-        abort error::invalid_argument(EINVALID_FEATURE)
+        abort error::invalid_argument(EFEATURE_CANNOT_BE_DISABLED)
     }
 
     #[deprecated]
     public fun concurrent_assets_enabled(): bool {
-        abort error::invalid_argument(EINVALID_FEATURE)
+        abort error::invalid_argument(EFEATURE_CANNOT_BE_DISABLED)
     }
 
     const LIMIT_MAX_IDENTIFIER_LENGTH: u64 = 38;

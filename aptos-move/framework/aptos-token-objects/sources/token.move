@@ -182,13 +182,11 @@ module aptos_token_objects::token {
         let deprecated_index = 0;
         let deprecated_name = string::utf8(b"");
 
-        // If aggregator_api_enabled, we always populate newly added fields
         let token_concurrent = TokenIdentifiers {
             index,
             name,
         };
         move_to(&object_signer, token_concurrent);
-
 
         let token = Token {
             collection,

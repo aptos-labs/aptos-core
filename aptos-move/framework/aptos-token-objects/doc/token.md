@@ -570,13 +570,11 @@ The token name is over the maximum length
     <b>let</b> deprecated_index = 0;
     <b>let</b> deprecated_name = <a href="../../aptos-framework/../aptos-stdlib/../move-stdlib/doc/string.md#0x1_string_utf8">string::utf8</a>(b"");
 
-    // If aggregator_api_enabled, we always populate newly added fields
     <b>let</b> token_concurrent = <a href="token.md#0x4_token_TokenIdentifiers">TokenIdentifiers</a> {
         index,
         name,
     };
     <b>move_to</b>(&object_signer, token_concurrent);
-
 
     <b>let</b> <a href="token.md#0x4_token">token</a> = <a href="token.md#0x4_token_Token">Token</a> {
         <a href="collection.md#0x4_collection">collection</a>,
