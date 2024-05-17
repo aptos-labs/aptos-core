@@ -111,7 +111,6 @@ impl MempoolProxy {
             max_items,
             max_bytes,
             true,
-            true,
             exclude_transactions,
             callback,
         );

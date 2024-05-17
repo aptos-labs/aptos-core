@@ -134,7 +134,7 @@ fn test_malformed_resource() {
             address: TEST_ADDR,
             module: Identifier::new("M").unwrap(),
             name: Identifier::new("Foo").unwrap(),
-            type_params: vec![],
+            type_args: vec![],
         },
         vec![0x3, 0x4, 0x5],
     );

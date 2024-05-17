@@ -1,7 +1,68 @@
-processed 3 tasks
+processed 4 tasks
 
-task 1 'publish'. lines 4-35:
+task 1 'print-bytecode'. lines 4-35:
+// Move bytecode v6
+module f75daa73fc071f93593335eb9033da804777eb94491650dd3f095ce6f778acb6.game {
+use 0000000000000000000000000000000000000000000000000000000000000001::debug;
+use 0000000000000000000000000000000000000000000000000000000000000001::signer;
+
+
+struct InnerStruct has copy, store, key {
+	amount: u64
+}
+struct OuterStruct has key {
+	any_field: vector<InnerStruct>
+}
+
+entry public test_upgrade(Arg0: &signer) /* def_idx: 0 */ {
+L1:	loc0: address
+L2:	loc1: u64
+L3:	loc2: u64
+L4:	loc3: &mut vector<InnerStruct>
+B0:
+	0: CopyLoc[0](Arg0: &signer)
+	1: Call signer::address_of(&signer): address
+	2: StLoc[1](loc0: address)
+	3: MoveLoc[0](Arg0: &signer)
+	4: VecPack(4, 0)
+	5: Pack[1](OuterStruct)
+	6: MoveTo[1](OuterStruct)
+	7: MoveLoc[1](loc0: address)
+	8: MutBorrowGlobal[1](OuterStruct)
+	9: MutBorrowField[0](OuterStruct.any_field: vector<InnerStruct>)
+	10: StLoc[4](loc3: &mut vector<InnerStruct>)
+	11: LdU64(0)
+	12: StLoc[2](loc1: u64)
+	13: CopyLoc[4](loc3: &mut vector<InnerStruct>)
+	14: FreezeRef
+	15: VecLen(4)
+	16: StLoc[3](loc2: u64)
+B1:
+	17: CopyLoc[2](loc1: u64)
+	18: CopyLoc[3](loc2: u64)
+	19: Lt
+	20: BrFalse(31)
+B2:
+	21: Branch(22)
+B3:
+	22: CopyLoc[4](loc3: &mut vector<InnerStruct>)
+	23: CopyLoc[2](loc1: u64)
+	24: VecMutBorrow(4)
+	25: Call debug::print<InnerStruct>(&InnerStruct)
+	26: MoveLoc[2](loc1: u64)
+	27: LdU64(1)
+	28: Add
+	29: StLoc[2](loc1: u64)
+	30: Branch(17)
+B4:
+	31: MoveLoc[4](loc3: &mut vector<InnerStruct>)
+	32: Pop
+	33: Ret
+}
+}
+
+task 2 'publish'. lines 37-68:
 Error: VMError with status CALL_TYPE_MISMATCH_ERROR at location Module ModuleId { address: f75daa73fc071f93593335eb9033da804777eb94491650dd3f095ce6f778acb6, name: Identifier("game") } at index 0 for function definition at code offset 25 in function definition 0
 
-task 2 'run'. lines 37-37:
-Error: Failed to execute transaction. ExecutionStatus: MiscellaneousError(Some(LINKER_ERROR))
+task 3 'run'. lines 70-70:
+Error: Failed to execute transaction. ExecutionStatus: MiscellaneousError(None)

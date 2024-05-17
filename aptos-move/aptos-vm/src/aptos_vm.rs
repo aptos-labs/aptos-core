@@ -7,7 +7,7 @@ use crate::{
     counters::*,
     data_cache::{AsMoveResolver, StorageAdapter},
     errors::{discarded_output, expect_only_successful_execution},
-    gas::{check_gas, get_gas_parameters},
+    gas::{check_gas, get_gas_parameters, make_prod_gas_meter, ProdGasMeter},
     keyless_validation,
     move_vm_ext::{
         get_max_binary_format_version, get_max_identifier_size,
@@ -17,11 +17,12 @@ use crate::{
         },
         AptosMoveResolver, MoveVmExt, SessionExt, SessionId, UserTransactionContext,
     },
+    randomness_config::AptosVMRandomnessConfig,
     sharded_block_executor::{executor_client::ExecutorClient, ShardedBlockExecutor},
     system_module_names::*,
     transaction_metadata::TransactionMetadata,
     transaction_validation, verifier,
-    verifier::randomness::has_randomness_attribute,
+    verifier::randomness::get_randomness_annotation,
     VMExecutor, VMValidator,
 };
 use anyhow::anyhow;
@@ -32,16 +33,14 @@ use aptos_framework::{
     RuntimeModuleMetadataV1,
 };
 use aptos_gas_algebra::{Gas, GasQuantity, NumBytes, Octa};
-use aptos_gas_meter::{AptosGasMeter, GasAlgebra, StandardGasAlgebra, StandardGasMeter};
+use aptos_gas_meter::{AptosGasMeter, GasAlgebra};
 use aptos_gas_schedule::{AptosGasParameters, TransactionGasParameters, VMGasParameters};
 use aptos_logger::{enabled, prelude::*, Level};
-use aptos_memory_usage_tracker::MemoryTrackedGasMeter;
 use aptos_metrics_core::TimerHelper;
 #[cfg(any(test, feature = "testing"))]
 use aptos_types::state_store::StateViewId;
 use aptos_types::{
-    account_config,
-    account_config::{new_block_event_key, AccountResource},
+    account_config::{self, new_block_event_key, AccountResource},
     block_executor::{
         config::{BlockExecutorConfig, BlockExecutorConfigFromOnchain, BlockExecutorLocalConfig},
         partitioner::PartitionedTransactions,
@@ -53,18 +52,18 @@ use aptos_types::{
     invalid_signature,
     move_utils::as_move_value::AsMoveValue,
     on_chain_config::{
-        new_epoch_event_key, ConfigurationResource, FeatureFlag, Features, OnChainConfig,
-        OnChainConsensusConfig, OnChainRandomnessConfig, RandomnessConfigMoveStruct,
-        TimedFeatureOverride, TimedFeatures, TimedFeaturesBuilder,
+        new_epoch_event_key, ApprovedExecutionHashes, ConfigStorage, ConfigurationResource,
+        FeatureFlag, Features, OnChainConfig, TimedFeatureOverride, TimedFeatures,
+        TimedFeaturesBuilder,
     },
     randomness::Randomness,
     state_store::{StateView, TStateView},
     transaction::{
         authenticator::AnySignature, signature_verified_transaction::SignatureVerifiedTransaction,
         BlockOutput, EntryFunction, ExecutionError, ExecutionStatus, ModuleBundle, Multisig,
-        MultisigTransactionPayload, Script, SignatureCheckedTransaction, SignedTransaction,
-        Transaction, TransactionAuxiliaryData, TransactionOutput, TransactionPayload,
-        TransactionStatus, VMValidatorResult, ViewFunctionOutput, WriteSetPayload,
+        MultisigTransactionPayload, Script, SignedTransaction, Transaction,
+        TransactionAuxiliaryData, TransactionOutput, TransactionPayload, TransactionStatus,
+        VMValidatorResult, ViewFunctionOutput, WriteSetPayload,
     },
     vm_status::{AbortLocation, StatusCode, VMStatus},
 };
@@ -197,16 +196,37 @@ pub(crate) fn get_or_vm_startup_failure<'a, T>(
     })
 }
 
+/// Checks if a given transaction is a governance proposal by checking if it has one of the
+/// approved execution hashes.
+fn is_approved_gov_script(
+    resolver: &impl ConfigStorage,
+    txn: &SignedTransaction,
+    txn_metadata: &TransactionMetadata,
+) -> bool {
+    match txn.payload() {
+        TransactionPayload::Script(_script) => {
+            match ApprovedExecutionHashes::fetch_config(resolver) {
+                Some(approved_execution_hashes) => approved_execution_hashes
+                    .entries
+                    .iter()
+                    .any(|(_, hash)| hash == &txn_metadata.script_hash),
+                None => false,
+            }
+        },
+        _ => false,
+    }
+}
+
 pub struct AptosVM {
     is_simulation: bool,
     move_vm: MoveVmExt,
-    gas_feature_version: u64,
+    pub(crate) gas_feature_version: u64,
     gas_params: Result<AptosGasParameters, String>,
     pub(crate) storage_gas_params: Result<StorageGasParameters, String>,
     timed_features: TimedFeatures,
-    randomness_enabled: bool,
     /// For a new chain, or even mainnet, the VK might not necessarily be set.
     pvk: Option<PreparedVerifyingKey<Bn254>>,
+    randomness_config: AptosVMRandomnessConfig,
 }
 
 impl AptosVM {
@@ -215,8 +235,8 @@ impl AptosVM {
         override_is_delayed_field_optimization_capable: Option<bool>,
     ) -> Self {
         let _timer = TIMER.timer_with(&["AptosVM::new"]);
-
         let features = Features::fetch_config(resolver).unwrap_or_default();
+        let randomness_config = AptosVMRandomnessConfig::fetch(resolver);
         let (
             gas_params,
             storage_gas_params,
@@ -246,12 +266,6 @@ impl AptosVM {
         let aggregator_v2_type_tagging = override_is_delayed_field_optimization_capable
             && features.is_aggregator_v2_delayed_fields_enabled();
 
-        let consensus_config = OnChainConsensusConfig::fetch_config(resolver).unwrap_or_default();
-        let randomness_config = RandomnessConfigMoveStruct::fetch_config(resolver)
-            .and_then(|x| OnChainRandomnessConfig::try_from(x).ok())
-            .unwrap_or_else(OnChainRandomnessConfig::default_if_missing);
-        let randomness_enabled =
-            consensus_config.is_vtxn_enabled() && randomness_config.randomness_enabled();
         let move_vm = MoveVmExt::new(
             native_gas_params,
             misc_gas_params,
@@ -280,8 +294,8 @@ impl AptosVM {
             gas_params,
             storage_gas_params,
             timed_features,
-            randomness_enabled,
             pvk,
+            randomness_config,
         }
     }
 
@@ -780,12 +794,13 @@ impl AptosVM {
 
     fn validate_and_execute_entry_function(
         &self,
+        resolver: &impl AptosMoveResolver,
         session: &mut SessionExt,
         gas_meter: &mut impl AptosGasMeter,
         traversal_context: &mut TraversalContext,
         senders: Vec<AccountAddress>,
         entry_fn: &EntryFunction,
-        txn_data: &TransactionMetadata,
+        _txn_data: &TransactionMetadata,
     ) -> Result<(), VMStatus> {
         // Note: Feature gating is needed here because the traversal of the dependencies could
         //       result in shallow-loading of the modules and therefore subtle changes in
@@ -806,7 +821,9 @@ impl AptosVM {
             entry_fn.ty_args(),
         )?;
 
-        if is_friend_or_private && txn_data.required_deposit.is_some() {
+        // The `has_randomness_attribute()` should have been feature-gated in 1.11...
+        if is_friend_or_private && get_randomness_annotation(resolver, session, entry_fn)?.is_some()
+        {
             let txn_context = session
                 .get_native_extensions()
                 .get_mut::<RandomnessContext>();
@@ -873,6 +890,7 @@ impl AptosVM {
             TransactionPayload::EntryFunction(entry_fn) => {
                 session.execute(|session| {
                     self.validate_and_execute_entry_function(
+                        resolver,
                         session,
                         gas_meter,
                         traversal_context,
@@ -980,6 +998,7 @@ impl AptosVM {
                         aptos_try!({
                             return_on_failure!(session.execute(|session| self
                                 .execute_multisig_entry_function(
+                                    resolver,
                                     session,
                                     gas_meter,
                                     traversal_context,
@@ -1107,6 +1126,7 @@ impl AptosVM {
             MultisigTransactionPayload::EntryFunction(entry_function) => {
                 session.execute(|session| {
                     self.execute_multisig_entry_function(
+                        resolver,
                         session,
                         gas_meter,
                         traversal_context,
@@ -1211,6 +1231,7 @@ impl AptosVM {
 
     fn execute_multisig_entry_function(
         &self,
+        resolver: &impl AptosMoveResolver,
         session: &mut SessionExt,
         gas_meter: &mut impl AptosGasMeter,
         traversal_context: &mut TraversalContext,
@@ -1222,6 +1243,7 @@ impl AptosVM {
         // If txn args are not valid, we'd still consider the transaction as executed but
         // failed. This is primarily because it's unrecoverable at this point.
         self.validate_and_execute_entry_function(
+            resolver,
             session,
             gas_meter,
             traversal_context,
@@ -1583,23 +1605,6 @@ impl AptosVM {
             .finish(Location::Undefined)
     }
 
-    pub(crate) fn make_standard_gas_meter(
-        &self,
-        balance: Gas,
-        log_context: &AdapterLogSchema,
-    ) -> Result<MemoryTrackedGasMeter<StandardGasMeter<StandardGasAlgebra>>, VMStatus> {
-        Ok(MemoryTrackedGasMeter::new(StandardGasMeter::new(
-            StandardGasAlgebra::new(
-                self.gas_feature_version,
-                get_or_vm_startup_failure(&self.gas_params, log_context)?
-                    .vm
-                    .clone(),
-                get_or_vm_startup_failure(&self.storage_gas_params, log_context)?.clone(),
-                balance,
-            ),
-        )))
-    }
-
     fn validate_signed_transaction(
         &self,
         session: &mut SessionExt,
@@ -1607,6 +1612,7 @@ impl AptosVM {
         transaction: &SignedTransaction,
         transaction_data: &TransactionMetadata,
         log_context: &AdapterLogSchema,
+        is_approved_gov_script: bool,
         traversal_context: &mut TraversalContext,
     ) -> Result<(), VMStatus> {
         // Check transaction format.
@@ -1634,7 +1640,6 @@ impl AptosVM {
                 self.pvk.as_ref().unwrap(),
                 &keyless_authenticators,
                 self.features(),
-                self.gas_feature_version,
                 resolver,
             )?;
         }
@@ -1648,6 +1653,7 @@ impl AptosVM {
             transaction.payload(),
             transaction_data,
             log_context,
+            is_approved_gov_script,
             traversal_context,
         )
     }
@@ -1687,15 +1693,17 @@ impl AptosVM {
         )
     }
 
-    fn execute_user_transaction_impl<'a>(
+    fn execute_user_transaction_impl(
         &self,
         resolver: &impl AptosMoveResolver,
-        txn: &'a SignedTransaction,
-        log_context: &AdapterLogSchema,
+        txn: &SignedTransaction,
+        mut txn_data: TransactionMetadata,
+        is_approved_gov_script: bool,
         gas_meter: &mut impl AptosGasMeter,
-        traversal_context: &mut TraversalContext<'a>,
+        log_context: &AdapterLogSchema,
     ) -> (VMStatus, VMOutput) {
-        let mut txn_data = TransactionMetadata::new(txn);
+        let traversal_storage = TraversalStorage::new();
+        let mut traversal_context = TraversalContext::new(&traversal_storage);
 
         // Revalidate the transaction.
         let mut prologue_session =
@@ -1707,7 +1715,7 @@ impl AptosVM {
                 &gas_meter.vm_gas_params().txn,
                 &txn_data,
                 txn.payload(),
-            );
+            )?;
             txn_data.set_required_deposit(required_deposit);
             self.validate_signed_transaction(
                 session,
@@ -1715,7 +1723,8 @@ impl AptosVM {
                 txn,
                 &txn_data,
                 log_context,
-                traversal_context,
+                is_approved_gov_script,
+                &mut traversal_context,
             )
         }));
         let storage_gas_params = unwrap_or_discard!(get_or_vm_startup_failure(
@@ -1741,7 +1750,7 @@ impl AptosVM {
                     session,
                     gas_meter,
                     txn.sender(),
-                    traversal_context,
+                    &mut traversal_context,
                 ))
             );
         }
@@ -1757,7 +1766,7 @@ impl AptosVM {
                     resolver,
                     user_session,
                     gas_meter,
-                    traversal_context,
+                    &mut traversal_context,
                     &txn_data,
                     payload,
                     log_context,
@@ -1769,7 +1778,7 @@ impl AptosVM {
                 user_session,
                 &prologue_change_set,
                 gas_meter,
-                traversal_context,
+                &mut traversal_context,
                 &txn_data,
                 payload,
                 log_context,
@@ -1800,44 +1809,28 @@ impl AptosVM {
                 gas_meter,
                 change_set_configs,
                 new_published_modules_loaded,
-                traversal_context,
+                &mut traversal_context,
             )
         })
     }
 
-    pub fn execute_user_transaction(
-        &self,
-        resolver: &impl AptosMoveResolver,
-        txn: &SignedTransaction,
-        log_context: &AdapterLogSchema,
-    ) -> (VMStatus, VMOutput) {
-        let balance = txn.max_gas_amount().into();
-        // TODO: would we end up having a diverging behavior by creating the gas meter at an earlier time?
-        let mut gas_meter = unwrap_or_discard!(self.make_standard_gas_meter(balance, log_context));
-
-        let traversal_storage = TraversalStorage::new();
-        let mut traversal_context = TraversalContext::new(&traversal_storage);
-
-        self.execute_user_transaction_impl(
-            resolver,
-            txn,
-            log_context,
-            &mut gas_meter,
-            &mut traversal_context,
-        )
-    }
-
+    /// Main entrypoint for executing a user transaction that also allows the customization of the
+    /// gas meter to be used.
     pub fn execute_user_transaction_with_custom_gas_meter<G, F>(
         &self,
         resolver: &impl AptosMoveResolver,
-        txn: &SignatureCheckedTransaction,
+        txn: &SignedTransaction,
         log_context: &AdapterLogSchema,
         make_gas_meter: F,
     ) -> Result<(VMStatus, VMOutput, G), VMStatus>
     where
         G: AptosGasMeter,
-        F: FnOnce(u64, VMGasParameters, StorageGasParameters, Gas) -> Result<G, VMStatus>,
+        F: FnOnce(u64, VMGasParameters, StorageGasParameters, bool, Gas) -> G,
     {
+        let txn_metadata = TransactionMetadata::new(txn);
+
+        let is_approved_gov_script = is_approved_gov_script(resolver, txn, &txn_metadata);
+
         let balance = txn.max_gas_amount().into();
         let mut gas_meter = make_gas_meter(
             self.gas_feature_version,
@@ -1845,19 +1838,76 @@ impl AptosVM {
                 .vm
                 .clone(),
             get_or_vm_startup_failure(&self.storage_gas_params, log_context)?.clone(),
+            is_approved_gov_script,
             balance,
-        )?;
-        let traversal_storage = TraversalStorage::new();
-        let mut traversal_context = TraversalContext::new(&traversal_storage);
+        );
         let (status, output) = self.execute_user_transaction_impl(
             resolver,
             txn,
-            log_context,
+            txn_metadata,
+            is_approved_gov_script,
             &mut gas_meter,
-            &mut traversal_context,
+            log_context,
         );
 
         Ok((status, output, gas_meter))
+    }
+
+    /// Alternative entrypoint for user transaction execution that allows customization based on
+    /// the production gas meter.
+    ///
+    /// This can be useful for off-chain applications that wants to perform additional
+    /// measurements or analysis while preserving the production gas behavior.
+    pub fn execute_user_transaction_with_modified_gas_meter<G, F>(
+        &self,
+        resolver: &impl AptosMoveResolver,
+        txn: &SignedTransaction,
+        log_context: &AdapterLogSchema,
+        modify_gas_meter: F,
+    ) -> Result<(VMStatus, VMOutput, G), VMStatus>
+    where
+        F: FnOnce(ProdGasMeter) -> G,
+        G: AptosGasMeter,
+    {
+        self.execute_user_transaction_with_custom_gas_meter(
+            resolver,
+            txn,
+            log_context,
+            |gas_feature_version,
+             vm_gas_params,
+             storage_gas_params,
+             is_approved_gov_script,
+             meter_balance| {
+                modify_gas_meter(make_prod_gas_meter(
+                    gas_feature_version,
+                    vm_gas_params,
+                    storage_gas_params,
+                    is_approved_gov_script,
+                    meter_balance,
+                ))
+            },
+        )
+    }
+
+    /// Executes a user transaction using the production gas meter.
+    pub fn execute_user_transaction(
+        &self,
+        resolver: &impl AptosMoveResolver,
+        txn: &SignedTransaction,
+        log_context: &AdapterLogSchema,
+    ) -> (VMStatus, VMOutput) {
+        match self.execute_user_transaction_with_custom_gas_meter(
+            resolver,
+            txn,
+            log_context,
+            make_prod_gas_meter,
+        ) {
+            Ok((vm_status, vm_output, _gas_meter)) => (vm_status, vm_output),
+            Err(vm_status) => {
+                let vm_output = discarded_output(vm_status.status_code());
+                (vm_status, vm_output)
+            },
+        }
     }
 
     fn execute_write_set(
@@ -2152,11 +2202,30 @@ impl AptosVM {
             &resolver,
             /*override_is_delayed_field_optimization_capable=*/ Some(false),
         );
+
         let log_context = AdapterLogSchema::new(state_view.id(), 0);
-        let mut gas_meter = match vm.make_standard_gas_meter(max_gas_amount.into(), &log_context) {
-            Ok(gas_meter) => gas_meter,
-            Err(e) => return ViewFunctionOutput::new(Err(anyhow::Error::msg(format!("{}", e))), 0),
+
+        let vm_gas_params = match get_or_vm_startup_failure(&vm.gas_params, &log_context) {
+            Ok(gas_params) => gas_params.vm.clone(),
+            Err(err) => {
+                return ViewFunctionOutput::new(Err(anyhow::Error::msg(format!("{}", err))), 0)
+            },
         };
+        let storage_gas_params =
+            match get_or_vm_startup_failure(&vm.storage_gas_params, &log_context) {
+                Ok(gas_params) => gas_params.clone(),
+                Err(err) => {
+                    return ViewFunctionOutput::new(Err(anyhow::Error::msg(format!("{}", err))), 0)
+                },
+            };
+
+        let mut gas_meter = make_prod_gas_meter(
+            vm.gas_feature_version,
+            vm_gas_params,
+            storage_gas_params,
+            /* is_approved_gov_script */ false,
+            max_gas_amount.into(),
+        );
 
         let mut session = vm.new_session(&resolver, SessionId::Void, None);
         let execution_result = Self::execute_view_function_in_vm(
@@ -2227,6 +2296,7 @@ impl AptosVM {
         payload: &TransactionPayload,
         txn_data: &TransactionMetadata,
         log_context: &AdapterLogSchema,
+        is_approved_gov_script: bool,
         traversal_context: &mut TraversalContext,
     ) -> Result<(), VMStatus> {
         check_gas(
@@ -2235,6 +2305,7 @@ impl AptosVM {
             resolver,
             txn_data,
             self.features(),
+            is_approved_gov_script,
             log_context,
         )?;
 
@@ -2414,38 +2485,49 @@ impl AptosVM {
         })
     }
 
+    #[allow(clippy::manual_filter)]
     pub fn get_required_deposit(
         &self,
         session: &mut SessionExt,
         resolver: &impl AptosMoveResolver,
-        txn_gas_params: &TransactionGasParameters,
+        _txn_gas_params: &TransactionGasParameters,
         txn_metadata: &TransactionMetadata,
         payload: &TransactionPayload,
-    ) -> Option<u64> {
+    ) -> Result<Option<u64>, VMStatus> {
         match payload {
             TransactionPayload::EntryFunction(entry_func) => {
-                if self.randomness_enabled
-                    && has_randomness_attribute(resolver, session, entry_func).unwrap_or(false)
+                if let Some(annotation) =
+                    get_randomness_annotation(resolver, session, entry_func).unwrap_or(None)
                 {
-                    let max_execution_gas: Gas = txn_gas_params
-                        .max_execution_gas
-                        .to_unit_round_up_with_params(txn_gas_params);
-                    let max_io_gas: Gas = txn_gas_params
-                        .max_io_gas
-                        .to_unit_round_up_with_params(txn_gas_params);
-                    let cand_0 = txn_metadata.gas_unit_price * (max_execution_gas + max_io_gas)
-                        + txn_gas_params.max_storage_fee;
-                    let cand_1 =
-                        txn_metadata.gas_unit_price * txn_gas_params.maximum_number_of_gas_units;
-                    let required_fee_deposit = min(cand_0, cand_1);
-                    Some(u64::from(required_fee_deposit))
+                    if let Some(default_gas_amount) =
+                        self.randomness_config.randomness_api_v0_required_deposit
+                    {
+                        let required_gas_amount =
+                            if self.randomness_config.allow_rand_contract_custom_max_gas {
+                                annotation.max_gas.unwrap_or(default_gas_amount)
+                            } else {
+                                default_gas_amount
+                            };
+                        let txn_max_gas = u64::from(txn_metadata.max_gas_amount);
+                        if required_gas_amount != txn_max_gas {
+                            return Err(VMStatus::error(
+                                StatusCode::REQUIRED_DEPOSIT_INCONSISTENT_WITH_TXN_MAX_GAS,
+                                None,
+                            ));
+                        }
+                        let octa_amount =
+                            u64::from(txn_metadata.max_gas_amount * txn_metadata.gas_unit_price);
+                        Ok(Some(octa_amount))
+                    } else {
+                        Ok(None)
+                    }
                 } else {
-                    None
+                    Ok(None)
                 }
             },
             TransactionPayload::Script(_)
             | TransactionPayload::ModuleBundle(_)
-            | TransactionPayload::Multisig(_) => None,
+            | TransactionPayload::Multisig(_) => Ok(None),
         }
     }
 }
@@ -2582,19 +2664,27 @@ impl VMValidator for AptosVM {
         let mut txn_data = TransactionMetadata::new(&txn);
 
         let resolver = self.as_move_resolver(&state_view);
+        let is_approved_gov_script = is_approved_gov_script(&resolver, &txn, &txn_data);
+
         let mut session = self.new_session(
             &resolver,
             SessionId::prologue_meta(&txn_data),
             Some(txn_data.as_user_transaction_context()),
         );
         let required_deposit = if let Ok(gas_params) = &self.gas_params {
-            self.get_required_deposit(
+            let maybe_required_deposit = self.get_required_deposit(
                 &mut session,
                 &resolver,
                 &gas_params.vm.txn,
                 &txn_data,
                 txn.payload(),
-            )
+            );
+            match maybe_required_deposit {
+                Ok(required_deposit) => required_deposit,
+                Err(vm_status) => {
+                    return VMValidatorResult::error(vm_status.status_code());
+                },
+            }
         } else {
             return VMValidatorResult::error(StatusCode::GAS_PARAMS_MISSING);
         };
@@ -2610,6 +2700,7 @@ impl VMValidator for AptosVM {
             &txn,
             &txn_data,
             &log_context,
+            is_approved_gov_script,
             &mut TraversalContext::new(&storage),
         ) {
             Err(err) if err.status_code() != StatusCode::SEQUENCE_NUMBER_TOO_NEW => (

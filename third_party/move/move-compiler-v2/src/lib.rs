@@ -22,7 +22,7 @@ pub mod unused_params_checker;
 use crate::{
     env_pipeline::{
         lambda_lifter, lambda_lifter::LambdaLiftingOptions, rewrite_target::RewritingScope,
-        spec_checker, spec_rewriter, EnvProcessorPipeline,
+        seqs_in_binop_checker, spec_checker, spec_rewriter, EnvProcessorPipeline,
     },
     pipeline::{
         ability_processor::AbilityProcessor, avail_copies_analysis::AvailCopiesAnalysisProcessor,
@@ -52,7 +52,9 @@ use move_compiler::{
 };
 use move_disassembler::disassembler::Disassembler;
 use move_ir_types::location;
-use move_model::{add_move_lang_diagnostics, model::GlobalEnv, PackageInfo};
+use move_model::{
+    add_move_lang_diagnostics, metadata::LanguageVersion, model::GlobalEnv, PackageInfo,
+};
 use move_stackless_bytecode::function_target_pipeline::{
     FunctionTargetPipeline, FunctionTargetsHolder, FunctionVariant,
 };
@@ -158,6 +160,10 @@ pub fn run_checker(options: Options) -> anyhow::Result<GlobalEnv> {
             sources: options.sources.clone(),
             address_map: addrs.clone(),
         },
+        PackageInfo {
+            sources: options.sources_deps.clone(),
+            address_map: addrs.clone(),
+        },
         vec![PackageInfo {
             sources: options.dependencies.clone(),
             address_map: addrs.clone(),
@@ -215,7 +221,10 @@ pub fn run_bytecode_gen(env: &GlobalEnv) -> FunctionTargetsHolder {
         if module.is_target() {
             for fun in module.get_functions() {
                 let id = fun.get_qualified_id();
-                todo.insert(id);
+                // Skip inline functions because invoke and lambda are not supported in the current code generator
+                if !fun.is_inline() {
+                    todo.insert(id);
+                }
             }
         }
     }
@@ -286,6 +295,16 @@ pub fn check_and_rewrite_pipeline<'a, 'b>(
             "access and use check before inlining",
             |env: &mut GlobalEnv| function_checker::check_access_and_use(env, true),
         );
+    }
+
+    let check_seqs_in_binops = options.language_version.unwrap_or_default() < LanguageVersion::V2_0
+        && options.experiment_on(Experiment::SEQS_IN_BINOPS_CHECK);
+
+    if !for_v1_model && check_seqs_in_binops {
+        env_pipeline.add("binop side effect check", |env| {
+            // This check should be done before inlining.
+            seqs_in_binop_checker::checker(env)
+        });
     }
 
     if options.experiment_on(Experiment::INLINING) {

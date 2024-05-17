@@ -1180,6 +1180,16 @@ module aptos_framework::multisig_account {
         let (num_approvals, _) = remove_executed_transaction(multisig_account_resource);
 
         if(features::multisig_v2_enhancement_feature_enabled() && implicit_approval) {
+            if (std::features::module_event_migration_enabled()) {
+                emit(
+                    Vote {
+                        multisig_account,
+                        owner: executor,
+                        sequence_number,
+                        approved: true,
+                    }
+                );
+            };
             num_approvals = num_approvals + 1;
             emit_event(
                 &mut multisig_account_resource.vote_events,
@@ -1444,6 +1454,10 @@ module aptos_framework::multisig_account {
     #[test_only]
     use std::string::utf8;
     use std::features;
+    #[test_only]
+    use aptos_framework::aptos_coin;
+    #[test_only]
+    use aptos_framework::coin::{destroy_mint_cap, destroy_burn_cap};
 
     #[test_only]
     const PAYLOAD: vector<u8> = vector[1, 2, 3];
@@ -1470,6 +1484,9 @@ module aptos_framework::multisig_account {
             framework_signer, vector[features::get_multisig_accounts_feature(), features::get_multisig_v2_enhancement_feature()], vector[]);
         timestamp::set_time_has_started_for_testing(framework_signer);
         chain_id::initialize_for_test(framework_signer, 1);
+        let (burn, mint) = aptos_coin::initialize_for_test(framework_signer);
+        destroy_mint_cap(mint);
+        destroy_burn_cap(burn);
     }
 
     #[test_only]
@@ -1479,6 +1496,9 @@ module aptos_framework::multisig_account {
             framework_signer, vector[], vector[features::get_multisig_accounts_feature()]);
         timestamp::set_time_has_started_for_testing(framework_signer);
         chain_id::initialize_for_test(framework_signer, 1);
+        let (burn, mint) = aptos_coin::initialize_for_test(framework_signer);
+        destroy_mint_cap(mint);
+        destroy_burn_cap(burn);
     }
 
     #[test(owner_1 = @0x123, owner_2 = @0x124, owner_3 = @0x125)]

@@ -3,7 +3,10 @@
 
 //! This module defines the gas parameters for Aptos Framework & Stdlib.
 
-use crate::gas_schedule::NativeGasParameters;
+use crate::{
+    gas_schedule::NativeGasParameters,
+    ver::gas_feature_versions::{RELEASE_V1_12, RELEASE_V1_13},
+};
 use aptos_gas_algebra::{
     InternalGas, InternalGasPerAbstractValueUnit, InternalGasPerArg, InternalGasPerByte,
 };
@@ -242,11 +245,11 @@ crate::gas_schedule::macros::define_gas_parameters!(
         [type_info_chain_id_base: InternalGas, { 4.. => "type_info.chain_id.base" }, 551],
 
         // TODO(Gas): Fix my cost
-        [function_info_check_is_identifier_base: InternalGas, { 17.. => "function_info.is_identifier.base" }, 551],
-        [function_info_check_is_identifier_per_byte: InternalGasPerByte, { 17.. => "function_info.is_identifier.per_byte" }, 3],
-        [function_info_check_dispatch_type_compatibility_impl_base: InternalGas, { 17.. => "function_info.check_dispatch_type_compatibility_impl.base" }, 1002],
-        [function_info_load_function_base: InternalGas, { 17.. => "function_info.load_function.base" }, 551],
-        [dispatchable_fungible_asset_dispatch_base: InternalGas, { 17.. => "dispatchable_fungible_asset.dispatch.base" }, 551],
+        [function_info_check_is_identifier_base: InternalGas, { RELEASE_V1_13.. => "function_info.is_identifier.base" }, 551],
+        [function_info_check_is_identifier_per_byte: InternalGasPerByte, { RELEASE_V1_13.. => "function_info.is_identifier.per_byte" }, 3],
+        [function_info_check_dispatch_type_compatibility_impl_base: InternalGas, { RELEASE_V1_13.. => "function_info.check_dispatch_type_compatibility_impl.base" }, 1002],
+        [function_info_load_function_base: InternalGas, { RELEASE_V1_13.. => "function_info.load_function.base" }, 551],
+        [dispatchable_fungible_asset_dispatch_base: InternalGas, { RELEASE_V1_13.. => "dispatchable_fungible_asset.dispatch.base" }, 551],
 
         // Reusing SHA2-512's cost from Ristretto
         [hash_sha2_512_base: InternalGas, { 4.. => "hash.sha2_512.base" }, 11910],  // 3_240 * 20
@@ -267,17 +270,17 @@ crate::gas_schedule::macros::define_gas_parameters!(
         [transaction_context_get_script_hash_base: InternalGas, "transaction_context.get_script_hash.base", 735],
         // Based on SHA3-256's cost
         [transaction_context_generate_unique_address_base: InternalGas, { 10.. => "transaction_context.generate_unique_address.base" }, 14704],
-        [transaction_context_sender_base: InternalGas, {17.. => "transaction_context.sender.base"}, 735],
-        [transaction_context_secondary_signers_base: InternalGas, {17.. => "transaction_context.secondary_signers.base"}, 735],
-        [transaction_context_secondary_signers_per_signer: InternalGasPerArg, {17.. => "transaction_context.secondary_signers.per_signer"}, 576], // 18 * 32
-        [transaction_context_fee_payer_base: InternalGas, {17.. => "transaction_context.fee_payer.base"}, 735],
-        [transaction_context_max_gas_amount_base: InternalGas, {17.. => "transaction_context.max_gas_amount.base"}, 735],
-        [transaction_context_gas_unit_price_base: InternalGas, {17.. => "transaction_context.gas_unit_price.base"}, 735],
-        [transaction_context_chain_id_base: InternalGas, {17.. => "transaction_context.chain_id.base"}, 735],
-        [transaction_context_entry_function_payload_base: InternalGas, {17.. => "transaction_context.entry_function_payload.base"}, 735],
-        [transaction_context_entry_function_payload_per_byte_in_str: InternalGasPerByte, {17.. => "transaction_context.entry_function_payload.per_abstract_memory_unit"}, 18],
-        [transaction_context_multisig_payload_base: InternalGas, {17.. => "transaction_context.multisig_payload.base"}, 735],
-        [transaction_context_multisig_payload_per_byte_in_str: InternalGasPerByte, {17.. => "transaction_context.multisig_payload.per_abstract_memory_unit"}, 18],
+        [transaction_context_sender_base: InternalGas, {RELEASE_V1_12.. => "transaction_context.sender.base"}, 735],
+        [transaction_context_secondary_signers_base: InternalGas, {RELEASE_V1_12.. => "transaction_context.secondary_signers.base"}, 735],
+        [transaction_context_secondary_signers_per_signer: InternalGasPerArg, {RELEASE_V1_12.. => "transaction_context.secondary_signers.per_signer"}, 576], // 18 * 32
+        [transaction_context_fee_payer_base: InternalGas, {RELEASE_V1_12.. => "transaction_context.fee_payer.base"}, 735],
+        [transaction_context_max_gas_amount_base: InternalGas, {RELEASE_V1_12.. => "transaction_context.max_gas_amount.base"}, 735],
+        [transaction_context_gas_unit_price_base: InternalGas, {RELEASE_V1_12.. => "transaction_context.gas_unit_price.base"}, 735],
+        [transaction_context_chain_id_base: InternalGas, {RELEASE_V1_12.. => "transaction_context.chain_id.base"}, 735],
+        [transaction_context_entry_function_payload_base: InternalGas, {RELEASE_V1_12.. => "transaction_context.entry_function_payload.base"}, 735],
+        [transaction_context_entry_function_payload_per_byte_in_str: InternalGasPerByte, {RELEASE_V1_12.. => "transaction_context.entry_function_payload.per_abstract_memory_unit"}, 18],
+        [transaction_context_multisig_payload_base: InternalGas, {RELEASE_V1_12.. => "transaction_context.multisig_payload.base"}, 735],
+        [transaction_context_multisig_payload_per_byte_in_str: InternalGasPerByte, {RELEASE_V1_12.. => "transaction_context.multisig_payload.per_abstract_memory_unit"}, 18],
 
         [code_request_publish_base: InternalGas, "code.request_publish.base", 1838],
         [code_request_publish_per_byte: InternalGasPerByte, "code.request_publish.per_byte", 7],
@@ -309,7 +312,7 @@ crate::gas_schedule::macros::define_gas_parameters!(
 
         [object_exists_at_base: InternalGas, { 7.. => "object.exists_at.base" }, 919],
         // Based on SHA3-256's cost
-        [object_user_derived_address_base: InternalGas, { 16.. => "object.user_derived_address.base" }, 14704],
+        [object_user_derived_address_base: InternalGas, { RELEASE_V1_12.. => "object.user_derived_address.base" }, 14704],
 
         // These are dummy value, they copied from storage gas in aptos-core/aptos-vm/src/aptos_vm_impl.rs
         [object_exists_at_per_byte_loaded: InternalGasPerByte, { 7.. => "object.exists_at.per_byte_loaded" }, 183],

@@ -51,7 +51,7 @@ pub fn generate_gas_upgrade_proposal(
             let gas_schedule_blob = bcs::to_bytes(gas_schedule).unwrap();
             assert!(gas_schedule_blob.len() < 65536);
             emit!(writer, "let gas_schedule_blob: vector<u8> = ");
-            generate_blob(writer, &gas_schedule_blob);
+            generate_blob_as_hex_string(writer, &gas_schedule_blob);
             emitln!(writer, ";\n");
             if !post_randomness_framework {
                 emitln!(

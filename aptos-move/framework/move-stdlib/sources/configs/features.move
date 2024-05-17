@@ -601,11 +601,15 @@ module std::features {
     ///
     /// While the scope is public, it can only be usd in system transactions like `block_prologue` and governance proposals,
     /// who have permission to set the flag that's checked in `extract()`.
-    public fun on_new_epoch(vm_or_framework: &signer) acquires Features, PendingFeatures {
-        ensure_vm_or_framework_signer(vm_or_framework);
+    public fun on_new_epoch(framework: &signer) acquires Features, PendingFeatures {
+        ensure_framework_signer(framework);
         if (exists<PendingFeatures>(@std)) {
             let PendingFeatures { features } = move_from<PendingFeatures>(@std);
-            borrow_global_mut<Features>(@std).features = features;
+            if (exists<Features>(@std)) {
+                borrow_global_mut<Features>(@std).features = features;
+            } else {
+                move_to(framework, Features { features })
+            }
         }
     }
 
@@ -646,9 +650,9 @@ module std::features {
         });
     }
 
-    fun ensure_vm_or_framework_signer(account: &signer) {
+    fun ensure_framework_signer(account: &signer) {
         let addr = signer::address_of(account);
-        assert!(addr == @std || addr == @vm, error::permission_denied(EFRAMEWORK_SIGNER_NEEDED));
+        assert!(addr == @std, error::permission_denied(EFRAMEWORK_SIGNER_NEEDED));
     }
 
     #[verify_only]
