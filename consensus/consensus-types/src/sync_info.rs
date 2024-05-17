@@ -148,7 +148,11 @@ impl SyncInfo {
 
         ensure!(
             self.highest_ordered_round() >= self.highest_commit_round(),
-            format!("HOC {} has lower round than HLI {}", self.highest_ordered_cert(), self.highest_commit_cert())
+            format!(
+                "HOC {} has lower round than HLI {}",
+                self.highest_ordered_cert(),
+                self.highest_commit_cert()
+            )
         );
 
         ensure!(

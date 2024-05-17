@@ -582,7 +582,7 @@ impl RoundManager {
             message_round == self.round_state.current_round(),
             "After sync, round {} doesn't match local {}. Input sync info: {:?}, Local Sync Info {:?}, Current sync info {:?}",
             message_round,
-            self.round_state.current_round()
+            self.round_state.current_round(),
             sync_info,
             local_sync_info,
             self.block_store.sync_info(),
