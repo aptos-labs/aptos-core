@@ -314,11 +314,9 @@ impl BlockStore {
 
         // Check early that recovery will succeed, and return before corrupting our state in case it will not.
         LedgerRecoveryData::new(highest_commit_cert.ledger_info().clone())
-            .find_root(
-                &mut blocks.clone(),
-                &mut quorum_certs.clone(),
-                Some(highest_ordered_cert.clone()),
-            )
+            .find_root(&mut blocks.clone(), &mut quorum_certs.clone(), &mut vec![
+                highest_ordered_cert.clone(),
+            ])
             .with_context(|| {
                 // for better readability
                 quorum_certs.sort_by_key(|qc| qc.certified_block().round());
@@ -338,11 +336,9 @@ impl BlockStore {
                 )
             })?;
 
-        storage.save_tree(
-            blocks.clone(),
-            quorum_certs.clone(),
-            Some(highest_ordered_cert.clone()),
-        )?;
+        storage.save_tree(blocks.clone(), quorum_certs.clone(), vec![
+            highest_ordered_cert.clone(),
+        ])?;
 
         execution_client
             .sync_to(highest_commit_cert.ledger_info().clone())

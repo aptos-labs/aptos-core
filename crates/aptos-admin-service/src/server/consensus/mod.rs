@@ -130,14 +130,11 @@ pub async fn handle_dump_block_request(
 fn dump_consensus_db(consensus_db: &dyn PersistentLivenessStorage) -> anyhow::Result<String> {
     let mut body = String::new();
 
-    let (last_vote, highest_tc, highest_ordered_cert, consensus_blocks, consensus_qcs) =
+    let (last_vote, highest_tc, consensus_blocks, consensus_qcs, consensus_wlis) =
         consensus_db.consensus_db().get_data()?;
 
     body.push_str(&format!("Last vote: \n{last_vote:?}\n\n"));
     body.push_str(&format!("Highest tc: \n{highest_tc:?}\n\n"));
-    body.push_str(&format!(
-        "Highest ordered cert: \n{highest_ordered_cert:?}\n\n"
-    ));
     body.push_str("Blocks: \n");
     for block in consensus_blocks {
         body.push_str(&format!(
@@ -155,7 +152,10 @@ fn dump_consensus_db(consensus_db: &dyn PersistentLivenessStorage) -> anyhow::Re
     for qc in consensus_qcs {
         body.push_str(&format!("{qc:?}\n\n"));
     }
-
+    body.push_str("Wrapped Ledger Infos: \n");
+    for wli in consensus_wlis {
+        body.push_str(&format!("{wli:?}\n\n"));
+    }
     Ok(body)
 }
 
@@ -189,7 +189,7 @@ fn dump_blocks(
 
     let all_batches = quorum_store_db.get_all_batches()?;
 
-    let (_, _, _, blocks, _) = consensus_db.consensus_db().get_data()?;
+    let (_, _, blocks, _, _) = consensus_db.consensus_db().get_data()?;
 
     for block in blocks {
         let id = block.id();
@@ -225,7 +225,7 @@ fn dump_blocks_bcs(
 ) -> anyhow::Result<Vec<u8>> {
     let all_batches = quorum_store_db.get_all_batches()?;
 
-    let (_, _, _, blocks, _) = consensus_db.consensus_db().get_data()?;
+    let (_, _, blocks, _, _) = consensus_db.consensus_db().get_data()?;
 
     let mut all_txns = Vec::new();
     for block in blocks {

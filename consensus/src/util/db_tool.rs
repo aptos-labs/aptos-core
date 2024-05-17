@@ -39,7 +39,7 @@ impl Command {
         let all_batches = quorum_store_db.get_all_batches().unwrap();
 
         let consensus_db = ConsensusDB::new(self.db_dir.clone());
-        let (_, _, _, blocks, _) = consensus_db.get_data()?;
+        let (_, _, blocks, _, _) = consensus_db.get_data()?;
 
         let mut txns = Vec::new();
         for block in blocks {

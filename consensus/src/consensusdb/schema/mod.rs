@@ -6,6 +6,7 @@ pub(crate) mod block;
 pub(crate) mod dag;
 pub(crate) mod quorum_certificate;
 pub(crate) mod single_entry;
+pub(crate) mod wrapped_ledger_info;
 
 use anyhow::{ensure, Result};
 
@@ -39,3 +40,4 @@ pub use block::BLOCK_CF_NAME;
 pub use dag::{CERTIFIED_NODE_CF_NAME, DAG_VOTE_CF_NAME, NODE_CF_NAME};
 pub use quorum_certificate::QC_CF_NAME;
 pub use single_entry::SINGLE_ENTRY_CF_NAME;
+pub use wrapped_ledger_info::WLI_CF_NAME;
