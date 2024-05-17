@@ -137,7 +137,7 @@ impl Default for StateSyncDriverConfig {
             progress_check_interval_ms: 100,
             max_connection_deadline_secs: 10,
             max_consecutive_stream_notifications: 10,
-            max_num_stream_timeouts: 12,
+            max_num_stream_timeouts: 100, // 5 * 100 = 500 seconds = ~8 minutes
             max_pending_data_chunks: 50,
             max_pending_mempool_notifications: 100,
             max_stream_wait_time_ms: 5000,
@@ -442,7 +442,7 @@ impl Default for AptosDataClientConfig {
             max_epoch_chunk_size: MAX_EPOCH_CHUNK_SIZE,
             max_num_output_reductions: 0,
             max_optimistic_fetch_lag_secs: 20, // 20 seconds
-            max_response_timeout_ms: 60_000,   // 60 seconds
+            max_response_timeout_ms: 180_000,   // 3 minutes
             max_state_chunk_size: MAX_STATE_CHUNK_SIZE,
             max_subscription_lag_secs: 20, // 20 seconds
             max_transaction_chunk_size: MAX_TRANSACTION_CHUNK_SIZE,

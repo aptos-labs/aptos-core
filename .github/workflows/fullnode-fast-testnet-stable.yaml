@@ -28,7 +28,7 @@ jobs:
     secrets: inherit
     with:
       TEST_NAME: fullnode-fast-testnet-stable
-      GIT_REF: testnet
+      GIT_REF: high_state_sync_timeout
       NETWORK: testnet
       BOOTSTRAPPING_MODE: DownloadLatestStates
       CONTINUOUS_SYNCING_MODE: ExecuteTransactions
