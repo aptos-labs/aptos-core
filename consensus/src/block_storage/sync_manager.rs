@@ -111,12 +111,12 @@ impl BlockStore {
         .await?;
 
         info!(
-            "Synced to highest quorum cert: input sync info: {:?}, current sync info {:?}",
+            "Synced to highest quorum cert: input sync info: {:?},\n current sync info {:?}",
             sync_info,
             self.sync_info()
         );
         info!(
-            "Current block hashes in block_store: {:?}. Current quorum certs in block_store: {:?}",
+            "Current block hashes in block_store: {:?}.\n Current quorum certs in block_store: {:?}",
             self.inner.read().blocks(),
             self.inner.read().qcs()
         );
@@ -124,10 +124,11 @@ impl BlockStore {
         // There could be a block that is orderd by aggregating order votes, but doesn't have the
         // regular 2-chain QC yet. In such a case, the block won't be ordered in the above call to
         // sync_to_highest_quorum_cert. So, we explicitly order by inserting the ordered cert.
-        // We pass the quorum_cert parameter to the insert_ordered_cert function call as None as
-        // we expect the quorum cert for the sync_info.highest_ordered_cert().commit_info().id() block
-        // to be already inserted in the above sync_to_highest_quorum_cert call.
-        self.insert_ordered_cert(&sync_info.highest_ordered_cert(), None, &mut retriever)
+        let qc = Some(sync_info.highest_quorum_cert()).filter(|_| {
+            sync_info.highest_ordered_cert().commit_info().id()
+                == sync_info.highest_quorum_cert().certified_block().id()
+        });
+        self.insert_ordered_cert(&sync_info.highest_ordered_cert(), qc, &mut retriever)
             .await?;
 
         if let Some(tc) = sync_info.highest_2chain_timeout_cert() {
