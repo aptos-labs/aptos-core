@@ -1,0 +1,14 @@
+---
+remote_endpoint: ~
+name: "v1.11"
+proposals:
+  - name: enables_delegation_pool_allowlisting
+    metadata:
+      title: "AIP-31: Allowlisting for delegation pools"
+      description: "AIP-31: This AIP introduces the concept of allowlisting in delegation pools, allowing pool owners to control who can stake in their delegation pool."
+      discussion_url: "https://github.com/aptos-foundation/AIPs/issues/121"
+    execution_mode: MultiStep
+    update_sequence:
+      - FeatureFlag:
+          enabled:
+            - delegation_pool_allowlisting
