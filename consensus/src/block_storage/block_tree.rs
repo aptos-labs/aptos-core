@@ -135,6 +135,14 @@ impl BlockTree {
         }
     }
 
+    pub fn blocks(&self) -> Vec<HashValue> {
+        self.id_to_block.keys().cloned().collect()
+    }
+
+    pub fn qcs(&self) -> Vec<HashValue> {
+        self.id_to_quorum_cert.keys().cloned().collect()
+    }
+
     // This method will only be used in this module.
     fn get_linkable_block(&self, block_id: &HashValue) -> Option<&LinkableBlock> {
         self.id_to_block.get(block_id)
