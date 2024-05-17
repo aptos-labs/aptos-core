@@ -756,11 +756,16 @@ impl AptosVM {
         senders: Vec<AccountAddress>,
         script: &Script,
     ) -> Result<(), VMStatus> {
-        session.check_script_dependencies_and_check_gas(
-            gas_meter,
-            traversal_context,
-            script.code(),
-        )?;
+        // Note: Feature gating is needed here because the traversal of the dependencies could
+        //       result in shallow-loading of the modules and therefore subtle changes in
+        //       the error semantics.
+        if self.gas_feature_version >= 15 {
+            session.check_script_dependencies_and_check_gas(
+                gas_meter,
+                traversal_context,
+                script.code(),
+            )?;
+        }
 
         let loaded_func = session.load_script(script.code(), script.ty_args().to_vec())?;
 
@@ -798,13 +803,18 @@ impl AptosVM {
         entry_fn: &EntryFunction,
         _txn_data: &TransactionMetadata,
     ) -> Result<(), VMStatus> {
-        let module_id = traversal_context
-            .referenced_module_ids
-            .alloc(entry_fn.module().clone());
-        session.check_dependencies_and_charge_gas(gas_meter, traversal_context, [(
-            module_id.address(),
-            module_id.name(),
-        )])?;
+        // Note: Feature gating is needed here because the traversal of the dependencies could
+        //       result in shallow-loading of the modules and therefore subtle changes in
+        //       the error semantics.
+        if self.gas_feature_version >= 15 {
+            let module_id = traversal_context
+                .referenced_module_ids
+                .alloc(entry_fn.module().clone());
+            session.check_dependencies_and_charge_gas(gas_meter, traversal_context, [(
+                module_id.address(),
+                module_id.name(),
+            )])?;
+        }
 
         let (function, is_friend_or_private) = session.load_function_and_is_friend_or_private_def(
             entry_fn.module(),
@@ -1421,50 +1431,56 @@ impl AptosVM {
             let modules: &Vec<CompiledModule> =
                 traversal_context.referenced_module_bundles.alloc(modules);
 
-            // Charge old versions of the modules, in case of upgrades.
-            session.check_dependencies_and_charge_gas_non_recursive_optional(
-                gas_meter,
-                traversal_context,
-                modules
-                    .iter()
-                    .map(|module| (module.self_addr(), module.self_name())),
-            )?;
+            // Note: Feature gating is needed here because the traversal of the dependencies could
+            //       result in shallow-loading of the modules and therefore subtle changes in
+            //       the error semantics.
+            if self.gas_feature_version >= 15 {
+                // Charge old versions of the modules, in case of upgrades.
+                session.check_dependencies_and_charge_gas_non_recursive_optional(
+                    gas_meter,
+                    traversal_context,
+                    modules
+                        .iter()
+                        .map(|module| (module.self_addr(), module.self_name())),
+                )?;
 
-            // Charge all modules in the bundle that is about to be published.
-            for (module, blob) in modules.iter().zip(bundle.iter()) {
-                let module_id = &module.self_id();
-                gas_meter
-                    .charge_dependency(
-                        true,
-                        module_id.address(),
-                        module_id.name(),
-                        NumBytes::new(blob.code().len() as u64),
-                    )
-                    .map_err(|err| err.finish(Location::Undefined))?;
+                // Charge all modules in the bundle that is about to be published.
+                for (module, blob) in modules.iter().zip(bundle.iter()) {
+                    let module_id = &module.self_id();
+                    gas_meter
+                        .charge_dependency(
+                            true,
+                            module_id.address(),
+                            module_id.name(),
+                            NumBytes::new(blob.code().len() as u64),
+                        )
+                        .map_err(|err| err.finish(Location::Undefined))?;
+                }
+
+                // Charge all dependencies.
+                //
+                // Must exclude the ones that are in the current bundle because they have not
+                // been published yet.
+                let module_ids_in_bundle = modules
+                    .iter()
+                    .map(|module| (module.self_addr(), module.self_name()))
+                    .collect::<BTreeSet<_>>();
+
+                session.check_dependencies_and_charge_gas(
+                    gas_meter,
+                    traversal_context,
+                    modules
+                        .iter()
+                        .flat_map(|module| {
+                            module
+                                .immediate_dependencies_iter()
+                                .chain(module.immediate_friends_iter())
+                        })
+                        .filter(|addr_and_name| !module_ids_in_bundle.contains(addr_and_name)),
+                )?;
+
+                // TODO: Revisit the order of traversal. Consider switching to alphabetical order.
             }
-
-            // Charge all dependencies.
-            //
-            // Must exclude the ones that are in the current bundle because they have not
-            // been published yet.
-            let module_ids_in_bundle = modules
-                .iter()
-                .map(|module| (module.self_addr(), module.self_name()))
-                .collect::<BTreeSet<_>>();
-
-            // TODO: Revisit the order of traversal. Consider switching to alphabetical order.
-            session.check_dependencies_and_charge_gas(
-                gas_meter,
-                traversal_context,
-                modules
-                    .iter()
-                    .flat_map(|module| {
-                        module
-                            .immediate_dependencies_iter()
-                            .chain(module.immediate_friends_iter())
-                    })
-                    .filter(|addr_and_name| !module_ids_in_bundle.contains(addr_and_name)),
-            )?;
 
             // Validate the module bundle
             self.validate_publish_request(session, modules, expected_modules, allowed_deps)?;
