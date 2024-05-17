@@ -21,7 +21,7 @@ use crate::{
     transaction::{authenticator::EphemeralSignature, RawTransaction, SignedTransaction},
 };
 use aptos_crypto::{
-    ed25519::Ed25519PrivateKey, poseidon_bn254::fr_to_bytes_le, SigningKey, Uniform,
+    ed25519::Ed25519PrivateKey, poseidon_bn254::keyless::fr_to_bytes_le, SigningKey, Uniform,
 };
 use ark_bn254::Bn254;
 use ark_groth16::PreparedVerifyingKey;

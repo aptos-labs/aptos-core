@@ -301,7 +301,7 @@ impl Loader {
         let hash_value: [u8; 32] = sha3_256.finalize().into();
 
         let mut scripts = self.scripts.write();
-        let (main, parameters, return_) = match scripts.get(&hash_value) {
+        let (main, param_tys, return_tys) = match scripts.get(&hash_value) {
             Some(cached) => cached,
             None => {
                 let ver_script = self.deserialize_and_verify_script(
@@ -315,16 +315,14 @@ impl Loader {
             },
         };
 
-        // Verify type arguments.
-        let mut type_arguments = vec![];
-        for ty in ty_args {
-            type_arguments.push(self.load_type(ty, data_store, module_store)?);
-        }
-
+        let ty_args = ty_args
+            .iter()
+            .map(|ty| self.load_type(ty, data_store, module_store))
+            .collect::<VMResult<Vec<_>>>()?;
         if self.vm_config.type_size_limit
-            && type_arguments
+            && ty_args
                 .iter()
-                .map(|loaded_ty| self.count_type_nodes(loaded_ty))
+                .map(|ty| self.count_type_nodes(ty))
                 .sum::<u64>()
                 > MAX_TYPE_INSTANTIATION_NODES
         {
@@ -336,7 +334,7 @@ impl Loader {
                 .finish(Location::Script));
         };
 
-        self.verify_ty_args(main.type_parameters(), &type_arguments)
+        self.verify_ty_arg_abilities(main.ty_arg_abilities(), &ty_args)
             .map_err(|e| {
                 e.with_message(format!(
                     "Failed to verify type arguments for script {}",
@@ -345,9 +343,9 @@ impl Loader {
                 .finish(Location::Script)
             })?;
         let instantiation = LoadedFunctionInstantiation {
-            type_arguments,
-            parameters,
-            return_,
+            ty_args,
+            param_tys,
+            return_tys,
         };
         Ok((main, instantiation))
     }
@@ -417,11 +415,9 @@ impl Loader {
             .resolve_function_by_name(function_name, module_id)
             .map_err(|err| err.finish(Location::Undefined))?;
 
-        let parameters = func.parameter_types().to_vec();
-
-        let return_ = func.return_types().to_vec();
-
-        Ok((module, func, parameters, return_))
+        let param_tys = func.param_tys().to_vec();
+        let return_tys = func.return_tys().to_vec();
+        Ok((module, func, param_tys, return_tys))
     }
 
     // Matches the actual returned type to the expected type, binding any type args to the
@@ -519,21 +515,20 @@ impl Loader {
         data_store: &mut TransactionDataCache,
         module_store: &ModuleStorageAdapter,
     ) -> VMResult<(LoadedFunction, LoadedFunctionInstantiation)> {
-        let (module, func, parameters, return_vec) = self.load_function_without_type_args(
+        let (module, func, param_tys, return_tys) = self.load_function_without_type_args(
             module_id,
             function_name,
             data_store,
             module_store,
         )?;
 
-        if return_vec.len() != 1 {
+        if return_tys.len() != 1 {
             // For functions that are marked constructor this should not happen.
             return Err(PartialVMError::new(StatusCode::ABORTED).finish(Location::Undefined));
         }
-        let return_type = &return_vec[0];
 
         let mut map = BTreeMap::new();
-        if !Self::match_return_type(return_type, expected_return_type, &mut map) {
+        if !Self::match_return_type(&return_tys[0], expected_return_type, &mut map) {
             // For functions that are marked constructor this should not happen.
             return Err(
                 PartialVMError::new(StatusCode::INVALID_MAIN_FUNCTION_SIGNATURE)
@@ -542,11 +537,11 @@ impl Loader {
         }
 
         // Construct the type arguments from the match
-        let mut type_arguments = vec![];
-        let type_param_len = func.type_parameters().len();
-        for i in 0..type_param_len {
-            if let Option::Some(t) = map.get(&(i as u16)) {
-                type_arguments.push((*t).clone());
+        let mut ty_args = vec![];
+        let num_ty_args = func.ty_arg_abilities().len();
+        for i in 0..num_ty_args {
+            if let Some(t) = map.get(&(i as u16)) {
+                ty_args.push((*t).clone());
             } else {
                 // Unknown type argument we are not able to infer the type arguments.
                 // For functions that are marked constructor this should not happen.
@@ -557,14 +552,13 @@ impl Loader {
             }
         }
 
-        // verify type arguments for capability constraints
-        self.verify_ty_args(func.type_parameters(), &type_arguments)
+        self.verify_ty_arg_abilities(func.ty_arg_abilities(), &ty_args)
             .map_err(|e| e.finish(Location::Module(module_id.clone())))?;
 
         let loaded = LoadedFunctionInstantiation {
-            type_arguments,
-            parameters,
-            return_: return_vec,
+            ty_args,
+            param_tys,
+            return_tys,
         };
         Ok((
             LoadedFunction {
@@ -586,33 +580,32 @@ impl Loader {
         data_store: &mut TransactionDataCache,
         module_store: &ModuleStorageAdapter,
     ) -> VMResult<(Arc<Module>, Arc<Function>, LoadedFunctionInstantiation)> {
-        let (module, func, parameters, return_) = self.load_function_without_type_args(
+        let (module, func, param_tys, return_tys) = self.load_function_without_type_args(
             module_id,
             function_name,
             data_store,
             module_store,
         )?;
 
-        let type_arguments = ty_args
+        let ty_args = ty_args
             .iter()
-            .map(|ty| self.load_type(ty, data_store, module_store))
+            .map(|ty_arg| self.load_type(ty_arg, data_store, module_store))
             .collect::<VMResult<Vec<_>>>()
             .map_err(|mut err| {
-                // User provided type arguement failed to load. Set extra sub status to distinguish from internal type loading error.
+                // User provided type argument failed to load. Set extra sub status to distinguish from internal type loading error.
                 if StatusCode::TYPE_RESOLUTION_FAILURE == err.major_status() {
                     err.set_sub_status(move_core_types::vm_status::sub_status::type_resolution_failure::EUSER_TYPE_LOADING_FAILURE);
                 }
                 err
             })?;
 
-        // verify type arguments
-        self.verify_ty_args(func.type_parameters(), &type_arguments)
+        self.verify_ty_arg_abilities(func.ty_arg_abilities(), &ty_args)
             .map_err(|e| e.finish(Location::Module(module_id.clone())))?;
 
         let loaded = LoadedFunctionInstantiation {
-            type_arguments,
-            parameters,
-            return_,
+            ty_args,
+            param_tys,
+            return_tys,
         };
         Ok((module, func, loaded))
     }
@@ -796,8 +789,8 @@ impl Loader {
             TypeTag::U256 => Type::U256,
             TypeTag::Address => Type::Address,
             TypeTag::Signer => Type::Signer,
-            TypeTag::Vector(tt) => Type::Vector(triomphe::Arc::new(self.load_type(
-                tt,
+            TypeTag::Vector(elem_tag) => Type::Vector(triomphe::Arc::new(self.load_type(
+                elem_tag,
                 data_store,
                 module_store,
             )?)),
@@ -805,27 +798,27 @@ impl Loader {
                 let module_id = ModuleId::new(struct_tag.address, struct_tag.module.clone());
                 self.load_module(&module_id, data_store, module_store)?;
                 let struct_type = module_store
-                    // GOOD module was loaded above
                     .get_struct_type_by_identifier(&struct_tag.name, &module_id)
                     .map_err(|e| e.finish(Location::Undefined))?;
-                if struct_type.type_parameters.is_empty() && struct_tag.type_params.is_empty() {
+                if struct_type.ty_params.is_empty() && struct_tag.type_args.is_empty() {
                     Type::Struct {
                         idx: struct_type.idx,
                         ability: AbilityInfo::struct_(struct_type.abilities),
                     }
                 } else {
-                    let mut type_params = vec![];
-                    for ty_param in &struct_tag.type_params {
-                        type_params.push(self.load_type(ty_param, data_store, module_store)?);
-                    }
-                    self.verify_ty_args(struct_type.type_param_constraints(), &type_params)
+                    let ty_args = struct_tag
+                        .type_args
+                        .iter()
+                        .map(|ty| self.load_type(ty, data_store, module_store))
+                        .collect::<VMResult<Vec<_>>>()?;
+                    self.verify_ty_arg_abilities(struct_type.ty_param_constraints(), &ty_args)
                         .map_err(|e| e.finish(Location::Undefined))?;
                     Type::StructInstantiation {
                         idx: struct_type.idx,
-                        ty_args: triomphe::Arc::new(type_params),
+                        ty_args: triomphe::Arc::new(ty_args),
                         ability: AbilityInfo::generic_struct(
                             struct_type.abilities,
-                            struct_type.phantom_ty_args_mask.clone(),
+                            struct_type.phantom_ty_params_mask.clone(),
                         ),
                     }
                 }
@@ -1278,19 +1271,23 @@ impl Loader {
     // Verify the kind (constraints) of an instantiation.
     // Both function and script invocation use this function to verify correctness
     // of type arguments provided
-    fn verify_ty_args<'a, I>(&self, constraints: I, ty_args: &[Type]) -> PartialVMResult<()>
+    fn verify_ty_arg_abilities<'a, I>(
+        &self,
+        expected_ty_arg_abilities: I,
+        ty_args: &[Type],
+    ) -> PartialVMResult<()>
     where
         I: IntoIterator<Item = &'a AbilitySet>,
         I::IntoIter: ExactSizeIterator,
     {
-        let constraints = constraints.into_iter();
-        if constraints.len() != ty_args.len() {
+        let expected_ty_arg_abilities = expected_ty_arg_abilities.into_iter();
+        if expected_ty_arg_abilities.len() != ty_args.len() {
             return Err(PartialVMError::new(
                 StatusCode::NUMBER_OF_TYPE_ARGUMENTS_MISMATCH,
             ));
         }
-        for (ty, expected_k) in ty_args.iter().zip(constraints) {
-            if !expected_k.is_subset(ty.abilities()?) {
+        for (ty, expected_ability) in ty_args.iter().zip(expected_ty_arg_abilities) {
+            if !expected_ability.is_subset(ty.abilities()?) {
                 return Err(PartialVMError::new(StatusCode::CONSTRAINT_NOT_SATISFIED));
             }
         }
@@ -1501,7 +1498,7 @@ impl<'a> Resolver<'a> {
             ),
             ability: AbilityInfo::generic_struct(
                 struct_.abilities,
-                struct_.phantom_ty_args_mask.clone(),
+                struct_.phantom_ty_params_mask.clone(),
             ),
         })
     }
@@ -1511,7 +1508,7 @@ impl<'a> Resolver<'a> {
             BinaryType::Module(module) => {
                 let handle = &module.field_handles[idx.0 as usize];
 
-                Ok(handle.definition_struct_type.fields[handle.offset].clone())
+                Ok(handle.definition_struct_type.field_tys[handle.offset].clone())
             },
             BinaryType::Script(_) => unreachable!("Scripts cannot have type instructions"),
         }
@@ -1534,11 +1531,11 @@ impl<'a> Resolver<'a> {
             .collect::<PartialVMResult<Vec<_>>>()?;
 
         // TODO: Is this type substitution unbounded?
-        field_instantiation.definition_struct_type.fields[field_instantiation.offset]
+        field_instantiation.definition_struct_type.field_tys[field_instantiation.offset]
             .subst(&instantiation_types)
     }
 
-    pub(crate) fn get_struct_fields(
+    pub(crate) fn get_struct_field_tys(
         &self,
         idx: StructDefinitionIndex,
     ) -> PartialVMResult<Arc<StructType>> {
@@ -1566,7 +1563,7 @@ impl<'a> Resolver<'a> {
             .collect::<PartialVMResult<Vec<_>>>()?;
 
         struct_type
-            .fields
+            .field_tys
             .iter()
             .map(|ty| ty.subst(&instantiation_types))
             .collect::<PartialVMResult<Vec<_>>>()
@@ -1664,7 +1661,7 @@ impl<'a> Resolver<'a> {
                     ),
                     ability: AbilityInfo::generic_struct(
                         struct_.abilities,
-                        struct_.phantom_ty_args_mask.clone(),
+                        struct_.phantom_ty_params_mask.clone(),
                     ),
                 })
             },
@@ -1800,7 +1797,7 @@ impl Loader {
 
         let cur_cost = gas_context.cost;
 
-        let ty_arg_tags = ty_args
+        let type_args = ty_args
             .iter()
             .map(|ty| self.type_to_type_tag_impl(ty, gas_context))
             .collect::<PartialVMResult<Vec<_>>>()?;
@@ -1808,7 +1805,7 @@ impl Loader {
             address: *name.module.address(),
             module: name.module.name().to_owned(),
             name: name.name.clone(),
-            type_params: ty_arg_tags,
+            type_args,
         };
 
         let size =
@@ -1914,7 +1911,7 @@ impl Loader {
         let maybe_mapping = self.get_identifier_mapping_kind(name);
 
         let field_tys = struct_type
-            .fields
+            .field_tys
             .iter()
             .map(|ty| self.subst(ty, ty_args))
             .collect::<PartialVMResult<Vec<_>>>()?;
@@ -2104,7 +2101,7 @@ impl Loader {
         }
 
         let struct_type = module_store.get_struct_type_by_identifier(&name.name, &name.module)?;
-        if struct_type.fields.len() != struct_type.field_names.len() {
+        if struct_type.field_tys.len() != struct_type.field_names.len() {
             return Err(
                 PartialVMError::new(StatusCode::UNKNOWN_INVARIANT_VIOLATION_ERROR).with_message(
                     format!(
@@ -2126,7 +2123,7 @@ impl Loader {
         let field_layouts = struct_type
             .field_names
             .iter()
-            .zip(&struct_type.fields)
+            .zip(&struct_type.field_tys)
             .map(|(n, ty)| {
                 let ty = self.subst(ty, ty_args)?;
                 let l =
@@ -2224,7 +2221,7 @@ impl Loader {
         let struct_type = module_store.get_struct_type_by_identifier(&name.name, &name.module)?;
 
         let formulas = struct_type
-            .fields
+            .field_tys
             .iter()
             .map(|field_type| self.calculate_depth_of_type(field_type, module_store))
             .collect::<PartialVMResult<Vec<_>>>()?;
@@ -2234,10 +2231,22 @@ impl Loader {
             .write()
             .depth_formula
             .insert(name.clone(), formula.clone());
-        if prev.is_some() {
+        if let Some(f) = prev {
+            // TODO: If the VM is not shared across threads, this error means that there is a
+            //       recursive type. But in case it is shared, the current implementation is not
+            //       correct because some other thread can cache depth formula before we reach
+            //       this line, and result in an invariant violation. We need to ensure correct
+            //       behavior, e.g., make the cache available per thread.
             return Err(
-                PartialVMError::new(StatusCode::UNKNOWN_INVARIANT_VIOLATION_ERROR)
-                    .with_message("Recursive type?".to_owned()),
+                PartialVMError::new(StatusCode::UNKNOWN_INVARIANT_VIOLATION_ERROR).with_message(
+                    format!(
+                        "Depth formula for struct '{}' and formula {:?} (struct type: {:?}) is already cached: {:?}",
+                        name,
+                        formula,
+                        struct_type.as_ref(),
+                        f
+                    ),
+                ),
             );
         }
         Ok(formula)

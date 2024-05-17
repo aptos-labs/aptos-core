@@ -30,7 +30,7 @@ pub fn generate_consensus_upgrade_proposal(
             assert!(consensus_config_blob.len() < 65536);
 
             emit!(writer, "let consensus_blob: vector<u8> = ");
-            generate_blob(writer, &consensus_config_blob);
+            generate_blob_as_hex_string(writer, &consensus_config_blob);
             emitln!(writer, ";\n");
 
             emitln!(

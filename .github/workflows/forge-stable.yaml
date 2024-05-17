@@ -8,6 +8,10 @@ permissions:
   id-token: write
   actions: write #required for workflow cancellation via check-aptos-core
 
+concurrency:
+  group: forge-stable-${{ github.ref_name }}
+  cancel-in-progress: true
+
 on:
   # Allow triggering manually
   workflow_dispatch:
@@ -124,7 +128,7 @@ jobs:
     uses: aptos-labs/aptos-core/.github/workflows/workflow-run-forge.yaml@main
     secrets: inherit
     with:
-      IMAGE_TAG: aptos-node-v1.10.1 # This workflow will test the upgradability from the current tip of the release branch to the current main branch.
+      IMAGE_TAG: 01b24e7e3548382dd25440b39a0438a993387f12 #aptos-node-v1.11 with randomness disabled in genesis
       FORGE_NAMESPACE: forge-framework-upgrade-${{ needs.determine-test-metadata.outputs.BRANCH_HASH }}
       FORGE_RUNNER_DURATION_SECS: 7200 # Run for 2 hours
       FORGE_TEST_SUITE: framework_upgrade
@@ -266,7 +270,7 @@ jobs:
       FORGE_RUNNER_DURATION_SECS: 300 # Run for 5 minutes
       # This will upgrade from testnet branch to the latest main
       FORGE_TEST_SUITE: compat
-      IMAGE_TAG: testnet
+      IMAGE_TAG: 01b24e7e3548382dd25440b39a0438a993387f12 #aptos-node-v1.11 with randomness disabled in genesis
       GIT_SHA: ${{ needs.determine-test-metadata.outputs.IMAGE_TAG }} # this is the git ref to checkout
       POST_TO_SLACK: true
 

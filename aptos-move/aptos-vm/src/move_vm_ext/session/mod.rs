@@ -2,7 +2,7 @@
 // SPDX-License-Identifier: Apache-2.0
 
 use crate::{
-    data_cache::get_resource_group_from_metadata,
+    data_cache::get_resource_group_member_from_metadata,
     move_vm_ext::{resource_state_key, write_op_converter::WriteOpConverter, AptosMoveResolver},
 };
 use aptos_framework::natives::{
@@ -238,7 +238,7 @@ impl<'r, 'l> SessionExt<'r, 'l> {
             for (struct_tag, blob_op) in resources {
                 let resource_group_tag = runtime
                     .with_module_metadata(&struct_tag.module_id(), |md| {
-                        get_resource_group_from_metadata(&struct_tag, md)
+                        get_resource_group_member_from_metadata(&struct_tag, md)
                     });
 
                 if let Some(resource_group_tag) = resource_group_tag {

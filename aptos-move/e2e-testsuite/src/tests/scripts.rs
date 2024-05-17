@@ -342,7 +342,7 @@ fn script_type_argument_module_does_not_exist() {
                 address,
                 module,
                 name: Identifier::new("fake").unwrap(),
-                type_params: vec![],
+                type_args: vec![],
             }))],
             vec![],
         ))
@@ -409,7 +409,7 @@ fn script_nested_type_argument_module_does_not_exist() {
                     address,
                     module,
                     name: Identifier::new("fake").unwrap(),
-                    type_params: vec![],
+                    type_args: vec![],
                 },
             ))))],
             vec![],

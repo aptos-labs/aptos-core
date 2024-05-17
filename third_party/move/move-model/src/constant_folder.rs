@@ -262,48 +262,34 @@ impl<'env> ConstantFolder<'env> {
             let result_type = self.env.get_node_type(id);
 
             if let (Number(val0), Number(val1), T(result_pty)) = (&val0, &val1, &result_type) {
+                // Get the name of a binary operator, is only used when `oper` is a binary operator.
+                let name = || oper.to_string_if_binop().expect("binop");
                 // Binops with numeric arguments and result.
                 match oper {
                     O::Add => {
-                        self.binop_num("add (+)", BigInt::checked_add, id, result_pty, val0, val1)
+                        self.binop_num(name(), BigInt::checked_add, id, result_pty, val0, val1)
                     },
                     O::Sub => {
-                        self.binop_num("sub (-)", BigInt::checked_sub, id, result_pty, val0, val1)
+                        self.binop_num(name(), BigInt::checked_sub, id, result_pty, val0, val1)
                     },
                     O::Mul => {
-                        self.binop_num("mul (*)", BigInt::checked_mul, id, result_pty, val0, val1)
+                        self.binop_num(name(), BigInt::checked_mul, id, result_pty, val0, val1)
                     },
                     O::Div => {
-                        self.binop_num("div (/)", BigInt::checked_div, id, result_pty, val0, val1)
+                        self.binop_num(name(), BigInt::checked_div, id, result_pty, val0, val1)
                     },
-                    O::Mod => {
-                        self.binop_num("rem (%)", Self::checked_rem, id, result_pty, val0, val1)
-                    },
+                    O::Mod => self.binop_num(name(), Self::checked_rem, id, result_pty, val0, val1),
                     O::Shl => {
                         // result_pty should be same size as arg0
                         let arg0_size = Self::ptype_num_bits_bigint(result_pty);
-                        self.binop_num(
-                            "shift left (<<)",
-                            Self::checked_shl,
-                            id,
-                            result_pty,
-                            val0,
-                            val1,
-                        )
-                        .filter(|_r| val1 < &arg0_size) // shift fails if val1 >= bits in val0
+                        self.binop_num(name(), Self::checked_shl, id, result_pty, val0, val1)
+                            .filter(|_r| val1 < &arg0_size) // shift fails if val1 >= bits in val0
                     },
                     O::Shr => {
                         // result_pty should be same size as arg0
                         let arg0_size = Self::ptype_num_bits_bigint(result_pty);
-                        self.binop_num(
-                            "shift right (>>)",
-                            Self::checked_shr,
-                            id,
-                            result_pty,
-                            val0,
-                            val1,
-                        )
-                        .filter(|_r| val1 < &arg0_size) // shift fails if val1 >= bits in val0
+                        self.binop_num(name(), Self::checked_shr, id, result_pty, val0, val1)
+                            .filter(|_r| val1 < &arg0_size) // shift fails if val1 >= bits in val0
                     },
                     O::BitAnd => Some(V(id, Number(val0.bitand(val1))).into_exp()),
                     O::BitOr => Some(V(id, Number(val0.bitor(val1))).into_exp()),

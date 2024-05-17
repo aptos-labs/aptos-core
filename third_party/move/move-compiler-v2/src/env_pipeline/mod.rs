@@ -12,6 +12,7 @@ use std::io::Write;
 
 pub mod lambda_lifter;
 pub mod rewrite_target;
+pub mod seqs_in_binop_checker;
 pub mod spec_checker;
 pub mod spec_rewriter;
 

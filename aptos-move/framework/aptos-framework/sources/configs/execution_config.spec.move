@@ -36,7 +36,9 @@ spec aptos_framework::execution_config {
         include config_buffer::SetForNextEpochAbortsIf;
     }
 
-    spec on_new_epoch() {
-        include config_buffer::OnNewEpochAbortsIf<ExecutionConfig>;
+    spec on_new_epoch(framework: &signer) {
+        requires @aptos_framework == std::signer::address_of(framework);
+        include config_buffer::OnNewEpochRequirement<ExecutionConfig>;
+        aborts_if false;
     }
 }
