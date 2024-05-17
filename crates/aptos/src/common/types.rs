@@ -1048,6 +1048,10 @@ pub struct MovePackageDir {
     #[clap(long, value_parser = crate::common::utils::parse_map::<String, AccountAddressWrapper>, default_value = "")]
     pub(crate) named_addresses: BTreeMap<String, AccountAddressWrapper>,
 
+    /// Override the standard library version by mainnet/testnet/dev
+    #[clap(long, value_parser)]
+    pub override_std: Option<String>,
+
     /// Skip pulling the latest git dependencies
     ///
     /// If you don't have a network connection, the compiler may fail due
@@ -1088,6 +1092,7 @@ impl MovePackageDir {
             package_dir: Some(package_dir),
             output_dir: None,
             named_addresses: Default::default(),
+            override_std: None,
             skip_fetch_latest_git_deps: true,
             bytecode_version: None,
             compiler_version: None,

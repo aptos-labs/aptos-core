@@ -73,6 +73,9 @@ pub struct BuildOptions {
     pub install_dir: Option<PathBuf>,
     #[clap(skip)] // TODO: have a parser for this; there is one in the CLI buts its  downstream
     pub named_addresses: BTreeMap<String, AccountAddress>,
+    /// Whether to override the standard library with the given version.
+    #[clap(long, value_parser)]
+    pub override_std: Option<String>,
     #[clap(skip)]
     pub docgen_options: Option<DocgenOptions>,
     #[clap(long)]
@@ -104,6 +107,7 @@ impl Default for BuildOptions {
             with_docs: false,
             install_dir: None,
             named_addresses: Default::default(),
+            override_std: None,
             docgen_options: None,
             // This is false by default, because it could accidentally pull new dependencies
             // while in a test (and cause some havoc)
@@ -191,7 +195,7 @@ impl BuiltPackage {
             full_model_generation: options.check_test_code,
             install_dir: options.install_dir.clone(),
             test_mode: false,
-            override_std: None,
+            override_std: options.override_std.clone(),
             force_recompilation: false,
             fetch_deps_only: false,
             skip_fetch_latest_git_deps: options.skip_fetch_latest_git_deps,

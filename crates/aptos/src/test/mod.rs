@@ -1090,6 +1090,7 @@ impl CliTestFramework {
             package_dir: Some(self.move_dir()),
             output_dir: None,
             named_addresses: Self::named_addresses(account_strs),
+            override_stdlib: None,
             skip_fetch_latest_git_deps: true,
             bytecode_version: None,
             compiler_version: None,
