@@ -286,6 +286,6 @@ pub(crate) fn validate_authenticators(
             },
         }
     }
-
+    println!("hi");
     Ok(())
 }
