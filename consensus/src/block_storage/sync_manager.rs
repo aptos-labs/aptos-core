@@ -3,7 +3,10 @@
 // SPDX-License-Identifier: Apache-2.0
 
 use crate::{
-    block_storage::{BlockReader, BlockStore},
+    block_storage::{
+        tracing::{observe_block, BlockStage},
+        BlockReader, BlockStore,
+    },
     counters::{
         BLOCKS_FETCHED_FROM_NETWORK_WHILE_SYNCING, LATE_EXECUTION_WITH_ORDER_VOTE_QC,
         SUCCESSFUL_EXECUTED_WITH_ORDER_VOTE_QC, SUCCESSFUL_EXECUTED_WITH_REGULAR_QC,
@@ -17,7 +20,7 @@ use crate::{
     persistent_liveness_storage::{LedgerRecoveryData, PersistentLivenessStorage, RecoveryData},
     pipeline::execution_client::TExecutionClient,
 };
-use anyhow::{bail, Context};
+use anyhow::{bail, ensure, Context};
 use aptos_consensus_types::{
     block::Block,
     block_retrieval::{
@@ -92,7 +95,13 @@ impl BlockStore {
             &retriever.network,
         )
         .await;
-        // TODO: Make sure syncing until highest quorum cert is okay
+
+        // sync_to_highest_quorum_cert will
+        // (1) resets the block store with highest commit cert = sync_info.highest_quorum_cert()
+        // (2) insert all the blocks between (inclusive) highest_commit_cert.commit_info().id() to
+        // highest_quorum_cert.certified_block().id() into the block store and storage
+        // (3) insert the quorum cert for all the above blocks into the block store and storage
+        // (4) executes all the blocks that are ordered while inserting the above quorum certs
         self.sync_to_highest_quorum_cert(
             sync_info.highest_quorum_cert().clone(),
             sync_info.highest_commit_cert().clone(),
@@ -101,7 +110,13 @@ impl BlockStore {
         )
         .await?;
 
-        self.insert_quorum_cert(sync_info.highest_quorum_cert(), &mut retriever)
+        // There could be a block that is orderd by aggregating order votes, but doesn't have the
+        // regular 2-chain QC yet. In such a case, the block won't be ordered in the above call to
+        // sync_to_highest_quorum_cert. So, we explicitly order by inserting the ordered cert.
+        // We pass the quorum_cert parameter to the insert_ordered_cert function call as None as
+        // we expect the quorum cert for the sync_info.highest_ordered_cert().commit_info().id() block
+        // to be already inserted in the above sync_to_highest_quorum_cert call.
+        self.insert_ordered_cert(&sync_info.highest_ordered_cert(), None, &mut retriever)
             .await?;
 
         if let Some(tc) = sync_info.highest_2chain_timeout_cert() {
@@ -142,9 +157,31 @@ impl BlockStore {
     pub async fn insert_ordered_cert(
         &self,
         ordered_cert: &WrappedLedgerInfo,
+        // This is the quorum cert on the above ordered block if available.
+        quorum_cert: Option<&QuorumCert>,
         retriever: &mut BlockRetriever,
     ) -> anyhow::Result<()> {
         if self.ordered_root().round() < ordered_cert.ledger_info().ledger_info().round() {
+            if !self.block_exists(ordered_cert.commit_info().id()) {
+                self.fetch_wrapped_ledger_info(ordered_cert.clone(), retriever)
+                    .await?;
+                // We've so far fetched and inserted the missing block and its ancestors.
+                // Before inserting the ordered cert on the block, we insert the QC on the block.
+                ensure!(quorum_cert.is_some(), "[SyncManager] Quorum cert is not provided for the ordered block when inserting the ordered cert {:?}", ordered_cert);
+                let quorum_cert = quorum_cert.unwrap().clone();
+                ensure!(quorum_cert.certified_block().id() == ordered_cert.commit_info().id(), "[SyncManager] Quorum cert {:?} does not match the ordered block when inserting the ordered cert {:?}", quorum_cert, ordered_cert);
+                self.insert_single_quorum_cert(quorum_cert)?;
+            }
+
+            if let Some(ordered_block) = self.get_block(ordered_cert.commit_info().id()) {
+                if !ordered_block.block().is_nil_block() {
+                    observe_block(
+                        ordered_block.block().timestamp_usecs(),
+                        BlockStage::OC_ADDED,
+                    );
+                }
+            }
+
             SUCCESSFUL_EXECUTED_WITH_ORDER_VOTE_QC.inc();
             self.send_for_execution(ordered_cert.clone()).await?;
             if ordered_cert.ledger_info().ledger_info().ends_epoch() {
@@ -180,9 +217,15 @@ impl BlockStore {
                 break;
             }
             let mut blocks = retriever
-                .retrieve_block_for_qc(&retrieve_qc, 1, retrieve_qc.certified_block().id())
+                .retrieve_block_in_range(
+                    retrieve_qc.certified_block().id(),
+                    1,
+                    retrieve_qc.certified_block().id(),
+                    qc.ledger_info()
+                        .get_voters(&retriever.validator_addresses()),
+                )
                 .await?;
-            // retrieve_block_for_qc guarantees that blocks has exactly 1 element
+            // retrieve_block_in_range guarantees that blocks has exactly 1 element
             let block = blocks.remove(0);
             retrieve_qc = block.quorum_cert().clone();
             pending.push(block);
@@ -194,6 +237,43 @@ impl BlockStore {
             self.insert_ordered_block(block).await?;
         }
         self.insert_single_quorum_cert(qc)
+    }
+
+    async fn fetch_wrapped_ledger_info(
+        &self,
+        wrapped_ledger_info: WrappedLedgerInfo,
+        retriever: &mut BlockRetriever,
+    ) -> anyhow::Result<()> {
+        let mut pending = vec![];
+        let mut voters = wrapped_ledger_info
+            .ledger_info()
+            .get_voters(&retriever.validator_addresses());
+        let mut retrieve_block_id = wrapped_ledger_info.commit_info().id();
+        loop {
+            if self.block_exists(retrieve_block_id) {
+                break;
+            }
+            let mut blocks = retriever
+                .retrieve_block_in_range(retrieve_block_id, 1, retrieve_block_id, voters)
+                .await?;
+            // retrieve_block_in_range guarantees that blocks has exactly 1 element
+            let block = blocks.remove(0);
+
+            // We need to fetch the parent of block to ensure we have the parent in the tree.
+            retrieve_block_id = block.quorum_cert().certified_block().id();
+            voters = block
+                .quorum_cert()
+                .ledger_info()
+                .get_voters(&retriever.validator_addresses());
+            pending.push(block);
+        }
+
+        while let Some(block) = pending.pop() {
+            let block_qc = block.quorum_cert().clone();
+            self.insert_single_quorum_cert(block_qc)?;
+            self.insert_ordered_block(block).await?;
+        }
+        Ok(())
     }
 
     /// Check the highest ordered cert sent by peer to see if we're behind and start a fast
@@ -275,10 +355,13 @@ impl BlockStore {
         assert!(num_blocks < std::usize::MAX as u64);
 
         let blocks = retriever
-            .retrieve_block_for_qc(
-                highest_quorum_cert,
+            .retrieve_block_in_range(
+                highest_quorum_cert.certified_block().id(),
                 num_blocks,
                 highest_commit_cert.commit_info().id(),
+                highest_quorum_cert
+                    .ledger_info()
+                    .get_voters(&retriever.validator_addresses()),
             )
             .await?;
 
@@ -438,6 +521,10 @@ impl BlockRetriever {
         }
     }
 
+    pub fn validator_addresses(&self) -> Vec<AccountAddress> {
+        self.validator_addresses.clone()
+    }
+
     async fn retrieve_block_for_id_chunk(
         &mut self,
         block_id: HashValue,
@@ -592,21 +679,16 @@ impl BlockRetriever {
     }
 
     /// Retrieve chain of n blocks for given QC
-    async fn retrieve_block_for_qc<'a>(
-        &'a mut self,
-        qc: &'a QuorumCert,
+    async fn retrieve_block_in_range(
+        &mut self,
+        initial_block_id: HashValue,
         num_blocks: u64,
         target_block_id: HashValue,
+        peers: Vec<AccountAddress>,
     ) -> anyhow::Result<Vec<Block>> {
         BLOCKS_FETCHED_FROM_NETWORK_WHILE_SYNCING.inc_by(num_blocks);
-        let peers = qc.ledger_info().get_voters(&self.validator_addresses);
-        self.retrieve_block_for_id(
-            qc.certified_block().id(),
-            target_block_id,
-            peers,
-            num_blocks,
-        )
-        .await
+        self.retrieve_block_for_id(initial_block_id, target_block_id, peers, num_blocks)
+            .await
     }
 
     fn pick_peer(&self, first_atempt: bool, peers: &mut Vec<AccountAddress>) -> AccountAddress {

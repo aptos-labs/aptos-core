@@ -39,7 +39,6 @@ use aptos_consensus_types::{
     block_data::BlockType,
     common::{Author, Round},
     delayed_qc_msg::DelayedQcMsg,
-    order_vote::OrderVote,
     order_vote_msg::OrderVoteMsg,
     proof_of_store::{ProofCache, ProofOfStoreMsg, SignedBatchInfoMsg},
     proposal_msg::ProposalMsg,
@@ -972,11 +971,8 @@ impl RoundManager {
                 let vote_reception_result = self
                     .pending_order_votes
                     .insert_order_vote(order_vote_msg.order_vote(), &self.epoch_state.verifier);
-                self.process_order_vote_reception_result(
-                    order_vote_msg.order_vote(),
-                    vote_reception_result,
-                )
-                .await?;
+                self.process_order_vote_reception_result(&order_vote_msg, vote_reception_result)
+                    .await?;
             } else {
                 ORDER_VOTE_VERY_OLD.inc();
                 info!(
@@ -1147,25 +1143,15 @@ impl RoundManager {
 
     async fn process_order_vote_reception_result(
         &mut self,
-        order_vote: &OrderVote,
+        order_vote_msg: &OrderVoteMsg,
         result: OrderVoteReceptionResult,
     ) -> anyhow::Result<()> {
         match result {
             OrderVoteReceptionResult::NewLedgerInfoWithSignatures(ledger_info_with_signatures) => {
-                if let Some(order_voted_block) = self
-                    .block_store
-                    .get_block(order_vote.ledger_info().consensus_block_id())
-                {
-                    if !order_voted_block.block().is_nil_block() {
-                        observe_block(
-                            order_voted_block.block().timestamp_usecs(),
-                            BlockStage::ORDER_VOTE_QC_CREATED,
-                        );
-                    }
-                }
                 self.new_ordered_cert(
                     WrappedLedgerInfo::new(VoteData::dummy(), ledger_info_with_signatures),
-                    order_vote.author(),
+                    order_vote_msg.quorum_cert(),
+                    order_vote_msg.order_vote().author(),
                 )
                 .await
             },
@@ -1198,11 +1184,13 @@ impl RoundManager {
     async fn new_ordered_cert(
         &mut self,
         ordered_cert: WrappedLedgerInfo,
+        quorum_cert: &QuorumCert,
         preferred_peer: Author,
     ) -> anyhow::Result<()> {
         self.block_store
             .insert_ordered_cert(
                 &ordered_cert,
+                Some(quorum_cert),
                 &mut self.create_block_retriever(preferred_peer),
             )
             .await
