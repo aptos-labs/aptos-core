@@ -12,6 +12,7 @@ use anyhow::{bail, Context};
 use aptos::node::analyze::fetch_metadata::FetchMetadata;
 use aptos_sdk::types::PeerId;
 use aptos_transaction_emitter_lib::{TxnStats, TxnStatsRate};
+use itertools::Itertools;
 use prometheus_http_query::response::Sample;
 use std::{collections::BTreeMap, time::Duration};
 
@@ -64,6 +65,14 @@ impl MetricsThreshold {
             .filter(|sample| sample.value() > self.max)
             .count();
         let breach_pct = (breach_count * 100) / metrics.len();
+        let metric_avg = metrics.iter().map(|s| s.value()).sum::<f64>() / metrics.len() as f64;
+        let metric_p90 = metrics
+            .iter()
+            .map(|s| s.value())
+            .filter(|v| !v.is_nan())
+            .sorted_by(|a, b| a.partial_cmp(b).unwrap())
+            .nth((metrics.len() as f64 * 0.9) as usize)
+            .unwrap();
         if breach_pct > self.max_breach_pct {
             bail!(
                 "{:?} metric violated threshold of {:?}, max_breach_pct: {:?}, breach_pct: {:?} ",
@@ -71,6 +80,11 @@ impl MetricsThreshold {
                 self.max,
                 self.max_breach_pct,
                 breach_pct
+            );
+        } else {
+            println!(
+                "{:?} metric with avg {:?} and p90 {:?} is within threshold of {:?}, max_breach_pct: {:?}, breach_pct: {:?}",
+                metrics_name, metric_avg, metric_p90, self.max, self.max_breach_pct, breach_pct
             );
         }
         Ok(())
