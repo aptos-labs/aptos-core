@@ -1,7 +1,10 @@
 // Copyright © Aptos Foundation
 // SPDX-License-Identifier: Apache-2.0
 
-use crate::on_chain_config::{FeatureFlag, Features, TimedFeatureFlag, TimedFeatures};
+use crate::on_chain_config::{
+    randomness_api_v0_config::{AllowCustomMaxGasFlag, RequiredGasDeposit},
+    ConfigStorage, FeatureFlag, Features, OnChainConfig, TimedFeatureFlag, TimedFeatures,
+};
 use move_binary_format::deserializer::DeserializerConfig;
 use move_bytecode_verifier::VerifierConfig;
 use move_vm_runtime::config::VMConfig;
@@ -83,5 +86,26 @@ pub fn aptos_prod_vm_config(
         type_base_cost,
         type_byte_cost,
         aggregator_v2_type_tagging,
+    }
+}
+
+/// A collection of on-chain randomness API configs that VM needs to be aware of.
+pub struct RandomnessConfig {
+    pub randomness_api_v0_required_deposit: Option<u64>,
+    pub allow_rand_contract_custom_max_gas: bool,
+}
+
+impl RandomnessConfig {
+    pub fn fetch(storage: &impl ConfigStorage) -> Self {
+        let randomness_api_v0_required_deposit = RequiredGasDeposit::fetch_config(storage)
+            .unwrap_or_else(RequiredGasDeposit::default_if_missing)
+            .gas_amount;
+        let allow_rand_contract_custom_max_gas = AllowCustomMaxGasFlag::fetch_config(storage)
+            .unwrap_or_else(AllowCustomMaxGasFlag::default_if_missing)
+            .value;
+        Self {
+            randomness_api_v0_required_deposit,
+            allow_rand_contract_custom_max_gas,
+        }
     }
 }

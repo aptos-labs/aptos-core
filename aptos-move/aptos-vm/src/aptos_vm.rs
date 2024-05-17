@@ -16,7 +16,6 @@ use crate::{
         },
         AptosMoveResolver, MoveVmExt, SessionExt, SessionId, UserTransactionContext,
     },
-    randomness_config::AptosVMRandomnessConfig,
     sharded_block_executor::{executor_client::ExecutorClient, ShardedBlockExecutor},
     system_module_names::*,
     transaction_metadata::TransactionMetadata,
@@ -64,7 +63,7 @@ use aptos_types::{
         TransactionAuxiliaryData, TransactionOutput, TransactionPayload, TransactionStatus,
         VMValidatorResult, ViewFunctionOutput, WriteSetPayload,
     },
-    vm::configs::aptos_prod_deserializer_config,
+    vm::configs::{aptos_prod_deserializer_config, RandomnessConfig},
     vm_status::{AbortLocation, StatusCode, VMStatus},
 };
 use aptos_utils::{aptos_try, return_on_failure};
@@ -225,7 +224,7 @@ pub struct AptosVM {
     timed_features: TimedFeatures,
     /// For a new chain, or even mainnet, the VK might not necessarily be set.
     pvk: Option<PreparedVerifyingKey<Bn254>>,
-    randomness_config: AptosVMRandomnessConfig,
+    randomness_config: RandomnessConfig,
 }
 
 impl AptosVM {
@@ -235,7 +234,7 @@ impl AptosVM {
     ) -> Self {
         let _timer = TIMER.timer_with(&["AptosVM::new"]);
         let features = Features::fetch_config(resolver).unwrap_or_default();
-        let randomness_config = AptosVMRandomnessConfig::fetch(resolver);
+        let randomness_config = RandomnessConfig::fetch(resolver);
         let (
             gas_params,
             storage_gas_params,
