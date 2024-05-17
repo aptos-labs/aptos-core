@@ -470,24 +470,26 @@ impl AptosVM {
         change_set_configs: &ChangeSetConfigs,
         traversal_context: &mut TraversalContext,
     ) -> (VMStatus, VMOutput) {
-        // Check if the gas meter's internal counters are consistent.
-        //
-        // Since we are already in the failure epilogue, there is not much we can do
-        // other than logging the inconsistency.
-        //
-        // This is a tradeoff. We have to either
-        //   1. Continue to calculate the gas cost based on the numbers we have.
-        //   2. Discard the transaction.
-        //
-        // Option (2) does not work, since it would enable DoS attacks.
-        // Option (1) is not ideal, but optimistically, it should allow the network
-        // to continue functioning, less the transactions that run into this problem.
-        if let Err(err) = gas_meter.algebra().check_consistency() {
-            println!(
-                "[aptos-vm][gas-meter][failure-epilogue] {}",
-                err.message()
-                    .unwrap_or("No message found -- this should not happen.")
-            );
+        if self.gas_feature_version >= 12 {
+            // Check if the gas meter's internal counters are consistent.
+            //
+            // Since we are already in the failure epilogue, there is not much we can do
+            // other than logging the inconsistency.
+            //
+            // This is a tradeoff. We have to either
+            //   1. Continue to calculate the gas cost based on the numbers we have.
+            //   2. Discard the transaction.
+            //
+            // Option (2) does not work, since it would enable DoS attacks.
+            // Option (1) is not ideal, but optimistically, it should allow the network
+            // to continue functioning, less the transactions that run into this problem.
+            if let Err(err) = gas_meter.algebra().check_consistency() {
+                println!(
+                    "[aptos-vm][gas-meter][failure-epilogue] {}",
+                    err.message()
+                        .unwrap_or("No message found -- this should not happen.")
+                );
+            }
         }
 
         let (txn_status, txn_aux_data) = TransactionStatus::from_vm_status(
@@ -702,17 +704,19 @@ impl AptosVM {
         change_set_configs: &ChangeSetConfigs,
         traversal_context: &mut TraversalContext,
     ) -> Result<(VMStatus, VMOutput), VMStatus> {
-        // Check if the gas meter's internal counters are consistent.
-        //
-        // It's better to fail the transaction due to invariant violation than to allow
-        // potentially bogus states to be committed.
-        if let Err(err) = gas_meter.algebra().check_consistency() {
-            println!(
-                "[aptos-vm][gas-meter][success-epilogue] {}",
-                err.message()
-                    .unwrap_or("No message found -- this should not happen.")
-            );
-            return Err(err.finish(Location::Undefined).into());
+        if self.gas_feature_version >= 12 {
+            // Check if the gas meter's internal counters are consistent.
+            //
+            // It's better to fail the transaction due to invariant violation than to allow
+            // potentially bogus states to be committed.
+            if let Err(err) = gas_meter.algebra().check_consistency() {
+                println!(
+                    "[aptos-vm][gas-meter][success-epilogue] {}",
+                    err.message()
+                        .unwrap_or("No message found -- this should not happen.")
+                );
+                return Err(err.finish(Location::Undefined).into());
+            }
         }
 
         let fee_statement = AptosVM::fee_statement_from_gas_meter(
