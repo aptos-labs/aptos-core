@@ -286,7 +286,7 @@ impl DagDriver {
                 },
                 Ok(Some(start_time)) => {
                     let sleep_time =
-                        Duration::from_millis(200).saturating_sub(start_time.elapsed());
+                        Duration::from_millis(100).saturating_sub(start_time.elapsed());
                     tokio::time::sleep(sleep_time).await;
                 },
                 Ok(None) => {},
