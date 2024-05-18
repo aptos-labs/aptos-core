@@ -37,10 +37,18 @@ module rewards::rewards {
         coin::value(rewards)
     }
 
+    #[view]
+    /// Returns if caller is authorised to perform the action.
+    public fun is_admin(admin: address): bool acquires RewardStore {
+        let rewards_store = borrow_global<RewardStore>(@rewards);
+        assert!(rewards_store.admin == admin, ENOT_AUTHORISED);
+        true
+    }
+
     /// Allow admin to upload rewards for multiple recipients.
     public entry fun add_rewards(admin: &signer, recipients: vector<address>, amounts: vector<u64>) acquires RewardStore {
+        is_admin(signer::address_of(admin));
         let rewards_store = borrow_global_mut<RewardStore>(@rewards);
-        assert!(rewards_store.admin == signer::address_of(admin), ENOT_AUTHORISED);
         vector::zip(recipients, amounts, |recipient, amount| {
             // Extract rewards from the admin's account.
             let reward = coin::withdraw<AptosCoin>(admin, amount);
@@ -54,9 +62,9 @@ module rewards::rewards {
     }
 
     public entry fun cancel_rewards(admin: &signer, recipients: vector<address>) acquires RewardStore {
-        let rewards_store = borrow_global_mut<RewardStore>(@rewards);
         let admin_addr = signer::address_of(admin);
-        assert!(rewards_store.admin == admin_addr, ENOT_AUTHORISED);
+        is_admin(admin_addr);
+        let rewards_store = borrow_global_mut<RewardStore>(@rewards);
         vector::for_each(recipients, |recipient| {
             let rewards = smart_table::remove(&mut rewards_store.rewards, recipient);
             aptos_account::deposit_coins(admin_addr, rewards);
@@ -70,6 +78,13 @@ module rewards::rewards {
         assert!(smart_table::contains(&rewards_store.rewards, user_address), ENO_REWARDS_TO_CLAIM);
         let rewards = smart_table::remove(&mut rewards_store.rewards, user_address);
         aptos_account::deposit_coins(user_address, rewards);
+    }
+
+    /// Transfer the admin role to a new address.
+    public entry fun transfer_admin_role(admin: &signer, new_admin: address) acquires RewardStore {
+        is_admin(signer::address_of(admin));
+        let rewards_store = borrow_global_mut<RewardStore>(@rewards);
+        rewards_store.admin = new_admin;
     }
 
     #[test_only]

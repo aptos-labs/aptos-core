@@ -8,13 +8,15 @@ module rewards::rewards_tests {
     use aptos_framework::stake;
     use rewards::rewards;
 
-    #[test(admin = @0xcafe, claimer_1 = @0xdead, claimer_2 = @0xbeef)]
-    fun test_e2e(admin: &signer, claimer_1: &signer, claimer_2: &signer) {
+    #[test(admin = @0xcafe, claimer_1 = @0xdead, claimer_2 = @0xbeef, admin_2 = @0xface)]
+    fun test_e2e(admin: &signer, claimer_1: &signer, claimer_2: &signer, admin_2: &signer) {
         stake::initialize_for_test(&account::create_signer_for_test(@0x1));
         rewards::init_for_test(admin);
-        // Initialize the admin account with 1000 coins.
+        // Initialize the admin and admin_2 account with 1000 coins each.
         let apt = stake::mint_coins(1000);
+        let apt_2 = stake::mint_coins(1000);
         aptos_account::deposit_coins(signer::address_of(admin), apt);
+        aptos_account::deposit_coins(signer::address_of(admin_2), apt_2);
 
         // Add rewards
         let claimer_1_addr = signer::address_of(claimer_1);
@@ -30,5 +32,10 @@ module rewards::rewards_tests {
         assert!(rewards::pending_rewards(claimer_1_addr) == 500, 0);
         rewards::claim_reward(claimer_1);
         assert!(coin::balance<AptosCoin>(claimer_1_addr) == 500, 0);
+
+        // Transfer Admin Role and add more rewards
+        let admin_2_addr = signer::address_of(admin_2);
+        rewards::transfer_admin_role(admin, admin_2_addr);
+        rewards::add_rewards(admin_2, vector[claimer_1_addr, claimer_2_addr], vector[500, 500]);
     }
 }
