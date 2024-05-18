@@ -26,14 +26,12 @@ fn test_put_get() {
     assert_eq!(db.get_all::<QCSchema>().unwrap().len(), 0);
 
     let qcs = vec![certificate_for_genesis()];
-    let wlis = vec![certificate_for_genesis().into_wrapped_ledger_info()];
 
-    db.save_blocks_and_quorum_certificates(blocks.clone(), qcs.clone(), wlis.clone())
+    db.save_blocks_and_quorum_certificates(blocks.clone(), qcs.clone())
         .unwrap();
 
     assert_eq!(db.get_all::<BlockSchema>().unwrap().len(), 1);
     assert_eq!(db.get_all::<QCSchema>().unwrap().len(), 1);
-    assert_eq!(db.get_all::<WLISchema>().unwrap().len(), 1);
 
     let tc = vec![0u8, 1, 2];
     db.save_highest_2chain_timeout_certificate(tc.clone())
@@ -42,10 +40,9 @@ fn test_put_get() {
     let vote = vec![2u8, 1, 0];
     db.save_vote(vote.clone()).unwrap();
 
-    let (vote_1, tc_1, blocks_1, qc_1, wli_1) = db.get_data().unwrap();
+    let (vote_1, tc_1, blocks_1, qc_1) = db.get_data().unwrap();
     assert_eq!(blocks, blocks_1);
     assert_eq!(qcs, qc_1);
-    assert_eq!(wlis, wli_1);
     assert_eq!(Some(tc), tc_1);
     assert_eq!(Some(vote), vote_1);
 
@@ -72,21 +69,15 @@ fn test_delete_block_and_qc() {
     let qcs = vec![certificate_for_genesis()];
     let qc_id = qcs[0].certified_block().id();
 
-    let wlis = vec![certificate_for_genesis().into_wrapped_ledger_info()];
-    let wli_id = wlis[0].ledger_info().ledger_info().consensus_block_id();
-
-    db.save_blocks_and_quorum_certificates(blocks, qcs, wlis)
-        .unwrap();
+    db.save_blocks_and_quorum_certificates(blocks, qcs).unwrap();
     assert_eq!(db.get_all::<BlockSchema>().unwrap().len(), 1);
     assert_eq!(db.get_all::<QCSchema>().unwrap().len(), 1);
-    assert_eq!(db.get_all::<WLISchema>().unwrap().len(), 1);
 
     // Start to delete
-    db.delete_blocks_and_quorum_certificates(vec![block_id, qc_id, wli_id])
+    db.delete_blocks_and_quorum_certificates(vec![block_id, qc_id])
         .unwrap();
     assert_eq!(db.get_all::<BlockSchema>().unwrap().len(), 0);
     assert_eq!(db.get_all::<QCSchema>().unwrap().len(), 0);
-    assert_eq!(db.get_all::<WLISchema>().unwrap().len(), 0);
 }
 
 fn test_dag_type<S: Schema<Key = K>, K: Eq + Hash>(key: S::Key, value: S::Value, db: &ConsensusDB) {
