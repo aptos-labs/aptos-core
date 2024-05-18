@@ -340,16 +340,19 @@ impl InMemDag {
                     let minority_strong_votes = validator_verifier
                         .check_aggregated_voting_power(*aggregated_strong_voting_power, false)
                         .is_ok();
-                    if super_majority_weak_votes && minority_strong_votes {
-                        ANCHOR_ORDER_TYPE.with_label_values(&[&"both"]).inc();
-                    } else if super_majority_weak_votes {
-                        ANCHOR_ORDER_TYPE.with_label_values(&[&"weak"]).inc();
-                    } else if minority_strong_votes {
-                        ANCHOR_ORDER_TYPE.with_label_values(&[&"strong"]).inc();
-                    }
                     if COUNT_WEAK_VOTES {
+                        if super_majority_weak_votes && minority_strong_votes {
+                            ANCHOR_ORDER_TYPE.with_label_values(&[&"both"]).inc();
+                        } else if super_majority_weak_votes {
+                            ANCHOR_ORDER_TYPE.with_label_values(&[&"weak"]).inc();
+                        } else if minority_strong_votes {
+                            ANCHOR_ORDER_TYPE.with_label_values(&[&"strong"]).inc();
+                        }
                         super_majority_weak_votes || minority_strong_votes
                     } else {
+                        if minority_strong_votes {
+                            ANCHOR_ORDER_TYPE.with_label_values(&[&"strong"]).inc();
+                        }
                         minority_strong_votes
                     }
                 },
