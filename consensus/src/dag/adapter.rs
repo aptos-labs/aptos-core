@@ -192,14 +192,14 @@ impl OrderedNotifier for OrderedNotifierAdapter {
         {
             let nodes = ordered_nodes.clone();
             let txn_timestamp_store = self.txn_timestamp_store.clone();
+            let now = SystemTime::now();
             tokio::task::spawn_blocking(move || {
-                for node in nodes {
+                nodes.par_iter().for_each(|node| {
                     let payload = node.payload();
                     let txns = match payload {
                         DirectMempool(txns) => txns,
                         _ => unreachable!("this should not happen"),
                     };
-                    let now = SystemTime::now();
                     txns.par_iter().with_min_len(10).for_each(|txn| {
                         if let Some((_, insertion_time)) =
                             txn_timestamp_store.remove(&txn.clone().committed_hash())
@@ -208,7 +208,7 @@ impl OrderedNotifier for OrderedNotifierAdapter {
                             TXN_ORDERED_LATENCY.observe(duration.as_secs_f64());
                         }
                     });
-                }
+                });
             });
         }
         {
