@@ -140,21 +140,26 @@ impl LedgerRecoveryData {
             .ok_or_else(|| format_err!("No QC found for root: {}", root_id))?
             .clone();
 
-        let root_ordered_cert = if order_vote_enabled {
-            WrappedLedgerInfo::new(VoteData::dummy(), self.storage_ledger.clone())
+        let (root_ordered_cert, root_commit_cert) = if order_vote_enabled {
+            // TODO: Using the same certificate for both ordered and commit. Need to find a better way.
+            (
+                WrappedLedgerInfo::new(VoteData::dummy(), latest_ledger_info_sig.clone()),
+                WrappedLedgerInfo::new(VoteData::dummy(), latest_ledger_info_sig.clone()),
+            )
         } else {
-            quorum_certs
+            let root_ordered_cert = quorum_certs
                 .iter()
                 .find(|qc| qc.commit_info().id() == root_block.id())
                 .ok_or_else(|| format_err!("No LI found for root: {}", root_id))?
                 .clone()
-                .into_wrapped_ledger_info()
+                .into_wrapped_ledger_info();
+            let root_commit_cert = root_ordered_cert
+                .create_merged_with_executed_state(latest_ledger_info_sig)
+                .expect("Inconsistent commit proof and evaluation decision, cannot commit block");
+            (root_ordered_cert, root_commit_cert)
         };
         info!("Consensus root block is {}", root_block);
 
-        let root_commit_cert = root_ordered_cert
-            .create_merged_with_executed_state(latest_ledger_info_sig)
-            .expect("Inconsistent commit proof and evaluation decision, cannot commit block");
         Ok(RootInfo(
             Box::new(root_block),
             root_quorum_cert,
