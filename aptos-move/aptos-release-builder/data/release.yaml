@@ -8,7 +8,11 @@ proposals:
       description: "Upgrades the gas schedule to version 18, enabling separate limits for governance proposals"
     execution_mode: MultiStep
     update_sequence:
-      - DefaultGas
+      - DefaultGasWithOverride:
+          feature_version: 17
+          overrides:
+            - name: "txn.max_execution_gas"
+              value: 4000000000
   - name: step_2_upgrade_framework
     metadata:
       title: "Multi-step proposal to upgrade mainnet framework to v1.13"
