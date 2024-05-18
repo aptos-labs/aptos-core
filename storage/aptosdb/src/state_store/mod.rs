@@ -64,7 +64,7 @@ use aptos_types::{
 };
 use claims::{assert_ge, assert_le};
 use rayon::prelude::*;
-use std::{collections::HashSet, ops::Deref, sync::Arc};
+use std::{collections::HashSet, convert::identity, ops::Deref, sync::Arc};
 
 pub(crate) mod buffered_state;
 mod state_merkle_batch_committer;
@@ -269,15 +269,19 @@ impl StateDb {
         state_key: &StateKey,
         version: Version,
     ) -> Result<StateValue> {
-        self.get_state_value_by_version(state_key, version)
-            .and_then(|opt| {
-                opt.ok_or_else(|| {
-                    AptosDbError::NotFound(format!(
-                        "State Value is missing for key {:?} by version {}",
-                        state_key, version
-                    ))
-                })
-            })
+        // if it's None, the key is missing from the DB
+        // if it's Some(None), it's a "tombstone" to mark a deletion
+        let opt_opt = self
+            .state_kv_db
+            .db_shard(state_key.get_shard_id())
+            .get::<StateValueSchema>(&(state_key.clone(), version))?;
+
+        opt_opt.and_then(identity).ok_or_else(|| {
+            AptosDbError::NotFound(format!(
+                "State Value is missing for key {:?} by version {}",
+                state_key, version
+            ))
+        })
     }
 }
 
@@ -1014,7 +1018,6 @@ impl StateStore {
         .take(chunk_size)
         .map(|it| it.map_err(Into::into));
         let state_key_values: Vec<(StateKey, StateValue)> = result_iter
-            .into_iter()
             .map(|res| {
                 res.and_then(|(_, (key, version))| {
                     Ok((key.clone(), self.expect_value_by_version(&key, version)?))

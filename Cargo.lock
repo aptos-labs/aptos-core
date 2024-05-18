@@ -1106,6 +1106,7 @@ dependencies = [
  "aptos-accumulator",
  "aptos-config",
  "aptos-crypto",
+ "aptos-db",
  "aptos-db-indexer",
  "aptos-executor",
  "aptos-executor-types",
