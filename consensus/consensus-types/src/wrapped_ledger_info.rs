@@ -54,6 +54,14 @@ impl WrappedLedgerInfo {
         }
     }
 
+    pub fn vote_data(&self) -> &VoteData {
+        &self.vote_data
+    }
+
+    pub fn certified_block(&self) -> &BlockInfo {
+        self.vote_data().proposed()
+    }
+
     pub fn ledger_info(&self) -> &LedgerInfoWithSignatures {
         &self.signed_ledger_info
     }

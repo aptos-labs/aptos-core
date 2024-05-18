@@ -364,7 +364,7 @@ impl NodeSetup {
     pub fn restart(self, playground: &mut NetworkPlayground, executor: Handle) -> Self {
         let recover_data = self
             .storage
-            .try_start()
+            .try_start(self.onchain_consensus_config.order_vote_enabled())
             .unwrap_or_else(|e| panic!("fail to restart due to: {}", e));
         Self::new(
             playground,

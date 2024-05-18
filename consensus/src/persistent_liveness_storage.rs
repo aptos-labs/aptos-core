@@ -7,7 +7,7 @@ use anyhow::{format_err, Context, Result};
 use aptos_config::config::NodeConfig;
 use aptos_consensus_types::{
     block::Block, quorum_cert::QuorumCert, timeout_2chain::TwoChainTimeoutCertificate, vote::Vote,
-    wrapped_ledger_info::WrappedLedgerInfo,
+    vote_data::VoteData, wrapped_ledger_info::WrappedLedgerInfo,
 };
 use aptos_crypto::HashValue;
 use aptos_logger::prelude::*;
@@ -24,13 +24,8 @@ use std::{cmp::max, collections::HashSet, fmt::Debug, sync::Arc};
 /// Blocks persisted are proposed but not yet committed.  The committed state is persisted
 /// via StateComputer.
 pub trait PersistentLivenessStorage: Send + Sync {
-    /// Persist the blocks, quorum certs and wrapped ledger infos into storage atomically.
-    fn save_tree(
-        &self,
-        blocks: Vec<Block>,
-        quorum_certs: Vec<QuorumCert>,
-        wraped_ledger_infos: Vec<WrappedLedgerInfo>,
-    ) -> Result<()>;
+    /// Persist the blocks, quorum cert into storage atomically.
+    fn save_tree(&self, blocks: Vec<Block>, quorum_certs: Vec<QuorumCert>) -> Result<()>;
 
     /// Delete the corresponding blocks and quorum certs atomically.
     fn prune_tree(&self, block_ids: Vec<HashValue>) -> Result<()>;
@@ -42,7 +37,7 @@ pub trait PersistentLivenessStorage: Send + Sync {
     fn recover_from_ledger(&self) -> LedgerRecoveryData;
 
     /// Construct necessary data to start consensus.
-    fn start(&self) -> LivenessStorageData;
+    fn start(&self, order_vote_enabled: bool) -> LivenessStorageData;
 
     /// Persist the highest 2chain timeout certificate for improved liveness - proof for other replicas
     /// to jump to this round
@@ -103,7 +98,7 @@ impl LedgerRecoveryData {
         &self,
         blocks: &mut Vec<Block>,
         quorum_certs: &mut Vec<QuorumCert>,
-        wrapped_ledger_infos: &mut [WrappedLedgerInfo],
+        order_vote_enabled: bool,
     ) -> Result<RootInfo> {
         info!(
             "The last committed block id as recorded in storage: {}",
@@ -144,19 +139,17 @@ impl LedgerRecoveryData {
             .find(|qc| qc.certified_block().id() == root_block.id())
             .ok_or_else(|| format_err!("No QC found for root: {}", root_id))?
             .clone();
-        let root_ordered_cert = quorum_certs
-            .iter()
-            .find(|qc| qc.commit_info().id() == root_block.id())
-            .map(|qc| qc.into_wrapped_ledger_info())
-            .or_else(|| {
-                wrapped_ledger_infos
-                    .iter()
-                    .find(|wli| wli.ledger_info().ledger_info().consensus_block_id() == root_id)
-                    .cloned()
-            })
-            .ok_or_else(|| format_err!("No LI found for root: {}", root_id))?
-            .clone();
 
+        let root_ordered_cert = if order_vote_enabled {
+            WrappedLedgerInfo::new(VoteData::dummy(), self.storage_ledger.clone())
+        } else {
+            quorum_certs
+                .iter()
+                .find(|qc| qc.commit_info().id() == root_block.id())
+                .ok_or_else(|| format_err!("No LI found for root: {}", root_id))?
+                .clone()
+                .into_wrapped_ledger_info()
+        };
         info!("Consensus root block is {}", root_block);
 
         let root_commit_cert = root_ordered_cert
@@ -227,10 +220,10 @@ impl RecoveryData {
         root_metadata: RootMetadata,
         mut quorum_certs: Vec<QuorumCert>,
         highest_2chain_timeout_cert: Option<TwoChainTimeoutCertificate>,
-        mut wrapped_ledger_infos: Vec<WrappedLedgerInfo>,
+        order_vote_enabled: bool,
     ) -> Result<Self> {
         let root = ledger_recovery_data
-            .find_root(&mut blocks, &mut quorum_certs, &mut wrapped_ledger_infos)
+            .find_root(&mut blocks, &mut quorum_certs, order_vote_enabled)
             .with_context(|| {
                 // for better readability
                 blocks.sort_by_key(|block| block.round());
@@ -346,17 +339,10 @@ impl StorageWriteProxy {
 }
 
 impl PersistentLivenessStorage for StorageWriteProxy {
-    fn save_tree(
-        &self,
-        blocks: Vec<Block>,
-        quorum_certs: Vec<QuorumCert>,
-        wrapped_ledger_infos: Vec<WrappedLedgerInfo>,
-    ) -> Result<()> {
-        Ok(self.db.save_blocks_and_quorum_certificates(
-            blocks,
-            quorum_certs,
-            wrapped_ledger_infos,
-        )?)
+    fn save_tree(&self, blocks: Vec<Block>, quorum_certs: Vec<QuorumCert>) -> Result<()> {
+        Ok(self
+            .db
+            .save_blocks_and_quorum_certificates(blocks, quorum_certs)?)
     }
 
     fn prune_tree(&self, block_ids: Vec<HashValue>) -> Result<()> {
@@ -379,7 +365,7 @@ impl PersistentLivenessStorage for StorageWriteProxy {
         LedgerRecoveryData::new(latest_ledger_info)
     }
 
-    fn start(&self) -> LivenessStorageData {
+    fn start(&self, order_vote_enabled: bool) -> LivenessStorageData {
         info!("Start consensus recovery.");
         let raw_data = self
             .db
@@ -395,7 +381,6 @@ impl PersistentLivenessStorage for StorageWriteProxy {
         });
         let blocks = raw_data.2;
         let quorum_certs: Vec<_> = raw_data.3;
-        let wrapped_ledger_infos = raw_data.4;
         let blocks_repr: Vec<String> = blocks.iter().map(|b| format!("\n\t{}", b)).collect();
         info!(
             "The following blocks were restored from ConsensusDB : {}",
@@ -408,14 +393,6 @@ impl PersistentLivenessStorage for StorageWriteProxy {
         info!(
             "The following quorum certs were restored from ConsensusDB: {}",
             qc_repr.concat()
-        );
-        let wli_repr: Vec<String> = wrapped_ledger_infos
-            .iter()
-            .map(|wli| format!("\n\t{}", wli))
-            .collect();
-        info!(
-            "The following wrapped ledger infos were restored from ConsensusDB: {}",
-            wli_repr.concat()
         );
         // find the block corresponding to storage latest ledger info
         let latest_ledger_info = self
@@ -435,7 +412,7 @@ impl PersistentLivenessStorage for StorageWriteProxy {
             accumulator_summary.into(),
             quorum_certs,
             highest_2chain_timeout_cert,
-            wrapped_ledger_infos,
+            order_vote_enabled,
         ) {
             Ok(mut initial_data) => {
                 (self as &dyn PersistentLivenessStorage)

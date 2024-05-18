@@ -105,7 +105,6 @@ impl BlockStore {
         self.sync_to_highest_quorum_cert(
             sync_info.highest_quorum_cert().clone(),
             sync_info.highest_commit_cert().clone(),
-            sync_info.highest_ordered_cert().clone(),
             &mut retriever,
         )
         .await?;
@@ -316,7 +315,6 @@ impl BlockStore {
         &self,
         highest_quorum_cert: QuorumCert,
         highest_commit_cert: WrappedLedgerInfo,
-        highest_ordered_cert: WrappedLedgerInfo,
         retriever: &mut BlockRetriever,
     ) -> anyhow::Result<()> {
         if !self.need_sync_for_ledger_info(highest_commit_cert.ledger_info()) {
@@ -325,11 +323,11 @@ impl BlockStore {
         let (root, root_metadata, blocks, quorum_certs) = Self::fast_forward_sync(
             &highest_quorum_cert,
             &highest_commit_cert,
-            &highest_ordered_cert,
             retriever,
             self.storage.clone(),
             self.execution_client.clone(),
             self.payload_manager.clone(),
+            self.order_vote_enabled,
         )
         .await?
         .take();
@@ -362,11 +360,11 @@ impl BlockStore {
     pub async fn fast_forward_sync<'a>(
         highest_quorum_cert: &'a QuorumCert,
         highest_commit_cert: &'a WrappedLedgerInfo,
-        highest_ordered_cert: &'a WrappedLedgerInfo,
         retriever: &'a mut BlockRetriever,
         storage: Arc<dyn PersistentLivenessStorage>,
         execution_client: Arc<dyn TExecutionClient>,
         payload_manager: Arc<PayloadManager>,
+        order_vote_enabled: bool,
     ) -> anyhow::Result<RecoveryData> {
         info!(
             LogSchema::new(LogEvent::StateSync).remote_peer(retriever.preferred_peer),
@@ -383,7 +381,7 @@ impl BlockStore {
         // although unlikely, we might wrap num_blocks around on a 32-bit machine
         assert!(num_blocks < std::usize::MAX as u64);
 
-        let blocks = retriever
+        let mut blocks = retriever
             .retrieve_blocks_in_range(
                 highest_quorum_cert.certified_block().id(),
                 num_blocks,
@@ -416,6 +414,43 @@ impl BlockStore {
                 .map(|block| block.quorum_cert().clone()),
         );
 
+        if !order_vote_enabled {
+            // check if highest_commit_cert comes from a fork
+            // if so, we need to fetch it's block as well, to have a proof of commit.
+            if !blocks
+                .iter()
+                .any(|block| block.id() == highest_commit_cert.certified_block().id())
+            {
+                info!(
+                    "Found forked QC {}, fetching it as well",
+                    highest_commit_cert
+                );
+                let mut additional_blocks = retriever
+                    .retrieve_blocks_in_range(
+                        highest_commit_cert.certified_block().id(),
+                        1,
+                        highest_commit_cert.certified_block().id(),
+                        highest_commit_cert
+                            .ledger_info()
+                            .get_voters(&retriever.validator_addresses()),
+                    )
+                    .await?;
+
+                assert_eq!(additional_blocks.len(), 1);
+                let block = additional_blocks.pop().expect("blocks are empty");
+                assert_eq!(
+                    block.id(),
+                    highest_commit_cert.certified_block().id(),
+                    "Expecting in the retrieval response, for commit certificate fork, first block should be {}, but got {}",
+                    highest_commit_cert.certified_block().id(),
+                    block.id(),
+                );
+
+                blocks.push(block);
+                quorum_certs.push(highest_commit_cert.clone().into_quorum_cert());
+            }
+        }
+
         assert_eq!(blocks.len(), quorum_certs.len());
         info!("Fetched {} blocks. Requested num_blocks {}. Initial block hash {:?}, target block hash {:?}", blocks.len(), num_blocks, highest_quorum_cert.certified_block().id(), highest_commit_cert.commit_info().id());
         for (i, block) in blocks.iter().enumerate() {
@@ -433,9 +468,11 @@ impl BlockStore {
 
         // Check early that recovery will succeed, and return before corrupting our state in case it will not.
         LedgerRecoveryData::new(highest_commit_cert.ledger_info().clone())
-            .find_root(&mut blocks.clone(), &mut quorum_certs.clone(), &mut vec![
-                highest_ordered_cert.clone(),
-            ])
+            .find_root(
+                &mut blocks.clone(),
+                &mut quorum_certs.clone(),
+                order_vote_enabled,
+            )
             .with_context(|| {
                 // for better readability
                 quorum_certs.sort_by_key(|qc| qc.certified_block().round());
@@ -455,9 +492,7 @@ impl BlockStore {
                 )
             })?;
 
-        storage.save_tree(blocks.clone(), quorum_certs.clone(), vec![
-            highest_ordered_cert.clone(),
-        ])?;
+        storage.save_tree(blocks.clone(), quorum_certs.clone())?;
 
         execution_client
             .sync_to(highest_commit_cert.ledger_info().clone())
@@ -466,7 +501,7 @@ impl BlockStore {
         // we do not need to update block_tree.highest_commit_decision_ledger_info here
         // because the block_tree is going to rebuild itself.
 
-        let recovery_data = match storage.start() {
+        let recovery_data = match storage.start(order_vote_enabled) {
             LivenessStorageData::FullRecoveryData(recovery_data) => recovery_data,
             _ => panic!("Failed to construct recovery data after fast forward sync"),
         };

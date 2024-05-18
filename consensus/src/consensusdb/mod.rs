@@ -6,12 +6,9 @@
 mod consensusdb_test;
 mod schema;
 
-use self::schema::wrapped_ledger_info::WLISchema;
 use crate::error::DbError;
 use anyhow::Result;
-use aptos_consensus_types::{
-    block::Block, quorum_cert::QuorumCert, wrapped_ledger_info::WrappedLedgerInfo,
-};
+use aptos_consensus_types::{block::Block, quorum_cert::QuorumCert};
 use aptos_crypto::HashValue;
 use aptos_logger::prelude::*;
 use aptos_schemadb::{
@@ -26,7 +23,7 @@ pub use schema::{
 use schema::{
     single_entry::{SingleEntryKey, SingleEntrySchema},
     BLOCK_CF_NAME, CERTIFIED_NODE_CF_NAME, DAG_VOTE_CF_NAME, NODE_CF_NAME, QC_CF_NAME,
-    SINGLE_ENTRY_CF_NAME, WLI_CF_NAME,
+    SINGLE_ENTRY_CF_NAME,
 };
 use std::{iter::Iterator, path::Path, time::Instant};
 
@@ -63,7 +60,6 @@ impl ConsensusDB {
             NODE_CF_NAME,
             CERTIFIED_NODE_CF_NAME,
             DAG_VOTE_CF_NAME,
-            WLI_CF_NAME,
             "ordered_anchor_id", // deprecated CF
         ];
 
@@ -91,7 +87,6 @@ impl ConsensusDB {
         Option<Vec<u8>>,
         Vec<Block>,
         Vec<QuorumCert>,
-        Vec<WrappedLedgerInfo>,
     )> {
         let last_vote = self.get_last_vote()?;
         let highest_2chain_timeout_certificate = self.get_highest_2chain_timeout_certificate()?;
@@ -105,17 +100,11 @@ impl ConsensusDB {
             .into_iter()
             .map(|(_, qc)| qc)
             .collect();
-        let consensus_wlis = self
-            .get_all::<WLISchema>()?
-            .into_iter()
-            .map(|(_, wli)| wli)
-            .collect();
         Ok((
             last_vote,
             highest_2chain_timeout_certificate,
             consensus_blocks,
             consensus_qcs,
-            consensus_wlis,
         ))
     }
 
@@ -136,13 +125,9 @@ impl ConsensusDB {
         &self,
         block_data: Vec<Block>,
         qc_data: Vec<QuorumCert>,
-        wli_data: Vec<WrappedLedgerInfo>,
     ) -> Result<(), DbError> {
-        if block_data.is_empty() && qc_data.is_empty() && wli_data.is_empty() {
-            return Err(anyhow::anyhow!(
-                "Consensus blocks, qc data and wrapped ledger info data are empty!"
-            )
-            .into());
+        if block_data.is_empty() && qc_data.is_empty() {
+            return Err(anyhow::anyhow!("Consensus blocks and qc data are empty!").into());
         }
         let batch = SchemaBatch::new();
         block_data
@@ -151,9 +136,6 @@ impl ConsensusDB {
         qc_data
             .iter()
             .try_for_each(|qc| batch.put::<QCSchema>(&qc.certified_block().id(), qc))?;
-        wli_data.iter().try_for_each(|wli| {
-            batch.put::<WLISchema>(&wli.ledger_info().ledger_info().consensus_block_id(), wli)
-        })?;
         self.commit(batch)
     }
 
@@ -167,8 +149,7 @@ impl ConsensusDB {
         let batch = SchemaBatch::new();
         block_ids.iter().try_for_each(|hash| {
             batch.delete::<BlockSchema>(hash)?;
-            batch.delete::<QCSchema>(hash)?;
-            batch.delete::<WLISchema>(hash)
+            batch.delete::<QCSchema>(hash)
         })?;
         self.commit(batch)
     }
