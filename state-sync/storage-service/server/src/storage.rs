@@ -3,7 +3,7 @@
 
 use crate::{error::Error, metrics::increment_network_frame_overflow};
 use aptos_config::config::StorageServiceConfig;
-use aptos_logger::debug;
+use aptos_logger::{debug, info};
 use aptos_storage_interface::{AptosDbError, DbReader, Result as StorageResult};
 use aptos_storage_service_types::responses::{
     CompleteDataRange, DataResponse, DataSummary, TransactionOrOutputListWithProof,
@@ -18,7 +18,7 @@ use aptos_types::{
     transaction::{TransactionListWithProof, TransactionOutputListWithProof, Version},
 };
 use serde::Serialize;
-use std::{cmp::min, sync::Arc};
+use std::{cmp::min, sync::Arc, time::Instant};
 
 /// The interface into local storage (e.g., the Aptos DB) used by the storage
 /// server to handle client requests and responses.
@@ -477,6 +477,10 @@ impl StorageReaderInterface for StorageReader {
         while state_values.len() < num_state_values_to_fetch
             && serialized_state_value_size < self.config.max_network_chunk_bytes
         {
+            // Get the current timestamp
+            let current_timestamp = Instant::now();
+
+            // Process the next state value
             match state_value_iterator.next() {
                 Some(Ok(state_value)) => {
                     // Calculate the number of serialized bytes
@@ -486,6 +490,17 @@ impl StorageReaderInterface for StorageReader {
                     // Add the state value to the list and increment the serialized size
                     state_values.push(state_value);
                     serialized_state_value_size += num_serialized_bytes;
+
+                    // Calculate the duration of the state value fetch
+                    let duration = current_timestamp.elapsed();
+
+                    // Log the size and duration of the state value fetch
+                    info!(
+                        "Fetched state value: size: {:?} bytes, duration: {:?}, index: {:?}",
+                        num_serialized_bytes,
+                        duration,
+                        start_index + (state_values.len() as u64)
+                    );
                 },
                 Some(Err(error)) => {
                     // The iterator encountered an error
