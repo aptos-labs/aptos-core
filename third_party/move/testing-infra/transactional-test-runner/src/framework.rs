@@ -951,7 +951,8 @@ fn compile_ir_module<'a>(
 ) -> Result<CompiledModule> {
     use move_ir_compiler::Compiler as IRCompiler;
     let code = std::fs::read_to_string(file_name).unwrap();
-    IRCompiler::new(deps.collect()).into_compiled_module(&code)
+    let module = IRCompiler::new(deps.collect()).into_compiled_module(&code)?;
+    Ok(module)
 }
 
 fn compile_ir_script<'a>(
