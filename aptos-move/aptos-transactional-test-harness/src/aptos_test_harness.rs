@@ -29,6 +29,7 @@ use aptos_types::{
 use aptos_vm::{AptosVM, VMExecutor};
 use aptos_vm_genesis::GENESIS_KEYPAIR;
 use clap::Parser;
+use codespan_reporting::{diagnostic::Severity, term::termcolor::Buffer};
 use move_binary_format::file_format::{CompiledModule, CompiledScript};
 use move_bytecode_verifier::verify_module;
 use move_command_line_common::{
@@ -37,7 +38,11 @@ use move_command_line_common::{
     files::verify_and_create_named_address_mapping,
     testing::{EXP_EXT, EXP_EXT_V2},
 };
-use move_compiler::{self, shared::PackagePaths, FullyCompiledProgram};
+use move_compiler::{
+    self,
+    shared::{string_packagepath_to_symbol_packagepath, NumericalAddress, PackagePaths},
+    FullyCompiledProgram,
+};
 use move_core_types::{
     account_address::AccountAddress,
     identifier::{IdentStr, Identifier},
@@ -48,6 +53,8 @@ use move_core_types::{
     value::{MoveTypeLayout, MoveValue},
 };
 use move_model::metadata::LanguageVersion;
+use move_resource_viewer::{AnnotatedMoveValue, MoveValueAnnotator};
+use move_symbol_pool::Symbol as MoveSymbol;
 use move_transactional_test_runner::{
     framework::{run_test_impl, CompiledState, MoveTestAdapter},
     tasks::{InitCommand, SyntaxChoice, TaskInput},
@@ -63,6 +70,7 @@ use std::{
     string::String,
     sync::Arc,
 };
+use tempfile::NamedTempFile;
 
 /**
  * Definitions
@@ -290,32 +298,35 @@ fn panic_missing_private_key(cmd_name: &str) -> ! {
     )
 }
 
-static PRECOMPILED_APTOS_FRAMEWORK_V1: Lazy<Option<FullyCompiledProgram>> = Lazy::new(|| {
-    if get_move_compiler_block_v1_from_env() {
-        return None;
-    }
-    let deps = vec![PackagePaths {
-        name: None,
-        paths: aptos_cached_packages::head_release_bundle()
-            .files()
-            .unwrap(),
-        named_address_map: aptos_framework::named_addresses().clone(),
-    }];
-    let program_res = move_compiler::construct_pre_compiled_lib(
-        deps,
-        None,
-        move_compiler::Flags::empty().set_sources_shadow_deps(false),
-        aptos_framework::extended_checks::get_all_attribute_names(),
-    )
-    .unwrap();
-    match program_res {
-        Ok(af) => Some(af),
-        Err((files, errors)) => {
-            eprintln!("!!!Aptos Framework failed to compile!!!");
-            move_compiler::diagnostics::report_diagnostics(&files, errors)
-        },
-    }
-});
+static PRECOMPILED_APTOS_FRAMEWORK_V1: Lazy<Option<(FullyCompiledProgram, Vec<PackagePaths>)>> =
+    Lazy::new(|| {
+        if get_move_compiler_block_v1_from_env() {
+            return None;
+        }
+        let lib_paths = PackagePaths {
+            name: None,
+            paths: aptos_cached_packages::head_release_bundle()
+                .files()
+                .unwrap(),
+            named_address_map: aptos_framework::named_addresses().clone(),
+        };
+        let lib_paths_movesym =
+            string_packagepath_to_symbol_packagepath::<NumericalAddress>(&lib_paths);
+        let program_res = move_compiler::construct_pre_compiled_lib(
+            vec![lib_paths],
+            None,
+            move_compiler::Flags::empty().set_sources_shadow_deps(false),
+            aptos_framework::extended_checks::get_all_attribute_names(),
+        )
+        .unwrap();
+        match program_res {
+            Ok(af) => Some((af, vec![lib_paths_movesym])),
+            Err((files, errors)) => {
+                eprintln!("!!!Aptos Framework failed to compile!!!");
+                move_compiler::diagnostics::report_diagnostics(&files, errors)
+            },
+        }
+    });
 
 static APTOS_FRAMEWORK_FILES: Lazy<Vec<String>> = Lazy::new(|| {
     aptos_cached_packages::head_release_bundle()
@@ -601,7 +612,7 @@ impl<'a> MoveTestAdapter<'a> for AptosTestAdapter<'a> {
         default_syntax: SyntaxChoice,
         comparison_mode: bool,
         run_config: TestRunConfig,
-        pre_compiled_deps_v1: Option<&'a FullyCompiledProgram>,
+        pre_compiled_deps_v1: Option<&'a (FullyCompiledProgram, Vec<PackagePaths>)>,
         pre_compiled_deps_v2: Option<&'a PrecompiledFilesModules>,
         task_opt: Option<TaskInput<(InitCommand, Self::ExtraInitArgs)>>,
     ) -> (Self, Option<String>) {
@@ -678,6 +689,93 @@ impl<'a> MoveTestAdapter<'a> for AptosTestAdapter<'a> {
         }
 
         (adapter, None)
+    }
+
+    fn compile_module(
+        &mut self,
+        syntax: SyntaxChoice,
+        data: Option<NamedTempFile>,
+        start_line: usize,
+        command_lines_stop: usize,
+    ) -> Result<(
+        NamedTempFile,
+        Option<MoveSymbol>,
+        CompiledModule,
+        Option<String>,
+    )> {
+        let (data, named_addr_opt, module, opt_model, warnings_opt) =
+            self.compile_module_default(syntax, data, start_line, command_lines_stop, true)?;
+        let warnings_opt = match (syntax, opt_model) {
+            (SyntaxChoice::IR, _) => warnings_opt,
+            (_, Some(model)) => {
+                let _runtime_metadata =
+                    aptos_framework::extended_checks::run_extended_checks(&model);
+                // TODO(#13327): call inject_runtime_metadata in built_package.rs?  what file?
+                if model.diag_count(Severity::Warning) > 0 {
+                    let mut error_writer = Buffer::no_color();
+                    model.report_diag(&mut error_writer, Severity::Warning);
+                    let extended_warnings =
+                        String::from_utf8_lossy(&error_writer.into_inner()).to_string();
+                    if model.has_errors() {
+                        bail!("extended checks failed:\n\n{}", extended_warnings);
+                    };
+                    match warnings_opt {
+                        Some(warnings) => Some(warnings + &extended_warnings),
+                        None => Some(extended_warnings),
+                    }
+                } else {
+                    warnings_opt
+                }
+            },
+            (_, None) => {
+                bail!(
+                    "Cannot run extended checks, no model:\n\n{}",
+                    warnings_opt.unwrap_or_else(|| "No compiler warnings".to_string())
+                );
+            },
+        };
+        Ok((data, named_addr_opt, module, warnings_opt))
+    }
+
+    fn compile_script(
+        &mut self,
+        syntax: SyntaxChoice,
+        data: Option<NamedTempFile>,
+        start_line: usize,
+        command_lines_stop: usize,
+    ) -> Result<(CompiledScript, Option<String>)> {
+        let (compiled_script, opt_model, warnings_opt) =
+            self.compile_script_default(syntax, data, start_line, command_lines_stop, true)?;
+        let warnings_opt = match (syntax, opt_model) {
+            (SyntaxChoice::IR, _) => warnings_opt,
+            (_, Some(model)) => {
+                let _runtime_metadata =
+                    aptos_framework::extended_checks::run_extended_checks(&model);
+                // TODO(#13327): call inject_runtime_metadata in built_package.rs?  what file?
+                if model.diag_count(Severity::Warning) > 0 {
+                    let mut error_writer = Buffer::no_color();
+                    model.report_diag(&mut error_writer, Severity::Warning);
+                    let extended_warnings =
+                        String::from_utf8_lossy(&error_writer.into_inner()).to_string();
+                    if model.has_errors() {
+                        bail!("extended checks failed:\n\n{}", extended_warnings);
+                    };
+                    match warnings_opt {
+                        Some(warnings) => Some(warnings + &extended_warnings),
+                        None => Some(extended_warnings),
+                    }
+                } else {
+                    warnings_opt
+                }
+            },
+            (_, None) => {
+                bail!(
+                    "Cannot run extended checks, no model:\n\n{}",
+                    warnings_opt.unwrap_or_else(|| "No compiler warnings".to_string())
+                );
+            },
+        };
+        Ok((compiled_script, warnings_opt))
     }
 
     fn publish_module(
@@ -1003,7 +1101,7 @@ fn render_events(events: &[ContractEvent]) -> Option<String> {
 
 fn precompiled_v1_stdlib_if_needed(
     config: &TestRunConfig,
-) -> Option<&'static FullyCompiledProgram> {
+) -> Option<&'static (FullyCompiledProgram, Vec<PackagePaths>)> {
     match config {
         TestRunConfig::CompilerV1 { .. } => PRECOMPILED_APTOS_FRAMEWORK_V1.as_ref(),
         TestRunConfig::ComparisonV1V2 { .. } => PRECOMPILED_APTOS_FRAMEWORK_V1.as_ref(),
@@ -1031,10 +1129,13 @@ pub fn run_aptos_test_with_config(
 ) -> Result<(), Box<dyn std::error::Error>> {
     let (suffix, config) =
         if get_move_compiler_v2_from_env() && !matches!(config, TestRunConfig::CompilerV2 { .. }) {
-            (Some(EXP_EXT_V2.to_owned()), TestRunConfig::CompilerV2 {
-                language_version: LanguageVersion::default(),
-                v2_experiments: vec![],
-            })
+            (
+                Some(EXP_EXT_V2.to_owned()),
+                TestRunConfig::CompilerV2 {
+                    language_version: LanguageVersion::default(),
+                    v2_experiments: vec![("attach-compiled-module".to_owned(), true)],
+                },
+            )
         } else {
             (Some(EXP_EXT.to_owned()), config)
         };
