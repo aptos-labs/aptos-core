@@ -3,7 +3,7 @@
 
 use crate::{error::Error, metrics::increment_network_frame_overflow};
 use aptos_config::config::StorageServiceConfig;
-use aptos_logger::debug;
+use aptos_logger::{debug, info};
 use aptos_storage_interface::{AptosDbError, DbReader, Result as StorageResult};
 use aptos_storage_service_types::responses::{
     CompleteDataRange, DataResponse, DataSummary, TransactionOrOutputListWithProof,
@@ -11,11 +11,18 @@ use aptos_storage_service_types::responses::{
 use aptos_types::{
     epoch_change::EpochChangeProof,
     ledger_info::LedgerInfoWithSignatures,
-    state_store::state_value::StateValueChunkWithProof,
+    state_store::{
+        state_key::StateKey,
+        state_value::{StateValue, StateValueChunkWithProof},
+    },
     transaction::{TransactionListWithProof, TransactionOutputListWithProof, Version},
 };
 use serde::Serialize;
-use std::{cmp::min, sync::Arc};
+use std::{
+    cmp::min,
+    sync::Arc,
+    time::{Duration, Instant},
+};
 
 /// The interface into local storage (e.g., the Aptos DB) used by the storage
 /// server to handle client requests and responses.
@@ -457,46 +464,100 @@ impl StorageReaderInterface for StorageReader {
         // Calculate the number of state values to fetch
         let expected_num_state_values = inclusive_range_len(start_index, end_index)?;
         let max_num_state_values = self.config.max_state_chunk_size;
-        let mut num_state_values_to_fetch = min(expected_num_state_values, max_num_state_values);
+        let num_state_values_to_fetch =
+            min(expected_num_state_values, max_num_state_values) as usize;
 
-        // Attempt to serve the request
-        while num_state_values_to_fetch >= 1 {
-            let state_value_chunk_with_proof = self
-                .storage
-                .get_state_value_chunk_with_proof(
-                    version,
-                    start_index as usize,
-                    num_state_values_to_fetch as usize,
-                )
-                .map_err(|error| Error::StorageErrorEncountered(error.to_string()))?;
-            if num_state_values_to_fetch == 1 {
-                return Ok(state_value_chunk_with_proof); // We cannot return less than a single item
-            }
+        // Get the state value chunk iterator
+        let mut state_value_iterator = self
+            .storage
+            .get_state_value_chunk_iter(version, start_index as usize, num_state_values_to_fetch)
+            .map_err(|error| Error::StorageErrorEncountered(error.to_string()))?;
 
-            // Attempt to divide up the request if it overflows the message size
-            let (overflow_frame, num_bytes) = check_overflow_network_frame(
-                &state_value_chunk_with_proof,
-                self.config.max_network_chunk_bytes,
-            )?;
-            if !overflow_frame {
-                return Ok(state_value_chunk_with_proof);
-            } else {
-                increment_network_frame_overflow(
-                    DataResponse::StateValueChunkWithProof(state_value_chunk_with_proof)
-                        .get_label(),
-                );
-                let new_num_state_values_to_fetch = num_state_values_to_fetch / 2;
-                debug!("The request for {:?} state values was too large (num bytes: {:?}). Retrying with {:?}.",
-                    num_state_values_to_fetch, num_bytes, new_num_state_values_to_fetch);
-                num_state_values_to_fetch = new_num_state_values_to_fetch; // Try again with half the amount of data
+        // Initialize the state values, storage read time and serialized data size
+        let mut state_values = vec![];
+        let mut total_storage_read_duration = Duration::from_millis(0);
+        let mut serialized_state_value_size = 0;
+
+        // Generate a random number to track the request
+        let request_identifier = rand::random::<u64>();
+
+        // Log the request
+        info!(
+            "(Request: {:?}) Fetching state values: version: {:?}, start index: {:?}, end index: {:?}",
+            request_identifier, version, start_index, end_index
+        );
+
+        // Fetch as many state values as possible without exceeding the
+        // network frame size or the max storage read time.
+        while state_values.len() < num_state_values_to_fetch
+            && serialized_state_value_size < self.config.max_network_chunk_bytes
+            && total_storage_read_duration.as_millis()
+                < self.config.max_total_storage_read_time_ms as u128
+        {
+            // Get the current timestamp
+            let current_timestamp = Instant::now();
+
+            // Process the next state value
+            match state_value_iterator.next() {
+                Some(Ok(state_value)) => {
+                    // Calculate the number of serialized bytes
+                    let num_serialized_bytes = get_num_serialized_bytes(&state_value)
+                        .map_err(|error| Error::UnexpectedErrorEncountered(error.to_string()))?;
+
+                    // Calculate the duration of the state value fetch
+                    let storage_read_duration = current_timestamp.elapsed();
+
+                    // Add the state value to the list
+                    state_values.push(state_value);
+
+                    // Update the total serialized data size
+                    serialized_state_value_size += num_serialized_bytes;
+
+                    // Update the total storage read duration
+                    if let Some(total_duration) =
+                        total_storage_read_duration.checked_add(storage_read_duration)
+                    {
+                        total_storage_read_duration = total_duration;
+                    } else {
+                        break; // The total duration has overflowed
+                    }
+
+                    // Log the size and duration of the state value fetch
+                    info!(
+                        "(Request: {:?}) Fetched state value: size: {:?} bytes, duration: {:?}, index: {:?}",
+                        request_identifier,
+                        num_serialized_bytes,
+                        storage_read_duration,
+                        start_index + (state_values.len() as u64)
+                    );
+                },
+                Some(Err(error)) => {
+                    // The iterator encountered an error
+                    return Err(Error::StorageErrorEncountered(error.to_string()));
+                },
+                None => {
+                    break; // No more state values to fetch
+                },
             }
         }
 
-        Err(Error::UnexpectedErrorEncountered(format!(
-            "Unable to serve the get_state_value_chunk_with_proof request! Version: {:?}, \
-            start index: {:?}, end index: {:?}. The data cannot fit into a single network frame!",
-            version, start_index, end_index
-        )))
+        // Log if the data was truncated
+        if state_values.len() < num_state_values_to_fetch {
+            info!(
+                "(Request: {:?}) The state value fetch was truncated: expected: {:?}, actual: {:?}, total duration: {:?}",
+                request_identifier,
+                num_state_values_to_fetch,
+                state_values.len(),
+                total_storage_read_duration,
+            );
+        }
+
+        // Create the state value chunk with proof
+        let state_value_chunk_with_proof = self
+            .storage
+            .get_state_value_chunk_proof(version, start_index as usize, state_values)
+            .map_err(|error| Error::StorageErrorEncountered(error.to_string()))?;
+        Ok(state_value_chunk_with_proof)
     }
 }
 
@@ -578,6 +639,20 @@ impl DbReader for TimedStorageReader {
             start_idx: usize,
             chunk_size: usize,
         ) -> StorageResult<StateValueChunkWithProof>;
+
+        fn get_state_value_chunk_iter(
+            &self,
+            version: Version,
+            first_index: usize,
+            chunk_size: usize,
+        ) -> StorageResult<Box<dyn Iterator<Item = StorageResult<(StateKey, StateValue)>> + '_>>;
+
+        fn get_state_value_chunk_proof(
+            &self,
+            version: Version,
+            first_index: usize,
+            state_key_values: Vec<(StateKey, StateValue)>,
+        ) -> StorageResult<StateValueChunkWithProof>;
     );
 }
 
@@ -601,9 +676,17 @@ pub(crate) fn check_overflow_network_frame<T: ?Sized + Serialize>(
     data: &T,
     max_network_frame_bytes: u64,
 ) -> aptos_storage_service_types::Result<(bool, u64), Error> {
+    let num_serialized_bytes = get_num_serialized_bytes(data)?;
+    let overflow_frame = num_serialized_bytes >= max_network_frame_bytes;
+    Ok((overflow_frame, num_serialized_bytes))
+}
+
+/// Serializes the given data and returns the number of serialized bytes
+fn get_num_serialized_bytes<T: ?Sized + Serialize>(
+    data: &T,
+) -> aptos_storage_service_types::Result<u64, Error> {
     let num_serialized_bytes = bcs::to_bytes(&data)
         .map_err(|error| Error::UnexpectedErrorEncountered(error.to_string()))?
         .len() as u64;
-    let overflow_frame = num_serialized_bytes >= max_network_frame_bytes;
-    Ok((overflow_frame, num_serialized_bytes))
+    Ok(num_serialized_bytes)
 }

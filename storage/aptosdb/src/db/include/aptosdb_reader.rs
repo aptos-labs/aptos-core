@@ -755,6 +755,34 @@ impl DbReader for AptosDB {
         })
     }
 
+    fn get_state_value_chunk_iter(
+        &self,
+        version: Version,
+        first_index: usize,
+        chunk_size: usize,
+    ) -> Result<Box<dyn Iterator<Item = Result<(StateKey, StateValue)>> + '_>> {
+        gauged_api("get_state_value_chunk_iter", || {
+            self.error_if_state_merkle_pruned("State merkle", version)?;
+            let state_value_chunk_iter = self
+                .state_store
+                .get_value_chunk_iter(version, first_index, chunk_size)?;
+            Ok(Box::new(state_value_chunk_iter) as Box<dyn Iterator<Item = Result<(StateKey, StateValue)>> + '_>)
+        })
+    }
+
+    fn get_state_value_chunk_proof(
+        &self,
+        version: Version,
+        first_index: usize,
+        state_key_values: Vec<(StateKey, StateValue)>,
+    ) -> Result<StateValueChunkWithProof> {
+        gauged_api("get_state_value_chunk_proof", || {
+            self.error_if_state_merkle_pruned("State merkle", version)?;
+            self.state_store
+                .get_value_chunk_proof(version, first_index, state_key_values)
+        })
+    }
+
     fn is_state_merkle_pruner_enabled(&self) -> Result<bool> {
         gauged_api("is_state_merkle_pruner_enabled", || {
             Ok(self

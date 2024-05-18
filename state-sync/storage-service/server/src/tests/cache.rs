@@ -3,10 +3,14 @@
 
 use crate::tests::{mock, mock::MockClient, utils};
 use aptos_config::config::StorageServiceConfig;
-use aptos_crypto::hash::HashValue;
+use aptos_crypto::HashValue;
 use aptos_storage_service_types::responses::{DataResponse, StorageServiceResponse};
 use aptos_types::{
-    proof::definition::SparseMerkleRangeProof, state_store::state_value::StateValueChunkWithProof,
+    proof::SparseMerkleRangeProof,
+    state_store::{
+        state_key::StateKey,
+        state_value::{StateValue, StateValueChunkWithProof},
+    },
 };
 use mockall::{
     predicate::{always, eq},
@@ -162,12 +166,13 @@ async fn test_cachable_requests_eviction() {
     let version = 101;
     let start_index = 100;
     let end_index = 199;
+    let state_key_and_value = (StateKey::raw(b""), StateValue::new_legacy(vec![].into()));
     let state_value_chunk_with_proof = StateValueChunkWithProof {
         first_index: start_index,
         last_index: end_index,
         first_key: HashValue::random(),
         last_key: HashValue::random(),
-        raw_values: vec![],
+        raw_values: vec![state_key_and_value.clone()],
         proof: SparseMerkleRangeProof::new(vec![]),
         root_hash: HashValue::random(),
     };
@@ -181,15 +186,32 @@ async fn test_cachable_requests_eviction() {
         .with(always())
         .returning(move |_| Ok(165));
     for _ in 0..2 {
-        let state_value_chunk_with_proof_clone = state_value_chunk_with_proof.clone();
+        // Set expectations for the chunk iterator
+        let state_values = vec![Ok(state_key_and_value.clone())];
+        let state_value_iterator = Box::new(state_values.into_iter())
+            as Box<
+                dyn Iterator<Item = aptos_storage_interface::Result<(StateKey, StateValue)>>
+                    + Send
+                    + Sync,
+            >;
         db_reader
-            .expect_get_state_value_chunk_with_proof()
+            .expect_get_state_value_chunk_iter()
             .times(1)
             .with(
                 eq(version),
                 eq(start_index as usize),
                 eq((end_index - start_index + 1) as usize),
             )
+            .return_once(move |_, _, _| Ok(state_value_iterator))
+            .in_sequence(&mut expectation_sequence);
+
+        // Set expectations for the chunk proof
+        let state_values = vec![state_key_and_value.clone()];
+        let state_value_chunk_with_proof_clone = state_value_chunk_with_proof.clone();
+        db_reader
+            .expect_get_state_value_chunk_proof()
+            .times(1)
+            .with(eq(version), eq(start_index as usize), eq(state_values))
             .return_once(move |_, _, _| Ok(state_value_chunk_with_proof_clone))
             .in_sequence(&mut expectation_sequence);
     }

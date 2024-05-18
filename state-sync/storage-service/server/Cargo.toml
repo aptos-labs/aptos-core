@@ -32,6 +32,7 @@ dashmap = { workspace = true }
 futures = { workspace = true }
 mini-moka = { workspace = true }
 once_cell = { workspace = true }
+rand = { workspace = true }
 serde = { workspace = true }
 thiserror = { workspace = true }
 tokio = { workspace = true }
