@@ -88,7 +88,7 @@ To check if a specific address is the admin, run the following command. This can
 
 ```bash
 aptos move view --function-id 0x123::rewards::is_admin \
-  --profile user \
+  --profile rewards \
   --args address:0x789
 ```
 
