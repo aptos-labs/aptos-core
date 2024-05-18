@@ -23,7 +23,7 @@ use crate::{
 use aptos_bounded_executor::BoundedExecutor;
 use aptos_channels::{aptos_channel, message_queues::QueueStyle};
 use aptos_config::config::DagConsensusConfig;
-use aptos_consensus_types::common::Author;
+use aptos_consensus_types::common::{Author, Round};
 use aptos_crypto::HashValue;
 use aptos_infallible::RwLock;
 use aptos_logger::{debug, error};
@@ -32,8 +32,8 @@ use aptos_reliable_broadcast::{RBNetworkSender, ReliableBroadcast};
 use aptos_types::{
     epoch_state::EpochState,
     on_chain_config::{
-        DagConsensusConfigV1, OnChainJWKConsensusConfig, OnChainRandomnessConfig,
-        ValidatorTxnConfig,
+        AnchorElectionMode, DagConsensusConfigV1, OnChainJWKConsensusConfig,
+        OnChainRandomnessConfig, ProposerAndVoterConfig, ValidatorTxnConfig,
     },
     validator_signer::ValidatorSigner,
 };
@@ -53,10 +53,11 @@ use tokio_retry::strategy::ExponentialBackoff;
 pub const NUM_OF_DAGS: usize = 1;
 
 /// Shoal+Opt1
-pub const COUNT_WEAK_VOTES: bool = true;
+pub const COUNT_WEAK_VOTES: bool = false;
 
 /// Shoal+Opt2
-/// [DagConsensusConfigV1::anchor_election_mode::proposers_per_round]
+/// [ProposerAndVoterConfig::proposers_per_round] in [DagConsensusConfigV1::anchor_election_mode]
+const NOOP: bool = false;
 
 /// Bullshark vs Shoal
 pub const ORDER_RULE_ROUND_INCREMENT: Round = 1;
