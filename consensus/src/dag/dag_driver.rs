@@ -16,7 +16,10 @@ use crate::{
         },
         order_rule::OrderRule,
         round_state::RoundState,
-        shoal_plus_plus::shoalpp_types::{BoltBCParms, BoltBCRet},
+        shoal_plus_plus::{
+            shoalpp_bootstrap::NUM_OF_DAGS,
+            shoalpp_types::{BoltBCParms, BoltBCRet},
+        },
         storage::DAGStorage,
         types::{
             CertificateAckState, CertifiedAck, CertifiedNode, CertifiedNodeMessage, DAGMessage,
@@ -279,15 +282,21 @@ impl DagDriver {
             let notif = tokio::time::timeout(Duration::from_millis(300), prev_dag_rx.recv()).await;
             match notif {
                 Err(_) => {
-                    info!(
-                        dag_id = self.dag_id,
-                        "{}: timeout waiting for prev dag", self.dag_id
-                    );
+                    if NUM_OF_DAGS > 1 {
+                        info!(
+                            dag_id = self.dag_id,
+                            "{}: timeout waiting for prev dag", self.dag_id
+                        );
+                    } else {
+                        unreachable!("cannot timeout with one DAG");
+                    }
                 },
                 Ok(Some(start_time)) => {
-                    let sleep_time =
-                        Duration::from_millis(100).saturating_sub(start_time.elapsed());
-                    tokio::time::sleep(sleep_time).await;
+                    if NUM_OF_DAGS > 1 {
+                        let sleep_time =
+                            Duration::from_millis(100).saturating_sub(start_time.elapsed());
+                        tokio::time::sleep(sleep_time).await;
+                    }
                 },
                 Ok(None) => {},
             }

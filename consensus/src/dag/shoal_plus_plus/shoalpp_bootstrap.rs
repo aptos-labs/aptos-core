@@ -49,6 +49,18 @@ use std::{
 use tokio::sync::mpsc::{channel, Receiver};
 use tokio_retry::strategy::ExponentialBackoff;
 
+/// Shoal++
+pub const NUM_OF_DAGS: usize = 1;
+
+/// Shoal+Opt1
+pub const COUNT_WEAK_VOTES: bool = true;
+
+/// Shoal+Opt2
+/// [DagConsensusConfigV1::anchor_election_mode::proposers_per_round]
+
+/// Bullshark vs Shoal
+pub const ORDER_RULE_ROUND_INCREMENT: Round = 1;
+
 pub struct ShoalppBootstrapper {
     epoch_state: Arc<EpochState>,
     dags: Vec<DagBootstrapper>,
@@ -94,7 +106,7 @@ impl ShoalppBootstrapper {
         )));
 
         let mut dag_store_vec = Vec::new();
-        for _i in 0..3 {
+        for _i in 0..NUM_OF_DAGS {
             // TDOO: consider changing  ArcSwapOption -> Mutex
             dag_store_vec.push(Arc::new(ArcSwapOption::from(None)));
         }
@@ -126,14 +138,14 @@ impl ShoalppBootstrapper {
 
         let mut txs = VecDeque::new();
         let mut rxs = VecDeque::new();
-        for _ in 1..=3 {
+        for _ in 1..=NUM_OF_DAGS {
             let (tx, rx) = tokio::sync::mpsc::unbounded_channel();
             txs.push_back(tx);
             rxs.push_back(rx);
         }
         txs[0].send(Instant::now()).unwrap();
         txs.rotate_left(1);
-        for dag_id in 0..3 {
+        for dag_id in 0..NUM_OF_DAGS {
             let (order_nodes_tx, ordered_node_rx) = tokio::sync::mpsc::unbounded_channel();
             let (broadcast_sender, broadcast_receiver) = channel(100);
             receiver_vec.push(broadcast_receiver);
@@ -198,7 +210,7 @@ impl ShoalppBootstrapper {
         shoalpp_rpc_rx: aptos_channel::Receiver<Author, (Author, IncomingShoalppRequest)>,
         shutdown_rx: oneshot::Receiver<oneshot::Sender<()>>,
     ) {
-        assert_eq!(self.dags.len(), 3);
+        assert_eq!(self.dags.len(), NUM_OF_DAGS);
         let mut dag_rpc_tx_vec = Vec::new();
         let mut dag_shutdown_tx_vec = Vec::new();
 

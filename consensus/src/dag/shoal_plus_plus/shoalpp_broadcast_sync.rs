@@ -2,7 +2,10 @@
 // SPDX-License-Identifier: Apache-2.0
 
 use crate::dag::{
-    shoal_plus_plus::shoalpp_types::{BoltBCParms, BoltBCRet},
+    shoal_plus_plus::{
+        shoalpp_bootstrap::NUM_OF_DAGS,
+        shoalpp_types::{BoltBCParms, BoltBCRet},
+    },
     DAGMessage, DAGRpcResult,
 };
 use aptos_logger::debug;
@@ -73,11 +76,11 @@ impl BoltBroadcastSync {
 #[async_trait]
 impl BroadcastSync for BoltBroadcastSync {
     async fn run(mut self) {
-        assert_eq!(self.receivers.len(), 3);
+        assert_eq!(self.receivers.len(), NUM_OF_DAGS);
         // TODO: think about synchronization after state sync.
 
         loop {
-            for i in 0..3 {
+            for i in 0..NUM_OF_DAGS {
                 // TODO: think about the unwrap()
                 let (ret_tx, bolt_bc_parms) = self.receivers[i].recv().await.unwrap();
                 if let Err(_e) =

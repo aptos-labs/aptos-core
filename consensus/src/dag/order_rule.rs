@@ -11,6 +11,7 @@ use crate::{
             logging::{LogEvent, LogSchema},
             tracing::{observe_node, NodeStage},
         },
+        shoal_plus_plus::shoalpp_bootstrap::ORDER_RULE_ROUND_INCREMENT,
         storage::CommitEvent,
         types::NodeMetadata,
         CertifiedNode,
@@ -140,7 +141,8 @@ impl OrderRule {
                 // It is possible that the anchor is already ordered
                 if matches!(anchor_node_status, NodeStatus::Ordered(_)) {
                     if self.current_instance == self.max_instances - 1 {
-                        self.lowest_unordered_anchor_round = start_round + 1;
+                        self.lowest_unordered_anchor_round =
+                            start_round + ORDER_RULE_ROUND_INCREMENT;
                         self.current_instance = 0;
                         start_round = start_round + 1;
                     } else {
@@ -260,7 +262,7 @@ impl OrderRule {
             // If an anchor was missing in the lowest unordered anchor round, then we should move to
             // either the current anchor round or the next round.
             if self.current_instance == self.max_instances - 1 {
-                self.lowest_unordered_anchor_round = anchor.round() + 1;
+                self.lowest_unordered_anchor_round = anchor.round() + ORDER_RULE_ROUND_INCREMENT;
                 self.current_instance = 0;
             } else {
                 self.lowest_unordered_anchor_round = anchor.round();
@@ -270,7 +272,7 @@ impl OrderRule {
             // Only update the lowest unordered anchor round after ordering all instances in that
             // round
             if self.current_instance == self.max_instances - 1 {
-                self.lowest_unordered_anchor_round = anchor.round() + 1;
+                self.lowest_unordered_anchor_round = anchor.round() + ORDER_RULE_ROUND_INCREMENT;
                 self.current_instance = 0;
             } else {
                 self.current_instance += 1;

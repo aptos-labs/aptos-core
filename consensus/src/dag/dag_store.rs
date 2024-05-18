@@ -3,6 +3,7 @@
 
 use super::{
     observability::counters::ANCHOR_ORDER_TYPE,
+    shoal_plus_plus::shoalpp_bootstrap::COUNT_WEAK_VOTES,
     types::{DagSnapshotBitmask, NodeMetadata},
 };
 use crate::{
@@ -346,7 +347,11 @@ impl InMemDag {
                     } else if minority_strong_votes {
                         ANCHOR_ORDER_TYPE.with_label_values(&[&"strong"]).inc();
                     }
-                    super_majority_weak_votes || minority_strong_votes
+                    if COUNT_WEAK_VOTES {
+                        super_majority_weak_votes || minority_strong_votes
+                    } else {
+                        minority_strong_votes
+                    }
                 },
                 NodeStatus::Ordered(_) => {
                     error!("checking voting power for Ordered node");

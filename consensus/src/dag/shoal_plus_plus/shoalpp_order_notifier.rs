@@ -6,6 +6,7 @@ use crate::{
     dag::{
         adapter::{LedgerInfoProvider, ShoalppOrderBlocksInfo},
         dag_store::DagStore,
+        shoal_plus_plus::shoalpp_bootstrap::NUM_OF_DAGS,
     },
     pipeline::buffer_manager::OrderedBlocks,
 };
@@ -168,6 +169,7 @@ impl ShoalppOrderNotifier {
         // TODO: shutdown logic
 
         let num_dags = self.receivers.len();
+        assert_eq!(num_dags, NUM_OF_DAGS);
 
         loop {
             for dag_id in 0..=(num_dags - 1) {
