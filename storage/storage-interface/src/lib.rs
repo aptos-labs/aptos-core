@@ -435,6 +435,22 @@ pub trait DbReader: Send + Sync {
             chunk_size: usize,
         ) -> Result<StateValueChunkWithProof>;
 
+        /// Returns an iterator of state key value pairs starting from the index.
+        fn get_state_value_chunk_iter(
+            &self,
+            version: Version,
+            first_index: usize,
+            chunk_size: usize,
+        ) -> Result<Box<dyn Iterator<Item = Result<(StateKey, StateValue)>> + '_>>;
+
+        /// Returns a state value chunk proof for the given state key values.
+        fn get_state_value_chunk_proof(
+            &self,
+            version: Version,
+            first_index: usize,
+            state_key_values: Vec<(StateKey, StateValue)>,
+        ) -> Result<StateValueChunkWithProof>;
+
         /// Returns if the state store pruner is enabled.
         fn is_state_merkle_pruner_enabled(&self) -> Result<bool>;
 
