@@ -499,22 +499,24 @@ impl StorageReaderInterface for StorageReader {
                     let num_serialized_bytes = get_num_serialized_bytes(&state_value)
                         .map_err(|error| Error::UnexpectedErrorEncountered(error.to_string()))?;
 
-                    // Add the state value to the list and increment the serialized size
-                    state_values.push(state_value);
-                    serialized_state_value_size += num_serialized_bytes;
-
                     // Calculate the duration of the state value fetch
                     let duration = current_timestamp.elapsed();
 
                     if duration.as_millis() > 100 {
                         // Log the size and duration of the state value fetch
                         info!(
-                            "Slow single fetch: size: {:?} bytes, duration: {:?}, index: {:?}",
+                            "Slow single fetch info: size: {:?} bytes, duration: {:?}, index: {:?}, version: {}, key: {:?}",
                             num_serialized_bytes,
                             duration,
-                            start_index + (state_values.len() as u64)
+                            start_index + (state_values.len() as u64),
+                            version,
+                            state_value.0
                         );
                     }
+
+                    // Add the state value to the list and increment the serialized size
+                    state_values.push(state_value);
+                    serialized_state_value_size += num_serialized_bytes;
                 },
                 Some(Err(error)) => {
                     // The iterator encountered an error
@@ -659,8 +661,7 @@ pub(crate) fn check_overflow_network_frame<T: ?Sized + Serialize>(
 fn get_num_serialized_bytes<T: ?Sized + Serialize>(
     data: &T,
 ) -> aptos_storage_service_types::Result<u64, Error> {
-    let num_serialized_bytes = bcs::to_bytes(&data)
-        .map_err(|error| Error::UnexpectedErrorEncountered(error.to_string()))?
-        .len() as u64;
-    Ok(num_serialized_bytes)
+    let num_serialized_bytes = bcs::serialized_size(&data)
+        .map_err(|error| Error::UnexpectedErrorEncountered(error.to_string()))?;
+    Ok(num_serialized_bytes as u64)
 }
