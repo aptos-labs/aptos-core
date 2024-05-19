@@ -377,7 +377,7 @@ pub fn run_dag_consensus_only_realistic_env_max_tps() -> ForgeConfig {
         .with_emit_job(
             EmitJobRequest::default()
                 .mode(EmitJobMode::ConstTps { tps: 20_000 })
-                .num_accounts_mode(NumAccountsMode::NumAccounts(15_000))
+                .num_accounts_mode(NumAccountsMode::NumAccounts(100))
                 .txn_expiration_time_secs(5 * 60),
                 // .num_accounts_mode(NumAccountsMode::NumAccounts(100)),
         )
