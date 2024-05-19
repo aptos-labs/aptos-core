@@ -120,6 +120,10 @@ impl BlockStore {
             self.inner.read().qcs()
         );
 
+        // The insert_ordered_cert(order_cert) function call expects that order_cert.commit_info().id() block 
+        // is already stored in block_store. So, we first call insert_quorum_cert(highest_quorum_cert).
+        // This call will ensure that the highest ceritified block along with all its ancestors are inserted
+        // into the block store.
         self.insert_quorum_cert(sync_info.highest_quorum_cert(), &mut retriever)
             .await?;
 
