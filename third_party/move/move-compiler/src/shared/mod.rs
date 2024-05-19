@@ -193,7 +193,7 @@ pub fn string_packagepath_to_symbol_packagepath<T: Clone>(
     input: &PackagePaths<String, String>,
 ) -> PackagePaths {
     PackagePaths {
-        name: input.name.clone(),
+        name: input.name,
         paths: string_vec_to_symbol_vec(&input.paths),
         named_address_map: string_map_to_symbol_map(&input.named_address_map),
     }
