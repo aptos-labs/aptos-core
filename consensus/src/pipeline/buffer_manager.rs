@@ -614,7 +614,7 @@ impl BufferManager {
                 let target_block_id = commit_proof.ledger_info().commit_info().id();
                 info!(
                     "Receive commit decision {}",
-                    commit_proof.ledger_info().commit_info()
+                    commit_proof.ledger_info()
                 );
                 let cursor = self
                     .buffer
