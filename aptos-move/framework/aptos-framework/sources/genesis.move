@@ -135,6 +135,10 @@ module aptos_framework::genesis {
     /// Genesis step 2: Initialize Aptos coin.
     fun initialize_aptos_coin(aptos_framework: &signer) {
         let (burn_cap, mint_cap) = aptos_coin::initialize(aptos_framework);
+
+        coin::create_coin_conversion_map(aptos_framework);
+        coin::create_pairing<AptosCoin>(aptos_framework);
+
         // Give stake module MintCapability<AptosCoin> so it can mint rewards.
         stake::store_aptos_coin_mint_cap(aptos_framework, mint_cap);
         // Give transaction_fee module BurnCapability<AptosCoin> so it can burn gas.
@@ -149,6 +153,10 @@ module aptos_framework::genesis {
         core_resources_auth_key: vector<u8>,
     ) {
         let (burn_cap, mint_cap) = aptos_coin::initialize(aptos_framework);
+
+        coin::create_coin_conversion_map(aptos_framework);
+        coin::create_pairing<AptosCoin>(aptos_framework);
+
         // Give stake module MintCapability<AptosCoin> so it can mint rewards.
         stake::store_aptos_coin_mint_cap(aptos_framework, mint_cap);
         // Give transaction_fee module BurnCapability<AptosCoin> so it can burn gas.

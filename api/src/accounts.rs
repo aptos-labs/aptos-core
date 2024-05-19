@@ -23,10 +23,8 @@ use aptos_types::{
     event::{EventHandle, EventKey},
     state_store::state_key::StateKey,
 };
-use aptos_vm::data_cache::AsMoveResolver;
 use move_core_types::{
     identifier::Identifier, language_storage::StructTag, move_resource::MoveStructType,
-    resolver::MoveResolver,
 };
 use poem_openapi::{
     param::{Path, Query},
@@ -344,12 +342,11 @@ impl Account {
                 let state_view = self
                     .context
                     .latest_state_view_poem(&self.latest_ledger_info)?;
-                let converted_resources = state_view
-                    .as_move_resolver()
-                    .as_converter(
-                        self.context.db.clone(),
-                        self.context.table_info_reader.clone(),
-                    )
+                let converter = state_view.as_converter(
+                    self.context.db.clone(),
+                    self.context.table_info_reader.clone(),
+                );
+                let converted_resources = converter
                     .try_into_resources(resources.iter().map(|(k, v)| (k.clone(), v.as_slice())))
                     .context("Failed to build move resource response from data in DB")
                     .map_err(|err| {
@@ -523,10 +520,13 @@ impl Account {
     ) -> Result<Vec<(Identifier, move_core_types::value::MoveValue)>, BasicErrorWith404> {
         let (ledger_info, ledger_version, state_view) =
             self.context.state_view(Some(self.ledger_version))?;
-        let resolver = state_view.as_move_resolver();
 
-        let bytes = resolver
-            .get_resource(&self.address.into(), resource_type)
+        let bytes = state_view
+            .as_converter(
+                self.context.db.clone(),
+                self.context.table_info_reader.clone(),
+            )
+            .find_resource(&state_view, self.address, resource_type)
             .context(format!(
                 "Failed to query DB to check for {} at {}",
                 resource_type, self.address
@@ -542,7 +542,7 @@ impl Account {
                 resource_not_found(self.address, resource_type, ledger_version, &ledger_info)
             })?;
 
-        resolver
+        state_view
             .as_converter(
                 self.context.db.clone(),
                 self.context.table_info_reader.clone(),

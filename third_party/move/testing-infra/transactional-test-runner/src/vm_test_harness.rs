@@ -9,12 +9,8 @@ use crate::{
 use anyhow::{anyhow, Result};
 use clap::Parser;
 use move_binary_format::{
-    compatibility::Compatibility,
-    errors::{PartialVMError, VMResult},
-    file_format::CompiledScript,
-    file_format_common,
-    file_format_common::VERSION_MAX,
-    CompiledModule,
+    compatibility::Compatibility, errors::VMResult, file_format::CompiledScript,
+    file_format_common, CompiledModule,
 };
 use move_command_line_common::{
     address::ParsedAddress,
@@ -60,30 +56,6 @@ struct SimpleVMTestAdapter<'a> {
     default_syntax: SyntaxChoice,
     comparison_mode: bool,
     run_config: TestRunConfig,
-}
-
-pub fn view_resource_in_move_storage(
-    storage: &impl MoveResolver<PartialVMError>,
-    address: AccountAddress,
-    module: &ModuleId,
-    resource: &IdentStr,
-    type_args: Vec<TypeTag>,
-) -> Result<String> {
-    let tag = StructTag {
-        address: *module.address(),
-        module: module.name().to_owned(),
-        name: resource.to_owned(),
-        type_params: type_args,
-    };
-    // TODO
-    match storage.get_resource(&address, &tag).unwrap() {
-        None => Ok("[No Resource Exists]".to_owned()),
-        Some(data) => {
-            let annotated = MoveValueAnnotator::new_with_max_bytecode_version(storage, VERSION_MAX)
-                .view_resource(&tag, &data)?;
-            Ok(format!("{}", annotated))
-        },
-    }
 }
 
 #[derive(Debug, Parser)]
@@ -381,7 +353,20 @@ impl<'a> MoveTestAdapter<'a> for SimpleVMTestAdapter<'a> {
         resource: &IdentStr,
         type_args: Vec<TypeTag>,
     ) -> Result<String> {
-        view_resource_in_move_storage(&self.storage, address, module, resource, type_args)
+        let tag = StructTag {
+            address: *module.address(),
+            module: module.name().to_owned(),
+            name: resource.to_owned(),
+            type_args,
+        };
+        match self.storage.get_resource(&address, &tag).unwrap() {
+            None => Ok("[No Resource Exists]".to_owned()),
+            Some(data) => {
+                let annotated =
+                    MoveValueAnnotator::new(self.storage.clone()).view_resource(&tag, &data)?;
+                Ok(format!("{}", annotated))
+            },
+        }
     }
 
     fn handle_subcommand(&mut self, _: TaskInput<Self::Subcommand>) -> Result<Option<String>> {

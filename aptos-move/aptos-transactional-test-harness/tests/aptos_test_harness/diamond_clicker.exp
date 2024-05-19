@@ -65,4 +65,4 @@ task 2 'publish'. lines 37-68:
 Error: VMError with status CALL_TYPE_MISMATCH_ERROR at location Module ModuleId { address: f75daa73fc071f93593335eb9033da804777eb94491650dd3f095ce6f778acb6, name: Identifier("game") } at index 0 for function definition at code offset 25 in function definition 0
 
 task 3 'run'. lines 70-70:
-Error: Failed to execute transaction. ExecutionStatus: MiscellaneousError(Some(LINKER_ERROR))
+Error: Failed to execute transaction. ExecutionStatus: MiscellaneousError(None)

@@ -69,6 +69,7 @@ pub enum TransactionTypeArg {
     SmartTablePicture1MWith256Change,
     SmartTablePicture1BWith256Change,
     SmartTablePicture1MWith1KChangeExceedsLimit,
+    DeserializeU256,
 }
 
 impl TransactionTypeArg {
@@ -432,6 +433,11 @@ impl TransactionTypeArg {
                     num_modules: module_working_set_size,
                     use_account_pool: sender_use_account_pool,
                 }
+            },
+            TransactionTypeArg::DeserializeU256 => TransactionType::CallCustomModules {
+                entry_point: EntryPoints::DeserializeU256,
+                num_modules: module_working_set_size,
+                use_account_pool: sender_use_account_pool,
             },
         }
     }

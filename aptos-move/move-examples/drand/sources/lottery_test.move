@@ -42,11 +42,11 @@ module drand::lottery_test {
         enable_cryptography_algebra_natives(&fx);
         timestamp::set_time_has_started_for_testing(&fx);
 
-        // Deploy the lottery smart contract
-        lottery::init_module_for_testing(&myself);
-
         // Needed to mint coins out of thin air for testing
         let (burn_cap, mint_cap) = aptos_coin::initialize_for_test(&fx);
+
+        // Deploy the lottery smart contract
+        lottery::init_module_for_testing(&myself);
 
         // We simulate different runs of the lottery to demonstrate the uniformity of the outcomes
         let vec_signed_bytes = vector::empty<vector<u8>>();

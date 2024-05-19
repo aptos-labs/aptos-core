@@ -249,12 +249,13 @@ impl StateMerkleDb {
         &self,
         state_key: &StateKey,
         version: Version,
+        root_depth: usize,
     ) -> Result<(
         Option<(HashValue, (StateKey, Version))>,
         SparseMerkleProofExt,
     )> {
         JellyfishMerkleTree::new(self)
-            .get_with_proof_ext(state_key.hash(), version)
+            .get_with_proof_ext(state_key.hash(), version, root_depth)
             .map_err(Into::into)
     }
 

@@ -163,6 +163,7 @@ spec aptos_framework::staking_config {
     }
 
     spec calculate_and_save_latest_rewards_config(): StakingRewardsConfig {
+        pragma verify_duration_estimate = 120;
         requires features::spec_periodical_reward_rate_decrease_enabled();
         include StakingRewardsConfigRequirement;
         aborts_if !exists<StakingRewardsConfig>(@aptos_framework);
