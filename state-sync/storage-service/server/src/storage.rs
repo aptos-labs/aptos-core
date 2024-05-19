@@ -472,6 +472,7 @@ impl StorageReaderInterface for StorageReader {
         // Initialize the state values and the serialized data size
         let mut state_values = vec![];
         let mut serialized_state_value_size = 0;
+        let start_timestamp = Instant::now();
 
         // Fetch as many state values as possible without exceeding the network frame size
         while state_values.len() < num_state_values_to_fetch
@@ -479,6 +480,17 @@ impl StorageReaderInterface for StorageReader {
         {
             // Get the current timestamp
             let current_timestamp = Instant::now();
+
+            let since_start = current_timestamp - start_timestamp;
+            if since_start.as_secs() > 10 {
+                info!(
+                    "Too much total time, returning early. since_start: {:?}, bytes: {}, items: {}",
+                    since_start,
+                    serialized_state_value_size,
+                    state_values.len(),
+                );
+                break;
+            }
 
             // Process the next state value
             match state_value_iterator.next() {
@@ -494,13 +506,15 @@ impl StorageReaderInterface for StorageReader {
                     // Calculate the duration of the state value fetch
                     let duration = current_timestamp.elapsed();
 
-                    // Log the size and duration of the state value fetch
-                    info!(
-                        "Fetched state value: size: {:?} bytes, duration: {:?}, index: {:?}",
-                        num_serialized_bytes,
-                        duration,
-                        start_index + (state_values.len() as u64)
-                    );
+                    if duration.as_millis() > 100 {
+                        // Log the size and duration of the state value fetch
+                        info!(
+                            "Slow single fetch: size: {:?} bytes, duration: {:?}, index: {:?}",
+                            num_serialized_bytes,
+                            duration,
+                            start_index + (state_values.len() as u64)
+                        );
+                    }
                 },
                 Some(Err(error)) => {
                     // The iterator encountered an error
