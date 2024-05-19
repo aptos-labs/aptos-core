@@ -6,7 +6,7 @@ use crate::{
     schema::jellyfish_merkle_node::JellyfishMerkleNodeSchema,
     state_merkle_db::StateMerkleDb,
 };
-use aptos_crypto::HashValue;
+use aptos_crypto::{hash::CryptoHash, HashValue};
 use aptos_jellyfish_merkle::{
     node_type::{Child, Node, NodeKey, NodeType},
     TreeReader,
@@ -18,7 +18,6 @@ use aptos_types::{
 };
 use clap::Parser;
 use owo_colors::OwoColorize;
-use aptos_crypto::hash::CryptoHash;
 
 #[derive(Parser)]
 #[clap(about = "Print nodes leading to target nibble.")]
