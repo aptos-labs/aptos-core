@@ -472,6 +472,7 @@ impl BlockStore {
         counters::OP_COUNTERS
             .gauge("back_pressure")
             .set((ordered_round - commit_round) as i64);
+        info!("ordered_round: {}, vote_backpressure_limit: {}, commit_round: {}", ordered_round, self.vote_back_pressure_limit, commit_round);
         ordered_round > self.vote_back_pressure_limit + commit_round
     }
 

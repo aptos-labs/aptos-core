@@ -572,7 +572,7 @@ impl BufferManager {
                 // find the corresponding item
                 let author = vote.author();
                 let commit_info = vote.commit_info().clone();
-                info!("Receive commit vote {} from {}", commit_info, author);
+                info!("Receive commit vote {}, consensus_data_hash {} from {}", commit_info, vote.consensus_data_hash(), author);
                 let target_block_id = vote.commit_info().id();
                 let current_cursor = self
                     .buffer

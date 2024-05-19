@@ -26,6 +26,7 @@ fn generate_commit_ledger_info(
     ordered_proof: &LedgerInfoWithSignatures,
     order_vote_enabled: bool,
 ) -> LedgerInfo {
+    info!("Generating commit ledger info from ordered proof: {}", ordered_proof);
     LedgerInfo::new(
         commit_info.clone(),
         if order_vote_enabled {
