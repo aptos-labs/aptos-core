@@ -824,6 +824,7 @@ impl<P: OnChainConfigProvider> EpochManager<P> {
             Arc::clone(&self.time_service),
             self.config.vote_back_pressure_limit,
             payload_manager,
+            self.txn_timestamp_store.clone(),
         ));
 
         info!(epoch = epoch, "Create ProposalGenerator");

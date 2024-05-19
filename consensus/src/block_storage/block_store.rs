@@ -9,6 +9,7 @@ use crate::{
         BlockReader,
     },
     counters,
+    dag::observability::counters::TXN_ORDERED_LATENCY,
     payload_manager::PayloadManager,
     persistent_liveness_storage::{
         PersistentLivenessStorage, RecoveryData, RootInfo, RootMetadata,
@@ -18,20 +19,29 @@ use crate::{
 };
 use anyhow::{bail, ensure, format_err, Context};
 use aptos_consensus_types::{
-    block::Block, common::Round, pipelined_block::PipelinedBlock, quorum_cert::QuorumCert,
-    sync_info::SyncInfo, timeout_2chain::TwoChainTimeoutCertificate,
+    block::Block,
+    common::{Payload::DirectMempool, Round},
+    pipelined_block::PipelinedBlock,
+    quorum_cert::QuorumCert,
+    sync_info::SyncInfo,
+    timeout_2chain::TwoChainTimeoutCertificate,
 };
 use aptos_crypto::{hash::ACCUMULATOR_PLACEHOLDER_HASH, HashValue};
 use aptos_executor_types::StateComputeResult;
 use aptos_infallible::RwLock;
 use aptos_logger::prelude::*;
 use aptos_types::ledger_info::LedgerInfoWithSignatures;
+use dashmap::DashMap;
 use futures::executor::block_on;
+use rayon::iter::{IndexedParallelIterator, IntoParallelRefIterator, ParallelIterator};
 #[cfg(test)]
 use std::collections::VecDeque;
 #[cfg(any(test, feature = "fuzzing"))]
 use std::sync::atomic::{AtomicBool, Ordering};
-use std::{sync::Arc, time::Duration};
+use std::{
+    sync::Arc,
+    time::{Duration, SystemTime},
+};
 
 #[cfg(test)]
 #[path = "block_store_test.rs"]
@@ -75,6 +85,8 @@ pub struct BlockStore {
     payload_manager: Arc<PayloadManager>,
     #[cfg(any(test, feature = "fuzzing"))]
     back_pressure_for_test: AtomicBool,
+
+    txn_timestamp_store: Arc<DashMap<HashValue, SystemTime>>,
 }
 
 impl BlockStore {
@@ -86,6 +98,7 @@ impl BlockStore {
         time_service: Arc<dyn TimeService>,
         vote_back_pressure_limit: Round,
         payload_manager: Arc<PayloadManager>,
+        txn_timestamp_store: Arc<DashMap<HashValue, SystemTime>>,
     ) -> Self {
         let highest_2chain_tc = initial_data.highest_2chain_timeout_certificate();
         let (root, root_metadata, blocks, quorum_certs) = initial_data.take();
@@ -101,6 +114,7 @@ impl BlockStore {
             time_service,
             vote_back_pressure_limit,
             payload_manager,
+            txn_timestamp_store,
         ));
         block_on(block_store.try_send_for_execution());
         block_store
@@ -139,6 +153,7 @@ impl BlockStore {
         time_service: Arc<dyn TimeService>,
         vote_back_pressure_limit: Round,
         payload_manager: Arc<PayloadManager>,
+        txn_timestamp_store: Arc<DashMap<HashValue, SystemTime>>,
     ) -> Self {
         let RootInfo(root_block, root_qc, root_ordered_cert, root_commit_cert) = root;
 
@@ -197,6 +212,7 @@ impl BlockStore {
             payload_manager,
             #[cfg(any(test, feature = "fuzzing"))]
             back_pressure_for_test: AtomicBool::new(false),
+            txn_timestamp_store,
         };
 
         for block in blocks {
@@ -264,6 +280,28 @@ impl BlockStore {
         self.inner.write().update_ordered_root(block_to_commit.id());
         update_counters_for_ordered_blocks(&blocks_to_commit);
 
+        let txn_timestamp_store = self.txn_timestamp_store.clone();
+        let now = SystemTime::now();
+        tokio::task::spawn_blocking(move || {
+            blocks_to_commit.par_iter().for_each(|block| {
+                let Some(payload) = block.payload() else {
+                    return;
+                };
+                let txns = match payload {
+                    DirectMempool(txns) => txns,
+                    _ => unreachable!(),
+                };
+                txns.par_iter().with_min_len(10).for_each(|txn| {
+                    if let Some((_, insertion_time)) =
+                        txn_timestamp_store.remove(&txn.clone().committed_hash())
+                    {
+                        let duration = now.duration_since(insertion_time).unwrap();
+                        TXN_ORDERED_LATENCY.observe(duration.as_secs_f64());
+                    }
+                });
+            });
+        });
+
         Ok(())
     }
 
@@ -291,6 +329,7 @@ impl BlockStore {
             Arc::clone(&self.time_service),
             self.vote_back_pressure_limit,
             self.payload_manager.clone(),
+            Arc::clone(&self.txn_timestamp_store),
         )
         .await;
 
