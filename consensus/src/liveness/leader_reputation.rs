@@ -711,7 +711,7 @@ impl ProposerElection for LeaderReputation {
             .map(|(i, w)| *w as u128 * self.voting_powers[i] as u128)
             .collect();
 
-        let chosen_proposers = (0..self.proposers_per_round as u64)
+        let chosen_proposers: Vec<_> = (0..self.proposers_per_round as u64)
             .into_par_iter()
             .map(|instance| {
                 let state = if self.use_root_hash {
@@ -760,7 +760,7 @@ impl ProposerElection for LeaderReputation {
         // };
 
         (
-            proposers[0],
+            chosen_proposers[0],
             voting_power_participation_ratio,
             chosen_proposers,
         )
