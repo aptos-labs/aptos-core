@@ -13,14 +13,12 @@ Ok(
                 ),
             ),
             events: [
-                ModuleEvent { type: Struct(StructTag { address: 0000000000000000000000000000000000000000000000000000000000000001, module: Identifier("transaction_fee"), name: Identifier("FeeStatement"), type_params: [] }), event_data: "03000000000000000300000000000000000000000000000000000000000000000000000000000000" },
+                ModuleEvent { type: Struct(StructTag { address: 0000000000000000000000000000000000000000000000000000000000000001, module: Identifier("transaction_fee"), name: Identifier("FeeStatement"), type_args: [] }), event_data: "03000000000000000300000000000000000000000000000000000000000000000000000000000000" },
             ],
             gas_used: 3,
             status: Keep(
                 MiscellaneousError(
-                    Some(
-                        TYPE_MISMATCH,
-                    ),
+                    None,
                 ),
             ),
             auxiliary_data: V1(

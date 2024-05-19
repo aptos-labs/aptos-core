@@ -8,6 +8,9 @@ warning: Unused anonymous function parameter `x`. Consider removing or prefixing
 
 // -- Model dump before bytecode pipeline
 module 0xc0ffee::m {
+    private inline fun test(p: u64,f: |u64|u64): u64 {
+        (f)(p)
+    }
     private fun unused_lambda() {
         1;
         Tuple()

@@ -217,7 +217,7 @@ pub fn struct_tag_for_config(config_id: ConfigID) -> StructTag {
         address: CORE_CODE_ADDRESS,
         module: Identifier::new(config_id.1).expect("fail to make identifier"),
         name: Identifier::new(config_id.2).expect("fail to make identifier"),
-        type_params: vec![],
+        type_args: vec![],
     }
 }
 
