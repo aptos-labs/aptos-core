@@ -50,7 +50,7 @@ use tokio::sync::mpsc::{channel, Receiver};
 use tokio_retry::strategy::ExponentialBackoff;
 
 /// Shoal++
-pub const NUM_OF_DAGS: usize = 1;
+pub const NUM_OF_DAGS: usize = 3;
 
 /// Shoal+Opt1
 pub const COUNT_WEAK_VOTES: bool = true;
