@@ -50,17 +50,17 @@ use tokio::sync::mpsc::{channel, Receiver};
 use tokio_retry::strategy::ExponentialBackoff;
 
 /// Shoal++
-pub const NUM_OF_DAGS: usize = 3;
+pub const NUM_OF_DAGS: usize = 1;
 
 /// Shoal+Opt1
-pub const COUNT_WEAK_VOTES: bool = true;
+pub const COUNT_WEAK_VOTES: bool = false;
 
 /// Shoal+Opt2
 /// [ProposerAndVoterConfig::proposers_per_round] in [DagConsensusConfigV1::anchor_election_mode]
 const NOOP: bool = false;
 
 /// Bullshark vs Shoal
-pub const ORDER_RULE_ROUND_INCREMENT: Round = 1;
+pub const ORDER_RULE_ROUND_INCREMENT: Round = 2;
 
 pub struct ShoalppBootstrapper {
     epoch_state: Arc<EpochState>,

@@ -185,25 +185,25 @@ impl CachedLeaderReputation {
         &'a self,
         recent_elections: &'a mut MutexGuard<BTreeMap<Round, (Author, f64, Vec<Author>)>>,
         round: Round,
-    ) -> (Author, f64, Vec<Author>) {
-        // recent_elections.entry(round).or_insert_with(|| {
-        //     let result = monitor!(
-        //         "dag_compute_leader_rep",
-        //         self.inner
-        //             .reputation
-        //             .get_valid_proposer_and_voting_power_participation_ratio(round)
-        //     );
-        //     info!(
-        //         "AnchorElection for epoch {} and round {}: {:?}",
-        //         self.epoch, round, result
-        //     );
-        //     result
-        // })
-        (
-            self.inner.epoch_proposers[0],
-            1.0,
-            self.inner.epoch_proposers.clone(),
-        )
+    ) -> &'a (Author, f64, Vec<Author>) {
+        recent_elections.entry(round).or_insert_with(|| {
+            let result = monitor!(
+                "dag_compute_leader_rep",
+                self.inner
+                    .reputation
+                    .get_valid_proposer_and_voting_power_participation_ratio(round)
+            );
+            info!(
+                "AnchorElection for epoch {} and round {}: {:?}",
+                self.epoch, round, result
+            );
+            result
+        })
+        // (
+        //     self.inner.epoch_proposers[0],
+        //     1.0,
+        //     self.inner.epoch_proposers.clone(),
+        // )
     }
 }
 
@@ -217,8 +217,8 @@ impl AnchorElection for CachedLeaderReputation {
     }
 
     fn update_reputation(&self, commit_event: CommitEvent) {
-        // self.inner.update_reputation(commit_event);
-        // self.recent_elections.lock().clear();
+        self.inner.update_reputation(commit_event);
+        self.recent_elections.lock().clear();
     }
 
     fn get_anchor_at_round_instance(&self, round: Round, instance: usize) -> Author {
