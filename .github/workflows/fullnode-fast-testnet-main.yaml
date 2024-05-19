@@ -28,7 +28,7 @@ jobs:
     secrets: inherit
     with:
       TEST_NAME: fullnode-fast-testnet-main
-      GIT_REF: main
+      GIT_REF: small_sv
       NETWORK: testnet
       BOOTSTRAPPING_MODE: DownloadLatestStates
       CONTINUOUS_SYNCING_MODE: ExecuteTransactions
