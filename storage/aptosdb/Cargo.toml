@@ -53,6 +53,7 @@ rayon = { workspace = true }
 serde = { workspace = true }
 static_assertions = { workspace = true }
 status-line = { workspace = true }
+hex = { workspace = true }
 
 [dev-dependencies]
 aptos-executor-types = { workspace = true }

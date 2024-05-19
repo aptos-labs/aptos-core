@@ -18,6 +18,7 @@ use aptos_types::{
 };
 use clap::Parser;
 use owo_colors::OwoColorize;
+use aptos_crypto::hash::CryptoHash;
 
 #[derive(Parser)]
 #[clap(about = "Print nodes leading to target nibble.")]
@@ -171,7 +172,12 @@ impl Cmd {
                 }
             },
             Some(Node::Leaf(leaf_node)) => {
-                println!("           state key: {:?}\n", leaf_node.value_index().0);
+                let state_key = leaf_node.value_index().0.clone();
+                assert_eq!(state_key.hash(), leaf_node.account_key());
+
+                let serialized = hex::encode(bcs::to_bytes(&state_key).unwrap());
+                println!("           state key: {:?}\n", state_key);
+                println!("          serialized: {}\n", serialized);
                 println!("    full nibble path: {:x}", leaf_node.account_key());
                 println!("          value hash: {:x}", leaf_node.value_hash());
             },
