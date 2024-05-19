@@ -53,7 +53,7 @@ use tokio_retry::strategy::ExponentialBackoff;
 pub const NUM_OF_DAGS: usize = 1;
 
 /// Shoal+Opt1
-pub const COUNT_WEAK_VOTES: bool = false;
+pub const COUNT_WEAK_VOTES: bool = true;
 
 /// Shoal+Opt2
 /// [ProposerAndVoterConfig::proposers_per_round] in [DagConsensusConfigV1::anchor_election_mode]
