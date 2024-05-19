@@ -374,7 +374,7 @@ fn dag_realistic_network_tuned_for_throughput_test() -> ForgeConfig {
 /// !!!!This one has no chaos!!!!
 pub fn run_dag_consensus_only_realistic_env_max_tps() -> ForgeConfig {
     ForgeConfig::default()
-        .with_initial_validator_count(NonZeroUsize::new(100).unwrap())
+        .with_initial_validator_count(NonZeroUsize::new(67).unwrap())
         .with_emit_job(
             EmitJobRequest::default()
                 .mode(EmitJobMode::ConstTps { tps: 20_000 })
@@ -413,6 +413,8 @@ pub fn run_dag_consensus_only_realistic_env_max_tps() -> ForgeConfig {
 
             // no epoch change.
             helm_values["chain"]["epoch_duration_secs"] = (24 * 3600).into();
+
+            helm_values["genesis"]["numValidators"] = 100.into();
         }))
         .with_validator_override_node_config_fn(Arc::new(|config, _| {
             optimize_for_maximum_throughput(config, 20_000, 4_500, 3.0);
