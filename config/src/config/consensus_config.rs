@@ -153,7 +153,7 @@ impl Default for ConsensusConfig {
             max_sending_block_bytes: 20 * 1024 * 1024, // 3MB
             max_receiving_block_txns: 10000.max(2 * MAX_SENDING_BLOCK_TXNS),
             max_sending_inline_txns: 100,
-            max_sending_inline_bytes: 200 * 1024,       // 200 KB
+            max_sending_inline_bytes: 200 * 1024, // 200 KB
             max_receiving_block_bytes: 21 * 1024 * 1024, // 6MB
             max_pruned_blocks_in_mem: 100,
             mempool_executed_txn_timeout_ms: 1000,
@@ -312,7 +312,7 @@ impl Default for ConsensusConfig {
             max_blocks_per_sending_request_quorum_store_override: 10,
             max_blocks_per_receiving_request: 10,
             max_blocks_per_receiving_request_quorum_store_override: 100,
-            broadcast_vote: true,
+            broadcast_vote: false,
             proof_cache_capacity: 10_000,
             rand_rb_config: ReliableBroadcastConfig {
                 backoff_policy_base_ms: 2,

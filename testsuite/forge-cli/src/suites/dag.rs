@@ -12,8 +12,9 @@ use aptos_forge::{
     EmitJobMode, EmitJobRequest, ForgeConfig, NodeResourceOverride,
 };
 use aptos_sdk::types::on_chain_config::{
-    BlockGasLimitType, ConsensusAlgorithmConfig, DagConsensusConfigV1, OnChainConsensusConfig,
-    OnChainExecutionConfig, TransactionDeduperType, TransactionShufflerType, ValidatorTxnConfig,
+    BlockGasLimitType, ConsensusAlgorithmConfig, ConsensusConfigV1, DagConsensusConfigV1,
+    OnChainConsensusConfig, OnChainExecutionConfig, TransactionDeduperType,
+    TransactionShufflerType, ValidatorTxnConfig,
 };
 use aptos_testcases::{
     consensus_reliability_tests::ChangingWorkingQuorumTest,
@@ -377,14 +378,15 @@ pub fn run_dag_consensus_only_realistic_env_max_tps() -> ForgeConfig {
         .with_emit_job(
             EmitJobRequest::default()
                 .mode(EmitJobMode::ConstTps { tps: 20_000 })
-                .num_accounts_mode(NumAccountsMode::NumAccounts(100))
+                .num_accounts_mode(NumAccountsMode::NumAccounts(10))
                 .txn_expiration_time_secs(5 * 60),
                 // .num_accounts_mode(NumAccountsMode::NumAccounts(100)),
         )
         .add_network_test(PerformanceBenchmark)
         .with_genesis_helm_config_fn(Arc::new(|helm_values| {
             let onchain_consensus_config = OnChainConsensusConfig::V3 {
-                alg: ConsensusAlgorithmConfig::DAG(DagConsensusConfigV1::default()),
+                // alg: ConsensusAlgorithmConfig::DAG(DagConsensusConfigV1::default()),
+                alg: ConsensusAlgorithmConfig::Jolteon { main: ConsensusConfigV1::default(), quorum_store_enabled: false },
                 vtxn: ValidatorTxnConfig::default_disabled(),
             };
 
