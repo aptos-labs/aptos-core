@@ -452,7 +452,7 @@ impl Default for DagConsensusConfigV1 {
                     voter_window_num_validators_multiplier: 1,
                     weight_by_voting_power: true,
                     use_history_from_previous_epoch_max_count: 5,
-                    proposers_per_round: 1,
+                    proposers_per_round: 100,
                 }),
             ),
             quorum_store_enabled: false,
