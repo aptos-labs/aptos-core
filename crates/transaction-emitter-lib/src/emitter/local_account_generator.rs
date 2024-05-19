@@ -1,4 +1,4 @@
-// Copyright © Aptos Foundation
+// Copyright (c) Aptos Foundation
 // SPDX-License-Identifier: Apache-2.0
 use aptos_sdk::types::{AccountKey, LocalAccount};
 use aptos_transaction_generator_lib::{AccountType, ReliableTransactionSubmitter};
