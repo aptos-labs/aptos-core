@@ -53,7 +53,6 @@ use move_core_types::{
     value::{MoveTypeLayout, MoveValue},
 };
 use move_model::metadata::LanguageVersion;
-use move_resource_viewer::{AnnotatedMoveValue, MoveValueAnnotator};
 use move_symbol_pool::Symbol as MoveSymbol;
 use move_transactional_test_runner::{
     framework::{run_test_impl, CompiledState, MoveTestAdapter},
@@ -1129,13 +1128,10 @@ pub fn run_aptos_test_with_config(
 ) -> Result<(), Box<dyn std::error::Error>> {
     let (suffix, config) =
         if get_move_compiler_v2_from_env() && !matches!(config, TestRunConfig::CompilerV2 { .. }) {
-            (
-                Some(EXP_EXT_V2.to_owned()),
-                TestRunConfig::CompilerV2 {
-                    language_version: LanguageVersion::default(),
-                    v2_experiments: vec![("attach-compiled-module".to_owned(), true)],
-                },
-            )
+            (Some(EXP_EXT_V2.to_owned()), TestRunConfig::CompilerV2 {
+                language_version: LanguageVersion::default(),
+                v2_experiments: vec![("attach-compiled-module".to_owned(), true)],
+            })
         } else {
             (Some(EXP_EXT.to_owned()), config)
         };
