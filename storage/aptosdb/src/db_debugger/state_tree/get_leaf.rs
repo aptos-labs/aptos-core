@@ -2,13 +2,13 @@
 // SPDX-License-Identifier: Apache-2.0
 
 use crate::{db_debugger::common::DbDir, schema::jellyfish_merkle_node::JellyfishMerkleNodeSchema};
+use aptos_crypto::hash::CryptoHash;
 use aptos_jellyfish_merkle::{iterator::JellyfishMerkleIterator, node_type::NodeKey};
 use aptos_storage_interface::{db_ensure as ensure, AptosDbError, Result};
-use aptos_types::{transaction::Version};
+use aptos_types::transaction::Version;
 use clap::Parser;
 use owo_colors::OwoColorize;
 use std::sync::Arc;
-use aptos_crypto::hash::CryptoHash;
 
 #[derive(Parser)]
 #[clap(about = "Print leaf info for given leaf index in a snapshot")]
@@ -60,8 +60,8 @@ impl Cmd {
 
         let serialized = hex::encode(bcs::to_bytes(&state_key).unwrap());
         println!("           state key: {:?}\n", state_key);
-        println!("             version: {:?}\n", leaf_version);
         println!("          serialized: {}\n", serialized);
+        println!("             version: {:?}", leaf_version);
         println!("    full nibble path: {:x}", key_hash);
 
         Ok(())
