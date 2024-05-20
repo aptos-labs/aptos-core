@@ -1121,7 +1121,6 @@ impl RoundManager {
                         BlockStage::QC_AGGREGATED,
                     );
                 }
-                QC_AGGREGATED_FROM_VOTES.inc();
                 if delay_if_block_not_exist
                     && !self.block_store.block_exists(qc.certified_block().id())
                 {
@@ -1133,6 +1132,7 @@ impl RoundManager {
                     });
                     return Ok(());
                 }
+                QC_AGGREGATED_FROM_VOTES.inc();
                 self.new_qc_aggregated(qc.clone(), vote.author())
                     .await
                     .context(format!(
