@@ -82,15 +82,12 @@ fn run_test_impl(
                 },
                 Err(error) => format!("{:#}\n", error),
             },
-            (_, true) => match ModelBuilder::create(
-                resolved_package,
-                ModelConfig {
-                    all_files_as_targets: false,
-                    target_filter: None,
-                    compiler_version,
-                    language_version: LanguageVersion::default(),
-                },
-            )
+            (_, true) => match ModelBuilder::create(resolved_package, ModelConfig {
+                all_files_as_targets: false,
+                target_filter: None,
+                compiler_version,
+                language_version: LanguageVersion::default(),
+            })
             .build_model()
             {
                 Ok(_) => "Built model".to_string(),
