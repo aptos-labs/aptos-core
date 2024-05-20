@@ -323,6 +323,7 @@ impl NodeSetup {
 
         let mut local_config = local_consensus_config.clone();
         local_config.enable_broadcast_vote(false);
+        let (delayed_qc_tx, _) = unbounded();
 
         let mut round_manager = RoundManager::new(
             epoch_state,
@@ -339,6 +340,7 @@ impl NodeSetup {
             onchain_randomness_config.clone(),
             onchain_jwk_consensus_config.clone(),
             None,
+            delayed_qc_tx,
         );
         block_on(round_manager.init(last_vote_sent));
         Self {

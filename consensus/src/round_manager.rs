@@ -66,8 +66,8 @@ use aptos_types::{
     PeerId,
 };
 use fail::fail_point;
-use futures::{channel::oneshot, FutureExt, StreamExt};
-use futures_channel::mpsc::UnboundedReceiver;
+use futures::{channel::oneshot, FutureExt, SinkExt, StreamExt};
+use futures_channel::mpsc::{UnboundedReceiver, UnboundedSender};
 use serde::Serialize;
 use std::{mem::Discriminant, sync::Arc, time::Duration};
 use tokio::{
@@ -240,6 +240,7 @@ pub struct RoundManager {
     randomness_config: OnChainRandomnessConfig,
     jwk_consensus_config: OnChainJWKConsensusConfig,
     fast_rand_config: Option<RandConfig>,
+    delayed_qc_tx: UnboundedSender<DelayedQcMsg>,
     // Stores the order votes from all the rounds above highest_ordered_round
     pending_order_votes: PendingOrderVotes,
 }
@@ -261,6 +262,7 @@ impl RoundManager {
         randomness_config: OnChainRandomnessConfig,
         jwk_consensus_config: OnChainJWKConsensusConfig,
         fast_rand_config: Option<RandConfig>,
+        delayed_qc_tx: UnboundedSender<DelayedQcMsg>,
     ) -> Self {
         // when decoupled execution is false,
         // the counter is still static.
@@ -288,6 +290,7 @@ impl RoundManager {
             randomness_config,
             jwk_consensus_config,
             fast_rand_config,
+            delayed_qc_tx,
             pending_order_votes: PendingOrderVotes::new(),
         }
     }
@@ -522,7 +525,7 @@ impl RoundManager {
             "Received delayed QC message and vote reception result is {:?}",
             vote_reception_result
         );
-        self.process_vote_reception_result(&vote, vote_reception_result)
+        self.process_vote_reception_result(&vote, vote_reception_result, false)
             .await
     }
 
@@ -1099,7 +1102,7 @@ impl RoundManager {
         let vote_reception_result = self
             .round_state
             .insert_vote(vote, &self.epoch_state.verifier);
-        self.process_vote_reception_result(vote, vote_reception_result)
+        self.process_vote_reception_result(vote, vote_reception_result, true)
             .await
     }
 
@@ -1107,6 +1110,7 @@ impl RoundManager {
         &mut self,
         vote: &Vote,
         result: VoteReceptionResult,
+        delay_if_block_not_exist: bool,
     ) -> anyhow::Result<()> {
         let round = vote.vote_data().proposed().round();
         match result {
@@ -1118,6 +1122,17 @@ impl RoundManager {
                     );
                 }
                 QC_AGGREGATED_FROM_VOTES.inc();
+                if delay_if_block_not_exist
+                    && !self.block_store.block_exists(qc.certified_block().id())
+                {
+                    let mut tx = self.delayed_qc_tx.clone();
+                    let vote = vote.clone();
+                    tokio::spawn(async move {
+                        tokio::time::sleep(Duration::from_millis(10)).await;
+                        let _ = tx.send(DelayedQcMsg::new(vote)).await;
+                    });
+                    return Ok(());
+                }
                 self.new_qc_aggregated(qc.clone(), vote.author())
                     .await
                     .context(format!(

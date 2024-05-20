@@ -780,7 +780,7 @@ impl<P: OnChainConfigProvider> EpochManager<P> {
         let round_state = self.create_round_state(
             self.time_service.clone(),
             self.timeout_sender.clone(),
-            delayed_qc_tx,
+            delayed_qc_tx.clone(),
             self.config.qc_aggregator_type.clone(),
         );
 
@@ -877,6 +877,7 @@ impl<P: OnChainConfigProvider> EpochManager<P> {
             onchain_randomness_config,
             onchain_jwk_consensus_config,
             fast_rand_config,
+            delayed_qc_tx,
         );
 
         round_manager.init(last_vote).await;

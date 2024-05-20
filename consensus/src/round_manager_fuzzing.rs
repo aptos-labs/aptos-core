@@ -201,6 +201,8 @@ fn create_node_for_fuzzing() -> RoundManager {
 
     let (round_manager_tx, _) = aptos_channel::new(QueueStyle::LIFO, 1, None);
 
+    let (delayed_qc_tx, _) = unbounded();
+
     // event processor
     RoundManager::new(
         epoch_state,
@@ -220,6 +222,7 @@ fn create_node_for_fuzzing() -> RoundManager {
         OnChainRandomnessConfig::default_enabled(),
         OnChainJWKConsensusConfig::default_enabled(),
         None,
+        delayed_qc_tx,
     )
 }
 
