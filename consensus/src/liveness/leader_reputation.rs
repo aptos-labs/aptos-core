@@ -29,6 +29,7 @@ use std::{
     cmp::max,
     collections::{HashMap, HashSet},
     convert::TryFrom,
+    iter::zip,
     sync::Arc,
 };
 
@@ -703,6 +704,17 @@ impl ProposerElection for LeaderReputation {
                 .get_weights(self.epoch, &self.epoch_to_proposers, &sliding_window);
         let proposers = &self.epoch_to_proposers[&self.epoch];
         assert_eq!(weights.len(), proposers.len());
+
+        let (proposers, mut weights): (Vec<_>, Vec<_>) = zip(proposers, weights)
+            .into_iter()
+            .filter_map(|(author, weight)| {
+                if weight < 1000 {
+                    None
+                } else {
+                    Some((*author, weight))
+                }
+            })
+            .unzip();
 
         // Multiply weights by voting power:
         let stake_weights: Vec<u128> = weights
