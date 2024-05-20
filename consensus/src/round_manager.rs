@@ -611,12 +611,14 @@ impl RoundManager {
 
     fn sync_only(&self) -> bool {
         let sync_or_not = self.local_config.sync_only || self.block_store.vote_back_pressure();
-        info!(
-            "sync_only: {}, local_config_sync_only: {}, vote backpressure: {}",
-            sync_or_not,
-            self.local_config.sync_only,
-            self.block_store.vote_back_pressure()
-        );
+        if sync_or_not {
+            info!(
+                "sync_or_not: {}, local_config_sync_only: {}, vote backpressure: {}",
+                sync_or_not,
+                self.local_config.sync_only,
+                self.block_store.vote_back_pressure()
+            );
+        }
         counters::OP_COUNTERS
             .gauge("sync_only")
             .set(sync_or_not as i64);

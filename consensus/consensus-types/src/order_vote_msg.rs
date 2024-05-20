@@ -46,8 +46,7 @@ impl OrderVoteMsg {
 
     pub fn verify(&self, validator: &ValidatorVerifier) -> anyhow::Result<()> {
         ensure!(
-            self.quorum_cert().certified_block()
-                == self.order_vote().ledger_info().commit_info(),
+            self.quorum_cert().certified_block() == self.order_vote().ledger_info().commit_info(),
             "QuorumCert and OrderVote do not match"
         );
         self.order_vote

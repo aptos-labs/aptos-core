@@ -114,13 +114,7 @@ impl BlockStore {
         // reproduce the same batches (important for the commit phase)
         let mut certs = self.inner.read().get_all_quorum_certs_with_commit_info();
         certs.sort_unstable_by_key(|qc| qc.commit_info().round());
-        info!("Try_send_for_execution with {} quorum certs. self.commit_root().round() {:?}, certs {:?}", certs.len(), self.commit_root().round(), certs);
         for qc in certs {
-            info!(
-                "try_send_for_execution with qc round {:?}, self round {:?}",
-                qc.commit_info().round(),
-                self.commit_root().round()
-            );
             if qc.commit_info().round() > self.commit_root().round() {
                 info!(
                     "trying to commit to round {} with ledger info {}",
@@ -472,10 +466,6 @@ impl BlockStore {
         counters::OP_COUNTERS
             .gauge("back_pressure")
             .set((ordered_round - commit_round) as i64);
-        info!(
-            "quorum_cert: {}, ordered_root_round: {}, ordered_cert_round: {}, vote_backpressure_limit: {}, commit_root_round: {}, commit_cert_round: {}",
-            self.highest_quorum_cert().certified_block().round(), ordered_round, self.highest_ordered_cert().commit_info().round(), self.vote_back_pressure_limit, commit_round, self.highest_commit_cert().commit_info().round()
-        );
         ordered_round > self.vote_back_pressure_limit + commit_round
     }
 

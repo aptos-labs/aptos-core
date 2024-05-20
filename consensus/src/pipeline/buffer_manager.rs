@@ -606,16 +606,12 @@ impl BufferManager {
                         return None;
                     }
                 } else {
-                    warn!("Reply NACK for commit vote {}", vote.ledger_info());
                     reply_nack(protocol, response_sender); // TODO: send_commit_vote() doesn't care about the response and this should be direct send not RPC
                 }
             },
             CommitMessage::Decision(commit_proof) => {
                 let target_block_id = commit_proof.ledger_info().commit_info().id();
-                info!(
-                    "Receive commit decision {}",
-                    commit_proof.ledger_info()
-                );
+                info!("Receive commit decision {}", commit_proof.ledger_info());
                 let cursor = self
                     .buffer
                     .find_elem_by_key(*self.buffer.head_cursor(), target_block_id);
@@ -635,7 +631,6 @@ impl BufferManager {
                         return Some(target_block_id);
                     }
                 }
-                warn!("Rejecting commit decision with NACK for {}", commit_proof.ledger_info());
                 reply_nack(protocol, response_sender); // TODO: send_commit_proof() doesn't care about the response and this should be direct send not RPC
             },
             CommitMessage::Ack(_) => {
