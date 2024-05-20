@@ -3,7 +3,7 @@
 // SPDX-License-Identifier: Apache-2.0
 
 use crate::{
-    block_storage::{BlockReader, BlockStore},
+    block_storage::{pending_blocks::PendingBlocks, BlockReader, BlockStore},
     liveness::{
         proposal_generator::{
             ChainHealthBackoffConfig, PipelineBackpressureConfig, ProposalGenerator,
@@ -279,6 +279,7 @@ impl NodeSetup {
             time_service.clone(),
             10,
             Arc::from(PayloadManager::DirectMempool),
+            Arc::new(Mutex::new(PendingBlocks::new())),
         ));
 
         let proposer_election = Self::create_proposer_election(proposers.clone());
