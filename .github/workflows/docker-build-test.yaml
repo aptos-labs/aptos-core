@@ -125,17 +125,17 @@ jobs:
         id: determine_file_changes
         uses: ./.github/actions/file-change-determinator
 
-  # This job determines if the framework upgrade test should be run
-  framework-upgrade-determinator:
+  # This job determines which tests to run
+  test-target-determinator:
     needs: [permission-check]
     runs-on: ubuntu-latest
     outputs:
-      run_framework_upgrade_test: ${{ steps.determine_framework_upgrade_test.outputs.run_framework_upgrade_test }}
+      run_framework_upgrade_test: ${{ steps.determine_test_targets.outputs.run_framework_upgrade_test }}
     steps:
       - uses: actions/checkout@v3
-      - name: Run the framework upgrade test determinator
-        id: determine_framework_upgrade_test
-        uses: ./.github/actions/framework-upgrade-determinator
+      - name: Run the test target determinator
+        id: determine_test_targets
+        uses: ./.github/actions/test-target-determinator
 
   # This is a PR required job.
   rust-images:
@@ -312,7 +312,7 @@ jobs:
     with:
       GIT_SHA: ${{ needs.determine-docker-build-metadata.outputs.gitSha }}
       FORGE_TEST_SUITE: compat
-      IMAGE_TAG: 01b24e7e3548382dd25440b39a0438a993387f12 #aptos-node-v1.11 with randomness disabled in genesis
+      IMAGE_TAG: 3ffe0986b5fe4acb76544ae7ae85d73b91a6a411 #aptos-node-v1.13.0
       FORGE_RUNNER_DURATION_SECS: 300
       COMMENT_HEADER: forge-compat
       FORGE_NAMESPACE: forge-compat-${{ needs.determine-docker-build-metadata.outputs.targetCacheId }}
@@ -327,7 +327,7 @@ jobs:
       - rust-images-failpoints
       - rust-images-performance
       - rust-images-consensus-only-perf-test
-      - framework-upgrade-determinator
+      - test-target-determinator
     if: |
       !failure() && !cancelled() && needs.permission-check.result == 'success' && (
         (github.event_name == 'push' && github.ref_name != 'main') ||
@@ -340,11 +340,11 @@ jobs:
     with:
       GIT_SHA: ${{ needs.determine-docker-build-metadata.outputs.gitSha }}
       FORGE_TEST_SUITE: framework_upgrade
-      IMAGE_TAG: 01b24e7e3548382dd25440b39a0438a993387f12 #aptos-node-v1.11 with randomness disabled in genesis
+      IMAGE_TAG: c90dafdb2f450e4d3aa16b1a7cff8e3cad2b882e #aptos-node-v1.13.0
       FORGE_RUNNER_DURATION_SECS: 3600
       COMMENT_HEADER: forge-framework-upgrade
       FORGE_NAMESPACE: forge-framework-upgrade-${{ needs.determine-docker-build-metadata.outputs.targetCacheId }}
-      SKIP_JOB: ${{ !contains(github.event.pull_request.labels.*.name, 'CICD:run-framework-upgrade-test') && (needs.framework-upgrade-determinator.outputs.run_framework_upgrade_test == 'false') }}
+      SKIP_JOB: ${{ !contains(github.event.pull_request.labels.*.name, 'CICD:run-framework-upgrade-test') && (needs.test-target-determinator.outputs.run_framework_upgrade_test == 'false') }}
 
   forge-consensus-only-perf-test:
     needs:

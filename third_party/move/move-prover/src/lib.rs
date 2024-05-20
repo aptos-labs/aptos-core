@@ -53,6 +53,7 @@ pub fn run_move_prover<W: WriteColor>(
             paths: options.move_sources.clone(),
             named_address_map: addrs.clone(),
         }],
+        vec![],
         vec![PackagePaths {
             name: None,
             paths: options.move_deps.clone(),
@@ -82,6 +83,7 @@ pub fn run_move_prover_v2<W: WriteColor>(
         experiments: vec![],
         experiment_cache: Default::default(),
         sources: cloned_options.move_sources,
+        sources_deps: vec![],
         warn_unused: false,
         whole_program: false,
         compile_test_code: false,

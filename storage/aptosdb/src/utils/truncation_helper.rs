@@ -4,7 +4,6 @@
 #![allow(dead_code)]
 
 use crate::{
-    common::NUM_STATE_SHARDS,
     ledger_db::{LedgerDb, LedgerDbSchemaBatches},
     schema::{
         db_metadata::{DbMetadataKey, DbMetadataSchema, DbMetadataValue},
@@ -76,14 +75,16 @@ pub(crate) fn truncate_state_kv_db(
     target_version: Version,
     batch_size: usize,
 ) -> Result<()> {
-    let status = StatusLine::new(Progress::new(target_version));
+    assert!(batch_size > 0);
+    let status = StatusLine::new(Progress::new("Truncating State KV DB", target_version));
+    status.set_current_version(current_version);
 
     let mut current_version = current_version;
     // current_version can be the same with target_version while there is data written to the db before
     // the progress is recorded -- we need to run the truncate for at least one batch
     loop {
         let target_version_for_this_batch = std::cmp::max(
-            current_version.wrapping_sub(batch_size as Version),
+            current_version.saturating_sub(batch_size as Version),
             target_version,
         );
         // By writing the progress first, we still maintain that it is less than or equal to the
@@ -109,7 +110,7 @@ pub(crate) fn truncate_state_kv_db_shards(
     state_kv_db: &StateKvDb,
     target_version: Version,
 ) -> Result<()> {
-    (0..NUM_STATE_SHARDS)
+    (0..state_kv_db.hack_num_real_shards())
         .into_par_iter()
         .try_for_each(|shard_id| {
             truncate_state_kv_db_single_shard(state_kv_db, shard_id as u8, target_version)
@@ -130,7 +131,8 @@ pub(crate) fn truncate_state_merkle_db(
     state_merkle_db: &StateMerkleDb,
     target_version: Version,
 ) -> Result<()> {
-    let status = StatusLine::new(Progress::new(target_version));
+    let status = StatusLine::new(Progress::new("Truncating State Merkle DB.", target_version));
+
     loop {
         let current_version = get_current_version_in_state_merkle_db(state_merkle_db)?
             .expect("Current version of state merkle db must exist.");
@@ -164,7 +166,7 @@ pub(crate) fn truncate_state_merkle_db_shards(
     state_merkle_db: &StateMerkleDb,
     target_version: Version,
 ) -> Result<()> {
-    (0..NUM_STATE_SHARDS)
+    (0..state_merkle_db.hack_num_real_shards())
         .into_par_iter()
         .try_for_each(|shard_id| {
             truncate_state_merkle_db_single_shard(state_merkle_db, shard_id as u8, target_version)
@@ -466,13 +468,15 @@ fn delete_nodes_and_stale_indices_at_or_after_version(
 }
 
 struct Progress {
+    message: &'static str,
     current_version: AtomicU64,
     target_version: Version,
 }
 
 impl Progress {
-    pub fn new(target_version: Version) -> Self {
+    pub fn new(message: &'static str, target_version: Version) -> Self {
         Self {
+            message,
             current_version: 0.into(),
             target_version,
         }
@@ -488,7 +492,8 @@ impl Display for Progress {
     fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
         write!(
             f,
-            "current: {}, target: {}",
+            "{}: current: {}, target: {}",
+            self.message,
             self.current_version.load(Ordering::Relaxed),
             self.target_version
         )

@@ -20,7 +20,6 @@ use aptos_api_types::{
     MoveStructTag, VerifyInputWithRecursion, VersionedEvent, U64,
 };
 use aptos_types::event::EventKey;
-use aptos_vm::data_cache::AsMoveResolver;
 use poem_openapi::{
     param::{Path, Query},
     OpenApi,
@@ -185,7 +184,6 @@ impl EventsApi {
                 let events = self
                     .context
                     .latest_state_view_poem(&latest_ledger_info)?
-                    .as_move_resolver()
                     .as_converter(
                         self.context.db.clone(),
                         self.context.table_info_reader.clone(),

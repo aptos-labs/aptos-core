@@ -360,6 +360,7 @@ pub trait DbReader: Send + Sync {
             &self,
             state_key: &StateKey,
             version: Version,
+            root_depth: usize,
         ) -> Result<SparseMerkleProofExt>;
 
         /// Gets a state value by state key along with the proof, out of the ledger state indicated by the state
@@ -374,6 +375,7 @@ pub trait DbReader: Send + Sync {
             &self,
             state_key: &StateKey,
             version: Version,
+            root_depth: usize,
         ) -> Result<(Option<StateValue>, SparseMerkleProofExt)>;
 
         /// Gets the latest ExecutedTrees no matter if db has been bootstrapped.
@@ -474,7 +476,7 @@ pub trait DbReader: Send + Sync {
         state_key: &StateKey,
         version: Version,
     ) -> Result<(Option<StateValue>, SparseMerkleProof)> {
-        self.get_state_value_with_proof_by_version_ext(state_key, version)
+        self.get_state_value_with_proof_by_version_ext(state_key, version, 0)
             .map(|(value, proof_ext)| (value, proof_ext.into()))
     }
 }

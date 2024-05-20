@@ -160,6 +160,10 @@ pub fn run_checker(options: Options) -> anyhow::Result<GlobalEnv> {
             sources: options.sources.clone(),
             address_map: addrs.clone(),
         },
+        PackageInfo {
+            sources: options.sources_deps.clone(),
+            address_map: addrs.clone(),
+        },
         vec![PackageInfo {
             sources: options.dependencies.clone(),
             address_map: addrs.clone(),
@@ -217,7 +221,10 @@ pub fn run_bytecode_gen(env: &GlobalEnv) -> FunctionTargetsHolder {
         if module.is_target() {
             for fun in module.get_functions() {
                 let id = fun.get_qualified_id();
-                todo.insert(id);
+                // Skip inline functions because invoke and lambda are not supported in the current code generator
+                if !fun.is_inline() {
+                    todo.insert(id);
+                }
             }
         }
     }

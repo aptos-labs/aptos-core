@@ -68,6 +68,7 @@ pub struct CompiledState<'a> {
     pub named_address_mapping: BTreeMap<String, NumericalAddress>,
     default_named_address_mapping: Option<NumericalAddress>,
     modules: BTreeMap<ModuleId, ProcessedModule>,
+    temp_file_mapping: BTreeMap<String, String>,
 }
 
 impl<'a> CompiledState<'a> {
@@ -288,6 +289,7 @@ pub trait MoveTestAdapter<'a>: Sized {
                 (None, module, None)
             },
         };
+        self.register_temp_filename(&data);
         Ok((data, named_addr_opt, module, warnings_opt))
     }
 
@@ -367,6 +369,9 @@ pub trait MoveTestAdapter<'a>: Sized {
             stop_line,
             data,
         } = task;
+        if let Some(data) = &data {
+            self.register_temp_filename(data);
+        }
         match command {
             TaskCommand::Init { .. } => {
                 panic!("The 'init' command is optional. But if used, it must be the first command")
@@ -398,6 +403,7 @@ pub trait MoveTestAdapter<'a>: Sized {
                 let syntax = syntax.unwrap_or_else(|| self.default_syntax());
                 let (data, named_addr_opt, module, warnings_opt) =
                     self.compile_module(syntax, data, start_line, command_lines_stop)?;
+                self.register_temp_filename(&data);
                 let printed = if print_bytecode {
                     let disassembler = disassembler_for_view(BinaryIndexedView::Module(&module));
                     Some(format!(
@@ -501,7 +507,7 @@ pub trait MoveTestAdapter<'a>: Sized {
                     address: module_addr,
                     module,
                     name,
-                    type_params: type_arguments,
+                    type_args: type_arguments,
                 } = resource
                     .into_struct_tag(&|s| Some(state.resolve_named_address(s)))
                     .unwrap();
@@ -523,6 +529,35 @@ pub trait MoveTestAdapter<'a>: Sized {
                 stop_line,
                 data,
             }),
+        }
+    }
+
+    fn register_temp_filename(&mut self, data: &NamedTempFile) {
+        let data_path = data.path().to_str().unwrap();
+        if !data_path.is_empty() {
+            let compiled_state = self.compiled_state();
+            let mapping = &mut compiled_state.temp_file_mapping;
+            if !mapping.contains_key(data_path) {
+                let generic_name = match mapping.len() {
+                    0 => "TEMPFILE".to_string(),
+                    idx => format!("TEMPFILE{}", idx),
+                };
+                mapping.insert(data_path.to_owned(), generic_name);
+            }
+        }
+    }
+
+    fn rewrite_temp_filenames(&mut self, output: String) -> String {
+        let compiled_state = self.compiled_state();
+        let mapping = &mut compiled_state.temp_file_mapping;
+        if !mapping.is_empty() {
+            let mut result_string = output;
+            for (source, target) in mapping.iter() {
+                result_string = result_string.replace(source, target);
+            }
+            result_string
+        } else {
+            output
         }
     }
 }
@@ -609,6 +644,7 @@ impl<'a> CompiledState<'a> {
             compiled_module_named_address_mapping: BTreeMap::new(),
             named_address_mapping,
             default_named_address_mapping,
+            temp_file_mapping: BTreeMap::new(),
         };
         for annot_module in either_or_no_modules(pre_compiled_deps_v1, pre_compiled_deps_v2) {
             let (named_addr_opt, _id) = annot_module.module_id();
@@ -996,19 +1032,16 @@ fn handle_known_task<'a, Adapter: MoveTestAdapter<'a>>(
     let task_name = task.name.to_owned();
     let start_line = task.start_line;
     let stop_line = task.stop_line;
-    let data_path = match &task.data {
-        Some(f) => f.path().to_str().unwrap().to_string(),
-        None => "".to_string(),
-    };
+    if let Some(data) = &task.data {
+        adapter.register_temp_filename(data);
+    }
     let result = adapter.handle_command(task);
-    let mut result_string = match result {
+    let result_string = match result {
         Ok(None) => return,
         Ok(Some(s)) => s,
         Err(e) => format!("Error: {}", e),
     };
-    if !data_path.is_empty() {
-        result_string = result_string.replace(&data_path, "TEMPFILE");
-    }
+    let result_string = adapter.rewrite_temp_filenames(result_string);
     assert!(!result_string.is_empty());
     writeln!(
         output,

@@ -814,18 +814,20 @@ impl DbReader for FakeAptosDB {
         &self,
         state_key: &StateKey,
         version: Version,
+        root_depth: usize,
     ) -> Result<SparseMerkleProofExt> {
         self.inner
-            .get_state_proof_by_version_ext(state_key, version)
+            .get_state_proof_by_version_ext(state_key, version, root_depth)
     }
 
     fn get_state_value_with_proof_by_version_ext(
         &self,
         state_key: &StateKey,
         version: Version,
+        root_depth: usize,
     ) -> Result<(Option<StateValue>, SparseMerkleProofExt)> {
         self.inner
-            .get_state_value_with_proof_by_version_ext(state_key, version)
+            .get_state_value_with_proof_by_version_ext(state_key, version, root_depth)
     }
 
     fn get_latest_executed_trees(&self) -> Result<ExecutedTrees> {

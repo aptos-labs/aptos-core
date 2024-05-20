@@ -781,7 +781,7 @@ impl<'env> BoogieWrapper<'env> {
                         kind: BoogieErrorKind::Inconclusive,
                         loc,
                         message: if msg.contains("out of resource") || msg.contains("timed out") {
-                            let timeout = self.options.adjust_timeout(self.options.vc_timeout);
+                            let timeout = self.options.vc_timeout;
                             format!(
                                 "verification out of resources/timeout (global timeout set to {}s)",
                                 timeout

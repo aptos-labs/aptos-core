@@ -135,6 +135,8 @@ impl FeatureFlag {
             FeatureFlag::COIN_TO_FUNGIBLE_ASSET_MIGRATION,
             FeatureFlag::OBJECT_NATIVE_DERIVED_ADDRESS,
             FeatureFlag::DISPATCHABLE_FUNGIBLE_ASSET,
+            FeatureFlag::REMOVE_DETAILED_ERROR_FROM_HASH,
+            FeatureFlag::CONCURRENT_FUNGIBLE_ASSETS,
         ]
     }
 }
