@@ -24,7 +24,7 @@ script {
         let vk = keyless_account::new_groth16_verification_key(alpha_g1, beta_g2, gamma_g2, delta_g2, gamma_abc_g1);
 
         // Prepare misc configs.
-        let override_aud_val = vector[utf8(b"test.recovery.aud")];
+        let override_aud_val = vector[];
         let max_signatures_per_txn = 3;
         let max_exp_horizon_secs = 10_000_000;
         let training_wheels_pubkey = option::some(x"c9c9c08c2e3fdbf0c818274a34a943263eebd7c6683e8b37b61f21f62af4dea1");
