@@ -21,7 +21,6 @@ Output: Ok(Changes { accounts: {000000000000000000000000000000000000000000000000
 Test failures:
 
 Failures in 0x1::Module:
-
 ┌── tests_d ──────
 │ error[E11001]: test failure
 │     ┌─ proposal_test.move:102:9

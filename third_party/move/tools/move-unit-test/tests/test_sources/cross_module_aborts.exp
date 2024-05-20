@@ -9,7 +9,6 @@ Output: Ok(Changes { accounts: {} })
 Test failures:
 
 Failures in 0x1::B:
-
 ┌── failing_test ──────
 │ error[E11001]: test failure
 │   ┌─ cross_module_aborts.move:5:9

@@ -6,7 +6,6 @@ Output: Ok(Changes { accounts: {} })
 Test failures:
 
 Failures in 0x1::M:
-
 ┌── non_existent_native ──────
 │ error[E11001]: test failure
 │   ┌─ non_exsistent_native.move:3:16

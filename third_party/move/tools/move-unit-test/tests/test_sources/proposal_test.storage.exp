@@ -21,7 +21,6 @@ Output: Ok(Changes { accounts: {000000000000000000000000000000000000000000000000
 Test failures:
 
 Failures in 0x1::Module:
-
 ┌── tests_d ──────
 │ error[E11001]: test failure
 │     ┌─ proposal_test.move:102:9
@@ -33,7 +32,7 @@ Failures in 0x1::Module:
 │     │         ^^^^^^^^^^^^^^^^^^^^^^^^^^^ Test was not expected to error, but it aborted with code 3 originating in the module 0000000000000000000000000000000000000000000000000000000000000001::Module rooted here
 │ 
 │ 
-│ ────── Storage state at point of failure ──────
+│ --──── Storage state at point of failure --────
 │ 0x1:
 │ 	=> key 0x1::Module::B<u64> {
 │ 	    t: 5
