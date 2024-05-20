@@ -23,19 +23,19 @@ module rewards::rewards_tests {
         let claimer_2_addr = signer::address_of(claimer_2);
         rewards::add_rewards(admin, vector[claimer_1_addr, claimer_2_addr], vector[500, 500]);
 
-        // // Cancel for claimer_2
-        // assert!(rewards::pending_rewards(claimer_2_addr) == 500, 0);
-        // rewards::cancel_rewards(admin, vector[claimer_2_addr]);
-        // assert!(rewards::pending_rewards(claimer_2_addr) == 0, 0);
+        // Cancel for claimer_2
+        assert!(rewards::pending_rewards(claimer_2_addr) == 500, 0);
+        rewards::cancel_rewards(admin, vector[claimer_2_addr]);
+        assert!(rewards::pending_rewards(claimer_2_addr) == 0, 0);
 
-        // // Claim
-        // assert!(rewards::pending_rewards(claimer_1_addr) == 500, 0);
-        // rewards::claim_reward(claimer_1);
-        // assert!(coin::balance<AptosCoin>(claimer_1_addr) == 500, 0);
+        // Claim
+        assert!(rewards::pending_rewards(claimer_1_addr) == 500, 0);
+        rewards::claim_reward(claimer_1);
+        assert!(coin::balance<AptosCoin>(claimer_1_addr) == 500, 0);
 
-        // // Transfer Admin Role and add more rewards
-        // let admin_2_addr = signer::address_of(admin_2);
-        // rewards::transfer_admin_role(admin, admin_2_addr);
-        // rewards::add_rewards(admin_2, vector[claimer_1_addr, claimer_2_addr], vector[500, 500]);
+        // Transfer Admin Role and add more rewards
+        let admin_2_addr = signer::address_of(admin_2);
+        rewards::transfer_admin_role(admin, admin_2_addr);
+        rewards::add_rewards(admin_2, vector[claimer_1_addr, claimer_2_addr], vector[500, 500]);
     }
 }
