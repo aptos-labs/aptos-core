@@ -8,8 +8,9 @@ proposals:
       description: "Enables the changes in AIP-61 https://github.com/aptos-foundation/AIPs/blob/main/aips/aip-61.md and related AIPs (75, 81)"
       source_code_url: ""
       discussion_url: "https://github.com/aptos-foundation/AIPs/issues/297"
-    execution_mode: RootSigner
+    execution_mode: MultiStep
     update_sequence:
+      - RawScript: aptos-move/aptos-release-builder/data/proposals/keyless_initialization.move
       - FeatureFlag:
           enabled:
             - keyless_accounts
