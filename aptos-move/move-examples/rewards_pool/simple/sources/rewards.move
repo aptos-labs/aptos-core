@@ -37,17 +37,9 @@ module rewards::rewards {
         coin::value(rewards)
     }
 
-    #[view]
-    /// Returns if caller is authorised to perform the action.
-    public fun is_admin(admin: address): bool acquires RewardStore {
-        let rewards_store = borrow_global<RewardStore>(@rewards);
-        assert!(rewards_store.admin == admin, ENOT_AUTHORISED);
-        true
-    }
-
     /// Allow admin to upload rewards for multiple recipients.
     public entry fun add_rewards(admin: &signer, recipients: vector<address>, amounts: vector<u64>) acquires RewardStore {
-        is_admin(signer::address_of(admin));
+        assert_is_admin(signer::address_of(admin));
         let rewards_store = borrow_global_mut<RewardStore>(@rewards);
         vector::zip(recipients, amounts, |recipient, amount| {
             // Extract rewards from the admin's account.
@@ -63,7 +55,7 @@ module rewards::rewards {
 
     public entry fun cancel_rewards(admin: &signer, recipients: vector<address>) acquires RewardStore {
         let admin_addr = signer::address_of(admin);
-        is_admin(admin_addr);
+        assert_is_admin(admin_addr);
         let rewards_store = borrow_global_mut<RewardStore>(@rewards);
         vector::for_each(recipients, |recipient| {
             let rewards = smart_table::remove(&mut rewards_store.rewards, recipient);
@@ -82,9 +74,14 @@ module rewards::rewards {
 
     /// Transfer the admin role to a new address.
     public entry fun transfer_admin_role(admin: &signer, new_admin: address) acquires RewardStore {
-        is_admin(signer::address_of(admin));
+        assert_is_admin(signer::address_of(admin));
         let rewards_store = borrow_global_mut<RewardStore>(@rewards);
         rewards_store.admin = new_admin;
+    }
+
+    fun assert_is_admin(admin: address) acquires RewardStore {
+        let rewards_store = borrow_global<RewardStore>(@rewards);
+        assert!(rewards_store.admin == admin, ENOT_AUTHORISED);
     }
 
     #[test_only]
