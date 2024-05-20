@@ -9,6 +9,7 @@ use crate::{
         BlockReader,
     },
     counters,
+    epoch_manager::PENDING_BLOCKS,
     payload_manager::PayloadManager,
     persistent_liveness_storage::{
         PersistentLivenessStorage, RecoveryData, RootInfo, RootMetadata,
@@ -247,7 +248,12 @@ impl BlockStore {
 
         let block_tree = self.inner.clone();
         let storage = self.storage.clone();
-        let finality_proof_clone = finality_proof.clone();
+        let finality_proof_clone = finality_proof.clone();        
+        PENDING_BLOCKS
+            .lock()
+            .unwrap()
+            .gc(finality_proof.commit_info().round());
+
         // This callback is invoked synchronously with and could be used for multiple batches of blocks.
         self.execution_client
             .finalize_order(

@@ -17,7 +17,7 @@ use crate::{
         BLOCKS_FETCHED_FROM_NETWORK_WHILE_SYNCING, LATE_EXECUTION_WITH_ORDER_VOTE_QC,
         SUCCESSFUL_EXECUTED_WITH_ORDER_VOTE_QC, SUCCESSFUL_EXECUTED_WITH_REGULAR_QC,
     },
-    epoch_manager::LivenessStorageData,
+    epoch_manager::{LivenessStorageData, PENDING_BLOCKS},
     logging::{LogEvent, LogSchema},
     monitor,
     network::{IncomingBlockRetrievalRequest, NetworkSender},
@@ -45,7 +45,8 @@ use aptos_types::{
     ledger_info::LedgerInfoWithSignatures,
 };
 use fail::fail_point;
-use futures::{stream::FuturesUnordered, StreamExt};
+use futures::{stream::FuturesUnordered, FutureExt, StreamExt};
+use futures_channel::oneshot;
 use rand::{prelude::*, Rng};
 use std::{clone::Clone, cmp::min, sync::Arc, time::Duration};
 use tokio::time;
@@ -588,6 +589,27 @@ impl BlockRetriever {
         monitor!("retrieve_block_for_id_chunk", {
             let mut interval = time::interval(retry_interval);
             let mut futures = FuturesUnordered::new();
+            if retrieve_batch_size == 1 {
+                let (tx, rx) = oneshot::channel();
+                let mut pending_blocks = PENDING_BLOCKS.lock().unwrap();
+                pending_blocks.insert_request(target_block_id, tx);
+                let author = self.network.author();
+                futures.push(
+                    async move {
+                        let response = rx
+                            .await
+                            .map(|block| {
+                                BlockRetrievalResponse::new(
+                                    BlockRetrievalStatus::SucceededWithTarget,
+                                    vec![block],
+                                )
+                            })
+                            .map_err(|_| anyhow::anyhow!("self retrieval failed"));
+                        (author, response)
+                    }
+                    .boxed(),
+                )
+            }
             let request = BlockRetrievalRequest::new_with_target_block_id(
                 block_id,
                 retrieve_batch_size,
@@ -628,7 +650,7 @@ impl BlockRetriever {
                                 peer,
                                 rpc_timeout,
                             );
-                            futures.push(async move { (remote_peer, future.await) });
+                            futures.push(async move { (remote_peer, future.await) }.boxed());
                         }
                     }
                     Some((peer, response)) = futures.next() => {
