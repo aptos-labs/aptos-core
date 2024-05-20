@@ -995,10 +995,13 @@ where
     } = config.clone()
     {
         (
-            vec![TestRunConfig::CompilerV1, TestRunConfig::CompilerV2 {
-                language_version,
-                v2_experiments,
-            }],
+            vec![
+                TestRunConfig::CompilerV1,
+                TestRunConfig::CompilerV2 {
+                    language_version,
+                    v2_experiments,
+                },
+            ],
             true,
         )
     } else {
