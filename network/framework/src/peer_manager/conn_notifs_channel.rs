@@ -23,19 +23,28 @@ pub fn new() -> (Sender, Receiver) {
 #[cfg(test)]
 mod test {
     use super::*;
-    use crate::transport::ConnectionMetadata;
-    use aptos_config::network_id::NetworkId;
+    use crate::{peer::DisconnectReason, transport::ConnectionMetadata};
+    use aptos_config::network_id::NetworkContext;
     use futures::{executor::block_on, future::FutureExt, stream::StreamExt};
 
     fn send_new_peer(sender: &mut Sender, connection: ConnectionMetadata) {
         let peer_id = connection.remote_peer_id;
-        let notif = ConnectionNotification::NewPeer(connection, NetworkId::Validator);
+        let notif =
+            ConnectionNotification::NewPeer(connection, NetworkContext::mock_with_peer_id(peer_id));
         sender.push(peer_id, notif).unwrap()
     }
 
-    fn send_lost_peer(sender: &mut Sender, connection: ConnectionMetadata) {
+    fn send_lost_peer(
+        sender: &mut Sender,
+        connection: ConnectionMetadata,
+        reason: DisconnectReason,
+    ) {
         let peer_id = connection.remote_peer_id;
-        let notif = ConnectionNotification::LostPeer(connection, NetworkId::Validator);
+        let notif = ConnectionNotification::LostPeer(
+            connection,
+            NetworkContext::mock_with_peer_id(peer_id),
+            reason,
+        );
         sender.push(peer_id, notif).unwrap()
     }
 
@@ -48,12 +57,20 @@ mod test {
             let conn_a = ConnectionMetadata::mock(peer_id_a);
             let conn_b = ConnectionMetadata::mock(peer_id_b);
             send_new_peer(&mut sender, conn_a.clone());
-            send_lost_peer(&mut sender, conn_a.clone());
+            send_lost_peer(
+                &mut sender,
+                conn_a.clone(),
+                DisconnectReason::ConnectionLost,
+            );
             send_new_peer(&mut sender, conn_a.clone());
-            send_lost_peer(&mut sender, conn_a.clone());
+            send_lost_peer(&mut sender, conn_a.clone(), DisconnectReason::Requested);
 
             // Ensure that only the last message is received.
-            let notif = ConnectionNotification::LostPeer(conn_a.clone(), NetworkId::Validator);
+            let notif = ConnectionNotification::LostPeer(
+                conn_a.clone(),
+                NetworkContext::mock_with_peer_id(peer_id_a),
+                DisconnectReason::Requested,
+            );
             assert_eq!(receiver.select_next_some().await, notif,);
             // Ensures that there is no other value which is ready
             assert_eq!(receiver.select_next_some().now_or_never(), None);
