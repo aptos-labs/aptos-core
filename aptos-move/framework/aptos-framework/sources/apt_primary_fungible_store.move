@@ -10,7 +10,7 @@ module aptos_framework::apt_primary_fungible_store {
     friend aptos_framework::transaction_fee;
     friend aptos_framework::transaction_validation;
 
-    inline fun store_address(account: address): address {
+    fun store_address(account: address): address {
         object::create_user_derived_object_address(account, @aptos_fungible_asset)
     }
 
@@ -31,7 +31,7 @@ module aptos_framework::apt_primary_fungible_store {
         };
     }
 
-    public(friend) inline fun ensure_primary_store_exists(owner: address): address {
+    public(friend) fun ensure_primary_store_exists(owner: address): address {
         let store_addr = store_address(owner);
         if (fungible_asset::store_exists(store_addr)) {
             store_addr

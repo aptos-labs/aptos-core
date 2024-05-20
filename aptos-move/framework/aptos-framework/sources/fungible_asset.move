@@ -439,7 +439,7 @@ module aptos_framework::fungible_asset {
         store_exists_inline(store)
     }
 
-    inline fun store_exists_inline(store: address): bool {
+    fun store_exists_inline(store: address): bool {
         exists<FungibleStore>(store)
     }
 
