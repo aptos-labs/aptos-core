@@ -723,29 +723,31 @@ impl ProposerElection for LeaderReputation {
             .map(|(i, w)| *w as u128 * self.voting_powers[i] as u128)
             .collect();
 
-        let chosen_proposers: Vec<_> = (0..self.proposers_per_round as u64)
-            .into_par_iter()
-            .map(|instance| {
-                let state = if self.use_root_hash {
-                    [
-                        root_hash.to_vec(),
-                        self.epoch.to_le_bytes().to_vec(),
-                        round.to_le_bytes().to_vec(),
-                        instance.to_le_bytes().to_vec(),
-                    ]
-                    .concat()
-                } else {
-                    [
-                        self.epoch.to_le_bytes().to_vec(),
-                        round.to_le_bytes().to_vec(),
-                        instance.to_le_bytes().to_vec(),
-                    ]
-                    .concat()
-                };
-                let chosen_index = choose_index(&stake_weights, state);
-                proposers[chosen_index]
-            })
-            .collect();
+        let chosen_proposers = proposers;
+
+        // let chosen_proposers: Vec<_> = (0..self.proposers_per_round as u64)
+        //     .into_par_iter()
+        //     .map(|instance| {
+        //         let state = if self.use_root_hash {
+        //             [
+        //                 root_hash.to_vec(),
+        //                 self.epoch.to_le_bytes().to_vec(),
+        //                 round.to_le_bytes().to_vec(),
+        //                 instance.to_le_bytes().to_vec(),
+        //             ]
+        //             .concat()
+        //         } else {
+        //             [
+        //                 self.epoch.to_le_bytes().to_vec(),
+        //                 round.to_le_bytes().to_vec(),
+        //                 instance.to_le_bytes().to_vec(),
+        //             ]
+        //             .concat()
+        //         };
+        //         let chosen_index = choose_index(&stake_weights, state);
+        //         proposers[chosen_index]
+        //     })
+        //     .collect();
         // let chosen_index = shift_number(chosen_index, self.proposers_per_round, proposers.len());
         // let chosen_proposers = if round > 300 {
         //     vec![
