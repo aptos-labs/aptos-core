@@ -218,6 +218,19 @@ use ark_circom::CircomBuilder;
 use std::fs::File;
 use std::io::prelude::*;
 use std::collections::HashMap;
+use std::str::FromStr;
+//use ark_ff::{BigInt,BigInteger};
+use num_bigint::{BigInt,BigUint};
+
+fn u8_to_bits(x: u8) -> Vec<bool> {
+    let mut result = Vec::new();
+    for i in 0..8 {
+        let mask = 1 << x;
+        let bit_is_set = (mask & x) > 0;
+        result.push(bit_is_set);
+    }
+    result
+}
 
 fn test_prove_and_verify<E>(n_iters: usize)
 where
@@ -225,11 +238,6 @@ where
 {
     println!("starting test");
 
-    let mut input_file = File::open("/Users/michael/aptos-labs/aptos-core/types/src/keyless/circuit-files/keyless_input.json").unwrap();
-    let mut input_json = String::new();
-    input_file.read_to_string(&mut input_json).unwrap();
-    let mut input_map: HashMap<String, Vec<String>> = serde_json::from_str(&input_json).unwrap();
-    println!("{:?}", input_map);
     let cfg = CircomConfig::<Bn254>::new(
     //"./circuit-files/keyless_main.wasm",
     //"./proof_simulation.rs",
@@ -245,6 +253,26 @@ where
 ).unwrap();*/
 
     let mut builder = CircomBuilder::new(cfg);
+    let mut input_file = File::open("/Users/michael/aptos-labs/aptos-core/types/src/keyless/circuit-files/keyless_input.json").unwrap();
+    let mut input_json = String::new();
+    input_file.read_to_string(&mut input_json).unwrap();
+    let mut input_map: HashMap<String, Vec<String>> = serde_json::from_str(&input_json).unwrap();
+    for (key, values) in input_map {
+        for v in values {
+            let v_biguint = BigInt::from_str(&v[..]).map_err(|_| ()).unwrap();
+            /*let v_biguint_bytes = v_biguint.to_bytes_le();
+            let mut v_biguint_bits = Vec::new();
+            for byte in v_biguint_bytes {
+                let mut v_bits = u8_to_bits(byte);
+                v_biguint_bits.append(&mut v_bits);
+            }
+            let v_bigint = ark_ff::BigInt::from_bits_le(&v_biguint_bits);*/
+            //let v_bigint = ark_ff::BigInt::try_from(v_biguint);
+            builder.push_input(key, v_biguint);
+        }
+    }
+    assert!(false);
+
     let circom = builder.setup();
     let mut rng = ark_std::rand::rngs::StdRng::seed_from_u64(test_rng().next_u64());
 
