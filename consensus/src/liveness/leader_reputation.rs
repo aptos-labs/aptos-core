@@ -705,7 +705,7 @@ impl ProposerElection for LeaderReputation {
         let proposers = &self.epoch_to_proposers[&self.epoch];
         assert_eq!(weights.len(), proposers.len());
 
-        let (proposers, mut weights): (Vec<_>, Vec<_>) = zip(proposers, weights)
+        let (filtered_proposers, mut weights): (Vec<_>, Vec<_>) = zip(proposers, weights)
             .into_iter()
             .filter_map(|(author, weight)| {
                 if weight < 1000 {
@@ -723,7 +723,11 @@ impl ProposerElection for LeaderReputation {
             .map(|(i, w)| *w as u128 * self.voting_powers[i] as u128)
             .collect();
 
-        let chosen_proposers = proposers;
+        let chosen_proposers = if filtered_proposers.len() < 67 {
+            proposers.clone()
+        } else {
+            filtered_proposers
+        };
 
         // let chosen_proposers: Vec<_> = (0..self.proposers_per_round as u64)
         //     .into_par_iter()
