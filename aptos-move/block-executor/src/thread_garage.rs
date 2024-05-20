@@ -257,7 +257,7 @@ impl ThreadGarage {
         where T : PartialEq + Copy + Debug, F: Fn(Baton<T>)->Option<Result<T,E>> {
         //println!("{thread_id}");
         
-        println!("conditional suspend called on thread={}", thread_id);
+        //println!("conditional suspend called on thread={}", thread_id);
         //create new baton for current_thread, using default_value
         let baton: Baton<T>;
         {

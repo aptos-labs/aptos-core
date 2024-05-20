@@ -148,11 +148,7 @@ impl PartialEq for ExecutionStatus {
             (
                 &Ready(ref a, ExecutionTaskType::Execution),
                 &Ready(ref b, ExecutionTaskType::Execution),
-            )
-            | (
-                &Executing(ref a, ExecutionTaskType::Execution),
-                &Executing(ref b, ExecutionTaskType::Execution),
-            )
+            )         
             | (
                 &Ready(ref a, ExecutionTaskType::Wakeup(_)),
                 &Ready(ref b, ExecutionTaskType::Wakeup(_)),
@@ -273,19 +269,19 @@ impl<'a> ConditionalSuspend for SchedulerHandle<'a> {
         // Otherwise, do not conditional suspend the garage, and update txn status to Suspended(.., None)
         // Return a different status to the caller indicated 'suspended but should re-execute'
         //println!("was in conditional suspend");
-        if txn_idx > self.scheduler.commit_state().0 + 5 {
+        if txn_idx > self.scheduler.commit_state().0 + 10 {
            //println!("unresolved suspend called txn_idx={}", txn_idx);
 
             /*if self.garage.unwrap().is_halted() {
                 return Ok(DependencyStatus::ExecutionHalted);
             }*/
-            println!("thread_id={} trying to suspend txn={}", self.get_thread_id(), txn_idx);
+            //println!("thread_id={} trying to suspend txn={}", self.get_thread_id(), txn_idx);
 
             let res = self.scheduler.wait_for_dependency(txn_idx, dep_txn_idx, None)?;
             /*if self.garage.unwrap().is_halted() {
                 return Ok(DependencyStatus::ExecutionHalted);
             }*/
-            println!("thread_id={} trying to suspend txn={} suspend result={:?}", self.get_thread_id(), txn_idx, res);
+            //println!("thread_id={} trying to suspend txn={} suspend result={:?}", self.get_thread_id(), txn_idx, res);
             return Ok(res);
         } 
        
@@ -478,6 +474,8 @@ impl Scheduler {
             return None;
         }
 
+
+
         let validation_status = self.txn_status[*commit_idx as usize].1.read();
 
         // Acquired the validation status read lock.
@@ -510,6 +508,8 @@ impl Scheduler {
                             self.done_marker.store(                                 true, Ordering::SeqCst);
                             //eprintln!("yay done with all transactions?");
                         }
+                        //TODO optimize
+                        self.execution_idx.fetch_min(*commit_idx+10, Ordering::SeqCst);
                         return Some((*commit_idx - 1, incarnation));
                     }
                 }
@@ -931,6 +931,9 @@ impl Scheduler {
         }
         
         if let ExecutionStatus::Ready(incarnation, execution_task_type) = &*status {
+            if *incarnation>0 && txn_idx > self.commit_state().0 + 10 {
+                return None;
+            }
             let ret: (u32, ExecutionTaskType) = (*incarnation, (*execution_task_type).clone());
             *status = ExecutionStatus::Executing(*incarnation, (*execution_task_type).clone());
             Some(ret)
@@ -1050,7 +1053,7 @@ impl Scheduler {
         baton: Option<Baton<DependencyStatus>>,
     ) -> Result<(), PanicError> {
         let mut status = self.txn_status[txn_idx as usize].0.write();
-        println!("suspend called on {:?}", txn_idx);
+        //println!("suspend called on {:?}", txn_idx);
         match *status {
             ExecutionStatus::Executing(incarnation, _) => {
                 *status = ExecutionStatus::Suspended(incarnation, baton);            

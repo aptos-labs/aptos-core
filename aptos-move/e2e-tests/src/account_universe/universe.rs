@@ -220,7 +220,7 @@ impl AccountPicker {
                     [temp[0]+2000,temp[1]+2000]
                 }*/
                     //let half_accounts = (*num_accounts) / 2;
-                if w % 45 < 15 {
+                if w % 10 < 3 {
                         Self::pick_pair_impl(3, indexes)
                 } else {
                         let temp = Self::pick_pair_impl((*num_accounts)-3, indexes);

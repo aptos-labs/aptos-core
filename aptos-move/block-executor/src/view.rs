@@ -218,7 +218,7 @@ fn get_delayed_field_value_impl<T: Transaction>(
                             panic!("Unresolved dependency on the same txn={} 215", txn_idx);
                         }
                         captured_reads.borrow_mut().set_unresolved_dependency(true);
-                        println!("returned inconsistentread panicor error {:?}", txn_idx);
+                        //println!("returned inconsistentread panicor error {:?}", txn_idx);
                         return Err(PanicOr::Or(DelayedFieldsSpeculativeError::InconsistentRead));
                     }
                     _ => {},
@@ -555,7 +555,7 @@ impl<'a, T: Transaction, X: Executable> ParallelState<'a, T, X> {
                                 panic!("Unresolved dependency on the same txn={} 550", txn_idx);
                             }
                             self.captured_reads.borrow_mut().set_unresolved_dependency(true);
-                            println!("returned SPECULATIVE_EXECUTION_ABORT_ERROR {:?}", txn_idx);
+                          //  println!("returned SPECULATIVE_EXECUTION_ABORT_ERROR {:?}", txn_idx);
 
                             return Err(PartialVMError::new(
                                 StatusCode::SPECULATIVE_EXECUTION_ABORT_ERROR,
@@ -715,7 +715,7 @@ impl<'a, T: Transaction, X: Executable> ResourceState<T> for ParallelState<'a, T
 
                             self.captured_reads.borrow_mut().set_unresolved_dependency(true);
                     
-                            println!("HaltSpeculativeExecution Unresoved dependency txn={}", txn_idx);
+                            //println!("HaltSpeculativeExecution Unresoved dependency txn={}", txn_idx);
                             return ReadResult::HaltSpeculativeExecution(
                                format!("txn={:?} not able to sleep 2", txn_idx)
                             );
@@ -1431,7 +1431,7 @@ impl<'a, T: Transaction, S: TStateView<Key = T::Key>, X: Executable> LatestView<
             // will not log the speculative error,
             // so no actual error will be logged once the execution is halted and
             // the speculative logging is flushed.
-            ReadResult::HaltSpeculativeExecution(msg) => { println!("created VM error ={}", msg); Err(PartialVMError::new(
+            ReadResult::HaltSpeculativeExecution(msg) => { /*println!("created VM error ={}", msg);*/ Err(PartialVMError::new(
                 StatusCode::SPECULATIVE_EXECUTION_ABORT_ERROR,
             )
             .with_message(msg)) },
