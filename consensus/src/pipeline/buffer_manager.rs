@@ -591,6 +591,10 @@ impl BufferManager {
                                 commit_info = commit_info,
                                 "Failed to add commit vote",
                             );
+                            warn!(
+                                "Reply NACK for commit vote {}. Unable to add signature, error: {}",
+                                commit_info, e
+                            );
                             reply_nack(protocol, response_sender);
                             item
                         },
@@ -631,6 +635,10 @@ impl BufferManager {
                         return Some(target_block_id);
                     }
                 }
+                warn!(
+                    "Rejecting commit decision with NACK for {}",
+                    commit_proof.ledger_info()
+                );
                 reply_nack(protocol, response_sender); // TODO: send_commit_proof() doesn't care about the response and this should be direct send not RPC
             },
             CommitMessage::Ack(_) => {
