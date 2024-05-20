@@ -215,12 +215,21 @@ pub fn prove_with_trapdoor<C: ConstraintSynthesizer<E::ScalarField>, R: RngCore>
 
 use ark_circom::CircomConfig;
 use ark_circom::CircomBuilder;
+use std::fs::File;
+use std::io::prelude::*;
+use std::collections::HashMap;
 
 fn test_prove_and_verify<E>(n_iters: usize)
 where
     E: Pairing, <E as Pairing>::ScalarField: From<i32>
 {
     println!("starting test");
+
+    let mut input_file = File::open("/Users/michael/aptos-labs/aptos-core/types/src/keyless/circuit-files/keyless_input.json").unwrap();
+    let mut input_json = String::new();
+    input_file.read_to_string(&mut input_json).unwrap();
+    let mut input_map: HashMap<String, Vec<String>> = serde_json::from_str(&input_json).unwrap();
+    println!("{:?}", input_map);
     let cfg = CircomConfig::<Bn254>::new(
     //"./circuit-files/keyless_main.wasm",
     //"./proof_simulation.rs",
