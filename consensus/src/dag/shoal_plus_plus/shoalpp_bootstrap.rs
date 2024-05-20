@@ -60,7 +60,7 @@ pub const COUNT_WEAK_VOTES: bool = false;
 const NOOP: bool = false;
 
 /// Bullshark vs Shoal
-pub const ORDER_RULE_ROUND_INCREMENT: Round = 2;
+pub const ORDER_RULE_ROUND_INCREMENT: Round = 1;
 
 pub struct ShoalppBootstrapper {
     epoch_state: Arc<EpochState>,
