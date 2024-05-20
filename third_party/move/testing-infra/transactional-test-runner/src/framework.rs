@@ -951,8 +951,7 @@ fn compile_ir_module<'a>(
 ) -> Result<CompiledModule> {
     use move_ir_compiler::Compiler as IRCompiler;
     let code = std::fs::read_to_string(file_name).unwrap();
-    let module = IRCompiler::new(deps.collect()).into_compiled_module(&code)?;
-    Ok(module)
+    IRCompiler::new(deps.collect()).into_compiled_module(&code)
 }
 
 fn compile_ir_script<'a>(
@@ -995,13 +994,10 @@ where
     } = config.clone()
     {
         (
-            vec![
-                TestRunConfig::CompilerV1,
-                TestRunConfig::CompilerV2 {
-                    language_version,
-                    v2_experiments,
-                },
-            ],
+            vec![TestRunConfig::CompilerV1, TestRunConfig::CompilerV2 {
+                language_version,
+                v2_experiments,
+            }],
             true,
         )
     } else {
