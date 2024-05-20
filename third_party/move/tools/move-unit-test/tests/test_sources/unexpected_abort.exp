@@ -18,7 +18,6 @@ Output: Ok(Changes { accounts: {} })
 Test failures:
 
 Failures in 0x1::M:
-
 ┌── unexpected_abort ──────
 │ error[E11001]: test failure
 │   ┌─ unexpected_abort.move:5:9
@@ -30,7 +29,6 @@ Failures in 0x1::M:
 │ 
 │ 
 └──────────────────
-
 
 ┌── unexpected_abort_in_other_function ──────
 │ error[E11001]: test failure
@@ -46,7 +44,6 @@ Failures in 0x1::M:
 │ 	M::unexpected_abort_in_other_function(tests/test_sources/unexpected_abort.move:33)
 │ 
 └──────────────────
-
 
 ┌── wrong_abort_code ──────
 │ error[E11001]: test failure

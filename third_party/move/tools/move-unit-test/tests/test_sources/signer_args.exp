@@ -21,11 +21,9 @@ Output: Ok(Changes { accounts: {} })
 Test failures:
 
 Failures in 0x1::M:
-
 ┌── multi_signer_fail ──────
 │ Test did not error as expected
 └──────────────────
-
 
 ┌── single_signer_fail ──────
 │ error[E11001]: test failure

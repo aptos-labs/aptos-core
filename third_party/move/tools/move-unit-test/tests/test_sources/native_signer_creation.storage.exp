@@ -12,7 +12,6 @@ Output: Ok(Changes { accounts: {000000000000000000000000000000000000000000000000
 Test failures:
 
 Failures in 0x1::M:
-
 ┌── test_doesnt_exist ──────
 │ error[E11001]: test failure
 │    ┌─ native_signer_creation.move:47:9
@@ -24,7 +23,7 @@ Failures in 0x1::M:
 │    │         ^^^^^^^ Test was not expected to error, but it aborted with code 0 originating in the module 0000000000000000000000000000000000000000000000000000000000000001::M rooted here
 │ 
 │ 
-│ ────── Storage state at point of failure ──────
+│ --──── Storage state at point of failure --────
 │ 0x0:
 │ 	=> key 0x1::M::A {
 │ 	    dummy_field: false

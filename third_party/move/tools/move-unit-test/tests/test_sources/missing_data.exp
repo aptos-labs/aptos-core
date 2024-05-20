@@ -15,7 +15,6 @@ Output: Ok(Changes { accounts: {} })
 Test failures:
 
 Failures in 0x1::MissingData:
-
 ┌── missing_data ──────
 │ error[E11001]: test failure
 │   ┌─ missing_data.move:6:9
@@ -27,7 +26,6 @@ Failures in 0x1::MissingData:
 │ 
 │ 
 └──────────────────
-
 
 ┌── missing_data_from_other_function ──────
 │ error[E11001]: test failure

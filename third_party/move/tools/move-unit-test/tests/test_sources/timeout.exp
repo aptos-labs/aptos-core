@@ -18,7 +18,6 @@ Output: Ok(Changes { accounts: {} })
 Test failures:
 
 Failures in 0x1::M:
-
 ┌── no_timeout_fail ──────
 │ error[E11001]: test failure
 │    ┌─ timeout.move:18:29
@@ -30,7 +29,6 @@ Failures in 0x1::M:
 │ 
 │ 
 └──────────────────
-
 
 ┌── timeout_fail ──────
 │ Test timed out
