@@ -368,13 +368,13 @@ impl BufferManager {
                 // TODO: As all the validators broadcast commit votes directly to all other validators,
                 // the proposer do not have to broadcast commit decision again. Remove this if block.
                 // if we're the proposer for the block, we're responsible to broadcast the commit decision.
-                if block.author() == Some(self.author) {
-                    let commit_decision = CommitMessage::Decision(CommitDecision::new(
-                        aggregated_item.commit_proof.clone(),
-                    ));
-                    self.commit_proof_rb_handle
-                        .replace(self.do_reliable_broadcast(commit_decision));
-                }
+                // if block.author() == Some(self.author) {
+                //     let commit_decision = CommitMessage::Decision(CommitDecision::new(
+                //         aggregated_item.commit_proof.clone(),
+                //     ));
+                //     self.commit_proof_rb_handle
+                //         .replace(self.do_reliable_broadcast(commit_decision));
+                // }
                 let commit_proof = aggregated_item.commit_proof.clone();
                 if commit_proof.ledger_info().ends_epoch() {
                     // the epoch ends, reset to avoid executing more blocks, execute after
