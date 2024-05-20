@@ -919,7 +919,7 @@ fn compile_source_unit(
                     }];
                     let deps_target_package = vec![PackagePaths {
                         name: None,
-                        paths: string_vec_to_symbol_vec(&deps),
+                        paths: string_vec_to_symbol_vec(deps),
                         named_address_map: symbol_map.clone(),
                     }];
                     let model_options = ModelBuilderOptions::default();
@@ -995,10 +995,13 @@ where
     } = config.clone()
     {
         (
-            vec![TestRunConfig::CompilerV1, TestRunConfig::CompilerV2 {
-                language_version,
-                v2_experiments,
-            }],
+            vec![
+                TestRunConfig::CompilerV1,
+                TestRunConfig::CompilerV2 {
+                    language_version,
+                    v2_experiments,
+                },
+            ],
             true,
         )
     } else {
