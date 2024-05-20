@@ -27,7 +27,7 @@ script {
         let override_aud_val = vector[utf8(b"test.recovery.aud")];
         let max_signatures_per_txn = 3;
         let max_exp_horizon_secs = 10_000_000;
-        let training_wheels_pubkey = option::some(b"");
+        let training_wheels_pubkey = option::some(x"c9c9c08c2e3fdbf0c818274a34a943263eebd7c6683e8b37b61f21f62af4dea1");
         let max_commited_epk_bytes = 93;
         let max_iss_val_bytes = 120;
         let max_extra_field_bytes = 350;
