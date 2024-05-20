@@ -279,6 +279,7 @@ impl RoundManager {
                 .collect(),
             self.local_config
                 .max_blocks_per_sending_request(self.onchain_config.quorum_store_enabled()),
+            self.block_store.pending_blocks(),
         )
     }
 
