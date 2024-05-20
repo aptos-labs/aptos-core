@@ -156,11 +156,6 @@ impl SyncInfo {
             "HLI has empty commit info"
         );
 
-        ensure!(
-            !self.highest_commit_cert.commit_info().is_ordered_only(),
-            "HLI has ordered only commit info"
-        );
-
         self.highest_quorum_cert
             .verify(validator)
             .and_then(|_| {

@@ -384,6 +384,10 @@ impl TExecutionClient for ExecutionProxyClient {
             Err(anyhow::anyhow!("Injected error in sync_to").into())
         });
 
+        if target.commit_info().is_ordered_only() {
+            return Err(anyhow::anyhow!("Sync to ordered only target").into());
+        }
+
         let (reset_tx_to_rand_manager, reset_tx_to_buffer_manager) = {
             let handle = self.handle.read();
             (
