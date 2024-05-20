@@ -442,6 +442,7 @@ impl BlockStore {
         }
         let commit_round = self.commit_root().round();
         let ordered_round = self.ordered_root().round();
+        info!("hqc_round: {}, ordered_root_round: {}, ordered_cert_round: {}, commit_root_round: {}, commit_cert_round: {}, backpressure_limit: {}", self.highest_quorum_cert().certified_block().round(), ordered_round, self.highest_ordered_cert().commit_info().round(), commit_round, self.highest_commit_cert().commit_info().round(), self.vote_back_pressure_limit);
         counters::OP_COUNTERS
             .gauge("back_pressure")
             .set((ordered_round - commit_round) as i64);
