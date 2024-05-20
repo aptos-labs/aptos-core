@@ -746,6 +746,7 @@ fn run_test(path: &Path, config: TestConfig) -> datatest_stable::Result<()> {
     options.warn_unused = path_str.contains("/unused/");
     options.warn_deprecated = path_str.contains("/deprecated/");
     options.compile_verify_code = path_str.contains("/verification/verify/");
+    options.warnings_are_errors = path_str.contains("/warnings_are_errors/");
     options.sources_deps = extract_test_directives(path, "// dep:")?;
     options.sources = vec![path_str.clone()];
     options.dependencies = if extract_test_directives(path, "// no-stdlib")?.is_empty() {

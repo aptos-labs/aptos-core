@@ -117,13 +117,13 @@ pub fn shortest_cycle<'a, T: Ord + Hash>(
             );
             match (shortest_path, path_opt) {
                 (p, None) | (None, p) => p,
-                (Some((acc_len, acc_path)), Some((cur_len, cur_path))) => Some(
-                    if cur_len < acc_len {
+                (Some((acc_len, acc_path)), Some((cur_len, cur_path))) => {
+                    Some(if cur_len < acc_len {
                         (cur_len, cur_path)
                     } else {
                         (acc_len, acc_path)
-                    },
-                ),
+                    })
+                },
             }
         });
     let (_, mut path) = shortest_path.unwrap();
@@ -256,6 +256,12 @@ impl CompilationEnv {
         &mut self,
         threshold: Severity,
     ) -> Result<(), Diagnostics> {
+        let threshold =
+            if self.flags.warnings_are_errors() && threshold == Severity::NonblockingError {
+                Severity::NonblockingError
+            } else {
+                threshold
+            };
         if self.has_diags_at_or_above_severity(threshold) {
             Err(std::mem::take(&mut self.diags))
         } else {
@@ -327,14 +333,20 @@ pub fn debug_compiler_env_var() -> bool {
 
 pub fn move_compiler_warn_of_deprecation_use_env_var() -> bool {
     static WARN_OF_DEPRECATION: Lazy<bool> =
-        Lazy::new(|| read_bool_env_var(cli::MOVE_COMPILER_WARN_OF_DEPRECATION_USE));
+        Lazy::new(|| read_bool_env_var(cli::MOVE_COMPILER_WARN_OF_DEPRECATION_USE_ENV_VAR));
     *WARN_OF_DEPRECATION
 }
 
 pub fn warn_of_deprecation_use_in_aptos_libs_env_var() -> bool {
     static WARN_OF_DEPRECATION: Lazy<bool> =
-        Lazy::new(|| read_bool_env_var(cli::WARN_OF_DEPRECATION_USE_IN_APTOS_LIBS));
+        Lazy::new(|| read_bool_env_var(cli::WARN_OF_DEPRECATION_USE_IN_APTOS_LIBS_ENV_VAR));
     *WARN_OF_DEPRECATION
+}
+
+pub fn move_compiler_warnings_are_errors_env_var() -> bool {
+    static WARNINGS_ARE_ERRORS: Lazy<bool> =
+        Lazy::new(|| read_bool_env_var(cli::MOVE_COMPILER_WARNINGS_ARE_ERRORS_ENV_VAR));
+    *WARNINGS_ARE_ERRORS
 }
 
 #[derive(Clone, Debug, Eq, PartialEq, Parser)]
@@ -406,6 +418,12 @@ pub struct Flags {
     #[clap(long = cli::WARN_UNUSED_FLAG, default_value="false")]
     warn_unused: bool,
 
+    /// Treat warnings as errors: stop compilation if warnings occur.
+    /// Note that current value of this constant is "Werror"
+    #[clap(long = cli::MOVE_COMPILER_WARNINGS_ARE_ERRORS_FLAG,
+           default_value=bool_to_str(move_compiler_warnings_are_errors_env_var()))]
+    warnings_are_errors: bool,
+
     /// Support Move 2 language features (up to expansion phase)
     #[clap(long = cli::LANG_V2_FLAG)]
     lang_v2: bool,
@@ -437,6 +455,7 @@ impl Flags {
             warn_of_deprecation_use: move_compiler_warn_of_deprecation_use_env_var(),
             warn_of_deprecation_use_in_aptos_libs: warn_of_deprecation_use_in_aptos_libs_env_var(),
             warn_unused: false,
+            warnings_are_errors: move_compiler_warnings_are_errors_env_var(),
             lang_v2: false,
             compiler_v2: false,
             language_version: LanguageVersion::V1,
@@ -586,6 +605,17 @@ impl Flags {
     pub fn set_warn_unused(self, new_value: bool) -> Self {
         Self {
             warn_unused: new_value,
+            ..self
+        }
+    }
+
+    pub fn warnings_are_errors(&self) -> bool {
+        self.warnings_are_errors
+    }
+
+    pub fn set_warnings_are_errors(self, new_value: bool) -> Self {
+        Self {
+            warnings_are_errors: new_value,
             ..self
         }
     }

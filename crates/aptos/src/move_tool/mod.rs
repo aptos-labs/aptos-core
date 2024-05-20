@@ -231,24 +231,30 @@ impl FrameworkPackageArgs {
         // Add the framework dependency if it's provided
         let mut dependencies = BTreeMap::new();
         if let Some(ref path) = self.framework_local_dir {
-            dependencies.insert(APTOS_FRAMEWORK.to_string(), Dependency {
-                local: Some(path.display().to_string()),
-                git: None,
-                rev: None,
-                subdir: None,
-                aptos: None,
-                address: None,
-            });
+            dependencies.insert(
+                APTOS_FRAMEWORK.to_string(),
+                Dependency {
+                    local: Some(path.display().to_string()),
+                    git: None,
+                    rev: None,
+                    subdir: None,
+                    aptos: None,
+                    address: None,
+                },
+            );
         } else {
             let git_rev = self.framework_git_rev.as_deref().unwrap_or(DEFAULT_BRANCH);
-            dependencies.insert(APTOS_FRAMEWORK.to_string(), Dependency {
-                local: None,
-                git: Some(APTOS_GIT_PATH.to_string()),
-                rev: Some(git_rev.to_string()),
-                subdir: Some(SUBDIR_PATH.to_string()),
-                aptos: None,
-                address: None,
-            });
+            dependencies.insert(
+                APTOS_FRAMEWORK.to_string(),
+                Dependency {
+                    local: None,
+                    git: Some(APTOS_GIT_PATH.to_string()),
+                    rev: Some(git_rev.to_string()),
+                    subdir: Some(SUBDIR_PATH.to_string()),
+                    aptos: None,
+                    address: None,
+                },
+            );
         }
 
         let manifest = MovePackageManifest {
@@ -559,6 +565,8 @@ impl CliCommand<&'static str> for TestPackage {
                 language_version: self.move_options.language_version,
                 experiments: experiments_from_opt_level(&self.move_options.optimize),
             },
+            warn_unused: self.move_options.warn_unused,
+            warnings_are_errors: self.move_options.warnings_are_errors,
             ..Default::default()
         };
 
@@ -707,6 +715,7 @@ impl CliCommand<&'static str> for DocumentPackage {
             check_test_code: move_options.check_test_code,
             known_attributes: extended_checks::get_all_attribute_names().clone(),
             move_2: move_options.move_2,
+            warnings_are_errors: false,
             ..BuildOptions::default()
         };
         BuiltPackage::build(move_options.get_package_path()?, build_options)?;

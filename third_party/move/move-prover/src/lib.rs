@@ -91,6 +91,7 @@ pub fn run_move_prover_v2<W: WriteColor>(
         whole_program: false,
         compile_test_code: false,
         compile_verify_code: true,
+        warnings_are_errors: cloned_options.warnings_are_errors,
     };
 
     let mut env = move_compiler_v2::run_move_compiler_for_analysis(error_writer, compiler_options)?;
