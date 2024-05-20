@@ -9,7 +9,13 @@
 /// are the randomness of the ciphertexts.
 
 module aptos_std::ristretto255_elgamal {
-    use aptos_std::ristretto255::{Self, RistrettoPoint, Scalar, CompressedRistretto, point_compress};
+    use aptos_std::ristretto255::{
+        Self,
+        RistrettoPoint,
+        Scalar,
+        CompressedRistretto,
+        point_compress
+    };
     use std::option::Option;
     use std::vector;
 
@@ -19,8 +25,8 @@ module aptos_std::ristretto255_elgamal {
 
     /// An ElGamal ciphertext.
     struct Ciphertext has drop {
-        left: RistrettoPoint,   // v * G + r * Y
-        right: RistrettoPoint,  // r * G
+        left: RistrettoPoint, // v * G + r * Y
+        right: RistrettoPoint, // r * G
     }
 
     /// A compressed ElGamal ciphertext.
@@ -42,9 +48,8 @@ module aptos_std::ristretto255_elgamal {
     public fun new_pubkey_from_bytes(bytes: vector<u8>): Option<CompressedPubkey> {
         let point = ristretto255::new_compressed_point_from_bytes(bytes);
         if (std::option::is_some(&mut point)) {
-            let pk = CompressedPubkey {
-                point: std::option::extract(&mut point)
-            };
+            let pk =
+                CompressedPubkey { point: std::option::extract(&mut point) };
             std::option::some(pk)
         } else {
             std::option::none<CompressedPubkey>()
@@ -69,7 +74,7 @@ module aptos_std::ristretto255_elgamal {
     /// Creates a new ciphertext from two serialized Ristretto255 points: the first 32 bytes store `r * G` while the
     /// next 32 bytes store `v * G + r * Y`, where `Y` is the public key.
     public fun new_ciphertext_from_bytes(bytes: vector<u8>): Option<Ciphertext> {
-        if(vector::length(&bytes) != 64) {
+        if (vector::length(&bytes) != 64) {
             return std::option::none<Ciphertext>()
         };
 
@@ -78,11 +83,12 @@ module aptos_std::ristretto255_elgamal {
         let left_point = ristretto255::new_point_from_bytes(bytes);
         let right_point = ristretto255::new_point_from_bytes(bytes_right);
 
-        if (std::option::is_some<RistrettoPoint>(&mut left_point) && std::option::is_some<RistrettoPoint>(&mut right_point)) {
+        if (std::option::is_some<RistrettoPoint>(&mut left_point) && std::option::is_some<
+                RistrettoPoint>(&mut right_point)) {
             std::option::some<Ciphertext>(Ciphertext {
-                left: std::option::extract<RistrettoPoint>(&mut left_point),
-                right: std::option::extract<RistrettoPoint>(&mut right_point)
-            })
+                    left: std::option::extract<RistrettoPoint>(&mut left_point),
+                    right: std::option::extract<RistrettoPoint>(&mut right_point)
+                })
         } else {
             std::option::none<Ciphertext>()
         }
@@ -98,25 +104,25 @@ module aptos_std::ristretto255_elgamal {
     }
 
     /// Moves a pair of Ristretto points into an ElGamal ciphertext.
-    public fun ciphertext_from_points(left: RistrettoPoint, right: RistrettoPoint): Ciphertext {
-        Ciphertext {
-            left,
-            right,
-        }
+    public fun ciphertext_from_points(
+        left: RistrettoPoint, right: RistrettoPoint
+    ): Ciphertext {
+        Ciphertext { left, right, }
     }
 
     /// Moves a pair of `CompressedRistretto` points into an ElGamal ciphertext.
-    public fun ciphertext_from_compressed_points(left: CompressedRistretto, right: CompressedRistretto): CompressedCiphertext {
-        CompressedCiphertext {
-            left,
-            right,
-        }
+    public fun ciphertext_from_compressed_points(
+        left: CompressedRistretto, right: CompressedRistretto
+    ): CompressedCiphertext {
+        CompressedCiphertext { left, right, }
     }
 
     /// Given a ciphertext `ct`, serializes that ciphertext into bytes.
     public fun ciphertext_to_bytes(ct: &Ciphertext): vector<u8> {
-        let bytes_left = ristretto255::point_to_bytes(&ristretto255::point_compress(&ct.left));
-        let bytes_right = ristretto255::point_to_bytes(&ristretto255::point_compress(&ct.right));
+        let bytes_left =
+            ristretto255::point_to_bytes(&ristretto255::point_compress(&ct.left));
+        let bytes_right =
+            ristretto255::point_to_bytes(&ristretto255::point_compress(&ct.right));
         let bytes = vector::empty<u8>();
         vector::append<u8>(&mut bytes, bytes_left);
         vector::append<u8>(&mut bytes, bytes_right);
@@ -190,8 +196,8 @@ module aptos_std::ristretto255_elgamal {
 
     /// Returns true if the two ciphertexts are identical: i.e., same value and same randomness.
     public fun ciphertext_equals(lhs: &Ciphertext, rhs: &Ciphertext): bool {
-        ristretto255::point_equals(&lhs.left, &rhs.left) &&
-        ristretto255::point_equals(&lhs.right, &rhs.right)
+        ristretto255::point_equals(&lhs.left, &rhs.left) && ristretto255::point_equals(&lhs
+            .right, &rhs.right)
     }
 
     /// Returns the `RistrettoPoint` in the ciphertext which contains the encrypted value in the exponent.
@@ -207,15 +213,15 @@ module aptos_std::ristretto255_elgamal {
     /// Given an ElGamal secret key `sk`, returns the corresponding ElGamal public key as `sk * G`.
     public fun pubkey_from_secret_key(sk: &Scalar): CompressedPubkey {
         let point = ristretto255::basepoint_mul(sk);
-        CompressedPubkey {
-            point: point_compress(&point)
-        }
+        CompressedPubkey { point: point_compress(&point) }
     }
 
     #[test_only]
     /// Returns a ciphertext (v * point + r * pubkey, r * point) where `point` is *any* Ristretto255 point,
     /// `pubkey` is the public key and `r` is the randomness.
-    public fun new_ciphertext(v: &Scalar, point: &RistrettoPoint, r: &Scalar, pubkey: &CompressedPubkey): Ciphertext {
+    public fun new_ciphertext(
+        v: &Scalar, point: &RistrettoPoint, r: &Scalar, pubkey: &CompressedPubkey
+    ): Ciphertext {
         Ciphertext {
             left: ristretto255::double_scalar_mul(v, point, r, &pubkey_to_point(pubkey)),
             right: ristretto255::point_mul(point, r),
@@ -225,7 +231,9 @@ module aptos_std::ristretto255_elgamal {
     #[test_only]
     /// Returns a ciphertext (v * basepoint + r * pubkey, r * basepoint) where `basepoint` is the Ristretto255 basepoint
     /// `pubkey` is the public key and `r` is the randomness.
-    public fun new_ciphertext_with_basepoint(v: &Scalar, r: &Scalar, pubkey: &CompressedPubkey): Ciphertext {
+    public fun new_ciphertext_with_basepoint(
+        v: &Scalar, r: &Scalar, pubkey: &CompressedPubkey
+    ): Ciphertext {
         Ciphertext {
             left: ristretto255::basepoint_double_mul(r, &pubkey_to_point(pubkey), v),
             right: ristretto255::basepoint_mul(r),

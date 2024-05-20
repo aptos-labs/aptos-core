@@ -94,7 +94,8 @@ module std::fixed_point32_tests {
         assert!(not_three == 2, 0);
 
         // Try again with a fraction slightly larger than 1/3.
-        let f = fixed_point32::create_from_raw_value(fixed_point32::get_raw_value(f) + 1);
+        let f =
+            fixed_point32::create_from_raw_value(fixed_point32::get_raw_value(f) + 1);
         let three = fixed_point32::multiply_u64(9, f);
         assert!(three == 3, 1);
     }
@@ -102,7 +103,8 @@ module std::fixed_point32_tests {
     #[test]
     fun create_from_rational_max_numerator_denominator() {
         // Test creating a 1.0 fraction from the maximum u64 value.
-        let f = fixed_point32::create_from_rational(18446744073709551615, 18446744073709551615);
+        let f =
+            fixed_point32::create_from_rational(18446744073709551615, 18446744073709551615);
         let one = fixed_point32::get_raw_value(f);
         assert!(one == 4294967296, 0); // 0x1.00000000
     }
@@ -113,10 +115,10 @@ module std::fixed_point32_tests {
         let two = fixed_point32::create_from_rational(2, 1);
         let smaller_number1 = fixed_point32::min(one, two);
         let val1 = fixed_point32::get_raw_value(smaller_number1);
-        assert!(val1 == 4294967296, 0);  // 0x1.00000000
+        assert!(val1 == 4294967296, 0); // 0x1.00000000
         let smaller_number2 = fixed_point32::min(two, one);
         let val2 = fixed_point32::get_raw_value(smaller_number2);
-        assert!(val2 == 4294967296, 0);  // 0x1.00000000
+        assert!(val2 == 4294967296, 0); // 0x1.00000000
     }
 
     #[test]
@@ -126,9 +128,9 @@ module std::fixed_point32_tests {
         let larger_number1 = fixed_point32::max(one, two);
         let larger_number2 = fixed_point32::max(two, one);
         let val1 = fixed_point32::get_raw_value(larger_number1);
-        assert!(val1 == 8589934592, 0);  // 0x2.00000000
+        assert!(val1 == 8589934592, 0); // 0x2.00000000
         let val2 = fixed_point32::get_raw_value(larger_number2);
-        assert!(val2 == 8589934592, 0);  // 0x2.00000000
+        assert!(val2 == 8589934592, 0); // 0x2.00000000
     }
 
     #[test]

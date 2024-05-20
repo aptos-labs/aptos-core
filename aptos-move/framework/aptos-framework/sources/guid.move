@@ -23,12 +23,7 @@ module aptos_framework::guid {
     public(friend) fun create(addr: address, creation_num_ref: &mut u64): GUID {
         let creation_num = *creation_num_ref;
         *creation_num_ref = creation_num + 1;
-        GUID {
-            id: ID {
-                creation_num,
-                addr,
-            }
-        }
+        GUID { id: ID { creation_num, addr, } }
     }
 
     /// Create a non-privileged id from `addr` and `creation_num`

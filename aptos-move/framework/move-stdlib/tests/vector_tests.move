@@ -3,8 +3,10 @@ module std::vector_tests {
     use std::vector as V;
     use std::vector;
 
-    struct R has store { }
+    struct R has store {}
+
     struct Droppable has drop {}
+
     struct NotDroppable {}
 
     #[test]
@@ -106,6 +108,7 @@ module std::vector_tests {
             assert!(&V::trim(&mut v, 0) == &vector[1, 2], 3);
         };
     }
+
     #[test]
     #[expected_failure(abort_code = V::EINDEX_OUT_OF_BOUNDS)]
     fun test_trim_fail() {
@@ -612,11 +615,9 @@ module std::vector_tests {
 
         test_natives_with_type<vector<u8>>(V::empty(), V::empty());
 
-        test_natives_with_type<Droppable>(Droppable{}, Droppable{});
-        (NotDroppable {}, NotDroppable {}) = test_natives_with_type<NotDroppable>(
-            NotDroppable {},
-            NotDroppable {}
-        );
+        test_natives_with_type<Droppable>(Droppable {}, Droppable {});
+        (NotDroppable {}, NotDroppable {}) = test_natives_with_type<NotDroppable>(NotDroppable {},
+            NotDroppable {});
     }
 
     #[test]
@@ -624,8 +625,8 @@ module std::vector_tests {
         let v = vector[1, 2, 3];
         let s = 0;
         V::for_each(v, |e| {
-            s = s + e;
-        });
+                s = s + e;
+            });
         assert!(s == 6, 0)
     }
 
@@ -654,9 +655,9 @@ module std::vector_tests {
         let i_s = 0;
         let s = 0;
         V::enumerate_ref(&v, |i, e| {
-            i_s = i_s + i;
-            s = s + *e;
-        });
+                i_s = i_s + i;
+                s = s + *e;
+            });
         assert!(i_s == 3, 0);
         assert!(s == 6, 0);
     }
@@ -673,7 +674,10 @@ module std::vector_tests {
     fun test_for_each_mut() {
         let v = vector[1, 2, 3];
         let s = 2;
-        V::for_each_mut(&mut v, |e| { *e = s; s = s + 1 });
+        V::for_each_mut(&mut v, |e| {
+                *e = s;
+                s = s + 1
+            });
         assert!(v == vector[2, 3, 4], 0)
     }
 
@@ -682,7 +686,7 @@ module std::vector_tests {
         let v1 = vector[1, 2, 3];
         let v2 = vector[10, 20, 30];
         let s = 0;
-        V::zip_ref(&v1, &v2, |e1, e2| s = s + *e1 * *e2);
+        V::zip_ref(&v1, &v2, |e1, e2| s = s + *e1 **e2);
         assert!(s == 140, 0);
     }
 
@@ -693,7 +697,7 @@ module std::vector_tests {
         let v1 = vector[1];
         let v2 = vector[10, 20];
         let s = 0;
-        V::zip_ref(&v1, &v2, |e1, e2| s = s + *e1 * *e2);
+        V::zip_ref(&v1, &v2, |e1, e2| s = s + *e1 **e2);
     }
 
     #[test]
@@ -701,11 +705,11 @@ module std::vector_tests {
         let v1 = vector[1, 2, 3];
         let v2 = vector[10, 20, 30];
         V::zip_mut(&mut v1, &mut v2, |e1, e2| {
-            let e1: &mut u64 = e1;
-            let e2: &mut u64 = e2;
-            *e1 = *e1 + 1;
-            *e2 = *e2 + 10;
-        });
+                let e1: &mut u64 = e1;
+                let e2: &mut u64 = e2;
+                *e1 = *e1 + 1;
+                *e2 = *e2 + 10;
+            });
         assert!(v1 == vector[2, 3, 4], 0);
         assert!(v2 == vector[20, 30, 40], 0);
     }
@@ -733,7 +737,7 @@ module std::vector_tests {
         let v1 = vector[1];
         let v2 = vector[10, 20];
         let s = 0;
-        V::zip_mut(&mut v1, &mut v2, |e1, e2| s = s + *e1 * *e2);
+        V::zip_mut(&mut v1, &mut v2, |e1, e2| s = s + *e1 **e2);
     }
 
     #[test]
@@ -751,7 +755,7 @@ module std::vector_tests {
     fun test_zip_map_ref_mismatching_lengths_should_fail() {
         let v1 = vector[1];
         let v2 = vector[10, 20];
-        V::zip_map_ref(&v1, &v2, |e1, e2| *e1 * *e2);
+        V::zip_map_ref(&v1, &v2, |e1, e2| *e1 **e2);
     }
 
     #[test]
@@ -760,10 +764,10 @@ module std::vector_tests {
         let i_s = 0;
         let s = 2;
         V::enumerate_mut(&mut v, |i, e| {
-            i_s = i_s + i;
-            *e = s;
-            s = s + 1
-        });
+                i_s = i_s + i;
+                *e = s;
+                s = s + 1
+            });
         assert!(i_s == 3, 0);
         assert!(v == vector[2, 3, 4], 0);
     }
@@ -772,7 +776,7 @@ module std::vector_tests {
     fun test_fold() {
         let v = vector[1, 2, 3];
         let s = V::fold(v, 0, |r, e| r + e);
-        assert!(s == 6 , 0)
+        assert!(s == 6, 0)
     }
 
     #[test]
@@ -796,21 +800,21 @@ module std::vector_tests {
     fun test_map() {
         let v = vector[1, 2, 3];
         let s = V::map(v, |x| x + 1);
-        assert!(s == vector[2, 3, 4] , 0)
+        assert!(s == vector[2, 3, 4], 0)
     }
 
     #[test]
     fun test_map_ref() {
         let v = vector[1, 2, 3];
         let s = V::map_ref(&v, |x| *x + 1);
-        assert!(s == vector[2, 3, 4] , 0)
+        assert!(s == vector[2, 3, 4], 0)
     }
 
     #[test]
     fun test_filter() {
         let v = vector[1, 2, 3];
         let s = V::filter(v, |x| *x % 2 == 0);
-        assert!(s == vector[2] , 0)
+        assert!(s == vector[2], 0)
     }
 
     #[test]
@@ -857,7 +861,7 @@ module std::vector_tests {
 
     #[test]
     fun test_stable_partition() {
-        let v:vector<u64> = vector[1, 2, 3, 4, 5];
+        let v: vector<u64> = vector[1, 2, 3, 4, 5];
 
         assert!(vector::stable_partition(&mut v, |n| *n % 2 == 0) == 2, 0);
         assert!(&v == &vector[2, 4, 1, 3, 5], 1);
@@ -871,21 +875,21 @@ module std::vector_tests {
 
     #[test]
     fun test_insert() {
-        let v:vector<u64> = vector[1, 2, 3, 4, 5];
+        let v: vector<u64> = vector[1, 2, 3, 4, 5];
 
-        vector::insert(&mut v,2, 6);
+        vector::insert(&mut v, 2, 6);
         assert!(&v == &vector[1, 2, 6, 3, 4, 5], 1);
 
-        vector::insert(&mut v,6, 7);
+        vector::insert(&mut v, 6, 7);
         assert!(&v == &vector[1, 2, 6, 3, 4, 5, 7], 1);
     }
 
     #[test]
     #[expected_failure(abort_code = V::EINDEX_OUT_OF_BOUNDS)]
     fun test_insert_out_of_bounds() {
-        let v:vector<u64> = vector[1, 2, 3, 4, 5];
+        let v: vector<u64> = vector[1, 2, 3, 4, 5];
 
-        vector::insert(&mut v,6, 6);
+        vector::insert(&mut v, 6, 6);
     }
 
     #[test]
@@ -952,6 +956,8 @@ module std::vector_tests {
     #[test]
     fun test_destroy() {
         let v = vector[MoveOnly {}];
-        vector::destroy(v, |m| { let MoveOnly {} = m; })
+        vector::destroy(v, |m| {
+                let MoveOnly {} = m;
+            })
     }
 }

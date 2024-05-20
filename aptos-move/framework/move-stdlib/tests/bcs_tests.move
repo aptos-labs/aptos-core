@@ -2,13 +2,33 @@
 module std::bcs_tests {
     use std::bcs;
 
-    struct Box<T> has copy, drop, store { x: T }
-    struct Box3<T> has copy, drop, store { x: Box<Box<T>> }
-    struct Box7<T> has copy, drop, store { x: Box3<Box3<T>> }
-    struct Box15<T> has copy, drop, store { x: Box7<Box7<T>> }
-    struct Box31<T> has copy, drop, store { x: Box15<Box15<T>> }
-    struct Box63<T> has copy, drop, store { x: Box31<Box31<T>> }
-    struct Box127<T> has copy, drop, store { x: Box63<Box63<T>> }
+    struct Box<T> has copy, drop, store {
+        x: T
+    }
+
+    struct Box3<T> has copy, drop, store {
+        x: Box<Box<T>>
+    }
+
+    struct Box7<T> has copy, drop, store {
+        x: Box3<Box3<T>>
+    }
+
+    struct Box15<T> has copy, drop, store {
+        x: Box7<Box7<T>>
+    }
+
+    struct Box31<T> has copy, drop, store {
+        x: Box15<Box15<T>>
+    }
+
+    struct Box63<T> has copy, drop, store {
+        x: Box31<Box31<T>>
+    }
+
+    struct Box127<T> has copy, drop, store {
+        x: Box63<Box63<T>>
+    }
 
     /* Deactivated because of address size dependency
     #[test]

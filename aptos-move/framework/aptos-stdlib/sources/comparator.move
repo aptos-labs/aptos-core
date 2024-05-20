@@ -138,29 +138,17 @@ module aptos_std::comparator {
         vector::push_back(&mut value0_1, 5);
         vector::push_back(&mut value0_1, 1);
 
-        let base = Complex {
-            value0: value0_0,
-            value1: 13,
-            value2: 41,
-        };
+        let base =
+            Complex { value0: value0_0, value1: 13, value2: 41, };
 
-        let other_0 = Complex {
-            value0: value0_1,
-            value1: 13,
-            value2: 41,
-        };
+        let other_0 =
+            Complex { value0: value0_1, value1: 13, value2: 41, };
 
-        let other_1 = Complex {
-            value0: copy value0_0,
-            value1: 14,
-            value2: 41,
-        };
+        let other_1 =
+            Complex { value0: copy value0_0, value1: 14, value2: 41, };
 
-        let other_2 = Complex {
-            value0: value0_0,
-            value1: 13,
-            value2: 42,
-        };
+        let other_2 =
+            Complex { value0: value0_0, value1: 13, value2: 42, };
 
         assert!(is_equal(&compare(&base, &base)), 0);
         assert!(is_smaller_than(&compare(&base, &other_0)), 1);

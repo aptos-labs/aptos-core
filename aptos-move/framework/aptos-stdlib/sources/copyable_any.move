@@ -17,15 +17,13 @@ module aptos_std::copyable_any {
     /// Pack a value into the `Any` representation. Because Any can be stored, dropped, and copied this is
     /// also required from `T`.
     public fun pack<T: drop + store + copy>(x: T): Any {
-        Any {
-            type_name: type_info::type_name<T>(),
-            data: bcs::to_bytes(&x)
-        }
+        Any { type_name: type_info::type_name<T>(), data: bcs::to_bytes(&x) }
     }
 
     /// Unpack a value from the `Any` representation. This aborts if the value has not the expected type `T`.
     public fun unpack<T>(x: Any): T {
-        assert!(type_info::type_name<T>() == x.type_name, error::invalid_argument(ETYPE_MISMATCH));
+        assert!(type_info::type_name<T>() == x.type_name,
+            error::invalid_argument(ETYPE_MISMATCH));
         from_bytes<T>(x.data)
     }
 
@@ -35,7 +33,9 @@ module aptos_std::copyable_any {
     }
 
     #[test_only]
-    struct S has store, drop, copy { x: u64 }
+    struct S has store, drop, copy {
+        x: u64
+    }
 
     #[test]
     fun test_any() {

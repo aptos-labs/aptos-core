@@ -24,7 +24,8 @@ spec aptos_std::capability {
         let addr = signer::address_of(requester);
         let root_addr = global<CapDelegateState<Feature>>(addr).root;
         include AcquireSchema<Feature>;
-        ensures spec_has_delegate_cap<Feature>(addr) ==> result.root == root_addr;
+        ensures spec_has_delegate_cap<Feature>(addr) ==>
+            result.root == root_addr;
         ensures !spec_has_delegate_cap<Feature>(addr) ==> result.root == addr;
     }
 
@@ -32,7 +33,8 @@ spec aptos_std::capability {
         let addr = signer::address_of(requester);
         let root_addr = global<CapDelegateState<Feature>>(addr).root;
         include AcquireSchema<Feature>;
-        ensures spec_has_delegate_cap<Feature>(addr) ==> result.root == root_addr;
+        ensures spec_has_delegate_cap<Feature>(addr) ==>
+            result.root == root_addr;
         ensures !spec_has_delegate_cap<Feature>(addr) ==> result.root == addr;
     }
 
@@ -40,15 +42,18 @@ spec aptos_std::capability {
         addr: address;
         root_addr: address;
         aborts_if spec_has_delegate_cap<Feature>(addr) && !spec_has_cap<Feature>(root_addr);
-        aborts_if spec_has_delegate_cap<Feature>(addr) && !vector::spec_contains(spec_delegates<Feature>(root_addr), addr);
+        aborts_if spec_has_delegate_cap<Feature>(addr) && !vector::spec_contains(
+            spec_delegates<Feature>(root_addr), addr);
         aborts_if !spec_has_delegate_cap<Feature>(addr) && !spec_has_cap<Feature>(addr);
     }
 
     spec delegate<Feature>(cap: Cap<Feature>, _feature_witness: &Feature, to: &signer) {
         let addr = signer::address_of(to);
         ensures spec_has_delegate_cap<Feature>(addr);
-        ensures !old(spec_has_delegate_cap<Feature>(addr)) ==> global<CapDelegateState<Feature>>(addr).root == cap.root;
-        ensures !old(spec_has_delegate_cap<Feature>(addr)) ==> vector::spec_contains(spec_delegates<Feature>(cap.root), addr);
+        ensures !old(spec_has_delegate_cap<Feature>(addr)) ==>
+            global<CapDelegateState<Feature>>(addr).root == cap.root;
+        ensures !old(spec_has_delegate_cap<Feature>(addr)) ==>
+            vector::spec_contains(spec_delegates<Feature>(cap.root), addr);
     }
 
     spec revoke<Feature>(cap: Cap<Feature>, _feature_witness: &Feature, from: address) {

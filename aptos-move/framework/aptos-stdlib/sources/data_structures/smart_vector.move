@@ -50,7 +50,9 @@ module aptos_std::smart_vector {
 
     /// Create an empty vector with customized config.
     /// When inline_capacity = 0, SmartVector degrades to a wrapper of BigVector.
-    public fun empty_with_config<T: store>(inline_capacity: u64, bucket_size: u64): SmartVector<T> {
+    public fun empty_with_config<T: store>(
+        inline_capacity: u64, bucket_size: u64
+    ): SmartVector<T> {
         assert!(bucket_size > 0, error::invalid_argument(EZERO_BUCKET_SIZE));
         SmartVector {
             inline_vec: vector[],
@@ -117,7 +119,9 @@ module aptos_std::smart_vector {
     /// Empty and destroy the other vector, and push each of the Ts in the other vector onto the lhs vector in the
     /// same order as they occurred in other.
     /// Disclaimer: This function may be costly. Use it at your own discretion.
-    public fun append<T: store>(lhs: &mut SmartVector<T>, other: SmartVector<T>) {
+    public fun append<T: store>(
+        lhs: &mut SmartVector<T>, other: SmartVector<T>
+    ) {
         let other_len = length(&other);
         let half_other_len = other_len / 2;
         let i = 0;
@@ -134,7 +138,9 @@ module aptos_std::smart_vector {
 
     /// Add multiple values to the vector at once.
     public fun add_all<T: store>(v: &mut SmartVector<T>, vals: vector<T>) {
-        vector::for_each(vals, |val| { push_back(v, val); })
+        vector::for_each(vals, |val| {
+                push_back(v, val);
+            })
     }
 
     /// Convert a smart vector to a native vector, which is supposed to be called mostly by view functions to get an
@@ -155,21 +161,23 @@ module aptos_std::smart_vector {
         let len = length(v);
         let inline_len = vector::length(&v.inline_vec);
         if (len == inline_len) {
-            let bucket_size = if (option::is_some(&v.inline_capacity)) {
-                if (len < *option::borrow(&v.inline_capacity)) {
-                    vector::push_back(&mut v.inline_vec, val);
-                    return
+            let bucket_size =
+                if (option::is_some(&v.inline_capacity)) {
+                    if (len < *option::borrow(&v.inline_capacity)) {
+                        vector::push_back(&mut v.inline_vec, val);
+                        return
+                    };
+                    *option::borrow(&v.bucket_size)
+                } else {
+                    let val_size = size_of_val(&val);
+                    if (val_size * (inline_len + 1) < 150 /* magic number */) {
+                        vector::push_back(&mut v.inline_vec, val);
+                        return
+                    };
+                    let estimated_avg_size =
+                        max((size_of_val(&v.inline_vec) + val_size) / (inline_len + 1), 1);
+                    max(1024 /* free_write_quota */ / estimated_avg_size, 1)
                 };
-                *option::borrow(&v.bucket_size)
-            } else {
-                let val_size = size_of_val(&val);
-                if (val_size * (inline_len + 1) < 150 /* magic number */) {
-                    vector::push_back(&mut v.inline_vec, val);
-                    return
-                };
-                let estimated_avg_size = max((size_of_val(&v.inline_vec) + val_size) / (inline_len + 1), 1);
-                max(1024 /* free_write_quota */ / estimated_avg_size, 1)
-            };
             option::fill(&mut v.big_vec, big_vector::empty(bucket_size));
         };
         big_vector::push_back(option::borrow_mut(&mut v.big_vec), val);
@@ -312,14 +320,11 @@ module aptos_std::smart_vector {
     /// Disclaimer: This function may be costly. Use it at your own discretion.
     public fun index_of<T>(v: &SmartVector<T>, val: &T): (bool, u64) {
         let (found, i) = vector::index_of(&v.inline_vec, val);
-        if (found) {
-            (true, i)
-        } else if (option::is_some(&v.big_vec)) {
+        if (found) { (true, i) }
+        else if (option::is_some(&v.big_vec)) {
             let (found, i) = big_vector::index_of(option::borrow(&v.big_vec), val);
             (found, i + vector::length(&v.inline_vec))
-        } else {
-            (false, 0)
-        }
+        } else { (false, 0) }
     }
 
     /// Return true if `val` is in the vector `v`.
@@ -332,9 +337,8 @@ module aptos_std::smart_vector {
 
     /// Return the length of the vector.
     public fun length<T>(v: &SmartVector<T>): u64 {
-        vector::length(&v.inline_vec) + if (option::is_none(&v.big_vec)) {
-            0
-        } else {
+        vector::length(&v.inline_vec) + if (option::is_none(&v.big_vec)) { 0 }
+        else {
             big_vector::length(option::borrow(&v.big_vec))
         }
     }
@@ -403,9 +407,7 @@ module aptos_std::smart_vector {
     /// Fold the function over the Ts. For example, `fold(vector[1,2,3], 0, f)` will execute
     /// `f(f(f(0, 1), 2), 3)`
     public inline fun fold<Accumulator, T: store>(
-        v: SmartVector<T>,
-        init: Accumulator,
-        f: |Accumulator, T|Accumulator
+        v: SmartVector<T>, init: Accumulator, f: |Accumulator, T| Accumulator
     ): Accumulator {
         let accu = init;
         aptos_std::smart_vector::for_each(v, |elem| accu = f(accu, elem));
@@ -415,9 +417,7 @@ module aptos_std::smart_vector {
     /// Fold right like fold above but working right to left. For example, `fold(vector[1,2,3], 0, f)` will execute
     /// `f(1, f(2, f(3, 0)))`
     public inline fun foldr<Accumulator, T>(
-        v: SmartVector<T>,
-        init: Accumulator,
-        f: |T, Accumulator|Accumulator
+        v: SmartVector<T>, init: Accumulator, f: |T, Accumulator| Accumulator
     ): Accumulator {
         let accu = init;
         aptos_std::smart_vector::for_each_reverse(v, |elem| accu = f(elem, accu));
@@ -426,38 +426,33 @@ module aptos_std::smart_vector {
 
     /// Map the function over the references of the Ts of the vector, producing a new vector without modifying the
     /// original vector.
-    public inline fun map_ref<T1, T2: store>(
-        v: &SmartVector<T1>,
-        f: |&T1|T2
-    ): SmartVector<T2> {
+    public inline fun map_ref<T1, T2: store>(v: &SmartVector<T1>, f: |&T1| T2): SmartVector<T2> {
         let result = aptos_std::smart_vector::new<T2>();
-        aptos_std::smart_vector::for_each_ref(v, |elem| aptos_std::smart_vector::push_back(&mut result, f(elem)));
+        aptos_std::smart_vector::for_each_ref(v, |elem| aptos_std::smart_vector::push_back(&mut result, f(
+                    elem)));
         result
     }
 
     /// Map the function over the Ts of the vector, producing a new vector.
-    public inline fun map<T1: store, T2: store>(
-        v: SmartVector<T1>,
-        f: |T1|T2
-    ): SmartVector<T2> {
+    public inline fun map<T1: store, T2: store>(v: SmartVector<T1>, f: |T1| T2)
+        : SmartVector<T2> {
         let result = aptos_std::smart_vector::new<T2>();
         aptos_std::smart_vector::for_each(v, |elem| push_back(&mut result, f(elem)));
         result
     }
 
     /// Filter the vector using the boolean function, removing all Ts for which `p(e)` is not true.
-    public inline fun filter<T: store + drop>(
-        v: SmartVector<T>,
-        p: |&T|bool
-    ): SmartVector<T> {
+    public inline fun filter<T: store + drop>(v: SmartVector<T>, p: |&T| bool): SmartVector<T> {
         let result = aptos_std::smart_vector::new<T>();
         aptos_std::smart_vector::for_each(v, |elem| {
-            if (p(&elem)) aptos_std::smart_vector::push_back(&mut result, elem);
-        });
+                if (p(&elem)) aptos_std::smart_vector::push_back(&mut result, elem);
+            });
         result
     }
 
-    public inline fun zip<T1: store, T2: store>(v1: SmartVector<T1>, v2: SmartVector<T2>, f: |T1, T2|) {
+    public inline fun zip<T1: store, T2: store>(
+        v1: SmartVector<T1>, v2: SmartVector<T2>, f: |T1, T2|
+    ) {
         // We need to reverse the vectors to consume it efficiently
         aptos_std::smart_vector::reverse(&mut v1);
         aptos_std::smart_vector::reverse(&mut v2);
@@ -467,16 +462,15 @@ module aptos_std::smart_vector {
     /// Apply the function to each pair of elements in the two given vectors in the reverse order, consuming them.
     /// This errors out if the vectors are not of the same length.
     public inline fun zip_reverse<T1, T2>(
-        v1: SmartVector<T1>,
-        v2: SmartVector<T2>,
-        f: |T1, T2|,
+        v1: SmartVector<T1>, v2: SmartVector<T2>, f: |T1, T2|,
     ) {
         let len = aptos_std::smart_vector::length(&v1);
         // We can't use the constant ESMART_VECTORS_LENGTH_MISMATCH here as all calling code would then need to define it
         // due to how inline functions work.
         assert!(len == aptos_std::smart_vector::length(&v2), 0x20005);
         while (len > 0) {
-            f(aptos_std::smart_vector::pop_back(&mut v1), aptos_std::smart_vector::pop_back(&mut v2));
+            f(aptos_std::smart_vector::pop_back(&mut v1),
+                aptos_std::smart_vector::pop_back(&mut v2));
             len = len - 1;
         };
         aptos_std::smart_vector::destroy_empty(v1);
@@ -486,9 +480,7 @@ module aptos_std::smart_vector {
     /// Apply the function to the references of each pair of elements in the two given vectors.
     /// This errors out if the vectors are not of the same length.
     public inline fun zip_ref<T1, T2>(
-        v1: &SmartVector<T1>,
-        v2: &SmartVector<T2>,
-        f: |&T1, &T2|,
+        v1: &SmartVector<T1>, v2: &SmartVector<T2>, f: |&T1, &T2|,
     ) {
         let len = aptos_std::smart_vector::length(v1);
         // We can't use the constant ESMART_VECTORS_LENGTH_MISMATCH here as all calling code would then need to define it
@@ -514,20 +506,20 @@ module aptos_std::smart_vector {
         // due to how inline functions work.
         assert!(len == aptos_std::smart_vector::length(v2), 0x20005);
         while (i < len) {
-            f(aptos_std::smart_vector::borrow_mut(v1, i), aptos_std::smart_vector::borrow_mut(v2, i));
+            f(aptos_std::smart_vector::borrow_mut(v1, i),
+                aptos_std::smart_vector::borrow_mut(v2, i));
             i = i + 1
         }
     }
 
     /// Map the function over the element pairs of the two vectors, producing a new vector.
     public inline fun zip_map<T1: store, T2: store, NewT: store>(
-        v1: SmartVector<T1>,
-        v2: SmartVector<T2>,
-        f: |T1, T2|NewT
+        v1: SmartVector<T1>, v2: SmartVector<T2>, f: |T1, T2| NewT
     ): SmartVector<NewT> {
         // We can't use the constant ESMART_VECTORS_LENGTH_MISMATCH here as all calling code would then need to define it
         // due to how inline functions work.
-        assert!(aptos_std::smart_vector::length(&v1) == aptos_std::smart_vector::length(&v2), 0x20005);
+        assert!(aptos_std::smart_vector::length(&v1)
+            == aptos_std::smart_vector::length(&v2), 0x20005);
 
         let result = aptos_std::smart_vector::new<NewT>();
         aptos_std::smart_vector::zip(v1, v2, |e1, e2| push_back(&mut result, f(e1, e2)));
@@ -537,13 +529,12 @@ module aptos_std::smart_vector {
     /// Map the function over the references of the element pairs of two vectors, producing a new vector from the return
     /// values without modifying the original vectors.
     public inline fun zip_map_ref<T1, T2, NewT: store>(
-        v1: &SmartVector<T1>,
-        v2: &SmartVector<T2>,
-        f: |&T1, &T2|NewT
+        v1: &SmartVector<T1>, v2: &SmartVector<T2>, f: |&T1, &T2| NewT
     ): SmartVector<NewT> {
         // We can't use the constant ESMART_VECTORS_LENGTH_MISMATCH here as all calling code would then need to define it
         // due to how inline functions work.
-        assert!(aptos_std::smart_vector::length(v1) == aptos_std::smart_vector::length(v2), 0x20005);
+        assert!(aptos_std::smart_vector::length(v1)
+            == aptos_std::smart_vector::length(v2), 0x20005);
 
         let result = aptos_std::smart_vector::new<NewT>();
         aptos_std::smart_vector::zip_ref(v1, v2, |e1, e2| push_back(&mut result, f(e1, e2)));
@@ -688,13 +679,9 @@ module aptos_std::smart_vector {
         i = 0;
         let len = length(&v);
         while (i + 1 < len) {
-            assert!(
-                *big_vector::borrow(option::borrow(&v.big_vec), i) == *big_vector::borrow(
-                    option::borrow(&v.big_vec),
-                    i + 1
-                ) + 1,
-                0
-            );
+            assert!(*big_vector::borrow(option::borrow(&v.big_vec), i)
+                == *big_vector::borrow(option::borrow(&v.big_vec), i + 1) + 1,
+                0);
             i = i + 1;
         };
         destroy(v);

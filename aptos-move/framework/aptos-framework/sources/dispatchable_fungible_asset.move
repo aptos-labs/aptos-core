@@ -43,45 +43,31 @@ module aptos_framework::dispatchable_fungible_asset {
         deposit_function: Option<FunctionInfo>,
         derived_balance_function: Option<FunctionInfo>,
     ) {
-        fungible_asset::register_dispatch_functions(
-            constructor_ref,
+        fungible_asset::register_dispatch_functions(constructor_ref,
             withdraw_function,
             deposit_function,
-            derived_balance_function,
-        );
+            derived_balance_function,);
         let store_obj = &object::generate_signer(constructor_ref);
-        move_to<TransferRefStore>(
-            store_obj,
+        move_to<TransferRefStore>(store_obj,
             TransferRefStore {
                 transfer_ref: fungible_asset::generate_transfer_ref(constructor_ref),
-            }
-        );
+            });
     }
 
     /// Withdraw `amount` of the fungible asset from `store` by the owner.
     ///
     /// The semantics of deposit will be governed by the function specified in DispatchFunctionStore.
-    public fun withdraw<T: key>(
-        owner: &signer,
-        store: Object<T>,
-        amount: u64,
-    ): FungibleAsset acquires TransferRefStore {
+    public fun withdraw<T: key>(owner: &signer, store: Object<T>, amount: u64,): FungibleAsset acquires TransferRefStore {
         fungible_asset::withdraw_sanity_check(owner, store, false);
         let func_opt = fungible_asset::withdraw_dispatch_function(store);
         if (option::is_some(&func_opt)) {
-            assert!(
-                features::dispatchable_fungible_asset_enabled(),
-                error::aborted(ENOT_ACTIVATED)
-            );
+            assert!(features::dispatchable_fungible_asset_enabled(),
+                error::aborted(ENOT_ACTIVATED));
             let start_balance = fungible_asset::balance(store);
             let func = option::borrow(&func_opt);
             function_info::load_module_from_function(func);
-            let fa = dispatchable_withdraw(
-                store,
-                amount,
-                borrow_transfer_ref(store),
-                func,
-            );
+            let fa =
+                dispatchable_withdraw(store, amount, borrow_transfer_ref(store), func,);
             let end_balance = fungible_asset::balance(store);
             assert!(amount <= start_balance - end_balance, error::aborted(EAMOUNT_MISMATCH));
             fa
@@ -97,18 +83,11 @@ module aptos_framework::dispatchable_fungible_asset {
         fungible_asset::deposit_sanity_check(store, false);
         let func_opt = fungible_asset::deposit_dispatch_function(store);
         if (option::is_some(&func_opt)) {
-            assert!(
-                features::dispatchable_fungible_asset_enabled(),
-                error::aborted(ENOT_ACTIVATED)
-            );
+            assert!(features::dispatchable_fungible_asset_enabled(),
+                error::aborted(ENOT_ACTIVATED));
             let func = option::borrow(&func_opt);
             function_info::load_module_from_function(func);
-            dispatchable_deposit(
-                store,
-                fa,
-                borrow_transfer_ref(store),
-                func
-            )
+            dispatchable_deposit(store, fa, borrow_transfer_ref(store), func)
         } else {
             fungible_asset::deposit_internal(store, fa)
         }
@@ -117,10 +96,7 @@ module aptos_framework::dispatchable_fungible_asset {
     /// Transfer an `amount` of fungible asset from `from_store`, which should be owned by `sender`, to `receiver`.
     /// Note: it does not move the underlying object.
     public entry fun transfer<T: key>(
-        sender: &signer,
-        from: Object<T>,
-        to: Object<T>,
-        amount: u64,
+        sender: &signer, from: Object<T>, to: Object<T>, amount: u64,
     ) acquires TransferRefStore {
         let fa = withdraw(sender, from, amount);
         deposit(to, fa);
@@ -130,11 +106,7 @@ module aptos_framework::dispatchable_fungible_asset {
     /// The recipient is guranteed to receive asset greater than the expected amount.
     /// Note: it does not move the underlying object.
     public entry fun transfer_assert_minimum_deposit<T: key>(
-        sender: &signer,
-        from: Object<T>,
-        to: Object<T>,
-        amount: u64,
-        expected: u64
+        sender: &signer, from: Object<T>, to: Object<T>, amount: u64, expected: u64
     ) acquires TransferRefStore {
         let start = fungible_asset::balance(to);
         let fa = withdraw(sender, from, amount);
@@ -150,10 +122,8 @@ module aptos_framework::dispatchable_fungible_asset {
     public fun derived_balance<T: key>(store: Object<T>): u64 {
         let func_opt = fungible_asset::derived_balance_dispatch_function(store);
         if (option::is_some(&func_opt)) {
-            assert!(
-                features::dispatchable_fungible_asset_enabled(),
-                error::aborted(ENOT_ACTIVATED)
-            );
+            assert!(features::dispatchable_fungible_asset_enabled(),
+                error::aborted(ENOT_ACTIVATED));
             let func = option::borrow(&func_opt);
             function_info::load_module_from_function(func);
             dispatchable_derived_balance(store, func)
@@ -163,32 +133,17 @@ module aptos_framework::dispatchable_fungible_asset {
     }
 
     inline fun borrow_transfer_ref<T: key>(metadata: Object<T>): &TransferRef acquires TransferRefStore {
-        let metadata_addr = object::object_address(
-            &fungible_asset::store_metadata(metadata)
-        );
-        assert!(
-            exists<TransferRefStore>(metadata_addr),
-            error::not_found(ESTORE_NOT_FOUND)
-        );
+        let metadata_addr =
+            object::object_address(&fungible_asset::store_metadata(metadata));
+        assert!(exists<TransferRefStore>(metadata_addr), error::not_found(ESTORE_NOT_FOUND));
         &borrow_global<TransferRefStore>(metadata_addr).transfer_ref
     }
 
-    native fun dispatchable_withdraw<T: key>(
-        store: Object<T>,
-        amount: u64,
-        transfer_ref: &TransferRef,
-        function: &FunctionInfo,
-    ): FungibleAsset;
+    native fun dispatchable_withdraw<T: key>(store: Object<T>, amount: u64, transfer_ref: &TransferRef,
+        function: &FunctionInfo,): FungibleAsset;
 
-    native fun dispatchable_deposit<T: key>(
-        store: Object<T>,
-        fa: FungibleAsset,
-        transfer_ref: &TransferRef,
-        function: &FunctionInfo,
-    );
+    native fun dispatchable_deposit<T: key>(store: Object<T>, fa: FungibleAsset, transfer_ref: &TransferRef,
+        function: &FunctionInfo,);
 
-    native fun dispatchable_derived_balance<T: key>(
-        store: Object<T>,
-        function: &FunctionInfo,
-    ): u64;
+    native fun dispatchable_derived_balance<T: key>(store: Object<T>, function: &FunctionInfo,): u64;
 }

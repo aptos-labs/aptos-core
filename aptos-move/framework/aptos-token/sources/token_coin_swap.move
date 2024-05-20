@@ -79,8 +79,7 @@ module aptos_token::token_coin_swap {
     }
 
     public fun does_listing_exist<CoinType>(
-        _token_owner: address,
-        _token_id: TokenId
+        _token_owner: address, _token_id: TokenId
     ): bool {
         abort error::invalid_argument(EDEPRECATED_MODULE)
     }
@@ -125,37 +124,28 @@ module aptos_token::token_coin_swap {
 
     /// Put the token into escrow that cannot be transferred or withdrawed by the owner.
     public fun deposit_token_to_escrow(
-        _token_owner: &signer,
-        _token_id: TokenId,
-        _tokens: Token,
-        _locked_until_secs: u64
+        _token_owner: &signer, _token_id: TokenId, _tokens: Token, _locked_until_secs: u64
     ) {
         abort error::invalid_argument(EDEPRECATED_MODULE)
     }
 
     /// Private function for withdraw tokens from an escrow stored in token owner address
     fun withdraw_token_from_escrow_internal(
-        _token_owner_addr: address,
-        _token_id: TokenId,
-        _amount: u64
+        _token_owner_addr: address, _token_id: TokenId, _amount: u64
     ): Token {
         abort error::invalid_argument(EDEPRECATED_MODULE)
     }
 
     /// Withdraw tokens from the token escrow. It needs a signer to authorize
     public fun withdraw_token_from_escrow(
-        _token_owner: &signer,
-        _token_id: TokenId,
-        _amount: u64
+        _token_owner: &signer, _token_id: TokenId, _amount: u64
     ): Token {
         abort error::invalid_argument(EDEPRECATED_MODULE)
     }
 
     /// Cancel token listing for a fixed amount
     public fun cancel_token_listing<CoinType>(
-        _token_owner: &signer,
-        _token_id: TokenId,
-        _token_amount: u64,
+        _token_owner: &signer, _token_id: TokenId, _token_amount: u64,
     ) {
         abort error::invalid_argument(EDEPRECATED_MODULE)
     }

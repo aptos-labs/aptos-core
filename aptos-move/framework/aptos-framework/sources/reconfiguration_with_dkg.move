@@ -25,18 +25,15 @@ module aptos_framework::reconfiguration_with_dkg {
         let incomplete_dkg_session = dkg::incomplete_session();
         if (option::is_some(&incomplete_dkg_session)) {
             let session = option::borrow(&incomplete_dkg_session);
-            if (dkg::session_dealer_epoch(session) == reconfiguration::current_epoch()) {
-                return
-            }
+            if (dkg::session_dealer_epoch(session)
+                == reconfiguration::current_epoch()) { return }
         };
         reconfiguration_state::on_reconfig_start();
         let cur_epoch = reconfiguration::current_epoch();
-        dkg::start(
-            cur_epoch,
+        dkg::start(cur_epoch,
             randomness_config::current(),
             stake::cur_validator_consensus_infos(),
-            stake::next_validator_consensus_infos(),
-        );
+            stake::next_validator_consensus_infos(),);
     }
 
     /// Clear incomplete DKG session, if it exists.

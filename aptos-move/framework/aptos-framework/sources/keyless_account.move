@@ -17,7 +17,7 @@ module aptos_framework::keyless_account {
     friend aptos_framework::reconfiguration_with_dkg;
 
     /// The training wheels PK needs to be 32 bytes long.
-    const E_TRAINING_WHEELS_PK_WRONG_SIZE : u64 = 1;
+    const E_TRAINING_WHEELS_PK_WRONG_SIZE: u64 = 1;
 
     /// A serialized BN254 G1 point is invalid.
     const E_INVALID_BN254_G1_SERIALIZATION: u64 = 2;
@@ -68,26 +68,23 @@ module aptos_framework::keyless_account {
     }
 
     #[test_only]
-    public fun initialize_for_test(fx: &signer, vk: Groth16VerificationKey, constants: Configuration) {
+    public fun initialize_for_test(
+        fx: &signer, vk: Groth16VerificationKey, constants: Configuration
+    ) {
         system_addresses::assert_aptos_framework(fx);
 
         move_to(fx, vk);
         move_to(fx, constants);
     }
 
-    public fun new_groth16_verification_key(alpha_g1: vector<u8>,
-                                            beta_g2: vector<u8>,
-                                            gamma_g2: vector<u8>,
-                                            delta_g2: vector<u8>,
-                                            gamma_abc_g1: vector<vector<u8>>
+    public fun new_groth16_verification_key(
+        alpha_g1: vector<u8>,
+        beta_g2: vector<u8>,
+        gamma_g2: vector<u8>,
+        delta_g2: vector<u8>,
+        gamma_abc_g1: vector<vector<u8>>
     ): Groth16VerificationKey {
-        Groth16VerificationKey {
-            alpha_g1,
-            beta_g2,
-            gamma_g2,
-            delta_g2,
-            gamma_abc_g1,
-        }
+        Groth16VerificationKey { alpha_g1, beta_g2, gamma_g2, delta_g2, gamma_abc_g1, }
     }
 
     public fun new_configuration(
@@ -115,12 +112,22 @@ module aptos_framework::keyless_account {
     /// Pre-validate the VK to actively-prevent incorrect VKs from being set on-chain.
     fun validate_groth16_vk(vk: &Groth16VerificationKey) {
         // Could be leveraged to speed up the VM deserialization of the VK by 2x, since it can assume the points are valid.
-        assert!(option::is_some(&crypto_algebra::deserialize<bn254_algebra::G1, bn254_algebra::FormatG1Compr>(&vk.alpha_g1)), E_INVALID_BN254_G1_SERIALIZATION);
-        assert!(option::is_some(&crypto_algebra::deserialize<bn254_algebra::G2, bn254_algebra::FormatG2Compr>(&vk.beta_g2)), E_INVALID_BN254_G2_SERIALIZATION);
-        assert!(option::is_some(&crypto_algebra::deserialize<bn254_algebra::G2, bn254_algebra::FormatG2Compr>(&vk.gamma_g2)), E_INVALID_BN254_G2_SERIALIZATION);
-        assert!(option::is_some(&crypto_algebra::deserialize<bn254_algebra::G2, bn254_algebra::FormatG2Compr>(&vk.delta_g2)), E_INVALID_BN254_G2_SERIALIZATION);
-        for(i in 0..vector::length(&vk.gamma_abc_g1)) {
-            assert!(option::is_some(&crypto_algebra::deserialize<bn254_algebra::G1, bn254_algebra::FormatG1Compr>(vector::borrow(&vk.gamma_abc_g1, i))), E_INVALID_BN254_G1_SERIALIZATION);
+        assert!(option::is_some(&crypto_algebra::deserialize<bn254_algebra::G1, bn254_algebra::FormatG1Compr>(
+                    &vk.alpha_g1)),
+            E_INVALID_BN254_G1_SERIALIZATION);
+        assert!(option::is_some(&crypto_algebra::deserialize<bn254_algebra::G2, bn254_algebra::FormatG2Compr>(
+                    &vk.beta_g2)),
+            E_INVALID_BN254_G2_SERIALIZATION);
+        assert!(option::is_some(&crypto_algebra::deserialize<bn254_algebra::G2, bn254_algebra::FormatG2Compr>(
+                    &vk.gamma_g2)),
+            E_INVALID_BN254_G2_SERIALIZATION);
+        assert!(option::is_some(&crypto_algebra::deserialize<bn254_algebra::G2, bn254_algebra::FormatG2Compr>(
+                    &vk.delta_g2)),
+            E_INVALID_BN254_G2_SERIALIZATION);
+        for (i in 0..vector::length(&vk.gamma_abc_g1)) {
+            assert!(option::is_some(&crypto_algebra::deserialize<bn254_algebra::G1, bn254_algebra::FormatG1Compr>(
+                        vector::borrow(&vk.gamma_abc_g1, i))),
+                E_INVALID_BN254_G1_SERIALIZATION);
         };
     }
 
@@ -128,7 +135,9 @@ module aptos_framework::keyless_account {
     /// `set_groth16_verification_key_for_next_epoch`.
     ///
     /// WARNING: See `set_groth16_verification_key_for_next_epoch` for caveats.
-    public fun update_groth16_verification_key(fx: &signer, vk: Groth16VerificationKey) {
+    public fun update_groth16_verification_key(
+        fx: &signer, vk: Groth16VerificationKey
+    ) {
         system_addresses::assert_aptos_framework(fx);
         chain_status::assert_genesis();
         // There should not be a previous resource set here.
@@ -152,7 +161,8 @@ module aptos_framework::keyless_account {
         chain_status::assert_genesis();
 
         if (option::is_some(&pk)) {
-            assert!(vector::length(option::borrow(&pk)) == 32, E_TRAINING_WHEELS_PK_WRONG_SIZE)
+            assert!(vector::length(option::borrow(&pk)) == 32,
+                E_TRAINING_WHEELS_PK_WRONG_SIZE)
         };
 
         let config = borrow_global_mut<Configuration>(signer::address_of(fx));
@@ -185,6 +195,7 @@ module aptos_framework::keyless_account {
         let config = borrow_global_mut<Configuration>(signer::address_of(fx));
         vector::push_back(&mut config.override_aud_vals, aud);
     }
+
     /// Queues up a change to the Groth16 verification key. The change will only be effective after reconfiguration.
     /// Only callable via governance proposal.
     ///
@@ -192,19 +203,22 @@ module aptos_framework::keyless_account {
     /// so that old ZKPs for the old VK cannot be replayed as potentially-valid ZKPs.
     ///
     /// WARNING: If a malicious key is set, this would lead to stolen funds.
-    public fun set_groth16_verification_key_for_next_epoch(fx: &signer, vk: Groth16VerificationKey) {
+    public fun set_groth16_verification_key_for_next_epoch(
+        fx: &signer, vk: Groth16VerificationKey
+    ) {
         system_addresses::assert_aptos_framework(fx);
         validate_groth16_vk(&vk);
         config_buffer::upsert<Groth16VerificationKey>(vk);
     }
-
 
     /// Queues up a change to the keyless configuration. The change will only be effective after reconfiguration. Only
     /// callable via governance proposal.
     ///
     /// WARNING: A malicious `Configuration` could lead to DoS attacks, create liveness issues, or enable a malicious
     /// recovery service provider to phish users' accounts.
-    public fun set_configuration_for_next_epoch(fx: &signer, config: Configuration) {
+    public fun set_configuration_for_next_epoch(
+        fx: &signer, config: Configuration
+    ) {
         system_addresses::assert_aptos_framework(fx);
         config_buffer::upsert<Configuration>(config);
     }
@@ -213,7 +227,9 @@ module aptos_framework::keyless_account {
     /// reconfiguration. Only callable via governance proposal.
     ///
     /// WARNING: If a malicious key is set, this *could* lead to stolen funds.
-    public fun update_training_wheels_for_next_epoch(fx: &signer, pk: Option<vector<u8>>) acquires Configuration {
+    public fun update_training_wheels_for_next_epoch(
+        fx: &signer, pk: Option<vector<u8>>
+    ) acquires Configuration {
         system_addresses::assert_aptos_framework(fx);
 
         // If a PK is being set, validate it first.
@@ -223,11 +239,12 @@ module aptos_framework::keyless_account {
             assert!(option::is_some(&vpk), E_TRAINING_WHEELS_PK_WRONG_SIZE)
         };
 
-        let config = if (config_buffer::does_exist<Configuration>()) {
-            config_buffer::extract<Configuration>()
-        } else {
-            *borrow_global<Configuration>(signer::address_of(fx))
-        };
+        let config =
+            if (config_buffer::does_exist<Configuration>()) {
+                config_buffer::extract<Configuration>()
+            } else {
+                *borrow_global<Configuration>(signer::address_of(fx))
+            };
 
         config.training_wheels_pubkey = pk;
 
@@ -236,14 +253,17 @@ module aptos_framework::keyless_account {
 
     /// Convenience method to queues up a change to the max expiration horizon. The change will only be effective after
     /// reconfiguration. Only callable via governance proposal.
-    public fun update_max_exp_horizon_for_next_epoch(fx: &signer, max_exp_horizon_secs: u64) acquires Configuration {
+    public fun update_max_exp_horizon_for_next_epoch(
+        fx: &signer, max_exp_horizon_secs: u64
+    ) acquires Configuration {
         system_addresses::assert_aptos_framework(fx);
 
-        let config = if (config_buffer::does_exist<Configuration>()) {
-            config_buffer::extract<Configuration>()
-        } else {
-            *borrow_global<Configuration>(signer::address_of(fx))
-        };
+        let config =
+            if (config_buffer::does_exist<Configuration>()) {
+                config_buffer::extract<Configuration>()
+            } else {
+                *borrow_global<Configuration>(signer::address_of(fx))
+            };
 
         config.max_exp_horizon_secs = max_exp_horizon_secs;
 
@@ -258,11 +278,12 @@ module aptos_framework::keyless_account {
     public fun remove_all_override_auds_for_next_epoch(fx: &signer) acquires Configuration {
         system_addresses::assert_aptos_framework(fx);
 
-        let config = if (config_buffer::does_exist<Configuration>()) {
-            config_buffer::extract<Configuration>()
-        } else {
-            *borrow_global<Configuration>(signer::address_of(fx))
-        };
+        let config =
+            if (config_buffer::does_exist<Configuration>()) {
+                config_buffer::extract<Configuration>()
+            } else {
+                *borrow_global<Configuration>(signer::address_of(fx))
+            };
 
         config.override_aud_vals = vector[];
 
@@ -276,11 +297,12 @@ module aptos_framework::keyless_account {
     public fun add_override_aud_for_next_epoch(fx: &signer, aud: String) acquires Configuration {
         system_addresses::assert_aptos_framework(fx);
 
-        let config = if (config_buffer::does_exist<Configuration>()) {
-            config_buffer::extract<Configuration>()
-        } else {
-            *borrow_global<Configuration>(signer::address_of(fx))
-        };
+        let config =
+            if (config_buffer::does_exist<Configuration>()) {
+                config_buffer::extract<Configuration>()
+            } else {
+                *borrow_global<Configuration>(signer::address_of(fx))
+            };
 
         vector::push_back(&mut config.override_aud_vals, aud);
 
@@ -300,7 +322,7 @@ module aptos_framework::keyless_account {
             }
         };
 
-        if(config_buffer::does_exist<Configuration>()) {
+        if (config_buffer::does_exist<Configuration>()) {
             let config = config_buffer::extract();
             if (exists<Configuration>(@aptos_framework)) {
                 *borrow_global_mut<Configuration>(@aptos_framework) = config;

@@ -9,10 +9,8 @@ spec aptos_std::copyable_any {
         use aptos_std::from_bcs;
         aborts_if false;
         pragma opaque;
-        ensures result == Any {
-            type_name: type_info::type_name<T>(),
-            data: bcs::serialize<T>(x)
-        };
+        ensures result
+        == Any { type_name: type_info::type_name<T>(), data: bcs::serialize<T>(x) };
         ensures [abstract] from_bcs::deserializable<T>(result.data);
     }
 

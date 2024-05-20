@@ -9,8 +9,8 @@ module aptos_std::math_fixed {
     const EOVERFLOW_EXP: u64 = 1;
 
     /// Natural log 2 in 32 bit fixed point
-    const LN2: u128 = 2977044472;  // ln(2) in fixed 32 representation
-    const LN2_X_32: u64 = 32 * 2977044472;  // 32 * ln(2) in fixed 32 representation
+    const LN2: u128 = 2977044472; // ln(2) in fixed 32 representation
+    const LN2_X_32: u64 = 32 * 2977044472; // 32 * ln(2) in fixed 32 representation
 
     /// Square root of fixed point number
     public fun sqrt(x: FixedPoint32): FixedPoint32 {
@@ -48,7 +48,7 @@ module aptos_std::math_fixed {
         let a = fixed_point32::get_raw_value(x);
         let b = fixed_point32::get_raw_value(y);
         let c = fixed_point32::get_raw_value(z);
-        fixed_point32::create_from_raw_value (math64::mul_div(a, b, c))
+        fixed_point32::create_from_raw_value(math64::mul_div(a, b, c))
     }
 
     // Calculate e^x where x and the result are fixed point numbers
@@ -64,7 +64,7 @@ module aptos_std::math_fixed {
         let exponent = remainder / bigfactor;
         let x = remainder % bigfactor;
         // 2^(remainder / ln2) = (2^(1/4999))^exponent * exp(x / 2^32)
-        let roottwo = 4295562865;  // fixed point representation of 2^(1/4999)
+        let roottwo = 4295562865; // fixed point representation of 2^(1/4999)
         // This has an error of 5000 / 4 10^9 roughly 6 digits of precission
         let power = pow_raw(roottwo, exponent);
         let eps_correction = 1241009291;
@@ -99,7 +99,8 @@ module aptos_std::math_fixed {
         assert!(fixed_point32::get_raw_value(result) == fixed_base, 0);
 
         let result = sqrt(fixed_point32::create_from_u64(2));
-        assert_approx_the_same((fixed_point32::get_raw_value(result) as u128), 6074001000, 9);
+        assert_approx_the_same((fixed_point32::get_raw_value(result) as u128), 6074001000,
+            9);
     }
 
     #[test]
@@ -109,11 +110,11 @@ module aptos_std::math_fixed {
         assert!(result == fixed_base, 0);
 
         let result = exp_raw(fixed_base);
-        let e = 11674931554;  // e in 32 bit fixed point
+        let e = 11674931554; // e in 32 bit fixed point
         assert_approx_the_same(result, e, 9);
 
         let result = exp_raw(10 * fixed_base);
-        let exp10 = 94602950235157;  // e^10 in 32 bit fixed point
+        let exp10 = 94602950235157; // e^10 in 32 bit fixed point
         assert_approx_the_same(result, exp10, 9);
     }
 
@@ -121,7 +122,7 @@ module aptos_std::math_fixed {
     public entry fun test_pow() {
         // We use the case of exp
         let result = pow_raw(4295562865, 4999);
-        assert_approx_the_same(result,  1 << 33, 6);
+        assert_approx_the_same(result, 1 << 33, 6);
     }
 
     #[test_only]

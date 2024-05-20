@@ -8,10 +8,8 @@ spec aptos_std::any {
         use std::bcs;
         use aptos_std::from_bcs;
         aborts_if false;
-        ensures result == Any {
-            type_name: type_info::type_name<T>(),
-            data: bcs::serialize<T>(x)
-        };
+        ensures result
+        == Any { type_name: type_info::type_name<T>(), data: bcs::serialize<T>(x) };
         ensures [abstract] from_bcs::deserializable<T>(result.data);
     }
 

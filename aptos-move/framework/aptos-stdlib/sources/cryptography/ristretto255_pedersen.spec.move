@@ -1,2 +1,1 @@
-spec aptos_std::ristretto255_pedersen {
-}
+spec aptos_std::ristretto255_pedersen {}

@@ -175,7 +175,8 @@ spec aptos_framework::multisig_account {
 
     spec num_signatures_required(multisig_account: address): u64 {
         aborts_if !exists<MultisigAccount>(multisig_account);
-        ensures result == global<MultisigAccount>(multisig_account).num_signatures_required;
+        ensures result
+        == global<MultisigAccount>(multisig_account).num_signatures_required;
     }
 
     spec owners(multisig_account: address): vector<address> {
@@ -183,27 +184,27 @@ spec aptos_framework::multisig_account {
         ensures result == global<MultisigAccount>(multisig_account).owners;
     }
 
-    spec get_transaction(
-        multisig_account: address,
-        sequence_number: u64,
-    ): MultisigTransaction {
+    spec get_transaction(multisig_account: address, sequence_number: u64,): MultisigTransaction {
         let multisig_account_resource = global<MultisigAccount>(multisig_account);
         aborts_if !exists<MultisigAccount>(multisig_account);
         aborts_if sequence_number == 0 || sequence_number >= multisig_account_resource.next_sequence_number;
-        aborts_if !table::spec_contains(multisig_account_resource.transactions, sequence_number);
-        ensures result == table::spec_get(multisig_account_resource.transactions, sequence_number);
+        aborts_if !table::spec_contains(multisig_account_resource.transactions,
+            sequence_number);
+        ensures result
+        == table::spec_get(multisig_account_resource.transactions, sequence_number);
     }
 
-    spec get_next_transaction_payload(
-    multisig_account: address, provided_payload: vector<u8>
-    ): vector<u8> {
+    spec get_next_transaction_payload(multisig_account: address, provided_payload: vector<u8>): vector<u8> {
         let multisig_account_resource = global<MultisigAccount>(multisig_account);
         let sequence_number = multisig_account_resource.last_executed_sequence_number + 1;
-        let transaction = table::spec_get(multisig_account_resource.transactions, sequence_number);
+        let transaction = table::spec_get(multisig_account_resource.transactions,
+            sequence_number);
         aborts_if !exists<MultisigAccount>(multisig_account);
         aborts_if multisig_account_resource.last_executed_sequence_number + 1 > MAX_U64;
-        aborts_if !table::spec_contains(multisig_account_resource.transactions, sequence_number);
-        ensures option::spec_is_none(transaction.payload) ==> result == provided_payload;
+        aborts_if !table::spec_contains(multisig_account_resource.transactions,
+            sequence_number);
+        ensures option::spec_is_none(transaction.payload) ==>
+            result == provided_payload;
     }
 
     spec get_next_multisig_account_address(creator: address): address {
@@ -214,7 +215,8 @@ spec aptos_framework::multisig_account {
     spec last_resolved_sequence_number(multisig_account: address): u64 {
         let multisig_account_resource = global<MultisigAccount>(multisig_account);
         aborts_if !exists<MultisigAccount>(multisig_account);
-        ensures result == multisig_account_resource.last_executed_sequence_number;
+        ensures result
+        == multisig_account_resource.last_executed_sequence_number;
     }
 
     spec next_sequence_number(multisig_account: address): u64 {
@@ -223,21 +225,18 @@ spec aptos_framework::multisig_account {
         ensures result == multisig_account_resource.next_sequence_number;
     }
 
-    spec vote(
-        multisig_account: address,
-        sequence_number: u64,
-        owner: address
-    ): (bool, bool) {
+    spec vote(multisig_account: address, sequence_number: u64, owner: address): (bool, bool) {
         let multisig_account_resource = global<MultisigAccount>(multisig_account);
         aborts_if !exists<MultisigAccount>(multisig_account);
         aborts_if sequence_number == 0 || sequence_number >= multisig_account_resource.next_sequence_number;
-        aborts_if !table::spec_contains(multisig_account_resource.transactions, sequence_number);
-        let transaction = table::spec_get(multisig_account_resource.transactions, sequence_number);
+        aborts_if !table::spec_contains(multisig_account_resource.transactions,
+            sequence_number);
+        let transaction = table::spec_get(multisig_account_resource.transactions,
+            sequence_number);
         let votes = transaction.votes;
         let voted = simple_map::spec_contains_key(votes, owner);
         let vote = voted && simple_map::spec_get(votes, owner);
         ensures result_1 == voted;
         ensures result_2 == vote;
     }
-
 }

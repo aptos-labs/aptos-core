@@ -56,7 +56,9 @@ module aptos_framework::aggregator_v2 {
     }
 
     /// Returns `max_value` exceeding which aggregator overflows.
-    public fun max_value<IntElement: copy + drop>(aggregator: &Aggregator<IntElement>): IntElement {
+    public fun max_value<IntElement: copy + drop>(
+        aggregator: &Aggregator<IntElement>
+    ): IntElement {
         aggregator.max_value
     }
 
@@ -64,7 +66,8 @@ module aptos_framework::aggregator_v2 {
     ///
     /// Currently supported types for IntElement are u64 and u128.
     /// EAGGREGATOR_ELEMENT_TYPE_NOT_SUPPORTED raised if called with a different type.
-    public native fun create_aggregator<IntElement: copy + drop>(max_value: IntElement): Aggregator<IntElement>;
+    public native fun create_aggregator<IntElement: copy + drop>(max_value: IntElement): Aggregator<
+        IntElement>;
 
     /// Creates new aggregator, without any 'max_value' on top of the implicit bound restriction
     /// due to the width of the type (i.e. MAX_U64 for u64, MAX_U128 for u128).
@@ -79,7 +82,9 @@ module aptos_framework::aggregator_v2 {
 
     // Adds `value` to aggregator, uncoditionally.
     // If addition would exceed the max_value, EAGGREGATOR_OVERFLOW exception will be thrown.
-    public fun add<IntElement>(aggregator: &mut Aggregator<IntElement>, value: IntElement) {
+    public fun add<IntElement>(
+        aggregator: &mut Aggregator<IntElement>, value: IntElement
+    ) {
         assert!(try_add(aggregator, value), error::out_of_range(EAGGREGATOR_OVERFLOW));
     }
 
@@ -89,7 +94,9 @@ module aptos_framework::aggregator_v2 {
 
     // Subtracts `value` to aggregator, uncoditionally.
     // If subtraction would result in a negative value, EAGGREGATOR_UNDERFLOW exception will be thrown.
-    public fun sub<IntElement>(aggregator: &mut Aggregator<IntElement>, value: IntElement) {
+    public fun sub<IntElement>(
+        aggregator: &mut Aggregator<IntElement>, value: IntElement
+    ) {
         assert!(try_sub(aggregator, value), error::out_of_range(EAGGREGATOR_UNDERFLOW));
     }
 
@@ -101,11 +108,13 @@ module aptos_framework::aggregator_v2 {
 
     /// Returns a wrapper of a current value of an aggregator
     /// Unlike read(), it is fast and avoids sequential dependencies.
-    public native fun snapshot<IntElement>(aggregator: &Aggregator<IntElement>): AggregatorSnapshot<IntElement>;
+    public native fun snapshot<IntElement>(aggregator: &Aggregator<IntElement>): AggregatorSnapshot<
+        IntElement>;
 
     /// Creates a snapshot of a given value.
     /// Useful for when object is sometimes created via snapshot() or string_concat(), and sometimes directly.
-    public native fun create_snapshot<IntElement: copy + drop>(value: IntElement): AggregatorSnapshot<IntElement>;
+    public native fun create_snapshot<IntElement: copy + drop>(value: IntElement): AggregatorSnapshot<
+        IntElement>;
 
     /// Returns a value stored in this snapshot.
     /// Note: This operation is resource-intensive, and reduces parallelism.
@@ -127,17 +136,20 @@ module aptos_framework::aggregator_v2 {
     /// snapshot passed needs to have integer type - currently supported types are u64 and u128.
     /// Raises EUNSUPPORTED_AGGREGATOR_SNAPSHOT_TYPE if called with another type.
     /// If length of prefix and suffix together exceed 256 bytes, ECONCAT_STRING_LENGTH_TOO_LARGE is raised.
-    public native fun derive_string_concat<IntElement>(before: String, snapshot: &AggregatorSnapshot<IntElement>, after: String): DerivedStringSnapshot;
+    public native fun derive_string_concat<IntElement>(before: String, snapshot: &AggregatorSnapshot<
+            IntElement>, after: String): DerivedStringSnapshot;
 
     // ===== DEPRECATE/NOT YET IMPLEMENTED ====
 
     #[deprecated]
     /// NOT YET IMPLEMENTED, always raises EAGGREGATOR_FUNCTION_NOT_YET_SUPPORTED.
-    public native fun copy_snapshot<IntElement: copy + drop>(snapshot: &AggregatorSnapshot<IntElement>): AggregatorSnapshot<IntElement>;
+    public native fun copy_snapshot<IntElement: copy + drop>(snapshot: &AggregatorSnapshot<IntElement>): AggregatorSnapshot<
+        IntElement>;
 
     #[deprecated]
     /// DEPRECATED, use derive_string_concat() instead. always raises EAGGREGATOR_FUNCTION_NOT_YET_SUPPORTED.
-    public native fun string_concat<IntElement>(before: String, snapshot: &AggregatorSnapshot<IntElement>, after: String): AggregatorSnapshot<String>;
+    public native fun string_concat<IntElement>(before: String, snapshot: &AggregatorSnapshot<
+            IntElement>, after: String): AggregatorSnapshot<String>;
 
     // ========================================
 
@@ -177,8 +189,11 @@ module aptos_framework::aggregator_v2 {
     #[test]
     fun test_string_concat1() {
         let snapshot = create_snapshot(42);
-        let derived = derive_string_concat(std::string::utf8(b"before"), &snapshot, std::string::utf8(b"after"));
-        assert!(read_derived_string(&derived) == std::string::utf8(b"before42after"), 0);
+        let derived =
+            derive_string_concat(std::string::utf8(b"before"), &snapshot,
+                std::string::utf8(b"after"));
+        assert!(read_derived_string(&derived)
+            == std::string::utf8(b"before42after"), 0);
     }
 
     // Tests commented out, as flag used in rust cannot be disabled.

@@ -25,7 +25,8 @@ spec aptos_framework::consensus_config {
         use aptos_framework::chain_status;
         pragma verify = true;
         pragma aborts_if_is_strict;
-        invariant [suspendable] chain_status::is_operating() ==> exists<ConsensusConfig>(@aptos_framework);
+        invariant [suspendable] chain_status::is_operating() ==>
+            exists<ConsensusConfig>(@aptos_framework);
     }
 
     /// Ensure caller is admin.
@@ -76,7 +77,7 @@ spec aptos_framework::consensus_config {
     }
 
     spec on_new_epoch(framework: &signer) {
-        requires @aptos_framework == std::signer::address_of(framework);
+        requires@aptos_framework == std::signer::address_of(framework);
         include config_buffer::OnNewEpochRequirement<ConsensusConfig>;
         aborts_if false;
     }
@@ -84,7 +85,8 @@ spec aptos_framework::consensus_config {
     spec validator_txn_enabled(): bool {
         pragma opaque;
         aborts_if !exists<ConsensusConfig>(@aptos_framework);
-        ensures [abstract] result == spec_validator_txn_enabled_internal(global<ConsensusConfig>(@aptos_framework).config);
+        ensures [abstract] result
+        == spec_validator_txn_enabled_internal(global<ConsensusConfig>(@aptos_framework).config);
     }
 
     spec validator_txn_enabled_internal(config_bytes: vector<u8>): bool {

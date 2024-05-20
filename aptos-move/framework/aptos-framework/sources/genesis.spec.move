@@ -148,7 +148,8 @@ spec aptos_framework::genesis {
         let addr = std::signer::address_of(aptos_framework);
         aborts_if addr != @aptos_framework;
         aborts_if exists<chain_status::GenesisEndMarker>(@aptos_framework);
-        ensures global<chain_status::GenesisEndMarker>(@aptos_framework) == chain_status::GenesisEndMarker {};
+        ensures global<chain_status::GenesisEndMarker>(@aptos_framework)
+        == chain_status::GenesisEndMarker {};
     }
 
     spec schema InitalizeRequires {
@@ -164,7 +165,8 @@ spec aptos_framework::genesis {
     }
 
     spec schema CompareTimeRequires {
-        let staking_rewards_config = global<staking_config::StakingRewardsConfig>(@aptos_framework);
+        let staking_rewards_config = global<staking_config::StakingRewardsConfig>(
+            @aptos_framework);
         requires staking_rewards_config.last_rewards_rate_period_start_in_secs <= timestamp::spec_now_seconds();
     }
 }

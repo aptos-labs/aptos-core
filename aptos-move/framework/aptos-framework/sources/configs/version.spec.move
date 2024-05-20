@@ -62,8 +62,10 @@ spec aptos_framework::version {
         aborts_if exists<SetVersionCapability>(@aptos_framework);
         ensures exists<Version>(@aptos_framework);
         ensures exists<SetVersionCapability>(@aptos_framework);
-        ensures global<Version>(@aptos_framework) == Version { major: initial_version };
-        ensures global<SetVersionCapability>(@aptos_framework) == SetVersionCapability {};
+        ensures global<Version>(@aptos_framework)
+        == Version { major: initial_version };
+        ensures global<SetVersionCapability>(@aptos_framework)
+        == SetVersionCapability {};
     }
 
     spec set_for_next_epoch(account: &signer, major: u64) {
@@ -74,7 +76,7 @@ spec aptos_framework::version {
     }
 
     spec on_new_epoch(framework: &signer) {
-        requires @aptos_framework == std::signer::address_of(framework);
+        requires@aptos_framework == std::signer::address_of(framework);
         include config_buffer::OnNewEpochRequirement<Version>;
         aborts_if false;
     }
