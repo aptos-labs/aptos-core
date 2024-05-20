@@ -1185,7 +1185,7 @@ impl RoundManager {
     ) -> anyhow::Result<()> {
         let result = self
             .block_store
-            .insert_quorum_cert(&qc, &mut self.create_block_retriever(preferred_peer))
+            .insert_quorum_cert(&qc, &mut self.create_block_retriever(preferred_peer), 1)
             .await
             .context("[RoundManager] Failed to process a newly aggregated QC");
         self.process_certificates().await?;
@@ -1207,6 +1207,7 @@ impl RoundManager {
             .insert_quorum_cert(
                 quorum_cert,
                 &mut self.create_block_retriever(preferred_peer),
+                4,
             )
             .await
             .context("RoundManager] Failed to process QC in order Cert")?;

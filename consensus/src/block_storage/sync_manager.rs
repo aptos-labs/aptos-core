@@ -10,6 +10,10 @@ use crate::{
     counters::{
         BLOCKS_FETCHED_FROM_NETWORK_WHILE_FAST_FORWARD_SYNC,
         BLOCKS_FETCHED_FROM_NETWORK_WHILE_INSERTING_QUORUM_CERT,
+        BLOCKS_FETCHED_FROM_NETWORK_WHILE_INSERTING_QUORUM_CERT_1,
+        BLOCKS_FETCHED_FROM_NETWORK_WHILE_INSERTING_QUORUM_CERT_2,
+        BLOCKS_FETCHED_FROM_NETWORK_WHILE_INSERTING_QUORUM_CERT_3,
+        BLOCKS_FETCHED_FROM_NETWORK_WHILE_INSERTING_QUORUM_CERT_4,
         BLOCKS_FETCHED_FROM_NETWORK_WHILE_SYNCING, LATE_EXECUTION_WITH_ORDER_VOTE_QC,
         SUCCESSFUL_EXECUTED_WITH_ORDER_VOTE_QC, SUCCESSFUL_EXECUTED_WITH_REGULAR_QC,
     },
@@ -115,7 +119,7 @@ impl BlockStore {
         // is already stored in block_store. So, we first call insert_quorum_cert(highest_quorum_cert).
         // This call will ensure that the highest ceritified block along with all its ancestors are inserted
         // into the block store.
-        self.insert_quorum_cert(sync_info.highest_quorum_cert(), &mut retriever)
+        self.insert_quorum_cert(sync_info.highest_quorum_cert(), &mut retriever, 2)
             .await?;
 
         if self.order_vote_enabled {
@@ -129,6 +133,7 @@ impl BlockStore {
                     .clone()
                     .into_quorum_cert(),
                 &mut retriever,
+                3,
             )
             .await?;
         }
@@ -162,9 +167,21 @@ impl BlockStore {
         &self,
         qc: &QuorumCert,
         retriever: &mut BlockRetriever,
+        context: u64,
     ) -> anyhow::Result<()> {
         match self.need_fetch_for_quorum_cert(qc) {
-            NeedFetchResult::NeedFetch => self.fetch_quorum_cert(qc.clone(), retriever).await?,
+            NeedFetchResult::NeedFetch => {
+                if context == 1 {
+                    BLOCKS_FETCHED_FROM_NETWORK_WHILE_INSERTING_QUORUM_CERT_1.inc_by(1);
+                } else if context == 2 {
+                    BLOCKS_FETCHED_FROM_NETWORK_WHILE_INSERTING_QUORUM_CERT_2.inc_by(1);
+                } else if context == 3 {
+                    BLOCKS_FETCHED_FROM_NETWORK_WHILE_INSERTING_QUORUM_CERT_3.inc_by(1);
+                } else if context == 4 {
+                    BLOCKS_FETCHED_FROM_NETWORK_WHILE_INSERTING_QUORUM_CERT_4.inc_by(1);
+                }
+                self.fetch_quorum_cert(qc.clone(), retriever).await?
+            },
             NeedFetchResult::QCBlockExist => self.insert_single_quorum_cert(qc.clone())?,
             NeedFetchResult::QCAlreadyExist => return Ok(()),
             _ => (),
