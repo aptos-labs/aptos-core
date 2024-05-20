@@ -50,7 +50,7 @@ use aptos_infallible::Mutex;
 use aptos_logger::prelude::info;
 use aptos_network::{
     application::interface::NetworkClient,
-    peer_manager::{ConnectionRequestSender, PeerManagerRequestSender},
+    peer_manager::{conn_notifs_channel, ConnectionRequestSender, PeerManagerRequestSender},
     protocols::{
         network,
         network::{Event, NetworkEvents, NewNetworkEvents, NewNetworkSender},
@@ -232,6 +232,7 @@ impl NodeSetup {
         let (connection_reqs_tx, _) = aptos_channel::new(QueueStyle::FIFO, 8, None);
         let (consensus_tx, consensus_rx) = aptos_channel::new(QueueStyle::FIFO, 8, None);
         let (_conn_mgr_reqs_tx, conn_mgr_reqs_rx) = aptos_channels::new_test(8);
+        let (_, conn_status_rx) = conn_notifs_channel::new();
         let network_sender = network::NetworkSender::new(
             PeerManagerRequestSender::new(network_reqs_tx),
             ConnectionRequestSender::new(connection_reqs_tx),
@@ -243,7 +244,7 @@ impl NodeSetup {
             playground.peer_protocols(),
         );
         let consensus_network_client = ConsensusNetworkClient::new(network_client);
-        let network_events = NetworkEvents::new(consensus_rx, None);
+        let network_events = NetworkEvents::new(consensus_rx, conn_status_rx, None);
         let author = signer.author();
 
         let twin_id = TwinId { id, author };
@@ -401,6 +402,7 @@ impl NodeSetup {
                     self.identity_desc()
                 )
             },
+            _ => panic!("Unexpected Network Event"),
         }
     }
 
@@ -411,6 +413,7 @@ impl NodeSetup {
                 msg,
                 self.identity_desc()
             ),
+            Some(_) => panic!("Unexpected Network Event"),
             None => {},
         }
     }
@@ -473,6 +476,7 @@ impl NodeSetup {
                 msg,
                 self.identity_desc()
             ),
+            Some(_) => panic!("Unexpected Network Event"),
             None => None,
         }
     }
