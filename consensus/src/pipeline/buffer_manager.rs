@@ -602,6 +602,7 @@ impl BufferManager {
                         return None;
                     }
                 } else {
+                    warn!("Reply NACK for commit vote {}", vote.ledger_info());
                     reply_nack(protocol, response_sender); // TODO: send_commit_vote() doesn't care about the response and this should be direct send not RPC
                 }
             },
