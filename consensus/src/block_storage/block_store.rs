@@ -473,8 +473,8 @@ impl BlockStore {
             .gauge("back_pressure")
             .set((ordered_round - commit_round) as i64);
         info!(
-            "ordered_round: {}, vote_backpressure_limit: {}, commit_round: {}",
-            ordered_round, self.vote_back_pressure_limit, commit_round
+            "quorum_cert: {}, ordered_round: {}, ordered_cert: {}, vote_backpressure_limit: {}, commit_round: {}, commit_cert: {}",
+            self.highest_quorum_cert.round(), ordered_round, self.highest_ordered_cert.round(), self.vote_back_pressure_limit, commit_round, self.highest_commit_cert.round()
         );
         ordered_round > self.vote_back_pressure_limit + commit_round
     }

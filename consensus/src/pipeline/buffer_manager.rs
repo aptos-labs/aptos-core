@@ -635,6 +635,7 @@ impl BufferManager {
                         return Some(target_block_id);
                     }
                 }
+                warn!("Rejecting commit decision with NACK for {} by {}", commit_proof.ledger_info(), commit_proof.author());
                 reply_nack(protocol, response_sender); // TODO: send_commit_proof() doesn't care about the response and this should be direct send not RPC
             },
             CommitMessage::Ack(_) => {
