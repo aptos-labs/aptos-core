@@ -84,7 +84,7 @@ impl BlockStore {
     ) -> anyhow::Result<()> {
         self.sync_to_highest_commit_cert(
             sync_info.highest_commit_cert().ledger_info(),
-            &retriever.network,
+            retriever.network.clone(),
         )
         .await;
         self.sync_to_highest_ordered_cert(
@@ -346,14 +346,15 @@ impl BlockStore {
     async fn sync_to_highest_commit_cert(
         &self,
         ledger_info: &LedgerInfoWithSignatures,
-        network: &Arc<NetworkSender>,
+        network: Arc<NetworkSender>,
     ) {
         // if the block exists between commit root and ordered root
         if self.commit_root().round() < ledger_info.commit_info().round()
             && self.block_exists(ledger_info.commit_info().id())
             && self.ordered_root().round() >= ledger_info.commit_info().round()
         {
-            network.send_commit_proof(ledger_info.clone()).await
+            let proof = ledger_info.clone();
+            tokio::spawn(async move { network.send_commit_proof(proof).await });
         }
     }
 
