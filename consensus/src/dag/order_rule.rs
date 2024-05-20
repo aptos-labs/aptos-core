@@ -232,7 +232,6 @@ impl OrderRule {
                 .map(|(_, author)| *author)
                 .collect(),
         );
-        self.anchor_election.update_reputation(event);
 
         let mut dag_writer = self.dag.write();
         let mut ordered_nodes: Vec<_> = dag_writer
@@ -259,6 +258,7 @@ impl OrderRule {
         );
 
         if self.lowest_unordered_anchor_round != anchor.round() {
+            self.anchor_election.update_reputation(event);
             // If an anchor was missing in the lowest unordered anchor round, then we should move to
             // either the current anchor round or the next round.
             if self.current_instance == self.max_instances - 1 {
@@ -272,6 +272,7 @@ impl OrderRule {
             // Only update the lowest unordered anchor round after ordering all instances in that
             // round
             if self.current_instance == self.max_instances - 1 {
+                self.anchor_election.update_reputation(event);
                 self.lowest_unordered_anchor_round = anchor.round() + ORDER_RULE_ROUND_INCREMENT;
                 self.current_instance = 0;
             } else {
