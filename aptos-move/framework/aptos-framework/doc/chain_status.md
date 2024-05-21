@@ -3,9 +3,9 @@
 
 # Module `0x1::chain_status`
 
-This module code to assert that it is running in genesis (<code><a href="chain_status.md#0x1_chain_status_assert_genesis">Self::assert_genesis</a></code>) or after
-genesis (<code><a href="chain_status.md#0x1_chain_status_assert_operating">Self::assert_operating</a></code>). These are essentially distinct states of the system. Specifically,
-if <code><a href="chain_status.md#0x1_chain_status_assert_operating">Self::assert_operating</a></code> succeeds, assumptions about invariants over the global state can be made
+This module code to assert that it is running in genesis (<code>Self::assert_genesis</code>) or after
+genesis (<code>Self::assert_operating</code>). These are essentially distinct states of the system. Specifically,
+if <code>Self::assert_operating</code> succeeds, assumptions about invariants over the global state can be made
 which reflect that the system has been successfully initialized.
 
 
@@ -24,8 +24,8 @@ which reflect that the system has been successfully initialized.
     -  [Function `assert_genesis`](#@Specification_1_assert_genesis)
 
 
-<pre><code><b>use</b> <a href="../../aptos-stdlib/../move-stdlib/doc/error.md#0x1_error">0x1::error</a>;
-<b>use</b> <a href="system_addresses.md#0x1_system_addresses">0x1::system_addresses</a>;
+<pre><code>use 0x1::error;
+use 0x1::system_addresses;
 </code></pre>
 
 
@@ -37,7 +37,7 @@ which reflect that the system has been successfully initialized.
 Marker to publish at the end of genesis.
 
 
-<pre><code><b>struct</b> <a href="chain_status.md#0x1_chain_status_GenesisEndMarker">GenesisEndMarker</a> <b>has</b> key
+<pre><code>struct GenesisEndMarker has key
 </code></pre>
 
 
@@ -68,7 +68,7 @@ Marker to publish at the end of genesis.
 The blockchain is not in the genesis status.
 
 
-<pre><code><b>const</b> <a href="chain_status.md#0x1_chain_status_ENOT_GENESIS">ENOT_GENESIS</a>: u64 = 2;
+<pre><code>const ENOT_GENESIS: u64 &#61; 2;
 </code></pre>
 
 
@@ -78,7 +78,7 @@ The blockchain is not in the genesis status.
 The blockchain is not in the operating status.
 
 
-<pre><code><b>const</b> <a href="chain_status.md#0x1_chain_status_ENOT_OPERATING">ENOT_OPERATING</a>: u64 = 1;
+<pre><code>const ENOT_OPERATING: u64 &#61; 1;
 </code></pre>
 
 
@@ -90,7 +90,7 @@ The blockchain is not in the operating status.
 Marks that genesis has finished.
 
 
-<pre><code><b>public</b>(<b>friend</b>) <b>fun</b> <a href="chain_status.md#0x1_chain_status_set_genesis_end">set_genesis_end</a>(aptos_framework: &<a href="../../aptos-stdlib/../move-stdlib/doc/signer.md#0x1_signer">signer</a>)
+<pre><code>public(friend) fun set_genesis_end(aptos_framework: &amp;signer)
 </code></pre>
 
 
@@ -99,10 +99,10 @@ Marks that genesis has finished.
 <summary>Implementation</summary>
 
 
-<pre><code><b>public</b>(<b>friend</b>) <b>fun</b> <a href="chain_status.md#0x1_chain_status_set_genesis_end">set_genesis_end</a>(aptos_framework: &<a href="../../aptos-stdlib/../move-stdlib/doc/signer.md#0x1_signer">signer</a>) {
-    <a href="system_addresses.md#0x1_system_addresses_assert_aptos_framework">system_addresses::assert_aptos_framework</a>(aptos_framework);
-    <b>move_to</b>(aptos_framework, <a href="chain_status.md#0x1_chain_status_GenesisEndMarker">GenesisEndMarker</a> {});
-}
+<pre><code>public(friend) fun set_genesis_end(aptos_framework: &amp;signer) &#123;
+    system_addresses::assert_aptos_framework(aptos_framework);
+    move_to(aptos_framework, GenesisEndMarker &#123;&#125;);
+&#125;
 </code></pre>
 
 
@@ -116,8 +116,8 @@ Marks that genesis has finished.
 Helper function to determine if Aptos is in genesis state.
 
 
-<pre><code>#[view]
-<b>public</b> <b>fun</b> <a href="chain_status.md#0x1_chain_status_is_genesis">is_genesis</a>(): bool
+<pre><code>&#35;[view]
+public fun is_genesis(): bool
 </code></pre>
 
 
@@ -126,9 +126,9 @@ Helper function to determine if Aptos is in genesis state.
 <summary>Implementation</summary>
 
 
-<pre><code><b>public</b> <b>fun</b> <a href="chain_status.md#0x1_chain_status_is_genesis">is_genesis</a>(): bool {
-    !<b>exists</b>&lt;<a href="chain_status.md#0x1_chain_status_GenesisEndMarker">GenesisEndMarker</a>&gt;(@aptos_framework)
-}
+<pre><code>public fun is_genesis(): bool &#123;
+    !exists&lt;GenesisEndMarker&gt;(@aptos_framework)
+&#125;
 </code></pre>
 
 
@@ -140,12 +140,12 @@ Helper function to determine if Aptos is in genesis state.
 ## Function `is_operating`
 
 Helper function to determine if Aptos is operating. This is
-the same as <code>!<a href="chain_status.md#0x1_chain_status_is_genesis">is_genesis</a>()</code> and is provided for convenience.
-Testing <code><a href="chain_status.md#0x1_chain_status_is_operating">is_operating</a>()</code> is more frequent than <code><a href="chain_status.md#0x1_chain_status_is_genesis">is_genesis</a>()</code>.
+the same as <code>!is_genesis()</code> and is provided for convenience.
+Testing <code>is_operating()</code> is more frequent than <code>is_genesis()</code>.
 
 
-<pre><code>#[view]
-<b>public</b> <b>fun</b> <a href="chain_status.md#0x1_chain_status_is_operating">is_operating</a>(): bool
+<pre><code>&#35;[view]
+public fun is_operating(): bool
 </code></pre>
 
 
@@ -154,9 +154,9 @@ Testing <code><a href="chain_status.md#0x1_chain_status_is_operating">is_operati
 <summary>Implementation</summary>
 
 
-<pre><code><b>public</b> <b>fun</b> <a href="chain_status.md#0x1_chain_status_is_operating">is_operating</a>(): bool {
-    <b>exists</b>&lt;<a href="chain_status.md#0x1_chain_status_GenesisEndMarker">GenesisEndMarker</a>&gt;(@aptos_framework)
-}
+<pre><code>public fun is_operating(): bool &#123;
+    exists&lt;GenesisEndMarker&gt;(@aptos_framework)
+&#125;
 </code></pre>
 
 
@@ -170,7 +170,7 @@ Testing <code><a href="chain_status.md#0x1_chain_status_is_operating">is_operati
 Helper function to assert operating (not genesis) state.
 
 
-<pre><code><b>public</b> <b>fun</b> <a href="chain_status.md#0x1_chain_status_assert_operating">assert_operating</a>()
+<pre><code>public fun assert_operating()
 </code></pre>
 
 
@@ -179,9 +179,9 @@ Helper function to assert operating (not genesis) state.
 <summary>Implementation</summary>
 
 
-<pre><code><b>public</b> <b>fun</b> <a href="chain_status.md#0x1_chain_status_assert_operating">assert_operating</a>() {
-    <b>assert</b>!(<a href="chain_status.md#0x1_chain_status_is_operating">is_operating</a>(), <a href="../../aptos-stdlib/../move-stdlib/doc/error.md#0x1_error_invalid_state">error::invalid_state</a>(<a href="chain_status.md#0x1_chain_status_ENOT_OPERATING">ENOT_OPERATING</a>));
-}
+<pre><code>public fun assert_operating() &#123;
+    assert!(is_operating(), error::invalid_state(ENOT_OPERATING));
+&#125;
 </code></pre>
 
 
@@ -195,7 +195,7 @@ Helper function to assert operating (not genesis) state.
 Helper function to assert genesis state.
 
 
-<pre><code><b>public</b> <b>fun</b> <a href="chain_status.md#0x1_chain_status_assert_genesis">assert_genesis</a>()
+<pre><code>public fun assert_genesis()
 </code></pre>
 
 
@@ -204,9 +204,9 @@ Helper function to assert genesis state.
 <summary>Implementation</summary>
 
 
-<pre><code><b>public</b> <b>fun</b> <a href="chain_status.md#0x1_chain_status_assert_genesis">assert_genesis</a>() {
-    <b>assert</b>!(<a href="chain_status.md#0x1_chain_status_is_genesis">is_genesis</a>(), <a href="../../aptos-stdlib/../move-stdlib/doc/error.md#0x1_error_invalid_state">error::invalid_state</a>(<a href="chain_status.md#0x1_chain_status_ENOT_OPERATING">ENOT_OPERATING</a>));
-}
+<pre><code>public fun assert_genesis() &#123;
+    assert!(is_genesis(), error::invalid_state(ENOT_OPERATING));
+&#125;
 </code></pre>
 
 
@@ -263,10 +263,10 @@ Helper function to assert genesis state.
 ### Module-level Specification
 
 
-<pre><code><b>pragma</b> verify = <b>true</b>;
-<b>pragma</b> aborts_if_is_strict;
+<pre><code>pragma verify &#61; true;
+pragma aborts_if_is_strict;
 // This enforces <a id="high-level-req-2" href="#high-level-req">high-level requirement 2</a>:
-<b>invariant</b> <a href="chain_status.md#0x1_chain_status_is_genesis">is_genesis</a>() == !<a href="chain_status.md#0x1_chain_status_is_operating">is_operating</a>();
+invariant is_genesis() &#61;&#61; !is_operating();
 </code></pre>
 
 
@@ -276,20 +276,20 @@ Helper function to assert genesis state.
 ### Function `set_genesis_end`
 
 
-<pre><code><b>public</b>(<b>friend</b>) <b>fun</b> <a href="chain_status.md#0x1_chain_status_set_genesis_end">set_genesis_end</a>(aptos_framework: &<a href="../../aptos-stdlib/../move-stdlib/doc/signer.md#0x1_signer">signer</a>)
+<pre><code>public(friend) fun set_genesis_end(aptos_framework: &amp;signer)
 </code></pre>
 
 
 
 
-<pre><code><b>pragma</b> verify = <b>true</b>;
-<b>pragma</b> delegate_invariants_to_caller;
-<b>let</b> addr = <a href="../../aptos-stdlib/../move-stdlib/doc/signer.md#0x1_signer_address_of">signer::address_of</a>(aptos_framework);
-<b>aborts_if</b> addr != @aptos_framework;
+<pre><code>pragma verify &#61; true;
+pragma delegate_invariants_to_caller;
+let addr &#61; signer::address_of(aptos_framework);
+aborts_if addr !&#61; @aptos_framework;
 // This enforces <a id="high-level-req-3" href="#high-level-req">high-level requirement 3</a>:
-<b>aborts_if</b> <b>exists</b>&lt;<a href="chain_status.md#0x1_chain_status_GenesisEndMarker">GenesisEndMarker</a>&gt;(@aptos_framework);
+aborts_if exists&lt;GenesisEndMarker&gt;(@aptos_framework);
 // This enforces <a id="high-level-req-1" href="#high-level-req">high-level requirement 1</a>:
-<b>ensures</b> <b>global</b>&lt;<a href="chain_status.md#0x1_chain_status_GenesisEndMarker">GenesisEndMarker</a>&gt;(@aptos_framework) == <a href="chain_status.md#0x1_chain_status_GenesisEndMarker">GenesisEndMarker</a> {};
+ensures global&lt;GenesisEndMarker&gt;(@aptos_framework) &#61;&#61; GenesisEndMarker &#123;&#125;;
 </code></pre>
 
 
@@ -298,9 +298,9 @@ Helper function to assert genesis state.
 <a id="0x1_chain_status_RequiresIsOperating"></a>
 
 
-<pre><code><b>schema</b> <a href="chain_status.md#0x1_chain_status_RequiresIsOperating">RequiresIsOperating</a> {
-    <b>requires</b> <a href="chain_status.md#0x1_chain_status_is_operating">is_operating</a>();
-}
+<pre><code>schema RequiresIsOperating &#123;
+    requires is_operating();
+&#125;
 </code></pre>
 
 
@@ -310,13 +310,13 @@ Helper function to assert genesis state.
 ### Function `assert_operating`
 
 
-<pre><code><b>public</b> <b>fun</b> <a href="chain_status.md#0x1_chain_status_assert_operating">assert_operating</a>()
+<pre><code>public fun assert_operating()
 </code></pre>
 
 
 
 
-<pre><code><b>aborts_if</b> !<a href="chain_status.md#0x1_chain_status_is_operating">is_operating</a>();
+<pre><code>aborts_if !is_operating();
 </code></pre>
 
 
@@ -326,13 +326,13 @@ Helper function to assert genesis state.
 ### Function `assert_genesis`
 
 
-<pre><code><b>public</b> <b>fun</b> <a href="chain_status.md#0x1_chain_status_assert_genesis">assert_genesis</a>()
+<pre><code>public fun assert_genesis()
 </code></pre>
 
 
 
 
-<pre><code><b>aborts_if</b> !<a href="chain_status.md#0x1_chain_status_is_genesis">is_genesis</a>();
+<pre><code>aborts_if !is_genesis();
 </code></pre>
 
 

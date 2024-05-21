@@ -10,6 +10,7 @@ use crate::{
 };
 use clap::ValueEnum;
 use move_command_line_common::address::NumericalAddress;
+use move_docgen::OutputFormat;
 use once_cell::sync::Lazy;
 use std::{collections::BTreeMap, fmt::Display, path::PathBuf, str::FromStr};
 
@@ -116,6 +117,7 @@ impl ReleaseTarget {
                     collapsed_sections: true,
                     landing_page_template: Some("doc_template/overview.md".to_string()),
                     references_file: Some("doc_template/references.md".to_string()),
+                    output_format: Some(OutputFormat::MDX),
                 }),
                 skip_fetch_latest_git_deps: true,
                 bytecode_version: None,

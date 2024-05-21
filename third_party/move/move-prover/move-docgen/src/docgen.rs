@@ -2,6 +2,7 @@
 // Copyright (c) The Move Contributors
 // SPDX-License-Identifier: Apache-2.0
 
+use clap::ValueEnum;
 use codespan::{ByteIndex, Span};
 use itertools::Itertools;
 #[allow(unused_imports)]
@@ -20,11 +21,11 @@ use move_model::{
     ty::TypeDisplayContext,
 };
 use once_cell::sync::Lazy;
-use regex::Regex;
+use regex::{Captures, Regex};
 use serde::{Deserialize, Serialize};
 use std::{
     cell::RefCell,
-    collections::{BTreeMap, BTreeSet, VecDeque},
+    collections::{BTreeMap, BTreeSet, HashMap, VecDeque},
     fmt::Write as FmtWrite,
     fs::{self, File},
     io::{Read, Write},
@@ -35,6 +36,22 @@ use std::{
 
 /// The maximum number of subheadings that are allowed
 const MAX_SUBSECTIONS: usize = 6;
+
+/// Rex for generating code doc
+static CODE_REX: Lazy<Regex> = Lazy::new(|| {
+    Regex::new(
+        "(?P<ident>(\\b\\w+\\b\\s*::\\s*)*\\b\\w+\\b)(?P<call>\\s*[(<])?|(?P<lt><)|(?P<gt>>)|(?P<lb>\\{)|(?P<rb>\\})|(?P<amper>\\&)|(?P<squote>')|(?P<dquote>\")|(?P<sharp>#)|(?P<mul>\\*)|(?P<plus>\\+)|(?P<minus>\\-)|(?P<eq>\\=)|(?P<bar>\\|)|(?P<tilde>\\~)",
+    )
+        .unwrap()
+});
+
+/// The output format of the docgen
+/// If the format is MDX, generated doc is mdx compatible
+#[derive(ValueEnum, Clone, Copy, Debug, Eq, PartialEq, PartialOrd, Serialize, Deserialize)]
+pub enum OutputFormat {
+    Github,
+    MDX,
+}
 
 /// Options passed into the documentation generator.
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -93,6 +110,7 @@ pub struct DocgenOptions {
     pub include_call_diagrams: bool,
     /// If this is being compiled relative to a different place where it will be stored (output directory).
     pub compile_relative_to_output_dir: bool,
+    pub output_format: Option<OutputFormat>,
 }
 
 impl Default for DocgenOptions {
@@ -112,7 +130,14 @@ impl Default for DocgenOptions {
             references_file: None,
             include_dep_diagrams: false,
             include_call_diagrams: false,
+            output_format: None,
         }
+    }
+}
+
+impl DocgenOptions {
+    fn is_mdx_compatible(&self) -> bool {
+        self.output_format.is_some_and(|o| o == OutputFormat::MDX)
     }
 }
 
@@ -1778,20 +1803,47 @@ impl<'env> Docgen<'env> {
         emitln!(self.writer, &self.decorate_code(code));
     }
 
+    /// Replace html entities if the output format needs to be mdx compatible
+    fn replace_for_mdx(&self, cap: &Captures) -> String {
+        static MDX: Lazy<HashMap<&str, &str>> = Lazy::new(|| {
+            let mut map = HashMap::new();
+            map.insert("lt", "&lt;");
+            map.insert("gt", "&gt;");
+            map.insert("lb", "&#123;");
+            map.insert("rb", "&#125;");
+            map.insert("amper", "&amp;");
+            map.insert("dquote", "&quot;");
+            map.insert("squote", "&apos;");
+            map.insert("sharp", "&#35;");
+            map.insert("mul", "&#42;");
+            map.insert("plus", "&#43;");
+            map.insert("minus", "&#45;");
+            map.insert("eq", "&#61;");
+            map.insert("bar", "&#124;");
+            map.insert("tilde", "&#126;");
+            map
+        });
+        let mut r = "".to_string();
+        for (group_name, replacement) in MDX.iter() {
+            if cap.name(group_name).is_some() {
+                r = replacement.to_string();
+                break;
+            }
+        }
+        r
+    }
+
     /// Decorates a code fragment, for use in an html block. Replaces < and >, bolds keywords and
     /// tries to resolve and cross-link references.
+    /// If the output format is MDX, replace all html entities to make the doc mdx compatible
     fn decorate_code(&self, code: &str) -> String {
-        static REX: Lazy<Regex> = Lazy::new(|| {
-            Regex::new(
-                r"(?P<ident>(\b\w+\b\s*::\s*)*\b\w+\b)(?P<call>\s*[(<])?|(?P<lt><)|(?P<gt>>)",
-            )
-            .unwrap()
-        });
         let mut r = String::new();
         let mut at = 0;
-        while let Some(cap) = REX.captures(&code[at..]) {
+        while let Some(cap) = CODE_REX.captures(&code[at..]) {
             let replacement = {
-                if cap.name("lt").is_some() {
+                if self.options.is_mdx_compatible() {
+                    self.replace_for_mdx(&cap)
+                } else if cap.name("lt").is_some() {
                     "&lt;".to_owned()
                 } else if cap.name("gt").is_some() {
                     "&gt;".to_owned()

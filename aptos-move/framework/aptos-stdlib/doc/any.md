@@ -16,11 +16,11 @@
     -  [Function `type_name`](#@Specification_1_type_name)
 
 
-<pre><code><b>use</b> <a href="../../move-stdlib/doc/bcs.md#0x1_bcs">0x1::bcs</a>;
-<b>use</b> <a href="../../move-stdlib/doc/error.md#0x1_error">0x1::error</a>;
-<b>use</b> <a href="from_bcs.md#0x1_from_bcs">0x1::from_bcs</a>;
-<b>use</b> <a href="../../move-stdlib/doc/string.md#0x1_string">0x1::string</a>;
-<b>use</b> <a href="type_info.md#0x1_type_info">0x1::type_info</a>;
+<pre><code>use 0x1::bcs;
+use 0x1::error;
+use 0x1::from_bcs;
+use 0x1::string;
+use 0x1::type_info;
 </code></pre>
 
 
@@ -42,7 +42,7 @@ extension: Option<Any>
 ```
 
 
-<pre><code><b>struct</b> <a href="any.md#0x1_any_Any">Any</a> <b>has</b> drop, store
+<pre><code>struct Any has drop, store
 </code></pre>
 
 
@@ -53,13 +53,13 @@ extension: Option<Any>
 
 <dl>
 <dt>
-<code>type_name: <a href="../../move-stdlib/doc/string.md#0x1_string_String">string::String</a></code>
+<code>type_name: string::String</code>
 </dt>
 <dd>
 
 </dd>
 <dt>
-<code>data: <a href="../../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u8&gt;</code>
+<code>data: vector&lt;u8&gt;</code>
 </dt>
 <dd>
 
@@ -79,7 +79,7 @@ extension: Option<Any>
 The type provided for <code>unpack</code> is not the same as was given for <code>pack</code>.
 
 
-<pre><code><b>const</b> <a href="any.md#0x1_any_ETYPE_MISMATCH">ETYPE_MISMATCH</a>: u64 = 1;
+<pre><code>const ETYPE_MISMATCH: u64 &#61; 1;
 </code></pre>
 
 
@@ -88,11 +88,11 @@ The type provided for <code>unpack</code> is not the same as was given for <code
 
 ## Function `pack`
 
-Pack a value into the <code><a href="any.md#0x1_any_Any">Any</a></code> representation. Because Any can be stored and dropped, this is
+Pack a value into the <code>Any</code> representation. Because Any can be stored and dropped, this is
 also required from <code>T</code>.
 
 
-<pre><code><b>public</b> <b>fun</b> <a href="any.md#0x1_any_pack">pack</a>&lt;T: drop, store&gt;(x: T): <a href="any.md#0x1_any_Any">any::Any</a>
+<pre><code>public fun pack&lt;T: drop, store&gt;(x: T): any::Any
 </code></pre>
 
 
@@ -101,12 +101,12 @@ also required from <code>T</code>.
 <summary>Implementation</summary>
 
 
-<pre><code><b>public</b> <b>fun</b> <a href="any.md#0x1_any_pack">pack</a>&lt;T: drop + store&gt;(x: T): <a href="any.md#0x1_any_Any">Any</a> {
-    <a href="any.md#0x1_any_Any">Any</a> {
-        type_name: <a href="type_info.md#0x1_type_info_type_name">type_info::type_name</a>&lt;T&gt;(),
-        data: to_bytes(&x)
-    }
-}
+<pre><code>public fun pack&lt;T: drop &#43; store&gt;(x: T): Any &#123;
+    Any &#123;
+        type_name: type_info::type_name&lt;T&gt;(),
+        data: to_bytes(&amp;x)
+    &#125;
+&#125;
 </code></pre>
 
 
@@ -117,10 +117,10 @@ also required from <code>T</code>.
 
 ## Function `unpack`
 
-Unpack a value from the <code><a href="any.md#0x1_any_Any">Any</a></code> representation. This aborts if the value has not the expected type <code>T</code>.
+Unpack a value from the <code>Any</code> representation. This aborts if the value has not the expected type <code>T</code>.
 
 
-<pre><code><b>public</b> <b>fun</b> <a href="any.md#0x1_any_unpack">unpack</a>&lt;T&gt;(x: <a href="any.md#0x1_any_Any">any::Any</a>): T
+<pre><code>public fun unpack&lt;T&gt;(x: any::Any): T
 </code></pre>
 
 
@@ -129,10 +129,10 @@ Unpack a value from the <code><a href="any.md#0x1_any_Any">Any</a></code> repres
 <summary>Implementation</summary>
 
 
-<pre><code><b>public</b> <b>fun</b> <a href="any.md#0x1_any_unpack">unpack</a>&lt;T&gt;(x: <a href="any.md#0x1_any_Any">Any</a>): T {
-    <b>assert</b>!(<a href="type_info.md#0x1_type_info_type_name">type_info::type_name</a>&lt;T&gt;() == x.type_name, <a href="../../move-stdlib/doc/error.md#0x1_error_invalid_argument">error::invalid_argument</a>(<a href="any.md#0x1_any_ETYPE_MISMATCH">ETYPE_MISMATCH</a>));
+<pre><code>public fun unpack&lt;T&gt;(x: Any): T &#123;
+    assert!(type_info::type_name&lt;T&gt;() &#61;&#61; x.type_name, error::invalid_argument(ETYPE_MISMATCH));
     from_bytes&lt;T&gt;(x.data)
-}
+&#125;
 </code></pre>
 
 
@@ -146,7 +146,7 @@ Unpack a value from the <code><a href="any.md#0x1_any_Any">Any</a></code> repres
 Returns the type name of this Any
 
 
-<pre><code><b>public</b> <b>fun</b> <a href="any.md#0x1_any_type_name">type_name</a>(x: &<a href="any.md#0x1_any_Any">any::Any</a>): &<a href="../../move-stdlib/doc/string.md#0x1_string_String">string::String</a>
+<pre><code>public fun type_name(x: &amp;any::Any): &amp;string::String
 </code></pre>
 
 
@@ -155,9 +155,9 @@ Returns the type name of this Any
 <summary>Implementation</summary>
 
 
-<pre><code><b>public</b> <b>fun</b> <a href="any.md#0x1_any_type_name">type_name</a>(x: &<a href="any.md#0x1_any_Any">Any</a>): &String {
-    &x.type_name
-}
+<pre><code>public fun type_name(x: &amp;Any): &amp;String &#123;
+    &amp;x.type_name
+&#125;
 </code></pre>
 
 
@@ -174,18 +174,18 @@ Returns the type name of this Any
 ### Function `pack`
 
 
-<pre><code><b>public</b> <b>fun</b> <a href="any.md#0x1_any_pack">pack</a>&lt;T: drop, store&gt;(x: T): <a href="any.md#0x1_any_Any">any::Any</a>
+<pre><code>public fun pack&lt;T: drop, store&gt;(x: T): any::Any
 </code></pre>
 
 
 
 
-<pre><code><b>aborts_if</b> <b>false</b>;
-<b>ensures</b> result == <a href="any.md#0x1_any_Any">Any</a> {
-    type_name: <a href="type_info.md#0x1_type_info_type_name">type_info::type_name</a>&lt;T&gt;(),
-    data: <a href="../../move-stdlib/doc/bcs.md#0x1_bcs_serialize">bcs::serialize</a>&lt;T&gt;(x)
-};
-<b>ensures</b> [abstract] <a href="from_bcs.md#0x1_from_bcs_deserializable">from_bcs::deserializable</a>&lt;T&gt;(result.data);
+<pre><code>aborts_if false;
+ensures result &#61;&#61; Any &#123;
+    type_name: type_info::type_name&lt;T&gt;(),
+    data: bcs::serialize&lt;T&gt;(x)
+&#125;;
+ensures [abstract] from_bcs::deserializable&lt;T&gt;(result.data);
 </code></pre>
 
 
@@ -195,14 +195,14 @@ Returns the type name of this Any
 ### Function `unpack`
 
 
-<pre><code><b>public</b> <b>fun</b> <a href="any.md#0x1_any_unpack">unpack</a>&lt;T&gt;(x: <a href="any.md#0x1_any_Any">any::Any</a>): T
+<pre><code>public fun unpack&lt;T&gt;(x: any::Any): T
 </code></pre>
 
 
 
 
-<pre><code><b>include</b> <a href="any.md#0x1_any_UnpackAbortsIf">UnpackAbortsIf</a>&lt;T&gt;;
-<b>ensures</b> result == <a href="from_bcs.md#0x1_from_bcs_deserialize">from_bcs::deserialize</a>&lt;T&gt;(x.data);
+<pre><code>include UnpackAbortsIf&lt;T&gt;;
+ensures result &#61;&#61; from_bcs::deserialize&lt;T&gt;(x.data);
 </code></pre>
 
 
@@ -211,11 +211,11 @@ Returns the type name of this Any
 <a id="0x1_any_UnpackAbortsIf"></a>
 
 
-<pre><code><b>schema</b> <a href="any.md#0x1_any_UnpackAbortsIf">UnpackAbortsIf</a>&lt;T&gt; {
-    x: <a href="any.md#0x1_any_Any">Any</a>;
-    <b>aborts_if</b> <a href="type_info.md#0x1_type_info_type_name">type_info::type_name</a>&lt;T&gt;() != x.type_name;
-    <b>aborts_if</b> !<a href="from_bcs.md#0x1_from_bcs_deserializable">from_bcs::deserializable</a>&lt;T&gt;(x.data);
-}
+<pre><code>schema UnpackAbortsIf&lt;T&gt; &#123;
+    x: Any;
+    aborts_if type_info::type_name&lt;T&gt;() !&#61; x.type_name;
+    aborts_if !from_bcs::deserializable&lt;T&gt;(x.data);
+&#125;
 </code></pre>
 
 
@@ -224,11 +224,11 @@ Returns the type name of this Any
 <a id="0x1_any_UnpackRequirement"></a>
 
 
-<pre><code><b>schema</b> <a href="any.md#0x1_any_UnpackRequirement">UnpackRequirement</a>&lt;T&gt; {
-    x: <a href="any.md#0x1_any_Any">Any</a>;
-    <b>requires</b> <a href="type_info.md#0x1_type_info_type_name">type_info::type_name</a>&lt;T&gt;() == x.type_name;
-    <b>requires</b> <a href="from_bcs.md#0x1_from_bcs_deserializable">from_bcs::deserializable</a>&lt;T&gt;(x.data);
-}
+<pre><code>schema UnpackRequirement&lt;T&gt; &#123;
+    x: Any;
+    requires type_info::type_name&lt;T&gt;() &#61;&#61; x.type_name;
+    requires from_bcs::deserializable&lt;T&gt;(x.data);
+&#125;
 </code></pre>
 
 
@@ -238,14 +238,14 @@ Returns the type name of this Any
 ### Function `type_name`
 
 
-<pre><code><b>public</b> <b>fun</b> <a href="any.md#0x1_any_type_name">type_name</a>(x: &<a href="any.md#0x1_any_Any">any::Any</a>): &<a href="../../move-stdlib/doc/string.md#0x1_string_String">string::String</a>
+<pre><code>public fun type_name(x: &amp;any::Any): &amp;string::String
 </code></pre>
 
 
 
 
-<pre><code><b>aborts_if</b> <b>false</b>;
-<b>ensures</b> result == x.type_name;
+<pre><code>aborts_if false;
+ensures result &#61;&#61; x.type_name;
 </code></pre>
 
 

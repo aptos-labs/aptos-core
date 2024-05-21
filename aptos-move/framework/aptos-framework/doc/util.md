@@ -30,7 +30,7 @@ deserialized a linear value, its their responsibility that the data they deseria
 owned.
 
 
-<pre><code><b>public</b>(<b>friend</b>) <b>fun</b> <a href="util.md#0x1_util_from_bytes">from_bytes</a>&lt;T&gt;(bytes: <a href="../../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u8&gt;): T
+<pre><code>public(friend) fun from_bytes&lt;T&gt;(bytes: vector&lt;u8&gt;): T
 </code></pre>
 
 
@@ -39,7 +39,7 @@ owned.
 <summary>Implementation</summary>
 
 
-<pre><code><b>public</b>(<b>friend</b>) <b>native</b> <b>fun</b> <a href="util.md#0x1_util_from_bytes">from_bytes</a>&lt;T&gt;(bytes: <a href="../../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u8&gt;): T;
+<pre><code>public(friend) native fun from_bytes&lt;T&gt;(bytes: vector&lt;u8&gt;): T;
 </code></pre>
 
 
@@ -52,7 +52,7 @@ owned.
 
 
 
-<pre><code><b>public</b> <b>fun</b> <a href="util.md#0x1_util_address_from_bytes">address_from_bytes</a>(bytes: <a href="../../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u8&gt;): <b>address</b>
+<pre><code>public fun address_from_bytes(bytes: vector&lt;u8&gt;): address
 </code></pre>
 
 
@@ -61,9 +61,9 @@ owned.
 <summary>Implementation</summary>
 
 
-<pre><code><b>public</b> <b>fun</b> <a href="util.md#0x1_util_address_from_bytes">address_from_bytes</a>(bytes: <a href="../../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u8&gt;): <b>address</b> {
-    <a href="util.md#0x1_util_from_bytes">from_bytes</a>(bytes)
-}
+<pre><code>public fun address_from_bytes(bytes: vector&lt;u8&gt;): address &#123;
+    from_bytes(bytes)
+&#125;
 </code></pre>
 
 
@@ -80,7 +80,7 @@ owned.
 ### Function `from_bytes`
 
 
-<pre><code><b>public</b>(<b>friend</b>) <b>fun</b> <a href="util.md#0x1_util_from_bytes">from_bytes</a>&lt;T&gt;(bytes: <a href="../../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u8&gt;): T
+<pre><code>public(friend) fun from_bytes&lt;T&gt;(bytes: vector&lt;u8&gt;): T
 </code></pre>
 
 
@@ -114,9 +114,9 @@ owned.
 ### Module-level Specification
 
 
-<pre><code><b>pragma</b> opaque;
-<b>aborts_if</b> [abstract] <b>false</b>;
-<b>ensures</b> [abstract] result == <a href="util.md#0x1_util_spec_from_bytes">spec_from_bytes</a>&lt;T&gt;(bytes);
+<pre><code>pragma opaque;
+aborts_if [abstract] false;
+ensures [abstract] result &#61;&#61; spec_from_bytes&lt;T&gt;(bytes);
 </code></pre>
 
 
@@ -125,7 +125,7 @@ owned.
 <a id="0x1_util_spec_from_bytes"></a>
 
 
-<pre><code><b>fun</b> <a href="util.md#0x1_util_spec_from_bytes">spec_from_bytes</a>&lt;T&gt;(bytes: <a href="../../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u8&gt;): T;
+<pre><code>fun spec_from_bytes&lt;T&gt;(bytes: vector&lt;u8&gt;): T;
 </code></pre>
 
 
@@ -135,14 +135,14 @@ owned.
 ### Function `address_from_bytes`
 
 
-<pre><code><b>public</b> <b>fun</b> <a href="util.md#0x1_util_address_from_bytes">address_from_bytes</a>(bytes: <a href="../../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u8&gt;): <b>address</b>
+<pre><code>public fun address_from_bytes(bytes: vector&lt;u8&gt;): address
 </code></pre>
 
 
 
 
 <pre><code>// This enforces <a id="high-level-req-1" href="#high-level-req">high-level requirement 1</a>:
-<b>aborts_if</b> [abstract] len(bytes) != 32;
+aborts_if [abstract] len(bytes) !&#61; 32;
 </code></pre>
 
 
