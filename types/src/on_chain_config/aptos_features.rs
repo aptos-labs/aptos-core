@@ -129,7 +129,7 @@ impl FeatureFlag {
             FeatureFlag::KEYLESS_ACCOUNTS_WITH_PASSKEYS,
             FeatureFlag::MULTISIG_V2_ENHANCEMENT,
             FeatureFlag::DELEGATION_POOL_ALLOWLISTING,
-            FeatureFlag::MODULE_EVENT_MIGRATION,
+            // FeatureFlag::MODULE_EVENT_MIGRATION, //TODO: re-enable once we fix indexer.
             FeatureFlag::REJECT_UNSTABLE_BYTECODE,
             FeatureFlag::TRANSACTION_CONTEXT_EXTENSION,
             FeatureFlag::COIN_TO_FUNGIBLE_ASSET_MIGRATION,
