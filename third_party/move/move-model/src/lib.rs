@@ -44,6 +44,7 @@ use move_ir_types::location::sp;
 use move_symbol_pool::Symbol as MoveSymbol;
 use std::{
     collections::{BTreeMap, BTreeSet, VecDeque},
+    fmt::Debug,
     rc::Rc,
 };
 
@@ -117,8 +118,8 @@ pub fn run_model_builder_in_compiler_mode(
 
 /// Build the move model with default compilation flags and custom options.
 pub fn run_model_builder_with_options<
-    Paths: Into<MoveSymbol> + Clone,
-    NamedAddress: Into<MoveSymbol> + Clone,
+    Paths: Into<MoveSymbol> + Clone + Debug,
+    NamedAddress: Into<MoveSymbol> + Clone + Debug,
 >(
     move_sources: Vec<PackagePaths<Paths, NamedAddress>>,
     move_deps: Vec<PackagePaths<Paths, NamedAddress>>,
@@ -141,8 +142,8 @@ pub fn run_model_builder_with_options<
 
 /// Build the move model with custom compilation flags and custom options
 pub fn run_model_builder_with_options_and_compilation_flags<
-    Paths: Into<MoveSymbol> + Clone,
-    NamedAddress: Into<MoveSymbol> + Clone,
+    Paths: Into<MoveSymbol> + Clone + Debug,
+    NamedAddress: Into<MoveSymbol> + Clone + Debug,
 >(
     move_sources_targets: Vec<PackagePaths<Paths, NamedAddress>>,
     move_sources_deps: Vec<PackagePaths<Paths, NamedAddress>>,

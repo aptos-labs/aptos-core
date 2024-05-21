@@ -18,7 +18,7 @@ use once_cell::sync::Lazy;
 use petgraph::{algo::astar as petgraph_astar, graphmap::DiGraphMap};
 use std::{
     collections::{BTreeMap, BTreeSet},
-    fmt,
+    fmt::{self, Debug},
     hash::Hash,
     string::ToString,
     sync::atomic::{AtomicUsize, Ordering as AtomicOrdering},
@@ -161,7 +161,10 @@ impl NamedAddressMaps {
 }
 
 #[derive(Clone, Debug, Eq, PartialEq)]
-pub struct PackagePaths<Path: Into<Symbol> = Symbol, NamedAddress: Into<Symbol> = Symbol> {
+pub struct PackagePaths<
+    Path: Into<Symbol> + Debug = Symbol,
+    NamedAddress: Into<Symbol> + Debug = Symbol,
+> {
     pub name: Option<Symbol>,
     pub paths: Vec<Path>,
     pub named_address_map: BTreeMap<NamedAddress, NumericalAddress>,
