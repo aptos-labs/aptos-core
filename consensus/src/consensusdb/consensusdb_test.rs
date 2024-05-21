@@ -26,7 +26,6 @@ fn test_put_get() {
     assert_eq!(db.get_all::<QCSchema>().unwrap().len(), 0);
 
     let qcs = vec![certificate_for_genesis()];
-
     db.save_blocks_and_quorum_certificates(blocks.clone(), qcs.clone())
         .unwrap();
 

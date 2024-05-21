@@ -8,9 +8,10 @@ use crate::{
         BlockReader, BlockRetriever, BlockStore,
     },
     counters::{
-        self, ORDER_VOTE_ADDED, ORDER_VOTE_BROADCASTED, ORDER_VOTE_OTHER_ERRORS,
-        ORDER_VOTE_VERY_OLD, PROPOSAL_VOTE_ADDED, PROPOSAL_VOTE_BROADCASTED, PROPOSED_VTXN_BYTES,
-        PROPOSED_VTXN_COUNT, QC_AGGREGATED_FROM_VOTES, SYNC_INFO_RECEIVED_WITH_NEWER_CERT,
+        self, ORDER_CERT_CREATED_WITHOUT_BLOCK_IN_BLOCK_STORE, ORDER_VOTE_ADDED,
+        ORDER_VOTE_BROADCASTED, ORDER_VOTE_OTHER_ERRORS, ORDER_VOTE_VERY_OLD, PROPOSAL_VOTE_ADDED,
+        PROPOSAL_VOTE_BROADCASTED, PROPOSED_VTXN_BYTES, PROPOSED_VTXN_COUNT,
+        QC_AGGREGATED_FROM_VOTES, SYNC_INFO_RECEIVED_WITH_NEWER_CERT,
     },
     error::{error_kind, VerifyError},
     liveness::{
@@ -576,16 +577,14 @@ impl RoundManager {
         if message_round < self.round_state.current_round() {
             return Ok(false);
         }
-        let local_sync_info = self.block_store.sync_info();
         self.sync_up(sync_info, author).await?;
         ensure!(
             message_round == self.round_state.current_round(),
-            "After sync, round {} doesn't match local {}.\n Input sync info: {:?},\n Local Sync Info {:?},\n Current sync info {:?}",
+            "After sync, round {} doesn't match local {}. Local Sync Info: {}. Remote Sync Info: {}",
             message_round,
             self.round_state.current_round(),
-            sync_info,
-            local_sync_info,
             self.block_store.sync_info(),
+            sync_info,
         );
         Ok(true)
     }
@@ -611,13 +610,8 @@ impl RoundManager {
 
     fn sync_only(&self) -> bool {
         let sync_or_not = self.local_config.sync_only || self.block_store.vote_back_pressure();
-        if sync_or_not {
-            info!(
-                "sync_or_not: {}, local_config_sync_only: {}, vote backpressure: {}",
-                sync_or_not,
-                self.local_config.sync_only,
-                self.block_store.vote_back_pressure()
-            );
+        if self.block_store.vote_back_pressure() {
+            warn!("Vote back pressure is set");
         }
         counters::OP_COUNTERS
             .gauge("sync_only")
@@ -1185,7 +1179,7 @@ impl RoundManager {
     ) -> anyhow::Result<()> {
         let result = self
             .block_store
-            .insert_quorum_cert(&qc, &mut self.create_block_retriever(preferred_peer), 1)
+            .insert_quorum_cert(&qc, &mut self.create_block_retriever(preferred_peer))
             .await
             .context("[RoundManager] Failed to process a newly aggregated QC");
         self.process_certificates().await?;
@@ -1203,11 +1197,17 @@ impl RoundManager {
             ordered_cert.commit_info().id() == quorum_cert.certified_block().id(),
             "QuorumCert attached to order votes doesn't match"
         );
+        if self
+            .block_store
+            .get_block(ordered_cert.commit_info().id())
+            .is_none()
+        {
+            ORDER_CERT_CREATED_WITHOUT_BLOCK_IN_BLOCK_STORE.inc();
+        }
         self.block_store
             .insert_quorum_cert(
                 quorum_cert,
                 &mut self.create_block_retriever(preferred_peer),
-                4,
             )
             .await
             .context("RoundManager] Failed to process QC in order Cert")?;

@@ -168,7 +168,7 @@ impl SafetyRules {
         if round > safety_data.highest_timeout_round {
             Ok(())
         } else {
-            Err(Error::NotSafeToOrderVote(
+            Err(Error::NotSafeForOrderVote(
                 round,
                 safety_data.highest_timeout_round,
             ))

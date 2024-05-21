@@ -127,7 +127,7 @@ impl ConsensusDB {
         qc_data: Vec<QuorumCert>,
     ) -> Result<(), DbError> {
         if block_data.is_empty() && qc_data.is_empty() {
-            return Err(anyhow::anyhow!("Consensus blocks and qc data are empty!").into());
+            return Err(anyhow::anyhow!("Consensus block and qc data is empty!").into());
         }
         let batch = SchemaBatch::new();
         block_data

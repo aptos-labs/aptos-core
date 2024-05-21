@@ -24,7 +24,7 @@ use std::{cmp::max, collections::HashSet, fmt::Debug, sync::Arc};
 /// Blocks persisted are proposed but not yet committed.  The committed state is persisted
 /// via StateComputer.
 pub trait PersistentLivenessStorage: Send + Sync {
-    /// Persist the blocks, quorum cert into storage atomically.
+    /// Persist the blocks and quorum certs into storage atomically.
     fn save_tree(&self, blocks: Vec<Block>, quorum_certs: Vec<QuorumCert>) -> Result<()>;
 
     /// Delete the corresponding blocks and quorum certs atomically.

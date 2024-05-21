@@ -572,6 +572,15 @@ pub static LATE_EXECUTION_WITH_ORDER_VOTE_QC: Lazy<IntCounter> = Lazy::new(|| {
     .unwrap()
 });
 
+// Created order certificate from order votes. But the block isn't available in the block store.
+pub static ORDER_CERT_CREATED_WITHOUT_BLOCK_IN_BLOCK_STORE: Lazy<IntCounter> = Lazy::new(|| {
+    register_int_counter!(
+        "aptos_consensus_order_cert_created_without_block_in_block_store",
+        "Count of the number of order certificates created without the block being in the block store"
+    )
+    .unwrap()
+});
+
 pub static SUCCESSFUL_EXECUTED_WITH_REGULAR_QC: Lazy<IntCounter> = Lazy::new(|| {
     register_int_counter!(
         "aptos_consensus_successful_executed_with_regular_qc",
@@ -666,42 +675,6 @@ pub static BLOCKS_FETCHED_FROM_NETWORK_WHILE_FAST_FORWARD_SYNC: Lazy<IntCounter>
         register_int_counter!(
             "aptos_consensus_blocks_fetched_network_while_fast_forward_sync",
             "Number of blocks fetched from the network while fast forward sync"
-        )
-        .unwrap()
-    });
-
-pub static BLOCKS_FETCHED_FROM_NETWORK_WHILE_INSERTING_QUORUM_CERT_1: Lazy<IntCounter> =
-    Lazy::new(|| {
-        register_int_counter!(
-            "aptos_consensus_blocks_fetched_network_while_inserting_quorum_cert_1",
-            "Number of blocks fetched from the network while inserting quorum cert 1"
-        )
-        .unwrap()
-    });
-
-pub static BLOCKS_FETCHED_FROM_NETWORK_WHILE_INSERTING_QUORUM_CERT_2: Lazy<IntCounter> =
-    Lazy::new(|| {
-        register_int_counter!(
-            "aptos_consensus_blocks_fetched_network_while_inserting_quorum_cert_2",
-            "Number of blocks fetched from the network while inserting quorum cert 2"
-        )
-        .unwrap()
-    });
-
-pub static BLOCKS_FETCHED_FROM_NETWORK_WHILE_INSERTING_QUORUM_CERT_3: Lazy<IntCounter> =
-    Lazy::new(|| {
-        register_int_counter!(
-            "aptos_consensus_blocks_fetched_network_while_inserting_quorum_cert_3",
-            "Number of blocks fetched from the network while inserting quorum cert 3"
-        )
-        .unwrap()
-    });
-
-pub static BLOCKS_FETCHED_FROM_NETWORK_WHILE_INSERTING_QUORUM_CERT_4: Lazy<IntCounter> =
-    Lazy::new(|| {
-        register_int_counter!(
-            "aptos_consensus_blocks_fetched_network_while_inserting_quorum_cert_4",
-            "Number of blocks fetched from the network while inserting quorum cert 4"
         )
         .unwrap()
     });

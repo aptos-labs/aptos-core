@@ -14,12 +14,14 @@ use serde::{Deserialize, Serialize};
 use std::fmt::{Display, Formatter};
 
 /// This struct is similar to QuorumCert, except that the verify function doesn't verify vote_data.
-/// vote_data and consensus_data_hash inside signed_ledger_info are not used anywhere in the code
-/// and can be set to dummy values. This struct is introduced to ensure backward compatibility when
-/// upgrading the consensus to use order votes to execute blocks faster.
+/// This struct is introduced to ensure backward compatibility when upgrading the consensus to use
+/// order votes to execute blocks faster. When order votes are enabled, then vote_data and
+/// consensus_data_hash inside signed_ledger_info are not used anywhere in the code and can be set
+/// to dummy values.
 #[derive(Deserialize, Serialize, Clone, Debug, Eq, PartialEq)]
 pub struct WrappedLedgerInfo {
-    /// The VoteData here is placeholder for backwards compatibility purpose and should not be used.
+    /// The VoteData here is placeholder for backwards compatibility purpose and should not be used
+    /// when order votes are enabled.
     vote_data: VoteData,
     /// The signed LedgerInfo of a committed block that carries the data about the certified block.
     signed_ledger_info: LedgerInfoWithSignatures,
@@ -54,12 +56,9 @@ impl WrappedLedgerInfo {
         }
     }
 
-    pub fn vote_data(&self) -> &VoteData {
-        &self.vote_data
-    }
-
+    // Caution: Use this only when order_vote_enabled is set to false.
     pub fn certified_block(&self) -> &BlockInfo {
-        self.vote_data().proposed()
+        self.vote_data.proposed()
     }
 
     pub fn ledger_info(&self) -> &LedgerInfoWithSignatures {
@@ -110,8 +109,7 @@ impl WrappedLedgerInfo {
         Ok(Self::new(self.vote_data.clone(), executed_ledger_info))
     }
 
-    // Use this only when order_vote_enabled is set to false.
-    // TODO: The method can be removed by having a duplicate method for insert_quourm_cert for wrapped ledger info
+    // Caution: Use this only when order_vote_enabled is set to false.
     pub fn into_quorum_cert(self) -> QuorumCert {
         QuorumCert::new(self.vote_data.clone(), self.signed_ledger_info.clone())
     }
