@@ -249,12 +249,13 @@ impl StateMerkleDb {
         &self,
         state_key: &StateKey,
         version: Version,
+        root_depth: usize,
     ) -> Result<(
         Option<(HashValue, (StateKey, Version))>,
         SparseMerkleProofExt,
     )> {
         JellyfishMerkleTree::new(self)
-            .get_with_proof_ext(state_key.hash(), version)
+            .get_with_proof_ext(state_key.hash(), version, root_depth)
             .map_err(Into::into)
     }
 
@@ -550,6 +551,14 @@ impl StateMerkleDb {
         NUM_STATE_SHARDS as u8
     }
 
+    pub(crate) fn hack_num_real_shards(&self) -> usize {
+        if self.enable_sharding {
+            NUM_STATE_SHARDS
+        } else {
+            1
+        }
+    }
+
     fn db_by_key(&self, node_key: &NodeKey) -> &DB {
         if let Some(shard_id) = node_key.get_shard_id() {
             self.db_shard(shard_id)
@@ -694,11 +703,7 @@ impl StateMerkleDb {
         }
 
         // traverse all shards in a naive way
-        // if sharding is not enable, we only need to search once.
-        let shards = self
-            .enable_sharding
-            .then(|| (0..NUM_STATE_SHARDS))
-            .unwrap_or(0..1);
+        let shards = 0..self.hack_num_real_shards();
         let start_num_of_nibbles = if self.enable_sharding { 1 } else { 0 };
         for shard_id in shards.rev() {
             let shard_db = self.state_merkle_db_shards[shard_id].clone();
@@ -846,11 +851,7 @@ impl TreeReader<StateKey> for StateMerkleDb {
         };
 
         let ret = None;
-        // if sharding is not enable, we only need to search once.
-        let shards = self
-            .enable_sharding
-            .then(|| (0..NUM_STATE_SHARDS))
-            .unwrap_or(0..1);
+        let shards = 0..self.hack_num_real_shards();
 
         // Search from right to left to find the first leaf node.
         for shard_id in shards.rev() {

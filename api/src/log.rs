@@ -77,7 +77,7 @@ pub async fn middleware_log<E: Endpoint>(next: E, request: Request) -> Result<Re
     let operation_id = response
         .data::<OperationId>()
         .map(|operation_id| operation_id.0)
-        .unwrap_or(&log.path);
+        .unwrap_or("operation_id_not_set");
 
     // Log response status per-endpoint + method.
     HISTOGRAM

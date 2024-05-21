@@ -37,8 +37,7 @@ use aptos_types::{
     state_proof::StateProof,
     state_store::{
         combine_sharded_state_updates,
-        state_key::StateKey,
-        state_key_prefix::StateKeyPrefix,
+        state_key::{prefix::StateKeyPrefix, StateKey},
         state_storage_usage::StateStorageUsage,
         state_value::{StateValue, StateValueChunkWithProof},
         table, ShardedStateUpdates,
@@ -815,18 +814,20 @@ impl DbReader for FakeAptosDB {
         &self,
         state_key: &StateKey,
         version: Version,
+        root_depth: usize,
     ) -> Result<SparseMerkleProofExt> {
         self.inner
-            .get_state_proof_by_version_ext(state_key, version)
+            .get_state_proof_by_version_ext(state_key, version, root_depth)
     }
 
     fn get_state_value_with_proof_by_version_ext(
         &self,
         state_key: &StateKey,
         version: Version,
+        root_depth: usize,
     ) -> Result<(Option<StateValue>, SparseMerkleProofExt)> {
         self.inner
-            .get_state_value_with_proof_by_version_ext(state_key, version)
+            .get_state_value_with_proof_by_version_ext(state_key, version, root_depth)
     }
 
     fn get_latest_executed_trees(&self) -> Result<ExecutedTrees> {

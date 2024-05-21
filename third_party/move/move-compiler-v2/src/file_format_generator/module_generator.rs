@@ -75,8 +75,8 @@ pub struct ModuleGenerator {
         BTreeMap<(QualifiedId<StructId>, usize, FF::SignatureIndex), FF::FieldInstantiationIndex>,
     /// A mapping from type sequences to signature indices.
     types_to_signature: BTreeMap<Vec<Type>, FF::SignatureIndex>,
-    /// A mapping from constants sequences to pool indices.
-    cons_to_idx: BTreeMap<Constant, FF::ConstantPoolIndex>,
+    /// A mapping from constants sequences (with the corresponding type information) to pool indices.
+    cons_to_idx: BTreeMap<(Constant, Type), FF::ConstantPoolIndex>,
     /// The file-format module we are building.
     pub module: FF::CompiledModule,
     /// The source map for the module.
@@ -179,6 +179,10 @@ impl ModuleGenerator {
 
         let acquires_map = ctx.generate_acquires_map(module_env);
         for fun_env in module_env.get_functions() {
+            // Do not need to generate code for inline functions
+            if fun_env.is_inline() {
+                continue;
+            }
             assert!(compile_test_code || !fun_env.is_test_only());
             let acquires_list = &acquires_map[&fun_env.get_id()];
             FunctionGenerator::run(self, ctx, fun_env, acquires_list);
@@ -763,7 +767,7 @@ impl ModuleGenerator {
         cons: &Constant,
         ty: &Type,
     ) -> FF::ConstantPoolIndex {
-        if let Some(idx) = self.cons_to_idx.get(cons) {
+        if let Some(idx) = self.cons_to_idx.get(&(cons.clone(), ty.clone())) {
             return *idx;
         }
         let data = cons
@@ -781,7 +785,7 @@ impl ModuleGenerator {
             "constant",
         ));
         self.module.constant_pool.push(ff_cons);
-        self.cons_to_idx.insert(cons.clone(), idx);
+        self.cons_to_idx.insert((cons.clone(), ty.clone()), idx);
         idx
     }
 }
@@ -864,6 +868,7 @@ impl<'env> ModuleContext<'env> {
         // Compute map with direct usage of resources
         let mut usage_map = module
             .get_functions()
+            .filter(|f| !f.is_inline())
             .map(|f| (f.get_id(), self.get_direct_function_acquires(&f)))
             .collect::<BTreeMap<_, _>>();
         // Now run a fixed-point loop: add resources used by called functions until there are no
@@ -871,6 +876,9 @@ impl<'env> ModuleContext<'env> {
         loop {
             let mut changes = false;
             for fun in module.get_functions() {
+                if fun.is_inline() {
+                    continue;
+                }
                 if let Some(callees) = fun.get_called_functions() {
                     let mut usage = usage_map[&fun.get_id()].clone();
                     let count = usage.len();

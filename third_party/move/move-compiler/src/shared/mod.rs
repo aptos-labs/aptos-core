@@ -8,7 +8,10 @@ use crate::{
     naming::ast::ModuleDefinition,
 };
 use clap::*;
-use move_command_line_common::env::read_bool_env_var;
+use move_command_line_common::env::{
+    bool_to_str, get_move_compiler_block_v1_from_env, read_bool_env_var,
+    MOVE_COMPILER_BLOCK_V1_FLAG,
+};
 use move_ir_types::location::*;
 use move_symbol_pool::Symbol;
 use once_cell::sync::Lazy;
@@ -17,6 +20,7 @@ use std::{
     collections::{BTreeMap, BTreeSet},
     fmt,
     hash::Hash,
+    string::ToString,
     sync::atomic::{AtomicUsize, Ordering as AtomicOrdering},
 };
 
@@ -286,17 +290,11 @@ pub fn format_comma<T: fmt::Display, I: IntoIterator<Item = T>>(items: I) -> Str
 //**************************************************************************************************
 
 pub fn debug_compiler_env_var() -> bool {
-    static DEBUG_COMPILER: Lazy<bool> =
-        Lazy::new(|| read_bool_env_var(cli::MOVE_COMPILER_DEBUG_ENV_VAR));
+    static DEBUG_COMPILER: Lazy<bool> = Lazy::new(|| {
+        read_bool_env_var(cli::MOVE_COMPILER_DEBUG_ENV_VAR)
+            || read_bool_env_var(cli::MVC_DEBUG_ENV_VAR)
+    });
     *DEBUG_COMPILER
-}
-
-pub fn debug_compiler_env_var_str() -> &'static str {
-    if debug_compiler_env_var() {
-        "true"
-    } else {
-        "false"
-    }
 }
 
 pub fn move_compiler_warn_of_deprecation_use_env_var() -> bool {
@@ -305,26 +303,10 @@ pub fn move_compiler_warn_of_deprecation_use_env_var() -> bool {
     *WARN_OF_DEPRECATION
 }
 
-pub fn move_compiler_warn_of_deprecation_use_env_var_str() -> &'static str {
-    if move_compiler_warn_of_deprecation_use_env_var() {
-        "true"
-    } else {
-        "false"
-    }
-}
-
 pub fn warn_of_deprecation_use_in_aptos_libs_env_var() -> bool {
     static WARN_OF_DEPRECATION: Lazy<bool> =
         Lazy::new(|| read_bool_env_var(cli::WARN_OF_DEPRECATION_USE_IN_APTOS_LIBS));
     *WARN_OF_DEPRECATION
-}
-
-pub fn warn_of_deprecation_use_in_aptos_libs_env_var_str() -> &'static str {
-    if warn_of_deprecation_use_in_aptos_libs_env_var() {
-        "true"
-    } else {
-        "false"
-    }
 }
 
 #[derive(Clone, Debug, Eq, PartialEq, Parser)]
@@ -376,18 +358,19 @@ pub struct Flags {
     skip_attribute_checks: bool,
 
     /// Debug compiler by printing out internal information
-    #[clap(long = cli::DEBUG_FLAG, default_value=debug_compiler_env_var_str())]
+    #[clap(long = cli::DEBUG_FLAG, default_value=bool_to_str(debug_compiler_env_var()))]
     debug: bool,
 
     /// Show warnings about use of deprecated functions, modules, constants, etc.
     /// Note that current value of this constant is "Wdeprecation"
-    #[clap(long = cli::MOVE_COMPILER_WARN_OF_DEPRECATION_USE_FLAG, default_value=move_compiler_warn_of_deprecation_use_env_var_str())]
+    #[clap(long = cli::MOVE_COMPILER_WARN_OF_DEPRECATION_USE_FLAG,
+           default_value=bool_to_str(move_compiler_warn_of_deprecation_use_env_var()))]
     warn_of_deprecation_use: bool,
 
     /// Show warnings about use of deprecated usage in the Aptos libraries,
     /// which we should generally not bother users with.
     /// Note that current value of this constant is "Wdeprecation-aptos"
-    #[clap(long = cli::WARN_OF_DEPRECATION_USE_IN_APTOS_LIBS_FLAG, default_value=warn_of_deprecation_use_in_aptos_libs_env_var_str())]
+    #[clap(long = cli::WARN_OF_DEPRECATION_USE_IN_APTOS_LIBS_FLAG, default_value=bool_to_str(warn_of_deprecation_use_in_aptos_libs_env_var()))]
     warn_of_deprecation_use_in_aptos_libs: bool,
 
     /// Show warnings about unused functions, fields, constants, etc.
@@ -398,6 +381,10 @@ pub struct Flags {
     /// Support v2 syntax (up to expansion phase)
     #[clap(long = cli::V2_FLAG)]
     v2: bool,
+
+    /// Block v1 runs past expansion phase
+    #[clap(long = MOVE_COMPILER_BLOCK_V1_FLAG, default_value=bool_to_str(get_move_compiler_block_v1_from_env()))]
+    block_v1_compiler: bool,
 }
 
 impl Flags {
@@ -415,23 +402,14 @@ impl Flags {
             warn_of_deprecation_use_in_aptos_libs: warn_of_deprecation_use_in_aptos_libs_env_var(),
             warn_unused: false,
             v2: false,
+            block_v1_compiler: get_move_compiler_block_v1_from_env(),
         }
     }
 
     pub fn testing() -> Self {
         Self {
             test: true,
-            verify: false,
-            shadow: false,
-            flavor: "".to_string(),
-            bytecode_version: None,
-            keep_testing_functions: false,
-            skip_attribute_checks: false,
-            debug: debug_compiler_env_var(),
-            warn_of_deprecation_use: move_compiler_warn_of_deprecation_use_env_var(),
-            warn_of_deprecation_use_in_aptos_libs: warn_of_deprecation_use_in_aptos_libs_env_var(),
-            warn_unused: false,
-            v2: false,
+            ..Self::empty()
         }
     }
 
@@ -439,16 +417,7 @@ impl Flags {
         Self {
             test: true,
             verify: true,
-            shadow: false,
-            flavor: "".to_string(),
-            bytecode_version: None,
-            keep_testing_functions: false,
-            skip_attribute_checks: false,
-            debug: debug_compiler_env_var(),
-            warn_of_deprecation_use: move_compiler_warn_of_deprecation_use_env_var(),
-            warn_of_deprecation_use_in_aptos_libs: warn_of_deprecation_use_in_aptos_libs_env_var(),
-            warn_unused: false,
-            v2: false,
+            ..Self::empty()
         }
     }
 
@@ -457,15 +426,7 @@ impl Flags {
             test: false,
             verify: true,
             shadow: true, // allows overlapping between sources and deps
-            flavor: "".to_string(),
-            bytecode_version: None,
-            keep_testing_functions: false,
-            skip_attribute_checks: false,
-            debug: debug_compiler_env_var(),
-            warn_of_deprecation_use: move_compiler_warn_of_deprecation_use_env_var(),
-            warn_of_deprecation_use_in_aptos_libs: warn_of_deprecation_use_in_aptos_libs_env_var(),
-            warn_unused: false,
-            v2: false,
+            ..Self::empty()
         }
     }
 
@@ -474,15 +435,9 @@ impl Flags {
             test: false,
             verify: true,
             shadow: true, // allows overlapping between sources and deps
-            flavor: "".to_string(),
-            bytecode_version: None,
             keep_testing_functions: true,
-            skip_attribute_checks: false,
-            debug: false,
-            warn_of_deprecation_use: move_compiler_warn_of_deprecation_use_env_var(),
-            warn_of_deprecation_use_in_aptos_libs: warn_of_deprecation_use_in_aptos_libs_env_var(),
-            warn_unused: false,
             v2: true,
+            ..Self::empty()
         }
     }
 
@@ -564,6 +519,17 @@ impl Flags {
     pub fn set_warn_of_deprecation_use_in_aptos_libs(self, new_value: bool) -> Self {
         Self {
             warn_of_deprecation_use_in_aptos_libs: new_value,
+            ..self
+        }
+    }
+
+    pub fn get_block_v1_compiler(&self) -> bool {
+        self.block_v1_compiler
+    }
+
+    pub fn set_block_v1_compiler(self, new_value: bool) -> Self {
+        Self {
+            block_v1_compiler: new_value,
             ..self
         }
     }

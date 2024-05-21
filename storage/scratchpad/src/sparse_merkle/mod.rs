@@ -441,20 +441,16 @@ pub enum StateStoreStatus<V> {
     /// The entry exists in the tree, therefore we can give its value.
     ExistsInScratchPad(V),
 
-    /// The entry does not exist in the tree, but exists in DB. This happens when the search
-    /// reaches a leaf node that has the requested account, but the node has only the value hash
-    /// because it was loaded into memory as part of a non-inclusion proof. When we go to DB we
-    /// don't need to traverse the tree to find the same leaf, instead we can use the value hash to
-    /// look up the entry content directly.
-    ExistsInDB,
-
     /// The entry does not exist in either the tree or DB. This happens when the search reaches
     /// an empty node, or a leaf node that has a different account.
     DoesNotExist,
 
-    /// We do not know if this entry exists or not and need to go to DB to find out. This happens
-    /// when the search reaches a subtree node.
-    Unknown,
+    /// Tree nodes only exist until `depth` on the route from the root to the leaf address, needs
+    /// to check the DB for the rest.
+    UnknownSubtreeRoot { hash: HashValue, depth: usize },
+
+    /// Found leaf node, but the value is only in the DB.
+    UnknownValue,
 }
 
 /// In the entire lifetime of this, in-mem nodes won't be dropped because a reference to the oldest
@@ -530,13 +526,20 @@ where
     pub fn get(&self, key: HashValue) -> StateStoreStatus<V> {
         let mut subtree = self.smt.root_weak();
         let mut bits = key.iter_bits();
+        let mut next_depth = 0;
 
         loop {
+            next_depth += 1;
             match subtree {
                 SubTree::Empty => return StateStoreStatus::DoesNotExist,
-                SubTree::NonEmpty { .. } => {
+                SubTree::NonEmpty { hash, root: _ } => {
                     match subtree.get_node_if_in_mem(self.base_generation) {
-                        None => return StateStoreStatus::Unknown,
+                        None => {
+                            return StateStoreStatus::UnknownSubtreeRoot {
+                                hash,
+                                depth: next_depth - 1,
+                            }
+                        },
                         Some(node) => match node.inner() {
                             NodeInner::Internal(internal_node) => {
                                 subtree = if bits.next().expect("Tree is too deep.") {
@@ -552,7 +555,7 @@ where
                                         Some(value) => StateStoreStatus::ExistsInScratchPad(
                                             value.as_ref().clone(),
                                         ),
-                                        None => StateStoreStatus::ExistsInDB,
+                                        None => StateStoreStatus::UnknownValue,
                                     }
                                 } else {
                                     StateStoreStatus::DoesNotExist

@@ -198,7 +198,7 @@ impl MockSharedMempool {
     pub fn get_txns(&self, size: u64) -> Vec<SignedTransaction> {
         let pool = self.mempool.lock();
         // assume txn size is less than 100kb
-        pool.get_batch(size, size * 102400, true, false, BTreeMap::new())
+        pool.get_batch(size, size * 102400, true, BTreeMap::new())
     }
 
     pub fn remove_txn(&self, txn: &SignedTransaction) {
