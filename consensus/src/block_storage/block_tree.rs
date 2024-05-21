@@ -285,6 +285,7 @@ impl BlockTree {
             .or_insert_with(|| Arc::clone(&qc));
 
         if self.highest_ordered_cert.commit_info().round() < qc.commit_info().round() {
+            // Question: We are updating highest_ordered_cert but not highest_ordered_root. Is that fine?
             self.highest_ordered_cert = Arc::new(qc.into_wrapped_ledger_info());
         }
 

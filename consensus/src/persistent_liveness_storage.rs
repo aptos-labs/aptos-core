@@ -141,7 +141,9 @@ impl LedgerRecoveryData {
             .clone();
 
         let (root_ordered_cert, root_commit_cert) = if order_vote_enabled {
-            // TODO: Using the same certificate for both ordered and commit. Need to find a better way.
+            // We are setting ordered_root same as commit_root. As every committed block is also ordered, this is fine.
+            // As the block store inserts all the fetched blocks and quorum certs and execute the blocks, the block store
+            // updates highest_ordered_cert accordingly.
             (
                 WrappedLedgerInfo::new(VoteData::dummy(), latest_ledger_info_sig.clone()),
                 WrappedLedgerInfo::new(VoteData::dummy(), latest_ledger_info_sig.clone()),
