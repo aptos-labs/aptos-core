@@ -383,12 +383,13 @@ struct HarnessProxy<'a> {
 
 impl<'a> ModuleResolver for HarnessProxy<'a> {
     type Error = PartialVMError;
+    type Module = Bytes;
 
     fn get_module_metadata(&self, _module_id: &ModuleId) -> Vec<Metadata> {
         vec![]
     }
 
-    fn get_module(&self, id: &ModuleId) -> Result<Option<Bytes>, Self::Error> {
+    fn get_module(&self, id: &ModuleId) -> Result<Option<Self::Module>, Self::Error> {
         Ok(self
             .harness
             .module_cache

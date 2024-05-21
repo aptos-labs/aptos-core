@@ -529,12 +529,13 @@ struct BogusStorage {
 
 impl ModuleResolver for BogusStorage {
     type Error = PartialVMError;
+    type Module = Bytes;
 
     fn get_module_metadata(&self, _module_id: &ModuleId) -> Vec<Metadata> {
         vec![]
     }
 
-    fn get_module(&self, _module_id: &ModuleId) -> Result<Option<Bytes>, Self::Error> {
+    fn get_module(&self, _module_id: &ModuleId) -> Result<Option<Self::Module>, Self::Error> {
         Err(PartialVMError::new(self.bad_status_code))
     }
 }

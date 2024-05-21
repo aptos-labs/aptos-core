@@ -23,11 +23,12 @@ use std::fmt::Debug;
 ///                       are always structurally valid)
 ///                    - storage encounters internal error
 pub trait ModuleResolver {
+    type Module;
     type Error: Debug;
 
     fn get_module_metadata(&self, module_id: &ModuleId) -> Vec<Metadata>;
 
-    fn get_module(&self, id: &ModuleId) -> Result<Option<Bytes>, Self::Error>;
+    fn get_module(&self, id: &ModuleId) -> Result<Option<Self::Module>, Self::Error>;
 }
 
 pub fn resource_size(resource: &Option<Bytes>) -> usize {
@@ -56,7 +57,9 @@ pub trait ResourceResolver {
 }
 
 /// A persistent storage implementation that can resolve both resources and modules
-pub trait MoveResolver<E: Debug>: ModuleResolver<Error = E> + ResourceResolver<Error = E> {
+pub trait MoveResolver<E: Debug>:
+    ModuleResolver<Module = Bytes, Error = E> + ResourceResolver<Error = E>
+{
     fn get_resource(
         &self,
         address: &AccountAddress,
@@ -81,7 +84,9 @@ pub trait MoveResolver<E: Debug>: ModuleResolver<Error = E> + ResourceResolver<E
     }
 }
 
-impl<E: Debug, T: ModuleResolver<Error = E> + ResourceResolver<Error = E> + ?Sized> MoveResolver<E>
-    for T
+impl<
+        E: Debug,
+        T: ModuleResolver<Module = Bytes, Error = E> + ResourceResolver<Error = E> + ?Sized,
+    > MoveResolver<E> for T
 {
 }

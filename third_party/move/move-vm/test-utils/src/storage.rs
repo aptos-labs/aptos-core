@@ -39,12 +39,13 @@ impl BlankStorage {
 
 impl ModuleResolver for BlankStorage {
     type Error = PartialVMError;
+    type Module = Bytes;
 
     fn get_module_metadata(&self, _module_id: &ModuleId) -> Vec<Metadata> {
         vec![]
     }
 
-    fn get_module(&self, _module_id: &ModuleId) -> Result<Option<Bytes>, Self::Error> {
+    fn get_module(&self, _module_id: &ModuleId) -> Result<Option<Self::Module>, Self::Error> {
         Ok(None)
     }
 }
@@ -83,14 +84,15 @@ pub struct DeltaStorage<'a, 'b, S> {
     change_set: &'b ChangeSet,
 }
 
-impl<'a, 'b, S: ModuleResolver> ModuleResolver for DeltaStorage<'a, 'b, S> {
+impl<'a, 'b, S: ModuleResolver<Module = Bytes>> ModuleResolver for DeltaStorage<'a, 'b, S> {
     type Error = S::Error;
+    type Module = Bytes;
 
     fn get_module_metadata(&self, _module_id: &ModuleId) -> Vec<Metadata> {
         vec![]
     }
 
-    fn get_module(&self, module_id: &ModuleId) -> Result<Option<Bytes>, Self::Error> {
+    fn get_module(&self, module_id: &ModuleId) -> Result<Option<Self::Module>, Self::Error> {
         if let Some(account_storage) = self.change_set.accounts().get(module_id.address()) {
             if let Some(blob_opt) = account_storage.modules().get(module_id.name()) {
                 return Ok(blob_opt.clone().ok());
@@ -330,12 +332,13 @@ impl InMemoryStorage {
 
 impl ModuleResolver for InMemoryStorage {
     type Error = PartialVMError;
+    type Module = Bytes;
 
     fn get_module_metadata(&self, _module_id: &ModuleId) -> Vec<Metadata> {
         vec![]
     }
 
-    fn get_module(&self, module_id: &ModuleId) -> Result<Option<Bytes>, Self::Error> {
+    fn get_module(&self, module_id: &ModuleId) -> Result<Option<Self::Module>, Self::Error> {
         if let Some(account_storage) = self.accounts.get(module_id.address()) {
             return Ok(account_storage.modules.get(module_id.name()).cloned());
         }

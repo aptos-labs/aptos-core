@@ -187,6 +187,7 @@ impl<'e, E: ExecutorView> ResourceResolver for StorageAdapter<'e, E> {
 
 impl<'e, E: ExecutorView> ModuleResolver for StorageAdapter<'e, E> {
     type Error = PartialVMError;
+    type Module = Bytes;
 
     fn get_module_metadata(&self, module_id: &ModuleId) -> Vec<Metadata> {
         let module_bytes = match self.get_module(module_id) {
@@ -202,7 +203,7 @@ impl<'e, E: ExecutorView> ModuleResolver for StorageAdapter<'e, E> {
         module.metadata
     }
 
-    fn get_module(&self, module_id: &ModuleId) -> Result<Option<Bytes>, Self::Error> {
+    fn get_module(&self, module_id: &ModuleId) -> Result<Option<Self::Module>, Self::Error> {
         self.executor_view
             .get_module_bytes(&StateKey::module_id(module_id))
     }
