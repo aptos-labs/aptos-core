@@ -23,6 +23,7 @@
 -  [Specification](#@Specification_1)
     -  [High-level Requirements](#high-level-req)
     -  [Module-level Specification](#module-level-spec)
+    -  [Function `register_apt`](#@Specification_1_register_apt)
     -  [Function `create_account`](#@Specification_1_create_account)
     -  [Function `batch_transfer`](#@Specification_1_batch_transfer)
     -  [Function `transfer`](#@Specification_1_transfer)
@@ -652,6 +653,102 @@ By default, this returns true if an account has not explicitly set whether the c
 
 
 
+<a id="@Specification_1_register_apt"></a>
+
+### Function `register_apt`
+
+
+<pre><code><b>public</b>(<b>friend</b>) <b>fun</b> <a href="aptos_account.md#0x1_aptos_account_register_apt">register_apt</a>(account_signer: &<a href="../../aptos-stdlib/../move-stdlib/doc/signer.md#0x1_signer">signer</a>)
+</code></pre>
+
+
+
+
+<pre><code><b>pragma</b> verify = <b>false</b>;
+</code></pre>
+
+
+
+
+<a id="0x1_aptos_account_CreateAccountTransferAbortsIf"></a>
+
+
+<pre><code><b>schema</b> <a href="aptos_account.md#0x1_aptos_account_CreateAccountTransferAbortsIf">CreateAccountTransferAbortsIf</a> {
+    <b>to</b>: <b>address</b>;
+    <b>aborts_if</b> !<a href="account.md#0x1_account_exists_at">account::exists_at</a>(<b>to</b>) && <a href="aptos_account.md#0x1_aptos_account_length_judgment">length_judgment</a>(<b>to</b>);
+    <b>aborts_if</b> !<a href="account.md#0x1_account_exists_at">account::exists_at</a>(<b>to</b>) && (<b>to</b> == @vm_reserved || <b>to</b> == @aptos_framework || <b>to</b> == @aptos_token);
+}
+</code></pre>
+
+
+
+
+<a id="0x1_aptos_account_WithdrawAbortsIf"></a>
+
+
+<pre><code><b>schema</b> <a href="aptos_account.md#0x1_aptos_account_WithdrawAbortsIf">WithdrawAbortsIf</a>&lt;CoinType&gt; {
+    from: &<a href="../../aptos-stdlib/../move-stdlib/doc/signer.md#0x1_signer">signer</a>;
+    amount: u64;
+    <b>let</b> account_addr_source = <a href="../../aptos-stdlib/../move-stdlib/doc/signer.md#0x1_signer_address_of">signer::address_of</a>(from);
+    <b>let</b> coin_store_source = <b>global</b>&lt;<a href="coin.md#0x1_coin_CoinStore">coin::CoinStore</a>&lt;CoinType&gt;&gt;(account_addr_source);
+    <b>let</b> balance_source = coin_store_source.<a href="coin.md#0x1_coin">coin</a>.value;
+    <b>aborts_if</b> !<b>exists</b>&lt;<a href="coin.md#0x1_coin_CoinStore">coin::CoinStore</a>&lt;CoinType&gt;&gt;(account_addr_source);
+    <b>aborts_if</b> coin_store_source.frozen;
+    <b>aborts_if</b> balance_source &lt; amount;
+}
+</code></pre>
+
+
+
+
+<a id="0x1_aptos_account_GuidAbortsIf"></a>
+
+
+<pre><code><b>schema</b> <a href="aptos_account.md#0x1_aptos_account_GuidAbortsIf">GuidAbortsIf</a>&lt;CoinType&gt; {
+    <b>to</b>: <b>address</b>;
+    <b>let</b> acc = <b>global</b>&lt;<a href="account.md#0x1_account_Account">account::Account</a>&gt;(<b>to</b>);
+    <b>aborts_if</b> <a href="account.md#0x1_account_exists_at">account::exists_at</a>(<b>to</b>) && !<b>exists</b>&lt;<a href="coin.md#0x1_coin_CoinStore">coin::CoinStore</a>&lt;CoinType&gt;&gt;(<b>to</b>) && acc.guid_creation_num + 2 &gt;= <a href="account.md#0x1_account_MAX_GUID_CREATION_NUM">account::MAX_GUID_CREATION_NUM</a>;
+    <b>aborts_if</b> <a href="account.md#0x1_account_exists_at">account::exists_at</a>(<b>to</b>) && !<b>exists</b>&lt;<a href="coin.md#0x1_coin_CoinStore">coin::CoinStore</a>&lt;CoinType&gt;&gt;(<b>to</b>) && acc.guid_creation_num + 2 &gt; MAX_U64;
+}
+</code></pre>
+
+
+
+
+<a id="0x1_aptos_account_RegistCoinAbortsIf"></a>
+
+
+<pre><code><b>schema</b> <a href="aptos_account.md#0x1_aptos_account_RegistCoinAbortsIf">RegistCoinAbortsIf</a>&lt;CoinType&gt; {
+    <b>to</b>: <b>address</b>;
+    <b>aborts_if</b> !<a href="coin.md#0x1_coin_spec_is_account_registered">coin::spec_is_account_registered</a>&lt;CoinType&gt;(<b>to</b>) && !<a href="../../aptos-stdlib/doc/type_info.md#0x1_type_info_spec_is_struct">type_info::spec_is_struct</a>&lt;CoinType&gt;();
+    <b>aborts_if</b> <b>exists</b>&lt;aptos_framework::account::Account&gt;(<b>to</b>);
+    <b>aborts_if</b> <a href="../../aptos-stdlib/doc/type_info.md#0x1_type_info_type_of">type_info::type_of</a>&lt;CoinType&gt;() != <a href="../../aptos-stdlib/doc/type_info.md#0x1_type_info_type_of">type_info::type_of</a>&lt;AptosCoin&gt;();
+}
+</code></pre>
+
+
+
+
+<a id="0x1_aptos_account_TransferEnsures"></a>
+
+
+<pre><code><b>schema</b> <a href="aptos_account.md#0x1_aptos_account_TransferEnsures">TransferEnsures</a>&lt;CoinType&gt; {
+    <b>to</b>: <b>address</b>;
+    account_addr_source: <b>address</b>;
+    amount: u64;
+    <b>let</b> if_exist_account = <b>exists</b>&lt;<a href="account.md#0x1_account_Account">account::Account</a>&gt;(<b>to</b>);
+    <b>let</b> if_exist_coin = <b>exists</b>&lt;<a href="coin.md#0x1_coin_CoinStore">coin::CoinStore</a>&lt;CoinType&gt;&gt;(<b>to</b>);
+    <b>let</b> coin_store_to = <b>global</b>&lt;<a href="coin.md#0x1_coin_CoinStore">coin::CoinStore</a>&lt;CoinType&gt;&gt;(<b>to</b>);
+    <b>let</b> coin_store_source = <b>global</b>&lt;<a href="coin.md#0x1_coin_CoinStore">coin::CoinStore</a>&lt;CoinType&gt;&gt;(account_addr_source);
+    <b>let</b> <b>post</b> p_coin_store_to = <b>global</b>&lt;<a href="coin.md#0x1_coin_CoinStore">coin::CoinStore</a>&lt;CoinType&gt;&gt;(<b>to</b>);
+    <b>let</b> <b>post</b> p_coin_store_source = <b>global</b>&lt;<a href="coin.md#0x1_coin_CoinStore">coin::CoinStore</a>&lt;CoinType&gt;&gt;(account_addr_source);
+    <b>ensures</b> coin_store_source.<a href="coin.md#0x1_coin">coin</a>.value - amount == p_coin_store_source.<a href="coin.md#0x1_coin">coin</a>.value;
+    <b>ensures</b> if_exist_account && if_exist_coin ==&gt; coin_store_to.<a href="coin.md#0x1_coin">coin</a>.value + amount == p_coin_store_to.<a href="coin.md#0x1_coin">coin</a>.value;
+}
+</code></pre>
+
+
+
 <a id="@Specification_1_create_account"></a>
 
 ### Function `create_account`
@@ -839,86 +936,6 @@ Limit the address of auth_key is not @vm_reserved / @aptos_framework / @aptos_to
 <b>aborts_if</b> <b>exists</b>&lt;<a href="coin.md#0x1_coin_CoinStore">coin::CoinStore</a>&lt;CoinType&gt;&gt;(<b>to</b>) && <b>global</b>&lt;<a href="coin.md#0x1_coin_CoinStore">coin::CoinStore</a>&lt;CoinType&gt;&gt;(<b>to</b>).frozen;
 <b>ensures</b> <b>exists</b>&lt;aptos_framework::account::Account&gt;(<b>to</b>);
 <b>ensures</b> <b>exists</b>&lt;aptos_framework::coin::CoinStore&lt;CoinType&gt;&gt;(<b>to</b>);
-</code></pre>
-
-
-
-
-<a id="0x1_aptos_account_CreateAccountTransferAbortsIf"></a>
-
-
-<pre><code><b>schema</b> <a href="aptos_account.md#0x1_aptos_account_CreateAccountTransferAbortsIf">CreateAccountTransferAbortsIf</a> {
-    <b>to</b>: <b>address</b>;
-    <b>aborts_if</b> !<a href="account.md#0x1_account_exists_at">account::exists_at</a>(<b>to</b>) && <a href="aptos_account.md#0x1_aptos_account_length_judgment">length_judgment</a>(<b>to</b>);
-    <b>aborts_if</b> !<a href="account.md#0x1_account_exists_at">account::exists_at</a>(<b>to</b>) && (<b>to</b> == @vm_reserved || <b>to</b> == @aptos_framework || <b>to</b> == @aptos_token);
-}
-</code></pre>
-
-
-
-
-<a id="0x1_aptos_account_WithdrawAbortsIf"></a>
-
-
-<pre><code><b>schema</b> <a href="aptos_account.md#0x1_aptos_account_WithdrawAbortsIf">WithdrawAbortsIf</a>&lt;CoinType&gt; {
-    from: &<a href="../../aptos-stdlib/../move-stdlib/doc/signer.md#0x1_signer">signer</a>;
-    amount: u64;
-    <b>let</b> account_addr_source = <a href="../../aptos-stdlib/../move-stdlib/doc/signer.md#0x1_signer_address_of">signer::address_of</a>(from);
-    <b>let</b> coin_store_source = <b>global</b>&lt;<a href="coin.md#0x1_coin_CoinStore">coin::CoinStore</a>&lt;CoinType&gt;&gt;(account_addr_source);
-    <b>let</b> balance_source = coin_store_source.<a href="coin.md#0x1_coin">coin</a>.value;
-    <b>aborts_if</b> !<b>exists</b>&lt;<a href="coin.md#0x1_coin_CoinStore">coin::CoinStore</a>&lt;CoinType&gt;&gt;(account_addr_source);
-    <b>aborts_if</b> coin_store_source.frozen;
-    <b>aborts_if</b> balance_source &lt; amount;
-}
-</code></pre>
-
-
-
-
-<a id="0x1_aptos_account_GuidAbortsIf"></a>
-
-
-<pre><code><b>schema</b> <a href="aptos_account.md#0x1_aptos_account_GuidAbortsIf">GuidAbortsIf</a>&lt;CoinType&gt; {
-    <b>to</b>: <b>address</b>;
-    <b>let</b> acc = <b>global</b>&lt;<a href="account.md#0x1_account_Account">account::Account</a>&gt;(<b>to</b>);
-    <b>aborts_if</b> <a href="account.md#0x1_account_exists_at">account::exists_at</a>(<b>to</b>) && !<b>exists</b>&lt;<a href="coin.md#0x1_coin_CoinStore">coin::CoinStore</a>&lt;CoinType&gt;&gt;(<b>to</b>) && acc.guid_creation_num + 2 &gt;= <a href="account.md#0x1_account_MAX_GUID_CREATION_NUM">account::MAX_GUID_CREATION_NUM</a>;
-    <b>aborts_if</b> <a href="account.md#0x1_account_exists_at">account::exists_at</a>(<b>to</b>) && !<b>exists</b>&lt;<a href="coin.md#0x1_coin_CoinStore">coin::CoinStore</a>&lt;CoinType&gt;&gt;(<b>to</b>) && acc.guid_creation_num + 2 &gt; MAX_U64;
-}
-</code></pre>
-
-
-
-
-<a id="0x1_aptos_account_RegistCoinAbortsIf"></a>
-
-
-<pre><code><b>schema</b> <a href="aptos_account.md#0x1_aptos_account_RegistCoinAbortsIf">RegistCoinAbortsIf</a>&lt;CoinType&gt; {
-    <b>to</b>: <b>address</b>;
-    <b>aborts_if</b> !<a href="coin.md#0x1_coin_spec_is_account_registered">coin::spec_is_account_registered</a>&lt;CoinType&gt;(<b>to</b>) && !<a href="../../aptos-stdlib/doc/type_info.md#0x1_type_info_spec_is_struct">type_info::spec_is_struct</a>&lt;CoinType&gt;();
-    <b>aborts_if</b> <b>exists</b>&lt;aptos_framework::account::Account&gt;(<b>to</b>);
-    <b>aborts_if</b> <a href="../../aptos-stdlib/doc/type_info.md#0x1_type_info_type_of">type_info::type_of</a>&lt;CoinType&gt;() != <a href="../../aptos-stdlib/doc/type_info.md#0x1_type_info_type_of">type_info::type_of</a>&lt;AptosCoin&gt;();
-}
-</code></pre>
-
-
-
-
-<a id="0x1_aptos_account_TransferEnsures"></a>
-
-
-<pre><code><b>schema</b> <a href="aptos_account.md#0x1_aptos_account_TransferEnsures">TransferEnsures</a>&lt;CoinType&gt; {
-    <b>to</b>: <b>address</b>;
-    account_addr_source: <b>address</b>;
-    amount: u64;
-    <b>let</b> if_exist_account = <b>exists</b>&lt;<a href="account.md#0x1_account_Account">account::Account</a>&gt;(<b>to</b>);
-    <b>let</b> if_exist_coin = <b>exists</b>&lt;<a href="coin.md#0x1_coin_CoinStore">coin::CoinStore</a>&lt;CoinType&gt;&gt;(<b>to</b>);
-    <b>let</b> coin_store_to = <b>global</b>&lt;<a href="coin.md#0x1_coin_CoinStore">coin::CoinStore</a>&lt;CoinType&gt;&gt;(<b>to</b>);
-    <b>let</b> coin_store_source = <b>global</b>&lt;<a href="coin.md#0x1_coin_CoinStore">coin::CoinStore</a>&lt;CoinType&gt;&gt;(account_addr_source);
-    <b>let</b> <b>post</b> p_coin_store_to = <b>global</b>&lt;<a href="coin.md#0x1_coin_CoinStore">coin::CoinStore</a>&lt;CoinType&gt;&gt;(<b>to</b>);
-    <b>let</b> <b>post</b> p_coin_store_source = <b>global</b>&lt;<a href="coin.md#0x1_coin_CoinStore">coin::CoinStore</a>&lt;CoinType&gt;&gt;(account_addr_source);
-    <b>ensures</b> coin_store_source.<a href="coin.md#0x1_coin">coin</a>.value - amount == p_coin_store_source.<a href="coin.md#0x1_coin">coin</a>.value;
-    <b>ensures</b> if_exist_account && if_exist_coin ==&gt; coin_store_to.<a href="coin.md#0x1_coin">coin</a>.value + amount == p_coin_store_to.<a href="coin.md#0x1_coin">coin</a>.value;
-}
 </code></pre>
 
 

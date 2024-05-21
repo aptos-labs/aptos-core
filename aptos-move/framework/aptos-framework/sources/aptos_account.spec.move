@@ -260,6 +260,11 @@ spec aptos_framework::aptos_account {
         ensures exists<aptos_framework::coin::CoinStore<CoinType>>(to);
     }
 
+    spec register_apt(account_signer: &signer) {
+        // TODO: temporary mockup.
+        pragma verify = false;
+    }
+
     spec schema CreateAccountTransferAbortsIf {
         to: address;
         aborts_if !account::exists_at(to) && length_judgment(to);
