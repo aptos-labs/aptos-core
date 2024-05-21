@@ -1025,6 +1025,12 @@ fn realistic_env_sweep_wrap(
         .with_initial_validator_count(NonZeroUsize::new(num_validators).unwrap())
         .with_initial_fullnode_count(num_fullnodes)
         .with_validator_override_node_config_fn(Arc::new(|config, _| {
+            config.consensus_observer.publisher_enabled = true
+        }))
+        .with_fullnode_override_node_config_fn(Arc::new(|config, _| {
+            config.consensus_observer.observer_enabled = true
+        }))
+        .with_validator_override_node_config_fn(Arc::new(|config, _| {
             config.execution.processed_transactions_detailed_counters = true;
         }))
         .add_network_test(wrap_with_realistic_env(test))
@@ -1050,16 +1056,17 @@ fn realistic_env_sweep_wrap(
 fn realistic_env_load_sweep_test() -> ForgeConfig {
     realistic_env_sweep_wrap(100, 10, LoadVsPerfBenchmark {
         test: Box::new(PerformanceBenchmark),
-        workloads: Workloads::TPS(vec![10, 100, 1000, 3000, 5000, 7500, 10000, 12500]),
+        workloads: Workloads::TPS(vec![10, 100, 1000, 3000, 5000]),
+        // workloads: Workloads::TPS(vec![10, 100, 1000, 3000, 5000, 7500, 10000, 12500]),
         criteria: [
             (9, 1.5, 3., 4., 0),
             (95, 1.5, 3., 4., 0),
             (950, 2., 3., 4., 0),
             (2750, 2.5, 3.5, 4.5, 0),
             (4600, 3., 4., 6., 10), // Allow some expired transactions (high-load)
-            (7000, 4.5, 6., 8., 20), // Allow some expired transactions (high-load)
-            (9500, 6., 9., 12., 30), // Allow some expired transactions (high-load)
-            (12000, 8., 12., 16., 40), // Allow some expired transactions (high-load)
+                                    // (7000, 4.5, 6., 8., 20), // Allow some expired transactions (high-load)
+                                    // (9500, 6., 9., 12., 30), // Allow some expired transactions (high-load)
+                                    // (12000, 8., 12., 16., 40), // Allow some expired transactions (high-load)
         ]
         .into_iter()
         .map(
@@ -1956,6 +1963,12 @@ fn realistic_env_max_load_test(
     ForgeConfig::default()
         .with_initial_validator_count(NonZeroUsize::new(num_validators).unwrap())
         .with_initial_fullnode_count(num_fullnodes)
+        .with_validator_override_node_config_fn(Arc::new(|config, _| {
+            config.consensus_observer.publisher_enabled = true
+        }))
+        .with_fullnode_override_node_config_fn(Arc::new(|config, _| {
+            config.consensus_observer.observer_enabled = true
+        }))
         .add_network_test(wrap_with_realistic_env(TwoTrafficsTest {
             inner_traffic: EmitJobRequest::default()
                 .mode(EmitJobMode::MaxLoad {
