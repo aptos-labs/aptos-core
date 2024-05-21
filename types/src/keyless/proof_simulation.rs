@@ -220,7 +220,10 @@ use std::io::prelude::*;
 use std::collections::HashMap;
 use std::str::FromStr;
 //use ark_ff::{BigInt,BigInteger};
-use num_bigint::{BigInt,BigUint};
+//use num_bigint::{BigInt,BigUint};
+use num_bigint::BigInt;
+use ark_ff::MontBackend;
+use ark_bn254::FrConfig;
 
 fn u8_to_bits(x: u8) -> Vec<bool> {
     let mut result = Vec::new();
@@ -234,7 +237,7 @@ fn u8_to_bits(x: u8) -> Vec<bool> {
 
 fn test_prove_and_verify<E>(n_iters: usize)
 where
-    E: Pairing, <E as Pairing>::ScalarField: From<i32>
+    E: Pairing<ScalarField = ark_ff::Fp<MontBackend<FrConfig, 4>, 4>>, <E as Pairing>::ScalarField: From<i32>
 {
     println!("starting test");
 
@@ -256,10 +259,10 @@ where
     let mut input_file = File::open("/Users/michael/aptos-labs/aptos-core/types/src/keyless/circuit-files/keyless_input.json").unwrap();
     let mut input_json = String::new();
     input_file.read_to_string(&mut input_json).unwrap();
-    let mut input_map: HashMap<String, Vec<String>> = serde_json::from_str(&input_json).unwrap();
+    let input_map: HashMap<String, Vec<String>> = serde_json::from_str(&input_json).unwrap();
     for (key, values) in input_map {
         for v in values {
-            let v_biguint = BigInt::from_str(&v[..]).map_err(|_| ()).unwrap();
+            let v_bigint = BigInt::from_str(&v[..]).map_err(|_| ()).unwrap();
             /*let v_biguint_bytes = v_biguint.to_bytes_le();
             let mut v_biguint_bits = Vec::new();
             for byte in v_biguint_bytes {
@@ -268,15 +271,15 @@ where
             }
             let v_bigint = ark_ff::BigInt::from_bits_le(&v_biguint_bits);*/
             //let v_bigint = ark_ff::BigInt::try_from(v_biguint);
-            builder.push_input(key, v_biguint);
+            builder.push_input(key.clone(), v_bigint);
         }
     }
-    assert!(false);
 
     let circom = builder.setup();
     let mut rng = ark_std::rand::rngs::StdRng::seed_from_u64(test_rng().next_u64());
 
-    let (pk, vk) = Groth16Simulator::<E>::circuit_specific_setup_with_trapdoor(MySillyCircuit { a: None, b: None }, &mut rng).unwrap();
+    //let (pk, vk) = Groth16Simulator::<E>::circuit_specific_setup_with_trapdoor(MySillyCircuit { a: None, b: None }, &mut rng).unwrap();
+    let (pk, vk) = Groth16Simulator::<E>::circuit_specific_setup_with_trapdoor(circom, &mut rng).unwrap();
     let pvk = prepare_verifying_key::<E>(&vk);
 
     for _ in 0..n_iters {
