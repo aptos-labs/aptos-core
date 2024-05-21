@@ -36,7 +36,6 @@ move-compiler = { workspace = true }
 move-compiler-v2 = { workspace = true }
 move-core-types = { workspace = true, features = ["fuzzing"] }
 move-model = { workspace = true }
-move-resource-viewer = { workspace = true }
 move-symbol-pool = { workspace = true }
 move-transactional-test-runner = { workspace = true }
 move-vm-runtime = { workspace = true }

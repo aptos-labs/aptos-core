@@ -3956,7 +3956,6 @@ dependencies = [
  "move-compiler-v2",
  "move-core-types",
  "move-model",
- "move-resource-viewer",
  "move-symbol-pool",
  "move-transactional-test-runner",
  "move-vm-runtime",
