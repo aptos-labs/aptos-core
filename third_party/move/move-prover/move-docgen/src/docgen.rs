@@ -40,7 +40,7 @@ const MAX_SUBSECTIONS: usize = 6;
 /// Rex for generating code doc
 static CODE_REX: Lazy<Regex> = Lazy::new(|| {
     Regex::new(
-        "(?P<ident>(\\b\\w+\\b\\s*::\\s*)*\\b\\w+\\b)(?P<call>\\s*[(<])?|(?P<lt><)|(?P<gt>>)|(?P<lb>\\{)|(?P<rb>\\})|(?P<amper>\\&)|(?P<squote>')|(?P<dquote>\")|(?P<sharp>#)|(?P<mul>\\*)|(?P<plus>\\+)|(?P<minus>\\-)|(?P<eq>\\=)|(?P<bar>\\|)|(?P<tilde>\\~)",
+        "(?P<ident>(\\b\\w+\\b\\s*::\\s*)*\\b\\w+\\b)(?P<call>\\s*[(<])?|(?P<lt><)|(?P<gt>>)|(?P<nl>\n)|(?P<lb>\\{)|(?P<rb>\\})|(?P<amper>\\&)|(?P<squote>')|(?P<dquote>\")|(?P<sharp>#)|(?P<mul>\\*)|(?P<plus>\\+)|(?P<minus>\\-)|(?P<eq>\\=)|(?P<bar>\\|)|(?P<tilde>\\~)",
     )
         .unwrap()
 });
@@ -49,7 +49,7 @@ static CODE_REX: Lazy<Regex> = Lazy::new(|| {
 /// If the format is MDX, generated doc is mdx compatible
 #[derive(ValueEnum, Clone, Copy, Debug, Eq, PartialEq, PartialOrd, Serialize, Deserialize)]
 pub enum OutputFormat {
-    Github,
+    MD,
     MDX,
 }
 
@@ -817,7 +817,10 @@ impl<'env> Docgen<'env> {
                     .resolve_to_label(module_name, false)
                     .unwrap_or_default();
                 let module_link = label_link.split('#').next().unwrap_or("").to_string();
-                let suffix = format!(" of the <a href={}>{}</a> module", module_link, module_name);
+                let suffix = format!(
+                    " of the <a href=\"{}\">{}</a> module",
+                    module_link, module_name
+                );
                 (req_tag, module_link, suffix)
             } else {
                 (tag, String::new(), String::new())
@@ -1800,7 +1803,11 @@ impl<'env> Docgen<'env> {
 
     /// Outputs decorated code text in context of a module.
     fn code_text(&self, code: &str) {
-        emitln!(self.writer, &self.decorate_code(code));
+        if self.options.is_mdx_compatible() {
+            emit!(self.writer, "{}<br/>", &self.decorate_code(code));
+        } else {
+            emitln!(self.writer, &self.decorate_code(code));
+        }
     }
 
     /// Replace html entities if the output format needs to be mdx compatible
@@ -1821,6 +1828,7 @@ impl<'env> Docgen<'env> {
             map.insert("eq", "&#61;");
             map.insert("bar", "&#124;");
             map.insert("tilde", "&#126;");
+            map.insert("nl", "<br/>");
             map
         });
         let mut r = "".to_string();
