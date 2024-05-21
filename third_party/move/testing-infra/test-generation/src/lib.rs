@@ -33,7 +33,7 @@ use move_compiler::{
 };
 use move_core_types::{
     account_address::AccountAddress,
-    effects::{ChangeSet, Op},
+    effects::{Changes, Op},
     language_storage::TypeTag,
     resolver::MoveResolver,
     value::MoveValue,
@@ -44,7 +44,7 @@ use move_vm_test_utils::{DeltaStorage, InMemoryStorage};
 use move_vm_types::gas::UnmeteredGasMeter;
 use once_cell::sync::Lazy;
 use rand::{rngs::StdRng, Rng, SeedableRng};
-use std::{fs, io::Write, panic, thread};
+use std::{fs, io::Write, panic, sync::Arc, thread};
 use tracing::{debug, error, info};
 
 /// This function calls the Bytecode verifier to test it
@@ -74,9 +74,7 @@ static STORAGE_WITH_MOVE_STDLIB: Lazy<InMemoryStorage> = Lazy::new(|| {
         AnnotatedCompiledUnit::Script(_) => panic!("Unexpected Script in stdlib"),
     });
     for module in compiled_modules {
-        let mut blob = vec![];
-        module.serialize(&mut blob).unwrap();
-        storage.publish_or_overwrite_module(module.self_id(), blob);
+        storage.publish_or_overwrite_module(module);
     }
     storage
 });
@@ -133,13 +131,13 @@ fn execute_function_in_module(
     idx: FunctionDefinitionIndex,
     ty_args: Vec<TypeTag>,
     args: Vec<Vec<u8>>,
-    storage: &impl MoveResolver<PartialVMError>,
+    storage: &impl MoveResolver<Arc<CompiledModule>, PartialVMError>,
 ) -> Result<(), VMStatus> {
     let module_id = module.self_id();
     let entry_name = {
         let entry_func_idx = module.function_def_at(idx).function;
         let entry_name_idx = module.function_handle_at(entry_func_idx).name;
-        module.identifier_at(entry_name_idx)
+        module.identifier_at(entry_name_idx).to_owned()
     };
     {
         let vm = MoveVM::new(move_stdlib::natives::all_natives(
@@ -147,11 +145,9 @@ fn execute_function_in_module(
             move_stdlib::natives::GasParameters::zeros(),
         ));
 
-        let mut changeset = ChangeSet::new();
-        let mut blob = vec![];
-        module.serialize(&mut blob).unwrap();
+        let mut changeset = Changes::new();
         changeset
-            .add_module_op(module_id.clone(), Op::New(blob.into()))
+            .add_module_op(module_id.clone(), Op::New(Arc::new(module)))
             .unwrap();
         let delta_storage = DeltaStorage::new(storage, &changeset);
         let mut sess = vm.new_session(&delta_storage);
@@ -159,7 +155,7 @@ fn execute_function_in_module(
 
         sess.execute_function_bypass_visibility(
             &module_id,
-            entry_name,
+            &entry_name,
             ty_args,
             args,
             &mut UnmeteredGasMeter,

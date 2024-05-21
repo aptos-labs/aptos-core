@@ -8,6 +8,7 @@ use aptos_aggregator::{
 use aptos_crypto::hash::HashValue;
 use aptos_types::{
     executable::ExecutableDescriptor,
+    vm::modules::OnChainUnverifiedModule,
     write_set::{TransactionWrite, WriteOpKind},
 };
 use aptos_vm_types::resolver::ResourceGroupSize;
@@ -107,7 +108,7 @@ pub enum MVDataOutput<V> {
 
 /// Returned as Ok(..) when read successfully from the multi-version data-structure.
 #[derive(Debug, PartialEq, Eq)]
-pub enum MVModulesOutput<M, X> {
+pub enum MVModulesOutput<X> {
     /// Arc to the executable corresponding to the latest module, and a descriptor
     /// with either the module hash or indicator that the module is from storage.
     Executable((Arc<X>, ExecutableDescriptor)),
@@ -115,7 +116,7 @@ pub enum MVModulesOutput<M, X> {
     /// this can't be a storage-level module, as it's from multi-versioned modules map.
     /// The Option can be None if HashValue can't be computed, currently may happen
     /// if the latest entry corresponded to the module deletion.
-    Module((Arc<M>, HashValue)),
+    Module((OnChainUnverifiedModule, HashValue)),
 }
 
 // TODO[agg_v2](cleanup): once VersionedAggregators is separated from the MVHashMap,

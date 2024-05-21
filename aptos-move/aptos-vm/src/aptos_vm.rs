@@ -1888,6 +1888,7 @@ impl AptosVM {
                 // it requires restarting execution afterwards,
                 // which allows it to be used as last transaction in delayed_field_enabled context.
                 let change = VMChangeSet::try_from_storage_change_set_with_delayed_field_optimization_disabled(
+                    &aptos_prod_deserializer_config(self.move_vm.features(), self.gas_feature_version),
                     change_set.clone(),
                     &change_set_configs,
                 )
@@ -1942,7 +1943,7 @@ impl AptosVM {
         // All Move executions satisfy the read-before-write property. Thus we need to read each
         // access path that the write set is going to update.
         for state_key in change_set.module_write_set().keys() {
-            executor_view.get_module_state_value(state_key)?;
+            executor_view.get_onchain_module(state_key)?;
         }
         for (state_key, write_op) in change_set.resource_write_set().iter() {
             executor_view.get_resource_state_value(state_key, None)?;

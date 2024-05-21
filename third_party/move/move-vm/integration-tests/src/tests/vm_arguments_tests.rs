@@ -278,10 +278,7 @@ fn call_script_function_with_args_ty_args_signers(
     let mut remote_view = InMemoryStorage::new();
 
     let module_id = module.self_id();
-    let mut module_blob = vec![];
-    module.serialize(&mut module_blob).unwrap();
-
-    remote_view.publish_or_overwrite_module(module_id.clone(), module_blob);
+    remote_view.publish_or_overwrite_module(module);
     let mut session = move_vm.new_session(&remote_view);
     let traversal_storage = TraversalStorage::new();
     session.execute_function_bypass_visibility(
@@ -771,8 +768,6 @@ fn check_script_function() {
 fn call_missing_item() {
     let module = empty_module();
     let module_id = module.self_id();
-    let mut module_blob = vec![];
-    module.serialize(&mut module_blob).unwrap();
 
     // missing module
     let function_name = ident_str!("foo");
@@ -801,7 +796,7 @@ fn call_missing_item() {
     drop(session);
 
     // missing function
-    remote_view.publish_or_overwrite_module(module_id.clone(), module_blob);
+    remote_view.publish_or_overwrite_module(module);
     let mut session = move_vm.new_session(&remote_view);
     let traversal_storage = TraversalStorage::new();
     let error = session

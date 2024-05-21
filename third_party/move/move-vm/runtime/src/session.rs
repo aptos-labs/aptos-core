@@ -14,10 +14,11 @@ use move_binary_format::{
     compatibility::Compatibility,
     errors::*,
     file_format::{AbilitySet, LocalIndex},
+    CompiledModule,
 };
 use move_core_types::{
     account_address::AccountAddress,
-    effects::{ChangeSet, Changes},
+    effects::Changes,
     gas_algebra::NumBytes,
     identifier::IdentStr,
     language_storage::{ModuleId, TypeTag},
@@ -265,7 +266,7 @@ impl<'r, 'l> Session<'r, 'l> {
     /// This function should always succeed with no user errors returned, barring invariant violations.
     ///
     /// This MUST NOT be called if there is a previous invocation that failed with an invariant violation.
-    pub fn finish(self) -> VMResult<ChangeSet> {
+    pub fn finish(self) -> VMResult<Changes<(Arc<CompiledModule>, Bytes), Bytes>> {
         self.data_cache
             .into_effects(self.move_vm.runtime.loader())
             .map_err(|e| e.finish(Location::Undefined))
@@ -274,14 +275,19 @@ impl<'r, 'l> Session<'r, 'l> {
     pub fn finish_with_custom_effects<Resource>(
         self,
         resource_converter: &dyn Fn(Value, MoveTypeLayout, bool) -> PartialVMResult<Resource>,
-    ) -> VMResult<Changes<Bytes, Resource>> {
+    ) -> VMResult<Changes<(Arc<CompiledModule>, Bytes), Resource>> {
         self.data_cache
             .into_custom_effects(resource_converter, self.move_vm.runtime.loader())
             .map_err(|e| e.finish(Location::Undefined))
     }
 
     /// Same like `finish`, but also extracts the native context extensions from the session.
-    pub fn finish_with_extensions(self) -> VMResult<(ChangeSet, NativeContextExtensions<'r>)> {
+    pub fn finish_with_extensions(
+        self,
+    ) -> VMResult<(
+        Changes<(Arc<CompiledModule>, Bytes), Bytes>,
+        NativeContextExtensions<'r>,
+    )> {
         let Session {
             data_cache,
             native_extensions,
@@ -296,7 +302,10 @@ impl<'r, 'l> Session<'r, 'l> {
     pub fn finish_with_extensions_with_custom_effects<Resource>(
         self,
         resource_converter: &dyn Fn(Value, MoveTypeLayout, bool) -> PartialVMResult<Resource>,
-    ) -> VMResult<(Changes<Bytes, Resource>, NativeContextExtensions<'r>)> {
+    ) -> VMResult<(
+        Changes<(Arc<CompiledModule>, Bytes), Resource>,
+        NativeContextExtensions<'r>,
+    )> {
         let Session {
             data_cache,
             native_extensions,
@@ -319,8 +328,8 @@ impl<'r, 'l> Session<'r, 'l> {
             .load_resource(self.move_vm.runtime.loader(), addr, ty, &self.module_store)
     }
 
-    /// Get the serialized format of a `CompiledModule` given a `ModuleId`.
-    pub fn load_module(&self, module_id: &ModuleId) -> VMResult<Bytes> {
+    // TODO: This is only needed for metadata, rename!
+    pub fn load_module(&self, module_id: &ModuleId) -> VMResult<Arc<CompiledModule>> {
         self.data_cache
             .load_module(module_id)
             .map_err(|e| e.finish(Location::Undefined))

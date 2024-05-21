@@ -18,8 +18,10 @@ use aptos_types::{
     on_chain_config::CurrentTimeMicroseconds,
     state_store::{state_key::StateKey, state_value::StateValueMetadata},
     transaction::{ExecutionStatus, TransactionAuxiliaryData, TransactionStatus},
+    vm::modules::ModuleWriteOp,
     write_set::WriteOp,
 };
+use move_binary_format::errors::PartialVMResult;
 use move_core_types::{
     identifier::Identifier,
     language_storage::{StructTag, TypeTag},
@@ -54,9 +56,7 @@ macro_rules! as_bytes {
         bcs::to_bytes(&$v).expect("unexpected serialization error")
     };
 }
-
 pub(crate) use as_bytes;
-use move_binary_format::errors::PartialVMResult;
 
 pub(crate) fn raw_metadata(v: u64) -> StateValueMetadata {
     StateValueMetadata::legacy(v, &CurrentTimeMicroseconds { microseconds: v })
@@ -152,7 +152,7 @@ pub(crate) fn mock_tag_2() -> StructTag {
 
 pub(crate) struct VMChangeSetBuilder {
     resource_write_set: BTreeMap<StateKey, AbstractResourceWriteOp>,
-    module_write_set: BTreeMap<StateKey, WriteOp>,
+    module_write_set: BTreeMap<StateKey, ModuleWriteOp>,
     events: Vec<(ContractEvent, Option<MoveTypeLayout>)>,
     delayed_field_change_set: BTreeMap<DelayedFieldID, DelayedChange<DelayedFieldID>>,
     aggregator_v1_write_set: BTreeMap<StateKey, WriteOp>,
@@ -180,14 +180,14 @@ impl VMChangeSetBuilder {
         self
     }
 
-    pub(crate) fn with_module_write_set(
-        mut self,
-        module_write_set: impl IntoIterator<Item = (StateKey, WriteOp)>,
-    ) -> Self {
-        assert!(self.module_write_set.is_empty());
-        self.module_write_set.extend(module_write_set);
-        self
-    }
+    // pub(crate) fn with_module_write_set(
+    //     mut self,
+    //     module_write_set: impl IntoIterator<Item = (StateKey, WriteOp)>,
+    // ) -> Self {
+    //     assert!(self.module_write_set.is_empty());
+    //     self.module_write_set.extend(module_write_set);
+    //     self
+    // }
 
     #[allow(dead_code)]
     pub(crate) fn with_events(
@@ -246,7 +246,7 @@ impl VMChangeSetBuilder {
 // For testing, output has always a success execution status and uses 100 gas units.
 pub(crate) fn build_vm_output(
     resource_write_set: impl IntoIterator<Item = (StateKey, AbstractResourceWriteOp)>,
-    module_write_set: impl IntoIterator<Item = (StateKey, WriteOp)>,
+    _module_write_set: impl IntoIterator<Item = (StateKey, ModuleWriteOp)>,
     delayed_field_change_set: impl IntoIterator<Item = (DelayedFieldID, DelayedChange<DelayedFieldID>)>,
     aggregator_v1_write_set: impl IntoIterator<Item = (StateKey, WriteOp)>,
     aggregator_v1_delta_set: impl IntoIterator<Item = (StateKey, DeltaOp)>,
@@ -256,7 +256,8 @@ pub(crate) fn build_vm_output(
     VMOutput::new(
         VMChangeSetBuilder::new()
             .with_resource_write_set(resource_write_set)
-            .with_module_write_set(module_write_set)
+            // TODO
+            // .with_module_write_set(module_write_set)
             .with_delayed_field_change_set(delayed_field_change_set)
             .with_aggregator_v1_write_set(aggregator_v1_write_set)
             .with_aggregator_v1_delta_set(aggregator_v1_delta_set)
@@ -270,7 +271,7 @@ pub(crate) fn build_vm_output(
 pub(crate) struct ExpandedVMChangeSetBuilder {
     resource_write_set: BTreeMap<StateKey, (WriteOp, Option<Arc<MoveTypeLayout>>)>,
     resource_group_write_set: BTreeMap<StateKey, GroupWrite>,
-    module_write_set: BTreeMap<StateKey, WriteOp>,
+    module_write_set: BTreeMap<StateKey, ModuleWriteOp>,
     aggregator_v1_write_set: BTreeMap<StateKey, WriteOp>,
     aggregator_v1_delta_set: BTreeMap<StateKey, DeltaOp>,
     delayed_field_change_set: BTreeMap<DelayedFieldID, DelayedChange<DelayedFieldID>>,
@@ -315,14 +316,14 @@ impl ExpandedVMChangeSetBuilder {
         self
     }
 
-    pub(crate) fn with_module_write_set(
-        mut self,
-        module_write_set: impl IntoIterator<Item = (StateKey, WriteOp)>,
-    ) -> Self {
-        assert!(self.module_write_set.is_empty());
-        self.module_write_set.extend(module_write_set);
-        self
-    }
+    // pub(crate) fn with_module_write_set(
+    //     mut self,
+    //     module_write_set: impl IntoIterator<Item = (StateKey, WriteOp)>,
+    // ) -> Self {
+    //     assert!(self.module_write_set.is_empty());
+    //     self.module_write_set.extend(module_write_set);
+    //     self
+    // }
 
     pub(crate) fn with_aggregator_v1_write_set(
         mut self,

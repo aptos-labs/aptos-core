@@ -37,7 +37,7 @@ pub struct MVHashMap<K, T, V: TransactionWrite, X: Executable, I: Clone> {
     data: VersionedData<K, V>,
     group_data: VersionedGroupData<K, T, V>,
     delayed_fields: VersionedDelayedFields<I>,
-    modules: VersionedModules<K, V, X>,
+    modules: VersionedModules<K, X>,
 }
 
 impl<
@@ -86,7 +86,7 @@ impl<
         &self.delayed_fields
     }
 
-    pub fn modules(&self) -> &VersionedModules<K, V, X> {
+    pub fn modules(&self) -> &VersionedModules<K, X> {
         &self.modules
     }
 }

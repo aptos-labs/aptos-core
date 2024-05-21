@@ -4077,6 +4077,7 @@ dependencies = [
  "serde_json",
  "serde_with",
  "serde_yaml 0.8.26",
+ "sha3 0.9.1",
  "strum 0.24.1",
  "strum_macros 0.24.3",
  "thiserror",
@@ -10983,6 +10984,7 @@ version = "0.1.0"
 dependencies = [
  "anyhow",
  "better_any",
+ "bytes",
  "clap 4.4.14",
  "codespan-reporting",
  "colored",

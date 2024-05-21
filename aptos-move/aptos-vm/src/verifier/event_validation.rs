@@ -121,14 +121,13 @@ pub(crate) fn validate_emit_calls(
 pub(crate) fn extract_event_metadata_from_module(
     session: &mut SessionExt,
     module_id: &ModuleId,
-    deserializer_config: &DeserializerConfig,
+    _deserializer_config: &DeserializerConfig,
 ) -> VMResult<HashSet<String>> {
-    let metadata = session.load_module(module_id).map(|module| {
-        CompiledModule::deserialize_with_config(&module, deserializer_config)
-            .map(|module| aptos_framework::get_metadata_from_compiled_module(&module))
-    });
+    let metadata = session
+        .load_module(module_id)
+        .map(|module| aptos_framework::get_metadata_from_compiled_module(&module));
 
-    if let Ok(Ok(Some(metadata))) = metadata {
+    if let Ok(Some(metadata)) = metadata {
         extract_event_metadata(&metadata)
     } else {
         Ok(HashSet::new())

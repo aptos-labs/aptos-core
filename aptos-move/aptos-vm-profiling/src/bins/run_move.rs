@@ -155,9 +155,7 @@ fn main() -> Result<()> {
 
     let test_modules = compile_test_modules();
     for module in &test_modules {
-        let mut blob = vec![];
-        module.serialize(&mut blob).unwrap();
-        storage.publish_or_overwrite_module(module.self_id(), blob);
+        storage.publish_or_overwrite_module(module.clone());
     }
 
     let mut extensions = NativeContextExtensions::default();

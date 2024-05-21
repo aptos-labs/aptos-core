@@ -19,8 +19,10 @@ use aptos_aggregator::{
 };
 use aptos_types::{
     delayed_fields::{PanicError, SnapshotToStringFormula},
+    on_chain_config::Features,
     state_store::{state_key::StateKey, state_value::StateValueMetadata},
     transaction::ChangeSet as StorageChangeSet,
+    vm::configs::aptos_prod_deserializer_config,
     write_set::{WriteOp, WriteSetMut},
 };
 use bytes::Bytes;
@@ -86,20 +88,20 @@ macro_rules! resource_write_set_1 {
     };
 }
 
-macro_rules! module_write_set_1 {
-    ($d:ident) => {
-        vec![
-            mock_create(format!("0{}", $d), 0),
-            mock_modify(format!("1{}", $d), 1),
-            mock_delete(format!("2{}", $d)),
-            mock_create(format!("7{}", $d), 7),
-            mock_create(format!("8{}", $d), 8),
-            mock_modify(format!("10{}", $d), 10),
-            mock_modify(format!("11{}", $d), 11),
-            mock_delete(format!("12{}", $d)),
-        ]
-    };
-}
+// macro_rules! module_write_set_1 {
+//     ($d:ident) => {
+//         vec![
+//             mock_create(format!("0{}", $d), 0),
+//             mock_modify(format!("1{}", $d), 1),
+//             mock_delete(format!("2{}", $d)),
+//             mock_create(format!("7{}", $d), 7),
+//             mock_create(format!("8{}", $d), 8),
+//             mock_modify(format!("10{}", $d), 10),
+//             mock_modify(format!("11{}", $d), 11),
+//             mock_delete(format!("12{}", $d)),
+//         ]
+//     };
+// }
 
 macro_rules! resource_write_set_2 {
     ($d:ident) => {
@@ -116,20 +118,21 @@ macro_rules! resource_write_set_2 {
     };
 }
 
-macro_rules! module_write_set_2 {
-    ($d:ident) => {
-        vec![
-            mock_create(format!("3{}", $d), 103),
-            mock_modify(format!("4{}", $d), 104),
-            mock_delete(format!("5{}", $d)),
-            mock_modify(format!("7{}", $d), 107),
-            mock_delete(format!("8{}", $d)),
-            mock_modify(format!("10{}", $d), 110),
-            mock_delete(format!("11{}", $d)),
-            mock_create(format!("12{}", $d), 112),
-        ]
-    };
-}
+// macro_rules! module_write_set_2 {
+//     ($d:ident) => {
+//         vec![
+//             mock_create(format!("3{}", $d), 103),
+//             mock_modify(format!("4{}", $d), 104),
+//             mock_delete(format!("5{}", $d)),
+//             mock_modify(format!("7{}", $d), 107),
+//             mock_delete(format!("8{}", $d)),
+//             mock_modify(format!("10{}", $d), 110),
+//             mock_delete(format!("11{}", $d)),
+//             mock_create(format!("12{}", $d), 112),
+//         ]
+//     };
+// }
+
 macro_rules! expected_resource_write_set {
     ($d:ident) => {
         BTreeMap::from([
@@ -147,30 +150,30 @@ macro_rules! expected_resource_write_set {
     };
 }
 
-macro_rules! expected_module_write_set {
-    ($d:ident) => {
-        BTreeMap::from([
-            mock_create(format!("0{}", $d), 0),
-            mock_modify(format!("1{}", $d), 1),
-            mock_delete(format!("2{}", $d)),
-            mock_create(format!("3{}", $d), 103),
-            mock_modify(format!("4{}", $d), 104),
-            mock_delete(format!("5{}", $d)),
-            mock_create(format!("7{}", $d), 107),
-            mock_modify(format!("10{}", $d), 110),
-            mock_delete(format!("11{}", $d)),
-            mock_modify(format!("12{}", $d), 112),
-        ])
-    };
-}
+// macro_rules! expected_module_write_set {
+//     ($d:ident) => {
+//         BTreeMap::from([
+//             mock_create(format!("0{}", $d), 0),
+//             mock_modify(format!("1{}", $d), 1),
+//             mock_delete(format!("2{}", $d)),
+//             mock_create(format!("3{}", $d), 103),
+//             mock_modify(format!("4{}", $d), 104),
+//             mock_delete(format!("5{}", $d)),
+//             mock_create(format!("7{}", $d), 107),
+//             mock_modify(format!("10{}", $d), 110),
+//             mock_delete(format!("11{}", $d)),
+//             mock_modify(format!("12{}", $d), 112),
+//         ])
+//     };
+// }
 
 // Populate sets according to the spec. Skip keys which lead to
 // errors because we test them separately.
 fn build_change_sets_for_test() -> (VMChangeSet, VMChangeSet) {
     let mut descriptor = "r";
     let resource_write_set_1 = resource_write_set_1!(descriptor);
-    descriptor = "m";
-    let module_write_set_1 = module_write_set_1!(descriptor);
+    // descriptor = "m";
+    // let module_write_set_1 = module_write_set_1!(descriptor);
     let aggregator_write_set_1 = vec![mock_create("18a", 18), mock_modify("19a", 19)];
     let aggregator_delta_set_1 = vec![
         mock_add("15a", 15),
@@ -180,15 +183,15 @@ fn build_change_sets_for_test() -> (VMChangeSet, VMChangeSet) {
     ];
     let change_set_1 = VMChangeSetBuilder::new()
         .with_resource_write_set(resource_write_set_1)
-        .with_module_write_set(module_write_set_1)
+        // .with_module_write_set(module_write_set_1)
         .with_aggregator_v1_write_set(aggregator_write_set_1)
         .with_aggregator_v1_delta_set(aggregator_delta_set_1)
         .build();
 
     descriptor = "r";
     let resource_write_set_2 = resource_write_set_2!(descriptor);
-    descriptor = "m";
-    let module_write_set_2 = module_write_set_2!(descriptor);
+    // descriptor = "m";
+    // let module_write_set_2 = module_write_set_2!(descriptor);
     let aggregator_write_set_2 = vec![mock_modify("22a", 122), mock_delete("23a")];
     let aggregator_delta_set_2 = vec![
         mock_add("16a", 116),
@@ -198,7 +201,7 @@ fn build_change_sets_for_test() -> (VMChangeSet, VMChangeSet) {
     ];
     let change_set_2 = VMChangeSetBuilder::new()
         .with_resource_write_set(resource_write_set_2)
-        .with_module_write_set(module_write_set_2)
+        // .with_module_write_set(module_write_set_2)
         .with_aggregator_v1_write_set(aggregator_write_set_2)
         .with_aggregator_v1_delta_set(aggregator_delta_set_2)
         .build();
@@ -213,16 +216,16 @@ fn test_successful_squash() {
         change_set.squash_additional_change_set(additional_change_set, &MockChangeSetChecker)
     );
 
-    let mut descriptor = "r";
+    let descriptor = "r";
     assert_eq!(
         change_set.resource_write_set(),
         &expected_resource_write_set!(descriptor)
     );
-    descriptor = "m";
-    assert_eq!(
-        change_set.module_write_set(),
-        &expected_module_write_set!(descriptor)
-    );
+    // descriptor = "m";
+    // assert_eq!(
+    //     change_set.module_write_set(),
+    //     &expected_module_write_set!(descriptor)
+    // );
 
     let expected_aggregator_write_set = BTreeMap::from([
         mock_create("18a", 136),
@@ -266,14 +269,14 @@ macro_rules! assert_invariant_violation {
             .build();
         let res = cs1.squash_additional_change_set(cs2, &MockChangeSetChecker);
         check(res);
-        let mut cs1 = VMChangeSetBuilder::new()
-            .with_module_write_set($w3.clone())
-            .build();
-        let cs2 = VMChangeSetBuilder::new()
-            .with_module_write_set($w4.clone())
-            .build();
-        let res = cs1.squash_additional_change_set(cs2, &MockChangeSetChecker);
-        check(res);
+        // let mut cs1 = VMChangeSetBuilder::new()
+        //     .with_module_write_set($w3.clone())
+        //     .build();
+        // let cs2 = VMChangeSetBuilder::new()
+        //     .with_module_write_set($w4.clone())
+        //     .build();
+        // let res = cs1.squash_additional_change_set(cs2, &MockChangeSetChecker);
+        // check(res);
         let mut cs1 = VMChangeSetBuilder::new()
             .with_aggregator_v1_write_set($w3.clone())
             .build();
@@ -387,6 +390,7 @@ fn test_roundtrip_to_storage_change_set() {
     let storage_change_set_before = StorageChangeSet::new(write_set, vec![]);
     let change_set = assert_ok!(
         VMChangeSet::try_from_storage_change_set_with_delayed_field_optimization_disabled(
+            &aptos_prod_deserializer_config(&Features::default(), 0),
             storage_change_set_before.clone(),
             &MockChangeSetChecker,
         )

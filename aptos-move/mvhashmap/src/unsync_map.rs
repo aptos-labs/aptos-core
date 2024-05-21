@@ -3,7 +3,6 @@
 
 use crate::{
     types::{GroupReadResult, MVModulesOutput, UnsyncGroupError, ValueWithLayout},
-    utils::module_hash,
     BlockStateStats,
 };
 use aptos_aggregator::types::{code_invariant_error, DelayedFieldValue};
@@ -11,6 +10,7 @@ use aptos_crypto::hash::HashValue;
 use aptos_types::{
     delayed_fields::PanicError,
     executable::{Executable, ExecutableDescriptor, ModulePath},
+    vm::modules::OnChainUnverifiedModule,
     write_set::TransactionWrite,
 };
 use aptos_vm_types::resource_group_adapter::group_size_as_sum;
@@ -43,7 +43,7 @@ pub struct UnsyncMap<
     // simplifies the trait-based integration for executable caching. TODO: better representation.
     resource_map: RefCell<HashMap<K, ValueWithLayout<V>>>,
     // Optional hash can store the hash of the module to avoid re-computations.
-    module_map: RefCell<HashMap<K, (Arc<V>, Option<HashValue>)>>,
+    module_map: RefCell<HashMap<K, (OnChainUnverifiedModule, Option<HashValue>)>>,
     group_cache: RefCell<HashMap<K, RefCell<HashMap<T, ValueWithLayout<V>>>>>,
     executable_cache: RefCell<HashMap<HashValue, Arc<X>>>,
     executable_bytes: RefCell<usize>,
@@ -233,19 +233,19 @@ impl<
         })
     }
 
-    pub fn fetch_module_data(&self, key: &K) -> Option<Arc<V>> {
+    pub fn fetch_module_data(&self, key: &K) -> Option<OnChainUnverifiedModule> {
         self.module_map
             .borrow()
             .get(key)
             .map(|entry| entry.0.clone())
     }
 
-    pub fn fetch_module(&self, key: &K) -> Option<MVModulesOutput<V, X>> {
+    pub fn fetch_module(&self, key: &K) -> Option<MVModulesOutput<X>> {
         use MVModulesOutput::*;
         debug_assert!(key.is_module_path());
 
         self.module_map.borrow_mut().get_mut(key).map(|entry| {
-            let hash = entry.1.get_or_insert(module_hash(entry.0.as_ref()));
+            let hash = entry.1.get_or_insert(HashValue::new(entry.0.hash));
 
             self.executable_cache.borrow().get(hash).map_or_else(
                 || Module((entry.0.clone(), *hash)),
@@ -264,10 +264,9 @@ impl<
             .insert(key, ValueWithLayout::Exchanged(value, layout));
     }
 
-    pub fn write_module(&self, key: K, value: V) {
-        self.module_map
-            .borrow_mut()
-            .insert(key, (Arc::new(value), None));
+    pub fn write_module(&self, key: K, value: OnChainUnverifiedModule) {
+        // TODO: can propagate hashes?
+        self.module_map.borrow_mut().insert(key, (value, None));
     }
 
     pub fn set_base_value(&self, key: K, value: ValueWithLayout<V>) {

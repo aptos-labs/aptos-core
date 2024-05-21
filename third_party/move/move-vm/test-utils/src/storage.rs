@@ -4,15 +4,14 @@
 
 use bytes::Bytes;
 use move_binary_format::{
-    deserializer::DeserializerConfig,
+    access::ModuleAccess,
     errors::{PartialVMError, PartialVMResult},
-    file_format_common::{IDENTIFIER_SIZE_MAX, VERSION_MAX},
     CompiledModule,
 };
 use move_bytecode_utils::compiled_module_viewer::CompiledModuleView;
 use move_core_types::{
     account_address::AccountAddress,
-    effects::{AccountChangeSet, ChangeSet, Op},
+    effects::{AccountChanges, Changes, Op},
     identifier::Identifier,
     language_storage::{ModuleId, StructTag},
     metadata::Metadata,
@@ -25,6 +24,7 @@ use move_table_extension::{TableChangeSet, TableHandle, TableResolver};
 use std::{
     collections::{btree_map, BTreeMap},
     fmt::Debug,
+    sync::Arc,
 };
 
 /// A dummy storage containing no modules or resources.
@@ -39,13 +39,20 @@ impl BlankStorage {
 
 impl ModuleResolver for BlankStorage {
     type Error = PartialVMError;
-    type Module = Bytes;
+    type Module = Arc<CompiledModule>;
 
     fn get_module_metadata(&self, _module_id: &ModuleId) -> Vec<Metadata> {
         vec![]
     }
 
     fn get_module(&self, _module_id: &ModuleId) -> Result<Option<Self::Module>, Self::Error> {
+        Ok(None)
+    }
+
+    fn get_module_info(
+        &self,
+        _module_id: &ModuleId,
+    ) -> Result<Option<(Self::Module, usize, [u8; 32])>, Self::Error> {
         Ok(None)
     }
 }
@@ -81,12 +88,14 @@ impl TableResolver for BlankStorage {
 #[derive(Debug, Clone)]
 pub struct DeltaStorage<'a, 'b, S> {
     base: &'a S,
-    change_set: &'b ChangeSet,
+    change_set: &'b Changes<Arc<CompiledModule>, Bytes>,
 }
 
-impl<'a, 'b, S: ModuleResolver<Module = Bytes>> ModuleResolver for DeltaStorage<'a, 'b, S> {
+impl<'a, 'b, S: ModuleResolver<Module = Arc<CompiledModule>>> ModuleResolver
+    for DeltaStorage<'a, 'b, S>
+{
     type Error = S::Error;
-    type Module = Bytes;
+    type Module = Arc<CompiledModule>;
 
     fn get_module_metadata(&self, _module_id: &ModuleId) -> Vec<Metadata> {
         vec![]
@@ -100,6 +109,13 @@ impl<'a, 'b, S: ModuleResolver<Module = Bytes>> ModuleResolver for DeltaStorage<
         }
 
         self.base.get_module(module_id)
+    }
+
+    fn get_module_info(
+        &self,
+        _module_id: &ModuleId,
+    ) -> Result<Option<(Self::Module, usize, [u8; 32])>, Self::Error> {
+        todo!()
     }
 }
 
@@ -139,8 +155,8 @@ impl<'a, 'b, S: TableResolver> TableResolver for DeltaStorage<'a, 'b, S> {
     }
 }
 
-impl<'a, 'b, S: MoveResolver<PartialVMError>> DeltaStorage<'a, 'b, S> {
-    pub fn new(base: &'a S, delta: &'b ChangeSet) -> Self {
+impl<'a, 'b, S: MoveResolver<Arc<CompiledModule>, PartialVMError>> DeltaStorage<'a, 'b, S> {
+    pub fn new(base: &'a S, delta: &'b Changes<Arc<CompiledModule>, Bytes>) -> Self {
         Self {
             base,
             change_set: delta,
@@ -152,7 +168,7 @@ impl<'a, 'b, S: MoveResolver<PartialVMError>> DeltaStorage<'a, 'b, S> {
 #[derive(Debug, Clone)]
 struct InMemoryAccountStorage {
     resources: BTreeMap<StructTag, Bytes>,
-    modules: BTreeMap<Identifier, Bytes>,
+    modules: BTreeMap<Identifier, Arc<CompiledModule>>,
 }
 
 /// Simple in-memory storage that can be used as a Move VM storage backend for testing purposes.
@@ -164,16 +180,10 @@ pub struct InMemoryStorage {
 }
 
 impl CompiledModuleView for InMemoryStorage {
-    type Item = CompiledModule;
+    type Item = Arc<CompiledModule>;
 
     fn view_compiled_module(&self, id: &ModuleId) -> anyhow::Result<Option<Self::Item>> {
-        Ok(match self.get_module(id)? {
-            Some(bytes) => {
-                let config = DeserializerConfig::new(VERSION_MAX, IDENTIFIER_SIZE_MAX);
-                Some(CompiledModule::deserialize_with_config(&bytes, &config)?)
-            },
-            None => None,
-        })
+        Ok(self.get_module(id)?)
     }
 }
 
@@ -233,7 +243,10 @@ where
 }
 
 impl InMemoryAccountStorage {
-    fn apply(&mut self, account_changeset: AccountChangeSet) -> PartialVMResult<()> {
+    fn apply(
+        &mut self,
+        account_changeset: AccountChanges<Arc<CompiledModule>, Bytes>,
+    ) -> PartialVMResult<()> {
         let (modules, resources) = account_changeset.into_inner();
         apply_changes(&mut self.modules, modules)?;
         apply_changes(&mut self.resources, resources)?;
@@ -251,7 +264,7 @@ impl InMemoryAccountStorage {
 impl InMemoryStorage {
     pub fn apply_extended(
         &mut self,
-        changeset: ChangeSet,
+        changeset: Changes<Arc<CompiledModule>, Bytes>,
         #[cfg(feature = "table-extension")] table_changes: TableChangeSet,
     ) -> PartialVMResult<()> {
         for (addr, account_changeset) in changeset.into_inner() {
@@ -273,7 +286,7 @@ impl InMemoryStorage {
         Ok(())
     }
 
-    pub fn apply(&mut self, changeset: ChangeSet) -> PartialVMResult<()> {
+    pub fn apply(&mut self, changeset: Changes<Arc<CompiledModule>, Bytes>) -> PartialVMResult<()> {
         self.apply_extended(
             changeset,
             #[cfg(feature = "table-extension")]
@@ -310,13 +323,13 @@ impl InMemoryStorage {
         }
     }
 
-    pub fn publish_or_overwrite_module(&mut self, module_id: ModuleId, blob: Vec<u8>) {
-        let account = get_or_insert(&mut self.accounts, *module_id.address(), || {
+    pub fn publish_or_overwrite_module(&mut self, module: CompiledModule) {
+        let account = get_or_insert(&mut self.accounts, *module.address(), || {
             InMemoryAccountStorage::new()
         });
         account
             .modules
-            .insert(module_id.name().to_owned(), blob.into());
+            .insert(module.name().to_owned(), Arc::new(module));
     }
 
     pub fn publish_or_overwrite_resource(
@@ -332,7 +345,7 @@ impl InMemoryStorage {
 
 impl ModuleResolver for InMemoryStorage {
     type Error = PartialVMError;
-    type Module = Bytes;
+    type Module = Arc<CompiledModule>;
 
     fn get_module_metadata(&self, _module_id: &ModuleId) -> Vec<Metadata> {
         vec![]
@@ -343,6 +356,13 @@ impl ModuleResolver for InMemoryStorage {
             return Ok(account_storage.modules.get(module_id.name()).cloned());
         }
         Ok(None)
+    }
+
+    fn get_module_info(
+        &self,
+        _module_id: &ModuleId,
+    ) -> Result<Option<(Self::Module, usize, [u8; 32])>, Self::Error> {
+        todo!()
     }
 }
 

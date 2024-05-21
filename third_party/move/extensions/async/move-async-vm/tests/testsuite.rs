@@ -10,7 +10,7 @@ use move_async_vm::{
     async_vm::{AsyncResult, AsyncSession, AsyncVM, Message},
     natives::GasParameters as ActorGasParameters,
 };
-use move_binary_format::{access::ModuleAccess, errors::PartialVMError};
+use move_binary_format::{access::ModuleAccess, errors::PartialVMError, CompiledModule};
 use move_command_line_common::testing::get_compiler_exp_extension;
 use move_compiler::{
     attr_derivation, compiled_unit::CompiledUnit, diagnostics::report_diagnostics_to_buffer,
@@ -18,7 +18,7 @@ use move_compiler::{
 };
 use move_core_types::{
     account_address::AccountAddress,
-    effects::{ChangeSet, Op},
+    effects::{Changes, Op},
     ident_str,
     identifier::{IdentStr, Identifier},
     language_storage::{ModuleId, StructTag},
@@ -33,6 +33,7 @@ use std::{
     collections::{BTreeMap, BTreeSet, VecDeque},
     path::{Path, PathBuf},
     str::FromStr,
+    sync::Arc,
 };
 
 const TEST_ADDR: &str = "0x3";
@@ -184,7 +185,7 @@ impl Harness {
         }
     }
 
-    fn commit_changeset(&self, changeset: ChangeSet) {
+    fn commit_changeset(&self, changeset: Changes<(Arc<CompiledModule>, Bytes), Bytes>) {
         for (addr, change) in changeset.into_inner() {
             for (struct_tag, op) in change.into_inner().1 {
                 self.log(format!(
@@ -383,18 +384,25 @@ struct HarnessProxy<'a> {
 
 impl<'a> ModuleResolver for HarnessProxy<'a> {
     type Error = PartialVMError;
-    type Module = Bytes;
+    type Module = Arc<CompiledModule>;
 
     fn get_module_metadata(&self, _module_id: &ModuleId) -> Vec<Metadata> {
         vec![]
     }
 
     fn get_module(&self, id: &ModuleId) -> Result<Option<Self::Module>, Self::Error> {
-        Ok(self
-            .harness
-            .module_cache
-            .get(id.name())
-            .map(|c| c.serialize(None).into()))
+        Ok(self.harness.module_cache.get(id.name()).map(|c| {
+            let bytes = c.serialize(None);
+            let module = CompiledModule::deserialize(&bytes).unwrap();
+            Arc::new(module)
+        }))
+    }
+
+    fn get_module_info(
+        &self,
+        _module_id: &ModuleId,
+    ) -> Result<Option<(Self::Module, usize, [u8; 32])>, Self::Error> {
+        todo!()
     }
 }
 

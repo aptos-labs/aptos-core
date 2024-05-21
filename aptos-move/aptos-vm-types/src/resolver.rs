@@ -11,13 +11,20 @@ use aptos_types::{
         state_value::{StateValue, StateValueMetadata},
         StateView, StateViewId,
     },
+    vm::modules::OnChainUnverifiedModule,
     write_set::WriteOp,
 };
 use bytes::Bytes;
-use move_binary_format::errors::{PartialVMError, PartialVMResult};
+use move_binary_format::{
+    errors::{PartialVMError, PartialVMResult},
+    CompiledModule,
+};
 use move_core_types::{language_storage::StructTag, value::MoveTypeLayout, vm_status::StatusCode};
 use move_vm_types::delayed_values::delayed_field_id::DelayedFieldID;
-use std::collections::{BTreeMap, HashMap};
+use std::{
+    collections::{BTreeMap, HashMap},
+    sync::Arc,
+};
 
 /// Allows to query resources from the state.
 pub trait TResourceView {
@@ -148,29 +155,39 @@ pub trait TModuleView {
     ///   -  Ok(None)         if the module is not in storage,
     ///   -  Ok(Some(...))    if the module exists in storage,
     ///   -  Err(...)         otherwise (e.g. storage error).
-    fn get_module_state_value(&self, state_key: &Self::Key) -> PartialVMResult<Option<StateValue>>;
+    fn get_onchain_module(
+        &self,
+        state_key: &Self::Key,
+    ) -> PartialVMResult<Option<OnChainUnverifiedModule>>;
 
-    fn get_module_bytes(&self, state_key: &Self::Key) -> PartialVMResult<Option<Bytes>> {
-        let maybe_state_value = self.get_module_state_value(state_key)?;
-        Ok(maybe_state_value.map(|state_value| state_value.bytes().clone()))
+    fn get_compiled_module(
+        &self,
+        state_key: &Self::Key,
+    ) -> PartialVMResult<Option<Arc<CompiledModule>>> {
+        let module = self.get_onchain_module(state_key)?;
+        Ok(module.map(|m| m.module))
     }
 
     fn get_module_state_value_metadata(
         &self,
         state_key: &Self::Key,
     ) -> PartialVMResult<Option<StateValueMetadata>> {
-        let maybe_state_value = self.get_module_state_value(state_key)?;
-        Ok(maybe_state_value.map(StateValue::into_metadata))
+        let module = self.get_onchain_module(state_key)?;
+        Ok(module.map(|m| m.state_value_metadata))
     }
 
-    fn get_module_state_value_size(&self, state_key: &Self::Key) -> PartialVMResult<Option<u64>> {
-        let maybe_state_value = self.get_module_state_value(state_key)?;
-        Ok(maybe_state_value.map(|state_value| state_value.size() as u64))
+    fn get_module_size_in_bytes(&self, state_key: &Self::Key) -> PartialVMResult<Option<usize>> {
+        let module = self.get_onchain_module(state_key)?;
+        Ok(module.map(|m| m.num_bytes))
+    }
+
+    fn get_module_hash(&self, state_key: &Self::Key) -> PartialVMResult<Option<[u8; 32]>> {
+        let module = self.get_onchain_module(state_key)?;
+        Ok(module.map(|m| m.hash))
     }
 
     fn module_exists(&self, state_key: &Self::Key) -> PartialVMResult<bool> {
-        self.get_module_state_value(state_key)
-            .map(|maybe_state_value| maybe_state_value.is_some())
+        self.get_onchain_module(state_key).map(|m| m.is_some())
     }
 }
 
@@ -264,12 +281,19 @@ where
 {
     type Key = StateKey;
 
-    fn get_module_state_value(&self, state_key: &Self::Key) -> PartialVMResult<Option<StateValue>> {
-        self.get_state_value(state_key).map_err(|e| {
+    fn get_onchain_module(
+        &self,
+        state_key: &Self::Key,
+    ) -> PartialVMResult<Option<OnChainUnverifiedModule>> {
+        let maybe_state_value = self.get_state_value(state_key).map_err(|e| {
             PartialVMError::new(StatusCode::STORAGE_ERROR).with_message(format!(
                 "Unexpected storage error for module at {:?}: {:?}",
                 state_key, e
             ))
+        })?;
+        Ok(match maybe_state_value {
+            Some(state_value) => Some(OnChainUnverifiedModule::from_state_value(state_value)?),
+            None => None,
         })
     }
 }

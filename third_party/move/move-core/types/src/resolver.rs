@@ -28,7 +28,12 @@ pub trait ModuleResolver {
 
     fn get_module_metadata(&self, module_id: &ModuleId) -> Vec<Metadata>;
 
-    fn get_module(&self, id: &ModuleId) -> Result<Option<Self::Module>, Self::Error>;
+    fn get_module(&self, module_id: &ModuleId) -> Result<Option<Self::Module>, Self::Error>;
+
+    fn get_module_info(
+        &self,
+        module_id: &ModuleId,
+    ) -> Result<Option<(Self::Module, usize, [u8; 32])>, Self::Error>;
 }
 
 pub fn resource_size(resource: &Option<Bytes>) -> usize {
@@ -57,8 +62,8 @@ pub trait ResourceResolver {
 }
 
 /// A persistent storage implementation that can resolve both resources and modules
-pub trait MoveResolver<E: Debug>:
-    ModuleResolver<Module = Bytes, Error = E> + ResourceResolver<Error = E>
+pub trait MoveResolver<M, E: Debug>:
+    ModuleResolver<Module = M, Error = E> + ResourceResolver<Error = E>
 {
     fn get_resource(
         &self,
@@ -85,8 +90,9 @@ pub trait MoveResolver<E: Debug>:
 }
 
 impl<
+        M,
         E: Debug,
-        T: ModuleResolver<Module = Bytes, Error = E> + ResourceResolver<Error = E> + ?Sized,
-    > MoveResolver<E> for T
+        T: ModuleResolver<Module = M, Error = E> + ResourceResolver<Error = E> + ?Sized,
+    > MoveResolver<M, E> for T
 {
 }

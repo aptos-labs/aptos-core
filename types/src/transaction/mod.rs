@@ -2050,10 +2050,11 @@ impl TryFrom<Transaction> for SignedTransaction {
     }
 }
 
-/// Trait that defines a transaction type that can be executed by the block executor. A transaction
-/// transaction will write to a key value storage as their side effect.
+/// Trait that defines a transaction type that can be executed by the block executor.
+/// Transactions will write to a key value storage as their side effect.
 pub trait BlockExecutableTransaction: Sync + Send + Clone + 'static {
     type Key: PartialOrd + Ord + Send + Sync + Clone + Hash + Eq + ModulePath + Debug;
+
     /// Some keys contain multiple "resources" distinguished by a tag. Reading these keys requires
     /// specifying a tag, and output requires merging all resources together (Note: this may change
     /// in the future if write-set format changes to be per-resource, could be more performant).
@@ -2068,6 +2069,7 @@ pub trait BlockExecutableTransaction: Sync + Send + Clone + 'static {
         + Debug
         + DeserializeOwned
         + Serialize;
+
     /// Delayed field identifier type.
     type Identifier: PartialOrd
         + Ord
@@ -2085,6 +2087,7 @@ pub trait BlockExecutableTransaction: Sync + Send + Clone + 'static {
         + TryIntoMoveValue
         + TryFromMoveValue<Hint = ()>;
     type Value: Send + Sync + Debug + Clone + TransactionWrite;
+    type Code: Send + Sync + Debug + Clone;
     type Event: Send + Sync + Debug + Clone + TransactionEvent;
 
     /// Size of the user transaction in bytes, 0 otherwise

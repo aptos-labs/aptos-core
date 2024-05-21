@@ -3,10 +3,11 @@
 // SPDX-License-Identifier: Apache-2.0
 
 use crate::compiler::{as_module, compile_units};
-use move_binary_format::errors::VMResult;
+use bytes::Bytes;
+use move_binary_format::{errors::VMResult, CompiledModule};
 use move_core_types::{
     account_address::AccountAddress,
-    effects::ChangeSet,
+    effects::Changes,
     identifier::Identifier,
     language_storage::ModuleId,
     u256::U256,
@@ -16,7 +17,7 @@ use move_core_types::{
 use move_vm_runtime::{module_traversal::*, move_vm::MoveVM, session::SerializedReturnValues};
 use move_vm_test_utils::InMemoryStorage;
 use move_vm_types::gas::UnmeteredGasMeter;
-use std::convert::TryInto;
+use std::{convert::TryInto, sync::Arc};
 
 const TEST_ADDR: AccountAddress = AccountAddress::new([42; AccountAddress::LENGTH]);
 const TEST_MODULE_ID: &str = "M";
@@ -89,7 +90,10 @@ fn run(
     module: &ModuleCode,
     fun_name: &str,
     arg_val0: MoveValue,
-) -> VMResult<(ChangeSet, SerializedReturnValues)> {
+) -> VMResult<(
+    Changes<(Arc<CompiledModule>, Bytes), Bytes>,
+    SerializedReturnValues,
+)> {
     let module_id = &module.0;
     let modules = vec![module.clone()];
     let (vm, storage) = setup_vm(&modules);
@@ -123,17 +127,15 @@ fn setup_vm(modules: &[ModuleCode]) -> (MoveVM, InMemoryStorage) {
 }
 
 fn compile_modules(storage: &mut InMemoryStorage, modules: &[ModuleCode]) {
-    modules.iter().for_each(|(id, code)| {
-        compile_module(storage, id, code);
+    modules.iter().for_each(|(_, code)| {
+        compile_module(storage, code);
     });
 }
 
-fn compile_module(storage: &mut InMemoryStorage, mod_id: &ModuleId, code: &str) {
+fn compile_module(storage: &mut InMemoryStorage, code: &str) {
     let mut units = compile_units(code).unwrap();
     let module = as_module(units.pop().unwrap());
-    let mut blob = vec![];
-    module.serialize(&mut blob).unwrap();
-    storage.publish_or_overwrite_module(mod_id.clone(), blob);
+    storage.publish_or_overwrite_module(module);
 }
 
 fn parse_u64_arg(arg: &[u8]) -> u64 {

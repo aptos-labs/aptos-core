@@ -160,16 +160,13 @@ pub(crate) fn validate_module_and_extract_new_entries(
 pub(crate) fn extract_resource_group_metadata_from_module(
     session: &mut SessionExt,
     module_id: &ModuleId,
-    deserializer_config: &DeserializerConfig,
+    _deserializer_config: &DeserializerConfig,
 ) -> VMResult<(
     BTreeMap<String, ResourceGroupScope>,
     BTreeMap<String, StructTag>,
     BTreeSet<String>,
 )> {
-    let module = session
-        .load_module(module_id)
-        .map(|module| CompiledModule::deserialize_with_config(&module, deserializer_config));
-    let (metadata, module) = if let Ok(Ok(module)) = module {
+    let (metadata, module) = if let Ok(module) = session.load_module(module_id) {
         (
             aptos_framework::get_metadata_from_compiled_module(&module),
             module,

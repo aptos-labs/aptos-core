@@ -6,6 +6,7 @@ use aptos_aggregator::delta_change_set::serialize;
 use aptos_types::{
     on_chain_config::{CurrentTimeMicroseconds, OnChainConfig},
     state_store::{state_key::StateKey, state_value::StateValueMetadata},
+    vm::modules::ModuleWriteOp,
     write_set::WriteOp,
 };
 use aptos_vm_types::{
@@ -13,7 +14,10 @@ use aptos_vm_types::{
     resource_group_adapter::group_tagged_resource_size,
 };
 use bytes::Bytes;
-use move_binary_format::errors::{PartialVMError, PartialVMResult};
+use move_binary_format::{
+    errors::{PartialVMError, PartialVMResult},
+    CompiledModule,
+};
 use move_core_types::{
     effects::Op as MoveStorageOp, language_storage::StructTag, value::MoveTypeLayout,
     vm_status::StatusCode,
@@ -138,8 +142,6 @@ fn check_size_and_existence_match(
 }
 
 impl<'r> WriteOpConverter<'r> {
-    convert_impl!(convert_module, get_module_state_value_metadata);
-
     convert_impl!(convert_aggregator, get_aggregator_v1_state_value_metadata);
 
     pub(crate) fn new(
@@ -159,6 +161,30 @@ impl<'r> WriteOpConverter<'r> {
             remote,
             new_slot_metadata,
         }
+    }
+
+    pub(crate) fn convert_module(
+        &self,
+        state_key: &StateKey,
+        move_storage_op: MoveStorageOp<(Arc<CompiledModule>, Bytes)>,
+        legacy_creation_as_modification: bool,
+    ) -> PartialVMResult<ModuleWriteOp> {
+        let state_value_metadata = self
+            .remote
+            .as_executor_view()
+            .get_module_state_value_metadata(state_key)?;
+
+        let (move_storage_op, module) = match move_storage_op {
+            MoveStorageOp::New((m, bytes)) => (MoveStorageOp::New(bytes), m),
+            MoveStorageOp::Modify((m, bytes)) => (MoveStorageOp::Modify(bytes), m),
+            MoveStorageOp::Delete => unreachable!("Modules cannot be deleted"),
+        };
+        let write_op = self.convert(
+            state_value_metadata,
+            move_storage_op,
+            legacy_creation_as_modification,
+        )?;
+        Ok(ModuleWriteOp { write_op, module })
     }
 
     pub(crate) fn convert_resource(

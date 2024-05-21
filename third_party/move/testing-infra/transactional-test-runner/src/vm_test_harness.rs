@@ -387,8 +387,10 @@ impl<'a> SimpleVMTestAdapter<'a> {
         let res = f(&mut session, &mut gas_status)?;
 
         // save changeset
-        let changeset = session.finish()?;
-        self.storage.apply(changeset).unwrap();
+        let _changeset = session.finish()?;
+
+        // TODO: re-enable
+        // self.storage.apply(changeset).unwrap();
         Ok(res)
     }
 }

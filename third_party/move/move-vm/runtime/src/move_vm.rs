@@ -71,7 +71,7 @@ impl MoveVM {
     ///     and apply the effects to the storage when the Session ends.
     pub fn new_session<'r>(
         &self,
-        remote: &'r impl MoveResolver<PartialVMError>,
+        remote: &'r impl MoveResolver<Arc<CompiledModule>, PartialVMError>,
     ) -> Session<'r, '_> {
         self.new_session_with_extensions(remote, NativeContextExtensions::default())
     }
@@ -79,7 +79,7 @@ impl MoveVM {
     /// Create a new session, as in `new_session`, but provide native context extensions.
     pub fn new_session_with_extensions<'r>(
         &self,
-        remote: &'r impl MoveResolver<PartialVMError>,
+        remote: &'r impl MoveResolver<Arc<CompiledModule>, PartialVMError>,
         native_extensions: NativeContextExtensions<'r>,
     ) -> Session<'r, '_> {
         Session {
@@ -93,10 +93,10 @@ impl MoveVM {
         }
     }
 
-    /// Create a new session, as in `new_session`, but provide native context extensions and custome storage for resolved modules.
+    /// Create a new session, as in `new_session`, but provide native context extensions and custom storage for resolved modules.
     pub fn new_session_with_extensions_and_modules<'r>(
         &self,
-        remote: &'r impl MoveResolver<PartialVMError>,
+        remote: &'r impl MoveResolver<Arc<CompiledModule>, PartialVMError>,
         module_storage: Arc<dyn ModuleStorage>,
         native_extensions: NativeContextExtensions<'r>,
     ) -> Session<'r, '_> {
@@ -115,7 +115,7 @@ impl MoveVM {
     pub fn load_module(
         &self,
         module_id: &ModuleId,
-        remote: &impl MoveResolver<PartialVMError>,
+        remote: &impl MoveResolver<Arc<CompiledModule>, PartialVMError>,
     ) -> VMResult<Arc<CompiledModule>> {
         self.runtime
             .loader()

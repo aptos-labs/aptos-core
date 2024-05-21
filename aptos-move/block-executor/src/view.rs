@@ -28,8 +28,7 @@ use aptos_logger::error;
 use aptos_mvhashmap::{
     types::{
         GroupReadResult, MVDataError, MVDataOutput, MVDelayedFieldsError, MVGroupError,
-        MVModulesError, MVModulesOutput, StorageVersion, TxnIndex, UnknownOrLayout,
-        UnsyncGroupError, ValueWithLayout,
+        StorageVersion, TxnIndex, UnknownOrLayout, UnsyncGroupError, ValueWithLayout,
     },
     unsync_map::UnsyncMap,
     versioned_delayed_fields::TVersionedDelayedFieldView,
@@ -46,6 +45,7 @@ use aptos_types::{
     },
     transaction::BlockExecutableTransaction as Transaction,
     vm::deserialization::Deserializer,
+    vm::modules::OnChainUnverifiedModule,
     write_set::TransactionWrite,
 };
 use aptos_vm_logging::{log_schema::AdapterLogSchema, prelude::*};
@@ -161,7 +161,7 @@ pub(crate) struct ParallelState<'a, T: Transaction, X: Executable> {
     scheduler: &'a Scheduler,
     start_counter: u32,
     counter: &'a AtomicU32,
-    captured_reads: RefCell<CapturedReads<T>>,
+    pub(crate) captured_reads: RefCell<CapturedReads<T>>,
 }
 
 fn get_delayed_field_value_impl<T: Transaction>(
@@ -440,13 +440,13 @@ fn wait_for_dependency(
 
 impl<'a, T: Transaction, X: Executable> ParallelState<'a, T, X> {
     pub(crate) fn new(
-        shared_map: &'a MVHashMap<T::Key, T::Tag, T::Value, X, T::Identifier>,
+        versioned_map: &'a MVHashMap<T::Key, T::Tag, T::Value, X, T::Identifier>,
         shared_scheduler: &'a Scheduler,
         start_shared_counter: u32,
         shared_counter: &'a AtomicU32,
     ) -> Self {
         Self {
-            versioned_map: shared_map,
+            versioned_map,
             scheduler: shared_scheduler,
             start_counter: start_shared_counter,
             counter: shared_counter,
@@ -458,21 +458,6 @@ impl<'a, T: Transaction, X: Executable> ParallelState<'a, T, X> {
         self.versioned_map
             .delayed_fields()
             .set_base_value(id, base_value)
-    }
-
-    // TODO: Actually fill in the logic to record fetched executables, etc.
-    fn fetch_module(
-        &self,
-        key: &T::Key,
-        txn_idx: TxnIndex,
-    ) -> anyhow::Result<MVModulesOutput<T::Value, X>, MVModulesError> {
-        // Record for the R/W path intersection fallback for modules.
-        self.captured_reads
-            .borrow_mut()
-            .module_reads
-            .push(key.clone());
-
-        self.versioned_map.modules().fetch_module(key, txn_idx)
     }
 
     fn read_group_size(
@@ -972,7 +957,7 @@ pub(crate) struct LatestView<
     #[allow(dead_code)]
     env: E,
     pub(crate) latest_view: ViewState<'a, T, X>,
-    txn_idx: TxnIndex,
+    pub(crate) txn_idx: TxnIndex,
 }
 
 impl<'a, T: Transaction, S: TStateView<Key = T::Key>, X: Executable, E: Deserializer>
@@ -1034,7 +1019,10 @@ impl<'a, T: Transaction, S: TStateView<Key = T::Key>, X: Executable, E: Deserial
         }
     }
 
-    fn get_raw_base_value(&self, state_key: &T::Key) -> PartialVMResult<Option<StateValue>> {
+    pub(crate) fn get_raw_base_value(
+        &self,
+        state_key: &T::Key,
+    ) -> PartialVMResult<Option<StateValue>> {
         let ret = self.base_view.get_state_value(state_key).map_err(|e| {
             PartialVMError::new(StatusCode::STORAGE_ERROR).with_message(format!(
                 "Unexpected storage error for {:?}: {:?}",
@@ -1540,41 +1528,11 @@ impl<'a, T: Transaction, S: TStateView<Key = T::Key>, X: Executable, E: Deserial
 {
     type Key = T::Key;
 
-    fn get_module_state_value(&self, state_key: &Self::Key) -> PartialVMResult<Option<StateValue>> {
-        debug_assert!(
-            state_key.is_module_path(),
-            "Reading a resource {:?} using ModuleView",
-            state_key,
-        );
-
-        match &self.latest_view {
-            ViewState::Sync(state) => {
-                use MVModulesError::*;
-                use MVModulesOutput::*;
-
-                match state.fetch_module(state_key, self.txn_idx) {
-                    Ok(Executable(_)) => unreachable!("Versioned executable not implemented"),
-                    Ok(Module((v, _))) => Ok(v.as_state_value()),
-                    Err(Dependency(_)) => {
-                        // Return anything (e.g. module does not exist) to avoid waiting,
-                        // because parallel execution will fall back to sequential anyway.
-                        Ok(None)
-                    },
-                    Err(NotFound) => self.get_raw_base_value(state_key),
-                }
-            },
-            ViewState::Unsync(state) => {
-                state
-                    .read_set
-                    .borrow_mut()
-                    .module_reads
-                    .insert(state_key.clone());
-                state.unsync_map.fetch_module_data(state_key).map_or_else(
-                    || self.get_raw_base_value(state_key),
-                    |v| Ok(v.as_state_value()),
-                )
-            },
-        }
+    fn get_onchain_module(
+        &self,
+        state_key: &Self::Key,
+    ) -> PartialVMResult<Option<OnChainUnverifiedModule>> {
+        self.get_module_state_value_impl(state_key)
     }
 }
 
@@ -1855,6 +1813,7 @@ mod test {
     struct TestTransactionType {}
 
     impl BlockExecutableTransaction for TestTransactionType {
+        type Code = ValueType;
         type Event = MockEvent;
         type Identifier = DelayedFieldID;
         type Key = KeyType<u32>;

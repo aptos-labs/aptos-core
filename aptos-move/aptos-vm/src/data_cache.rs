@@ -4,7 +4,7 @@
 //! Scratchpad for on chain values during the execution.
 
 use crate::{
-    gas::get_gas_config_from_storage,
+    gas::get_gas_feature_version,
     move_vm_ext::{
         resource_state_key, AptosMoveResolver, AsExecutorView, AsResourceGroupView,
         ResourceGroupResolver,
@@ -26,7 +26,6 @@ use aptos_types::{
         state_value::{StateValue, StateValueMetadata},
         StateView, StateViewId,
     },
-    vm::configs::aptos_prod_deserializer_config,
 };
 use aptos_vm_types::{
     resolver::{
@@ -35,7 +34,10 @@ use aptos_vm_types::{
     resource_group_adapter::ResourceGroupAdapter,
 };
 use bytes::Bytes;
-use move_binary_format::{deserializer::DeserializerConfig, errors::*, CompiledModule};
+use move_binary_format::{
+    errors::{PartialVMError, PartialVMResult},
+    CompiledModule,
+};
 use move_core_types::{
     account_address::AccountAddress,
     language_storage::{ModuleId, StructTag},
@@ -69,7 +71,6 @@ pub fn get_resource_group_member_from_metadata(
 /// for (non-group) resources and subsequent handling in the StorageAdapter itself.
 pub struct StorageAdapter<'e, E> {
     executor_view: &'e E,
-    deserializer_config: DeserializerConfig,
     resource_group_view: ResourceGroupAdapter<'e>,
     accessed_groups: RefCell<HashSet<StateKey>>,
 }
@@ -81,7 +82,6 @@ impl<'e, E: ExecutorView> StorageAdapter<'e, E> {
         features: &Features,
         maybe_resource_group_view: Option<&'e dyn ResourceGroupView>,
     ) -> Self {
-        let deserializer_config = aptos_prod_deserializer_config(features);
         let resource_group_adapter = ResourceGroupAdapter::new(
             maybe_resource_group_view,
             executor_view,
@@ -89,17 +89,12 @@ impl<'e, E: ExecutorView> StorageAdapter<'e, E> {
             features.is_resource_groups_split_in_vm_change_set_enabled(),
         );
 
-        Self::new(executor_view, deserializer_config, resource_group_adapter)
+        Self::new(executor_view, resource_group_adapter)
     }
 
-    fn new(
-        executor_view: &'e E,
-        deserializer_config: DeserializerConfig,
-        resource_group_view: ResourceGroupAdapter<'e>,
-    ) -> Self {
+    fn new(executor_view: &'e E, resource_group_view: ResourceGroupAdapter<'e>) -> Self {
         Self {
             executor_view,
-            deserializer_config,
             resource_group_view,
             accessed_groups: RefCell::new(HashSet::new()),
         }
@@ -187,25 +182,30 @@ impl<'e, E: ExecutorView> ResourceResolver for StorageAdapter<'e, E> {
 
 impl<'e, E: ExecutorView> ModuleResolver for StorageAdapter<'e, E> {
     type Error = PartialVMError;
-    type Module = Bytes;
+    type Module = Arc<CompiledModule>;
 
     fn get_module_metadata(&self, module_id: &ModuleId) -> Vec<Metadata> {
-        let module_bytes = match self.get_module(module_id) {
-            Ok(Some(bytes)) => bytes,
-            _ => return vec![],
-        };
-        let module =
-            match CompiledModule::deserialize_with_config(&module_bytes, &self.deserializer_config)
-            {
-                Ok(module) => module,
-                _ => return vec![],
-            };
-        module.metadata
+        let state_key = StateKey::module_id(module_id);
+        match self.executor_view.get_compiled_module(&state_key) {
+            Ok(Some(cm)) => cm.metadata.clone(),
+            _ => vec![],
+        }
     }
 
     fn get_module(&self, module_id: &ModuleId) -> Result<Option<Self::Module>, Self::Error> {
-        self.executor_view
-            .get_module_bytes(&StateKey::module_id(module_id))
+        let state_key = StateKey::module_id(module_id);
+        self.executor_view.get_compiled_module(&state_key)
+    }
+
+    fn get_module_info(
+        &self,
+        module_id: &ModuleId,
+    ) -> Result<Option<(Self::Module, usize, [u8; 32])>, Self::Error> {
+        let state_key = StateKey::module_id(module_id);
+        Ok(self
+            .executor_view
+            .get_onchain_module(&state_key)?
+            .map(|m| (m.module, m.num_bytes, m.hash)))
     }
 }
 
@@ -301,6 +301,7 @@ pub trait AsMoveResolver<S> {
 
 impl<S: StateView> AsMoveResolver<S> for S {
     fn as_move_resolver(&self) -> StorageAdapter<S> {
+<<<<<<< HEAD
         let features = Features::fetch_config(self).unwrap_or_default();
 <<<<<<< HEAD
         let deserializer_config = aptos_prod_deserializer_config(&features);
@@ -309,13 +310,17 @@ impl<S: StateView> AsMoveResolver<S> for S {
 =======
         let deserializer_config = aptos_prod_deserializer_config(&features, gas_feature_version);
 >>>>>>> c98a7ea632 (use prod configs for aptos)
+=======
+        let gas_feature_version = get_gas_feature_version(self);
+        let features = Features::fetch_config(self).unwrap_or_default();
+>>>>>>> 16b25ce618 (module deserialization propagation)
         let resource_group_adapter = ResourceGroupAdapter::new(
             None,
             self,
             gas_feature_version,
             features.is_resource_groups_split_in_vm_change_set_enabled(),
         );
-        StorageAdapter::new(self, deserializer_config, resource_group_adapter)
+        StorageAdapter::new(self, resource_group_adapter)
     }
 }
 
@@ -369,6 +374,7 @@ pub(crate) mod tests {
             gas_feature_version,
             resource_groups_split_in_vm_change_set_enabled,
         );
+<<<<<<< HEAD
 
 <<<<<<< HEAD
         let features = Features::fetch_config(state_view).unwrap_or_default();
@@ -379,5 +385,8 @@ pub(crate) mod tests {
         let deserializer_config = aptos_prod_deserializer_config(&features, gas_feature_version);
 >>>>>>> c98a7ea632 (use prod configs for aptos)
         StorageAdapter::new(state_view, deserializer_config, group_adapter)
+=======
+        StorageAdapter::new(state_view, group_adapter)
+>>>>>>> 16b25ce618 (module deserialization propagation)
     }
 }

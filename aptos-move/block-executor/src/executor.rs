@@ -908,7 +908,7 @@ where
                         &final_results,
                     ) {
                         // If there are multiple errors, they all get logged:
-                        // ModulePathReadWriteError and FatalVMErrorvariant is logged at construction,
+                        // ModulePathReadWriteError and FatalVMError variant is logged at construction,
                         // and below we log CodeInvariantErrors.
                         if let PanicOr::CodeInvariantError(err_msg) = err {
                             alert!("[BlockSTM] worker loop: CodeInvariantError({:?})", err_msg);

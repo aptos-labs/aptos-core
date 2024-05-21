@@ -14,7 +14,10 @@ use aptos_table_natives::{NativeTableContext, TableChangeSet};
 use aptos_types::{contract_event::ContractEvent, state_store::state_key::StateKey};
 use aptos_vm_types::{change_set::VMChangeSet, storage::change_set_configs::ChangeSetConfigs};
 use bytes::Bytes;
-use move_binary_format::errors::{Location, PartialVMError, PartialVMResult, VMResult};
+use move_binary_format::{
+    errors::{Location, PartialVMError, PartialVMResult, VMResult},
+    CompiledModule,
+};
 use move_core_types::{
     effects::{AccountChanges, Changes, Op as MoveStorageOp},
     language_storage::StructTag,
@@ -40,8 +43,8 @@ pub(crate) enum ResourceGroupChangeSet {
     // Granular ops to individual resources within a group.
     V1(BTreeMap<StateKey, BTreeMap<StructTag, MoveStorageOp<BytesWithResourceLayout>>>),
 }
-type AccountChangeSet = AccountChanges<Bytes, BytesWithResourceLayout>;
-type ChangeSet = Changes<Bytes, BytesWithResourceLayout>;
+type AccountChangeSet = AccountChanges<(Arc<CompiledModule>, Bytes), BytesWithResourceLayout>;
+type ChangeSet = Changes<(Arc<CompiledModule>, Bytes), BytesWithResourceLayout>;
 pub type BytesWithResourceLayout = (Bytes, Option<Arc<MoveTypeLayout>>);
 
 pub struct SessionExt<'r, 'l> {
@@ -326,9 +329,9 @@ impl<'r, 'l> SessionExt<'r, 'l> {
                 resource_write_set.insert(state_key, op);
             }
 
-            for (name, blob_op) in modules {
+            for (name, op) in modules {
                 let state_key = StateKey::module(&addr, &name);
-                let op = woc.convert_module(&state_key, blob_op, false)?;
+                let op = woc.convert_module(&state_key, op, false)?;
                 module_write_set.insert(state_key, op);
             }
         }

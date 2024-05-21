@@ -8,13 +8,14 @@ use crate::{
 };
 use bytes::Bytes;
 use move_binary_format::{
+    access::ModuleAccess,
     deserializer::DeserializerConfig,
     errors::*,
     file_format::{CompiledModule, CompiledScript},
 };
 use move_core_types::{
     account_address::AccountAddress,
-    effects::{AccountChanges, ChangeSet, Changes, Op},
+    effects::{AccountChanges, Changes, Op},
     gas_algebra::NumBytes,
     identifier::Identifier,
     language_storage::{ModuleId, TypeTag},
@@ -38,7 +39,7 @@ pub struct AccountDataCache {
     // The bool flag in the `data_map` indicates whether the resource contains
     // an aggregator or snapshot.
     data_map: BTreeMap<Type, (MoveTypeLayout, GlobalValue, bool)>,
-    module_map: BTreeMap<Identifier, (Bytes, bool)>,
+    module_map: BTreeMap<Identifier, ((Arc<CompiledModule>, Bytes), bool)>,
 }
 
 impl AccountDataCache {
@@ -51,16 +52,21 @@ impl AccountDataCache {
 }
 
 fn load_module_impl(
-    remote: &dyn MoveResolver<PartialVMError>,
+    remote: &dyn MoveResolver<Arc<CompiledModule>, PartialVMError>,
     account_map: &BTreeMap<AccountAddress, AccountDataCache>,
     module_id: &ModuleId,
-) -> PartialVMResult<Bytes> {
+) -> PartialVMResult<(Arc<CompiledModule>, usize, [u8; 32])> {
     if let Some(account_cache) = account_map.get(module_id.address()) {
-        if let Some((blob, _is_republishing)) = account_cache.module_map.get(module_id.name()) {
-            return Ok(blob.clone());
+        if let Some(((m, b), _is_republishing)) = account_cache.module_map.get(module_id.name()) {
+            // TODO: Remove this once we kill this local cache.
+            let mut sha3_256 = Sha3_256::new();
+            sha3_256.update(b);
+            let hash_value: [u8; 32] = sha3_256.finalize().into();
+
+            return Ok((m.clone(), b.len(), hash_value));
         }
     }
-    remote.get_module(module_id)?.ok_or_else(|| {
+    remote.get_module_info(module_id)?.ok_or_else(|| {
         PartialVMError::new(StatusCode::LINKER_ERROR)
             .with_message(format!("Linker Error: Module {} doesn't exist", module_id))
     })
@@ -80,7 +86,7 @@ fn load_module_impl(
 /// for a data store related to a transaction. Clients should create an instance of this type
 /// and pass it to the Move VM.
 pub(crate) struct TransactionDataCache<'r> {
-    remote: &'r dyn MoveResolver<PartialVMError>,
+    remote: &'r dyn MoveResolver<Arc<CompiledModule>, PartialVMError>,
     account_map: BTreeMap<AccountAddress, AccountDataCache>,
 
     deserializer_config: DeserializerConfig,
@@ -95,7 +101,7 @@ impl<'r> TransactionDataCache<'r> {
     /// not updated in the transaction.
     pub(crate) fn new(
         deserializer_config: DeserializerConfig,
-        remote: &'r impl MoveResolver<PartialVMError>,
+        remote: &'r impl MoveResolver<Arc<CompiledModule>, PartialVMError>,
     ) -> Self {
         TransactionDataCache {
             remote,
@@ -110,7 +116,10 @@ impl<'r> TransactionDataCache<'r> {
     /// published modules.
     ///
     /// Gives all proper guarantees on lifetime of global data as well.
-    pub(crate) fn into_effects(self, loader: &Loader) -> PartialVMResult<ChangeSet> {
+    pub(crate) fn into_effects(
+        self,
+        loader: &Loader,
+    ) -> PartialVMResult<Changes<(Arc<CompiledModule>, Bytes), Bytes>> {
         let resource_converter =
             |value: Value, layout: MoveTypeLayout, _: bool| -> PartialVMResult<Bytes> {
                 value
@@ -130,8 +139,8 @@ impl<'r> TransactionDataCache<'r> {
         self,
         resource_converter: &dyn Fn(Value, MoveTypeLayout, bool) -> PartialVMResult<Resource>,
         loader: &Loader,
-    ) -> PartialVMResult<Changes<Bytes, Resource>> {
-        let mut change_set = Changes::<Bytes, Resource>::new();
+    ) -> PartialVMResult<Changes<(Arc<CompiledModule>, Bytes), Resource>> {
+        let mut change_set = Changes::<(Arc<CompiledModule>, Bytes), Resource>::new();
         for (addr, account_data_cache) in self.account_map.into_iter() {
             let mut modules = BTreeMap::new();
             for (module_name, (module_blob, is_republishing)) in account_data_cache.module_map {
@@ -277,8 +286,8 @@ impl<'r> TransactionDataCache<'r> {
         ))
     }
 
-    pub(crate) fn load_module(&self, module_id: &ModuleId) -> PartialVMResult<Bytes> {
-        load_module_impl(self.remote, &self.account_map, module_id)
+    pub(crate) fn load_module(&self, module_id: &ModuleId) -> PartialVMResult<Arc<CompiledModule>> {
+        Ok(load_module_impl(self.remote, &self.account_map, module_id)?.0)
     }
 
     pub(crate) fn load_compiled_script_to_cache(
@@ -317,53 +326,37 @@ impl<'r> TransactionDataCache<'r> {
             btree_map::Entry::Occupied(entry) => Ok(entry.get().clone()),
             btree_map::Entry::Vacant(entry) => {
                 // bytes fetching, allow loading to fail if the flag is set
-                let bytes = match load_module_impl(self.remote, &self.account_map, entry.key())
-                    .map_err(|err| err.finish(Location::Undefined))
-                {
-                    Ok(bytes) => bytes,
-                    Err(err) if allow_loading_failure => return Err(err),
-                    Err(err) => {
-                        return Err(expect_no_verification_errors(err));
-                    },
-                };
+                let (module, size, h) =
+                    match load_module_impl(self.remote, &self.account_map, entry.key())
+                        .map_err(|err| err.finish(Location::Undefined))
+                    {
+                        Ok(module) => module,
+                        Err(err) if allow_loading_failure => return Err(err),
+                        Err(err) => {
+                            return Err(expect_no_verification_errors(err));
+                        },
+                    };
 
-                let mut sha3_256 = Sha3_256::new();
-                sha3_256.update(&bytes);
-                let hash_value: [u8; 32] = sha3_256.finalize().into();
-
-                // for bytes obtained from the data store, they should always deserialize and verify.
-                // It is an invariant violation if they don't.
-                let module =
-                    CompiledModule::deserialize_with_config(&bytes, &self.deserializer_config)
-                        .map_err(|err| {
-                            let msg = format!("Deserialization error: {:?}", err);
-                            PartialVMError::new(StatusCode::CODE_DESERIALIZATION_ERROR)
-                                .with_message(msg)
-                                .finish(Location::Module(entry.key().clone()))
-                        })
-                        .map_err(expect_no_verification_errors)?;
-
-                Ok(entry
-                    .insert((Arc::new(module), bytes.len(), hash_value))
-                    .clone())
+                Ok(entry.insert((module, size, h)).clone())
             },
         }
     }
 
     pub(crate) fn publish_module(
         &mut self,
-        module_id: &ModuleId,
-        blob: Vec<u8>,
+        module: CompiledModule,
+        blob: Bytes,
         is_republishing: bool,
     ) -> VMResult<()> {
         let account_cache =
-            Self::get_mut_or_insert_with(&mut self.account_map, module_id.address(), || {
-                (*module_id.address(), AccountDataCache::new())
+            Self::get_mut_or_insert_with(&mut self.account_map, module.address(), || {
+                (*module.address(), AccountDataCache::new())
             });
 
-        account_cache
-            .module_map
-            .insert(module_id.name().to_owned(), (blob.into(), is_republishing));
+        account_cache.module_map.insert(
+            module.name().to_owned(),
+            ((Arc::new(module), blob), is_republishing),
+        );
 
         Ok(())
     }

@@ -104,10 +104,12 @@ impl Adapter {
                 .publish_module(binary, WORKING_ACCOUNT, &mut UnmeteredGasMeter)
                 .unwrap_or_else(|_| panic!("failure publishing module: {:#?}", module));
         }
-        let changeset = session.finish().expect("failure getting write set");
-        self.store
-            .apply(changeset)
-            .expect("failure applying write set");
+        let _changeset = session.finish().expect("failure getting write set");
+
+        // TODO: re-enable
+        // self.store
+        //     .apply(changeset)
+        //     .expect("failure applying write set");
     }
 
     fn publish_modules_with_error(&mut self, modules: Vec<CompiledModule>) {

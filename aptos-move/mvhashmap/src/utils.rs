@@ -4,6 +4,8 @@
 use aptos_crypto::hash::{DefaultHasher, HashValue};
 use aptos_types::write_set::TransactionWrite;
 
+// TODO: do we need this? On chain code stores the hash.
+#[allow(dead_code)]
 pub(crate) fn module_hash<V: TransactionWrite>(module: &V) -> HashValue {
     module
         .extract_raw_bytes()

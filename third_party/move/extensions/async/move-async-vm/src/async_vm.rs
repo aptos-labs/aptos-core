@@ -8,10 +8,14 @@ use crate::{
     natives,
     natives::{AsyncExtension, GasParameters as ActorGasParameters},
 };
-use move_binary_format::errors::{Location, PartialVMError, PartialVMResult, VMError, VMResult};
+use bytes::Bytes;
+use move_binary_format::{
+    errors::{Location, PartialVMError, PartialVMResult, VMError, VMResult},
+    CompiledModule,
+};
 use move_core_types::{
     account_address::AccountAddress,
-    effects::{ChangeSet, Op},
+    effects::{Changes, Op},
     identifier::Identifier,
     language_storage::{ModuleId, StructTag, TypeTag},
     resolver::MoveResolver,
@@ -30,6 +34,7 @@ use std::{
     collections::HashMap,
     error::Error,
     fmt::{Debug, Display, Formatter},
+    sync::Arc,
 };
 
 /// Represents an instance of an async VM.
@@ -82,7 +87,7 @@ impl AsyncVM {
         &'l self,
         for_actor: AccountAddress,
         virtual_time: u128,
-        move_resolver: &'r mut impl MoveResolver<PartialVMError>,
+        move_resolver: &'r mut impl MoveResolver<Arc<CompiledModule>, PartialVMError>,
     ) -> AsyncSession<'r, 'l> {
         self.new_session_with_extensions(
             for_actor,
@@ -97,7 +102,7 @@ impl AsyncVM {
         &'l self,
         for_actor: AccountAddress,
         virtual_time: u128,
-        move_resolver: &'r mut impl MoveResolver<PartialVMError>,
+        move_resolver: &'r mut impl MoveResolver<Arc<CompiledModule>, PartialVMError>,
         ext: NativeContextExtensions<'r>,
     ) -> AsyncSession<'r, 'l> {
         let extensions = make_extensions(ext, for_actor, virtual_time, true);
@@ -141,7 +146,7 @@ pub type Message = (AccountAddress, u64, Vec<Vec<u8>>);
 
 /// A structure to represent success for the execution of an async session operation.
 pub struct AsyncSuccess<'r> {
-    pub change_set: ChangeSet,
+    pub change_set: Changes<(Arc<CompiledModule>, Bytes), Bytes>,
     pub messages: Vec<Message>,
     pub gas_used: Gas,
     pub ext: NativeContextExtensions<'r>,
@@ -379,7 +384,7 @@ fn make_extensions(
 }
 
 fn publish_actor_state(
-    change_set: &mut ChangeSet,
+    change_set: &mut Changes<(Arc<CompiledModule>, Bytes), Bytes>,
     actor_addr: AccountAddress,
     state_tag: StructTag,
     state: Vec<u8>,

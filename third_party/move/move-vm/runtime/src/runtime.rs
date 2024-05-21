@@ -197,7 +197,7 @@ impl VMRuntime {
         // all the checks, then the whole bundle can be published/upgraded together. Otherwise,
         // none of the module can be published/updated.
 
-        // All modules verified, publish them to data cache
+        // All modules verified, publish them.
         for (module, blob) in compiled_modules.into_iter().zip(modules.into_iter()) {
             let is_republishing = data_store.exists_module(&module.self_id())?;
             if is_republishing {
@@ -205,7 +205,7 @@ impl VMRuntime {
                 // old module.
                 self.loader.mark_as_invalid();
             }
-            data_store.publish_module(&module.self_id(), blob, is_republishing)?;
+            data_store.publish_module(module, blob.into(), is_republishing)?;
         }
         Ok(())
     }
