@@ -279,14 +279,14 @@ where
     let mut rng = ark_std::rand::rngs::StdRng::seed_from_u64(test_rng().next_u64());
 
     //let (pk, vk) = Groth16Simulator::<E>::circuit_specific_setup_with_trapdoor(MySillyCircuit { a: None, b: None }, &mut rng).unwrap();
-    let (pk, vk) = Groth16Simulator::<E>::circuit_specific_setup_with_trapdoor(circom, &mut rng).unwrap();
+    let (pk, vk) = Groth16Simulator::<E>::circuit_specific_setup_with_trapdoor(circom.clone(), &mut rng).unwrap();
     let pvk = prepare_verifying_key::<E>(&vk);
 
     for _ in 0..n_iters {
-        let a = E::ScalarField::from(3);//rand(&mut rng);
+        /*let a = E::ScalarField::from(3);//rand(&mut rng);
         let b = E::ScalarField::from(4);//rand(&mut rng);
         let mut c = a;
-        c *= b;
+        c *= b;*/
 
         /*let proof = Groth16Simulator::<E>::prove_with_trapdoor(
             &pk,
@@ -296,10 +296,17 @@ where
             },
             &mut rng,
         )
+        .unwrap();*/
+
+        let proof = Groth16Simulator::<E>::prove_with_trapdoor(
+            &pk,
+            circom.clone(),
+            &mut rng,
+        )
         .unwrap();
 
         assert!(Groth16::<E>::verify_with_processed_vk(&pvk, &[c], &proof).unwrap());
-        assert!(!Groth16::<E>::verify_with_processed_vk(&pvk, &[a], &proof).unwrap());*/
+        assert!(!Groth16::<E>::verify_with_processed_vk(&pvk, &[a], &proof).unwrap());
     }
 }
 
