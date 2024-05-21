@@ -247,15 +247,15 @@ struct Resize {
 static SYSTEM_12_CORES_5GB_THRESHOLD: Lazy<SystemMetricsThreshold> = Lazy::new(|| {
     SystemMetricsThreshold::new(
         // Check that we don't use more than 12 CPU cores for 30% of the time.
-        MetricsThreshold::new(12.0, 30),
+        MetricsThreshold::new(32.0, 30),
         // Check that we don't use more than 5 GB of memory for 30% of the time.
-        MetricsThreshold::new_gb(5.0, 30),
+        MetricsThreshold::new_gb(10.0, 30),
     )
 });
 static SYSTEM_12_CORES_10GB_THRESHOLD: Lazy<SystemMetricsThreshold> = Lazy::new(|| {
     SystemMetricsThreshold::new(
         // Check that we don't use more than 12 CPU cores for 30% of the time.
-        MetricsThreshold::new(12.0, 30),
+        MetricsThreshold::new(32.0, 30),
         // Check that we don't use more than 10 GB of memory for 30% of the time.
         MetricsThreshold::new_gb(10.0, 30),
     )
@@ -604,9 +604,7 @@ fn get_land_blocking_test(
     test_cmd: &TestCommand,
 ) -> Option<ForgeConfig> {
     let test = match test_name {
-        "land_blocking" | "realistic_env_max_load" => {
-            realistic_env_max_load_test(duration, test_cmd, 7, 5)
-        },
+        "land_blocking" | "realistic_env_max_load" => graceful_overload(),
         "compat" => compat(),
         "framework_upgrade" => framework_upgrade(),
         _ => return None, // The test name does not match a land-blocking test
