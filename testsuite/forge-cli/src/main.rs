@@ -669,7 +669,7 @@ fn get_pfn_test(test_name: &str, duration: Duration) -> Option<ForgeConfig> {
             pfn_performance(duration, false, true, false, 7, 1, false)
         },
         "pfn_performance_with_realistic_env" => {
-            pfn_performance(duration, true, true, false, 7, 1, false)
+            pfn_performance(duration, true, true, false, 100, 7, false)
         },
         "pfn_spam_duplicates" => pfn_performance(duration, true, true, true, 7, 7, true),
         _ => return None, // The test name does not match a PFN test
@@ -2529,6 +2529,13 @@ fn pfn_performance(
     ForgeConfig::default()
         .with_initial_validator_count(NonZeroUsize::new(num_validators).unwrap())
         .with_initial_fullnode_count(num_validators)
+        .with_validator_override_node_config_fn(Arc::new(|config, _| {
+            config.consensus_observer.publisher_enabled = true
+        }))
+        .with_fullnode_override_node_config_fn(Arc::new(|config, _| {
+            config.consensus_observer.observer_enabled = true
+        }))
+        .with_emit_job(EmitJobRequest::default().mode(EmitJobMode::ConstTps { tps: 5000 }))
         .add_network_test(PFNPerformance::new(
             num_pfns as u64,
             add_cpu_chaos,
