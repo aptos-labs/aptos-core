@@ -146,7 +146,7 @@ impl SafetyRules {
         updated
     }
 
-    pub(crate) fn observe_highest_timeout_round(
+    pub(crate) fn update_highest_timeout_round(
         &self,
         timeout: &TwoChainTimeout,
         safety_data: &mut SafetyData,

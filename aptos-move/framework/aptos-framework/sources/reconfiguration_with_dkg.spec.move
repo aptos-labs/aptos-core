@@ -56,6 +56,7 @@ spec aptos_framework::reconfiguration_with_dkg {
         include config_buffer::OnNewEpochRequirement<jwks::SupportedOIDCProviders>;
         include config_buffer::OnNewEpochRequirement<randomness_config::RandomnessConfig>;
         include config_buffer::OnNewEpochRequirement<randomness_config_seqnum::RandomnessConfigSeqNum>;
+        include config_buffer::OnNewEpochRequirement<randomness_api_v0_config::AllowCustomMaxGasFlag>;
         include config_buffer::OnNewEpochRequirement<randomness_api_v0_config::RequiredGasDeposit>;
         include config_buffer::OnNewEpochRequirement<jwk_consensus_config::JWKConsensusConfig>;
         include config_buffer::OnNewEpochRequirement<keyless_account::Configuration>;

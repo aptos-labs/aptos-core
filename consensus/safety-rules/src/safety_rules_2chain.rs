@@ -41,9 +41,9 @@ impl SafetyRules {
         }
         if timeout.round() > safety_data.last_voted_round {
             self.verify_and_update_last_vote_round(timeout.round(), &mut safety_data)?;
-            self.observe_highest_timeout_round(timeout, &mut safety_data);
-            self.persistent_storage.set_safety_data(safety_data)?;
         }
+        self.update_highest_timeout_round(timeout, &mut safety_data);
+        self.persistent_storage.set_safety_data(safety_data)?;
 
         let signature = self.sign(&timeout.signing_format())?;
         Ok(signature)
@@ -81,9 +81,6 @@ impl SafetyRules {
 
         // Record 1-chain data
         self.observe_qc(proposed_block.quorum_cert(), &mut safety_data);
-        if let Some(tc) = timeout_cert {
-            self.observe_highest_timeout_round(tc.timeout(), &mut safety_data);
-        }
         // Construct and sign vote
         let author = self.signer()?.author();
         let ledger_info = self.construct_ledger_info_2chain(proposed_block, vote_data.hash())?;

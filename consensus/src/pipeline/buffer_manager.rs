@@ -368,13 +368,13 @@ impl BufferManager {
                 // TODO: As all the validators broadcast commit votes directly to all other validators,
                 // the proposer do not have to broadcast commit decision again. Remove this if block.
                 // if we're the proposer for the block, we're responsible to broadcast the commit decision.
-                if block.author() == Some(self.author) {
-                    let commit_decision = CommitMessage::Decision(CommitDecision::new(
-                        aggregated_item.commit_proof.clone(),
-                    ));
-                    self.commit_proof_rb_handle
-                        .replace(self.do_reliable_broadcast(commit_decision));
-                }
+                // if block.author() == Some(self.author) {
+                //     let commit_decision = CommitMessage::Decision(CommitDecision::new(
+                //         aggregated_item.commit_proof.clone(),
+                //     ));
+                //     self.commit_proof_rb_handle
+                //         .replace(self.do_reliable_broadcast(commit_decision));
+                // }
                 let commit_proof = aggregated_item.commit_proof.clone();
                 if commit_proof.ledger_info().ends_epoch() {
                     // the epoch ends, reset to avoid executing more blocks, execute after
@@ -572,7 +572,7 @@ impl BufferManager {
                 // find the corresponding item
                 let author = vote.author();
                 let commit_info = vote.commit_info().clone();
-                info!("Receive commit vote {} from {}", commit_info, author);
+                info!("Receive commit vote {} from {}", vote.ledger_info(), author);
                 let target_block_id = vote.commit_info().id();
                 let current_cursor = self
                     .buffer
@@ -611,10 +611,7 @@ impl BufferManager {
             },
             CommitMessage::Decision(commit_proof) => {
                 let target_block_id = commit_proof.ledger_info().commit_info().id();
-                info!(
-                    "Receive commit decision {}",
-                    commit_proof.ledger_info().commit_info()
-                );
+                info!("Receive commit decision {}", commit_proof.ledger_info());
                 let cursor = self
                     .buffer
                     .find_elem_by_key(*self.buffer.head_cursor(), target_block_id);

@@ -756,13 +756,10 @@ impl CompiledPackage {
                 flags = flags.set_skip_attribute_checks(true)
             }
 
-            let model = match (
-                resolution_graph.build_options.generate_docs,
-                resolution_graph.build_options.generate_abis,
-                optional_global_env,
-            ) {
-                (false, false, Some(env)) => env, // Use V2 generated model if not for docgen or abigen
-                _ => run_model_builder_with_options_and_compilation_flags(
+            let model = if let Some(env) = optional_global_env {
+                env
+            } else {
+                run_model_builder_with_options_and_compilation_flags(
                     // Otherwise, use V1 generated model
                     vec![sources_package_paths],
                     vec![],
@@ -770,7 +767,7 @@ impl CompiledPackage {
                     ModelBuilderOptions::default(),
                     flags,
                     &known_attributes,
-                )?,
+                )?
             };
 
             if resolution_graph.build_options.generate_docs {

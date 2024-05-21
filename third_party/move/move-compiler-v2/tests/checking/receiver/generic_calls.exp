@@ -6,6 +6,10 @@ module 0x42::m {
     private fun id<T>(self: m::S<#0>): m::S<#0> {
         self
     }
+    private inline fun inlined<T>(f: |m::S<#0>|m::S<#0>,s: m::S<#0>) {
+        (f)(s);
+        Tuple()
+    }
     private fun receiver<T>(self: m::S<#0>,y: #0) {
         select m::S.x<m::S<T>>(self) = y;
         Tuple()

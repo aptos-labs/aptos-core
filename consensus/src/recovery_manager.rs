@@ -33,6 +33,7 @@ pub struct RecoveryManager {
     last_committed_round: Round,
     max_blocks_to_request: u64,
     payload_manager: Arc<PayloadManager>,
+    order_vote_enabled: bool,
 }
 
 impl RecoveryManager {
@@ -44,6 +45,7 @@ impl RecoveryManager {
         last_committed_round: Round,
         max_blocks_to_request: u64,
         payload_manager: Arc<PayloadManager>,
+        order_vote_enabled: bool,
     ) -> Self {
         RecoveryManager {
             epoch_state,
@@ -53,6 +55,7 @@ impl RecoveryManager {
             last_committed_round,
             max_blocks_to_request,
             payload_manager,
+            order_vote_enabled,
         }
     }
 
@@ -93,11 +96,11 @@ impl RecoveryManager {
         let recovery_data = BlockStore::fast_forward_sync(
             sync_info.highest_quorum_cert(),
             sync_info.highest_commit_cert(),
-            &sync_info.highest_ordered_cert(),
             &mut retriever,
             self.storage.clone(),
             self.execution_client.clone(),
             self.payload_manager.clone(),
+            self.order_vote_enabled,
         )
         .await?;
 

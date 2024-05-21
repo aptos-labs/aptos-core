@@ -85,13 +85,11 @@ impl ConsensusDB {
     ) -> Result<(
         Option<Vec<u8>>,
         Option<Vec<u8>>,
-        Option<Vec<u8>>,
         Vec<Block>,
         Vec<QuorumCert>,
     )> {
         let last_vote = self.get_last_vote()?;
         let highest_2chain_timeout_certificate = self.get_highest_2chain_timeout_certificate()?;
-        let highest_ordered_cert = self.get_highest_ordered_cer()?;
         let consensus_blocks = self
             .get_all::<BlockSchema>()?
             .into_iter()
@@ -105,7 +103,6 @@ impl ConsensusDB {
         Ok((
             last_vote,
             highest_2chain_timeout_certificate,
-            highest_ordered_cert,
             consensus_blocks,
             consensus_qcs,
         ))
@@ -128,13 +125,9 @@ impl ConsensusDB {
         &self,
         block_data: Vec<Block>,
         qc_data: Vec<QuorumCert>,
-        highest_ordered_cert: Option<Vec<u8>>,
     ) -> Result<(), DbError> {
-        if block_data.is_empty() && qc_data.is_empty() && highest_ordered_cert.is_none() {
-            return Err(anyhow::anyhow!(
-                "Consensus block is empty, qc data and highest ordered cert are empty!"
-            )
-            .into());
+        if block_data.is_empty() && qc_data.is_empty() {
+            return Err(anyhow::anyhow!("Consensus blocks and qc data are empty!").into());
         }
         let batch = SchemaBatch::new();
         block_data
@@ -143,9 +136,6 @@ impl ConsensusDB {
         qc_data
             .iter()
             .try_for_each(|qc| batch.put::<QCSchema>(&qc.certified_block().id(), qc))?;
-        if let Some(cert) = highest_ordered_cert {
-            batch.put::<SingleEntrySchema>(&SingleEntryKey::HighestOrderedCert, &cert)?;
-        }
         self.commit(batch)
     }
 
@@ -176,13 +166,6 @@ impl ConsensusDB {
         Ok(self
             .db
             .get::<SingleEntrySchema>(&SingleEntryKey::Highest2ChainTimeoutCert)?)
-    }
-
-    /// Get the highest ordered certificate
-    fn get_highest_ordered_cer(&self) -> Result<Option<Vec<u8>>, DbError> {
-        Ok(self
-            .db
-            .get::<SingleEntrySchema>(&SingleEntryKey::HighestOrderedCert)?)
     }
 
     pub fn delete_highest_2chain_timeout_certificate(&self) -> Result<(), DbError> {

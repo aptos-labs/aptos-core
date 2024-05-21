@@ -34,12 +34,12 @@ use aptos_types::{
     mempool_status::MempoolStatusCode,
     transaction::{
         EntryFunction, ExecutionStatus, MultisigTransactionPayload, RawTransaction,
-        RawTransactionWithData, SignedTransaction, TransactionPayload, TransactionStatus,
+        RawTransactionWithData, SignedTransaction, TransactionPayload,
     },
     vm_status::StatusCode,
     APTOS_COIN_TYPE,
 };
-use aptos_vm::{data_cache::AsMoveResolver, AptosSimulationVM, AptosVM};
+use aptos_vm::{AptosSimulationVM, AptosVM};
 use move_core_types::{ident_str, language_storage::ModuleId, vm_status::VMStatus};
 use poem_openapi::{
     param::{Path, Query},
@@ -891,12 +891,11 @@ impl TransactionsApi {
         match accept_type {
             AcceptType::Json => {
                 let state_view = self.context.latest_state_view_poem(ledger_info)?;
-                let resolver = state_view.as_move_resolver();
                 let transaction = match transaction_data {
                     TransactionData::OnChain(txn) => {
                         let timestamp =
                             self.context.get_block_timestamp(ledger_info, txn.version)?;
-                        resolver
+                        state_view
                             .as_converter(
                                 self.context.db.clone(),
                                 self.context.table_info_reader.clone(),
@@ -911,7 +910,7 @@ impl TransactionsApi {
                                 )
                             })?
                     },
-                    TransactionData::Pending(txn) => resolver
+                    TransactionData::Pending(txn) => state_view
                         .as_converter(
                             self.context.db.clone(),
                             self.context.table_info_reader.clone(),
@@ -1093,7 +1092,6 @@ impl TransactionsApi {
             SubmitTransactionPost::Json(data) => self
                 .context
                 .latest_state_view_poem(ledger_info)?
-                .as_move_resolver()
                 .as_converter(
                     self.context.db.clone(),
                     self.context.table_info_reader.clone(),
@@ -1174,8 +1172,7 @@ impl TransactionsApi {
                 .into_iter()
                 .enumerate()
                 .map(|(index, txn)| {
-                    self.context
-                        .latest_state_view_poem(ledger_info)?.as_move_resolver()
+                    self.context.latest_state_view_poem(ledger_info)?
                         .as_converter(self.context.db.clone(), self.context.table_info_reader.clone())
                         .try_into_signed_transaction_poem(txn, self.context.chain_id())
                         .context(format!("Failed to create SignedTransaction from SubmitTransactionRequest at position {}", index))
@@ -1264,10 +1261,9 @@ impl TransactionsApi {
                                 ledger_info,
                             )
                         })?;
-                    let resolver = state_view.as_move_resolver();
 
                     // We provide the pending transaction so that users have the hash associated
-                    let pending_txn = resolver
+                    let pending_txn = state_view
                             .as_converter(self.context.db.clone(), self.context.table_info_reader.clone())
                             .try_into_pending_transaction_poem(txn)
                             .context("Failed to build PendingTransaction from mempool response, even though it said the request was accepted")
@@ -1380,10 +1376,11 @@ impl TransactionsApi {
         let version = ledger_info.version();
 
         // Ensure that all known statuses return their values in the output (even if they aren't supposed to)
-        let exe_status = match output.status().clone() {
-            TransactionStatus::Keep(exec_status) => exec_status,
-            TransactionStatus::Discard(status) => ExecutionStatus::MiscellaneousError(Some(status)),
-            _ => ExecutionStatus::MiscellaneousError(None),
+        let exe_status = match vm_status.clone().keep_or_discard() {
+            Ok(kept_vm_status) => kept_vm_status.into(),
+            Err(discarded_vm_status) => {
+                ExecutionStatus::MiscellaneousError(Some(discarded_vm_status))
+            },
         };
 
         let stats_key = match txn.payload() {
@@ -1435,7 +1432,7 @@ impl TransactionsApi {
             changes: output.write_set().clone(),
         };
 
-        match accept_type {
+        let result = match accept_type {
             AcceptType::Json => {
                 let transactions = self
                     .context
@@ -1481,7 +1478,9 @@ impl TransactionsApi {
             AcceptType::Bcs => {
                 BasicResponse::try_from_bcs((simulated_txn, &ledger_info, BasicResponseStatus::Ok))
             },
-        }
+        };
+
+        result.map(|r| r.with_gas_used(Some(output.gas_used())))
     }
 
     /// Encode message as BCS
@@ -1500,8 +1499,7 @@ impl TransactionsApi {
 
         let ledger_info = self.context.get_latest_ledger_info()?;
         let state_view = self.context.latest_state_view_poem(&ledger_info)?;
-        let resolver = state_view.as_move_resolver();
-        let raw_txn: RawTransaction = resolver
+        let raw_txn: RawTransaction = state_view
             .as_converter(
                 self.context.db.clone(),
                 self.context.table_info_reader.clone(),

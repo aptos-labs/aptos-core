@@ -221,7 +221,7 @@ impl Interpreter {
                             module_id,
                             func.name(),
                             self.operand_stack
-                                .last_n(func.arg_count())
+                                .last_n(func.param_count())
                                 .map_err(|e| set_err_info!(current_frame, e))?,
                             (func.local_count() as u64).into(),
                         )
@@ -276,7 +276,7 @@ impl Interpreter {
                             func.name(),
                             ty_args.iter().map(|ty| TypeWithLoader { ty, loader }),
                             self.operand_stack
-                                .last_n(func.arg_count())
+                                .last_n(func.param_count())
                                 .map_err(|e| set_err_info!(current_frame, e))?,
                             (func.local_count() as u64).into(),
                         )
@@ -372,12 +372,12 @@ impl Interpreter {
         ty_args: Vec<Type>,
     ) -> PartialVMResult<Frame> {
         let mut locals = Locals::new(func.local_count());
-        let arg_count = func.arg_count();
+        let param_count = func.param_count();
         let is_generic = !ty_args.is_empty();
 
-        for i in 0..arg_count {
+        for i in 0..param_count {
             locals.store_loc(
-                arg_count - i - 1,
+                param_count - i - 1,
                 self.operand_stack.pop()?,
                 loader
                     .vm_config()
@@ -389,11 +389,11 @@ impl Interpreter {
                 let resolver = func.get_resolver(loader, module_store);
                 if is_generic {
                     ty.check_eq(
-                        &resolver.subst(&func.local_types()[arg_count - i - 1], &ty_args)?,
+                        &resolver.subst(&func.local_tys()[param_count - i - 1], &ty_args)?,
                     )?;
                 } else {
                     // Directly check against the expected type to save a clone here.
-                    ty.check_eq(&func.local_types()[arg_count - i - 1])?;
+                    ty.check_eq(&func.local_tys()[param_count - i - 1])?;
                 }
             }
         }
@@ -412,18 +412,18 @@ impl Interpreter {
         ty_args: Vec<Type>,
         locals: Locals,
     ) -> PartialVMResult<Frame> {
-        for ty in function.local_types() {
+        for ty in function.local_tys() {
             gas_meter
                 .charge_create_ty(NumTypeNodes::new(ty.num_nodes_in_subst(&ty_args)? as u64))?;
         }
 
         let local_tys = if self.paranoid_type_checks {
             if ty_args.is_empty() {
-                function.local_types().to_vec()
+                function.local_tys().to_vec()
             } else {
                 let resolver = function.get_resolver(loader, module_store);
                 function
-                    .local_types()
+                    .local_tys()
                     .iter()
                     .map(|ty| resolver.subst(ty, &ty_args))
                     .collect::<PartialVMResult<Vec<_>>>()?
@@ -496,9 +496,9 @@ impl Interpreter {
         function: Arc<Function>,
         ty_args: Vec<Type>,
     ) -> PartialVMResult<()> {
-        let return_type_count = function.return_type_count();
+        let is_generic = !ty_args.is_empty();
         let mut args = VecDeque::new();
-        let expected_args = function.arg_count();
+        let expected_args = function.param_count();
         for _ in 0..expected_args {
             args.push_front(self.operand_stack.pop()?);
         }
@@ -506,10 +506,14 @@ impl Interpreter {
 
         if self.paranoid_type_checks {
             for i in 0..expected_args {
-                let expected_ty =
-                    resolver.subst(&function.parameter_types()[expected_args - i - 1], &ty_args)?;
                 let ty = self.operand_stack.pop_ty()?;
-                ty.check_eq(&expected_ty)?;
+                if is_generic {
+                    let expected_ty =
+                        resolver.subst(&function.param_tys()[expected_args - i - 1], &ty_args)?;
+                    ty.check_eq(&expected_ty)?;
+                } else {
+                    ty.check_eq(&function.param_tys()[expected_args - i - 1])?;
+                }
                 args_ty.push_front(ty);
             }
         }
@@ -543,8 +547,8 @@ impl Interpreter {
             } => {
                 gas_meter.charge_native_function(cost, Some(return_values.iter()))?;
                 // Paranoid check to protect us against incorrect native function implementations. A native function that
-                // returns a different number of values than its declared types will trigger this check
-                if return_values.len() != return_type_count {
+                // returns a different number of values than its declared types will trigger this check.
+                if return_values.len() != function.return_tys().len() {
                     return Err(
                         PartialVMError::new(StatusCode::UNKNOWN_INVARIANT_VIOLATION_ERROR)
                             .with_message(
@@ -561,7 +565,7 @@ impl Interpreter {
                 }
 
                 if self.paranoid_type_checks {
-                    for ty in function.return_types() {
+                    for ty in function.return_tys() {
                         self.operand_stack.push_ty(resolver.subst(ty, &ty_args)?)?;
                     }
                 }
@@ -626,10 +630,9 @@ impl Interpreter {
                 // in the end to determine which function to jump to. The native function shouldn't switch ordering of arguments.
                 //
                 // Runtime will use such convention to reconstruct the type stack required to perform paranoid mode checks.
-                if function.type_parameters != target_func.type_parameters
-                    || function.return_types != target_func.return_types
-                    || function.parameter_types[0..function.parameter_types.len() - 1]
-                        != target_func.parameter_types
+                if function.ty_param_abilities != target_func.ty_param_abilities
+                    || function.return_tys != target_func.return_tys
+                    || function.param_tys[0..function.param_tys.len() - 1] != target_func.param_tys
                 {
                     return Err(PartialVMError::new(StatusCode::RUNTIME_DISPATCH_ERROR)
                         .with_message(
@@ -673,10 +676,11 @@ impl Interpreter {
                         traversal_context.referenced_modules,
                         [(arena_id.address(), arena_id.name())],
                     )
-                    .map_err(|err| {
-                        PartialVMError::new(err.major_status())
-                            .with_message(format!("Module {} failed to be charged", module_name))
-                    })?;
+                    .map_err(|err| err
+                        .to_partial()
+                        .append_message_with_separator('.',
+                            format!("Failed to charge transitive dependency for {}. Does this module exists?", module_name)
+                        ))?;
                 resolver
                     .loader()
                     .load_module(&module_name, data_store, module_store)
@@ -1211,7 +1215,7 @@ impl Stack {
         Ok(self.value[(self.value.len() - n)..].iter())
     }
 
-    /// Push a `Value` on the stack if the max stack size has not been reached. Abort execution
+    /// Push a type on the stack if the max stack size has not been reached. Abort execution
     /// otherwise.
     fn push_ty(&mut self, ty: Type) -> PartialVMResult<()> {
         if self.types.len() < OPERAND_STACK_SIZE_LIMIT {
@@ -1222,14 +1226,14 @@ impl Stack {
         }
     }
 
-    /// Pop a `Value` off the stack or abort execution if the stack is empty.
+    /// Pop a type off the stack or abort execution if the stack is empty.
     fn pop_ty(&mut self) -> PartialVMResult<Type> {
         self.types
             .pop()
             .ok_or_else(|| PartialVMError::new(StatusCode::EMPTY_VALUE_STACK))
     }
 
-    /// Pop n values off the stack.
+    /// Pop n types off the stack.
     fn popn_tys(&mut self, n: u16) -> PartialVMResult<Vec<Type>> {
         let remaining_stack_size = self
             .types
@@ -1263,7 +1267,7 @@ impl CallStack {
     }
 
     /// Push a `Frame` on the call stack.
-    fn push(&mut self, frame: Frame) -> ::std::result::Result<(), Frame> {
+    fn push(&mut self, frame: Frame) -> Result<(), Frame> {
         if self.0.len() < CALL_STACK_SIZE_LIMIT {
             self.0.push(frame);
             Ok(())
@@ -1429,21 +1433,15 @@ impl FrameTypeCache {
         resolver: &Resolver,
         ty_args: &[Type],
     ) -> PartialVMResult<((&Type, NumTypeNodes), (&Type, NumTypeNodes))> {
-        let ((field_ty, field_type_count), (struct_ty, struct_type_count)) =
+        let ((field_ty, field_ty_count), (struct_ty, struct_ty_count)) =
             Self::get_or(&mut self.field_instantiation, idx, |idx| {
                 let struct_type = resolver.field_instantiation_to_struct(idx, ty_args)?;
-                let struct_type_count = NumTypeNodes::new(struct_type.num_nodes() as u64);
-                let field_type = resolver.get_field_type_generic(idx, ty_args)?;
-                let field_type_count = NumTypeNodes::new(field_type.num_nodes() as u64);
-                Ok((
-                    (field_type, field_type_count),
-                    (struct_type, struct_type_count),
-                ))
+                let struct_ty_count = NumTypeNodes::new(struct_type.num_nodes() as u64);
+                let field_ty = resolver.get_field_type_generic(idx, ty_args)?;
+                let field_ty_count = NumTypeNodes::new(field_ty.num_nodes() as u64);
+                Ok(((field_ty, field_ty_count), (struct_type, struct_ty_count)))
             })?;
-        Ok((
-            (field_ty, *field_type_count),
-            (struct_ty, *struct_type_count),
-        ))
+        Ok(((field_ty, *field_ty_count), (struct_ty, *struct_ty_count)))
     }
 
     #[inline(always)]
@@ -1746,7 +1744,7 @@ impl Frame {
             },
             Bytecode::Pack(idx) => {
                 let field_count = resolver.field_count(*idx);
-                let args_ty = resolver.get_struct_fields(*idx)?;
+                let args_ty = resolver.get_struct_field_tys(*idx)?;
                 let output_ty = resolver.get_struct_type(*idx)?;
                 let ability = output_ty.abilities()?;
 
@@ -1759,7 +1757,7 @@ impl Frame {
                     ability
                 };
 
-                if field_count as usize != args_ty.fields.len() {
+                if field_count as usize != args_ty.field_tys.len() {
                     return Err(
                         PartialVMError::new(StatusCode::UNKNOWN_INVARIANT_VIOLATION_ERROR)
                             .with_message("Args count mismatch".to_string()),
@@ -1770,7 +1768,7 @@ impl Frame {
                     .operand_stack
                     .popn_tys(field_count)?
                     .into_iter()
-                    .zip(args_ty.fields.iter())
+                    .zip(args_ty.field_tys.iter())
                 {
                     // Fields ability should be a subset of the struct ability because abilities can be weakened but not the other direction.
                     // For example, it is ok to have a struct that doesn't have a copy capability where its field is a struct that has copy capability but not vice versa.
@@ -1819,8 +1817,8 @@ impl Frame {
             Bytecode::Unpack(idx) => {
                 let struct_ty = interpreter.operand_stack.pop_ty()?;
                 struct_ty.check_eq(&resolver.get_struct_type(*idx)?)?;
-                let struct_decl = resolver.get_struct_fields(*idx)?;
-                for ty in struct_decl.fields.iter() {
+                let struct_decl = resolver.get_struct_field_tys(*idx)?;
+                for ty in struct_decl.field_tys.iter() {
                     interpreter.operand_stack.push_ty(ty.clone())?;
                 }
             },
@@ -2704,7 +2702,6 @@ impl Frame {
                             .read_ref()?
                             .value_as::<AccountAddress>()?;
                         let ty = resolver.get_struct_type(*sd_idx)?;
-                        // REVIEW: Can we simplify Interpreter::move_to?
                         interpreter.move_to(
                             false,
                             resolver.loader(),

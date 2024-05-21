@@ -135,6 +135,14 @@ impl BlockTree {
         }
     }
 
+    pub fn blocks(&self) -> Vec<HashValue> {
+        self.id_to_block.keys().cloned().collect()
+    }
+
+    pub fn qcs(&self) -> Vec<HashValue> {
+        self.id_to_quorum_cert.keys().cloned().collect()
+    }
+
     // This method will only be used in this module.
     fn get_linkable_block(&self, block_id: &HashValue) -> Option<&LinkableBlock> {
         self.id_to_block.get(block_id)
@@ -441,14 +449,14 @@ impl BlockTree {
             block_id = block_to_commit.id(),
         );
 
-        let id_to_remove = self.find_blocks_to_prune(block_to_commit.id());
-        if let Err(e) = storage.prune_tree(id_to_remove.clone().into_iter().collect()) {
+        let ids_to_remove = self.find_blocks_to_prune(block_to_commit.id());
+        if let Err(e) = storage.prune_tree(ids_to_remove.clone().into_iter().collect()) {
             // it's fine to fail here, as long as the commit succeeds, the next restart will clean
             // up dangling blocks, and we need to prune the tree to keep the root consistent with
             // executor.
             warn!(error = ?e, "fail to delete block");
         }
-        self.process_pruned_blocks(id_to_remove);
+        self.process_pruned_blocks(ids_to_remove);
         self.update_highest_commit_cert(commit_proof);
     }
 }

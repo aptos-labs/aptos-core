@@ -226,8 +226,8 @@ fn test_verify_three_element_sparse_merkle() {
     {
         // Construct a proof of key1.
         let proof = SparseMerkleProof::new(Some(leaf1), vec![
-            internal_b_hash,
             *SPARSE_MERKLE_PLACEHOLDER_HASH,
+            internal_b_hash,
         ]);
 
         // The exact key value exists.

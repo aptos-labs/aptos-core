@@ -2,7 +2,7 @@
 // Parts of the project are originally copyright © Meta Platforms, Inc.
 // SPDX-License-Identifier: Apache-2.0
 
-use crate::vote_data::VoteData;
+use crate::{quorum_cert::QuorumCert, vote_data::VoteData};
 use anyhow::{ensure, Context};
 use aptos_types::{
     aggregate_signature::AggregateSignature,
@@ -54,6 +54,14 @@ impl WrappedLedgerInfo {
         }
     }
 
+    pub fn vote_data(&self) -> &VoteData {
+        &self.vote_data
+    }
+
+    pub fn certified_block(&self) -> &BlockInfo {
+        self.vote_data().proposed()
+    }
+
     pub fn ledger_info(&self) -> &LedgerInfoWithSignatures {
         &self.signed_ledger_info
     }
@@ -100,5 +108,11 @@ impl WrappedLedgerInfo {
             executed_commit_info
         );
         Ok(Self::new(self.vote_data.clone(), executed_ledger_info))
+    }
+
+    // Use this only when order_vote_enabled is set to false.
+    // TODO: The method can be removed by having a duplicate method for insert_quourm_cert for wrapped ledger info
+    pub fn into_quorum_cert(self) -> QuorumCert {
+        QuorumCert::new(self.vote_data.clone(), self.signed_ledger_info.clone())
     }
 }

@@ -676,6 +676,8 @@ module aptos_token_objects::collection {
     /// collection's address when calling `create_collection_address`.
     /// Once the collection has been created, the collection address should be saved for reference and
     /// `create_collection_address` should not be used to derive the collection's address.
+    ///
+    /// After changing the collection's name, to create tokens - only call functions that accept the collection object as an argument.
     public fun set_name(mutator_ref: &MutatorRef, name: String) acquires Collection {
         assert!(string::length(&name) <= MAX_COLLECTION_NAME_LENGTH, error::out_of_range(ECOLLECTION_NAME_TOO_LONG));
         let collection = borrow_mut(mutator_ref);

@@ -27,7 +27,7 @@ pub use account::AccountData;
 pub use address::Address;
 pub use block::{BcsBlock, Block};
 pub use bytecode::Bytecode;
-pub use convert::{new_vm_utf8_string, AsConverter, ExplainVMStatus, MoveConverter};
+pub use convert::{new_vm_utf8_string, AsConverter, MoveConverter};
 pub use error::{AptosError, AptosErrorCode};
 pub use hash::HashValue;
 pub use headers::*;

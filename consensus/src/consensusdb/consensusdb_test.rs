@@ -26,14 +26,9 @@ fn test_put_get() {
     assert_eq!(db.get_all::<QCSchema>().unwrap().len(), 0);
 
     let qcs = vec![certificate_for_genesis()];
-    let highest_ordered_cert = Some(vec![5u8, 6, 7]);
 
-    db.save_blocks_and_quorum_certificates(
-        blocks.clone(),
-        qcs.clone(),
-        highest_ordered_cert.clone(),
-    )
-    .unwrap();
+    db.save_blocks_and_quorum_certificates(blocks.clone(), qcs.clone())
+        .unwrap();
 
     assert_eq!(db.get_all::<BlockSchema>().unwrap().len(), 1);
     assert_eq!(db.get_all::<QCSchema>().unwrap().len(), 1);
@@ -45,10 +40,9 @@ fn test_put_get() {
     let vote = vec![2u8, 1, 0];
     db.save_vote(vote.clone()).unwrap();
 
-    let (vote_1, tc_1, highest_ordered_cert_1, blocks_1, qc_1) = db.get_data().unwrap();
+    let (vote_1, tc_1, blocks_1, qc_1) = db.get_data().unwrap();
     assert_eq!(blocks, blocks_1);
     assert_eq!(qcs, qc_1);
-    assert_eq!(highest_ordered_cert, highest_ordered_cert_1);
     assert_eq!(Some(tc), tc_1);
     assert_eq!(Some(vote), vote_1);
 
@@ -75,8 +69,7 @@ fn test_delete_block_and_qc() {
     let qcs = vec![certificate_for_genesis()];
     let qc_id = qcs[0].certified_block().id();
 
-    db.save_blocks_and_quorum_certificates(blocks, qcs, None)
-        .unwrap();
+    db.save_blocks_and_quorum_certificates(blocks, qcs).unwrap();
     assert_eq!(db.get_all::<BlockSchema>().unwrap().len(), 1);
     assert_eq!(db.get_all::<QCSchema>().unwrap().len(), 1);
 

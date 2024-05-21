@@ -150,15 +150,32 @@ impl KnownAttribute {
         self.kind == KnownAttributeKind::Event as u8
     }
 
-    pub fn randomness() -> Self {
+    pub fn randomness(claimed_gas: Option<u64>) -> Self {
         Self {
             kind: KnownAttributeKind::Randomness as u8,
-            args: vec![],
+            args: if let Some(amount) = claimed_gas {
+                vec![amount.to_string()]
+            } else {
+                vec![]
+            },
         }
     }
 
     pub fn is_randomness(&self) -> bool {
         self.kind == KnownAttributeKind::Randomness as u8
+    }
+
+    pub fn try_as_randomness_annotation(&self) -> Option<RandomnessAnnotation> {
+        if self.kind == KnownAttributeKind::Randomness as u8 {
+            if let Some(arg) = self.args.first() {
+                let max_gas = arg.parse::<u64>().ok();
+                Some(RandomnessAnnotation::new(max_gas))
+            } else {
+                Some(RandomnessAnnotation::default())
+            }
+        } else {
+            None
+        }
     }
 }
 
@@ -660,5 +677,18 @@ fn check_budget(meter: usize) -> Result<(), MetaDataValidationError> {
         ))
     } else {
         Ok(())
+    }
+}
+
+/// The randomness consuming options specified by developers for their entry function.
+/// Examples: `#[randomness(max_gas = 99999)]`, `#[randomness]`.
+#[derive(Default)]
+pub struct RandomnessAnnotation {
+    pub max_gas: Option<u64>,
+}
+
+impl RandomnessAnnotation {
+    pub fn new(max_gas: Option<u64>) -> Self {
+        Self { max_gas }
     }
 }

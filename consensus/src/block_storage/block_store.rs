@@ -112,10 +112,8 @@ impl BlockStore {
 
     async fn try_send_for_execution(&self) {
         // reproduce the same batches (important for the commit phase)
-
         let mut certs = self.inner.read().get_all_quorum_certs_with_commit_info();
         certs.sort_unstable_by_key(|qc| qc.commit_info().round());
-
         for qc in certs {
             if qc.commit_info().round() > self.commit_root().round() {
                 info!(
@@ -271,17 +269,9 @@ impl BlockStore {
             .expect("Failed to persist commit");
 
         self.inner.write().update_ordered_root(block_to_commit.id());
-        if self.order_vote_enabled {
-            self.inner
-                .write()
-                .insert_ordered_cert(finality_proof_clone.clone());
-            if let Err(err) = self
-                .storage
-                .save_tree(vec![], vec![], Some(finality_proof_clone))
-            {
-                error!("Failed to save ordered cert to storage: {:?}", err);
-            }
-        }
+        self.inner
+            .write()
+            .insert_ordered_cert(finality_proof_clone.clone());
         update_counters_for_ordered_blocks(&blocks_to_commit);
 
         Ok(())
@@ -295,6 +285,15 @@ impl BlockStore {
         quorum_certs: Vec<QuorumCert>,
         order_vote_enabled: bool,
     ) {
+        info!(
+            "Rebuilding block tree. root {:?}, blocks {:?}, qcs {:?}",
+            root,
+            blocks.iter().map(|b| b.id()).collect::<Vec<_>>(),
+            quorum_certs
+                .iter()
+                .map(|qc| qc.certified_block().id())
+                .collect::<Vec<_>>()
+        );
         let max_pruned_blocks_in_mem = self.inner.read().max_pruned_blocks_in_mem();
         // Rollover the previous highest TC from the old tree to the new one.
         let prev_2chain_htc = self
@@ -359,7 +358,7 @@ impl BlockStore {
                 .prefetch_payload_data(payload, pipelined_block.block().timestamp_usecs());
         }
         self.storage
-            .save_tree(vec![pipelined_block.block().clone()], vec![], None)
+            .save_tree(vec![pipelined_block.block().clone()], vec![])
             .context("Insert block failed when saving block")?;
         self.inner.write().insert_block(pipelined_block)
     }
@@ -392,7 +391,7 @@ impl BlockStore {
         };
 
         self.storage
-            .save_tree(vec![], vec![qc.clone()], None)
+            .save_tree(vec![], vec![qc.clone()])
             .context("Insert block failed when saving quorum")?;
         self.inner.write().insert_quorum_cert(qc)
     }
