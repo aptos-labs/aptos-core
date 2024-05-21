@@ -80,6 +80,7 @@ pub enum FeatureFlag {
     PRIMARY_APT_FUNGIBLE_STORE_AT_USER_ADDRESS = 61,
     OBJECT_NATIVE_DERIVED_ADDRESS = 62,
     DISPATCHABLE_FUNGIBLE_ASSET = 63,
+    MULTISIG_V2_FIX = 64,
 }
 
 impl FeatureFlag {
@@ -142,6 +143,7 @@ impl FeatureFlag {
             FeatureFlag::DISPATCHABLE_FUNGIBLE_ASSET,
             FeatureFlag::REMOVE_DETAILED_ERROR_FROM_HASH,
             FeatureFlag::CONCURRENT_FUNGIBLE_ASSETS,
+            FeatureFlag::MULTISIG_V2_FIX,
         ]
     }
 }
@@ -296,6 +298,10 @@ impl Features {
         } else {
             file_format_common::VERSION_5
         }
+    }
+
+    pub fn is_multisig_v2_fix_enabled(&self) -> bool {
+        self.is_enabled(FeatureFlag::MULTISIG_V2_FIX)
     }
 }
 

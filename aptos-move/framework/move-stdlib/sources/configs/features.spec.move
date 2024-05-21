@@ -96,6 +96,16 @@ spec std::features {
         ensures [abstract] result == spec_module_event_enabled();
     }
 
+    spec fun spec_multisig_v2_fix_enabled(): bool {
+        spec_is_enabled(MULTISIG_V2_FIX)
+    }
+
+    spec multisig_v2_fix_enabled {
+        pragma opaque;
+        aborts_if [abstract] false;
+        ensures [abstract] result == spec_multisig_v2_fix_enabled();
+    }
+
     spec on_new_epoch(framework: &signer) {
         requires @std == signer::address_of(framework);
         let features_pending = global<PendingFeatures>(@std).features;

@@ -118,6 +118,8 @@ return true.
 -  [Function `object_native_derived_address_enabled`](#0x1_features_object_native_derived_address_enabled)
 -  [Function `get_dispatchable_fungible_asset_feature`](#0x1_features_get_dispatchable_fungible_asset_feature)
 -  [Function `dispatchable_fungible_asset_enabled`](#0x1_features_dispatchable_fungible_asset_enabled)
+-  [Function `get_multisig_v2_fix_feature`](#0x1_features_get_multisig_v2_fix_feature)
+-  [Function `multisig_v2_fix_enabled`](#0x1_features_multisig_v2_fix_enabled)
 -  [Function `change_feature_flags`](#0x1_features_change_feature_flags)
 -  [Function `change_feature_flags_internal`](#0x1_features_change_feature_flags_internal)
 -  [Function `change_feature_flags_for_next_epoch`](#0x1_features_change_feature_flags_for_next_epoch)
@@ -134,6 +136,7 @@ return true.
     -  [Function `periodical_reward_rate_decrease_enabled`](#@Specification_1_periodical_reward_rate_decrease_enabled)
     -  [Function `partial_governance_voting_enabled`](#@Specification_1_partial_governance_voting_enabled)
     -  [Function `module_event_enabled`](#@Specification_1_module_event_enabled)
+    -  [Function `multisig_v2_fix_enabled`](#@Specification_1_multisig_v2_fix_enabled)
     -  [Function `change_feature_flags_internal`](#@Specification_1_change_feature_flags_internal)
     -  [Function `change_feature_flags_for_next_epoch`](#@Specification_1_change_feature_flags_for_next_epoch)
     -  [Function `on_new_epoch`](#@Specification_1_on_new_epoch)
@@ -611,6 +614,18 @@ Lifetime: transient
 
 
 <pre><code><b>const</b> <a href="features.md#0x1_features_MULTISIG_V2_ENHANCEMENT">MULTISIG_V2_ENHANCEMENT</a>: u64 = 55;
+</code></pre>
+
+
+
+<a id="0x1_features_MULTISIG_V2_FIX"></a>
+
+Whether the multisig v2 fix is enabled.
+
+Lifetime: transient
+
+
+<pre><code><b>const</b> <a href="features.md#0x1_features_MULTISIG_V2_FIX">MULTISIG_V2_FIX</a>: u64 = 64;
 </code></pre>
 
 
@@ -2841,6 +2856,52 @@ Lifetime: transient
 
 </details>
 
+<a id="0x1_features_get_multisig_v2_fix_feature"></a>
+
+## Function `get_multisig_v2_fix_feature`
+
+
+
+<pre><code><b>public</b> <b>fun</b> <a href="features.md#0x1_features_get_multisig_v2_fix_feature">get_multisig_v2_fix_feature</a>(): u64
+</code></pre>
+
+
+
+<details>
+<summary>Implementation</summary>
+
+
+<pre><code><b>public</b> <b>fun</b> <a href="features.md#0x1_features_get_multisig_v2_fix_feature">get_multisig_v2_fix_feature</a>(): u64 { <a href="features.md#0x1_features_MULTISIG_V2_FIX">MULTISIG_V2_FIX</a> }
+</code></pre>
+
+
+
+</details>
+
+<a id="0x1_features_multisig_v2_fix_enabled"></a>
+
+## Function `multisig_v2_fix_enabled`
+
+
+
+<pre><code><b>public</b> <b>fun</b> <a href="features.md#0x1_features_multisig_v2_fix_enabled">multisig_v2_fix_enabled</a>(): bool
+</code></pre>
+
+
+
+<details>
+<summary>Implementation</summary>
+
+
+<pre><code><b>public</b> <b>fun</b> <a href="features.md#0x1_features_multisig_v2_fix_enabled">multisig_v2_fix_enabled</a>(): bool <b>acquires</b> <a href="features.md#0x1_features_Features">Features</a> {
+    <a href="features.md#0x1_features_is_enabled">is_enabled</a>(<a href="features.md#0x1_features_MULTISIG_V2_FIX">MULTISIG_V2_FIX</a>)
+}
+</code></pre>
+
+
+
+</details>
+
 <a id="0x1_features_change_feature_flags"></a>
 
 ## Function `change_feature_flags`
@@ -3276,6 +3337,35 @@ Helper to check whether a feature flag is enabled.
 <pre><code><b>pragma</b> opaque;
 <b>aborts_if</b> [abstract] <b>false</b>;
 <b>ensures</b> [abstract] result == <a href="features.md#0x1_features_spec_module_event_enabled">spec_module_event_enabled</a>();
+</code></pre>
+
+
+
+
+<a id="0x1_features_spec_multisig_v2_fix_enabled"></a>
+
+
+<pre><code><b>fun</b> <a href="features.md#0x1_features_spec_multisig_v2_fix_enabled">spec_multisig_v2_fix_enabled</a>(): bool {
+   <a href="features.md#0x1_features_spec_is_enabled">spec_is_enabled</a>(<a href="features.md#0x1_features_MULTISIG_V2_FIX">MULTISIG_V2_FIX</a>)
+}
+</code></pre>
+
+
+
+<a id="@Specification_1_multisig_v2_fix_enabled"></a>
+
+### Function `multisig_v2_fix_enabled`
+
+
+<pre><code><b>public</b> <b>fun</b> <a href="features.md#0x1_features_multisig_v2_fix_enabled">multisig_v2_fix_enabled</a>(): bool
+</code></pre>
+
+
+
+
+<pre><code><b>pragma</b> opaque;
+<b>aborts_if</b> [abstract] <b>false</b>;
+<b>ensures</b> [abstract] result == <a href="features.md#0x1_features_spec_multisig_v2_fix_enabled">spec_multisig_v2_fix_enabled</a>();
 </code></pre>
 
 

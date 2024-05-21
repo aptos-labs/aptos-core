@@ -530,6 +530,17 @@ module std::features {
         is_enabled(DISPATCHABLE_FUNGIBLE_ASSET)
     }
 
+    /// Whether the multisig v2 fix is enabled.
+    ///
+    /// Lifetime: transient
+    const MULTISIG_V2_FIX: u64 = 64;
+
+    public fun get_multisig_v2_fix_feature(): u64 { MULTISIG_V2_FIX }
+
+    public fun multisig_v2_fix_enabled(): bool acquires Features {
+        is_enabled(MULTISIG_V2_FIX)
+    }
+
     // ============================================================================================
     // Feature Flag Implementation
 
