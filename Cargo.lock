@@ -10506,6 +10506,7 @@ name = "move-docgen"
 version = "0.1.0"
 dependencies = [
  "anyhow",
+ "clap 4.4.14",
  "codespan",
  "codespan-reporting",
  "datatest-stable",
