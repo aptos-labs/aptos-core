@@ -103,4 +103,8 @@ spec std::features {
         ensures exists<PendingFeatures>(@std) ==> features_std == features_pending;
         aborts_if false;
     }
+
+    spec fun spec_sha_512_and_ripemd_160_enabled(): bool {
+        spec_is_enabled(SHA_512_AND_RIPEMD_160_NATIVES)
+    }
 }
