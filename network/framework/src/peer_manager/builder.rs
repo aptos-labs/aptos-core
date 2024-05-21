@@ -417,7 +417,10 @@ impl PeerManagerBuilder {
     pub fn add_service(
         &mut self,
         config: &NetworkServiceConfig,
-    ) -> aptos_channel::Receiver<(PeerId, ProtocolId), PeerManagerNotification> {
+    ) -> (
+        aptos_channel::Receiver<(PeerId, ProtocolId), PeerManagerNotification>,
+        conn_notifs_channel::Receiver,
+    ) {
         // Register the direct send and rpc protocols
         self.transport_context()
             .add_protocols(&config.direct_send_protocols_and_preferences);
@@ -434,7 +437,8 @@ impl PeerManagerBuilder {
         {
             pm_context.add_upstream_handler(*protocol, network_notifs_tx.clone());
         }
+        let connection_notifs_rx = pm_context.add_connection_event_listener();
 
-        network_notifs_rx
+        (network_notifs_rx, connection_notifs_rx)
     }
 }
