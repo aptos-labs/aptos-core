@@ -245,10 +245,12 @@ where
     //"./circuit-files/keyless_main.wasm",
     //"./proof_simulation.rs",
     //"/Users/michael/aptos-labs/aptos-core/types/src/keyless/proof_simulation.rs",
-    "/Users/michael/aptos-labs/aptos-core/types/src/keyless/circuit-files/keyless_main.wasm",
+    //"/Users/michael/aptos-labs/aptos-core/types/src/keyless/circuit-files/keyless_main.wasm",
+    "/Users/michael/aptos-labs/aptos-core/types/src/keyless/toy-circuit-files/multiplier2_js/multiplier2.wasm",
     //"./circuit-files/keyless_main.r1cs",
     //"./proof_simulation.rs",
-    "/Users/michael/aptos-labs/aptos-core/types/src/keyless/circuit-files/keyless_main.r1cs",
+    //"/Users/michael/aptos-labs/aptos-core/types/src/keyless/circuit-files/keyless_main.r1cs",
+    "/Users/michael/aptos-labs/aptos-core/types/src/keyless/toy-circuit-files/multiplier2.circom",
 ).unwrap();
     /*let cfg = CircomConfig::<Bn254>::new(
     "/Users/michael/aptos-labs/aptos-core/types/src/keyless/circuit-files/keyless_main.wasm",
@@ -256,7 +258,8 @@ where
 ).unwrap();*/
 
     let mut builder = CircomBuilder::new(cfg);
-    let mut input_file = File::open("/Users/michael/aptos-labs/aptos-core/types/src/keyless/circuit-files/keyless_input.json").unwrap();
+    //let mut input_file = File::open("/Users/michael/aptos-labs/aptos-core/types/src/keyless/circuit-files/keyless_input.json").unwrap();
+    let mut input_file = File::open("/Users/michael/aptos-labs/aptos-core/types/src/keyless/toy-circuit-files/multiplier2_input.json").unwrap();
     let mut input_json = String::new();
     input_file.read_to_string(&mut input_json).unwrap();
     let input_map: HashMap<String, Vec<String>> = serde_json::from_str(&input_json).unwrap();
@@ -283,10 +286,10 @@ where
     let pvk = prepare_verifying_key::<E>(&vk);
 
     for _ in 0..n_iters {
-        /*let a = E::ScalarField::from(3);//rand(&mut rng);
+        let a = E::ScalarField::from(3);//rand(&mut rng);
         let b = E::ScalarField::from(4);//rand(&mut rng);
         let mut c = a;
-        c *= b;*/
+        c *= b;
 
         /*let proof = Groth16Simulator::<E>::prove_with_trapdoor(
             &pk,
