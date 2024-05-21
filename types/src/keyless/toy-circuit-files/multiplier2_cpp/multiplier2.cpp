@@ -9,9 +9,9 @@ Circom_TemplateFunction _functionTable[1] = {
 Multiplier2_0_run };
 Circom_TemplateFunction _functionTableParallel[1] = { 
 NULL };
-uint get_main_input_signal_start() {return 2;}
+uint get_main_input_signal_start() {return 1;}
 
-uint get_main_input_signal_no() {return 2;}
+uint get_main_input_signal_no() {return 3;}
 
 uint get_total_signal_no() {return 4;}
 
@@ -59,7 +59,7 @@ void Multiplier2_0_create(uint soffset,uint coffset,Circom_CalcWit* ctx,std::str
 ctx->componentMemory[coffset].templateId = 0;
 ctx->componentMemory[coffset].templateName = "Multiplier2";
 ctx->componentMemory[coffset].signalStart = soffset;
-ctx->componentMemory[coffset].inputCounter = 2;
+ctx->componentMemory[coffset].inputCounter = 3;
 ctx->componentMemory[coffset].componentName = componentName;
 ctx->componentMemory[coffset].idFather = componentFather;
 ctx->componentMemory[coffset].subcomponents = new uint[0];
@@ -76,17 +76,14 @@ u32* mySubcomponents = ctx->componentMemory[ctx_index].subcomponents;
 bool* mySubcomponentsParallel = ctx->componentMemory[ctx_index].subcomponentsParallel;
 FrElement* circuitConstants = ctx->circuitConstants;
 std::string* listOfTemplateMessages = ctx->listOfTemplateMessages;
-FrElement expaux[3];
+FrElement expaux[5];
 FrElement lvar[0];
 uint sub_component_aux;
 uint index_multiple_eq;
-{
-PFrElement aux_dest = &signalValues[mySignalStart + 0];
-// load src
-Fr_mul(&expaux[0],&signalValues[mySignalStart + 1],&signalValues[mySignalStart + 2]); // line circom 13
-// end load src
-Fr_copy(aux_dest,&expaux[0]);
-}
+Fr_mul(&expaux[2],&signalValues[mySignalStart + 1],&signalValues[mySignalStart + 2]); // line circom 13
+Fr_eq(&expaux[0],&signalValues[mySignalStart + 0],&expaux[2]); // line circom 13
+if (!Fr_isTrue(&expaux[0])) std::cout << "Failed assert in template/function " << myTemplateName << " line 13. " <<  "Followed trace of components: " << ctx->getTrace(myId) << std::endl;
+assert(Fr_isTrue(&expaux[0]));
 for (uint i = 0; i < 0; i++){
 uint index_subc = ctx->componentMemory[ctx_index].subcomponents[i];
 if (index_subc != 0)release_memory_component(ctx,index_subc);

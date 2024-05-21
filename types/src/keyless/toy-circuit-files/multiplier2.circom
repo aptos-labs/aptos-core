@@ -7,10 +7,10 @@ template Multiplier2 () {
    // Declaration of signals.  
    signal input a;  
    signal input b;  
-   signal output c;  
+   signal input c;  
 
    // Constraints.  
-   c <== a * b;  
+   c === a * b;  
 }
 
- component main = Multiplier2();
+ component main {public [c]} = Multiplier2();

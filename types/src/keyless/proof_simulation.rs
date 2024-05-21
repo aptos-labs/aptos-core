@@ -250,7 +250,7 @@ where
     //"./circuit-files/keyless_main.r1cs",
     //"./proof_simulation.rs",
     //"/Users/michael/aptos-labs/aptos-core/types/src/keyless/circuit-files/keyless_main.r1cs",
-    "/Users/michael/aptos-labs/aptos-core/types/src/keyless/toy-circuit-files/multiplier2.circom",
+    "/Users/michael/aptos-labs/aptos-core/types/src/keyless/toy-circuit-files/multiplier2.r1cs",
 ).unwrap();
     /*let cfg = CircomConfig::<Bn254>::new(
     "/Users/michael/aptos-labs/aptos-core/types/src/keyless/circuit-files/keyless_main.wasm",
@@ -279,6 +279,15 @@ where
     }
 
     let circom = builder.setup();
+    println!("circom: {:?}", circom);
+    let witness: Vec<<E as Pairing>::ScalarField> = builder
+                 .cfg 
+                 .wtns
+                 .calculate_witness_element::<E, _>(builder.inputs.clone(), builder.cfg.sanity_check).unwrap(); 
+    println!("witness: {:?}", witness);
+    let circom = builder.build().unwrap();
+    let inputs = circom.get_public_inputs().unwrap();
+    println!("{:?}", inputs);
     let mut rng = ark_std::rand::rngs::StdRng::seed_from_u64(test_rng().next_u64());
 
     //let (pk, vk) = Groth16Simulator::<E>::circuit_specific_setup_with_trapdoor(MySillyCircuit { a: None, b: None }, &mut rng).unwrap();
