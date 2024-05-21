@@ -248,7 +248,7 @@ impl BlockStore {
 
         let block_tree = self.inner.clone();
         let storage = self.storage.clone();
-        let finality_proof_clone = finality_proof.clone();        
+        let finality_proof_clone = finality_proof.clone();
         PENDING_BLOCKS
             .lock()
             .unwrap()
