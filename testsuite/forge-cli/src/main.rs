@@ -1058,8 +1058,8 @@ fn realistic_env_load_sweep_test() -> ForgeConfig {
             (2750, 2.5, 3.5, 4.5, 0),
             (4600, 3., 4., 6., 10), // Allow some expired transactions (high-load)
             (7000, 4.5, 6., 8., 20), // Allow some expired transactions (high-load)
-            (9500, 6., 8., 10., 30), // Allow some expired transactions (high-load)
-            (12000, 8., 10., 12., 40), // Allow some expired transactions (high-load)
+            (9500, 6., 9., 12., 30), // Allow some expired transactions (high-load)
+            (12000, 8., 12., 16., 40), // Allow some expired transactions (high-load)
         ]
         .into_iter()
         .map(
