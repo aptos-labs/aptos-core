@@ -5,6 +5,7 @@
 use crate::{common::Round, quorum_cert::QuorumCert, timeout_2chain::TwoChainTimeoutCertificate};
 use anyhow::{ensure, Context};
 use aptos_types::{block_info::BlockInfo, validator_verifier::ValidatorVerifier};
+use fail::fail_point;
 use serde::{Deserialize, Serialize};
 use std::fmt::{Debug, Display, Formatter};
 
@@ -52,9 +53,17 @@ impl SyncInfo {
         let highest_2chain_timeout_cert = highest_2chain_timeout_cert
             .filter(|tc| tc.round() > highest_quorum_cert.certified_block().round());
 
+        fail_point!("consensus::ordered_only_cert", |_| {
+            Self {
+                highest_quorum_cert: highest_quorum_cert.clone(),
+                highest_ordered_cert: Some(highest_ordered_cert.clone()),
+                highest_commit_cert: highest_ordered_cert.clone(),
+                highest_2chain_timeout_cert: highest_2chain_timeout_cert.clone(),
+            }
+        });
+
         let highest_ordered_cert =
             Some(highest_ordered_cert).filter(|hoc| hoc != &highest_quorum_cert);
-
         Self {
             highest_quorum_cert,
             highest_ordered_cert,
@@ -155,6 +164,16 @@ impl SyncInfo {
             *self.highest_commit_cert().commit_info() != BlockInfo::empty(),
             "HLI has empty commit info"
         );
+
+        // we don't have execution in unit tests, so this check would fail
+        #[cfg(not(any(test, feature = "fuzzing")))]
+        {
+            ensure!(
+                !self.highest_commit_cert().commit_info().is_ordered_only(),
+                "HLI {} has ordered only commit info",
+                self.highest_commit_cert().commit_info()
+            );
+        }
 
         self.highest_quorum_cert
             .verify(validator)
