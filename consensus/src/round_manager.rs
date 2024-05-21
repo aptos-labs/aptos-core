@@ -611,6 +611,14 @@ impl RoundManager {
 
     fn sync_only(&self) -> bool {
         let sync_or_not = self.local_config.sync_only || self.block_store.vote_back_pressure();
+        if sync_or_not {
+            info!(
+                "sync_or_not: {}, local_config_sync_only: {}, vote backpressure: {}",
+                sync_or_not,
+                self.local_config.sync_only,
+                self.block_store.vote_back_pressure()
+            );
+        }
         counters::OP_COUNTERS
             .gauge("sync_only")
             .set(sync_or_not as i64);
@@ -1056,7 +1064,7 @@ impl RoundManager {
     async fn process_vote(&mut self, vote: &Vote) -> anyhow::Result<()> {
         let round = vote.vote_data().proposed().round();
 
-        debug!(
+        info!(
             self.new_log(LogEvent::ReceiveVote)
                 .remote_peer(vote.author()),
             vote = %vote,
@@ -1177,7 +1185,7 @@ impl RoundManager {
     ) -> anyhow::Result<()> {
         let result = self
             .block_store
-            .insert_quorum_cert(&qc, &mut self.create_block_retriever(preferred_peer))
+            .insert_quorum_cert(&qc, &mut self.create_block_retriever(preferred_peer), 1)
             .await
             .context("[RoundManager] Failed to process a newly aggregated QC");
         self.process_certificates().await?;
@@ -1199,6 +1207,7 @@ impl RoundManager {
             .insert_quorum_cert(
                 quorum_cert,
                 &mut self.create_block_retriever(preferred_peer),
+                4,
             )
             .await
             .context("RoundManager] Failed to process QC in order Cert")?;

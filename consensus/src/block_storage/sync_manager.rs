@@ -8,6 +8,12 @@ use crate::{
         BlockReader, BlockStore,
     },
     counters::{
+        BLOCKS_FETCHED_FROM_NETWORK_WHILE_FAST_FORWARD_SYNC,
+        BLOCKS_FETCHED_FROM_NETWORK_WHILE_INSERTING_QUORUM_CERT,
+        BLOCKS_FETCHED_FROM_NETWORK_WHILE_INSERTING_QUORUM_CERT_1,
+        BLOCKS_FETCHED_FROM_NETWORK_WHILE_INSERTING_QUORUM_CERT_2,
+        BLOCKS_FETCHED_FROM_NETWORK_WHILE_INSERTING_QUORUM_CERT_3,
+        BLOCKS_FETCHED_FROM_NETWORK_WHILE_INSERTING_QUORUM_CERT_4,
         BLOCKS_FETCHED_FROM_NETWORK_WHILE_SYNCING, LATE_EXECUTION_WITH_ORDER_VOTE_QC,
         SUCCESSFUL_EXECUTED_WITH_ORDER_VOTE_QC, SUCCESSFUL_EXECUTED_WITH_REGULAR_QC,
     },
@@ -109,18 +115,11 @@ impl BlockStore {
         )
         .await?;
 
-        info!(
-            "Synced to highest quorum cert: input sync info: {:?},\n current sync info {:?}",
-            sync_info,
-            self.sync_info()
-        );
-        info!(
-            "Current block hashes in block_store: {:?}.\n Current quorum certs in block_store: {:?}",
-            self.inner.read().blocks(),
-            self.inner.read().qcs()
-        );
-
-        self.insert_quorum_cert(sync_info.highest_quorum_cert(), &mut retriever)
+        // The insert_ordered_cert(order_cert) function call expects that order_cert.commit_info().id() block
+        // is already stored in block_store. So, we first call insert_quorum_cert(highest_quorum_cert).
+        // This call will ensure that the highest ceritified block along with all its ancestors are inserted
+        // into the block store.
+        self.insert_quorum_cert(sync_info.highest_quorum_cert(), &mut retriever, 2)
             .await?;
 
         if self.order_vote_enabled {
@@ -134,6 +133,7 @@ impl BlockStore {
                     .clone()
                     .into_quorum_cert(),
                 &mut retriever,
+                3,
             )
             .await?;
         }
@@ -167,9 +167,21 @@ impl BlockStore {
         &self,
         qc: &QuorumCert,
         retriever: &mut BlockRetriever,
+        context: u64,
     ) -> anyhow::Result<()> {
         match self.need_fetch_for_quorum_cert(qc) {
-            NeedFetchResult::NeedFetch => self.fetch_quorum_cert(qc.clone(), retriever).await?,
+            NeedFetchResult::NeedFetch => {
+                if context == 1 {
+                    BLOCKS_FETCHED_FROM_NETWORK_WHILE_INSERTING_QUORUM_CERT_1.inc_by(1);
+                } else if context == 2 {
+                    BLOCKS_FETCHED_FROM_NETWORK_WHILE_INSERTING_QUORUM_CERT_2.inc_by(1);
+                } else if context == 3 {
+                    BLOCKS_FETCHED_FROM_NETWORK_WHILE_INSERTING_QUORUM_CERT_3.inc_by(1);
+                } else if context == 4 {
+                    BLOCKS_FETCHED_FROM_NETWORK_WHILE_INSERTING_QUORUM_CERT_4.inc_by(1);
+                }
+                self.fetch_quorum_cert(qc.clone(), retriever).await?
+            },
             NeedFetchResult::QCBlockExist => self.insert_single_quorum_cert(qc.clone())?,
             NeedFetchResult::QCAlreadyExist => return Ok(()),
             _ => (),
@@ -244,6 +256,7 @@ impl BlockStore {
             if self.block_exists(retrieve_qc.certified_block().id()) {
                 break;
             }
+            BLOCKS_FETCHED_FROM_NETWORK_WHILE_INSERTING_QUORUM_CERT.inc_by(1);
             let mut blocks = retriever
                 .retrieve_blocks_in_range(
                     retrieve_qc.certified_block().id(),
@@ -266,43 +279,6 @@ impl BlockStore {
         }
         self.insert_single_quorum_cert(qc)
     }
-
-    // async fn fetch_wrapped_ledger_info(
-    //     &self,
-    //     wrapped_ledger_info: WrappedLedgerInfo,
-    //     retriever: &mut BlockRetriever,
-    // ) -> anyhow::Result<()> {
-    //     let mut pending = vec![];
-    //     let mut voters = wrapped_ledger_info
-    //         .ledger_info()
-    //         .get_voters(&retriever.validator_addresses());
-    //     let mut retrieve_block_id = wrapped_ledger_info.commit_info().id();
-    //     loop {
-    //         if self.block_exists(retrieve_block_id) {
-    //             break;
-    //         }
-    //         let mut blocks = retriever
-    //             .retrieve_blocks_in_range(retrieve_block_id, 1, retrieve_block_id, voters)
-    //             .await?;
-    //         // retrieve_blocks_in_range guarantees that blocks has exactly 1 element
-    //         let block = blocks.remove(0);
-
-    //         // We need to fetch the parent of block to ensure we have the parent in the tree.
-    //         retrieve_block_id = block.quorum_cert().certified_block().id();
-    //         voters = block
-    //             .quorum_cert()
-    //             .ledger_info()
-    //             .get_voters(&retriever.validator_addresses());
-    //         pending.push(block);
-    //     }
-
-    //     while let Some(block) = pending.pop() {
-    //         let block_qc = block.quorum_cert().clone();
-    //         self.insert_single_quorum_cert(block_qc)?;
-    //         self.insert_ordered_block(block).await?;
-    //     }
-    //     Ok(())
-    // }
 
     /// Check the highest ordered cert sent by peer to see if we're behind and start a fast
     /// forward sync if the committed block doesn't exist in our tree.
@@ -381,6 +357,7 @@ impl BlockStore {
         // although unlikely, we might wrap num_blocks around on a 32-bit machine
         assert!(num_blocks < std::usize::MAX as u64);
 
+        BLOCKS_FETCHED_FROM_NETWORK_WHILE_FAST_FORWARD_SYNC.inc_by(num_blocks);
         let mut blocks = retriever
             .retrieve_blocks_in_range(
                 highest_quorum_cert.certified_block().id(),
@@ -425,6 +402,7 @@ impl BlockStore {
                     "Found forked QC {}, fetching it as well",
                     highest_commit_cert
                 );
+                BLOCKS_FETCHED_FROM_NETWORK_WHILE_FAST_FORWARD_SYNC.inc_by(num_blocks);
                 let mut additional_blocks = retriever
                     .retrieve_blocks_in_range(
                         highest_commit_cert.certified_block().id(),
@@ -452,15 +430,11 @@ impl BlockStore {
         }
 
         assert_eq!(blocks.len(), quorum_certs.len());
-        info!("Fetched {} blocks. Requested num_blocks {}. Initial block hash {:?}, target block hash {:?}", blocks.len(), num_blocks, highest_quorum_cert.certified_block().id(), highest_commit_cert.commit_info().id());
+        info!("[FastForwardSync] Fetched {} blocks. Requested num_blocks {}. Initial block hash {:?}, target block hash {:?}", 
+            blocks.len(), num_blocks, highest_quorum_cert.certified_block().id(), highest_commit_cert.commit_info().id()
+        );
         for (i, block) in blocks.iter().enumerate() {
             assert_eq!(block.id(), quorum_certs[i].certified_block().id());
-            info!(
-                "Fetched block: {:?} {:?} {:?}",
-                block.id(),
-                block.round(),
-                quorum_certs[i]
-            );
             if let Some(payload) = block.payload() {
                 payload_manager.prefetch_payload_data(payload, block.timestamp_usecs());
             }

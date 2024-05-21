@@ -114,13 +114,7 @@ impl BlockStore {
         // reproduce the same batches (important for the commit phase)
         let mut certs = self.inner.read().get_all_quorum_certs_with_commit_info();
         certs.sort_unstable_by_key(|qc| qc.commit_info().round());
-        info!("Try_send_for_execution with {} quorum certs. self.commit_root().round() {:?}, certs {:?}", certs.len(), self.commit_root().round(), certs);
         for qc in certs {
-            info!(
-                "try_send_for_execution with qc round {:?}, self round {:?}",
-                qc.commit_info().round(),
-                self.commit_root().round()
-            );
             if qc.commit_info().round() > self.commit_root().round() {
                 info!(
                     "trying to commit to round {} with ledger info {}",
