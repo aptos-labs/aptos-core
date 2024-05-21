@@ -18,12 +18,7 @@ Reconfiguration, and may be updated by root.
     -  [Function `on_new_epoch`](#@Specification_1_on_new_epoch)
 
 
-<pre><code><b>use</b> <a href="chain_status.md#0x1_chain_status">0x1::chain_status</a>;
-<b>use</b> <a href="config_buffer.md#0x1_config_buffer">0x1::config_buffer</a>;
-<b>use</b> <a href="../../aptos-stdlib/../move-stdlib/doc/error.md#0x1_error">0x1::error</a>;
-<b>use</b> <a href="reconfiguration.md#0x1_reconfiguration">0x1::reconfiguration</a>;
-<b>use</b> <a href="system_addresses.md#0x1_system_addresses">0x1::system_addresses</a>;
-</code></pre>
+<pre><code>use 0x1::chain_status;<br/>use 0x1::config_buffer;<br/>use 0x1::error;<br/>use 0x1::reconfiguration;<br/>use 0x1::system_addresses;<br/></code></pre>
 
 
 
@@ -33,8 +28,7 @@ Reconfiguration, and may be updated by root.
 
 
 
-<pre><code><b>struct</b> <a href="execution_config.md#0x1_execution_config_ExecutionConfig">ExecutionConfig</a> <b>has</b> drop, store, key
-</code></pre>
+<pre><code>struct ExecutionConfig has drop, store, key<br/></code></pre>
 
 
 
@@ -44,7 +38,7 @@ Reconfiguration, and may be updated by root.
 
 <dl>
 <dt>
-<code>config: <a href="../../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u8&gt;</code>
+<code>config: vector&lt;u8&gt;</code>
 </dt>
 <dd>
 
@@ -64,8 +58,7 @@ Reconfiguration, and may be updated by root.
 The provided on chain config bytes are empty or invalid
 
 
-<pre><code><b>const</b> <a href="execution_config.md#0x1_execution_config_EINVALID_CONFIG">EINVALID_CONFIG</a>: u64 = 1;
-</code></pre>
+<pre><code>const EINVALID_CONFIG: u64 &#61; 1;<br/></code></pre>
 
 
 
@@ -73,15 +66,14 @@ The provided on chain config bytes are empty or invalid
 
 ## Function `set`
 
-Deprecated by <code><a href="execution_config.md#0x1_execution_config_set_for_next_epoch">set_for_next_epoch</a>()</code>.
+Deprecated by <code>set_for_next_epoch()</code>.
 
 WARNING: calling this while randomness is enabled will trigger a new epoch without randomness!
 
 TODO: update all the tests that reference this function, then disable this function.
 
 
-<pre><code><b>public</b> <b>fun</b> <a href="execution_config.md#0x1_execution_config_set">set</a>(<a href="account.md#0x1_account">account</a>: &<a href="../../aptos-stdlib/../move-stdlib/doc/signer.md#0x1_signer">signer</a>, config: <a href="../../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u8&gt;)
-</code></pre>
+<pre><code>public fun set(account: &amp;signer, config: vector&lt;u8&gt;)<br/></code></pre>
 
 
 
@@ -89,22 +81,7 @@ TODO: update all the tests that reference this function, then disable this funct
 <summary>Implementation</summary>
 
 
-<pre><code><b>public</b> <b>fun</b> <a href="execution_config.md#0x1_execution_config_set">set</a>(<a href="account.md#0x1_account">account</a>: &<a href="../../aptos-stdlib/../move-stdlib/doc/signer.md#0x1_signer">signer</a>, config: <a href="../../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u8&gt;) <b>acquires</b> <a href="execution_config.md#0x1_execution_config_ExecutionConfig">ExecutionConfig</a> {
-    <a href="system_addresses.md#0x1_system_addresses_assert_aptos_framework">system_addresses::assert_aptos_framework</a>(<a href="account.md#0x1_account">account</a>);
-    <a href="chain_status.md#0x1_chain_status_assert_genesis">chain_status::assert_genesis</a>();
-
-    <b>assert</b>!(<a href="../../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector_length">vector::length</a>(&config) &gt; 0, <a href="../../aptos-stdlib/../move-stdlib/doc/error.md#0x1_error_invalid_argument">error::invalid_argument</a>(<a href="execution_config.md#0x1_execution_config_EINVALID_CONFIG">EINVALID_CONFIG</a>));
-
-    <b>if</b> (<b>exists</b>&lt;<a href="execution_config.md#0x1_execution_config_ExecutionConfig">ExecutionConfig</a>&gt;(@aptos_framework)) {
-        <b>let</b> config_ref = &<b>mut</b> <b>borrow_global_mut</b>&lt;<a href="execution_config.md#0x1_execution_config_ExecutionConfig">ExecutionConfig</a>&gt;(@aptos_framework).config;
-        *config_ref = config;
-    } <b>else</b> {
-        <b>move_to</b>(<a href="account.md#0x1_account">account</a>, <a href="execution_config.md#0x1_execution_config_ExecutionConfig">ExecutionConfig</a> { config });
-    };
-    // Need <b>to</b> trigger <a href="reconfiguration.md#0x1_reconfiguration">reconfiguration</a> so validator nodes can sync on the updated configs.
-    <a href="reconfiguration.md#0x1_reconfiguration_reconfigure">reconfiguration::reconfigure</a>();
-}
-</code></pre>
+<pre><code>public fun set(account: &amp;signer, config: vector&lt;u8&gt;) acquires ExecutionConfig &#123;<br/>    system_addresses::assert_aptos_framework(account);<br/>    chain_status::assert_genesis();<br/><br/>    assert!(vector::length(&amp;config) &gt; 0, error::invalid_argument(EINVALID_CONFIG));<br/><br/>    if (exists&lt;ExecutionConfig&gt;(@aptos_framework)) &#123;<br/>        let config_ref &#61; &amp;mut borrow_global_mut&lt;ExecutionConfig&gt;(@aptos_framework).config;<br/>        &#42;config_ref &#61; config;<br/>    &#125; else &#123;<br/>        move_to(account, ExecutionConfig &#123; config &#125;);<br/>    &#125;;<br/>    // Need to trigger reconfiguration so validator nodes can sync on the updated configs.<br/>    reconfiguration::reconfigure();<br/>&#125;<br/></code></pre>
 
 
 
@@ -122,8 +99,7 @@ aptos_framework::aptos_governance::reconfigure(&framework_signer);
 ```
 
 
-<pre><code><b>public</b> <b>fun</b> <a href="execution_config.md#0x1_execution_config_set_for_next_epoch">set_for_next_epoch</a>(<a href="account.md#0x1_account">account</a>: &<a href="../../aptos-stdlib/../move-stdlib/doc/signer.md#0x1_signer">signer</a>, config: <a href="../../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u8&gt;)
-</code></pre>
+<pre><code>public fun set_for_next_epoch(account: &amp;signer, config: vector&lt;u8&gt;)<br/></code></pre>
 
 
 
@@ -131,12 +107,7 @@ aptos_framework::aptos_governance::reconfigure(&framework_signer);
 <summary>Implementation</summary>
 
 
-<pre><code><b>public</b> <b>fun</b> <a href="execution_config.md#0x1_execution_config_set_for_next_epoch">set_for_next_epoch</a>(<a href="account.md#0x1_account">account</a>: &<a href="../../aptos-stdlib/../move-stdlib/doc/signer.md#0x1_signer">signer</a>, config: <a href="../../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u8&gt;) {
-    <a href="system_addresses.md#0x1_system_addresses_assert_aptos_framework">system_addresses::assert_aptos_framework</a>(<a href="account.md#0x1_account">account</a>);
-    <b>assert</b>!(<a href="../../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector_length">vector::length</a>(&config) &gt; 0, <a href="../../aptos-stdlib/../move-stdlib/doc/error.md#0x1_error_invalid_argument">error::invalid_argument</a>(<a href="execution_config.md#0x1_execution_config_EINVALID_CONFIG">EINVALID_CONFIG</a>));
-    <a href="config_buffer.md#0x1_config_buffer_upsert">config_buffer::upsert</a>(<a href="execution_config.md#0x1_execution_config_ExecutionConfig">ExecutionConfig</a> { config });
-}
-</code></pre>
+<pre><code>public fun set_for_next_epoch(account: &amp;signer, config: vector&lt;u8&gt;) &#123;<br/>    system_addresses::assert_aptos_framework(account);<br/>    assert!(vector::length(&amp;config) &gt; 0, error::invalid_argument(EINVALID_CONFIG));<br/>    config_buffer::upsert(ExecutionConfig &#123; config &#125;);<br/>&#125;<br/></code></pre>
 
 
 
@@ -146,11 +117,10 @@ aptos_framework::aptos_governance::reconfigure(&framework_signer);
 
 ## Function `on_new_epoch`
 
-Only used in reconfigurations to apply the pending <code><a href="execution_config.md#0x1_execution_config_ExecutionConfig">ExecutionConfig</a></code>, if there is any.
+Only used in reconfigurations to apply the pending <code>ExecutionConfig</code>, if there is any.
 
 
-<pre><code><b>public</b>(<b>friend</b>) <b>fun</b> <a href="execution_config.md#0x1_execution_config_on_new_epoch">on_new_epoch</a>(framework: &<a href="../../aptos-stdlib/../move-stdlib/doc/signer.md#0x1_signer">signer</a>)
-</code></pre>
+<pre><code>public(friend) fun on_new_epoch(framework: &amp;signer)<br/></code></pre>
 
 
 
@@ -158,18 +128,7 @@ Only used in reconfigurations to apply the pending <code><a href="execution_conf
 <summary>Implementation</summary>
 
 
-<pre><code><b>public</b>(<b>friend</b>) <b>fun</b> <a href="execution_config.md#0x1_execution_config_on_new_epoch">on_new_epoch</a>(framework: &<a href="../../aptos-stdlib/../move-stdlib/doc/signer.md#0x1_signer">signer</a>) <b>acquires</b> <a href="execution_config.md#0x1_execution_config_ExecutionConfig">ExecutionConfig</a> {
-    <a href="system_addresses.md#0x1_system_addresses_assert_aptos_framework">system_addresses::assert_aptos_framework</a>(framework);
-    <b>if</b> (<a href="config_buffer.md#0x1_config_buffer_does_exist">config_buffer::does_exist</a>&lt;<a href="execution_config.md#0x1_execution_config_ExecutionConfig">ExecutionConfig</a>&gt;()) {
-        <b>let</b> config = <a href="config_buffer.md#0x1_config_buffer_extract">config_buffer::extract</a>&lt;<a href="execution_config.md#0x1_execution_config_ExecutionConfig">ExecutionConfig</a>&gt;();
-        <b>if</b> (<b>exists</b>&lt;<a href="execution_config.md#0x1_execution_config_ExecutionConfig">ExecutionConfig</a>&gt;(@aptos_framework)) {
-            *<b>borrow_global_mut</b>&lt;<a href="execution_config.md#0x1_execution_config_ExecutionConfig">ExecutionConfig</a>&gt;(@aptos_framework) = config;
-        } <b>else</b> {
-            <b>move_to</b>(framework, config);
-        };
-    }
-}
-</code></pre>
+<pre><code>public(friend) fun on_new_epoch(framework: &amp;signer) acquires ExecutionConfig &#123;<br/>    system_addresses::assert_aptos_framework(framework);<br/>    if (config_buffer::does_exist&lt;ExecutionConfig&gt;()) &#123;<br/>        let config &#61; config_buffer::extract&lt;ExecutionConfig&gt;();<br/>        if (exists&lt;ExecutionConfig&gt;(@aptos_framework)) &#123;<br/>            &#42;borrow_global_mut&lt;ExecutionConfig&gt;(@aptos_framework) &#61; config;<br/>        &#125; else &#123;<br/>            move_to(framework, config);<br/>        &#125;;<br/>    &#125;<br/>&#125;<br/></code></pre>
 
 
 
@@ -181,9 +140,7 @@ Only used in reconfigurations to apply the pending <code><a href="execution_conf
 
 
 
-<pre><code><b>pragma</b> verify = <b>true</b>;
-<b>pragma</b> aborts_if_is_strict;
-</code></pre>
+<pre><code>pragma verify &#61; true;<br/>pragma aborts_if_is_strict;<br/></code></pre>
 
 
 
@@ -192,27 +149,14 @@ Only used in reconfigurations to apply the pending <code><a href="execution_conf
 ### Function `set`
 
 
-<pre><code><b>public</b> <b>fun</b> <a href="execution_config.md#0x1_execution_config_set">set</a>(<a href="account.md#0x1_account">account</a>: &<a href="../../aptos-stdlib/../move-stdlib/doc/signer.md#0x1_signer">signer</a>, config: <a href="../../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u8&gt;)
-</code></pre>
+<pre><code>public fun set(account: &amp;signer, config: vector&lt;u8&gt;)<br/></code></pre>
 
 
 Ensure the caller is admin
 When setting now time must be later than last_reconfiguration_time.
 
 
-<pre><code><b>pragma</b> verify_duration_estimate = 600;
-<b>let</b> addr = <a href="../../aptos-stdlib/../move-stdlib/doc/signer.md#0x1_signer_address_of">signer::address_of</a>(<a href="account.md#0x1_account">account</a>);
-<b>include</b> <a href="transaction_fee.md#0x1_transaction_fee_RequiresCollectedFeesPerValueLeqBlockAptosSupply">transaction_fee::RequiresCollectedFeesPerValueLeqBlockAptosSupply</a>;
-<b>requires</b> <a href="chain_status.md#0x1_chain_status_is_genesis">chain_status::is_genesis</a>();
-<b>requires</b> <b>exists</b>&lt;<a href="stake.md#0x1_stake_ValidatorFees">stake::ValidatorFees</a>&gt;(@aptos_framework);
-<b>requires</b> <b>exists</b>&lt;<a href="staking_config.md#0x1_staking_config_StakingRewardsConfig">staking_config::StakingRewardsConfig</a>&gt;(@aptos_framework);
-<b>requires</b> len(config) &gt; 0;
-<b>include</b> <a href="../../aptos-stdlib/../move-stdlib/doc/features.md#0x1_features_spec_periodical_reward_rate_decrease_enabled">features::spec_periodical_reward_rate_decrease_enabled</a>() ==&gt; <a href="staking_config.md#0x1_staking_config_StakingRewardsConfigEnabledRequirement">staking_config::StakingRewardsConfigEnabledRequirement</a>;
-<b>include</b> <a href="aptos_coin.md#0x1_aptos_coin_ExistsAptosCoin">aptos_coin::ExistsAptosCoin</a>;
-<b>requires</b> <a href="system_addresses.md#0x1_system_addresses_is_aptos_framework_address">system_addresses::is_aptos_framework_address</a>(addr);
-<b>requires</b> <a href="timestamp.md#0x1_timestamp_spec_now_microseconds">timestamp::spec_now_microseconds</a>() &gt;= <a href="reconfiguration.md#0x1_reconfiguration_last_reconfiguration_time">reconfiguration::last_reconfiguration_time</a>();
-<b>ensures</b> <b>exists</b>&lt;<a href="execution_config.md#0x1_execution_config_ExecutionConfig">ExecutionConfig</a>&gt;(@aptos_framework);
-</code></pre>
+<pre><code>pragma verify_duration_estimate &#61; 600;<br/>let addr &#61; signer::address_of(account);<br/>include transaction_fee::RequiresCollectedFeesPerValueLeqBlockAptosSupply;<br/>requires chain_status::is_genesis();<br/>requires exists&lt;stake::ValidatorFees&gt;(@aptos_framework);<br/>requires exists&lt;staking_config::StakingRewardsConfig&gt;(@aptos_framework);<br/>requires len(config) &gt; 0;<br/>include features::spec_periodical_reward_rate_decrease_enabled() &#61;&#61;&gt; staking_config::StakingRewardsConfigEnabledRequirement;<br/>include aptos_coin::ExistsAptosCoin;<br/>requires system_addresses::is_aptos_framework_address(addr);<br/>requires timestamp::spec_now_microseconds() &gt;&#61; reconfiguration::last_reconfiguration_time();<br/>ensures exists&lt;ExecutionConfig&gt;(@aptos_framework);<br/></code></pre>
 
 
 
@@ -221,14 +165,12 @@ When setting now time must be later than last_reconfiguration_time.
 ### Function `set_for_next_epoch`
 
 
-<pre><code><b>public</b> <b>fun</b> <a href="execution_config.md#0x1_execution_config_set_for_next_epoch">set_for_next_epoch</a>(<a href="account.md#0x1_account">account</a>: &<a href="../../aptos-stdlib/../move-stdlib/doc/signer.md#0x1_signer">signer</a>, config: <a href="../../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u8&gt;)
-</code></pre>
+<pre><code>public fun set_for_next_epoch(account: &amp;signer, config: vector&lt;u8&gt;)<br/></code></pre>
 
 
 
 
-<pre><code><b>include</b> <a href="config_buffer.md#0x1_config_buffer_SetForNextEpochAbortsIf">config_buffer::SetForNextEpochAbortsIf</a>;
-</code></pre>
+<pre><code>include config_buffer::SetForNextEpochAbortsIf;<br/></code></pre>
 
 
 
@@ -237,16 +179,12 @@ When setting now time must be later than last_reconfiguration_time.
 ### Function `on_new_epoch`
 
 
-<pre><code><b>public</b>(<b>friend</b>) <b>fun</b> <a href="execution_config.md#0x1_execution_config_on_new_epoch">on_new_epoch</a>(framework: &<a href="../../aptos-stdlib/../move-stdlib/doc/signer.md#0x1_signer">signer</a>)
-</code></pre>
+<pre><code>public(friend) fun on_new_epoch(framework: &amp;signer)<br/></code></pre>
 
 
 
 
-<pre><code><b>requires</b> @aptos_framework == std::signer::address_of(framework);
-<b>include</b> <a href="config_buffer.md#0x1_config_buffer_OnNewEpochRequirement">config_buffer::OnNewEpochRequirement</a>&lt;<a href="execution_config.md#0x1_execution_config_ExecutionConfig">ExecutionConfig</a>&gt;;
-<b>aborts_if</b> <b>false</b>;
-</code></pre>
+<pre><code>requires @aptos_framework &#61;&#61; std::signer::address_of(framework);<br/>include config_buffer::OnNewEpochRequirement&lt;ExecutionConfig&gt;;<br/>aborts_if false;<br/></code></pre>
 
 
 [move-book]: https://aptos.dev/move/book/SUMMARY

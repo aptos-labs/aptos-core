@@ -24,8 +24,7 @@ details on BCS.
 Return the binary representation of <code>v</code> in BCS (Binary Canonical Serialization) format
 
 
-<pre><code><b>public</b> <b>fun</b> <a href="bcs.md#0x1_bcs_to_bytes">to_bytes</a>&lt;MoveValue&gt;(v: &MoveValue): <a href="vector.md#0x1_vector">vector</a>&lt;u8&gt;
-</code></pre>
+<pre><code>public fun to_bytes&lt;MoveValue&gt;(v: &amp;MoveValue): vector&lt;u8&gt;<br/></code></pre>
 
 
 
@@ -33,8 +32,7 @@ Return the binary representation of <code>v</code> in BCS (Binary Canonical Seri
 <summary>Implementation</summary>
 
 
-<pre><code><b>native</b> <b>public</b> <b>fun</b> <a href="bcs.md#0x1_bcs_to_bytes">to_bytes</a>&lt;MoveValue&gt;(v: &MoveValue): <a href="vector.md#0x1_vector">vector</a>&lt;u8&gt;;
-</code></pre>
+<pre><code>native public fun to_bytes&lt;MoveValue&gt;(v: &amp;MoveValue): vector&lt;u8&gt;;<br/></code></pre>
 
 
 
@@ -52,8 +50,7 @@ Native function which is defined in the prover's prelude.
 <a id="0x1_bcs_serialize"></a>
 
 
-<pre><code><b>native</b> <b>fun</b> <a href="bcs.md#0x1_bcs_serialize">serialize</a>&lt;MoveValue&gt;(v: &MoveValue): <a href="vector.md#0x1_vector">vector</a>&lt;u8&gt;;
-</code></pre>
+<pre><code>native fun serialize&lt;MoveValue&gt;(v: &amp;MoveValue): vector&lt;u8&gt;;<br/></code></pre>
 
 
 [move-book]: https://aptos.dev/move/book/SUMMARY

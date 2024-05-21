@@ -23,11 +23,7 @@ By utilizing this current module, a developer can create his own coin and care l
     -  [Function `register`](#@Specification_1_register)
 
 
-<pre><code><b>use</b> <a href="coin.md#0x1_coin">0x1::coin</a>;
-<b>use</b> <a href="../../aptos-stdlib/../move-stdlib/doc/error.md#0x1_error">0x1::error</a>;
-<b>use</b> <a href="../../aptos-stdlib/../move-stdlib/doc/signer.md#0x1_signer">0x1::signer</a>;
-<b>use</b> <a href="../../aptos-stdlib/../move-stdlib/doc/string.md#0x1_string">0x1::string</a>;
-</code></pre>
+<pre><code>use 0x1::coin;<br/>use 0x1::error;<br/>use 0x1::signer;<br/>use 0x1::string;<br/></code></pre>
 
 
 
@@ -39,8 +35,7 @@ Capabilities resource storing mint and burn capabilities.
 The resource is stored on the account that initialized coin <code>CoinType</code>.
 
 
-<pre><code><b>struct</b> <a href="managed_coin.md#0x1_managed_coin_Capabilities">Capabilities</a>&lt;CoinType&gt; <b>has</b> key
-</code></pre>
+<pre><code>struct Capabilities&lt;CoinType&gt; has key<br/></code></pre>
 
 
 
@@ -50,19 +45,19 @@ The resource is stored on the account that initialized coin <code>CoinType</code
 
 <dl>
 <dt>
-<code>burn_cap: <a href="coin.md#0x1_coin_BurnCapability">coin::BurnCapability</a>&lt;CoinType&gt;</code>
+<code>burn_cap: coin::BurnCapability&lt;CoinType&gt;</code>
 </dt>
 <dd>
 
 </dd>
 <dt>
-<code>freeze_cap: <a href="coin.md#0x1_coin_FreezeCapability">coin::FreezeCapability</a>&lt;CoinType&gt;</code>
+<code>freeze_cap: coin::FreezeCapability&lt;CoinType&gt;</code>
 </dt>
 <dd>
 
 </dd>
 <dt>
-<code>mint_cap: <a href="coin.md#0x1_coin_MintCapability">coin::MintCapability</a>&lt;CoinType&gt;</code>
+<code>mint_cap: coin::MintCapability&lt;CoinType&gt;</code>
 </dt>
 <dd>
 
@@ -82,8 +77,7 @@ The resource is stored on the account that initialized coin <code>CoinType</code
 Account has no capabilities (burn/mint).
 
 
-<pre><code><b>const</b> <a href="managed_coin.md#0x1_managed_coin_ENO_CAPABILITIES">ENO_CAPABILITIES</a>: u64 = 1;
-</code></pre>
+<pre><code>const ENO_CAPABILITIES: u64 &#61; 1;<br/></code></pre>
 
 
 
@@ -91,11 +85,10 @@ Account has no capabilities (burn/mint).
 
 ## Function `burn`
 
-Withdraw an <code>amount</code> of coin <code>CoinType</code> from <code><a href="account.md#0x1_account">account</a></code> and burn it.
+Withdraw an <code>amount</code> of coin <code>CoinType</code> from <code>account</code> and burn it.
 
 
-<pre><code><b>public</b> entry <b>fun</b> <a href="managed_coin.md#0x1_managed_coin_burn">burn</a>&lt;CoinType&gt;(<a href="account.md#0x1_account">account</a>: &<a href="../../aptos-stdlib/../move-stdlib/doc/signer.md#0x1_signer">signer</a>, amount: u64)
-</code></pre>
+<pre><code>public entry fun burn&lt;CoinType&gt;(account: &amp;signer, amount: u64)<br/></code></pre>
 
 
 
@@ -103,23 +96,7 @@ Withdraw an <code>amount</code> of coin <code>CoinType</code> from <code><a href
 <summary>Implementation</summary>
 
 
-<pre><code><b>public</b> entry <b>fun</b> <a href="managed_coin.md#0x1_managed_coin_burn">burn</a>&lt;CoinType&gt;(
-    <a href="account.md#0x1_account">account</a>: &<a href="../../aptos-stdlib/../move-stdlib/doc/signer.md#0x1_signer">signer</a>,
-    amount: u64,
-) <b>acquires</b> <a href="managed_coin.md#0x1_managed_coin_Capabilities">Capabilities</a> {
-    <b>let</b> account_addr = <a href="../../aptos-stdlib/../move-stdlib/doc/signer.md#0x1_signer_address_of">signer::address_of</a>(<a href="account.md#0x1_account">account</a>);
-
-    <b>assert</b>!(
-        <b>exists</b>&lt;<a href="managed_coin.md#0x1_managed_coin_Capabilities">Capabilities</a>&lt;CoinType&gt;&gt;(account_addr),
-        <a href="../../aptos-stdlib/../move-stdlib/doc/error.md#0x1_error_not_found">error::not_found</a>(<a href="managed_coin.md#0x1_managed_coin_ENO_CAPABILITIES">ENO_CAPABILITIES</a>),
-    );
-
-    <b>let</b> capabilities = <b>borrow_global</b>&lt;<a href="managed_coin.md#0x1_managed_coin_Capabilities">Capabilities</a>&lt;CoinType&gt;&gt;(account_addr);
-
-    <b>let</b> to_burn = <a href="coin.md#0x1_coin_withdraw">coin::withdraw</a>&lt;CoinType&gt;(<a href="account.md#0x1_account">account</a>, amount);
-    <a href="coin.md#0x1_coin_burn">coin::burn</a>(to_burn, &capabilities.burn_cap);
-}
-</code></pre>
+<pre><code>public entry fun burn&lt;CoinType&gt;(<br/>    account: &amp;signer,<br/>    amount: u64,<br/>) acquires Capabilities &#123;<br/>    let account_addr &#61; signer::address_of(account);<br/><br/>    assert!(<br/>        exists&lt;Capabilities&lt;CoinType&gt;&gt;(account_addr),<br/>        error::not_found(ENO_CAPABILITIES),<br/>    );<br/><br/>    let capabilities &#61; borrow_global&lt;Capabilities&lt;CoinType&gt;&gt;(account_addr);<br/><br/>    let to_burn &#61; coin::withdraw&lt;CoinType&gt;(account, amount);<br/>    coin::burn(to_burn, &amp;capabilities.burn_cap);<br/>&#125;<br/></code></pre>
 
 
 
@@ -130,11 +107,10 @@ Withdraw an <code>amount</code> of coin <code>CoinType</code> from <code><a href
 ## Function `initialize`
 
 Initialize new coin <code>CoinType</code> in Aptos Blockchain.
-Mint and Burn Capabilities will be stored under <code><a href="account.md#0x1_account">account</a></code> in <code><a href="managed_coin.md#0x1_managed_coin_Capabilities">Capabilities</a></code> resource.
+Mint and Burn Capabilities will be stored under <code>account</code> in <code>Capabilities</code> resource.
 
 
-<pre><code><b>public</b> entry <b>fun</b> <a href="managed_coin.md#0x1_managed_coin_initialize">initialize</a>&lt;CoinType&gt;(<a href="account.md#0x1_account">account</a>: &<a href="../../aptos-stdlib/../move-stdlib/doc/signer.md#0x1_signer">signer</a>, name: <a href="../../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u8&gt;, symbol: <a href="../../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u8&gt;, decimals: u8, monitor_supply: bool)
-</code></pre>
+<pre><code>public entry fun initialize&lt;CoinType&gt;(account: &amp;signer, name: vector&lt;u8&gt;, symbol: vector&lt;u8&gt;, decimals: u8, monitor_supply: bool)<br/></code></pre>
 
 
 
@@ -142,28 +118,7 @@ Mint and Burn Capabilities will be stored under <code><a href="account.md#0x1_ac
 <summary>Implementation</summary>
 
 
-<pre><code><b>public</b> entry <b>fun</b> <a href="managed_coin.md#0x1_managed_coin_initialize">initialize</a>&lt;CoinType&gt;(
-    <a href="account.md#0x1_account">account</a>: &<a href="../../aptos-stdlib/../move-stdlib/doc/signer.md#0x1_signer">signer</a>,
-    name: <a href="../../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u8&gt;,
-    symbol: <a href="../../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u8&gt;,
-    decimals: u8,
-    monitor_supply: bool,
-) {
-    <b>let</b> (burn_cap, freeze_cap, mint_cap) = <a href="coin.md#0x1_coin_initialize">coin::initialize</a>&lt;CoinType&gt;(
-        <a href="account.md#0x1_account">account</a>,
-        <a href="../../aptos-stdlib/../move-stdlib/doc/string.md#0x1_string_utf8">string::utf8</a>(name),
-        <a href="../../aptos-stdlib/../move-stdlib/doc/string.md#0x1_string_utf8">string::utf8</a>(symbol),
-        decimals,
-        monitor_supply,
-    );
-
-    <b>move_to</b>(<a href="account.md#0x1_account">account</a>, <a href="managed_coin.md#0x1_managed_coin_Capabilities">Capabilities</a>&lt;CoinType&gt; {
-        burn_cap,
-        freeze_cap,
-        mint_cap,
-    });
-}
-</code></pre>
+<pre><code>public entry fun initialize&lt;CoinType&gt;(<br/>    account: &amp;signer,<br/>    name: vector&lt;u8&gt;,<br/>    symbol: vector&lt;u8&gt;,<br/>    decimals: u8,<br/>    monitor_supply: bool,<br/>) &#123;<br/>    let (burn_cap, freeze_cap, mint_cap) &#61; coin::initialize&lt;CoinType&gt;(<br/>        account,<br/>        string::utf8(name),<br/>        string::utf8(symbol),<br/>        decimals,<br/>        monitor_supply,<br/>    );<br/><br/>    move_to(account, Capabilities&lt;CoinType&gt; &#123;<br/>        burn_cap,<br/>        freeze_cap,<br/>        mint_cap,<br/>    &#125;);<br/>&#125;<br/></code></pre>
 
 
 
@@ -176,8 +131,7 @@ Mint and Burn Capabilities will be stored under <code><a href="account.md#0x1_ac
 Create new coins <code>CoinType</code> and deposit them into dst_addr's account.
 
 
-<pre><code><b>public</b> entry <b>fun</b> <a href="managed_coin.md#0x1_managed_coin_mint">mint</a>&lt;CoinType&gt;(<a href="account.md#0x1_account">account</a>: &<a href="../../aptos-stdlib/../move-stdlib/doc/signer.md#0x1_signer">signer</a>, dst_addr: <b>address</b>, amount: u64)
-</code></pre>
+<pre><code>public entry fun mint&lt;CoinType&gt;(account: &amp;signer, dst_addr: address, amount: u64)<br/></code></pre>
 
 
 
@@ -185,23 +139,7 @@ Create new coins <code>CoinType</code> and deposit them into dst_addr's account.
 <summary>Implementation</summary>
 
 
-<pre><code><b>public</b> entry <b>fun</b> <a href="managed_coin.md#0x1_managed_coin_mint">mint</a>&lt;CoinType&gt;(
-    <a href="account.md#0x1_account">account</a>: &<a href="../../aptos-stdlib/../move-stdlib/doc/signer.md#0x1_signer">signer</a>,
-    dst_addr: <b>address</b>,
-    amount: u64,
-) <b>acquires</b> <a href="managed_coin.md#0x1_managed_coin_Capabilities">Capabilities</a> {
-    <b>let</b> account_addr = <a href="../../aptos-stdlib/../move-stdlib/doc/signer.md#0x1_signer_address_of">signer::address_of</a>(<a href="account.md#0x1_account">account</a>);
-
-    <b>assert</b>!(
-        <b>exists</b>&lt;<a href="managed_coin.md#0x1_managed_coin_Capabilities">Capabilities</a>&lt;CoinType&gt;&gt;(account_addr),
-        <a href="../../aptos-stdlib/../move-stdlib/doc/error.md#0x1_error_not_found">error::not_found</a>(<a href="managed_coin.md#0x1_managed_coin_ENO_CAPABILITIES">ENO_CAPABILITIES</a>),
-    );
-
-    <b>let</b> capabilities = <b>borrow_global</b>&lt;<a href="managed_coin.md#0x1_managed_coin_Capabilities">Capabilities</a>&lt;CoinType&gt;&gt;(account_addr);
-    <b>let</b> coins_minted = <a href="coin.md#0x1_coin_mint">coin::mint</a>(amount, &capabilities.mint_cap);
-    <a href="coin.md#0x1_coin_deposit">coin::deposit</a>(dst_addr, coins_minted);
-}
-</code></pre>
+<pre><code>public entry fun mint&lt;CoinType&gt;(<br/>    account: &amp;signer,<br/>    dst_addr: address,<br/>    amount: u64,<br/>) acquires Capabilities &#123;<br/>    let account_addr &#61; signer::address_of(account);<br/><br/>    assert!(<br/>        exists&lt;Capabilities&lt;CoinType&gt;&gt;(account_addr),<br/>        error::not_found(ENO_CAPABILITIES),<br/>    );<br/><br/>    let capabilities &#61; borrow_global&lt;Capabilities&lt;CoinType&gt;&gt;(account_addr);<br/>    let coins_minted &#61; coin::mint(amount, &amp;capabilities.mint_cap);<br/>    coin::deposit(dst_addr, coins_minted);<br/>&#125;<br/></code></pre>
 
 
 
@@ -215,8 +153,7 @@ Creating a resource that stores balance of <code>CoinType</code> on user's accou
 Required if user wants to start accepting deposits of <code>CoinType</code> in his account.
 
 
-<pre><code><b>public</b> entry <b>fun</b> <a href="managed_coin.md#0x1_managed_coin_register">register</a>&lt;CoinType&gt;(<a href="account.md#0x1_account">account</a>: &<a href="../../aptos-stdlib/../move-stdlib/doc/signer.md#0x1_signer">signer</a>)
-</code></pre>
+<pre><code>public entry fun register&lt;CoinType&gt;(account: &amp;signer)<br/></code></pre>
 
 
 
@@ -224,10 +161,7 @@ Required if user wants to start accepting deposits of <code>CoinType</code> in h
 <summary>Implementation</summary>
 
 
-<pre><code><b>public</b> entry <b>fun</b> <a href="managed_coin.md#0x1_managed_coin_register">register</a>&lt;CoinType&gt;(<a href="account.md#0x1_account">account</a>: &<a href="../../aptos-stdlib/../move-stdlib/doc/signer.md#0x1_signer">signer</a>) {
-    <a href="coin.md#0x1_coin_register">coin::register</a>&lt;CoinType&gt;(<a href="account.md#0x1_account">account</a>);
-}
-</code></pre>
+<pre><code>public entry fun register&lt;CoinType&gt;(account: &amp;signer) &#123;<br/>    coin::register&lt;CoinType&gt;(account);<br/>&#125;<br/></code></pre>
 
 
 
@@ -307,9 +241,7 @@ Required if user wants to start accepting deposits of <code>CoinType</code> in h
 ### Module-level Specification
 
 
-<pre><code><b>pragma</b> verify = <b>true</b>;
-<b>pragma</b> aborts_if_is_strict;
-</code></pre>
+<pre><code>pragma verify &#61; true;<br/>pragma aborts_if_is_strict;<br/></code></pre>
 
 
 
@@ -318,28 +250,13 @@ Required if user wants to start accepting deposits of <code>CoinType</code> in h
 ### Function `burn`
 
 
-<pre><code><b>public</b> entry <b>fun</b> <a href="managed_coin.md#0x1_managed_coin_burn">burn</a>&lt;CoinType&gt;(<a href="account.md#0x1_account">account</a>: &<a href="../../aptos-stdlib/../move-stdlib/doc/signer.md#0x1_signer">signer</a>, amount: u64)
-</code></pre>
+<pre><code>public entry fun burn&lt;CoinType&gt;(account: &amp;signer, amount: u64)<br/></code></pre>
 
 
 
 
-<pre><code><b>pragma</b> verify = <b>false</b>;
-<b>let</b> account_addr = <a href="../../aptos-stdlib/../move-stdlib/doc/signer.md#0x1_signer_address_of">signer::address_of</a>(<a href="account.md#0x1_account">account</a>);
-<b>aborts_if</b> !<b>exists</b>&lt;<a href="managed_coin.md#0x1_managed_coin_Capabilities">Capabilities</a>&lt;CoinType&gt;&gt;(account_addr);
-<b>let</b> coin_store = <b>global</b>&lt;<a href="coin.md#0x1_coin_CoinStore">coin::CoinStore</a>&lt;CoinType&gt;&gt;(account_addr);
-<b>let</b> balance = coin_store.<a href="coin.md#0x1_coin">coin</a>.value;
-// This enforces <a id="high-level-req-3.2" href="#high-level-req">high-level requirement 3</a> and <a id="high-level-req-4.1" href="#high-level-req">high-level requirement 4</a>:
-<b>aborts_if</b> !<b>exists</b>&lt;<a href="coin.md#0x1_coin_CoinStore">coin::CoinStore</a>&lt;CoinType&gt;&gt;(account_addr);
-<b>aborts_if</b> coin_store.frozen;
-<b>aborts_if</b> balance &lt; amount;
-<b>let</b> addr =  <a href="../../aptos-stdlib/doc/type_info.md#0x1_type_info_type_of">type_info::type_of</a>&lt;CoinType&gt;().account_address;
-<b>let</b> maybe_supply = <b>global</b>&lt;<a href="coin.md#0x1_coin_CoinInfo">coin::CoinInfo</a>&lt;CoinType&gt;&gt;(addr).supply;
-<b>aborts_if</b> amount == 0;
-<b>aborts_if</b> !<b>exists</b>&lt;<a href="coin.md#0x1_coin_CoinInfo">coin::CoinInfo</a>&lt;CoinType&gt;&gt;(addr);
-<b>include</b> <a href="coin.md#0x1_coin_CoinSubAbortsIf">coin::CoinSubAbortsIf</a>&lt;CoinType&gt; { amount:amount };
-<b>ensures</b> <a href="coin.md#0x1_coin_supply">coin::supply</a>&lt;CoinType&gt; == <b>old</b>(<a href="coin.md#0x1_coin_supply">coin::supply</a>&lt;CoinType&gt;) - amount;
-</code></pre>
+<pre><code>pragma verify &#61; false;<br/>let account_addr &#61; signer::address_of(account);<br/>aborts_if !exists&lt;Capabilities&lt;CoinType&gt;&gt;(account_addr);<br/>let coin_store &#61; global&lt;coin::CoinStore&lt;CoinType&gt;&gt;(account_addr);<br/>let balance &#61; coin_store.coin.value;<br/>// This enforces <a id="high-level-req-3.2" href="#high-level-req">high-level requirement 3</a> and <a id="high-level-req-4.1" href="#high-level-req">high-level requirement 4</a>:
+aborts_if !exists&lt;coin::CoinStore&lt;CoinType&gt;&gt;(account_addr);<br/>aborts_if coin_store.frozen;<br/>aborts_if balance &lt; amount;<br/>let addr &#61;  type_info::type_of&lt;CoinType&gt;().account_address;<br/>let maybe_supply &#61; global&lt;coin::CoinInfo&lt;CoinType&gt;&gt;(addr).supply;<br/>aborts_if amount &#61;&#61; 0;<br/>aborts_if !exists&lt;coin::CoinInfo&lt;CoinType&gt;&gt;(addr);<br/>include coin::CoinSubAbortsIf&lt;CoinType&gt; &#123; amount:amount &#125;;<br/>ensures coin::supply&lt;CoinType&gt; &#61;&#61; old(coin::supply&lt;CoinType&gt;) &#45; amount;<br/></code></pre>
 
 
 
@@ -348,8 +265,7 @@ Required if user wants to start accepting deposits of <code>CoinType</code> in h
 ### Function `initialize`
 
 
-<pre><code><b>public</b> entry <b>fun</b> <a href="managed_coin.md#0x1_managed_coin_initialize">initialize</a>&lt;CoinType&gt;(<a href="account.md#0x1_account">account</a>: &<a href="../../aptos-stdlib/../move-stdlib/doc/signer.md#0x1_signer">signer</a>, name: <a href="../../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u8&gt;, symbol: <a href="../../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u8&gt;, decimals: u8, monitor_supply: bool)
-</code></pre>
+<pre><code>public entry fun initialize&lt;CoinType&gt;(account: &amp;signer, name: vector&lt;u8&gt;, symbol: vector&lt;u8&gt;, decimals: u8, monitor_supply: bool)<br/></code></pre>
 
 
 Make sure <code>name</code> and <code>symbol</code> are legal length.
@@ -359,13 +275,8 @@ The Capabilities<CoinType> should not be under the signer before creating;
 The Capabilities<CoinType> should be under the signer after creating;
 
 
-<pre><code><b>include</b> <a href="coin.md#0x1_coin_InitializeInternalSchema">coin::InitializeInternalSchema</a>&lt;CoinType&gt;;
-<b>aborts_if</b> !<a href="../../aptos-stdlib/../move-stdlib/doc/string.md#0x1_string_spec_internal_check_utf8">string::spec_internal_check_utf8</a>(name);
-<b>aborts_if</b> !<a href="../../aptos-stdlib/../move-stdlib/doc/string.md#0x1_string_spec_internal_check_utf8">string::spec_internal_check_utf8</a>(symbol);
-<b>aborts_if</b> <b>exists</b>&lt;<a href="managed_coin.md#0x1_managed_coin_Capabilities">Capabilities</a>&lt;CoinType&gt;&gt;(<a href="../../aptos-stdlib/../move-stdlib/doc/signer.md#0x1_signer_address_of">signer::address_of</a>(<a href="account.md#0x1_account">account</a>));
-// This enforces <a id="high-level-req-1" href="#high-level-req">high-level requirement 1</a> and <a id="high-level-req-3.1" href="#high-level-req">high-level requirement 3</a>:
-<b>ensures</b> <b>exists</b>&lt;<a href="managed_coin.md#0x1_managed_coin_Capabilities">Capabilities</a>&lt;CoinType&gt;&gt;(<a href="../../aptos-stdlib/../move-stdlib/doc/signer.md#0x1_signer_address_of">signer::address_of</a>(<a href="account.md#0x1_account">account</a>));
-</code></pre>
+<pre><code>include coin::InitializeInternalSchema&lt;CoinType&gt;;<br/>aborts_if !string::spec_internal_check_utf8(name);<br/>aborts_if !string::spec_internal_check_utf8(symbol);<br/>aborts_if exists&lt;Capabilities&lt;CoinType&gt;&gt;(signer::address_of(account));<br/>// This enforces <a id="high-level-req-1" href="#high-level-req">high-level requirement 1</a> and <a id="high-level-req-3.1" href="#high-level-req">high-level requirement 3</a>:
+ensures exists&lt;Capabilities&lt;CoinType&gt;&gt;(signer::address_of(account));<br/></code></pre>
 
 
 
@@ -374,28 +285,16 @@ The Capabilities<CoinType> should be under the signer after creating;
 ### Function `mint`
 
 
-<pre><code><b>public</b> entry <b>fun</b> <a href="managed_coin.md#0x1_managed_coin_mint">mint</a>&lt;CoinType&gt;(<a href="account.md#0x1_account">account</a>: &<a href="../../aptos-stdlib/../move-stdlib/doc/signer.md#0x1_signer">signer</a>, dst_addr: <b>address</b>, amount: u64)
-</code></pre>
+<pre><code>public entry fun mint&lt;CoinType&gt;(account: &amp;signer, dst_addr: address, amount: u64)<br/></code></pre>
 
 
 The Capabilities<CoinType> should not exist in the signer address.
 The <code>dst_addr</code> should not be frozen.
 
 
-<pre><code><b>pragma</b> verify = <b>false</b>;
-<b>let</b> account_addr = <a href="../../aptos-stdlib/../move-stdlib/doc/signer.md#0x1_signer_address_of">signer::address_of</a>(<a href="account.md#0x1_account">account</a>);
-// This enforces <a id="high-level-req-3.3" href="#high-level-req">high-level requirement 3</a>:
-<b>aborts_if</b> !<b>exists</b>&lt;<a href="managed_coin.md#0x1_managed_coin_Capabilities">Capabilities</a>&lt;CoinType&gt;&gt;(account_addr);
-<b>let</b> addr = <a href="../../aptos-stdlib/doc/type_info.md#0x1_type_info_type_of">type_info::type_of</a>&lt;CoinType&gt;().account_address;
-<b>aborts_if</b> (amount != 0) && !<b>exists</b>&lt;<a href="coin.md#0x1_coin_CoinInfo">coin::CoinInfo</a>&lt;CoinType&gt;&gt;(addr);
-<b>let</b> coin_store = <b>global</b>&lt;<a href="coin.md#0x1_coin_CoinStore">coin::CoinStore</a>&lt;CoinType&gt;&gt;(dst_addr);
-<b>aborts_if</b> !<b>exists</b>&lt;<a href="coin.md#0x1_coin_CoinStore">coin::CoinStore</a>&lt;CoinType&gt;&gt;(dst_addr);
-<b>aborts_if</b> coin_store.frozen;
-<b>include</b> <a href="coin.md#0x1_coin_CoinAddAbortsIf">coin::CoinAddAbortsIf</a>&lt;CoinType&gt;;
-<b>ensures</b> <a href="coin.md#0x1_coin_supply">coin::supply</a>&lt;CoinType&gt; == <b>old</b>(<a href="coin.md#0x1_coin_supply">coin::supply</a>&lt;CoinType&gt;) + amount;
-// This enforces <a id="high-level-req-6" href="#high-level-req">high-level requirement 6</a>:
-<b>ensures</b> <b>global</b>&lt;<a href="coin.md#0x1_coin_CoinStore">coin::CoinStore</a>&lt;CoinType&gt;&gt;(dst_addr).<a href="coin.md#0x1_coin">coin</a>.value == <b>old</b>(<b>global</b>&lt;<a href="coin.md#0x1_coin_CoinStore">coin::CoinStore</a>&lt;CoinType&gt;&gt;(dst_addr)).<a href="coin.md#0x1_coin">coin</a>.value + amount;
-</code></pre>
+<pre><code>pragma verify &#61; false;<br/>let account_addr &#61; signer::address_of(account);<br/>// This enforces <a id="high-level-req-3.3" href="#high-level-req">high-level requirement 3</a>:
+aborts_if !exists&lt;Capabilities&lt;CoinType&gt;&gt;(account_addr);<br/>let addr &#61; type_info::type_of&lt;CoinType&gt;().account_address;<br/>aborts_if (amount !&#61; 0) &amp;&amp; !exists&lt;coin::CoinInfo&lt;CoinType&gt;&gt;(addr);<br/>let coin_store &#61; global&lt;coin::CoinStore&lt;CoinType&gt;&gt;(dst_addr);<br/>aborts_if !exists&lt;coin::CoinStore&lt;CoinType&gt;&gt;(dst_addr);<br/>aborts_if coin_store.frozen;<br/>include coin::CoinAddAbortsIf&lt;CoinType&gt;;<br/>ensures coin::supply&lt;CoinType&gt; &#61;&#61; old(coin::supply&lt;CoinType&gt;) &#43; amount;<br/>// This enforces <a id="high-level-req-6" href="#high-level-req">high-level requirement 6</a>:
+ensures global&lt;coin::CoinStore&lt;CoinType&gt;&gt;(dst_addr).coin.value &#61;&#61; old(global&lt;coin::CoinStore&lt;CoinType&gt;&gt;(dst_addr)).coin.value &#43; amount;<br/></code></pre>
 
 
 
@@ -404,23 +303,14 @@ The <code>dst_addr</code> should not be frozen.
 ### Function `register`
 
 
-<pre><code><b>public</b> entry <b>fun</b> <a href="managed_coin.md#0x1_managed_coin_register">register</a>&lt;CoinType&gt;(<a href="account.md#0x1_account">account</a>: &<a href="../../aptos-stdlib/../move-stdlib/doc/signer.md#0x1_signer">signer</a>)
-</code></pre>
+<pre><code>public entry fun register&lt;CoinType&gt;(account: &amp;signer)<br/></code></pre>
 
 
 An account can only be registered once.
 Updating <code>Account.guid_creation_num</code> will not overflow.
 
 
-<pre><code><b>pragma</b> verify = <b>false</b>;
-<b>let</b> account_addr = <a href="../../aptos-stdlib/../move-stdlib/doc/signer.md#0x1_signer_address_of">signer::address_of</a>(<a href="account.md#0x1_account">account</a>);
-<b>let</b> acc = <b>global</b>&lt;<a href="account.md#0x1_account_Account">account::Account</a>&gt;(account_addr);
-<b>aborts_if</b> !<b>exists</b>&lt;<a href="coin.md#0x1_coin_CoinStore">coin::CoinStore</a>&lt;CoinType&gt;&gt;(account_addr) && acc.guid_creation_num + 2 &gt;= <a href="account.md#0x1_account_MAX_GUID_CREATION_NUM">account::MAX_GUID_CREATION_NUM</a>;
-<b>aborts_if</b> !<b>exists</b>&lt;<a href="coin.md#0x1_coin_CoinStore">coin::CoinStore</a>&lt;CoinType&gt;&gt;(account_addr) && acc.guid_creation_num + 2 &gt; MAX_U64;
-<b>aborts_if</b> !<b>exists</b>&lt;<a href="coin.md#0x1_coin_CoinStore">coin::CoinStore</a>&lt;CoinType&gt;&gt;(account_addr) && !<b>exists</b>&lt;<a href="account.md#0x1_account_Account">account::Account</a>&gt;(account_addr);
-<b>aborts_if</b> !<b>exists</b>&lt;<a href="coin.md#0x1_coin_CoinStore">coin::CoinStore</a>&lt;CoinType&gt;&gt;(account_addr) && !<a href="../../aptos-stdlib/doc/type_info.md#0x1_type_info_spec_is_struct">type_info::spec_is_struct</a>&lt;CoinType&gt;();
-<b>ensures</b> <b>exists</b>&lt;<a href="coin.md#0x1_coin_CoinStore">coin::CoinStore</a>&lt;CoinType&gt;&gt;(account_addr);
-</code></pre>
+<pre><code>pragma verify &#61; false;<br/>let account_addr &#61; signer::address_of(account);<br/>let acc &#61; global&lt;account::Account&gt;(account_addr);<br/>aborts_if !exists&lt;coin::CoinStore&lt;CoinType&gt;&gt;(account_addr) &amp;&amp; acc.guid_creation_num &#43; 2 &gt;&#61; account::MAX_GUID_CREATION_NUM;<br/>aborts_if !exists&lt;coin::CoinStore&lt;CoinType&gt;&gt;(account_addr) &amp;&amp; acc.guid_creation_num &#43; 2 &gt; MAX_U64;<br/>aborts_if !exists&lt;coin::CoinStore&lt;CoinType&gt;&gt;(account_addr) &amp;&amp; !exists&lt;account::Account&gt;(account_addr);<br/>aborts_if !exists&lt;coin::CoinStore&lt;CoinType&gt;&gt;(account_addr) &amp;&amp; !type_info::spec_is_struct&lt;CoinType&gt;();<br/>ensures exists&lt;coin::CoinStore&lt;CoinType&gt;&gt;(account_addr);<br/></code></pre>
 
 
 [move-book]: https://aptos.dev/move/book/SUMMARY

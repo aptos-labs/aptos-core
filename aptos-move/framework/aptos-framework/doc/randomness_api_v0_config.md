@@ -14,11 +14,7 @@
 -  [Specification](#@Specification_0)
 
 
-<pre><code><b>use</b> <a href="chain_status.md#0x1_chain_status">0x1::chain_status</a>;
-<b>use</b> <a href="config_buffer.md#0x1_config_buffer">0x1::config_buffer</a>;
-<b>use</b> <a href="../../aptos-stdlib/../move-stdlib/doc/option.md#0x1_option">0x1::option</a>;
-<b>use</b> <a href="system_addresses.md#0x1_system_addresses">0x1::system_addresses</a>;
-</code></pre>
+<pre><code>use 0x1::chain_status;<br/>use 0x1::config_buffer;<br/>use 0x1::option;<br/>use 0x1::system_addresses;<br/></code></pre>
 
 
 
@@ -28,8 +24,7 @@
 
 
 
-<pre><code><b>struct</b> <a href="randomness_api_v0_config.md#0x1_randomness_api_v0_config_RequiredGasDeposit">RequiredGasDeposit</a> <b>has</b> drop, store, key
-</code></pre>
+<pre><code>struct RequiredGasDeposit has drop, store, key<br/></code></pre>
 
 
 
@@ -39,7 +34,7 @@
 
 <dl>
 <dt>
-<code>gas_amount: <a href="../../aptos-stdlib/../move-stdlib/doc/option.md#0x1_option_Option">option::Option</a>&lt;u64&gt;</code>
+<code>gas_amount: option::Option&lt;u64&gt;</code>
 </dt>
 <dd>
 
@@ -53,11 +48,10 @@
 
 ## Resource `AllowCustomMaxGasFlag`
 
-If this flag is set, <code>max_gas</code> specified inside <code>#[<a href="randomness.md#0x1_randomness">randomness</a>()]</code> will be used as the required deposit.
+If this flag is set, <code>max_gas</code> specified inside <code>&#35;[randomness()]</code> will be used as the required deposit.
 
 
-<pre><code><b>struct</b> <a href="randomness_api_v0_config.md#0x1_randomness_api_v0_config_AllowCustomMaxGasFlag">AllowCustomMaxGasFlag</a> <b>has</b> drop, store, key
-</code></pre>
+<pre><code>struct AllowCustomMaxGasFlag has drop, store, key<br/></code></pre>
 
 
 
@@ -84,8 +78,7 @@ If this flag is set, <code>max_gas</code> specified inside <code>#[<a href="rand
 Only used in genesis.
 
 
-<pre><code><b>fun</b> <a href="randomness_api_v0_config.md#0x1_randomness_api_v0_config_initialize">initialize</a>(framework: &<a href="../../aptos-stdlib/../move-stdlib/doc/signer.md#0x1_signer">signer</a>, required_amount: <a href="randomness_api_v0_config.md#0x1_randomness_api_v0_config_RequiredGasDeposit">randomness_api_v0_config::RequiredGasDeposit</a>, allow_custom_max_gas_flag: <a href="randomness_api_v0_config.md#0x1_randomness_api_v0_config_AllowCustomMaxGasFlag">randomness_api_v0_config::AllowCustomMaxGasFlag</a>)
-</code></pre>
+<pre><code>fun initialize(framework: &amp;signer, required_amount: randomness_api_v0_config::RequiredGasDeposit, allow_custom_max_gas_flag: randomness_api_v0_config::AllowCustomMaxGasFlag)<br/></code></pre>
 
 
 
@@ -93,13 +86,7 @@ Only used in genesis.
 <summary>Implementation</summary>
 
 
-<pre><code><b>fun</b> <a href="randomness_api_v0_config.md#0x1_randomness_api_v0_config_initialize">initialize</a>(framework: &<a href="../../aptos-stdlib/../move-stdlib/doc/signer.md#0x1_signer">signer</a>, required_amount: <a href="randomness_api_v0_config.md#0x1_randomness_api_v0_config_RequiredGasDeposit">RequiredGasDeposit</a>, allow_custom_max_gas_flag: <a href="randomness_api_v0_config.md#0x1_randomness_api_v0_config_AllowCustomMaxGasFlag">AllowCustomMaxGasFlag</a>) {
-    <a href="system_addresses.md#0x1_system_addresses_assert_aptos_framework">system_addresses::assert_aptos_framework</a>(framework);
-    <a href="chain_status.md#0x1_chain_status_assert_genesis">chain_status::assert_genesis</a>();
-    <b>move_to</b>(framework, required_amount);
-    <b>move_to</b>(framework, allow_custom_max_gas_flag);
-}
-</code></pre>
+<pre><code>fun initialize(framework: &amp;signer, required_amount: RequiredGasDeposit, allow_custom_max_gas_flag: AllowCustomMaxGasFlag) &#123;<br/>    system_addresses::assert_aptos_framework(framework);<br/>    chain_status::assert_genesis();<br/>    move_to(framework, required_amount);<br/>    move_to(framework, allow_custom_max_gas_flag);<br/>&#125;<br/></code></pre>
 
 
 
@@ -109,11 +96,10 @@ Only used in genesis.
 
 ## Function `set_for_next_epoch`
 
-This can be called by on-chain governance to update <code><a href="randomness_api_v0_config.md#0x1_randomness_api_v0_config_RequiredGasDeposit">RequiredGasDeposit</a></code> for the next epoch.
+This can be called by on-chain governance to update <code>RequiredGasDeposit</code> for the next epoch.
 
 
-<pre><code><b>public</b> <b>fun</b> <a href="randomness_api_v0_config.md#0x1_randomness_api_v0_config_set_for_next_epoch">set_for_next_epoch</a>(framework: &<a href="../../aptos-stdlib/../move-stdlib/doc/signer.md#0x1_signer">signer</a>, gas_amount: <a href="../../aptos-stdlib/../move-stdlib/doc/option.md#0x1_option_Option">option::Option</a>&lt;u64&gt;)
-</code></pre>
+<pre><code>public fun set_for_next_epoch(framework: &amp;signer, gas_amount: option::Option&lt;u64&gt;)<br/></code></pre>
 
 
 
@@ -121,11 +107,7 @@ This can be called by on-chain governance to update <code><a href="randomness_ap
 <summary>Implementation</summary>
 
 
-<pre><code><b>public</b> <b>fun</b> <a href="randomness_api_v0_config.md#0x1_randomness_api_v0_config_set_for_next_epoch">set_for_next_epoch</a>(framework: &<a href="../../aptos-stdlib/../move-stdlib/doc/signer.md#0x1_signer">signer</a>, gas_amount: Option&lt;u64&gt;) {
-    <a href="system_addresses.md#0x1_system_addresses_assert_aptos_framework">system_addresses::assert_aptos_framework</a>(framework);
-    <a href="config_buffer.md#0x1_config_buffer_upsert">config_buffer::upsert</a>(<a href="randomness_api_v0_config.md#0x1_randomness_api_v0_config_RequiredGasDeposit">RequiredGasDeposit</a> { gas_amount });
-}
-</code></pre>
+<pre><code>public fun set_for_next_epoch(framework: &amp;signer, gas_amount: Option&lt;u64&gt;) &#123;<br/>    system_addresses::assert_aptos_framework(framework);<br/>    config_buffer::upsert(RequiredGasDeposit &#123; gas_amount &#125;);<br/>&#125;<br/></code></pre>
 
 
 
@@ -135,11 +117,10 @@ This can be called by on-chain governance to update <code><a href="randomness_ap
 
 ## Function `set_allow_max_gas_flag_for_next_epoch`
 
-This can be called by on-chain governance to update <code><a href="randomness_api_v0_config.md#0x1_randomness_api_v0_config_AllowCustomMaxGasFlag">AllowCustomMaxGasFlag</a></code> for the next epoch.
+This can be called by on-chain governance to update <code>AllowCustomMaxGasFlag</code> for the next epoch.
 
 
-<pre><code><b>public</b> <b>fun</b> <a href="randomness_api_v0_config.md#0x1_randomness_api_v0_config_set_allow_max_gas_flag_for_next_epoch">set_allow_max_gas_flag_for_next_epoch</a>(framework: &<a href="../../aptos-stdlib/../move-stdlib/doc/signer.md#0x1_signer">signer</a>, value: bool)
-</code></pre>
+<pre><code>public fun set_allow_max_gas_flag_for_next_epoch(framework: &amp;signer, value: bool)<br/></code></pre>
 
 
 
@@ -147,11 +128,7 @@ This can be called by on-chain governance to update <code><a href="randomness_ap
 <summary>Implementation</summary>
 
 
-<pre><code><b>public</b> <b>fun</b> <a href="randomness_api_v0_config.md#0x1_randomness_api_v0_config_set_allow_max_gas_flag_for_next_epoch">set_allow_max_gas_flag_for_next_epoch</a>(framework: &<a href="../../aptos-stdlib/../move-stdlib/doc/signer.md#0x1_signer">signer</a>, value: bool) {
-    <a href="system_addresses.md#0x1_system_addresses_assert_aptos_framework">system_addresses::assert_aptos_framework</a>(framework);
-    <a href="config_buffer.md#0x1_config_buffer_upsert">config_buffer::upsert</a>(<a href="randomness_api_v0_config.md#0x1_randomness_api_v0_config_AllowCustomMaxGasFlag">AllowCustomMaxGasFlag</a> { value } );
-}
-</code></pre>
+<pre><code>public fun set_allow_max_gas_flag_for_next_epoch(framework: &amp;signer, value: bool) &#123;<br/>    system_addresses::assert_aptos_framework(framework);<br/>    config_buffer::upsert(AllowCustomMaxGasFlag &#123; value &#125; );<br/>&#125;<br/></code></pre>
 
 
 
@@ -161,11 +138,10 @@ This can be called by on-chain governance to update <code><a href="randomness_ap
 
 ## Function `on_new_epoch`
 
-Only used in reconfigurations to apply the pending <code><a href="randomness_api_v0_config.md#0x1_randomness_api_v0_config_RequiredGasDeposit">RequiredGasDeposit</a></code>, if there is any.
+Only used in reconfigurations to apply the pending <code>RequiredGasDeposit</code>, if there is any.
 
 
-<pre><code><b>public</b> <b>fun</b> <a href="randomness_api_v0_config.md#0x1_randomness_api_v0_config_on_new_epoch">on_new_epoch</a>(framework: &<a href="../../aptos-stdlib/../move-stdlib/doc/signer.md#0x1_signer">signer</a>)
-</code></pre>
+<pre><code>public fun on_new_epoch(framework: &amp;signer)<br/></code></pre>
 
 
 
@@ -173,26 +149,7 @@ Only used in reconfigurations to apply the pending <code><a href="randomness_api
 <summary>Implementation</summary>
 
 
-<pre><code><b>public</b> <b>fun</b> <a href="randomness_api_v0_config.md#0x1_randomness_api_v0_config_on_new_epoch">on_new_epoch</a>(framework: &<a href="../../aptos-stdlib/../move-stdlib/doc/signer.md#0x1_signer">signer</a>) <b>acquires</b> <a href="randomness_api_v0_config.md#0x1_randomness_api_v0_config_RequiredGasDeposit">RequiredGasDeposit</a>, <a href="randomness_api_v0_config.md#0x1_randomness_api_v0_config_AllowCustomMaxGasFlag">AllowCustomMaxGasFlag</a> {
-    <a href="system_addresses.md#0x1_system_addresses_assert_aptos_framework">system_addresses::assert_aptos_framework</a>(framework);
-    <b>if</b> (<a href="config_buffer.md#0x1_config_buffer_does_exist">config_buffer::does_exist</a>&lt;<a href="randomness_api_v0_config.md#0x1_randomness_api_v0_config_RequiredGasDeposit">RequiredGasDeposit</a>&gt;()) {
-        <b>let</b> new_config = <a href="config_buffer.md#0x1_config_buffer_extract">config_buffer::extract</a>&lt;<a href="randomness_api_v0_config.md#0x1_randomness_api_v0_config_RequiredGasDeposit">RequiredGasDeposit</a>&gt;();
-        <b>if</b> (<b>exists</b>&lt;<a href="randomness_api_v0_config.md#0x1_randomness_api_v0_config_RequiredGasDeposit">RequiredGasDeposit</a>&gt;(@aptos_framework)) {
-            *<b>borrow_global_mut</b>&lt;<a href="randomness_api_v0_config.md#0x1_randomness_api_v0_config_RequiredGasDeposit">RequiredGasDeposit</a>&gt;(@aptos_framework) = new_config;
-        } <b>else</b> {
-            <b>move_to</b>(framework, new_config);
-        }
-    };
-    <b>if</b> (<a href="config_buffer.md#0x1_config_buffer_does_exist">config_buffer::does_exist</a>&lt;<a href="randomness_api_v0_config.md#0x1_randomness_api_v0_config_AllowCustomMaxGasFlag">AllowCustomMaxGasFlag</a>&gt;()) {
-        <b>let</b> new_config = <a href="config_buffer.md#0x1_config_buffer_extract">config_buffer::extract</a>&lt;<a href="randomness_api_v0_config.md#0x1_randomness_api_v0_config_AllowCustomMaxGasFlag">AllowCustomMaxGasFlag</a>&gt;();
-        <b>if</b> (<b>exists</b>&lt;<a href="randomness_api_v0_config.md#0x1_randomness_api_v0_config_AllowCustomMaxGasFlag">AllowCustomMaxGasFlag</a>&gt;(@aptos_framework)) {
-            *<b>borrow_global_mut</b>&lt;<a href="randomness_api_v0_config.md#0x1_randomness_api_v0_config_AllowCustomMaxGasFlag">AllowCustomMaxGasFlag</a>&gt;(@aptos_framework) = new_config;
-        } <b>else</b> {
-            <b>move_to</b>(framework, new_config);
-        }
-    }
-}
-</code></pre>
+<pre><code>public fun on_new_epoch(framework: &amp;signer) acquires RequiredGasDeposit, AllowCustomMaxGasFlag &#123;<br/>    system_addresses::assert_aptos_framework(framework);<br/>    if (config_buffer::does_exist&lt;RequiredGasDeposit&gt;()) &#123;<br/>        let new_config &#61; config_buffer::extract&lt;RequiredGasDeposit&gt;();<br/>        if (exists&lt;RequiredGasDeposit&gt;(@aptos_framework)) &#123;<br/>            &#42;borrow_global_mut&lt;RequiredGasDeposit&gt;(@aptos_framework) &#61; new_config;<br/>        &#125; else &#123;<br/>            move_to(framework, new_config);<br/>        &#125;<br/>    &#125;;<br/>    if (config_buffer::does_exist&lt;AllowCustomMaxGasFlag&gt;()) &#123;<br/>        let new_config &#61; config_buffer::extract&lt;AllowCustomMaxGasFlag&gt;();<br/>        if (exists&lt;AllowCustomMaxGasFlag&gt;(@aptos_framework)) &#123;<br/>            &#42;borrow_global_mut&lt;AllowCustomMaxGasFlag&gt;(@aptos_framework) &#61; new_config;<br/>        &#125; else &#123;<br/>            move_to(framework, new_config);<br/>        &#125;<br/>    &#125;<br/>&#125;<br/></code></pre>
 
 
 
@@ -204,8 +161,7 @@ Only used in reconfigurations to apply the pending <code><a href="randomness_api
 
 
 
-<pre><code><b>pragma</b> verify = <b>false</b>;
-</code></pre>
+<pre><code>pragma verify &#61; false;<br/></code></pre>
 
 
 [move-book]: https://aptos.dev/move/book/SUMMARY

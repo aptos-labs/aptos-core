@@ -7,11 +7,11 @@ Randomness stall recovery utils.
 
 When randomness generation is stuck due to a bug, the chain is also stuck. Below is the recovery procedure.
 1. Ensure more than 2/3 stakes are stuck at the same version.
-1. Every validator restarts with <code>randomness_override_seq_num</code> set to <code>X+1</code> in the node config file,
-where <code>X</code> is the current <code><a href="randomness_config_seqnum.md#0x1_randomness_config_seqnum_RandomnessConfigSeqNum">RandomnessConfigSeqNum</a></code> on chain.
+1. Every validator restarts with <code>randomness_override_seq_num</code> set to <code>X&#43;1</code> in the node config file,
+where <code>X</code> is the current <code>RandomnessConfigSeqNum</code> on chain.
 1. The chain should then be unblocked.
 1. Once the bug is fixed and the binary + framework have been patched,
-a governance proposal is needed to set <code><a href="randomness_config_seqnum.md#0x1_randomness_config_seqnum_RandomnessConfigSeqNum">RandomnessConfigSeqNum</a></code> to be <code>X+2</code>.
+a governance proposal is needed to set <code>RandomnessConfigSeqNum</code> to be <code>X&#43;2</code>.
 
 
 -  [Resource `RandomnessConfigSeqNum`](#0x1_randomness_config_seqnum_RandomnessConfigSeqNum)
@@ -22,9 +22,7 @@ a governance proposal is needed to set <code><a href="randomness_config_seqnum.m
     -  [Function `on_new_epoch`](#@Specification_0_on_new_epoch)
 
 
-<pre><code><b>use</b> <a href="config_buffer.md#0x1_config_buffer">0x1::config_buffer</a>;
-<b>use</b> <a href="system_addresses.md#0x1_system_addresses">0x1::system_addresses</a>;
-</code></pre>
+<pre><code>use 0x1::config_buffer;<br/>use 0x1::system_addresses;<br/></code></pre>
 
 
 
@@ -36,8 +34,7 @@ If this seqnum is smaller than a validator local override, the on-chain <code>Ra
 Useful in a chain recovery from randomness stall.
 
 
-<pre><code><b>struct</b> <a href="randomness_config_seqnum.md#0x1_randomness_config_seqnum_RandomnessConfigSeqNum">RandomnessConfigSeqNum</a> <b>has</b> drop, store, key
-</code></pre>
+<pre><code>struct RandomnessConfigSeqNum has drop, store, key<br/></code></pre>
 
 
 
@@ -61,12 +58,11 @@ Useful in a chain recovery from randomness stall.
 
 ## Function `set_for_next_epoch`
 
-Update <code><a href="randomness_config_seqnum.md#0x1_randomness_config_seqnum_RandomnessConfigSeqNum">RandomnessConfigSeqNum</a></code>.
+Update <code>RandomnessConfigSeqNum</code>.
 Used when re-enable randomness after an emergency randomness disable via local override.
 
 
-<pre><code><b>public</b> <b>fun</b> <a href="randomness_config_seqnum.md#0x1_randomness_config_seqnum_set_for_next_epoch">set_for_next_epoch</a>(framework: &<a href="../../aptos-stdlib/../move-stdlib/doc/signer.md#0x1_signer">signer</a>, seq_num: u64)
-</code></pre>
+<pre><code>public fun set_for_next_epoch(framework: &amp;signer, seq_num: u64)<br/></code></pre>
 
 
 
@@ -74,11 +70,7 @@ Used when re-enable randomness after an emergency randomness disable via local o
 <summary>Implementation</summary>
 
 
-<pre><code><b>public</b> <b>fun</b> <a href="randomness_config_seqnum.md#0x1_randomness_config_seqnum_set_for_next_epoch">set_for_next_epoch</a>(framework: &<a href="../../aptos-stdlib/../move-stdlib/doc/signer.md#0x1_signer">signer</a>, seq_num: u64) {
-    <a href="system_addresses.md#0x1_system_addresses_assert_aptos_framework">system_addresses::assert_aptos_framework</a>(framework);
-    <a href="config_buffer.md#0x1_config_buffer_upsert">config_buffer::upsert</a>(<a href="randomness_config_seqnum.md#0x1_randomness_config_seqnum_RandomnessConfigSeqNum">RandomnessConfigSeqNum</a> { seq_num });
-}
-</code></pre>
+<pre><code>public fun set_for_next_epoch(framework: &amp;signer, seq_num: u64) &#123;<br/>    system_addresses::assert_aptos_framework(framework);<br/>    config_buffer::upsert(RandomnessConfigSeqNum &#123; seq_num &#125;);<br/>&#125;<br/></code></pre>
 
 
 
@@ -91,8 +83,7 @@ Used when re-enable randomness after an emergency randomness disable via local o
 Initialize the configuration. Used in genesis or governance.
 
 
-<pre><code><b>public</b> <b>fun</b> <a href="randomness_config_seqnum.md#0x1_randomness_config_seqnum_initialize">initialize</a>(framework: &<a href="../../aptos-stdlib/../move-stdlib/doc/signer.md#0x1_signer">signer</a>)
-</code></pre>
+<pre><code>public fun initialize(framework: &amp;signer)<br/></code></pre>
 
 
 
@@ -100,13 +91,7 @@ Initialize the configuration. Used in genesis or governance.
 <summary>Implementation</summary>
 
 
-<pre><code><b>public</b> <b>fun</b> <a href="randomness_config_seqnum.md#0x1_randomness_config_seqnum_initialize">initialize</a>(framework: &<a href="../../aptos-stdlib/../move-stdlib/doc/signer.md#0x1_signer">signer</a>) {
-    <a href="system_addresses.md#0x1_system_addresses_assert_aptos_framework">system_addresses::assert_aptos_framework</a>(framework);
-    <b>if</b> (!<b>exists</b>&lt;<a href="randomness_config_seqnum.md#0x1_randomness_config_seqnum_RandomnessConfigSeqNum">RandomnessConfigSeqNum</a>&gt;(@aptos_framework)) {
-        <b>move_to</b>(framework, <a href="randomness_config_seqnum.md#0x1_randomness_config_seqnum_RandomnessConfigSeqNum">RandomnessConfigSeqNum</a> { seq_num: 0 })
-    }
-}
-</code></pre>
+<pre><code>public fun initialize(framework: &amp;signer) &#123;<br/>    system_addresses::assert_aptos_framework(framework);<br/>    if (!exists&lt;RandomnessConfigSeqNum&gt;(@aptos_framework)) &#123;<br/>        move_to(framework, RandomnessConfigSeqNum &#123; seq_num: 0 &#125;)<br/>    &#125;<br/>&#125;<br/></code></pre>
 
 
 
@@ -119,8 +104,7 @@ Initialize the configuration. Used in genesis or governance.
 Only used in reconfigurations to apply the pending <code>RandomnessConfig</code>, if there is any.
 
 
-<pre><code><b>public</b>(<b>friend</b>) <b>fun</b> <a href="randomness_config_seqnum.md#0x1_randomness_config_seqnum_on_new_epoch">on_new_epoch</a>(framework: &<a href="../../aptos-stdlib/../move-stdlib/doc/signer.md#0x1_signer">signer</a>)
-</code></pre>
+<pre><code>public(friend) fun on_new_epoch(framework: &amp;signer)<br/></code></pre>
 
 
 
@@ -128,18 +112,7 @@ Only used in reconfigurations to apply the pending <code>RandomnessConfig</code>
 <summary>Implementation</summary>
 
 
-<pre><code><b>public</b>(<b>friend</b>) <b>fun</b> <a href="randomness_config_seqnum.md#0x1_randomness_config_seqnum_on_new_epoch">on_new_epoch</a>(framework: &<a href="../../aptos-stdlib/../move-stdlib/doc/signer.md#0x1_signer">signer</a>) <b>acquires</b> <a href="randomness_config_seqnum.md#0x1_randomness_config_seqnum_RandomnessConfigSeqNum">RandomnessConfigSeqNum</a> {
-    <a href="system_addresses.md#0x1_system_addresses_assert_aptos_framework">system_addresses::assert_aptos_framework</a>(framework);
-    <b>if</b> (<a href="config_buffer.md#0x1_config_buffer_does_exist">config_buffer::does_exist</a>&lt;<a href="randomness_config_seqnum.md#0x1_randomness_config_seqnum_RandomnessConfigSeqNum">RandomnessConfigSeqNum</a>&gt;()) {
-        <b>let</b> new_config = <a href="config_buffer.md#0x1_config_buffer_extract">config_buffer::extract</a>&lt;<a href="randomness_config_seqnum.md#0x1_randomness_config_seqnum_RandomnessConfigSeqNum">RandomnessConfigSeqNum</a>&gt;();
-        <b>if</b> (<b>exists</b>&lt;<a href="randomness_config_seqnum.md#0x1_randomness_config_seqnum_RandomnessConfigSeqNum">RandomnessConfigSeqNum</a>&gt;(@aptos_framework)) {
-            *<b>borrow_global_mut</b>&lt;<a href="randomness_config_seqnum.md#0x1_randomness_config_seqnum_RandomnessConfigSeqNum">RandomnessConfigSeqNum</a>&gt;(@aptos_framework) = new_config;
-        } <b>else</b> {
-            <b>move_to</b>(framework, new_config);
-        }
-    }
-}
-</code></pre>
+<pre><code>public(friend) fun on_new_epoch(framework: &amp;signer) acquires RandomnessConfigSeqNum &#123;<br/>    system_addresses::assert_aptos_framework(framework);<br/>    if (config_buffer::does_exist&lt;RandomnessConfigSeqNum&gt;()) &#123;<br/>        let new_config &#61; config_buffer::extract&lt;RandomnessConfigSeqNum&gt;();<br/>        if (exists&lt;RandomnessConfigSeqNum&gt;(@aptos_framework)) &#123;<br/>            &#42;borrow_global_mut&lt;RandomnessConfigSeqNum&gt;(@aptos_framework) &#61; new_config;<br/>        &#125; else &#123;<br/>            move_to(framework, new_config);<br/>        &#125;<br/>    &#125;<br/>&#125;<br/></code></pre>
 
 
 
@@ -155,16 +128,12 @@ Only used in reconfigurations to apply the pending <code>RandomnessConfig</code>
 ### Function `on_new_epoch`
 
 
-<pre><code><b>public</b>(<b>friend</b>) <b>fun</b> <a href="randomness_config_seqnum.md#0x1_randomness_config_seqnum_on_new_epoch">on_new_epoch</a>(framework: &<a href="../../aptos-stdlib/../move-stdlib/doc/signer.md#0x1_signer">signer</a>)
-</code></pre>
+<pre><code>public(friend) fun on_new_epoch(framework: &amp;signer)<br/></code></pre>
 
 
 
 
-<pre><code><b>requires</b> @aptos_framework == std::signer::address_of(framework);
-<b>include</b> <a href="config_buffer.md#0x1_config_buffer_OnNewEpochRequirement">config_buffer::OnNewEpochRequirement</a>&lt;<a href="randomness_config_seqnum.md#0x1_randomness_config_seqnum_RandomnessConfigSeqNum">RandomnessConfigSeqNum</a>&gt;;
-<b>aborts_if</b> <b>false</b>;
-</code></pre>
+<pre><code>requires @aptos_framework &#61;&#61; std::signer::address_of(framework);<br/>include config_buffer::OnNewEpochRequirement&lt;RandomnessConfigSeqNum&gt;;<br/>aborts_if false;<br/></code></pre>
 
 
 [move-book]: https://aptos.dev/move/book/SUMMARY

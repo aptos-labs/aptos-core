@@ -25,11 +25,7 @@ can be enabled for the public.
     -  [Function `new_aggregator`](#@Specification_1_new_aggregator)
 
 
-<pre><code><b>use</b> <a href="aggregator.md#0x1_aggregator">0x1::aggregator</a>;
-<b>use</b> <a href="../../aptos-stdlib/../move-stdlib/doc/error.md#0x1_error">0x1::error</a>;
-<b>use</b> <a href="system_addresses.md#0x1_system_addresses">0x1::system_addresses</a>;
-<b>use</b> <a href="../../aptos-stdlib/doc/table.md#0x1_table">0x1::table</a>;
-</code></pre>
+<pre><code>use 0x1::aggregator;<br/>use 0x1::error;<br/>use 0x1::system_addresses;<br/>use 0x1::table;<br/></code></pre>
 
 
 
@@ -42,8 +38,7 @@ system and who can create them. At the moment, only Aptos Framework (0x1)
 account can.
 
 
-<pre><code><b>struct</b> <a href="aggregator_factory.md#0x1_aggregator_factory_AggregatorFactory">AggregatorFactory</a> <b>has</b> key
-</code></pre>
+<pre><code>struct AggregatorFactory has key<br/></code></pre>
 
 
 
@@ -53,7 +48,7 @@ account can.
 
 <dl>
 <dt>
-<code>phantom_table: <a href="../../aptos-stdlib/doc/table.md#0x1_table_Table">table::Table</a>&lt;<b>address</b>, u128&gt;</code>
+<code>phantom_table: table::Table&lt;address, u128&gt;</code>
 </dt>
 <dd>
 
@@ -73,8 +68,7 @@ account can.
 Aggregator factory is not published yet.
 
 
-<pre><code><b>const</b> <a href="aggregator_factory.md#0x1_aggregator_factory_EAGGREGATOR_FACTORY_NOT_FOUND">EAGGREGATOR_FACTORY_NOT_FOUND</a>: u64 = 1;
-</code></pre>
+<pre><code>const EAGGREGATOR_FACTORY_NOT_FOUND: u64 &#61; 1;<br/></code></pre>
 
 
 
@@ -85,8 +79,7 @@ Aggregator factory is not published yet.
 Creates a new factory for aggregators. Can only be called during genesis.
 
 
-<pre><code><b>public</b>(<b>friend</b>) <b>fun</b> <a href="aggregator_factory.md#0x1_aggregator_factory_initialize_aggregator_factory">initialize_aggregator_factory</a>(aptos_framework: &<a href="../../aptos-stdlib/../move-stdlib/doc/signer.md#0x1_signer">signer</a>)
-</code></pre>
+<pre><code>public(friend) fun initialize_aggregator_factory(aptos_framework: &amp;signer)<br/></code></pre>
 
 
 
@@ -94,14 +87,7 @@ Creates a new factory for aggregators. Can only be called during genesis.
 <summary>Implementation</summary>
 
 
-<pre><code><b>public</b>(<b>friend</b>) <b>fun</b> <a href="aggregator_factory.md#0x1_aggregator_factory_initialize_aggregator_factory">initialize_aggregator_factory</a>(aptos_framework: &<a href="../../aptos-stdlib/../move-stdlib/doc/signer.md#0x1_signer">signer</a>) {
-    <a href="system_addresses.md#0x1_system_addresses_assert_aptos_framework">system_addresses::assert_aptos_framework</a>(aptos_framework);
-    <b>let</b> <a href="aggregator_factory.md#0x1_aggregator_factory">aggregator_factory</a> = <a href="aggregator_factory.md#0x1_aggregator_factory_AggregatorFactory">AggregatorFactory</a> {
-        phantom_table: <a href="../../aptos-stdlib/doc/table.md#0x1_table_new">table::new</a>()
-    };
-    <b>move_to</b>(aptos_framework, <a href="aggregator_factory.md#0x1_aggregator_factory">aggregator_factory</a>);
-}
-</code></pre>
+<pre><code>public(friend) fun initialize_aggregator_factory(aptos_framework: &amp;signer) &#123;<br/>    system_addresses::assert_aptos_framework(aptos_framework);<br/>    let aggregator_factory &#61; AggregatorFactory &#123;<br/>        phantom_table: table::new()<br/>    &#125;;<br/>    move_to(aptos_framework, aggregator_factory);<br/>&#125;<br/></code></pre>
 
 
 
@@ -114,8 +100,7 @@ Creates a new factory for aggregators. Can only be called during genesis.
 Creates a new aggregator instance which overflows on exceeding a <code>limit</code>.
 
 
-<pre><code><b>public</b>(<b>friend</b>) <b>fun</b> <a href="aggregator_factory.md#0x1_aggregator_factory_create_aggregator_internal">create_aggregator_internal</a>(limit: u128): <a href="aggregator.md#0x1_aggregator_Aggregator">aggregator::Aggregator</a>
-</code></pre>
+<pre><code>public(friend) fun create_aggregator_internal(limit: u128): aggregator::Aggregator<br/></code></pre>
 
 
 
@@ -123,16 +108,7 @@ Creates a new aggregator instance which overflows on exceeding a <code>limit</co
 <summary>Implementation</summary>
 
 
-<pre><code><b>public</b>(<b>friend</b>) <b>fun</b> <a href="aggregator_factory.md#0x1_aggregator_factory_create_aggregator_internal">create_aggregator_internal</a>(limit: u128): Aggregator <b>acquires</b> <a href="aggregator_factory.md#0x1_aggregator_factory_AggregatorFactory">AggregatorFactory</a> {
-    <b>assert</b>!(
-        <b>exists</b>&lt;<a href="aggregator_factory.md#0x1_aggregator_factory_AggregatorFactory">AggregatorFactory</a>&gt;(@aptos_framework),
-        <a href="../../aptos-stdlib/../move-stdlib/doc/error.md#0x1_error_not_found">error::not_found</a>(<a href="aggregator_factory.md#0x1_aggregator_factory_EAGGREGATOR_FACTORY_NOT_FOUND">EAGGREGATOR_FACTORY_NOT_FOUND</a>)
-    );
-
-    <b>let</b> <a href="aggregator_factory.md#0x1_aggregator_factory">aggregator_factory</a> = <b>borrow_global_mut</b>&lt;<a href="aggregator_factory.md#0x1_aggregator_factory_AggregatorFactory">AggregatorFactory</a>&gt;(@aptos_framework);
-    <a href="aggregator_factory.md#0x1_aggregator_factory_new_aggregator">new_aggregator</a>(<a href="aggregator_factory.md#0x1_aggregator_factory">aggregator_factory</a>, limit)
-}
-</code></pre>
+<pre><code>public(friend) fun create_aggregator_internal(limit: u128): Aggregator acquires AggregatorFactory &#123;<br/>    assert!(<br/>        exists&lt;AggregatorFactory&gt;(@aptos_framework),<br/>        error::not_found(EAGGREGATOR_FACTORY_NOT_FOUND)<br/>    );<br/><br/>    let aggregator_factory &#61; borrow_global_mut&lt;AggregatorFactory&gt;(@aptos_framework);<br/>    new_aggregator(aggregator_factory, limit)<br/>&#125;<br/></code></pre>
 
 
 
@@ -146,8 +122,7 @@ This is currently a function closed for public. This can be updated in the futur
 to allow any signer to call.
 
 
-<pre><code><b>public</b> <b>fun</b> <a href="aggregator_factory.md#0x1_aggregator_factory_create_aggregator">create_aggregator</a>(<a href="account.md#0x1_account">account</a>: &<a href="../../aptos-stdlib/../move-stdlib/doc/signer.md#0x1_signer">signer</a>, limit: u128): <a href="aggregator.md#0x1_aggregator_Aggregator">aggregator::Aggregator</a>
-</code></pre>
+<pre><code>public fun create_aggregator(account: &amp;signer, limit: u128): aggregator::Aggregator<br/></code></pre>
 
 
 
@@ -155,12 +130,7 @@ to allow any signer to call.
 <summary>Implementation</summary>
 
 
-<pre><code><b>public</b> <b>fun</b> <a href="aggregator_factory.md#0x1_aggregator_factory_create_aggregator">create_aggregator</a>(<a href="account.md#0x1_account">account</a>: &<a href="../../aptos-stdlib/../move-stdlib/doc/signer.md#0x1_signer">signer</a>, limit: u128): Aggregator <b>acquires</b> <a href="aggregator_factory.md#0x1_aggregator_factory_AggregatorFactory">AggregatorFactory</a> {
-    // Only Aptos Framework (0x1) <a href="account.md#0x1_account">account</a> can call this for now.
-    <a href="system_addresses.md#0x1_system_addresses_assert_aptos_framework">system_addresses::assert_aptos_framework</a>(<a href="account.md#0x1_account">account</a>);
-    <a href="aggregator_factory.md#0x1_aggregator_factory_create_aggregator_internal">create_aggregator_internal</a>(limit)
-}
-</code></pre>
+<pre><code>public fun create_aggregator(account: &amp;signer, limit: u128): Aggregator acquires AggregatorFactory &#123;<br/>    // Only Aptos Framework (0x1) account can call this for now.<br/>    system_addresses::assert_aptos_framework(account);<br/>    create_aggregator_internal(limit)<br/>&#125;<br/></code></pre>
 
 
 
@@ -173,8 +143,7 @@ to allow any signer to call.
 Returns a new aggregator.
 
 
-<pre><code><b>fun</b> <a href="aggregator_factory.md#0x1_aggregator_factory_new_aggregator">new_aggregator</a>(<a href="aggregator_factory.md#0x1_aggregator_factory">aggregator_factory</a>: &<b>mut</b> <a href="aggregator_factory.md#0x1_aggregator_factory_AggregatorFactory">aggregator_factory::AggregatorFactory</a>, limit: u128): <a href="aggregator.md#0x1_aggregator_Aggregator">aggregator::Aggregator</a>
-</code></pre>
+<pre><code>fun new_aggregator(aggregator_factory: &amp;mut aggregator_factory::AggregatorFactory, limit: u128): aggregator::Aggregator<br/></code></pre>
 
 
 
@@ -182,8 +151,7 @@ Returns a new aggregator.
 <summary>Implementation</summary>
 
 
-<pre><code><b>native</b> <b>fun</b> <a href="aggregator_factory.md#0x1_aggregator_factory_new_aggregator">new_aggregator</a>(<a href="aggregator_factory.md#0x1_aggregator_factory">aggregator_factory</a>: &<b>mut</b> <a href="aggregator_factory.md#0x1_aggregator_factory_AggregatorFactory">AggregatorFactory</a>, limit: u128): Aggregator;
-</code></pre>
+<pre><code>native fun new_aggregator(aggregator_factory: &amp;mut AggregatorFactory, limit: u128): Aggregator;<br/></code></pre>
 
 
 
@@ -247,8 +215,7 @@ Returns a new aggregator.
 ### Module-level Specification
 
 
-<pre><code><b>pragma</b> aborts_if_is_strict;
-</code></pre>
+<pre><code>pragma aborts_if_is_strict;<br/></code></pre>
 
 
 
@@ -257,20 +224,15 @@ Returns a new aggregator.
 ### Function `initialize_aggregator_factory`
 
 
-<pre><code><b>public</b>(<b>friend</b>) <b>fun</b> <a href="aggregator_factory.md#0x1_aggregator_factory_initialize_aggregator_factory">initialize_aggregator_factory</a>(aptos_framework: &<a href="../../aptos-stdlib/../move-stdlib/doc/signer.md#0x1_signer">signer</a>)
-</code></pre>
+<pre><code>public(friend) fun initialize_aggregator_factory(aptos_framework: &amp;signer)<br/></code></pre>
 
 
 Make sure the caller is @aptos_framework.
 AggregatorFactory is not under the caller before creating the resource.
 
 
-<pre><code><b>let</b> addr = <a href="../../aptos-stdlib/../move-stdlib/doc/signer.md#0x1_signer_address_of">signer::address_of</a>(aptos_framework);
-<b>aborts_if</b> addr != @aptos_framework;
-<b>aborts_if</b> <b>exists</b>&lt;<a href="aggregator_factory.md#0x1_aggregator_factory_AggregatorFactory">AggregatorFactory</a>&gt;(addr);
-// This enforces <a id="high-level-req-1" href="#high-level-req">high-level requirement 1</a>:
-<b>ensures</b> <b>exists</b>&lt;<a href="aggregator_factory.md#0x1_aggregator_factory_AggregatorFactory">AggregatorFactory</a>&gt;(addr);
-</code></pre>
+<pre><code>let addr &#61; signer::address_of(aptos_framework);<br/>aborts_if addr !&#61; @aptos_framework;<br/>aborts_if exists&lt;AggregatorFactory&gt;(addr);<br/>// This enforces <a id="high-level-req-1" href="#high-level-req">high-level requirement 1</a>:
+ensures exists&lt;AggregatorFactory&gt;(addr);<br/></code></pre>
 
 
 
@@ -279,17 +241,13 @@ AggregatorFactory is not under the caller before creating the resource.
 ### Function `create_aggregator_internal`
 
 
-<pre><code><b>public</b>(<b>friend</b>) <b>fun</b> <a href="aggregator_factory.md#0x1_aggregator_factory_create_aggregator_internal">create_aggregator_internal</a>(limit: u128): <a href="aggregator.md#0x1_aggregator_Aggregator">aggregator::Aggregator</a>
-</code></pre>
+<pre><code>public(friend) fun create_aggregator_internal(limit: u128): aggregator::Aggregator<br/></code></pre>
 
 
 
 
 <pre><code>// This enforces <a id="high-level-req-2" href="#high-level-req">high-level requirement 2</a>:
-<b>include</b> <a href="aggregator_factory.md#0x1_aggregator_factory_CreateAggregatorInternalAbortsIf">CreateAggregatorInternalAbortsIf</a>;
-<b>ensures</b> <a href="aggregator.md#0x1_aggregator_spec_get_limit">aggregator::spec_get_limit</a>(result) == limit;
-<b>ensures</b> <a href="aggregator.md#0x1_aggregator_spec_aggregator_get_val">aggregator::spec_aggregator_get_val</a>(result) == 0;
-</code></pre>
+include CreateAggregatorInternalAbortsIf;<br/>ensures aggregator::spec_get_limit(result) &#61;&#61; limit;<br/>ensures aggregator::spec_aggregator_get_val(result) &#61;&#61; 0;<br/></code></pre>
 
 
 
@@ -297,10 +255,7 @@ AggregatorFactory is not under the caller before creating the resource.
 <a id="0x1_aggregator_factory_CreateAggregatorInternalAbortsIf"></a>
 
 
-<pre><code><b>schema</b> <a href="aggregator_factory.md#0x1_aggregator_factory_CreateAggregatorInternalAbortsIf">CreateAggregatorInternalAbortsIf</a> {
-    <b>aborts_if</b> !<b>exists</b>&lt;<a href="aggregator_factory.md#0x1_aggregator_factory_AggregatorFactory">AggregatorFactory</a>&gt;(@aptos_framework);
-}
-</code></pre>
+<pre><code>schema CreateAggregatorInternalAbortsIf &#123;<br/>aborts_if !exists&lt;AggregatorFactory&gt;(@aptos_framework);<br/>&#125;<br/></code></pre>
 
 
 
@@ -309,19 +264,15 @@ AggregatorFactory is not under the caller before creating the resource.
 ### Function `create_aggregator`
 
 
-<pre><code><b>public</b> <b>fun</b> <a href="aggregator_factory.md#0x1_aggregator_factory_create_aggregator">create_aggregator</a>(<a href="account.md#0x1_account">account</a>: &<a href="../../aptos-stdlib/../move-stdlib/doc/signer.md#0x1_signer">signer</a>, limit: u128): <a href="aggregator.md#0x1_aggregator_Aggregator">aggregator::Aggregator</a>
-</code></pre>
+<pre><code>public fun create_aggregator(account: &amp;signer, limit: u128): aggregator::Aggregator<br/></code></pre>
 
 
 Make sure the caller is @aptos_framework.
 AggregatorFactory existed under the @aptos_framework when Creating a new aggregator.
 
 
-<pre><code><b>let</b> addr = <a href="../../aptos-stdlib/../move-stdlib/doc/signer.md#0x1_signer_address_of">signer::address_of</a>(<a href="account.md#0x1_account">account</a>);
-// This enforces <a id="high-level-req-3" href="#high-level-req">high-level requirement 3</a>:
-<b>aborts_if</b> addr != @aptos_framework;
-<b>aborts_if</b> !<b>exists</b>&lt;<a href="aggregator_factory.md#0x1_aggregator_factory_AggregatorFactory">AggregatorFactory</a>&gt;(@aptos_framework);
-</code></pre>
+<pre><code>let addr &#61; signer::address_of(account);<br/>// This enforces <a id="high-level-req-3" href="#high-level-req">high-level requirement 3</a>:
+aborts_if addr !&#61; @aptos_framework;<br/>aborts_if !exists&lt;AggregatorFactory&gt;(@aptos_framework);<br/></code></pre>
 
 
 
@@ -329,8 +280,7 @@ AggregatorFactory existed under the @aptos_framework when Creating a new aggrega
 <a id="0x1_aggregator_factory_spec_new_aggregator"></a>
 
 
-<pre><code><b>native</b> <b>fun</b> <a href="aggregator_factory.md#0x1_aggregator_factory_spec_new_aggregator">spec_new_aggregator</a>(limit: u128): Aggregator;
-</code></pre>
+<pre><code>native fun spec_new_aggregator(limit: u128): Aggregator;<br/></code></pre>
 
 
 
@@ -339,17 +289,12 @@ AggregatorFactory existed under the @aptos_framework when Creating a new aggrega
 ### Function `new_aggregator`
 
 
-<pre><code><b>fun</b> <a href="aggregator_factory.md#0x1_aggregator_factory_new_aggregator">new_aggregator</a>(<a href="aggregator_factory.md#0x1_aggregator_factory">aggregator_factory</a>: &<b>mut</b> <a href="aggregator_factory.md#0x1_aggregator_factory_AggregatorFactory">aggregator_factory::AggregatorFactory</a>, limit: u128): <a href="aggregator.md#0x1_aggregator_Aggregator">aggregator::Aggregator</a>
-</code></pre>
+<pre><code>fun new_aggregator(aggregator_factory: &amp;mut aggregator_factory::AggregatorFactory, limit: u128): aggregator::Aggregator<br/></code></pre>
 
 
 
 
-<pre><code><b>pragma</b> opaque;
-<b>aborts_if</b> <b>false</b>;
-<b>ensures</b> result == <a href="aggregator_factory.md#0x1_aggregator_factory_spec_new_aggregator">spec_new_aggregator</a>(limit);
-<b>ensures</b> <a href="aggregator.md#0x1_aggregator_spec_get_limit">aggregator::spec_get_limit</a>(result) == limit;
-</code></pre>
+<pre><code>pragma opaque;<br/>aborts_if false;<br/>ensures result &#61;&#61; spec_new_aggregator(limit);<br/>ensures aggregator::spec_get_limit(result) &#61;&#61; limit;<br/></code></pre>
 
 
 [move-book]: https://aptos.dev/move/book/SUMMARY

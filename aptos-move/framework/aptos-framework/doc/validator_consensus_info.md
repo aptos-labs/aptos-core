@@ -3,7 +3,7 @@
 
 # Module `0x1::validator_consensus_info`
 
-Common type: <code><a href="validator_consensus_info.md#0x1_validator_consensus_info_ValidatorConsensusInfo">ValidatorConsensusInfo</a></code>.
+Common type: <code>ValidatorConsensusInfo</code>.
 
 
 -  [Struct `ValidatorConsensusInfo`](#0x1_validator_consensus_info_ValidatorConsensusInfo)
@@ -26,8 +26,7 @@ Common type: <code><a href="validator_consensus_info.md#0x1_validator_consensus_
 Information about a validator that participates consensus.
 
 
-<pre><code><b>struct</b> <a href="validator_consensus_info.md#0x1_validator_consensus_info_ValidatorConsensusInfo">ValidatorConsensusInfo</a> <b>has</b> <b>copy</b>, drop, store
-</code></pre>
+<pre><code>struct ValidatorConsensusInfo has copy, drop, store<br/></code></pre>
 
 
 
@@ -37,13 +36,13 @@ Information about a validator that participates consensus.
 
 <dl>
 <dt>
-<code>addr: <b>address</b></code>
+<code>addr: address</code>
 </dt>
 <dd>
 
 </dd>
 <dt>
-<code>pk_bytes: <a href="../../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u8&gt;</code>
+<code>pk_bytes: vector&lt;u8&gt;</code>
 </dt>
 <dd>
 
@@ -63,11 +62,10 @@ Information about a validator that participates consensus.
 
 ## Function `default`
 
-Create a default <code><a href="validator_consensus_info.md#0x1_validator_consensus_info_ValidatorConsensusInfo">ValidatorConsensusInfo</a></code> object. Value may be invalid. Only for place holding prupose.
+Create a default <code>ValidatorConsensusInfo</code> object. Value may be invalid. Only for place holding prupose.
 
 
-<pre><code><b>public</b> <b>fun</b> <a href="validator_consensus_info.md#0x1_validator_consensus_info_default">default</a>(): <a href="validator_consensus_info.md#0x1_validator_consensus_info_ValidatorConsensusInfo">validator_consensus_info::ValidatorConsensusInfo</a>
-</code></pre>
+<pre><code>public fun default(): validator_consensus_info::ValidatorConsensusInfo<br/></code></pre>
 
 
 
@@ -75,14 +73,7 @@ Create a default <code><a href="validator_consensus_info.md#0x1_validator_consen
 <summary>Implementation</summary>
 
 
-<pre><code><b>public</b> <b>fun</b> <a href="validator_consensus_info.md#0x1_validator_consensus_info_default">default</a>(): <a href="validator_consensus_info.md#0x1_validator_consensus_info_ValidatorConsensusInfo">ValidatorConsensusInfo</a> {
-    <a href="validator_consensus_info.md#0x1_validator_consensus_info_ValidatorConsensusInfo">ValidatorConsensusInfo</a> {
-        addr: @vm,
-        pk_bytes: <a href="../../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector">vector</a>[],
-        voting_power: 0,
-    }
-}
-</code></pre>
+<pre><code>public fun default(): ValidatorConsensusInfo &#123;<br/>    ValidatorConsensusInfo &#123;<br/>        addr: @vm,<br/>        pk_bytes: vector[],<br/>        voting_power: 0,<br/>    &#125;<br/>&#125;<br/></code></pre>
 
 
 
@@ -92,11 +83,10 @@ Create a default <code><a href="validator_consensus_info.md#0x1_validator_consen
 
 ## Function `new`
 
-Create a <code><a href="validator_consensus_info.md#0x1_validator_consensus_info_ValidatorConsensusInfo">ValidatorConsensusInfo</a></code> object.
+Create a <code>ValidatorConsensusInfo</code> object.
 
 
-<pre><code><b>public</b> <b>fun</b> <a href="validator_consensus_info.md#0x1_validator_consensus_info_new">new</a>(addr: <b>address</b>, pk_bytes: <a href="../../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u8&gt;, voting_power: u64): <a href="validator_consensus_info.md#0x1_validator_consensus_info_ValidatorConsensusInfo">validator_consensus_info::ValidatorConsensusInfo</a>
-</code></pre>
+<pre><code>public fun new(addr: address, pk_bytes: vector&lt;u8&gt;, voting_power: u64): validator_consensus_info::ValidatorConsensusInfo<br/></code></pre>
 
 
 
@@ -104,14 +94,7 @@ Create a <code><a href="validator_consensus_info.md#0x1_validator_consensus_info
 <summary>Implementation</summary>
 
 
-<pre><code><b>public</b> <b>fun</b> <a href="validator_consensus_info.md#0x1_validator_consensus_info_new">new</a>(addr: <b>address</b>, pk_bytes: <a href="../../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u8&gt;, voting_power: u64): <a href="validator_consensus_info.md#0x1_validator_consensus_info_ValidatorConsensusInfo">ValidatorConsensusInfo</a> {
-    <a href="validator_consensus_info.md#0x1_validator_consensus_info_ValidatorConsensusInfo">ValidatorConsensusInfo</a> {
-        addr,
-        pk_bytes,
-        voting_power,
-    }
-}
-</code></pre>
+<pre><code>public fun new(addr: address, pk_bytes: vector&lt;u8&gt;, voting_power: u64): ValidatorConsensusInfo &#123;<br/>    ValidatorConsensusInfo &#123;<br/>        addr,<br/>        pk_bytes,<br/>        voting_power,<br/>    &#125;<br/>&#125;<br/></code></pre>
 
 
 
@@ -121,11 +104,10 @@ Create a <code><a href="validator_consensus_info.md#0x1_validator_consensus_info
 
 ## Function `get_addr`
 
-Get <code><a href="validator_consensus_info.md#0x1_validator_consensus_info_ValidatorConsensusInfo">ValidatorConsensusInfo</a>.addr</code>.
+Get <code>ValidatorConsensusInfo.addr</code>.
 
 
-<pre><code><b>public</b> <b>fun</b> <a href="validator_consensus_info.md#0x1_validator_consensus_info_get_addr">get_addr</a>(vci: &<a href="validator_consensus_info.md#0x1_validator_consensus_info_ValidatorConsensusInfo">validator_consensus_info::ValidatorConsensusInfo</a>): <b>address</b>
-</code></pre>
+<pre><code>public fun get_addr(vci: &amp;validator_consensus_info::ValidatorConsensusInfo): address<br/></code></pre>
 
 
 
@@ -133,10 +115,7 @@ Get <code><a href="validator_consensus_info.md#0x1_validator_consensus_info_Vali
 <summary>Implementation</summary>
 
 
-<pre><code><b>public</b> <b>fun</b> <a href="validator_consensus_info.md#0x1_validator_consensus_info_get_addr">get_addr</a>(vci: &<a href="validator_consensus_info.md#0x1_validator_consensus_info_ValidatorConsensusInfo">ValidatorConsensusInfo</a>): <b>address</b> {
-    vci.addr
-}
-</code></pre>
+<pre><code>public fun get_addr(vci: &amp;ValidatorConsensusInfo): address &#123;<br/>    vci.addr<br/>&#125;<br/></code></pre>
 
 
 
@@ -146,11 +125,10 @@ Get <code><a href="validator_consensus_info.md#0x1_validator_consensus_info_Vali
 
 ## Function `get_pk_bytes`
 
-Get <code><a href="validator_consensus_info.md#0x1_validator_consensus_info_ValidatorConsensusInfo">ValidatorConsensusInfo</a>.pk_bytes</code>.
+Get <code>ValidatorConsensusInfo.pk_bytes</code>.
 
 
-<pre><code><b>public</b> <b>fun</b> <a href="validator_consensus_info.md#0x1_validator_consensus_info_get_pk_bytes">get_pk_bytes</a>(vci: &<a href="validator_consensus_info.md#0x1_validator_consensus_info_ValidatorConsensusInfo">validator_consensus_info::ValidatorConsensusInfo</a>): <a href="../../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u8&gt;
-</code></pre>
+<pre><code>public fun get_pk_bytes(vci: &amp;validator_consensus_info::ValidatorConsensusInfo): vector&lt;u8&gt;<br/></code></pre>
 
 
 
@@ -158,10 +136,7 @@ Get <code><a href="validator_consensus_info.md#0x1_validator_consensus_info_Vali
 <summary>Implementation</summary>
 
 
-<pre><code><b>public</b> <b>fun</b> <a href="validator_consensus_info.md#0x1_validator_consensus_info_get_pk_bytes">get_pk_bytes</a>(vci: &<a href="validator_consensus_info.md#0x1_validator_consensus_info_ValidatorConsensusInfo">ValidatorConsensusInfo</a>): <a href="../../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u8&gt; {
-    vci.pk_bytes
-}
-</code></pre>
+<pre><code>public fun get_pk_bytes(vci: &amp;ValidatorConsensusInfo): vector&lt;u8&gt; &#123;<br/>    vci.pk_bytes<br/>&#125;<br/></code></pre>
 
 
 
@@ -171,11 +146,10 @@ Get <code><a href="validator_consensus_info.md#0x1_validator_consensus_info_Vali
 
 ## Function `get_voting_power`
 
-Get <code><a href="validator_consensus_info.md#0x1_validator_consensus_info_ValidatorConsensusInfo">ValidatorConsensusInfo</a>.voting_power</code>.
+Get <code>ValidatorConsensusInfo.voting_power</code>.
 
 
-<pre><code><b>public</b> <b>fun</b> <a href="validator_consensus_info.md#0x1_validator_consensus_info_get_voting_power">get_voting_power</a>(vci: &<a href="validator_consensus_info.md#0x1_validator_consensus_info_ValidatorConsensusInfo">validator_consensus_info::ValidatorConsensusInfo</a>): u64
-</code></pre>
+<pre><code>public fun get_voting_power(vci: &amp;validator_consensus_info::ValidatorConsensusInfo): u64<br/></code></pre>
 
 
 
@@ -183,10 +157,7 @@ Get <code><a href="validator_consensus_info.md#0x1_validator_consensus_info_Vali
 <summary>Implementation</summary>
 
 
-<pre><code><b>public</b> <b>fun</b> <a href="validator_consensus_info.md#0x1_validator_consensus_info_get_voting_power">get_voting_power</a>(vci: &<a href="validator_consensus_info.md#0x1_validator_consensus_info_ValidatorConsensusInfo">ValidatorConsensusInfo</a>): u64 {
-    vci.voting_power
-}
-</code></pre>
+<pre><code>public fun get_voting_power(vci: &amp;ValidatorConsensusInfo): u64 &#123;<br/>    vci.voting_power<br/>&#125;<br/></code></pre>
 
 
 
@@ -198,8 +169,7 @@ Get <code><a href="validator_consensus_info.md#0x1_validator_consensus_info_Vali
 
 
 
-<pre><code><b>pragma</b> verify = <b>true</b>;
-</code></pre>
+<pre><code>pragma verify &#61; true;<br/></code></pre>
 
 
 [move-book]: https://aptos.dev/move/book/SUMMARY

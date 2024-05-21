@@ -28,16 +28,7 @@ it costs to execute Move on the network.
     -  [Function `set_storage_gas_config_for_next_epoch`](#@Specification_1_set_storage_gas_config_for_next_epoch)
 
 
-<pre><code><b>use</b> <a href="chain_status.md#0x1_chain_status">0x1::chain_status</a>;
-<b>use</b> <a href="config_buffer.md#0x1_config_buffer">0x1::config_buffer</a>;
-<b>use</b> <a href="../../aptos-stdlib/../move-stdlib/doc/error.md#0x1_error">0x1::error</a>;
-<b>use</b> <a href="reconfiguration.md#0x1_reconfiguration">0x1::reconfiguration</a>;
-<b>use</b> <a href="storage_gas.md#0x1_storage_gas">0x1::storage_gas</a>;
-<b>use</b> <a href="../../aptos-stdlib/../move-stdlib/doc/string.md#0x1_string">0x1::string</a>;
-<b>use</b> <a href="system_addresses.md#0x1_system_addresses">0x1::system_addresses</a>;
-<b>use</b> <a href="util.md#0x1_util">0x1::util</a>;
-<b>use</b> <a href="../../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector">0x1::vector</a>;
-</code></pre>
+<pre><code>use 0x1::chain_status;<br/>use 0x1::config_buffer;<br/>use 0x1::error;<br/>use 0x1::reconfiguration;<br/>use 0x1::storage_gas;<br/>use 0x1::string;<br/>use 0x1::system_addresses;<br/>use 0x1::util;<br/>use 0x1::vector;<br/></code></pre>
 
 
 
@@ -47,8 +38,7 @@ it costs to execute Move on the network.
 
 
 
-<pre><code><b>struct</b> <a href="gas_schedule.md#0x1_gas_schedule_GasEntry">GasEntry</a> <b>has</b> <b>copy</b>, drop, store
-</code></pre>
+<pre><code>struct GasEntry has copy, drop, store<br/></code></pre>
 
 
 
@@ -58,7 +48,7 @@ it costs to execute Move on the network.
 
 <dl>
 <dt>
-<code>key: <a href="../../aptos-stdlib/../move-stdlib/doc/string.md#0x1_string_String">string::String</a></code>
+<code>key: string::String</code>
 </dt>
 <dd>
 
@@ -80,8 +70,7 @@ it costs to execute Move on the network.
 
 
 
-<pre><code><b>struct</b> <a href="gas_schedule.md#0x1_gas_schedule_GasSchedule">GasSchedule</a> <b>has</b> <b>copy</b>, drop, key
-</code></pre>
+<pre><code>struct GasSchedule has copy, drop, key<br/></code></pre>
 
 
 
@@ -91,7 +80,7 @@ it costs to execute Move on the network.
 
 <dl>
 <dt>
-<code>entries: <a href="../../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;<a href="gas_schedule.md#0x1_gas_schedule_GasEntry">gas_schedule::GasEntry</a>&gt;</code>
+<code>entries: vector&lt;gas_schedule::GasEntry&gt;</code>
 </dt>
 <dd>
 
@@ -107,8 +96,7 @@ it costs to execute Move on the network.
 
 
 
-<pre><code><b>struct</b> <a href="gas_schedule.md#0x1_gas_schedule_GasScheduleV2">GasScheduleV2</a> <b>has</b> <b>copy</b>, drop, store, key
-</code></pre>
+<pre><code>struct GasScheduleV2 has copy, drop, store, key<br/></code></pre>
 
 
 
@@ -124,7 +112,7 @@ it costs to execute Move on the network.
 
 </dd>
 <dt>
-<code>entries: <a href="../../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;<a href="gas_schedule.md#0x1_gas_schedule_GasEntry">gas_schedule::GasEntry</a>&gt;</code>
+<code>entries: vector&lt;gas_schedule::GasEntry&gt;</code>
 </dt>
 <dd>
 
@@ -143,8 +131,7 @@ it costs to execute Move on the network.
 
 
 
-<pre><code><b>const</b> <a href="gas_schedule.md#0x1_gas_schedule_EINVALID_GAS_FEATURE_VERSION">EINVALID_GAS_FEATURE_VERSION</a>: u64 = 2;
-</code></pre>
+<pre><code>const EINVALID_GAS_FEATURE_VERSION: u64 &#61; 2;<br/></code></pre>
 
 
 
@@ -153,8 +140,7 @@ it costs to execute Move on the network.
 The provided gas schedule bytes are empty or invalid
 
 
-<pre><code><b>const</b> <a href="gas_schedule.md#0x1_gas_schedule_EINVALID_GAS_SCHEDULE">EINVALID_GAS_SCHEDULE</a>: u64 = 1;
-</code></pre>
+<pre><code>const EINVALID_GAS_SCHEDULE: u64 &#61; 1;<br/></code></pre>
 
 
 
@@ -165,8 +151,7 @@ The provided gas schedule bytes are empty or invalid
 Only called during genesis.
 
 
-<pre><code><b>public</b>(<b>friend</b>) <b>fun</b> <a href="gas_schedule.md#0x1_gas_schedule_initialize">initialize</a>(aptos_framework: &<a href="../../aptos-stdlib/../move-stdlib/doc/signer.md#0x1_signer">signer</a>, gas_schedule_blob: <a href="../../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u8&gt;)
-</code></pre>
+<pre><code>public(friend) fun initialize(aptos_framework: &amp;signer, gas_schedule_blob: vector&lt;u8&gt;)<br/></code></pre>
 
 
 
@@ -174,15 +159,7 @@ Only called during genesis.
 <summary>Implementation</summary>
 
 
-<pre><code><b>public</b>(<b>friend</b>) <b>fun</b> <a href="gas_schedule.md#0x1_gas_schedule_initialize">initialize</a>(aptos_framework: &<a href="../../aptos-stdlib/../move-stdlib/doc/signer.md#0x1_signer">signer</a>, gas_schedule_blob: <a href="../../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u8&gt;) {
-    <a href="system_addresses.md#0x1_system_addresses_assert_aptos_framework">system_addresses::assert_aptos_framework</a>(aptos_framework);
-    <b>assert</b>!(!<a href="../../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector_is_empty">vector::is_empty</a>(&gas_schedule_blob), <a href="../../aptos-stdlib/../move-stdlib/doc/error.md#0x1_error_invalid_argument">error::invalid_argument</a>(<a href="gas_schedule.md#0x1_gas_schedule_EINVALID_GAS_SCHEDULE">EINVALID_GAS_SCHEDULE</a>));
-
-    // TODO(Gas): check <b>if</b> gas schedule is consistent
-    <b>let</b> <a href="gas_schedule.md#0x1_gas_schedule">gas_schedule</a>: <a href="gas_schedule.md#0x1_gas_schedule_GasScheduleV2">GasScheduleV2</a> = from_bytes(gas_schedule_blob);
-    <b>move_to</b>&lt;<a href="gas_schedule.md#0x1_gas_schedule_GasScheduleV2">GasScheduleV2</a>&gt;(aptos_framework, <a href="gas_schedule.md#0x1_gas_schedule">gas_schedule</a>);
-}
-</code></pre>
+<pre><code>public(friend) fun initialize(aptos_framework: &amp;signer, gas_schedule_blob: vector&lt;u8&gt;) &#123;<br/>    system_addresses::assert_aptos_framework(aptos_framework);<br/>    assert!(!vector::is_empty(&amp;gas_schedule_blob), error::invalid_argument(EINVALID_GAS_SCHEDULE));<br/><br/>    // TODO(Gas): check if gas schedule is consistent<br/>    let gas_schedule: GasScheduleV2 &#61; from_bytes(gas_schedule_blob);<br/>    move_to&lt;GasScheduleV2&gt;(aptos_framework, gas_schedule);<br/>&#125;<br/></code></pre>
 
 
 
@@ -192,15 +169,14 @@ Only called during genesis.
 
 ## Function `set_gas_schedule`
 
-Deprecated by <code><a href="gas_schedule.md#0x1_gas_schedule_set_for_next_epoch">set_for_next_epoch</a>()</code>.
+Deprecated by <code>set_for_next_epoch()</code>.
 
 WARNING: calling this while randomness is enabled will trigger a new epoch without randomness!
 
 TODO: update all the tests that reference this function, then disable this function.
 
 
-<pre><code><b>public</b> <b>fun</b> <a href="gas_schedule.md#0x1_gas_schedule_set_gas_schedule">set_gas_schedule</a>(aptos_framework: &<a href="../../aptos-stdlib/../move-stdlib/doc/signer.md#0x1_signer">signer</a>, gas_schedule_blob: <a href="../../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u8&gt;)
-</code></pre>
+<pre><code>public fun set_gas_schedule(aptos_framework: &amp;signer, gas_schedule_blob: vector&lt;u8&gt;)<br/></code></pre>
 
 
 
@@ -208,32 +184,7 @@ TODO: update all the tests that reference this function, then disable this funct
 <summary>Implementation</summary>
 
 
-<pre><code><b>public</b> <b>fun</b> <a href="gas_schedule.md#0x1_gas_schedule_set_gas_schedule">set_gas_schedule</a>(aptos_framework: &<a href="../../aptos-stdlib/../move-stdlib/doc/signer.md#0x1_signer">signer</a>, gas_schedule_blob: <a href="../../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u8&gt;) <b>acquires</b> <a href="gas_schedule.md#0x1_gas_schedule_GasSchedule">GasSchedule</a>, <a href="gas_schedule.md#0x1_gas_schedule_GasScheduleV2">GasScheduleV2</a> {
-    <a href="system_addresses.md#0x1_system_addresses_assert_aptos_framework">system_addresses::assert_aptos_framework</a>(aptos_framework);
-    <b>assert</b>!(!<a href="../../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector_is_empty">vector::is_empty</a>(&gas_schedule_blob), <a href="../../aptos-stdlib/../move-stdlib/doc/error.md#0x1_error_invalid_argument">error::invalid_argument</a>(<a href="gas_schedule.md#0x1_gas_schedule_EINVALID_GAS_SCHEDULE">EINVALID_GAS_SCHEDULE</a>));
-    <a href="chain_status.md#0x1_chain_status_assert_genesis">chain_status::assert_genesis</a>();
-
-    <b>if</b> (<b>exists</b>&lt;<a href="gas_schedule.md#0x1_gas_schedule_GasScheduleV2">GasScheduleV2</a>&gt;(@aptos_framework)) {
-        <b>let</b> <a href="gas_schedule.md#0x1_gas_schedule">gas_schedule</a> = <b>borrow_global_mut</b>&lt;<a href="gas_schedule.md#0x1_gas_schedule_GasScheduleV2">GasScheduleV2</a>&gt;(@aptos_framework);
-        <b>let</b> new_gas_schedule: <a href="gas_schedule.md#0x1_gas_schedule_GasScheduleV2">GasScheduleV2</a> = from_bytes(gas_schedule_blob);
-        <b>assert</b>!(new_gas_schedule.feature_version &gt;= <a href="gas_schedule.md#0x1_gas_schedule">gas_schedule</a>.feature_version,
-            <a href="../../aptos-stdlib/../move-stdlib/doc/error.md#0x1_error_invalid_argument">error::invalid_argument</a>(<a href="gas_schedule.md#0x1_gas_schedule_EINVALID_GAS_FEATURE_VERSION">EINVALID_GAS_FEATURE_VERSION</a>));
-        // TODO(Gas): check <b>if</b> gas schedule is consistent
-        *<a href="gas_schedule.md#0x1_gas_schedule">gas_schedule</a> = new_gas_schedule;
-    }
-    <b>else</b> {
-        <b>if</b> (<b>exists</b>&lt;<a href="gas_schedule.md#0x1_gas_schedule_GasSchedule">GasSchedule</a>&gt;(@aptos_framework)) {
-            _ = <b>move_from</b>&lt;<a href="gas_schedule.md#0x1_gas_schedule_GasSchedule">GasSchedule</a>&gt;(@aptos_framework);
-        };
-        <b>let</b> new_gas_schedule: <a href="gas_schedule.md#0x1_gas_schedule_GasScheduleV2">GasScheduleV2</a> = from_bytes(gas_schedule_blob);
-        // TODO(Gas): check <b>if</b> gas schedule is consistent
-        <b>move_to</b>&lt;<a href="gas_schedule.md#0x1_gas_schedule_GasScheduleV2">GasScheduleV2</a>&gt;(aptos_framework, new_gas_schedule);
-    };
-
-    // Need <b>to</b> trigger <a href="reconfiguration.md#0x1_reconfiguration">reconfiguration</a> so validator nodes can sync on the updated gas schedule.
-    <a href="reconfiguration.md#0x1_reconfiguration_reconfigure">reconfiguration::reconfigure</a>();
-}
-</code></pre>
+<pre><code>public fun set_gas_schedule(aptos_framework: &amp;signer, gas_schedule_blob: vector&lt;u8&gt;) acquires GasSchedule, GasScheduleV2 &#123;<br/>    system_addresses::assert_aptos_framework(aptos_framework);<br/>    assert!(!vector::is_empty(&amp;gas_schedule_blob), error::invalid_argument(EINVALID_GAS_SCHEDULE));<br/>    chain_status::assert_genesis();<br/><br/>    if (exists&lt;GasScheduleV2&gt;(@aptos_framework)) &#123;<br/>        let gas_schedule &#61; borrow_global_mut&lt;GasScheduleV2&gt;(@aptos_framework);<br/>        let new_gas_schedule: GasScheduleV2 &#61; from_bytes(gas_schedule_blob);<br/>        assert!(new_gas_schedule.feature_version &gt;&#61; gas_schedule.feature_version,<br/>            error::invalid_argument(EINVALID_GAS_FEATURE_VERSION));<br/>        // TODO(Gas): check if gas schedule is consistent<br/>        &#42;gas_schedule &#61; new_gas_schedule;<br/>    &#125;<br/>    else &#123;<br/>        if (exists&lt;GasSchedule&gt;(@aptos_framework)) &#123;<br/>            _ &#61; move_from&lt;GasSchedule&gt;(@aptos_framework);<br/>        &#125;;<br/>        let new_gas_schedule: GasScheduleV2 &#61; from_bytes(gas_schedule_blob);<br/>        // TODO(Gas): check if gas schedule is consistent<br/>        move_to&lt;GasScheduleV2&gt;(aptos_framework, new_gas_schedule);<br/>    &#125;;<br/><br/>    // Need to trigger reconfiguration so validator nodes can sync on the updated gas schedule.<br/>    reconfiguration::reconfigure();<br/>&#125;<br/></code></pre>
 
 
 
@@ -253,8 +204,7 @@ aptos_framework::aptos_governance::reconfigure(&framework_signer);
 ```
 
 
-<pre><code><b>public</b> <b>fun</b> <a href="gas_schedule.md#0x1_gas_schedule_set_for_next_epoch">set_for_next_epoch</a>(aptos_framework: &<a href="../../aptos-stdlib/../move-stdlib/doc/signer.md#0x1_signer">signer</a>, gas_schedule_blob: <a href="../../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u8&gt;)
-</code></pre>
+<pre><code>public fun set_for_next_epoch(aptos_framework: &amp;signer, gas_schedule_blob: vector&lt;u8&gt;)<br/></code></pre>
 
 
 
@@ -262,20 +212,7 @@ aptos_framework::aptos_governance::reconfigure(&framework_signer);
 <summary>Implementation</summary>
 
 
-<pre><code><b>public</b> <b>fun</b> <a href="gas_schedule.md#0x1_gas_schedule_set_for_next_epoch">set_for_next_epoch</a>(aptos_framework: &<a href="../../aptos-stdlib/../move-stdlib/doc/signer.md#0x1_signer">signer</a>, gas_schedule_blob: <a href="../../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u8&gt;) <b>acquires</b> <a href="gas_schedule.md#0x1_gas_schedule_GasScheduleV2">GasScheduleV2</a> {
-    <a href="system_addresses.md#0x1_system_addresses_assert_aptos_framework">system_addresses::assert_aptos_framework</a>(aptos_framework);
-    <b>assert</b>!(!<a href="../../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector_is_empty">vector::is_empty</a>(&gas_schedule_blob), <a href="../../aptos-stdlib/../move-stdlib/doc/error.md#0x1_error_invalid_argument">error::invalid_argument</a>(<a href="gas_schedule.md#0x1_gas_schedule_EINVALID_GAS_SCHEDULE">EINVALID_GAS_SCHEDULE</a>));
-    <b>let</b> new_gas_schedule: <a href="gas_schedule.md#0x1_gas_schedule_GasScheduleV2">GasScheduleV2</a> = from_bytes(gas_schedule_blob);
-    <b>if</b> (<b>exists</b>&lt;<a href="gas_schedule.md#0x1_gas_schedule_GasScheduleV2">GasScheduleV2</a>&gt;(@aptos_framework)) {
-        <b>let</b> cur_gas_schedule = <b>borrow_global</b>&lt;<a href="gas_schedule.md#0x1_gas_schedule_GasScheduleV2">GasScheduleV2</a>&gt;(@aptos_framework);
-        <b>assert</b>!(
-            new_gas_schedule.feature_version &gt;= cur_gas_schedule.feature_version,
-            <a href="../../aptos-stdlib/../move-stdlib/doc/error.md#0x1_error_invalid_argument">error::invalid_argument</a>(<a href="gas_schedule.md#0x1_gas_schedule_EINVALID_GAS_FEATURE_VERSION">EINVALID_GAS_FEATURE_VERSION</a>)
-        );
-    };
-    <a href="config_buffer.md#0x1_config_buffer_upsert">config_buffer::upsert</a>(new_gas_schedule);
-}
-</code></pre>
+<pre><code>public fun set_for_next_epoch(aptos_framework: &amp;signer, gas_schedule_blob: vector&lt;u8&gt;) acquires GasScheduleV2 &#123;<br/>    system_addresses::assert_aptos_framework(aptos_framework);<br/>    assert!(!vector::is_empty(&amp;gas_schedule_blob), error::invalid_argument(EINVALID_GAS_SCHEDULE));<br/>    let new_gas_schedule: GasScheduleV2 &#61; from_bytes(gas_schedule_blob);<br/>    if (exists&lt;GasScheduleV2&gt;(@aptos_framework)) &#123;<br/>        let cur_gas_schedule &#61; borrow_global&lt;GasScheduleV2&gt;(@aptos_framework);<br/>        assert!(<br/>            new_gas_schedule.feature_version &gt;&#61; cur_gas_schedule.feature_version,<br/>            error::invalid_argument(EINVALID_GAS_FEATURE_VERSION)<br/>        );<br/>    &#125;;<br/>    config_buffer::upsert(new_gas_schedule);<br/>&#125;<br/></code></pre>
 
 
 
@@ -285,11 +222,10 @@ aptos_framework::aptos_governance::reconfigure(&framework_signer);
 
 ## Function `on_new_epoch`
 
-Only used in reconfigurations to apply the pending <code><a href="gas_schedule.md#0x1_gas_schedule_GasScheduleV2">GasScheduleV2</a></code>, if there is any.
+Only used in reconfigurations to apply the pending <code>GasScheduleV2</code>, if there is any.
 
 
-<pre><code><b>public</b>(<b>friend</b>) <b>fun</b> <a href="gas_schedule.md#0x1_gas_schedule_on_new_epoch">on_new_epoch</a>(framework: &<a href="../../aptos-stdlib/../move-stdlib/doc/signer.md#0x1_signer">signer</a>)
-</code></pre>
+<pre><code>public(friend) fun on_new_epoch(framework: &amp;signer)<br/></code></pre>
 
 
 
@@ -297,18 +233,7 @@ Only used in reconfigurations to apply the pending <code><a href="gas_schedule.m
 <summary>Implementation</summary>
 
 
-<pre><code><b>public</b>(<b>friend</b>) <b>fun</b> <a href="gas_schedule.md#0x1_gas_schedule_on_new_epoch">on_new_epoch</a>(framework: &<a href="../../aptos-stdlib/../move-stdlib/doc/signer.md#0x1_signer">signer</a>) <b>acquires</b> <a href="gas_schedule.md#0x1_gas_schedule_GasScheduleV2">GasScheduleV2</a> {
-    <a href="system_addresses.md#0x1_system_addresses_assert_aptos_framework">system_addresses::assert_aptos_framework</a>(framework);
-    <b>if</b> (<a href="config_buffer.md#0x1_config_buffer_does_exist">config_buffer::does_exist</a>&lt;<a href="gas_schedule.md#0x1_gas_schedule_GasScheduleV2">GasScheduleV2</a>&gt;()) {
-        <b>let</b> new_gas_schedule = <a href="config_buffer.md#0x1_config_buffer_extract">config_buffer::extract</a>&lt;<a href="gas_schedule.md#0x1_gas_schedule_GasScheduleV2">GasScheduleV2</a>&gt;();
-        <b>if</b> (<b>exists</b>&lt;<a href="gas_schedule.md#0x1_gas_schedule_GasScheduleV2">GasScheduleV2</a>&gt;(@aptos_framework)) {
-            *<b>borrow_global_mut</b>&lt;<a href="gas_schedule.md#0x1_gas_schedule_GasScheduleV2">GasScheduleV2</a>&gt;(@aptos_framework) = new_gas_schedule;
-        } <b>else</b> {
-            <b>move_to</b>(framework, new_gas_schedule);
-        }
-    }
-}
-</code></pre>
+<pre><code>public(friend) fun on_new_epoch(framework: &amp;signer) acquires GasScheduleV2 &#123;<br/>    system_addresses::assert_aptos_framework(framework);<br/>    if (config_buffer::does_exist&lt;GasScheduleV2&gt;()) &#123;<br/>        let new_gas_schedule &#61; config_buffer::extract&lt;GasScheduleV2&gt;();<br/>        if (exists&lt;GasScheduleV2&gt;(@aptos_framework)) &#123;<br/>            &#42;borrow_global_mut&lt;GasScheduleV2&gt;(@aptos_framework) &#61; new_gas_schedule;<br/>        &#125; else &#123;<br/>            move_to(framework, new_gas_schedule);<br/>        &#125;<br/>    &#125;<br/>&#125;<br/></code></pre>
 
 
 
@@ -320,8 +245,7 @@ Only used in reconfigurations to apply the pending <code><a href="gas_schedule.m
 
 
 
-<pre><code><b>public</b> <b>fun</b> <a href="gas_schedule.md#0x1_gas_schedule_set_storage_gas_config">set_storage_gas_config</a>(aptos_framework: &<a href="../../aptos-stdlib/../move-stdlib/doc/signer.md#0x1_signer">signer</a>, config: <a href="storage_gas.md#0x1_storage_gas_StorageGasConfig">storage_gas::StorageGasConfig</a>)
-</code></pre>
+<pre><code>public fun set_storage_gas_config(aptos_framework: &amp;signer, config: storage_gas::StorageGasConfig)<br/></code></pre>
 
 
 
@@ -329,13 +253,7 @@ Only used in reconfigurations to apply the pending <code><a href="gas_schedule.m
 <summary>Implementation</summary>
 
 
-<pre><code><b>public</b> <b>fun</b> <a href="gas_schedule.md#0x1_gas_schedule_set_storage_gas_config">set_storage_gas_config</a>(aptos_framework: &<a href="../../aptos-stdlib/../move-stdlib/doc/signer.md#0x1_signer">signer</a>, config: StorageGasConfig) {
-    <a href="storage_gas.md#0x1_storage_gas_set_config">storage_gas::set_config</a>(aptos_framework, config);
-    // Need <b>to</b> trigger <a href="reconfiguration.md#0x1_reconfiguration">reconfiguration</a> so the VM is guaranteed <b>to</b> load the new gas fee starting from the next
-    // transaction.
-    <a href="reconfiguration.md#0x1_reconfiguration_reconfigure">reconfiguration::reconfigure</a>();
-}
-</code></pre>
+<pre><code>public fun set_storage_gas_config(aptos_framework: &amp;signer, config: StorageGasConfig) &#123;<br/>    storage_gas::set_config(aptos_framework, config);<br/>    // Need to trigger reconfiguration so the VM is guaranteed to load the new gas fee starting from the next<br/>    // transaction.<br/>    reconfiguration::reconfigure();<br/>&#125;<br/></code></pre>
 
 
 
@@ -347,8 +265,7 @@ Only used in reconfigurations to apply the pending <code><a href="gas_schedule.m
 
 
 
-<pre><code><b>public</b> <b>fun</b> <a href="gas_schedule.md#0x1_gas_schedule_set_storage_gas_config_for_next_epoch">set_storage_gas_config_for_next_epoch</a>(aptos_framework: &<a href="../../aptos-stdlib/../move-stdlib/doc/signer.md#0x1_signer">signer</a>, config: <a href="storage_gas.md#0x1_storage_gas_StorageGasConfig">storage_gas::StorageGasConfig</a>)
-</code></pre>
+<pre><code>public fun set_storage_gas_config_for_next_epoch(aptos_framework: &amp;signer, config: storage_gas::StorageGasConfig)<br/></code></pre>
 
 
 
@@ -356,10 +273,7 @@ Only used in reconfigurations to apply the pending <code><a href="gas_schedule.m
 <summary>Implementation</summary>
 
 
-<pre><code><b>public</b> <b>fun</b> <a href="gas_schedule.md#0x1_gas_schedule_set_storage_gas_config_for_next_epoch">set_storage_gas_config_for_next_epoch</a>(aptos_framework: &<a href="../../aptos-stdlib/../move-stdlib/doc/signer.md#0x1_signer">signer</a>, config: StorageGasConfig) {
-    <a href="storage_gas.md#0x1_storage_gas_set_config">storage_gas::set_config</a>(aptos_framework, config);
-}
-</code></pre>
+<pre><code>public fun set_storage_gas_config_for_next_epoch(aptos_framework: &amp;signer, config: StorageGasConfig) &#123;<br/>    storage_gas::set_config(aptos_framework, config);<br/>&#125;<br/></code></pre>
 
 
 
@@ -423,9 +337,7 @@ Only used in reconfigurations to apply the pending <code><a href="gas_schedule.m
 ### Module-level Specification
 
 
-<pre><code><b>pragma</b> verify = <b>true</b>;
-<b>pragma</b> aborts_if_is_strict;
-</code></pre>
+<pre><code>pragma verify &#61; true;<br/>pragma aborts_if_is_strict;<br/></code></pre>
 
 
 
@@ -434,20 +346,14 @@ Only used in reconfigurations to apply the pending <code><a href="gas_schedule.m
 ### Function `initialize`
 
 
-<pre><code><b>public</b>(<b>friend</b>) <b>fun</b> <a href="gas_schedule.md#0x1_gas_schedule_initialize">initialize</a>(aptos_framework: &<a href="../../aptos-stdlib/../move-stdlib/doc/signer.md#0x1_signer">signer</a>, gas_schedule_blob: <a href="../../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u8&gt;)
-</code></pre>
+<pre><code>public(friend) fun initialize(aptos_framework: &amp;signer, gas_schedule_blob: vector&lt;u8&gt;)<br/></code></pre>
 
 
 
 
-<pre><code><b>let</b> addr = <a href="../../aptos-stdlib/../move-stdlib/doc/signer.md#0x1_signer_address_of">signer::address_of</a>(aptos_framework);
-// This enforces <a id="high-level-req-1" href="#high-level-req">high-level requirement 1</a>:
-<b>include</b> <a href="system_addresses.md#0x1_system_addresses_AbortsIfNotAptosFramework">system_addresses::AbortsIfNotAptosFramework</a>{ <a href="account.md#0x1_account">account</a>: aptos_framework };
-// This enforces <a id="high-level-req-3.3" href="#high-level-req">high-level requirement 3</a>:
-<b>aborts_if</b> len(gas_schedule_blob) == 0;
-<b>aborts_if</b> <b>exists</b>&lt;<a href="gas_schedule.md#0x1_gas_schedule_GasScheduleV2">GasScheduleV2</a>&gt;(addr);
-<b>ensures</b> <b>exists</b>&lt;<a href="gas_schedule.md#0x1_gas_schedule_GasScheduleV2">GasScheduleV2</a>&gt;(addr);
-</code></pre>
+<pre><code>let addr &#61; signer::address_of(aptos_framework);<br/>// This enforces <a id="high-level-req-1" href="#high-level-req">high-level requirement 1</a>:
+include system_addresses::AbortsIfNotAptosFramework&#123; account: aptos_framework &#125;;<br/>// This enforces <a id="high-level-req-3.3" href="#high-level-req">high-level requirement 3</a>:
+aborts_if len(gas_schedule_blob) &#61;&#61; 0;<br/>aborts_if exists&lt;GasScheduleV2&gt;(addr);<br/>ensures exists&lt;GasScheduleV2&gt;(addr);<br/></code></pre>
 
 
 
@@ -456,29 +362,15 @@ Only used in reconfigurations to apply the pending <code><a href="gas_schedule.m
 ### Function `set_gas_schedule`
 
 
-<pre><code><b>public</b> <b>fun</b> <a href="gas_schedule.md#0x1_gas_schedule_set_gas_schedule">set_gas_schedule</a>(aptos_framework: &<a href="../../aptos-stdlib/../move-stdlib/doc/signer.md#0x1_signer">signer</a>, gas_schedule_blob: <a href="../../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u8&gt;)
-</code></pre>
+<pre><code>public fun set_gas_schedule(aptos_framework: &amp;signer, gas_schedule_blob: vector&lt;u8&gt;)<br/></code></pre>
 
 
 
 
-<pre><code><b>pragma</b> verify_duration_estimate = 600;
-<b>requires</b> <b>exists</b>&lt;<a href="stake.md#0x1_stake_ValidatorFees">stake::ValidatorFees</a>&gt;(@aptos_framework);
-<b>requires</b> <b>exists</b>&lt;CoinInfo&lt;AptosCoin&gt;&gt;(@aptos_framework);
-<b>requires</b> <a href="chain_status.md#0x1_chain_status_is_genesis">chain_status::is_genesis</a>();
-<b>include</b> <a href="transaction_fee.md#0x1_transaction_fee_RequiresCollectedFeesPerValueLeqBlockAptosSupply">transaction_fee::RequiresCollectedFeesPerValueLeqBlockAptosSupply</a>;
-<b>include</b> <a href="staking_config.md#0x1_staking_config_StakingRewardsConfigRequirement">staking_config::StakingRewardsConfigRequirement</a>;
-// This enforces <a id="high-level-req-2" href="#high-level-req">high-level requirement 2</a>:
-<b>include</b> <a href="system_addresses.md#0x1_system_addresses_AbortsIfNotAptosFramework">system_addresses::AbortsIfNotAptosFramework</a>{ <a href="account.md#0x1_account">account</a>: aptos_framework };
-// This enforces <a id="high-level-req-3.2" href="#high-level-req">high-level requirement 3</a>:
-<b>aborts_if</b> len(gas_schedule_blob) == 0;
-<b>let</b> new_gas_schedule = <a href="util.md#0x1_util_spec_from_bytes">util::spec_from_bytes</a>&lt;<a href="gas_schedule.md#0x1_gas_schedule_GasScheduleV2">GasScheduleV2</a>&gt;(gas_schedule_blob);
-<b>let</b> <a href="gas_schedule.md#0x1_gas_schedule">gas_schedule</a> = <b>global</b>&lt;<a href="gas_schedule.md#0x1_gas_schedule_GasScheduleV2">GasScheduleV2</a>&gt;(@aptos_framework);
-// This enforces <a id="high-level-req-4" href="#high-level-req">high-level requirement 4</a>:
-<b>aborts_if</b> <b>exists</b>&lt;<a href="gas_schedule.md#0x1_gas_schedule_GasScheduleV2">GasScheduleV2</a>&gt;(@aptos_framework) && new_gas_schedule.feature_version &lt; <a href="gas_schedule.md#0x1_gas_schedule">gas_schedule</a>.feature_version;
-<b>ensures</b> <b>exists</b>&lt;<a href="gas_schedule.md#0x1_gas_schedule_GasScheduleV2">GasScheduleV2</a>&gt;(<a href="../../aptos-stdlib/../move-stdlib/doc/signer.md#0x1_signer_address_of">signer::address_of</a>(aptos_framework));
-<b>ensures</b> <b>global</b>&lt;<a href="gas_schedule.md#0x1_gas_schedule_GasScheduleV2">GasScheduleV2</a>&gt;(@aptos_framework) == new_gas_schedule;
-</code></pre>
+<pre><code>pragma verify_duration_estimate &#61; 600;<br/>requires exists&lt;stake::ValidatorFees&gt;(@aptos_framework);<br/>requires exists&lt;CoinInfo&lt;AptosCoin&gt;&gt;(@aptos_framework);<br/>requires chain_status::is_genesis();<br/>include transaction_fee::RequiresCollectedFeesPerValueLeqBlockAptosSupply;<br/>include staking_config::StakingRewardsConfigRequirement;<br/>// This enforces <a id="high-level-req-2" href="#high-level-req">high-level requirement 2</a>:
+include system_addresses::AbortsIfNotAptosFramework&#123; account: aptos_framework &#125;;<br/>// This enforces <a id="high-level-req-3.2" href="#high-level-req">high-level requirement 3</a>:
+aborts_if len(gas_schedule_blob) &#61;&#61; 0;<br/>let new_gas_schedule &#61; util::spec_from_bytes&lt;GasScheduleV2&gt;(gas_schedule_blob);<br/>let gas_schedule &#61; global&lt;GasScheduleV2&gt;(@aptos_framework);<br/>// This enforces <a id="high-level-req-4" href="#high-level-req">high-level requirement 4</a>:
+aborts_if exists&lt;GasScheduleV2&gt;(@aptos_framework) &amp;&amp; new_gas_schedule.feature_version &lt; gas_schedule.feature_version;<br/>ensures exists&lt;GasScheduleV2&gt;(signer::address_of(aptos_framework));<br/>ensures global&lt;GasScheduleV2&gt;(@aptos_framework) &#61;&#61; new_gas_schedule;<br/></code></pre>
 
 
 
@@ -487,21 +379,12 @@ Only used in reconfigurations to apply the pending <code><a href="gas_schedule.m
 ### Function `set_for_next_epoch`
 
 
-<pre><code><b>public</b> <b>fun</b> <a href="gas_schedule.md#0x1_gas_schedule_set_for_next_epoch">set_for_next_epoch</a>(aptos_framework: &<a href="../../aptos-stdlib/../move-stdlib/doc/signer.md#0x1_signer">signer</a>, gas_schedule_blob: <a href="../../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u8&gt;)
-</code></pre>
+<pre><code>public fun set_for_next_epoch(aptos_framework: &amp;signer, gas_schedule_blob: vector&lt;u8&gt;)<br/></code></pre>
 
 
 
 
-<pre><code><b>include</b> <a href="system_addresses.md#0x1_system_addresses_AbortsIfNotAptosFramework">system_addresses::AbortsIfNotAptosFramework</a>{ <a href="account.md#0x1_account">account</a>: aptos_framework };
-<b>include</b> <a href="config_buffer.md#0x1_config_buffer_SetForNextEpochAbortsIf">config_buffer::SetForNextEpochAbortsIf</a> {
-    <a href="account.md#0x1_account">account</a>: aptos_framework,
-    config: gas_schedule_blob
-};
-<b>let</b> new_gas_schedule = <a href="util.md#0x1_util_spec_from_bytes">util::spec_from_bytes</a>&lt;<a href="gas_schedule.md#0x1_gas_schedule_GasScheduleV2">GasScheduleV2</a>&gt;(gas_schedule_blob);
-<b>let</b> cur_gas_schedule = <b>global</b>&lt;<a href="gas_schedule.md#0x1_gas_schedule_GasScheduleV2">GasScheduleV2</a>&gt;(@aptos_framework);
-<b>aborts_if</b> <b>exists</b>&lt;<a href="gas_schedule.md#0x1_gas_schedule_GasScheduleV2">GasScheduleV2</a>&gt;(@aptos_framework) && new_gas_schedule.feature_version &lt; cur_gas_schedule.feature_version;
-</code></pre>
+<pre><code>include system_addresses::AbortsIfNotAptosFramework&#123; account: aptos_framework &#125;;<br/>include config_buffer::SetForNextEpochAbortsIf &#123;<br/>    account: aptos_framework,<br/>    config: gas_schedule_blob<br/>&#125;;<br/>let new_gas_schedule &#61; util::spec_from_bytes&lt;GasScheduleV2&gt;(gas_schedule_blob);<br/>let cur_gas_schedule &#61; global&lt;GasScheduleV2&gt;(@aptos_framework);<br/>aborts_if exists&lt;GasScheduleV2&gt;(@aptos_framework) &amp;&amp; new_gas_schedule.feature_version &lt; cur_gas_schedule.feature_version;<br/></code></pre>
 
 
 
@@ -510,16 +393,12 @@ Only used in reconfigurations to apply the pending <code><a href="gas_schedule.m
 ### Function `on_new_epoch`
 
 
-<pre><code><b>public</b>(<b>friend</b>) <b>fun</b> <a href="gas_schedule.md#0x1_gas_schedule_on_new_epoch">on_new_epoch</a>(framework: &<a href="../../aptos-stdlib/../move-stdlib/doc/signer.md#0x1_signer">signer</a>)
-</code></pre>
+<pre><code>public(friend) fun on_new_epoch(framework: &amp;signer)<br/></code></pre>
 
 
 
 
-<pre><code><b>requires</b> @aptos_framework == std::signer::address_of(framework);
-<b>include</b> <a href="config_buffer.md#0x1_config_buffer_OnNewEpochRequirement">config_buffer::OnNewEpochRequirement</a>&lt;<a href="gas_schedule.md#0x1_gas_schedule_GasScheduleV2">GasScheduleV2</a>&gt;;
-<b>aborts_if</b> <b>false</b>;
-</code></pre>
+<pre><code>requires @aptos_framework &#61;&#61; std::signer::address_of(framework);<br/>include config_buffer::OnNewEpochRequirement&lt;GasScheduleV2&gt;;<br/>aborts_if false;<br/></code></pre>
 
 
 
@@ -528,28 +407,17 @@ Only used in reconfigurations to apply the pending <code><a href="gas_schedule.m
 ### Function `set_storage_gas_config`
 
 
-<pre><code><b>public</b> <b>fun</b> <a href="gas_schedule.md#0x1_gas_schedule_set_storage_gas_config">set_storage_gas_config</a>(aptos_framework: &<a href="../../aptos-stdlib/../move-stdlib/doc/signer.md#0x1_signer">signer</a>, config: <a href="storage_gas.md#0x1_storage_gas_StorageGasConfig">storage_gas::StorageGasConfig</a>)
-</code></pre>
+<pre><code>public fun set_storage_gas_config(aptos_framework: &amp;signer, config: storage_gas::StorageGasConfig)<br/></code></pre>
 
 
 
 
-<pre><code><b>pragma</b> verify_duration_estimate = 600;
-<b>requires</b> <b>exists</b>&lt;<a href="stake.md#0x1_stake_ValidatorFees">stake::ValidatorFees</a>&gt;(@aptos_framework);
-<b>requires</b> <b>exists</b>&lt;CoinInfo&lt;AptosCoin&gt;&gt;(@aptos_framework);
-<b>include</b> <a href="system_addresses.md#0x1_system_addresses_AbortsIfNotAptosFramework">system_addresses::AbortsIfNotAptosFramework</a>{ <a href="account.md#0x1_account">account</a>: aptos_framework };
-<b>include</b> <a href="transaction_fee.md#0x1_transaction_fee_RequiresCollectedFeesPerValueLeqBlockAptosSupply">transaction_fee::RequiresCollectedFeesPerValueLeqBlockAptosSupply</a>;
-<b>include</b> <a href="staking_config.md#0x1_staking_config_StakingRewardsConfigRequirement">staking_config::StakingRewardsConfigRequirement</a>;
-<b>aborts_if</b> !<b>exists</b>&lt;StorageGasConfig&gt;(@aptos_framework);
-<b>ensures</b> <b>global</b>&lt;StorageGasConfig&gt;(@aptos_framework) == config;
-</code></pre>
+<pre><code>pragma verify_duration_estimate &#61; 600;<br/>requires exists&lt;stake::ValidatorFees&gt;(@aptos_framework);<br/>requires exists&lt;CoinInfo&lt;AptosCoin&gt;&gt;(@aptos_framework);<br/>include system_addresses::AbortsIfNotAptosFramework&#123; account: aptos_framework &#125;;<br/>include transaction_fee::RequiresCollectedFeesPerValueLeqBlockAptosSupply;<br/>include staking_config::StakingRewardsConfigRequirement;<br/>aborts_if !exists&lt;StorageGasConfig&gt;(@aptos_framework);<br/>ensures global&lt;StorageGasConfig&gt;(@aptos_framework) &#61;&#61; config;<br/></code></pre>
 
 
 
 
-<pre><code><b>include</b> <a href="system_addresses.md#0x1_system_addresses_AbortsIfNotAptosFramework">system_addresses::AbortsIfNotAptosFramework</a>{ <a href="account.md#0x1_account">account</a>: aptos_framework };
-<b>aborts_if</b> !<b>exists</b>&lt;<a href="storage_gas.md#0x1_storage_gas_StorageGasConfig">storage_gas::StorageGasConfig</a>&gt;(@aptos_framework);
-</code></pre>
+<pre><code>include system_addresses::AbortsIfNotAptosFramework&#123; account: aptos_framework &#125;;<br/>aborts_if !exists&lt;storage_gas::StorageGasConfig&gt;(@aptos_framework);<br/></code></pre>
 
 
 
@@ -558,15 +426,12 @@ Only used in reconfigurations to apply the pending <code><a href="gas_schedule.m
 ### Function `set_storage_gas_config_for_next_epoch`
 
 
-<pre><code><b>public</b> <b>fun</b> <a href="gas_schedule.md#0x1_gas_schedule_set_storage_gas_config_for_next_epoch">set_storage_gas_config_for_next_epoch</a>(aptos_framework: &<a href="../../aptos-stdlib/../move-stdlib/doc/signer.md#0x1_signer">signer</a>, config: <a href="storage_gas.md#0x1_storage_gas_StorageGasConfig">storage_gas::StorageGasConfig</a>)
-</code></pre>
+<pre><code>public fun set_storage_gas_config_for_next_epoch(aptos_framework: &amp;signer, config: storage_gas::StorageGasConfig)<br/></code></pre>
 
 
 
 
-<pre><code><b>include</b> <a href="system_addresses.md#0x1_system_addresses_AbortsIfNotAptosFramework">system_addresses::AbortsIfNotAptosFramework</a>{ <a href="account.md#0x1_account">account</a>: aptos_framework };
-<b>aborts_if</b> !<b>exists</b>&lt;<a href="storage_gas.md#0x1_storage_gas_StorageGasConfig">storage_gas::StorageGasConfig</a>&gt;(@aptos_framework);
-</code></pre>
+<pre><code>include system_addresses::AbortsIfNotAptosFramework&#123; account: aptos_framework &#125;;<br/>aborts_if !exists&lt;storage_gas::StorageGasConfig&gt;(@aptos_framework);<br/></code></pre>
 
 
 [move-book]: https://aptos.dev/move/book/SUMMARY

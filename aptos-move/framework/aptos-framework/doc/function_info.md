@@ -3,7 +3,7 @@
 
 # Module `0x1::function_info`
 
-The <code><a href="function_info.md#0x1_function_info">function_info</a></code> module defines the <code><a href="function_info.md#0x1_function_info_FunctionInfo">FunctionInfo</a></code> type which simulates a function pointer.
+The <code>function_info</code> module defines the <code>FunctionInfo</code> type which simulates a function pointer.
 
 
 -  [Struct `FunctionInfo`](#0x1_function_info_FunctionInfo)
@@ -20,11 +20,7 @@ The <code><a href="function_info.md#0x1_function_info">function_info</a></code> 
     -  [Function `load_function_impl`](#@Specification_1_load_function_impl)
 
 
-<pre><code><b>use</b> <a href="../../aptos-stdlib/../move-stdlib/doc/error.md#0x1_error">0x1::error</a>;
-<b>use</b> <a href="../../aptos-stdlib/../move-stdlib/doc/features.md#0x1_features">0x1::features</a>;
-<b>use</b> <a href="../../aptos-stdlib/../move-stdlib/doc/signer.md#0x1_signer">0x1::signer</a>;
-<b>use</b> <a href="../../aptos-stdlib/../move-stdlib/doc/string.md#0x1_string">0x1::string</a>;
-</code></pre>
+<pre><code>use 0x1::error;<br/>use 0x1::features;<br/>use 0x1::signer;<br/>use 0x1::string;<br/></code></pre>
 
 
 
@@ -35,8 +31,7 @@ The <code><a href="function_info.md#0x1_function_info">function_info</a></code> 
 A <code>String</code> holds a sequence of bytes which is guaranteed to be in utf8 format.
 
 
-<pre><code><b>struct</b> <a href="function_info.md#0x1_function_info_FunctionInfo">FunctionInfo</a> <b>has</b> <b>copy</b>, drop, store
-</code></pre>
+<pre><code>struct FunctionInfo has copy, drop, store<br/></code></pre>
 
 
 
@@ -46,19 +41,19 @@ A <code>String</code> holds a sequence of bytes which is guaranteed to be in utf
 
 <dl>
 <dt>
-<code>module_address: <b>address</b></code>
+<code>module_address: address</code>
 </dt>
 <dd>
 
 </dd>
 <dt>
-<code>module_name: <a href="../../aptos-stdlib/../move-stdlib/doc/string.md#0x1_string_String">string::String</a></code>
+<code>module_name: string::String</code>
 </dt>
 <dd>
 
 </dd>
 <dt>
-<code>function_name: <a href="../../aptos-stdlib/../move-stdlib/doc/string.md#0x1_string_String">string::String</a></code>
+<code>function_name: string::String</code>
 </dt>
 <dd>
 
@@ -78,8 +73,7 @@ A <code>String</code> holds a sequence of bytes which is guaranteed to be in utf
 Function specified in the FunctionInfo doesn't exist on chain.
 
 
-<pre><code><b>const</b> <a href="function_info.md#0x1_function_info_EINVALID_FUNCTION">EINVALID_FUNCTION</a>: u64 = 2;
-</code></pre>
+<pre><code>const EINVALID_FUNCTION: u64 &#61; 2;<br/></code></pre>
 
 
 
@@ -88,8 +82,7 @@ Function specified in the FunctionInfo doesn't exist on chain.
 String is not a valid Move identifier
 
 
-<pre><code><b>const</b> <a href="function_info.md#0x1_function_info_EINVALID_IDENTIFIER">EINVALID_IDENTIFIER</a>: u64 = 1;
-</code></pre>
+<pre><code>const EINVALID_IDENTIFIER: u64 &#61; 1;<br/></code></pre>
 
 
 
@@ -98,8 +91,7 @@ String is not a valid Move identifier
 Feature hasn't been activated yet.
 
 
-<pre><code><b>const</b> <a href="function_info.md#0x1_function_info_ENOT_ACTIVATED">ENOT_ACTIVATED</a>: u64 = 3;
-</code></pre>
+<pre><code>const ENOT_ACTIVATED: u64 &#61; 3;<br/></code></pre>
 
 
 
@@ -110,8 +102,7 @@ Feature hasn't been activated yet.
 Creates a new function info from names.
 
 
-<pre><code><b>public</b> <b>fun</b> <a href="function_info.md#0x1_function_info_new_function_info">new_function_info</a>(module_signer: &<a href="../../aptos-stdlib/../move-stdlib/doc/signer.md#0x1_signer">signer</a>, module_name: <a href="../../aptos-stdlib/../move-stdlib/doc/string.md#0x1_string_String">string::String</a>, function_name: <a href="../../aptos-stdlib/../move-stdlib/doc/string.md#0x1_string_String">string::String</a>): <a href="function_info.md#0x1_function_info_FunctionInfo">function_info::FunctionInfo</a>
-</code></pre>
+<pre><code>public fun new_function_info(module_signer: &amp;signer, module_name: string::String, function_name: string::String): function_info::FunctionInfo<br/></code></pre>
 
 
 
@@ -119,18 +110,7 @@ Creates a new function info from names.
 <summary>Implementation</summary>
 
 
-<pre><code><b>public</b> <b>fun</b> <a href="function_info.md#0x1_function_info_new_function_info">new_function_info</a>(
-    module_signer: &<a href="../../aptos-stdlib/../move-stdlib/doc/signer.md#0x1_signer">signer</a>,
-    module_name: String,
-    function_name: String,
-): <a href="function_info.md#0x1_function_info_FunctionInfo">FunctionInfo</a> {
-    <a href="function_info.md#0x1_function_info_new_function_info_from_address">new_function_info_from_address</a>(
-        <a href="../../aptos-stdlib/../move-stdlib/doc/signer.md#0x1_signer_address_of">signer::address_of</a>(module_signer),
-        module_name,
-        function_name,
-    )
-}
-</code></pre>
+<pre><code>public fun new_function_info(<br/>    module_signer: &amp;signer,<br/>    module_name: String,<br/>    function_name: String,<br/>): FunctionInfo &#123;<br/>    new_function_info_from_address(<br/>        signer::address_of(module_signer),<br/>        module_name,<br/>        function_name,<br/>    )<br/>&#125;<br/></code></pre>
 
 
 
@@ -142,8 +122,7 @@ Creates a new function info from names.
 
 
 
-<pre><code><b>public</b>(<b>friend</b>) <b>fun</b> <a href="function_info.md#0x1_function_info_new_function_info_from_address">new_function_info_from_address</a>(module_address: <b>address</b>, module_name: <a href="../../aptos-stdlib/../move-stdlib/doc/string.md#0x1_string_String">string::String</a>, function_name: <a href="../../aptos-stdlib/../move-stdlib/doc/string.md#0x1_string_String">string::String</a>): <a href="function_info.md#0x1_function_info_FunctionInfo">function_info::FunctionInfo</a>
-</code></pre>
+<pre><code>public(friend) fun new_function_info_from_address(module_address: address, module_name: string::String, function_name: string::String): function_info::FunctionInfo<br/></code></pre>
 
 
 
@@ -151,26 +130,7 @@ Creates a new function info from names.
 <summary>Implementation</summary>
 
 
-<pre><code><b>public</b>(<b>friend</b>) <b>fun</b> <a href="function_info.md#0x1_function_info_new_function_info_from_address">new_function_info_from_address</a>(
-    module_address: <b>address</b>,
-    module_name: String,
-    function_name: String,
-): <a href="function_info.md#0x1_function_info_FunctionInfo">FunctionInfo</a> {
-    <b>assert</b>!(
-        <a href="function_info.md#0x1_function_info_is_identifier">is_identifier</a>(<a href="../../aptos-stdlib/../move-stdlib/doc/string.md#0x1_string_bytes">string::bytes</a>(&module_name)),
-        <a href="function_info.md#0x1_function_info_EINVALID_IDENTIFIER">EINVALID_IDENTIFIER</a>
-    );
-    <b>assert</b>!(
-        <a href="function_info.md#0x1_function_info_is_identifier">is_identifier</a>(<a href="../../aptos-stdlib/../move-stdlib/doc/string.md#0x1_string_bytes">string::bytes</a>(&function_name)),
-        <a href="function_info.md#0x1_function_info_EINVALID_IDENTIFIER">EINVALID_IDENTIFIER</a>
-    );
-    <a href="function_info.md#0x1_function_info_FunctionInfo">FunctionInfo</a> {
-        module_address,
-        module_name,
-        function_name,
-    }
-}
-</code></pre>
+<pre><code>public(friend) fun new_function_info_from_address(<br/>    module_address: address,<br/>    module_name: String,<br/>    function_name: String,<br/>): FunctionInfo &#123;<br/>    assert!(<br/>        is_identifier(string::bytes(&amp;module_name)),<br/>        EINVALID_IDENTIFIER<br/>    );<br/>    assert!(<br/>        is_identifier(string::bytes(&amp;function_name)),<br/>        EINVALID_IDENTIFIER<br/>    );<br/>    FunctionInfo &#123;<br/>        module_address,<br/>        module_name,<br/>        function_name,<br/>    &#125;<br/>&#125;<br/></code></pre>
 
 
 
@@ -186,14 +146,13 @@ framework_function is the dispatch native function defined in the aptos_framewor
 dispatch_target is the function passed in by the user.
 
 dispatch_target should have the same signature (same argument type, same generics constraint) except
-that the framework_function will have a <code>&<a href="function_info.md#0x1_function_info_FunctionInfo">FunctionInfo</a></code> in the last argument that will instruct the VM which
+that the framework_function will have a <code>&amp;FunctionInfo</code> in the last argument that will instruct the VM which
 function to jump to.
 
 dispatch_target also needs to be public so the type signature will remain unchanged.
 
 
-<pre><code><b>public</b>(<b>friend</b>) <b>fun</b> <a href="function_info.md#0x1_function_info_check_dispatch_type_compatibility">check_dispatch_type_compatibility</a>(framework_function: &<a href="function_info.md#0x1_function_info_FunctionInfo">function_info::FunctionInfo</a>, dispatch_target: &<a href="function_info.md#0x1_function_info_FunctionInfo">function_info::FunctionInfo</a>): bool
-</code></pre>
+<pre><code>public(friend) fun check_dispatch_type_compatibility(framework_function: &amp;function_info::FunctionInfo, dispatch_target: &amp;function_info::FunctionInfo): bool<br/></code></pre>
 
 
 
@@ -201,18 +160,7 @@ dispatch_target also needs to be public so the type signature will remain unchan
 <summary>Implementation</summary>
 
 
-<pre><code><b>public</b>(<b>friend</b>) <b>fun</b> <a href="function_info.md#0x1_function_info_check_dispatch_type_compatibility">check_dispatch_type_compatibility</a>(
-    framework_function: &<a href="function_info.md#0x1_function_info_FunctionInfo">FunctionInfo</a>,
-    dispatch_target: &<a href="function_info.md#0x1_function_info_FunctionInfo">FunctionInfo</a>,
-): bool {
-    <b>assert</b>!(
-        <a href="../../aptos-stdlib/../move-stdlib/doc/features.md#0x1_features_dispatchable_fungible_asset_enabled">features::dispatchable_fungible_asset_enabled</a>(),
-        <a href="../../aptos-stdlib/../move-stdlib/doc/error.md#0x1_error_aborted">error::aborted</a>(<a href="function_info.md#0x1_function_info_ENOT_ACTIVATED">ENOT_ACTIVATED</a>)
-    );
-    <a href="function_info.md#0x1_function_info_load_function_impl">load_function_impl</a>(dispatch_target);
-    <a href="function_info.md#0x1_function_info_check_dispatch_type_compatibility_impl">check_dispatch_type_compatibility_impl</a>(framework_function, dispatch_target)
-}
-</code></pre>
+<pre><code>public(friend) fun check_dispatch_type_compatibility(<br/>    framework_function: &amp;FunctionInfo,<br/>    dispatch_target: &amp;FunctionInfo,<br/>): bool &#123;<br/>    assert!(<br/>        features::dispatchable_fungible_asset_enabled(),<br/>        error::aborted(ENOT_ACTIVATED)<br/>    );<br/>    load_function_impl(dispatch_target);<br/>    check_dispatch_type_compatibility_impl(framework_function, dispatch_target)<br/>&#125;<br/></code></pre>
 
 
 
@@ -233,8 +181,7 @@ Calling <code>check_dispatch_type_compatibility_impl</code> or dispatch without 
 if such module isn't accessed previously in the transaction.
 
 
-<pre><code><b>public</b>(<b>friend</b>) <b>fun</b> <a href="function_info.md#0x1_function_info_load_module_from_function">load_module_from_function</a>(f: &<a href="function_info.md#0x1_function_info_FunctionInfo">function_info::FunctionInfo</a>)
-</code></pre>
+<pre><code>public(friend) fun load_module_from_function(f: &amp;function_info::FunctionInfo)<br/></code></pre>
 
 
 
@@ -242,10 +189,7 @@ if such module isn't accessed previously in the transaction.
 <summary>Implementation</summary>
 
 
-<pre><code><b>public</b>(<b>friend</b>) <b>fun</b> <a href="function_info.md#0x1_function_info_load_module_from_function">load_module_from_function</a>(f: &<a href="function_info.md#0x1_function_info_FunctionInfo">FunctionInfo</a>) {
-    <a href="function_info.md#0x1_function_info_load_function_impl">load_function_impl</a>(f)
-}
-</code></pre>
+<pre><code>public(friend) fun load_module_from_function(f: &amp;FunctionInfo) &#123;<br/>    load_function_impl(f)<br/>&#125;<br/></code></pre>
 
 
 
@@ -257,8 +201,7 @@ if such module isn't accessed previously in the transaction.
 
 
 
-<pre><code><b>fun</b> <a href="function_info.md#0x1_function_info_check_dispatch_type_compatibility_impl">check_dispatch_type_compatibility_impl</a>(lhs: &<a href="function_info.md#0x1_function_info_FunctionInfo">function_info::FunctionInfo</a>, r: &<a href="function_info.md#0x1_function_info_FunctionInfo">function_info::FunctionInfo</a>): bool
-</code></pre>
+<pre><code>fun check_dispatch_type_compatibility_impl(lhs: &amp;function_info::FunctionInfo, r: &amp;function_info::FunctionInfo): bool<br/></code></pre>
 
 
 
@@ -266,8 +209,7 @@ if such module isn't accessed previously in the transaction.
 <summary>Implementation</summary>
 
 
-<pre><code><b>native</b> <b>fun</b> <a href="function_info.md#0x1_function_info_check_dispatch_type_compatibility_impl">check_dispatch_type_compatibility_impl</a>(lhs: &<a href="function_info.md#0x1_function_info_FunctionInfo">FunctionInfo</a>, r: &<a href="function_info.md#0x1_function_info_FunctionInfo">FunctionInfo</a>): bool;
-</code></pre>
+<pre><code>native fun check_dispatch_type_compatibility_impl(lhs: &amp;FunctionInfo, r: &amp;FunctionInfo): bool;<br/></code></pre>
 
 
 
@@ -279,8 +221,7 @@ if such module isn't accessed previously in the transaction.
 
 
 
-<pre><code><b>fun</b> <a href="function_info.md#0x1_function_info_is_identifier">is_identifier</a>(s: &<a href="../../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u8&gt;): bool
-</code></pre>
+<pre><code>fun is_identifier(s: &amp;vector&lt;u8&gt;): bool<br/></code></pre>
 
 
 
@@ -288,8 +229,7 @@ if such module isn't accessed previously in the transaction.
 <summary>Implementation</summary>
 
 
-<pre><code><b>native</b> <b>fun</b> <a href="function_info.md#0x1_function_info_is_identifier">is_identifier</a>(s: &<a href="../../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u8&gt;): bool;
-</code></pre>
+<pre><code>native fun is_identifier(s: &amp;vector&lt;u8&gt;): bool;<br/></code></pre>
 
 
 
@@ -301,8 +241,7 @@ if such module isn't accessed previously in the transaction.
 
 
 
-<pre><code><b>fun</b> <a href="function_info.md#0x1_function_info_load_function_impl">load_function_impl</a>(f: &<a href="function_info.md#0x1_function_info_FunctionInfo">function_info::FunctionInfo</a>)
-</code></pre>
+<pre><code>fun load_function_impl(f: &amp;function_info::FunctionInfo)<br/></code></pre>
 
 
 
@@ -310,8 +249,7 @@ if such module isn't accessed previously in the transaction.
 <summary>Implementation</summary>
 
 
-<pre><code><b>native</b> <b>fun</b> <a href="function_info.md#0x1_function_info_load_function_impl">load_function_impl</a>(f: &<a href="function_info.md#0x1_function_info_FunctionInfo">FunctionInfo</a>);
-</code></pre>
+<pre><code>native fun load_function_impl(f: &amp;FunctionInfo);<br/></code></pre>
 
 
 
@@ -323,8 +261,7 @@ if such module isn't accessed previously in the transaction.
 
 
 
-<pre><code><b>pragma</b> verify = <b>false</b>;
-</code></pre>
+<pre><code>pragma verify &#61; false;<br/></code></pre>
 
 
 
@@ -333,14 +270,12 @@ if such module isn't accessed previously in the transaction.
 ### Function `check_dispatch_type_compatibility_impl`
 
 
-<pre><code><b>fun</b> <a href="function_info.md#0x1_function_info_check_dispatch_type_compatibility_impl">check_dispatch_type_compatibility_impl</a>(lhs: &<a href="function_info.md#0x1_function_info_FunctionInfo">function_info::FunctionInfo</a>, r: &<a href="function_info.md#0x1_function_info_FunctionInfo">function_info::FunctionInfo</a>): bool
-</code></pre>
+<pre><code>fun check_dispatch_type_compatibility_impl(lhs: &amp;function_info::FunctionInfo, r: &amp;function_info::FunctionInfo): bool<br/></code></pre>
 
 
 
 
-<pre><code><b>pragma</b> opaque;
-</code></pre>
+<pre><code>pragma opaque;<br/></code></pre>
 
 
 
@@ -349,14 +284,12 @@ if such module isn't accessed previously in the transaction.
 ### Function `load_function_impl`
 
 
-<pre><code><b>fun</b> <a href="function_info.md#0x1_function_info_load_function_impl">load_function_impl</a>(f: &<a href="function_info.md#0x1_function_info_FunctionInfo">function_info::FunctionInfo</a>)
-</code></pre>
+<pre><code>fun load_function_impl(f: &amp;function_info::FunctionInfo)<br/></code></pre>
 
 
 
 
-<pre><code><b>pragma</b> opaque;
-</code></pre>
+<pre><code>pragma opaque;<br/></code></pre>
 
 
 [move-book]: https://aptos.dev/move/book/SUMMARY

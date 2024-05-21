@@ -8,10 +8,10 @@ unsigned integers and support addition and subtraction (aborting on underflow
 or on overflowing a custom upper limit). The difference from integers is that
 aggregators allow to perform both additions and subtractions in parallel across
 multiple transactions, enabling parallel execution. For example, if the first
-transaction is doing <code><a href="aggregator.md#0x1_aggregator_add">add</a>(X, 1)</code> for aggregator resource <code>X</code>, and the second
-is doing <code><a href="aggregator.md#0x1_aggregator_sub">sub</a>(X,3)</code>, they can be executed in parallel avoiding a read-modify-write
+transaction is doing <code>add(X, 1)</code> for aggregator resource <code>X</code>, and the second
+is doing <code>sub(X,3)</code>, they can be executed in parallel avoiding a read-modify-write
 dependency.
-However, reading the aggregator value (i.e. calling <code><a href="aggregator.md#0x1_aggregator_read">read</a>(X)</code>) is an expensive
+However, reading the aggregator value (i.e. calling <code>read(X)</code>) is an expensive
 operation and should be avoided as much as possible because it reduces the
 parallelism. Moreover, **aggregators can only be created by Aptos Framework (0x1)
 at the moment.**
@@ -47,8 +47,7 @@ Represents an integer which supports parallel additions and subtractions
 across multiple transactions. See the module description for more details.
 
 
-<pre><code><b>struct</b> <a href="aggregator.md#0x1_aggregator_Aggregator">Aggregator</a> <b>has</b> store
-</code></pre>
+<pre><code>struct Aggregator has store<br/></code></pre>
 
 
 
@@ -58,13 +57,13 @@ across multiple transactions. See the module description for more details.
 
 <dl>
 <dt>
-<code>handle: <b>address</b></code>
+<code>handle: address</code>
 </dt>
 <dd>
 
 </dd>
 <dt>
-<code>key: <b>address</b></code>
+<code>key: address</code>
 </dt>
 <dd>
 
@@ -90,8 +89,7 @@ across multiple transactions. See the module description for more details.
 The value of aggregator overflows. Raised by native code.
 
 
-<pre><code><b>const</b> <a href="aggregator.md#0x1_aggregator_EAGGREGATOR_OVERFLOW">EAGGREGATOR_OVERFLOW</a>: u64 = 1;
-</code></pre>
+<pre><code>const EAGGREGATOR_OVERFLOW: u64 &#61; 1;<br/></code></pre>
 
 
 
@@ -100,8 +98,7 @@ The value of aggregator overflows. Raised by native code.
 The value of aggregator underflows (goes below zero). Raised by native code.
 
 
-<pre><code><b>const</b> <a href="aggregator.md#0x1_aggregator_EAGGREGATOR_UNDERFLOW">EAGGREGATOR_UNDERFLOW</a>: u64 = 2;
-</code></pre>
+<pre><code>const EAGGREGATOR_UNDERFLOW: u64 &#61; 2;<br/></code></pre>
 
 
 
@@ -110,8 +107,7 @@ The value of aggregator underflows (goes below zero). Raised by native code.
 Aggregator feature is not supported. Raised by native code.
 
 
-<pre><code><b>const</b> <a href="aggregator.md#0x1_aggregator_ENOT_SUPPORTED">ENOT_SUPPORTED</a>: u64 = 3;
-</code></pre>
+<pre><code>const ENOT_SUPPORTED: u64 &#61; 3;<br/></code></pre>
 
 
 
@@ -122,8 +118,7 @@ Aggregator feature is not supported. Raised by native code.
 Returns <code>limit</code> exceeding which aggregator overflows.
 
 
-<pre><code><b>public</b> <b>fun</b> <a href="aggregator.md#0x1_aggregator_limit">limit</a>(<a href="aggregator.md#0x1_aggregator">aggregator</a>: &<a href="aggregator.md#0x1_aggregator_Aggregator">aggregator::Aggregator</a>): u128
-</code></pre>
+<pre><code>public fun limit(aggregator: &amp;aggregator::Aggregator): u128<br/></code></pre>
 
 
 
@@ -131,10 +126,7 @@ Returns <code>limit</code> exceeding which aggregator overflows.
 <summary>Implementation</summary>
 
 
-<pre><code><b>public</b> <b>fun</b> <a href="aggregator.md#0x1_aggregator_limit">limit</a>(<a href="aggregator.md#0x1_aggregator">aggregator</a>: &<a href="aggregator.md#0x1_aggregator_Aggregator">Aggregator</a>): u128 {
-    <a href="aggregator.md#0x1_aggregator">aggregator</a>.limit
-}
-</code></pre>
+<pre><code>public fun limit(aggregator: &amp;Aggregator): u128 &#123;<br/>    aggregator.limit<br/>&#125;<br/></code></pre>
 
 
 
@@ -147,8 +139,7 @@ Returns <code>limit</code> exceeding which aggregator overflows.
 Adds <code>value</code> to aggregator. Aborts on overflowing the limit.
 
 
-<pre><code><b>public</b> <b>fun</b> <a href="aggregator.md#0x1_aggregator_add">add</a>(<a href="aggregator.md#0x1_aggregator">aggregator</a>: &<b>mut</b> <a href="aggregator.md#0x1_aggregator_Aggregator">aggregator::Aggregator</a>, value: u128)
-</code></pre>
+<pre><code>public fun add(aggregator: &amp;mut aggregator::Aggregator, value: u128)<br/></code></pre>
 
 
 
@@ -156,8 +147,7 @@ Adds <code>value</code> to aggregator. Aborts on overflowing the limit.
 <summary>Implementation</summary>
 
 
-<pre><code><b>public</b> <b>native</b> <b>fun</b> <a href="aggregator.md#0x1_aggregator_add">add</a>(<a href="aggregator.md#0x1_aggregator">aggregator</a>: &<b>mut</b> <a href="aggregator.md#0x1_aggregator_Aggregator">Aggregator</a>, value: u128);
-</code></pre>
+<pre><code>public native fun add(aggregator: &amp;mut Aggregator, value: u128);<br/></code></pre>
 
 
 
@@ -170,8 +160,7 @@ Adds <code>value</code> to aggregator. Aborts on overflowing the limit.
 Subtracts <code>value</code> from aggregator. Aborts on going below zero.
 
 
-<pre><code><b>public</b> <b>fun</b> <a href="aggregator.md#0x1_aggregator_sub">sub</a>(<a href="aggregator.md#0x1_aggregator">aggregator</a>: &<b>mut</b> <a href="aggregator.md#0x1_aggregator_Aggregator">aggregator::Aggregator</a>, value: u128)
-</code></pre>
+<pre><code>public fun sub(aggregator: &amp;mut aggregator::Aggregator, value: u128)<br/></code></pre>
 
 
 
@@ -179,8 +168,7 @@ Subtracts <code>value</code> from aggregator. Aborts on going below zero.
 <summary>Implementation</summary>
 
 
-<pre><code><b>public</b> <b>native</b> <b>fun</b> <a href="aggregator.md#0x1_aggregator_sub">sub</a>(<a href="aggregator.md#0x1_aggregator">aggregator</a>: &<b>mut</b> <a href="aggregator.md#0x1_aggregator_Aggregator">Aggregator</a>, value: u128);
-</code></pre>
+<pre><code>public native fun sub(aggregator: &amp;mut Aggregator, value: u128);<br/></code></pre>
 
 
 
@@ -193,8 +181,7 @@ Subtracts <code>value</code> from aggregator. Aborts on going below zero.
 Returns a value stored in this aggregator.
 
 
-<pre><code><b>public</b> <b>fun</b> <a href="aggregator.md#0x1_aggregator_read">read</a>(<a href="aggregator.md#0x1_aggregator">aggregator</a>: &<a href="aggregator.md#0x1_aggregator_Aggregator">aggregator::Aggregator</a>): u128
-</code></pre>
+<pre><code>public fun read(aggregator: &amp;aggregator::Aggregator): u128<br/></code></pre>
 
 
 
@@ -202,8 +189,7 @@ Returns a value stored in this aggregator.
 <summary>Implementation</summary>
 
 
-<pre><code><b>public</b> <b>native</b> <b>fun</b> <a href="aggregator.md#0x1_aggregator_read">read</a>(<a href="aggregator.md#0x1_aggregator">aggregator</a>: &<a href="aggregator.md#0x1_aggregator_Aggregator">Aggregator</a>): u128;
-</code></pre>
+<pre><code>public native fun read(aggregator: &amp;Aggregator): u128;<br/></code></pre>
 
 
 
@@ -216,8 +202,7 @@ Returns a value stored in this aggregator.
 Destroys an aggregator and removes it from its <code>AggregatorFactory</code>.
 
 
-<pre><code><b>public</b> <b>fun</b> <a href="aggregator.md#0x1_aggregator_destroy">destroy</a>(<a href="aggregator.md#0x1_aggregator">aggregator</a>: <a href="aggregator.md#0x1_aggregator_Aggregator">aggregator::Aggregator</a>)
-</code></pre>
+<pre><code>public fun destroy(aggregator: aggregator::Aggregator)<br/></code></pre>
 
 
 
@@ -225,8 +210,7 @@ Destroys an aggregator and removes it from its <code>AggregatorFactory</code>.
 <summary>Implementation</summary>
 
 
-<pre><code><b>public</b> <b>native</b> <b>fun</b> <a href="aggregator.md#0x1_aggregator_destroy">destroy</a>(<a href="aggregator.md#0x1_aggregator">aggregator</a>: <a href="aggregator.md#0x1_aggregator_Aggregator">Aggregator</a>);
-</code></pre>
+<pre><code>public native fun destroy(aggregator: Aggregator);<br/></code></pre>
 
 
 
@@ -242,20 +226,19 @@ Destroys an aggregator and removes it from its <code>AggregatorFactory</code>.
 ### Struct `Aggregator`
 
 
-<pre><code><b>struct</b> <a href="aggregator.md#0x1_aggregator_Aggregator">Aggregator</a> <b>has</b> store
-</code></pre>
+<pre><code>struct Aggregator has store<br/></code></pre>
 
 
 
 <dl>
 <dt>
-<code>handle: <b>address</b></code>
+<code>handle: address</code>
 </dt>
 <dd>
 
 </dd>
 <dt>
-<code>key: <b>address</b></code>
+<code>key: address</code>
 </dt>
 <dd>
 
@@ -314,8 +297,7 @@ Destroys an aggregator and removes it from its <code>AggregatorFactory</code>.
 ### Module-level Specification
 
 
-<pre><code><b>pragma</b> intrinsic;
-</code></pre>
+<pre><code>pragma intrinsic;<br/></code></pre>
 
 
 
@@ -324,17 +306,13 @@ Destroys an aggregator and removes it from its <code>AggregatorFactory</code>.
 ### Function `limit`
 
 
-<pre><code><b>public</b> <b>fun</b> <a href="aggregator.md#0x1_aggregator_limit">limit</a>(<a href="aggregator.md#0x1_aggregator">aggregator</a>: &<a href="aggregator.md#0x1_aggregator_Aggregator">aggregator::Aggregator</a>): u128
-</code></pre>
+<pre><code>public fun limit(aggregator: &amp;aggregator::Aggregator): u128<br/></code></pre>
 
 
 
 
-<pre><code><b>pragma</b> opaque;
-// This enforces <a id="high-level-req-1.2" href="#high-level-req">high-level requirement 1</a>:
-<b>aborts_if</b> <b>false</b>;
-<b>ensures</b> [abstract] result == <a href="aggregator.md#0x1_aggregator_spec_get_limit">spec_get_limit</a>(<a href="aggregator.md#0x1_aggregator">aggregator</a>);
-</code></pre>
+<pre><code>pragma opaque;<br/>// This enforces <a id="high-level-req-1.2" href="#high-level-req">high-level requirement 1</a>:
+aborts_if false;<br/>ensures [abstract] result &#61;&#61; spec_get_limit(aggregator);<br/></code></pre>
 
 
 
@@ -342,8 +320,7 @@ Destroys an aggregator and removes it from its <code>AggregatorFactory</code>.
 <a id="0x1_aggregator_spec_read"></a>
 
 
-<pre><code><b>native</b> <b>fun</b> <a href="aggregator.md#0x1_aggregator_spec_read">spec_read</a>(<a href="aggregator.md#0x1_aggregator">aggregator</a>: <a href="aggregator.md#0x1_aggregator_Aggregator">Aggregator</a>): u128;
-</code></pre>
+<pre><code>native fun spec_read(aggregator: Aggregator): u128;<br/></code></pre>
 
 
 
@@ -351,8 +328,7 @@ Destroys an aggregator and removes it from its <code>AggregatorFactory</code>.
 <a id="0x1_aggregator_spec_get_limit"></a>
 
 
-<pre><code><b>native</b> <b>fun</b> <a href="aggregator.md#0x1_aggregator_spec_get_limit">spec_get_limit</a>(a: <a href="aggregator.md#0x1_aggregator_Aggregator">Aggregator</a>): u128;
-</code></pre>
+<pre><code>native fun spec_get_limit(a: Aggregator): u128;<br/></code></pre>
 
 
 
@@ -360,8 +336,7 @@ Destroys an aggregator and removes it from its <code>AggregatorFactory</code>.
 <a id="0x1_aggregator_spec_get_handle"></a>
 
 
-<pre><code><b>native</b> <b>fun</b> <a href="aggregator.md#0x1_aggregator_spec_get_handle">spec_get_handle</a>(a: <a href="aggregator.md#0x1_aggregator_Aggregator">Aggregator</a>): u128;
-</code></pre>
+<pre><code>native fun spec_get_handle(a: Aggregator): u128;<br/></code></pre>
 
 
 
@@ -369,8 +344,7 @@ Destroys an aggregator and removes it from its <code>AggregatorFactory</code>.
 <a id="0x1_aggregator_spec_get_key"></a>
 
 
-<pre><code><b>native</b> <b>fun</b> <a href="aggregator.md#0x1_aggregator_spec_get_key">spec_get_key</a>(a: <a href="aggregator.md#0x1_aggregator_Aggregator">Aggregator</a>): u128;
-</code></pre>
+<pre><code>native fun spec_get_key(a: Aggregator): u128;<br/></code></pre>
 
 
 
@@ -378,8 +352,7 @@ Destroys an aggregator and removes it from its <code>AggregatorFactory</code>.
 <a id="0x1_aggregator_spec_aggregator_set_val"></a>
 
 
-<pre><code><b>native</b> <b>fun</b> <a href="aggregator.md#0x1_aggregator_spec_aggregator_set_val">spec_aggregator_set_val</a>(a: <a href="aggregator.md#0x1_aggregator_Aggregator">Aggregator</a>, v: u128): <a href="aggregator.md#0x1_aggregator_Aggregator">Aggregator</a>;
-</code></pre>
+<pre><code>native fun spec_aggregator_set_val(a: Aggregator, v: u128): Aggregator;<br/></code></pre>
 
 
 
@@ -387,8 +360,7 @@ Destroys an aggregator and removes it from its <code>AggregatorFactory</code>.
 <a id="0x1_aggregator_spec_aggregator_get_val"></a>
 
 
-<pre><code><b>native</b> <b>fun</b> <a href="aggregator.md#0x1_aggregator_spec_aggregator_get_val">spec_aggregator_get_val</a>(a: <a href="aggregator.md#0x1_aggregator_Aggregator">Aggregator</a>): u128;
-</code></pre>
+<pre><code>native fun spec_aggregator_get_val(a: Aggregator): u128;<br/></code></pre>
 
 
 
@@ -397,20 +369,13 @@ Destroys an aggregator and removes it from its <code>AggregatorFactory</code>.
 ### Function `add`
 
 
-<pre><code><b>public</b> <b>fun</b> <a href="aggregator.md#0x1_aggregator_add">add</a>(<a href="aggregator.md#0x1_aggregator">aggregator</a>: &<b>mut</b> <a href="aggregator.md#0x1_aggregator_Aggregator">aggregator::Aggregator</a>, value: u128)
-</code></pre>
+<pre><code>public fun add(aggregator: &amp;mut aggregator::Aggregator, value: u128)<br/></code></pre>
 
 
 
 
-<pre><code><b>pragma</b> opaque;
-<b>aborts_if</b> <a href="aggregator.md#0x1_aggregator_spec_aggregator_get_val">spec_aggregator_get_val</a>(<a href="aggregator.md#0x1_aggregator">aggregator</a>) + value &gt; <a href="aggregator.md#0x1_aggregator_spec_get_limit">spec_get_limit</a>(<a href="aggregator.md#0x1_aggregator">aggregator</a>);
-// This enforces <a id="high-level-req-2" href="#high-level-req">high-level requirement 2</a>:
-<b>aborts_if</b> <a href="aggregator.md#0x1_aggregator_spec_aggregator_get_val">spec_aggregator_get_val</a>(<a href="aggregator.md#0x1_aggregator">aggregator</a>) + value &gt; MAX_U128;
-<b>ensures</b> <a href="aggregator.md#0x1_aggregator_spec_get_limit">spec_get_limit</a>(<a href="aggregator.md#0x1_aggregator">aggregator</a>) == <a href="aggregator.md#0x1_aggregator_spec_get_limit">spec_get_limit</a>(<b>old</b>(<a href="aggregator.md#0x1_aggregator">aggregator</a>));
-<b>ensures</b> <a href="aggregator.md#0x1_aggregator">aggregator</a> == <a href="aggregator.md#0x1_aggregator_spec_aggregator_set_val">spec_aggregator_set_val</a>(<b>old</b>(<a href="aggregator.md#0x1_aggregator">aggregator</a>),
-    <a href="aggregator.md#0x1_aggregator_spec_aggregator_get_val">spec_aggregator_get_val</a>(<b>old</b>(<a href="aggregator.md#0x1_aggregator">aggregator</a>)) + value);
-</code></pre>
+<pre><code>pragma opaque;<br/>aborts_if spec_aggregator_get_val(aggregator) &#43; value &gt; spec_get_limit(aggregator);<br/>// This enforces <a id="high-level-req-2" href="#high-level-req">high-level requirement 2</a>:
+aborts_if spec_aggregator_get_val(aggregator) &#43; value &gt; MAX_U128;<br/>ensures spec_get_limit(aggregator) &#61;&#61; spec_get_limit(old(aggregator));<br/>ensures aggregator &#61;&#61; spec_aggregator_set_val(old(aggregator),<br/>    spec_aggregator_get_val(old(aggregator)) &#43; value);<br/></code></pre>
 
 
 
@@ -419,18 +384,12 @@ Destroys an aggregator and removes it from its <code>AggregatorFactory</code>.
 ### Function `sub`
 
 
-<pre><code><b>public</b> <b>fun</b> <a href="aggregator.md#0x1_aggregator_sub">sub</a>(<a href="aggregator.md#0x1_aggregator">aggregator</a>: &<b>mut</b> <a href="aggregator.md#0x1_aggregator_Aggregator">aggregator::Aggregator</a>, value: u128)
-</code></pre>
+<pre><code>public fun sub(aggregator: &amp;mut aggregator::Aggregator, value: u128)<br/></code></pre>
 
 
 
 
-<pre><code><b>pragma</b> opaque;
-<b>aborts_if</b> <a href="aggregator.md#0x1_aggregator_spec_aggregator_get_val">spec_aggregator_get_val</a>(<a href="aggregator.md#0x1_aggregator">aggregator</a>) &lt; value;
-<b>ensures</b> <a href="aggregator.md#0x1_aggregator_spec_get_limit">spec_get_limit</a>(<a href="aggregator.md#0x1_aggregator">aggregator</a>) == <a href="aggregator.md#0x1_aggregator_spec_get_limit">spec_get_limit</a>(<b>old</b>(<a href="aggregator.md#0x1_aggregator">aggregator</a>));
-<b>ensures</b> <a href="aggregator.md#0x1_aggregator">aggregator</a> == <a href="aggregator.md#0x1_aggregator_spec_aggregator_set_val">spec_aggregator_set_val</a>(<b>old</b>(<a href="aggregator.md#0x1_aggregator">aggregator</a>),
-    <a href="aggregator.md#0x1_aggregator_spec_aggregator_get_val">spec_aggregator_get_val</a>(<b>old</b>(<a href="aggregator.md#0x1_aggregator">aggregator</a>)) - value);
-</code></pre>
+<pre><code>pragma opaque;<br/>aborts_if spec_aggregator_get_val(aggregator) &lt; value;<br/>ensures spec_get_limit(aggregator) &#61;&#61; spec_get_limit(old(aggregator));<br/>ensures aggregator &#61;&#61; spec_aggregator_set_val(old(aggregator),<br/>    spec_aggregator_get_val(old(aggregator)) &#45; value);<br/></code></pre>
 
 
 
@@ -439,18 +398,13 @@ Destroys an aggregator and removes it from its <code>AggregatorFactory</code>.
 ### Function `read`
 
 
-<pre><code><b>public</b> <b>fun</b> <a href="aggregator.md#0x1_aggregator_read">read</a>(<a href="aggregator.md#0x1_aggregator">aggregator</a>: &<a href="aggregator.md#0x1_aggregator_Aggregator">aggregator::Aggregator</a>): u128
-</code></pre>
+<pre><code>public fun read(aggregator: &amp;aggregator::Aggregator): u128<br/></code></pre>
 
 
 
 
-<pre><code><b>pragma</b> opaque;
-// This enforces <a id="high-level-req-1.1" href="#high-level-req">high-level requirement 1</a>:
-<b>aborts_if</b> <b>false</b>;
-<b>ensures</b> result == <a href="aggregator.md#0x1_aggregator_spec_read">spec_read</a>(<a href="aggregator.md#0x1_aggregator">aggregator</a>);
-<b>ensures</b> result &lt;= <a href="aggregator.md#0x1_aggregator_spec_get_limit">spec_get_limit</a>(<a href="aggregator.md#0x1_aggregator">aggregator</a>);
-</code></pre>
+<pre><code>pragma opaque;<br/>// This enforces <a id="high-level-req-1.1" href="#high-level-req">high-level requirement 1</a>:
+aborts_if false;<br/>ensures result &#61;&#61; spec_read(aggregator);<br/>ensures result &lt;&#61; spec_get_limit(aggregator);<br/></code></pre>
 
 
 
@@ -459,16 +413,13 @@ Destroys an aggregator and removes it from its <code>AggregatorFactory</code>.
 ### Function `destroy`
 
 
-<pre><code><b>public</b> <b>fun</b> <a href="aggregator.md#0x1_aggregator_destroy">destroy</a>(<a href="aggregator.md#0x1_aggregator">aggregator</a>: <a href="aggregator.md#0x1_aggregator_Aggregator">aggregator::Aggregator</a>)
-</code></pre>
+<pre><code>public fun destroy(aggregator: aggregator::Aggregator)<br/></code></pre>
 
 
 
 
-<pre><code><b>pragma</b> opaque;
-// This enforces <a id="high-level-req-1.2" href="#high-level-req">high-level requirement 1</a>:
-<b>aborts_if</b> <b>false</b>;
-</code></pre>
+<pre><code>pragma opaque;<br/>// This enforces <a id="high-level-req-1.2" href="#high-level-req">high-level requirement 1</a>:
+aborts_if false;<br/></code></pre>
 
 
 [move-book]: https://aptos.dev/move/book/SUMMARY

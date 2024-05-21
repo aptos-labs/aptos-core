@@ -34,35 +34,7 @@
     -  [Function `initialize_for_verification`](#@Specification_1_initialize_for_verification)
 
 
-<pre><code><b>use</b> <a href="account.md#0x1_account">0x1::account</a>;
-<b>use</b> <a href="aggregator_factory.md#0x1_aggregator_factory">0x1::aggregator_factory</a>;
-<b>use</b> <a href="aptos_coin.md#0x1_aptos_coin">0x1::aptos_coin</a>;
-<b>use</b> <a href="aptos_governance.md#0x1_aptos_governance">0x1::aptos_governance</a>;
-<b>use</b> <a href="block.md#0x1_block">0x1::block</a>;
-<b>use</b> <a href="chain_id.md#0x1_chain_id">0x1::chain_id</a>;
-<b>use</b> <a href="chain_status.md#0x1_chain_status">0x1::chain_status</a>;
-<b>use</b> <a href="coin.md#0x1_coin">0x1::coin</a>;
-<b>use</b> <a href="consensus_config.md#0x1_consensus_config">0x1::consensus_config</a>;
-<b>use</b> <a href="create_signer.md#0x1_create_signer">0x1::create_signer</a>;
-<b>use</b> <a href="../../aptos-stdlib/../move-stdlib/doc/error.md#0x1_error">0x1::error</a>;
-<b>use</b> <a href="execution_config.md#0x1_execution_config">0x1::execution_config</a>;
-<b>use</b> <a href="../../aptos-stdlib/../move-stdlib/doc/features.md#0x1_features">0x1::features</a>;
-<b>use</b> <a href="../../aptos-stdlib/../move-stdlib/doc/fixed_point32.md#0x1_fixed_point32">0x1::fixed_point32</a>;
-<b>use</b> <a href="gas_schedule.md#0x1_gas_schedule">0x1::gas_schedule</a>;
-<b>use</b> <a href="reconfiguration.md#0x1_reconfiguration">0x1::reconfiguration</a>;
-<b>use</b> <a href="../../aptos-stdlib/doc/simple_map.md#0x1_simple_map">0x1::simple_map</a>;
-<b>use</b> <a href="stake.md#0x1_stake">0x1::stake</a>;
-<b>use</b> <a href="staking_config.md#0x1_staking_config">0x1::staking_config</a>;
-<b>use</b> <a href="staking_contract.md#0x1_staking_contract">0x1::staking_contract</a>;
-<b>use</b> <a href="state_storage.md#0x1_state_storage">0x1::state_storage</a>;
-<b>use</b> <a href="storage_gas.md#0x1_storage_gas">0x1::storage_gas</a>;
-<b>use</b> <a href="timestamp.md#0x1_timestamp">0x1::timestamp</a>;
-<b>use</b> <a href="transaction_fee.md#0x1_transaction_fee">0x1::transaction_fee</a>;
-<b>use</b> <a href="transaction_validation.md#0x1_transaction_validation">0x1::transaction_validation</a>;
-<b>use</b> <a href="../../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector">0x1::vector</a>;
-<b>use</b> <a href="version.md#0x1_version">0x1::version</a>;
-<b>use</b> <a href="vesting.md#0x1_vesting">0x1::vesting</a>;
-</code></pre>
+<pre><code>use 0x1::account;<br/>use 0x1::aggregator_factory;<br/>use 0x1::aptos_coin;<br/>use 0x1::aptos_governance;<br/>use 0x1::block;<br/>use 0x1::chain_id;<br/>use 0x1::chain_status;<br/>use 0x1::coin;<br/>use 0x1::consensus_config;<br/>use 0x1::create_signer;<br/>use 0x1::error;<br/>use 0x1::execution_config;<br/>use 0x1::features;<br/>use 0x1::fixed_point32;<br/>use 0x1::gas_schedule;<br/>use 0x1::reconfiguration;<br/>use 0x1::simple_map;<br/>use 0x1::stake;<br/>use 0x1::staking_config;<br/>use 0x1::staking_contract;<br/>use 0x1::state_storage;<br/>use 0x1::storage_gas;<br/>use 0x1::timestamp;<br/>use 0x1::transaction_fee;<br/>use 0x1::transaction_validation;<br/>use 0x1::vector;<br/>use 0x1::version;<br/>use 0x1::vesting;<br/></code></pre>
 
 
 
@@ -72,8 +44,7 @@
 
 
 
-<pre><code><b>struct</b> <a href="genesis.md#0x1_genesis_AccountMap">AccountMap</a> <b>has</b> drop
-</code></pre>
+<pre><code>struct AccountMap has drop<br/></code></pre>
 
 
 
@@ -83,7 +54,7 @@
 
 <dl>
 <dt>
-<code>account_address: <b>address</b></code>
+<code>account_address: address</code>
 </dt>
 <dd>
 
@@ -105,8 +76,7 @@
 
 
 
-<pre><code><b>struct</b> <a href="genesis.md#0x1_genesis_EmployeeAccountMap">EmployeeAccountMap</a> <b>has</b> <b>copy</b>, drop
-</code></pre>
+<pre><code>struct EmployeeAccountMap has copy, drop<br/></code></pre>
 
 
 
@@ -116,19 +86,19 @@
 
 <dl>
 <dt>
-<code>accounts: <a href="../../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;<b>address</b>&gt;</code>
+<code>accounts: vector&lt;address&gt;</code>
 </dt>
 <dd>
 
 </dd>
 <dt>
-<code>validator: <a href="genesis.md#0x1_genesis_ValidatorConfigurationWithCommission">genesis::ValidatorConfigurationWithCommission</a></code>
+<code>validator: genesis::ValidatorConfigurationWithCommission</code>
 </dt>
 <dd>
 
 </dd>
 <dt>
-<code>vesting_schedule_numerator: <a href="../../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u64&gt;</code>
+<code>vesting_schedule_numerator: vector&lt;u64&gt;</code>
 </dt>
 <dd>
 
@@ -140,7 +110,7 @@
 
 </dd>
 <dt>
-<code>beneficiary_resetter: <b>address</b></code>
+<code>beneficiary_resetter: address</code>
 </dt>
 <dd>
 
@@ -156,8 +126,7 @@
 
 
 
-<pre><code><b>struct</b> <a href="genesis.md#0x1_genesis_ValidatorConfiguration">ValidatorConfiguration</a> <b>has</b> <b>copy</b>, drop
-</code></pre>
+<pre><code>struct ValidatorConfiguration has copy, drop<br/></code></pre>
 
 
 
@@ -167,19 +136,19 @@
 
 <dl>
 <dt>
-<code>owner_address: <b>address</b></code>
+<code>owner_address: address</code>
 </dt>
 <dd>
 
 </dd>
 <dt>
-<code>operator_address: <b>address</b></code>
+<code>operator_address: address</code>
 </dt>
 <dd>
 
 </dd>
 <dt>
-<code>voter_address: <b>address</b></code>
+<code>voter_address: address</code>
 </dt>
 <dd>
 
@@ -191,25 +160,25 @@
 
 </dd>
 <dt>
-<code>consensus_pubkey: <a href="../../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u8&gt;</code>
+<code>consensus_pubkey: vector&lt;u8&gt;</code>
 </dt>
 <dd>
 
 </dd>
 <dt>
-<code>proof_of_possession: <a href="../../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u8&gt;</code>
+<code>proof_of_possession: vector&lt;u8&gt;</code>
 </dt>
 <dd>
 
 </dd>
 <dt>
-<code>network_addresses: <a href="../../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u8&gt;</code>
+<code>network_addresses: vector&lt;u8&gt;</code>
 </dt>
 <dd>
 
 </dd>
 <dt>
-<code>full_node_network_addresses: <a href="../../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u8&gt;</code>
+<code>full_node_network_addresses: vector&lt;u8&gt;</code>
 </dt>
 <dd>
 
@@ -225,8 +194,7 @@
 
 
 
-<pre><code><b>struct</b> <a href="genesis.md#0x1_genesis_ValidatorConfigurationWithCommission">ValidatorConfigurationWithCommission</a> <b>has</b> <b>copy</b>, drop
-</code></pre>
+<pre><code>struct ValidatorConfigurationWithCommission has copy, drop<br/></code></pre>
 
 
 
@@ -236,7 +204,7 @@
 
 <dl>
 <dt>
-<code>validator_config: <a href="genesis.md#0x1_genesis_ValidatorConfiguration">genesis::ValidatorConfiguration</a></code>
+<code>validator_config: genesis::ValidatorConfiguration</code>
 </dt>
 <dd>
 
@@ -267,8 +235,7 @@
 
 
 
-<pre><code><b>const</b> <a href="genesis.md#0x1_genesis_EACCOUNT_DOES_NOT_EXIST">EACCOUNT_DOES_NOT_EXIST</a>: u64 = 2;
-</code></pre>
+<pre><code>const EACCOUNT_DOES_NOT_EXIST: u64 &#61; 2;<br/></code></pre>
 
 
 
@@ -276,8 +243,7 @@
 
 
 
-<pre><code><b>const</b> <a href="genesis.md#0x1_genesis_EDUPLICATE_ACCOUNT">EDUPLICATE_ACCOUNT</a>: u64 = 1;
-</code></pre>
+<pre><code>const EDUPLICATE_ACCOUNT: u64 &#61; 1;<br/></code></pre>
 
 
 
@@ -288,8 +254,7 @@
 Genesis step 1: Initialize aptos framework account and core modules on chain.
 
 
-<pre><code><b>fun</b> <a href="genesis.md#0x1_genesis_initialize">initialize</a>(<a href="gas_schedule.md#0x1_gas_schedule">gas_schedule</a>: <a href="../../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u8&gt;, <a href="chain_id.md#0x1_chain_id">chain_id</a>: u8, initial_version: u64, <a href="consensus_config.md#0x1_consensus_config">consensus_config</a>: <a href="../../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u8&gt;, <a href="execution_config.md#0x1_execution_config">execution_config</a>: <a href="../../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u8&gt;, epoch_interval_microsecs: u64, minimum_stake: u64, maximum_stake: u64, recurring_lockup_duration_secs: u64, allow_validator_set_change: bool, rewards_rate: u64, rewards_rate_denominator: u64, voting_power_increase_limit: u64)
-</code></pre>
+<pre><code>fun initialize(gas_schedule: vector&lt;u8&gt;, chain_id: u8, initial_version: u64, consensus_config: vector&lt;u8&gt;, execution_config: vector&lt;u8&gt;, epoch_interval_microsecs: u64, minimum_stake: u64, maximum_stake: u64, recurring_lockup_duration_secs: u64, allow_validator_set_change: bool, rewards_rate: u64, rewards_rate_denominator: u64, voting_power_increase_limit: u64)<br/></code></pre>
 
 
 
@@ -297,75 +262,7 @@ Genesis step 1: Initialize aptos framework account and core modules on chain.
 <summary>Implementation</summary>
 
 
-<pre><code><b>fun</b> <a href="genesis.md#0x1_genesis_initialize">initialize</a>(
-    <a href="gas_schedule.md#0x1_gas_schedule">gas_schedule</a>: <a href="../../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u8&gt;,
-    <a href="chain_id.md#0x1_chain_id">chain_id</a>: u8,
-    initial_version: u64,
-    <a href="consensus_config.md#0x1_consensus_config">consensus_config</a>: <a href="../../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u8&gt;,
-    <a href="execution_config.md#0x1_execution_config">execution_config</a>: <a href="../../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u8&gt;,
-    epoch_interval_microsecs: u64,
-    minimum_stake: u64,
-    maximum_stake: u64,
-    recurring_lockup_duration_secs: u64,
-    allow_validator_set_change: bool,
-    rewards_rate: u64,
-    rewards_rate_denominator: u64,
-    voting_power_increase_limit: u64,
-) {
-    // Initialize the aptos framework <a href="account.md#0x1_account">account</a>. This is the <a href="account.md#0x1_account">account</a> <b>where</b> system resources and modules will be
-    // deployed <b>to</b>. This will be entirely managed by on-chain governance and no entities have the key or privileges
-    // <b>to</b> <b>use</b> this <a href="account.md#0x1_account">account</a>.
-    <b>let</b> (aptos_framework_account, aptos_framework_signer_cap) = <a href="account.md#0x1_account_create_framework_reserved_account">account::create_framework_reserved_account</a>(@aptos_framework);
-    // Initialize <a href="account.md#0x1_account">account</a> configs on aptos framework <a href="account.md#0x1_account">account</a>.
-    <a href="account.md#0x1_account_initialize">account::initialize</a>(&aptos_framework_account);
-
-    <a href="transaction_validation.md#0x1_transaction_validation_initialize">transaction_validation::initialize</a>(
-        &aptos_framework_account,
-        b"script_prologue",
-        b"module_prologue",
-        b"multi_agent_script_prologue",
-        b"epilogue",
-    );
-
-    // Give the decentralized on-chain governance control over the core framework <a href="account.md#0x1_account">account</a>.
-    <a href="aptos_governance.md#0x1_aptos_governance_store_signer_cap">aptos_governance::store_signer_cap</a>(&aptos_framework_account, @aptos_framework, aptos_framework_signer_cap);
-
-    // put reserved framework reserved accounts under aptos governance
-    <b>let</b> framework_reserved_addresses = <a href="../../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;<b>address</b>&gt;[@0x2, @0x3, @0x4, @0x5, @0x6, @0x7, @0x8, @0x9, @0xa];
-    <b>while</b> (!<a href="../../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector_is_empty">vector::is_empty</a>(&framework_reserved_addresses)) {
-        <b>let</b> <b>address</b> = <a href="../../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector_pop_back">vector::pop_back</a>&lt;<b>address</b>&gt;(&<b>mut</b> framework_reserved_addresses);
-        <b>let</b> (_, framework_signer_cap) = <a href="account.md#0x1_account_create_framework_reserved_account">account::create_framework_reserved_account</a>(<b>address</b>);
-        <a href="aptos_governance.md#0x1_aptos_governance_store_signer_cap">aptos_governance::store_signer_cap</a>(&aptos_framework_account, <b>address</b>, framework_signer_cap);
-    };
-
-    <a href="consensus_config.md#0x1_consensus_config_initialize">consensus_config::initialize</a>(&aptos_framework_account, <a href="consensus_config.md#0x1_consensus_config">consensus_config</a>);
-    <a href="execution_config.md#0x1_execution_config_set">execution_config::set</a>(&aptos_framework_account, <a href="execution_config.md#0x1_execution_config">execution_config</a>);
-    <a href="version.md#0x1_version_initialize">version::initialize</a>(&aptos_framework_account, initial_version);
-    <a href="stake.md#0x1_stake_initialize">stake::initialize</a>(&aptos_framework_account);
-    <a href="staking_config.md#0x1_staking_config_initialize">staking_config::initialize</a>(
-        &aptos_framework_account,
-        minimum_stake,
-        maximum_stake,
-        recurring_lockup_duration_secs,
-        allow_validator_set_change,
-        rewards_rate,
-        rewards_rate_denominator,
-        voting_power_increase_limit,
-    );
-    <a href="storage_gas.md#0x1_storage_gas_initialize">storage_gas::initialize</a>(&aptos_framework_account);
-    <a href="gas_schedule.md#0x1_gas_schedule_initialize">gas_schedule::initialize</a>(&aptos_framework_account, <a href="gas_schedule.md#0x1_gas_schedule">gas_schedule</a>);
-
-    // Ensure we can create aggregators for supply, but not enable it for common <b>use</b> just yet.
-    <a href="aggregator_factory.md#0x1_aggregator_factory_initialize_aggregator_factory">aggregator_factory::initialize_aggregator_factory</a>(&aptos_framework_account);
-    <a href="coin.md#0x1_coin_initialize_supply_config">coin::initialize_supply_config</a>(&aptos_framework_account);
-
-    <a href="chain_id.md#0x1_chain_id_initialize">chain_id::initialize</a>(&aptos_framework_account, <a href="chain_id.md#0x1_chain_id">chain_id</a>);
-    <a href="reconfiguration.md#0x1_reconfiguration_initialize">reconfiguration::initialize</a>(&aptos_framework_account);
-    <a href="block.md#0x1_block_initialize">block::initialize</a>(&aptos_framework_account, epoch_interval_microsecs);
-    <a href="state_storage.md#0x1_state_storage_initialize">state_storage::initialize</a>(&aptos_framework_account);
-    <a href="timestamp.md#0x1_timestamp_set_time_has_started">timestamp::set_time_has_started</a>(&aptos_framework_account);
-}
-</code></pre>
+<pre><code>fun initialize(<br/>    gas_schedule: vector&lt;u8&gt;,<br/>    chain_id: u8,<br/>    initial_version: u64,<br/>    consensus_config: vector&lt;u8&gt;,<br/>    execution_config: vector&lt;u8&gt;,<br/>    epoch_interval_microsecs: u64,<br/>    minimum_stake: u64,<br/>    maximum_stake: u64,<br/>    recurring_lockup_duration_secs: u64,<br/>    allow_validator_set_change: bool,<br/>    rewards_rate: u64,<br/>    rewards_rate_denominator: u64,<br/>    voting_power_increase_limit: u64,<br/>) &#123;<br/>    // Initialize the aptos framework account. This is the account where system resources and modules will be<br/>    // deployed to. This will be entirely managed by on&#45;chain governance and no entities have the key or privileges<br/>    // to use this account.<br/>    let (aptos_framework_account, aptos_framework_signer_cap) &#61; account::create_framework_reserved_account(@aptos_framework);<br/>    // Initialize account configs on aptos framework account.<br/>    account::initialize(&amp;aptos_framework_account);<br/><br/>    transaction_validation::initialize(<br/>        &amp;aptos_framework_account,<br/>        b&quot;script_prologue&quot;,<br/>        b&quot;module_prologue&quot;,<br/>        b&quot;multi_agent_script_prologue&quot;,<br/>        b&quot;epilogue&quot;,<br/>    );<br/><br/>    // Give the decentralized on&#45;chain governance control over the core framework account.<br/>    aptos_governance::store_signer_cap(&amp;aptos_framework_account, @aptos_framework, aptos_framework_signer_cap);<br/><br/>    // put reserved framework reserved accounts under aptos governance<br/>    let framework_reserved_addresses &#61; vector&lt;address&gt;[@0x2, @0x3, @0x4, @0x5, @0x6, @0x7, @0x8, @0x9, @0xa];<br/>    while (!vector::is_empty(&amp;framework_reserved_addresses)) &#123;<br/>        let address &#61; vector::pop_back&lt;address&gt;(&amp;mut framework_reserved_addresses);<br/>        let (_, framework_signer_cap) &#61; account::create_framework_reserved_account(address);<br/>        aptos_governance::store_signer_cap(&amp;aptos_framework_account, address, framework_signer_cap);<br/>    &#125;;<br/><br/>    consensus_config::initialize(&amp;aptos_framework_account, consensus_config);<br/>    execution_config::set(&amp;aptos_framework_account, execution_config);<br/>    version::initialize(&amp;aptos_framework_account, initial_version);<br/>    stake::initialize(&amp;aptos_framework_account);<br/>    staking_config::initialize(<br/>        &amp;aptos_framework_account,<br/>        minimum_stake,<br/>        maximum_stake,<br/>        recurring_lockup_duration_secs,<br/>        allow_validator_set_change,<br/>        rewards_rate,<br/>        rewards_rate_denominator,<br/>        voting_power_increase_limit,<br/>    );<br/>    storage_gas::initialize(&amp;aptos_framework_account);<br/>    gas_schedule::initialize(&amp;aptos_framework_account, gas_schedule);<br/><br/>    // Ensure we can create aggregators for supply, but not enable it for common use just yet.<br/>    aggregator_factory::initialize_aggregator_factory(&amp;aptos_framework_account);<br/>    coin::initialize_supply_config(&amp;aptos_framework_account);<br/><br/>    chain_id::initialize(&amp;aptos_framework_account, chain_id);<br/>    reconfiguration::initialize(&amp;aptos_framework_account);<br/>    block::initialize(&amp;aptos_framework_account, epoch_interval_microsecs);<br/>    state_storage::initialize(&amp;aptos_framework_account);<br/>    timestamp::set_time_has_started(&amp;aptos_framework_account);<br/>&#125;<br/></code></pre>
 
 
 
@@ -378,8 +275,7 @@ Genesis step 1: Initialize aptos framework account and core modules on chain.
 Genesis step 2: Initialize Aptos coin.
 
 
-<pre><code><b>fun</b> <a href="genesis.md#0x1_genesis_initialize_aptos_coin">initialize_aptos_coin</a>(aptos_framework: &<a href="../../aptos-stdlib/../move-stdlib/doc/signer.md#0x1_signer">signer</a>)
-</code></pre>
+<pre><code>fun initialize_aptos_coin(aptos_framework: &amp;signer)<br/></code></pre>
 
 
 
@@ -387,20 +283,7 @@ Genesis step 2: Initialize Aptos coin.
 <summary>Implementation</summary>
 
 
-<pre><code><b>fun</b> <a href="genesis.md#0x1_genesis_initialize_aptos_coin">initialize_aptos_coin</a>(aptos_framework: &<a href="../../aptos-stdlib/../move-stdlib/doc/signer.md#0x1_signer">signer</a>) {
-    <b>let</b> (burn_cap, mint_cap) = <a href="aptos_coin.md#0x1_aptos_coin_initialize">aptos_coin::initialize</a>(aptos_framework);
-
-    <a href="coin.md#0x1_coin_create_coin_conversion_map">coin::create_coin_conversion_map</a>(aptos_framework);
-    <a href="coin.md#0x1_coin_create_pairing">coin::create_pairing</a>&lt;AptosCoin&gt;(aptos_framework);
-
-    // Give <a href="stake.md#0x1_stake">stake</a> <b>module</b> MintCapability&lt;AptosCoin&gt; so it can mint rewards.
-    <a href="stake.md#0x1_stake_store_aptos_coin_mint_cap">stake::store_aptos_coin_mint_cap</a>(aptos_framework, mint_cap);
-    // Give <a href="transaction_fee.md#0x1_transaction_fee">transaction_fee</a> <b>module</b> BurnCapability&lt;AptosCoin&gt; so it can burn gas.
-    <a href="transaction_fee.md#0x1_transaction_fee_store_aptos_coin_burn_cap">transaction_fee::store_aptos_coin_burn_cap</a>(aptos_framework, burn_cap);
-    // Give <a href="transaction_fee.md#0x1_transaction_fee">transaction_fee</a> <b>module</b> MintCapability&lt;AptosCoin&gt; so it can mint refunds.
-    <a href="transaction_fee.md#0x1_transaction_fee_store_aptos_coin_mint_cap">transaction_fee::store_aptos_coin_mint_cap</a>(aptos_framework, mint_cap);
-}
-</code></pre>
+<pre><code>fun initialize_aptos_coin(aptos_framework: &amp;signer) &#123;<br/>    let (burn_cap, mint_cap) &#61; aptos_coin::initialize(aptos_framework);<br/><br/>    coin::create_coin_conversion_map(aptos_framework);<br/>    coin::create_pairing&lt;AptosCoin&gt;(aptos_framework);<br/><br/>    // Give stake module MintCapability&lt;AptosCoin&gt; so it can mint rewards.<br/>    stake::store_aptos_coin_mint_cap(aptos_framework, mint_cap);<br/>    // Give transaction_fee module BurnCapability&lt;AptosCoin&gt; so it can burn gas.<br/>    transaction_fee::store_aptos_coin_burn_cap(aptos_framework, burn_cap);<br/>    // Give transaction_fee module MintCapability&lt;AptosCoin&gt; so it can mint refunds.<br/>    transaction_fee::store_aptos_coin_mint_cap(aptos_framework, mint_cap);<br/>&#125;<br/></code></pre>
 
 
 
@@ -413,8 +296,7 @@ Genesis step 2: Initialize Aptos coin.
 Only called for testnets and e2e tests.
 
 
-<pre><code><b>fun</b> <a href="genesis.md#0x1_genesis_initialize_core_resources_and_aptos_coin">initialize_core_resources_and_aptos_coin</a>(aptos_framework: &<a href="../../aptos-stdlib/../move-stdlib/doc/signer.md#0x1_signer">signer</a>, core_resources_auth_key: <a href="../../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u8&gt;)
-</code></pre>
+<pre><code>fun initialize_core_resources_and_aptos_coin(aptos_framework: &amp;signer, core_resources_auth_key: vector&lt;u8&gt;)<br/></code></pre>
 
 
 
@@ -422,27 +304,7 @@ Only called for testnets and e2e tests.
 <summary>Implementation</summary>
 
 
-<pre><code><b>fun</b> <a href="genesis.md#0x1_genesis_initialize_core_resources_and_aptos_coin">initialize_core_resources_and_aptos_coin</a>(
-    aptos_framework: &<a href="../../aptos-stdlib/../move-stdlib/doc/signer.md#0x1_signer">signer</a>,
-    core_resources_auth_key: <a href="../../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u8&gt;,
-) {
-    <b>let</b> (burn_cap, mint_cap) = <a href="aptos_coin.md#0x1_aptos_coin_initialize">aptos_coin::initialize</a>(aptos_framework);
-
-    <a href="coin.md#0x1_coin_create_coin_conversion_map">coin::create_coin_conversion_map</a>(aptos_framework);
-    <a href="coin.md#0x1_coin_create_pairing">coin::create_pairing</a>&lt;AptosCoin&gt;(aptos_framework);
-
-    // Give <a href="stake.md#0x1_stake">stake</a> <b>module</b> MintCapability&lt;AptosCoin&gt; so it can mint rewards.
-    <a href="stake.md#0x1_stake_store_aptos_coin_mint_cap">stake::store_aptos_coin_mint_cap</a>(aptos_framework, mint_cap);
-    // Give <a href="transaction_fee.md#0x1_transaction_fee">transaction_fee</a> <b>module</b> BurnCapability&lt;AptosCoin&gt; so it can burn gas.
-    <a href="transaction_fee.md#0x1_transaction_fee_store_aptos_coin_burn_cap">transaction_fee::store_aptos_coin_burn_cap</a>(aptos_framework, burn_cap);
-    // Give <a href="transaction_fee.md#0x1_transaction_fee">transaction_fee</a> <b>module</b> MintCapability&lt;AptosCoin&gt; so it can mint refunds.
-    <a href="transaction_fee.md#0x1_transaction_fee_store_aptos_coin_mint_cap">transaction_fee::store_aptos_coin_mint_cap</a>(aptos_framework, mint_cap);
-
-    <b>let</b> core_resources = <a href="account.md#0x1_account_create_account">account::create_account</a>(@core_resources);
-    <a href="account.md#0x1_account_rotate_authentication_key_internal">account::rotate_authentication_key_internal</a>(&core_resources, core_resources_auth_key);
-    <a href="aptos_coin.md#0x1_aptos_coin_configure_accounts_for_test">aptos_coin::configure_accounts_for_test</a>(aptos_framework, &core_resources, mint_cap);
-}
-</code></pre>
+<pre><code>fun initialize_core_resources_and_aptos_coin(<br/>    aptos_framework: &amp;signer,<br/>    core_resources_auth_key: vector&lt;u8&gt;,<br/>) &#123;<br/>    let (burn_cap, mint_cap) &#61; aptos_coin::initialize(aptos_framework);<br/><br/>    coin::create_coin_conversion_map(aptos_framework);<br/>    coin::create_pairing&lt;AptosCoin&gt;(aptos_framework);<br/><br/>    // Give stake module MintCapability&lt;AptosCoin&gt; so it can mint rewards.<br/>    stake::store_aptos_coin_mint_cap(aptos_framework, mint_cap);<br/>    // Give transaction_fee module BurnCapability&lt;AptosCoin&gt; so it can burn gas.<br/>    transaction_fee::store_aptos_coin_burn_cap(aptos_framework, burn_cap);<br/>    // Give transaction_fee module MintCapability&lt;AptosCoin&gt; so it can mint refunds.<br/>    transaction_fee::store_aptos_coin_mint_cap(aptos_framework, mint_cap);<br/><br/>    let core_resources &#61; account::create_account(@core_resources);<br/>    account::rotate_authentication_key_internal(&amp;core_resources, core_resources_auth_key);<br/>    aptos_coin::configure_accounts_for_test(aptos_framework, &amp;core_resources, mint_cap);<br/>&#125;<br/></code></pre>
 
 
 
@@ -454,8 +316,7 @@ Only called for testnets and e2e tests.
 
 
 
-<pre><code><b>fun</b> <a href="genesis.md#0x1_genesis_create_accounts">create_accounts</a>(aptos_framework: &<a href="../../aptos-stdlib/../move-stdlib/doc/signer.md#0x1_signer">signer</a>, accounts: <a href="../../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;<a href="genesis.md#0x1_genesis_AccountMap">genesis::AccountMap</a>&gt;)
-</code></pre>
+<pre><code>fun create_accounts(aptos_framework: &amp;signer, accounts: vector&lt;genesis::AccountMap&gt;)<br/></code></pre>
 
 
 
@@ -463,24 +324,7 @@ Only called for testnets and e2e tests.
 <summary>Implementation</summary>
 
 
-<pre><code><b>fun</b> <a href="genesis.md#0x1_genesis_create_accounts">create_accounts</a>(aptos_framework: &<a href="../../aptos-stdlib/../move-stdlib/doc/signer.md#0x1_signer">signer</a>, accounts: <a href="../../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;<a href="genesis.md#0x1_genesis_AccountMap">AccountMap</a>&gt;) {
-    <b>let</b> unique_accounts = <a href="../../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector_empty">vector::empty</a>();
-    <a href="../../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector_for_each_ref">vector::for_each_ref</a>(&accounts, |account_map| {
-        <b>let</b> account_map: &<a href="genesis.md#0x1_genesis_AccountMap">AccountMap</a> = account_map;
-        <b>assert</b>!(
-            !<a href="../../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector_contains">vector::contains</a>(&unique_accounts, &account_map.account_address),
-            <a href="../../aptos-stdlib/../move-stdlib/doc/error.md#0x1_error_already_exists">error::already_exists</a>(<a href="genesis.md#0x1_genesis_EDUPLICATE_ACCOUNT">EDUPLICATE_ACCOUNT</a>),
-        );
-        <a href="../../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector_push_back">vector::push_back</a>(&<b>mut</b> unique_accounts, account_map.account_address);
-
-        <a href="genesis.md#0x1_genesis_create_account">create_account</a>(
-            aptos_framework,
-            account_map.account_address,
-            account_map.balance,
-        );
-    });
-}
-</code></pre>
+<pre><code>fun create_accounts(aptos_framework: &amp;signer, accounts: vector&lt;AccountMap&gt;) &#123;<br/>    let unique_accounts &#61; vector::empty();<br/>    vector::for_each_ref(&amp;accounts, &#124;account_map&#124; &#123;<br/>        let account_map: &amp;AccountMap &#61; account_map;<br/>        assert!(<br/>            !vector::contains(&amp;unique_accounts, &amp;account_map.account_address),<br/>            error::already_exists(EDUPLICATE_ACCOUNT),<br/>        );<br/>        vector::push_back(&amp;mut unique_accounts, account_map.account_address);<br/><br/>        create_account(<br/>            aptos_framework,<br/>            account_map.account_address,<br/>            account_map.balance,<br/>        );<br/>    &#125;);<br/>&#125;<br/></code></pre>
 
 
 
@@ -494,8 +338,7 @@ This creates an funds an account if it doesn't exist.
 If it exists, it just returns the signer.
 
 
-<pre><code><b>fun</b> <a href="genesis.md#0x1_genesis_create_account">create_account</a>(aptos_framework: &<a href="../../aptos-stdlib/../move-stdlib/doc/signer.md#0x1_signer">signer</a>, account_address: <b>address</b>, balance: u64): <a href="../../aptos-stdlib/../move-stdlib/doc/signer.md#0x1_signer">signer</a>
-</code></pre>
+<pre><code>fun create_account(aptos_framework: &amp;signer, account_address: address, balance: u64): signer<br/></code></pre>
 
 
 
@@ -503,17 +346,7 @@ If it exists, it just returns the signer.
 <summary>Implementation</summary>
 
 
-<pre><code><b>fun</b> <a href="genesis.md#0x1_genesis_create_account">create_account</a>(aptos_framework: &<a href="../../aptos-stdlib/../move-stdlib/doc/signer.md#0x1_signer">signer</a>, account_address: <b>address</b>, balance: u64): <a href="../../aptos-stdlib/../move-stdlib/doc/signer.md#0x1_signer">signer</a> {
-    <b>if</b> (<a href="account.md#0x1_account_exists_at">account::exists_at</a>(account_address)) {
-        <a href="create_signer.md#0x1_create_signer">create_signer</a>(account_address)
-    } <b>else</b> {
-        <b>let</b> <a href="account.md#0x1_account">account</a> = <a href="account.md#0x1_account_create_account">account::create_account</a>(account_address);
-        <a href="coin.md#0x1_coin_register">coin::register</a>&lt;AptosCoin&gt;(&<a href="account.md#0x1_account">account</a>);
-        <a href="aptos_coin.md#0x1_aptos_coin_mint">aptos_coin::mint</a>(aptos_framework, account_address, balance);
-        <a href="account.md#0x1_account">account</a>
-    }
-}
-</code></pre>
+<pre><code>fun create_account(aptos_framework: &amp;signer, account_address: address, balance: u64): signer &#123;<br/>    if (account::exists_at(account_address)) &#123;<br/>        create_signer(account_address)<br/>    &#125; else &#123;<br/>        let account &#61; account::create_account(account_address);<br/>        coin::register&lt;AptosCoin&gt;(&amp;account);<br/>        aptos_coin::mint(aptos_framework, account_address, balance);<br/>        account<br/>    &#125;<br/>&#125;<br/></code></pre>
 
 
 
@@ -525,8 +358,7 @@ If it exists, it just returns the signer.
 
 
 
-<pre><code><b>fun</b> <a href="genesis.md#0x1_genesis_create_employee_validators">create_employee_validators</a>(employee_vesting_start: u64, employee_vesting_period_duration: u64, employees: <a href="../../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;<a href="genesis.md#0x1_genesis_EmployeeAccountMap">genesis::EmployeeAccountMap</a>&gt;)
-</code></pre>
+<pre><code>fun create_employee_validators(employee_vesting_start: u64, employee_vesting_period_duration: u64, employees: vector&lt;genesis::EmployeeAccountMap&gt;)<br/></code></pre>
 
 
 
@@ -534,92 +366,7 @@ If it exists, it just returns the signer.
 <summary>Implementation</summary>
 
 
-<pre><code><b>fun</b> <a href="genesis.md#0x1_genesis_create_employee_validators">create_employee_validators</a>(
-    employee_vesting_start: u64,
-    employee_vesting_period_duration: u64,
-    employees: <a href="../../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;<a href="genesis.md#0x1_genesis_EmployeeAccountMap">EmployeeAccountMap</a>&gt;,
-) {
-    <b>let</b> unique_accounts = <a href="../../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector_empty">vector::empty</a>();
-
-    <a href="../../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector_for_each_ref">vector::for_each_ref</a>(&employees, |employee_group| {
-        <b>let</b> j = 0;
-        <b>let</b> employee_group: &<a href="genesis.md#0x1_genesis_EmployeeAccountMap">EmployeeAccountMap</a> = employee_group;
-        <b>let</b> num_employees_in_group = <a href="../../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector_length">vector::length</a>(&employee_group.accounts);
-
-        <b>let</b> buy_ins = <a href="../../aptos-stdlib/doc/simple_map.md#0x1_simple_map_create">simple_map::create</a>();
-
-        <b>while</b> (j &lt; num_employees_in_group) {
-            <b>let</b> <a href="account.md#0x1_account">account</a> = <a href="../../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector_borrow">vector::borrow</a>(&employee_group.accounts, j);
-            <b>assert</b>!(
-                !<a href="../../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector_contains">vector::contains</a>(&unique_accounts, <a href="account.md#0x1_account">account</a>),
-                <a href="../../aptos-stdlib/../move-stdlib/doc/error.md#0x1_error_already_exists">error::already_exists</a>(<a href="genesis.md#0x1_genesis_EDUPLICATE_ACCOUNT">EDUPLICATE_ACCOUNT</a>),
-            );
-            <a href="../../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector_push_back">vector::push_back</a>(&<b>mut</b> unique_accounts, *<a href="account.md#0x1_account">account</a>);
-
-            <b>let</b> employee = <a href="create_signer.md#0x1_create_signer">create_signer</a>(*<a href="account.md#0x1_account">account</a>);
-            <b>let</b> total = <a href="coin.md#0x1_coin_balance">coin::balance</a>&lt;AptosCoin&gt;(*<a href="account.md#0x1_account">account</a>);
-            <b>let</b> coins = <a href="coin.md#0x1_coin_withdraw">coin::withdraw</a>&lt;AptosCoin&gt;(&employee, total);
-            <a href="../../aptos-stdlib/doc/simple_map.md#0x1_simple_map_add">simple_map::add</a>(&<b>mut</b> buy_ins, *<a href="account.md#0x1_account">account</a>, coins);
-
-            j = j + 1;
-        };
-
-        <b>let</b> j = 0;
-        <b>let</b> num_vesting_events = <a href="../../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector_length">vector::length</a>(&employee_group.vesting_schedule_numerator);
-        <b>let</b> schedule = <a href="../../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector_empty">vector::empty</a>();
-
-        <b>while</b> (j &lt; num_vesting_events) {
-            <b>let</b> numerator = <a href="../../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector_borrow">vector::borrow</a>(&employee_group.vesting_schedule_numerator, j);
-            <b>let</b> <a href="event.md#0x1_event">event</a> = <a href="../../aptos-stdlib/../move-stdlib/doc/fixed_point32.md#0x1_fixed_point32_create_from_rational">fixed_point32::create_from_rational</a>(*numerator, employee_group.vesting_schedule_denominator);
-            <a href="../../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector_push_back">vector::push_back</a>(&<b>mut</b> schedule, <a href="event.md#0x1_event">event</a>);
-
-            j = j + 1;
-        };
-
-        <b>let</b> vesting_schedule = <a href="vesting.md#0x1_vesting_create_vesting_schedule">vesting::create_vesting_schedule</a>(
-            schedule,
-            employee_vesting_start,
-            employee_vesting_period_duration,
-        );
-
-        <b>let</b> admin = employee_group.validator.validator_config.owner_address;
-        <b>let</b> admin_signer = &<a href="create_signer.md#0x1_create_signer">create_signer</a>(admin);
-        <b>let</b> contract_address = <a href="vesting.md#0x1_vesting_create_vesting_contract">vesting::create_vesting_contract</a>(
-            admin_signer,
-            &employee_group.accounts,
-            buy_ins,
-            vesting_schedule,
-            admin,
-            employee_group.validator.validator_config.operator_address,
-            employee_group.validator.validator_config.voter_address,
-            employee_group.validator.commission_percentage,
-            x"",
-        );
-        <b>let</b> pool_address = <a href="vesting.md#0x1_vesting_stake_pool_address">vesting::stake_pool_address</a>(contract_address);
-
-        <b>if</b> (employee_group.beneficiary_resetter != @0x0) {
-            <a href="vesting.md#0x1_vesting_set_beneficiary_resetter">vesting::set_beneficiary_resetter</a>(admin_signer, contract_address, employee_group.beneficiary_resetter);
-        };
-
-        <b>let</b> validator = &employee_group.validator.validator_config;
-        <b>assert</b>!(
-            <a href="account.md#0x1_account_exists_at">account::exists_at</a>(validator.owner_address),
-            <a href="../../aptos-stdlib/../move-stdlib/doc/error.md#0x1_error_not_found">error::not_found</a>(<a href="genesis.md#0x1_genesis_EACCOUNT_DOES_NOT_EXIST">EACCOUNT_DOES_NOT_EXIST</a>),
-        );
-        <b>assert</b>!(
-            <a href="account.md#0x1_account_exists_at">account::exists_at</a>(validator.operator_address),
-            <a href="../../aptos-stdlib/../move-stdlib/doc/error.md#0x1_error_not_found">error::not_found</a>(<a href="genesis.md#0x1_genesis_EACCOUNT_DOES_NOT_EXIST">EACCOUNT_DOES_NOT_EXIST</a>),
-        );
-        <b>assert</b>!(
-            <a href="account.md#0x1_account_exists_at">account::exists_at</a>(validator.voter_address),
-            <a href="../../aptos-stdlib/../move-stdlib/doc/error.md#0x1_error_not_found">error::not_found</a>(<a href="genesis.md#0x1_genesis_EACCOUNT_DOES_NOT_EXIST">EACCOUNT_DOES_NOT_EXIST</a>),
-        );
-        <b>if</b> (employee_group.validator.join_during_genesis) {
-            <a href="genesis.md#0x1_genesis_initialize_validator">initialize_validator</a>(pool_address, validator);
-        };
-    });
-}
-</code></pre>
+<pre><code>fun create_employee_validators(<br/>    employee_vesting_start: u64,<br/>    employee_vesting_period_duration: u64,<br/>    employees: vector&lt;EmployeeAccountMap&gt;,<br/>) &#123;<br/>    let unique_accounts &#61; vector::empty();<br/><br/>    vector::for_each_ref(&amp;employees, &#124;employee_group&#124; &#123;<br/>        let j &#61; 0;<br/>        let employee_group: &amp;EmployeeAccountMap &#61; employee_group;<br/>        let num_employees_in_group &#61; vector::length(&amp;employee_group.accounts);<br/><br/>        let buy_ins &#61; simple_map::create();<br/><br/>        while (j &lt; num_employees_in_group) &#123;<br/>            let account &#61; vector::borrow(&amp;employee_group.accounts, j);<br/>            assert!(<br/>                !vector::contains(&amp;unique_accounts, account),<br/>                error::already_exists(EDUPLICATE_ACCOUNT),<br/>            );<br/>            vector::push_back(&amp;mut unique_accounts, &#42;account);<br/><br/>            let employee &#61; create_signer(&#42;account);<br/>            let total &#61; coin::balance&lt;AptosCoin&gt;(&#42;account);<br/>            let coins &#61; coin::withdraw&lt;AptosCoin&gt;(&amp;employee, total);<br/>            simple_map::add(&amp;mut buy_ins, &#42;account, coins);<br/><br/>            j &#61; j &#43; 1;<br/>        &#125;;<br/><br/>        let j &#61; 0;<br/>        let num_vesting_events &#61; vector::length(&amp;employee_group.vesting_schedule_numerator);<br/>        let schedule &#61; vector::empty();<br/><br/>        while (j &lt; num_vesting_events) &#123;<br/>            let numerator &#61; vector::borrow(&amp;employee_group.vesting_schedule_numerator, j);<br/>            let event &#61; fixed_point32::create_from_rational(&#42;numerator, employee_group.vesting_schedule_denominator);<br/>            vector::push_back(&amp;mut schedule, event);<br/><br/>            j &#61; j &#43; 1;<br/>        &#125;;<br/><br/>        let vesting_schedule &#61; vesting::create_vesting_schedule(<br/>            schedule,<br/>            employee_vesting_start,<br/>            employee_vesting_period_duration,<br/>        );<br/><br/>        let admin &#61; employee_group.validator.validator_config.owner_address;<br/>        let admin_signer &#61; &amp;create_signer(admin);<br/>        let contract_address &#61; vesting::create_vesting_contract(<br/>            admin_signer,<br/>            &amp;employee_group.accounts,<br/>            buy_ins,<br/>            vesting_schedule,<br/>            admin,<br/>            employee_group.validator.validator_config.operator_address,<br/>            employee_group.validator.validator_config.voter_address,<br/>            employee_group.validator.commission_percentage,<br/>            x&quot;&quot;,<br/>        );<br/>        let pool_address &#61; vesting::stake_pool_address(contract_address);<br/><br/>        if (employee_group.beneficiary_resetter !&#61; @0x0) &#123;<br/>            vesting::set_beneficiary_resetter(admin_signer, contract_address, employee_group.beneficiary_resetter);<br/>        &#125;;<br/><br/>        let validator &#61; &amp;employee_group.validator.validator_config;<br/>        assert!(<br/>            account::exists_at(validator.owner_address),<br/>            error::not_found(EACCOUNT_DOES_NOT_EXIST),<br/>        );<br/>        assert!(<br/>            account::exists_at(validator.operator_address),<br/>            error::not_found(EACCOUNT_DOES_NOT_EXIST),<br/>        );<br/>        assert!(<br/>            account::exists_at(validator.voter_address),<br/>            error::not_found(EACCOUNT_DOES_NOT_EXIST),<br/>        );<br/>        if (employee_group.validator.join_during_genesis) &#123;<br/>            initialize_validator(pool_address, validator);<br/>        &#125;;<br/>    &#125;);<br/>&#125;<br/></code></pre>
 
 
 
@@ -631,8 +378,7 @@ If it exists, it just returns the signer.
 
 
 
-<pre><code><b>fun</b> <a href="genesis.md#0x1_genesis_create_initialize_validators_with_commission">create_initialize_validators_with_commission</a>(aptos_framework: &<a href="../../aptos-stdlib/../move-stdlib/doc/signer.md#0x1_signer">signer</a>, use_staking_contract: bool, validators: <a href="../../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;<a href="genesis.md#0x1_genesis_ValidatorConfigurationWithCommission">genesis::ValidatorConfigurationWithCommission</a>&gt;)
-</code></pre>
+<pre><code>fun create_initialize_validators_with_commission(aptos_framework: &amp;signer, use_staking_contract: bool, validators: vector&lt;genesis::ValidatorConfigurationWithCommission&gt;)<br/></code></pre>
 
 
 
@@ -640,23 +386,7 @@ If it exists, it just returns the signer.
 <summary>Implementation</summary>
 
 
-<pre><code><b>fun</b> <a href="genesis.md#0x1_genesis_create_initialize_validators_with_commission">create_initialize_validators_with_commission</a>(
-    aptos_framework: &<a href="../../aptos-stdlib/../move-stdlib/doc/signer.md#0x1_signer">signer</a>,
-    use_staking_contract: bool,
-    validators: <a href="../../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;<a href="genesis.md#0x1_genesis_ValidatorConfigurationWithCommission">ValidatorConfigurationWithCommission</a>&gt;,
-) {
-    <a href="../../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector_for_each_ref">vector::for_each_ref</a>(&validators, |validator| {
-        <b>let</b> validator: &<a href="genesis.md#0x1_genesis_ValidatorConfigurationWithCommission">ValidatorConfigurationWithCommission</a> = validator;
-        <a href="genesis.md#0x1_genesis_create_initialize_validator">create_initialize_validator</a>(aptos_framework, validator, use_staking_contract);
-    });
-
-    // Destroy the aptos framework <a href="account.md#0x1_account">account</a>'s ability <b>to</b> mint coins now that we're done <b>with</b> setting up the initial
-    // validators.
-    <a href="aptos_coin.md#0x1_aptos_coin_destroy_mint_cap">aptos_coin::destroy_mint_cap</a>(aptos_framework);
-
-    <a href="stake.md#0x1_stake_on_new_epoch">stake::on_new_epoch</a>();
-}
-</code></pre>
+<pre><code>fun create_initialize_validators_with_commission(<br/>    aptos_framework: &amp;signer,<br/>    use_staking_contract: bool,<br/>    validators: vector&lt;ValidatorConfigurationWithCommission&gt;,<br/>) &#123;<br/>    vector::for_each_ref(&amp;validators, &#124;validator&#124; &#123;<br/>        let validator: &amp;ValidatorConfigurationWithCommission &#61; validator;<br/>        create_initialize_validator(aptos_framework, validator, use_staking_contract);<br/>    &#125;);<br/><br/>    // Destroy the aptos framework account&apos;s ability to mint coins now that we&apos;re done with setting up the initial<br/>    // validators.<br/>    aptos_coin::destroy_mint_cap(aptos_framework);<br/><br/>    stake::on_new_epoch();<br/>&#125;<br/></code></pre>
 
 
 
@@ -678,8 +408,7 @@ Network address fields are a vector per account, where each entry is a vector of
 encoded in a single BCS byte array.
 
 
-<pre><code><b>fun</b> <a href="genesis.md#0x1_genesis_create_initialize_validators">create_initialize_validators</a>(aptos_framework: &<a href="../../aptos-stdlib/../move-stdlib/doc/signer.md#0x1_signer">signer</a>, validators: <a href="../../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;<a href="genesis.md#0x1_genesis_ValidatorConfiguration">genesis::ValidatorConfiguration</a>&gt;)
-</code></pre>
+<pre><code>fun create_initialize_validators(aptos_framework: &amp;signer, validators: vector&lt;genesis::ValidatorConfiguration&gt;)<br/></code></pre>
 
 
 
@@ -687,20 +416,7 @@ encoded in a single BCS byte array.
 <summary>Implementation</summary>
 
 
-<pre><code><b>fun</b> <a href="genesis.md#0x1_genesis_create_initialize_validators">create_initialize_validators</a>(aptos_framework: &<a href="../../aptos-stdlib/../move-stdlib/doc/signer.md#0x1_signer">signer</a>, validators: <a href="../../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;<a href="genesis.md#0x1_genesis_ValidatorConfiguration">ValidatorConfiguration</a>&gt;) {
-    <b>let</b> validators_with_commission = <a href="../../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector_empty">vector::empty</a>();
-    <a href="../../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector_for_each_reverse">vector::for_each_reverse</a>(validators, |validator| {
-        <b>let</b> validator_with_commission = <a href="genesis.md#0x1_genesis_ValidatorConfigurationWithCommission">ValidatorConfigurationWithCommission</a> {
-            validator_config: validator,
-            commission_percentage: 0,
-            join_during_genesis: <b>true</b>,
-        };
-        <a href="../../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector_push_back">vector::push_back</a>(&<b>mut</b> validators_with_commission, validator_with_commission);
-    });
-
-    <a href="genesis.md#0x1_genesis_create_initialize_validators_with_commission">create_initialize_validators_with_commission</a>(aptos_framework, <b>false</b>, validators_with_commission);
-}
-</code></pre>
+<pre><code>fun create_initialize_validators(aptos_framework: &amp;signer, validators: vector&lt;ValidatorConfiguration&gt;) &#123;<br/>    let validators_with_commission &#61; vector::empty();<br/>    vector::for_each_reverse(validators, &#124;validator&#124; &#123;<br/>        let validator_with_commission &#61; ValidatorConfigurationWithCommission &#123;<br/>            validator_config: validator,<br/>            commission_percentage: 0,<br/>            join_during_genesis: true,<br/>        &#125;;<br/>        vector::push_back(&amp;mut validators_with_commission, validator_with_commission);<br/>    &#125;);<br/><br/>    create_initialize_validators_with_commission(aptos_framework, false, validators_with_commission);<br/>&#125;<br/></code></pre>
 
 
 
@@ -712,8 +428,7 @@ encoded in a single BCS byte array.
 
 
 
-<pre><code><b>fun</b> <a href="genesis.md#0x1_genesis_create_initialize_validator">create_initialize_validator</a>(aptos_framework: &<a href="../../aptos-stdlib/../move-stdlib/doc/signer.md#0x1_signer">signer</a>, commission_config: &<a href="genesis.md#0x1_genesis_ValidatorConfigurationWithCommission">genesis::ValidatorConfigurationWithCommission</a>, use_staking_contract: bool)
-</code></pre>
+<pre><code>fun create_initialize_validator(aptos_framework: &amp;signer, commission_config: &amp;genesis::ValidatorConfigurationWithCommission, use_staking_contract: bool)<br/></code></pre>
 
 
 
@@ -721,43 +436,7 @@ encoded in a single BCS byte array.
 <summary>Implementation</summary>
 
 
-<pre><code><b>fun</b> <a href="genesis.md#0x1_genesis_create_initialize_validator">create_initialize_validator</a>(
-    aptos_framework: &<a href="../../aptos-stdlib/../move-stdlib/doc/signer.md#0x1_signer">signer</a>,
-    commission_config: &<a href="genesis.md#0x1_genesis_ValidatorConfigurationWithCommission">ValidatorConfigurationWithCommission</a>,
-    use_staking_contract: bool,
-) {
-    <b>let</b> validator = &commission_config.validator_config;
-
-    <b>let</b> owner = &<a href="genesis.md#0x1_genesis_create_account">create_account</a>(aptos_framework, validator.owner_address, validator.stake_amount);
-    <a href="genesis.md#0x1_genesis_create_account">create_account</a>(aptos_framework, validator.operator_address, 0);
-    <a href="genesis.md#0x1_genesis_create_account">create_account</a>(aptos_framework, validator.voter_address, 0);
-
-    // Initialize the <a href="stake.md#0x1_stake">stake</a> pool and join the validator set.
-    <b>let</b> pool_address = <b>if</b> (use_staking_contract) {
-        <a href="staking_contract.md#0x1_staking_contract_create_staking_contract">staking_contract::create_staking_contract</a>(
-            owner,
-            validator.operator_address,
-            validator.voter_address,
-            validator.stake_amount,
-            commission_config.commission_percentage,
-            x"",
-        );
-        <a href="staking_contract.md#0x1_staking_contract_stake_pool_address">staking_contract::stake_pool_address</a>(validator.owner_address, validator.operator_address)
-    } <b>else</b> {
-        <a href="stake.md#0x1_stake_initialize_stake_owner">stake::initialize_stake_owner</a>(
-            owner,
-            validator.stake_amount,
-            validator.operator_address,
-            validator.voter_address,
-        );
-        validator.owner_address
-    };
-
-    <b>if</b> (commission_config.join_during_genesis) {
-        <a href="genesis.md#0x1_genesis_initialize_validator">initialize_validator</a>(pool_address, validator);
-    };
-}
-</code></pre>
+<pre><code>fun create_initialize_validator(<br/>    aptos_framework: &amp;signer,<br/>    commission_config: &amp;ValidatorConfigurationWithCommission,<br/>    use_staking_contract: bool,<br/>) &#123;<br/>    let validator &#61; &amp;commission_config.validator_config;<br/><br/>    let owner &#61; &amp;create_account(aptos_framework, validator.owner_address, validator.stake_amount);<br/>    create_account(aptos_framework, validator.operator_address, 0);<br/>    create_account(aptos_framework, validator.voter_address, 0);<br/><br/>    // Initialize the stake pool and join the validator set.<br/>    let pool_address &#61; if (use_staking_contract) &#123;<br/>        staking_contract::create_staking_contract(<br/>            owner,<br/>            validator.operator_address,<br/>            validator.voter_address,<br/>            validator.stake_amount,<br/>            commission_config.commission_percentage,<br/>            x&quot;&quot;,<br/>        );<br/>        staking_contract::stake_pool_address(validator.owner_address, validator.operator_address)<br/>    &#125; else &#123;<br/>        stake::initialize_stake_owner(<br/>            owner,<br/>            validator.stake_amount,<br/>            validator.operator_address,<br/>            validator.voter_address,<br/>        );<br/>        validator.owner_address<br/>    &#125;;<br/><br/>    if (commission_config.join_during_genesis) &#123;<br/>        initialize_validator(pool_address, validator);<br/>    &#125;;<br/>&#125;<br/></code></pre>
 
 
 
@@ -769,8 +448,7 @@ encoded in a single BCS byte array.
 
 
 
-<pre><code><b>fun</b> <a href="genesis.md#0x1_genesis_initialize_validator">initialize_validator</a>(pool_address: <b>address</b>, validator: &<a href="genesis.md#0x1_genesis_ValidatorConfiguration">genesis::ValidatorConfiguration</a>)
-</code></pre>
+<pre><code>fun initialize_validator(pool_address: address, validator: &amp;genesis::ValidatorConfiguration)<br/></code></pre>
 
 
 
@@ -778,24 +456,7 @@ encoded in a single BCS byte array.
 <summary>Implementation</summary>
 
 
-<pre><code><b>fun</b> <a href="genesis.md#0x1_genesis_initialize_validator">initialize_validator</a>(pool_address: <b>address</b>, validator: &<a href="genesis.md#0x1_genesis_ValidatorConfiguration">ValidatorConfiguration</a>) {
-    <b>let</b> operator = &<a href="create_signer.md#0x1_create_signer">create_signer</a>(validator.operator_address);
-
-    <a href="stake.md#0x1_stake_rotate_consensus_key">stake::rotate_consensus_key</a>(
-        operator,
-        pool_address,
-        validator.consensus_pubkey,
-        validator.proof_of_possession,
-    );
-    <a href="stake.md#0x1_stake_update_network_and_fullnode_addresses">stake::update_network_and_fullnode_addresses</a>(
-        operator,
-        pool_address,
-        validator.network_addresses,
-        validator.full_node_network_addresses,
-    );
-    <a href="stake.md#0x1_stake_join_validator_set_internal">stake::join_validator_set_internal</a>(operator, pool_address);
-}
-</code></pre>
+<pre><code>fun initialize_validator(pool_address: address, validator: &amp;ValidatorConfiguration) &#123;<br/>    let operator &#61; &amp;create_signer(validator.operator_address);<br/><br/>    stake::rotate_consensus_key(<br/>        operator,<br/>        pool_address,<br/>        validator.consensus_pubkey,<br/>        validator.proof_of_possession,<br/>    );<br/>    stake::update_network_and_fullnode_addresses(<br/>        operator,<br/>        pool_address,<br/>        validator.network_addresses,<br/>        validator.full_node_network_addresses,<br/>    );<br/>    stake::join_validator_set_internal(operator, pool_address);<br/>&#125;<br/></code></pre>
 
 
 
@@ -808,8 +469,7 @@ encoded in a single BCS byte array.
 The last step of genesis.
 
 
-<pre><code><b>fun</b> <a href="genesis.md#0x1_genesis_set_genesis_end">set_genesis_end</a>(aptos_framework: &<a href="../../aptos-stdlib/../move-stdlib/doc/signer.md#0x1_signer">signer</a>)
-</code></pre>
+<pre><code>fun set_genesis_end(aptos_framework: &amp;signer)<br/></code></pre>
 
 
 
@@ -817,10 +477,7 @@ The last step of genesis.
 <summary>Implementation</summary>
 
 
-<pre><code><b>fun</b> <a href="genesis.md#0x1_genesis_set_genesis_end">set_genesis_end</a>(aptos_framework: &<a href="../../aptos-stdlib/../move-stdlib/doc/signer.md#0x1_signer">signer</a>) {
-    <a href="chain_status.md#0x1_chain_status_set_genesis_end">chain_status::set_genesis_end</a>(aptos_framework);
-}
-</code></pre>
+<pre><code>fun set_genesis_end(aptos_framework: &amp;signer) &#123;<br/>    chain_status::set_genesis_end(aptos_framework);<br/>&#125;<br/></code></pre>
 
 
 
@@ -832,9 +489,7 @@ The last step of genesis.
 
 
 
-<pre><code>#[verify_only]
-<b>fun</b> <a href="genesis.md#0x1_genesis_initialize_for_verification">initialize_for_verification</a>(<a href="gas_schedule.md#0x1_gas_schedule">gas_schedule</a>: <a href="../../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u8&gt;, <a href="chain_id.md#0x1_chain_id">chain_id</a>: u8, initial_version: u64, <a href="consensus_config.md#0x1_consensus_config">consensus_config</a>: <a href="../../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u8&gt;, <a href="execution_config.md#0x1_execution_config">execution_config</a>: <a href="../../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u8&gt;, epoch_interval_microsecs: u64, minimum_stake: u64, maximum_stake: u64, recurring_lockup_duration_secs: u64, allow_validator_set_change: bool, rewards_rate: u64, rewards_rate_denominator: u64, voting_power_increase_limit: u64, aptos_framework: &<a href="../../aptos-stdlib/../move-stdlib/doc/signer.md#0x1_signer">signer</a>, min_voting_threshold: u128, required_proposer_stake: u64, voting_duration_secs: u64, accounts: <a href="../../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;<a href="genesis.md#0x1_genesis_AccountMap">genesis::AccountMap</a>&gt;, employee_vesting_start: u64, employee_vesting_period_duration: u64, employees: <a href="../../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;<a href="genesis.md#0x1_genesis_EmployeeAccountMap">genesis::EmployeeAccountMap</a>&gt;, validators: <a href="../../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;<a href="genesis.md#0x1_genesis_ValidatorConfigurationWithCommission">genesis::ValidatorConfigurationWithCommission</a>&gt;)
-</code></pre>
+<pre><code>&#35;[verify_only]<br/>fun initialize_for_verification(gas_schedule: vector&lt;u8&gt;, chain_id: u8, initial_version: u64, consensus_config: vector&lt;u8&gt;, execution_config: vector&lt;u8&gt;, epoch_interval_microsecs: u64, minimum_stake: u64, maximum_stake: u64, recurring_lockup_duration_secs: u64, allow_validator_set_change: bool, rewards_rate: u64, rewards_rate_denominator: u64, voting_power_increase_limit: u64, aptos_framework: &amp;signer, min_voting_threshold: u128, required_proposer_stake: u64, voting_duration_secs: u64, accounts: vector&lt;genesis::AccountMap&gt;, employee_vesting_start: u64, employee_vesting_period_duration: u64, employees: vector&lt;genesis::EmployeeAccountMap&gt;, validators: vector&lt;genesis::ValidatorConfigurationWithCommission&gt;)<br/></code></pre>
 
 
 
@@ -842,59 +497,7 @@ The last step of genesis.
 <summary>Implementation</summary>
 
 
-<pre><code><b>fun</b> <a href="genesis.md#0x1_genesis_initialize_for_verification">initialize_for_verification</a>(
-    <a href="gas_schedule.md#0x1_gas_schedule">gas_schedule</a>: <a href="../../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u8&gt;,
-    <a href="chain_id.md#0x1_chain_id">chain_id</a>: u8,
-    initial_version: u64,
-    <a href="consensus_config.md#0x1_consensus_config">consensus_config</a>: <a href="../../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u8&gt;,
-    <a href="execution_config.md#0x1_execution_config">execution_config</a>: <a href="../../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u8&gt;,
-    epoch_interval_microsecs: u64,
-    minimum_stake: u64,
-    maximum_stake: u64,
-    recurring_lockup_duration_secs: u64,
-    allow_validator_set_change: bool,
-    rewards_rate: u64,
-    rewards_rate_denominator: u64,
-    voting_power_increase_limit: u64,
-    aptos_framework: &<a href="../../aptos-stdlib/../move-stdlib/doc/signer.md#0x1_signer">signer</a>,
-    min_voting_threshold: u128,
-    required_proposer_stake: u64,
-    voting_duration_secs: u64,
-    accounts: <a href="../../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;<a href="genesis.md#0x1_genesis_AccountMap">AccountMap</a>&gt;,
-    employee_vesting_start: u64,
-    employee_vesting_period_duration: u64,
-    employees: <a href="../../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;<a href="genesis.md#0x1_genesis_EmployeeAccountMap">EmployeeAccountMap</a>&gt;,
-    validators: <a href="../../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;<a href="genesis.md#0x1_genesis_ValidatorConfigurationWithCommission">ValidatorConfigurationWithCommission</a>&gt;
-) {
-    <a href="genesis.md#0x1_genesis_initialize">initialize</a>(
-        <a href="gas_schedule.md#0x1_gas_schedule">gas_schedule</a>,
-        <a href="chain_id.md#0x1_chain_id">chain_id</a>,
-        initial_version,
-        <a href="consensus_config.md#0x1_consensus_config">consensus_config</a>,
-        <a href="execution_config.md#0x1_execution_config">execution_config</a>,
-        epoch_interval_microsecs,
-        minimum_stake,
-        maximum_stake,
-        recurring_lockup_duration_secs,
-        allow_validator_set_change,
-        rewards_rate,
-        rewards_rate_denominator,
-        voting_power_increase_limit
-    );
-    <a href="../../aptos-stdlib/../move-stdlib/doc/features.md#0x1_features_change_feature_flags_for_verification">features::change_feature_flags_for_verification</a>(aptos_framework, <a href="../../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector">vector</a>[1, 2], <a href="../../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector">vector</a>[]);
-    <a href="genesis.md#0x1_genesis_initialize_aptos_coin">initialize_aptos_coin</a>(aptos_framework);
-    <a href="aptos_governance.md#0x1_aptos_governance_initialize_for_verification">aptos_governance::initialize_for_verification</a>(
-        aptos_framework,
-        min_voting_threshold,
-        required_proposer_stake,
-        voting_duration_secs
-    );
-    <a href="genesis.md#0x1_genesis_create_accounts">create_accounts</a>(aptos_framework, accounts);
-    <a href="genesis.md#0x1_genesis_create_employee_validators">create_employee_validators</a>(employee_vesting_start, employee_vesting_period_duration, employees);
-    <a href="genesis.md#0x1_genesis_create_initialize_validators_with_commission">create_initialize_validators_with_commission</a>(aptos_framework, <b>true</b>, validators);
-    <a href="genesis.md#0x1_genesis_set_genesis_end">set_genesis_end</a>(aptos_framework);
-}
-</code></pre>
+<pre><code>fun initialize_for_verification(<br/>    gas_schedule: vector&lt;u8&gt;,<br/>    chain_id: u8,<br/>    initial_version: u64,<br/>    consensus_config: vector&lt;u8&gt;,<br/>    execution_config: vector&lt;u8&gt;,<br/>    epoch_interval_microsecs: u64,<br/>    minimum_stake: u64,<br/>    maximum_stake: u64,<br/>    recurring_lockup_duration_secs: u64,<br/>    allow_validator_set_change: bool,<br/>    rewards_rate: u64,<br/>    rewards_rate_denominator: u64,<br/>    voting_power_increase_limit: u64,<br/>    aptos_framework: &amp;signer,<br/>    min_voting_threshold: u128,<br/>    required_proposer_stake: u64,<br/>    voting_duration_secs: u64,<br/>    accounts: vector&lt;AccountMap&gt;,<br/>    employee_vesting_start: u64,<br/>    employee_vesting_period_duration: u64,<br/>    employees: vector&lt;EmployeeAccountMap&gt;,<br/>    validators: vector&lt;ValidatorConfigurationWithCommission&gt;<br/>) &#123;<br/>    initialize(<br/>        gas_schedule,<br/>        chain_id,<br/>        initial_version,<br/>        consensus_config,<br/>        execution_config,<br/>        epoch_interval_microsecs,<br/>        minimum_stake,<br/>        maximum_stake,<br/>        recurring_lockup_duration_secs,<br/>        allow_validator_set_change,<br/>        rewards_rate,<br/>        rewards_rate_denominator,<br/>        voting_power_increase_limit<br/>    );<br/>    features::change_feature_flags_for_verification(aptos_framework, vector[1, 2], vector[]);<br/>    initialize_aptos_coin(aptos_framework);<br/>    aptos_governance::initialize_for_verification(<br/>        aptos_framework,<br/>        min_voting_threshold,<br/>        required_proposer_stake,<br/>        voting_duration_secs<br/>    );<br/>    create_accounts(aptos_framework, accounts);<br/>    create_employee_validators(employee_vesting_start, employee_vesting_period_duration, employees);<br/>    create_initialize_validators_with_commission(aptos_framework, true, validators);<br/>    set_genesis_end(aptos_framework);<br/>&#125;<br/></code></pre>
 
 
 
@@ -965,8 +568,7 @@ The last step of genesis.
 ### Module-level Specification
 
 
-<pre><code><b>pragma</b> verify = <b>true</b>;
-</code></pre>
+<pre><code>pragma verify &#61; true;<br/></code></pre>
 
 
 
@@ -975,56 +577,14 @@ The last step of genesis.
 ### Function `initialize`
 
 
-<pre><code><b>fun</b> <a href="genesis.md#0x1_genesis_initialize">initialize</a>(<a href="gas_schedule.md#0x1_gas_schedule">gas_schedule</a>: <a href="../../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u8&gt;, <a href="chain_id.md#0x1_chain_id">chain_id</a>: u8, initial_version: u64, <a href="consensus_config.md#0x1_consensus_config">consensus_config</a>: <a href="../../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u8&gt;, <a href="execution_config.md#0x1_execution_config">execution_config</a>: <a href="../../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u8&gt;, epoch_interval_microsecs: u64, minimum_stake: u64, maximum_stake: u64, recurring_lockup_duration_secs: u64, allow_validator_set_change: bool, rewards_rate: u64, rewards_rate_denominator: u64, voting_power_increase_limit: u64)
-</code></pre>
+<pre><code>fun initialize(gas_schedule: vector&lt;u8&gt;, chain_id: u8, initial_version: u64, consensus_config: vector&lt;u8&gt;, execution_config: vector&lt;u8&gt;, epoch_interval_microsecs: u64, minimum_stake: u64, maximum_stake: u64, recurring_lockup_duration_secs: u64, allow_validator_set_change: bool, rewards_rate: u64, rewards_rate_denominator: u64, voting_power_increase_limit: u64)<br/></code></pre>
 
 
 
 
-<pre><code><b>pragma</b> aborts_if_is_partial;
-<b>include</b> <a href="genesis.md#0x1_genesis_InitalizeRequires">InitalizeRequires</a>;
-// This enforces <a id="high-level-req-2" href="#high-level-req">high-level requirement 2</a>:
-<b>aborts_if</b> <b>exists</b>&lt;<a href="account.md#0x1_account_Account">account::Account</a>&gt;(@0x0);
-<b>aborts_if</b> <b>exists</b>&lt;<a href="account.md#0x1_account_Account">account::Account</a>&gt;(@0x2);
-<b>aborts_if</b> <b>exists</b>&lt;<a href="account.md#0x1_account_Account">account::Account</a>&gt;(@0x3);
-<b>aborts_if</b> <b>exists</b>&lt;<a href="account.md#0x1_account_Account">account::Account</a>&gt;(@0x4);
-<b>aborts_if</b> <b>exists</b>&lt;<a href="account.md#0x1_account_Account">account::Account</a>&gt;(@0x5);
-<b>aborts_if</b> <b>exists</b>&lt;<a href="account.md#0x1_account_Account">account::Account</a>&gt;(@0x6);
-<b>aborts_if</b> <b>exists</b>&lt;<a href="account.md#0x1_account_Account">account::Account</a>&gt;(@0x7);
-<b>aborts_if</b> <b>exists</b>&lt;<a href="account.md#0x1_account_Account">account::Account</a>&gt;(@0x8);
-<b>aborts_if</b> <b>exists</b>&lt;<a href="account.md#0x1_account_Account">account::Account</a>&gt;(@0x9);
-<b>aborts_if</b> <b>exists</b>&lt;<a href="account.md#0x1_account_Account">account::Account</a>&gt;(@0xa);
-<b>ensures</b> <b>exists</b>&lt;<a href="account.md#0x1_account_Account">account::Account</a>&gt;(@0x0);
-<b>ensures</b> <b>exists</b>&lt;<a href="account.md#0x1_account_Account">account::Account</a>&gt;(@0x2);
-<b>ensures</b> <b>exists</b>&lt;<a href="account.md#0x1_account_Account">account::Account</a>&gt;(@0x3);
-<b>ensures</b> <b>exists</b>&lt;<a href="account.md#0x1_account_Account">account::Account</a>&gt;(@0x4);
-<b>ensures</b> <b>exists</b>&lt;<a href="account.md#0x1_account_Account">account::Account</a>&gt;(@0x5);
-<b>ensures</b> <b>exists</b>&lt;<a href="account.md#0x1_account_Account">account::Account</a>&gt;(@0x6);
-<b>ensures</b> <b>exists</b>&lt;<a href="account.md#0x1_account_Account">account::Account</a>&gt;(@0x7);
-<b>ensures</b> <b>exists</b>&lt;<a href="account.md#0x1_account_Account">account::Account</a>&gt;(@0x8);
-<b>ensures</b> <b>exists</b>&lt;<a href="account.md#0x1_account_Account">account::Account</a>&gt;(@0x9);
-<b>ensures</b> <b>exists</b>&lt;<a href="account.md#0x1_account_Account">account::Account</a>&gt;(@0xa);
-// This enforces <a id="high-level-req-1" href="#high-level-req">high-level requirement 1</a>:
-<b>ensures</b> <b>exists</b>&lt;<a href="aptos_governance.md#0x1_aptos_governance_GovernanceResponsbility">aptos_governance::GovernanceResponsbility</a>&gt;(@aptos_framework);
-<b>ensures</b> <b>exists</b>&lt;<a href="consensus_config.md#0x1_consensus_config_ConsensusConfig">consensus_config::ConsensusConfig</a>&gt;(@aptos_framework);
-<b>ensures</b> <b>exists</b>&lt;<a href="execution_config.md#0x1_execution_config_ExecutionConfig">execution_config::ExecutionConfig</a>&gt;(@aptos_framework);
-<b>ensures</b> <b>exists</b>&lt;<a href="version.md#0x1_version_Version">version::Version</a>&gt;(@aptos_framework);
-<b>ensures</b> <b>exists</b>&lt;<a href="stake.md#0x1_stake_ValidatorSet">stake::ValidatorSet</a>&gt;(@aptos_framework);
-<b>ensures</b> <b>exists</b>&lt;<a href="stake.md#0x1_stake_ValidatorPerformance">stake::ValidatorPerformance</a>&gt;(@aptos_framework);
-<b>ensures</b> <b>exists</b>&lt;<a href="storage_gas.md#0x1_storage_gas_StorageGasConfig">storage_gas::StorageGasConfig</a>&gt;(@aptos_framework);
-<b>ensures</b> <b>exists</b>&lt;<a href="storage_gas.md#0x1_storage_gas_StorageGas">storage_gas::StorageGas</a>&gt;(@aptos_framework);
-<b>ensures</b> <b>exists</b>&lt;<a href="gas_schedule.md#0x1_gas_schedule_GasScheduleV2">gas_schedule::GasScheduleV2</a>&gt;(@aptos_framework);
-<b>ensures</b> <b>exists</b>&lt;<a href="aggregator_factory.md#0x1_aggregator_factory_AggregatorFactory">aggregator_factory::AggregatorFactory</a>&gt;(@aptos_framework);
-<b>ensures</b> <b>exists</b>&lt;<a href="coin.md#0x1_coin_SupplyConfig">coin::SupplyConfig</a>&gt;(@aptos_framework);
-<b>ensures</b> <b>exists</b>&lt;<a href="chain_id.md#0x1_chain_id_ChainId">chain_id::ChainId</a>&gt;(@aptos_framework);
-<b>ensures</b> <b>exists</b>&lt;<a href="reconfiguration.md#0x1_reconfiguration_Configuration">reconfiguration::Configuration</a>&gt;(@aptos_framework);
-<b>ensures</b> <b>exists</b>&lt;<a href="block.md#0x1_block_BlockResource">block::BlockResource</a>&gt;(@aptos_framework);
-<b>ensures</b> <b>exists</b>&lt;<a href="state_storage.md#0x1_state_storage_StateStorageUsage">state_storage::StateStorageUsage</a>&gt;(@aptos_framework);
-<b>ensures</b> <b>exists</b>&lt;<a href="timestamp.md#0x1_timestamp_CurrentTimeMicroseconds">timestamp::CurrentTimeMicroseconds</a>&gt;(@aptos_framework);
-<b>ensures</b> <b>exists</b>&lt;<a href="account.md#0x1_account_Account">account::Account</a>&gt;(@aptos_framework);
-<b>ensures</b> <b>exists</b>&lt;<a href="version.md#0x1_version_SetVersionCapability">version::SetVersionCapability</a>&gt;(@aptos_framework);
-<b>ensures</b> <b>exists</b>&lt;<a href="staking_config.md#0x1_staking_config_StakingConfig">staking_config::StakingConfig</a>&gt;(@aptos_framework);
-</code></pre>
+<pre><code>pragma aborts_if_is_partial;<br/>include InitalizeRequires;<br/>// This enforces <a id="high-level-req-2" href="#high-level-req">high-level requirement 2</a>:
+aborts_if exists&lt;account::Account&gt;(@0x0);<br/>aborts_if exists&lt;account::Account&gt;(@0x2);<br/>aborts_if exists&lt;account::Account&gt;(@0x3);<br/>aborts_if exists&lt;account::Account&gt;(@0x4);<br/>aborts_if exists&lt;account::Account&gt;(@0x5);<br/>aborts_if exists&lt;account::Account&gt;(@0x6);<br/>aborts_if exists&lt;account::Account&gt;(@0x7);<br/>aborts_if exists&lt;account::Account&gt;(@0x8);<br/>aborts_if exists&lt;account::Account&gt;(@0x9);<br/>aborts_if exists&lt;account::Account&gt;(@0xa);<br/>ensures exists&lt;account::Account&gt;(@0x0);<br/>ensures exists&lt;account::Account&gt;(@0x2);<br/>ensures exists&lt;account::Account&gt;(@0x3);<br/>ensures exists&lt;account::Account&gt;(@0x4);<br/>ensures exists&lt;account::Account&gt;(@0x5);<br/>ensures exists&lt;account::Account&gt;(@0x6);<br/>ensures exists&lt;account::Account&gt;(@0x7);<br/>ensures exists&lt;account::Account&gt;(@0x8);<br/>ensures exists&lt;account::Account&gt;(@0x9);<br/>ensures exists&lt;account::Account&gt;(@0xa);<br/>// This enforces <a id="high-level-req-1" href="#high-level-req">high-level requirement 1</a>:
+ensures exists&lt;aptos_governance::GovernanceResponsbility&gt;(@aptos_framework);<br/>ensures exists&lt;consensus_config::ConsensusConfig&gt;(@aptos_framework);<br/>ensures exists&lt;execution_config::ExecutionConfig&gt;(@aptos_framework);<br/>ensures exists&lt;version::Version&gt;(@aptos_framework);<br/>ensures exists&lt;stake::ValidatorSet&gt;(@aptos_framework);<br/>ensures exists&lt;stake::ValidatorPerformance&gt;(@aptos_framework);<br/>ensures exists&lt;storage_gas::StorageGasConfig&gt;(@aptos_framework);<br/>ensures exists&lt;storage_gas::StorageGas&gt;(@aptos_framework);<br/>ensures exists&lt;gas_schedule::GasScheduleV2&gt;(@aptos_framework);<br/>ensures exists&lt;aggregator_factory::AggregatorFactory&gt;(@aptos_framework);<br/>ensures exists&lt;coin::SupplyConfig&gt;(@aptos_framework);<br/>ensures exists&lt;chain_id::ChainId&gt;(@aptos_framework);<br/>ensures exists&lt;reconfiguration::Configuration&gt;(@aptos_framework);<br/>ensures exists&lt;block::BlockResource&gt;(@aptos_framework);<br/>ensures exists&lt;state_storage::StateStorageUsage&gt;(@aptos_framework);<br/>ensures exists&lt;timestamp::CurrentTimeMicroseconds&gt;(@aptos_framework);<br/>ensures exists&lt;account::Account&gt;(@aptos_framework);<br/>ensures exists&lt;version::SetVersionCapability&gt;(@aptos_framework);<br/>ensures exists&lt;staking_config::StakingConfig&gt;(@aptos_framework);<br/></code></pre>
 
 
 
@@ -1033,18 +593,13 @@ The last step of genesis.
 ### Function `initialize_aptos_coin`
 
 
-<pre><code><b>fun</b> <a href="genesis.md#0x1_genesis_initialize_aptos_coin">initialize_aptos_coin</a>(aptos_framework: &<a href="../../aptos-stdlib/../move-stdlib/doc/signer.md#0x1_signer">signer</a>)
-</code></pre>
+<pre><code>fun initialize_aptos_coin(aptos_framework: &amp;signer)<br/></code></pre>
 
 
 
 
 <pre><code>// This enforces <a id="high-level-req-3" href="#high-level-req">high-level requirement 3</a>:
-<b>requires</b> !<b>exists</b>&lt;<a href="stake.md#0x1_stake_AptosCoinCapabilities">stake::AptosCoinCapabilities</a>&gt;(@aptos_framework);
-<b>ensures</b> <b>exists</b>&lt;<a href="stake.md#0x1_stake_AptosCoinCapabilities">stake::AptosCoinCapabilities</a>&gt;(@aptos_framework);
-<b>requires</b> <b>exists</b>&lt;<a href="transaction_fee.md#0x1_transaction_fee_AptosCoinCapabilities">transaction_fee::AptosCoinCapabilities</a>&gt;(@aptos_framework);
-<b>ensures</b> <b>exists</b>&lt;<a href="transaction_fee.md#0x1_transaction_fee_AptosCoinCapabilities">transaction_fee::AptosCoinCapabilities</a>&gt;(@aptos_framework);
-</code></pre>
+requires !exists&lt;stake::AptosCoinCapabilities&gt;(@aptos_framework);<br/>ensures exists&lt;stake::AptosCoinCapabilities&gt;(@aptos_framework);<br/>requires exists&lt;transaction_fee::AptosCoinCapabilities&gt;(@aptos_framework);<br/>ensures exists&lt;transaction_fee::AptosCoinCapabilities&gt;(@aptos_framework);<br/></code></pre>
 
 
 
@@ -1053,18 +608,12 @@ The last step of genesis.
 ### Function `create_initialize_validators_with_commission`
 
 
-<pre><code><b>fun</b> <a href="genesis.md#0x1_genesis_create_initialize_validators_with_commission">create_initialize_validators_with_commission</a>(aptos_framework: &<a href="../../aptos-stdlib/../move-stdlib/doc/signer.md#0x1_signer">signer</a>, use_staking_contract: bool, validators: <a href="../../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;<a href="genesis.md#0x1_genesis_ValidatorConfigurationWithCommission">genesis::ValidatorConfigurationWithCommission</a>&gt;)
-</code></pre>
+<pre><code>fun create_initialize_validators_with_commission(aptos_framework: &amp;signer, use_staking_contract: bool, validators: vector&lt;genesis::ValidatorConfigurationWithCommission&gt;)<br/></code></pre>
 
 
 
 
-<pre><code><b>pragma</b> verify_duration_estimate = 120;
-<b>include</b> <a href="stake.md#0x1_stake_ResourceRequirement">stake::ResourceRequirement</a>;
-<b>include</b> <a href="stake.md#0x1_stake_GetReconfigStartTimeRequirement">stake::GetReconfigStartTimeRequirement</a>;
-<b>include</b> <a href="genesis.md#0x1_genesis_CompareTimeRequires">CompareTimeRequires</a>;
-<b>include</b> <a href="aptos_coin.md#0x1_aptos_coin_ExistsAptosCoin">aptos_coin::ExistsAptosCoin</a>;
-</code></pre>
+<pre><code>pragma verify_duration_estimate &#61; 120;<br/>include stake::ResourceRequirement;<br/>include stake::GetReconfigStartTimeRequirement;<br/>include CompareTimeRequires;<br/>include aptos_coin::ExistsAptosCoin;<br/></code></pre>
 
 
 
@@ -1073,18 +622,12 @@ The last step of genesis.
 ### Function `create_initialize_validators`
 
 
-<pre><code><b>fun</b> <a href="genesis.md#0x1_genesis_create_initialize_validators">create_initialize_validators</a>(aptos_framework: &<a href="../../aptos-stdlib/../move-stdlib/doc/signer.md#0x1_signer">signer</a>, validators: <a href="../../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;<a href="genesis.md#0x1_genesis_ValidatorConfiguration">genesis::ValidatorConfiguration</a>&gt;)
-</code></pre>
+<pre><code>fun create_initialize_validators(aptos_framework: &amp;signer, validators: vector&lt;genesis::ValidatorConfiguration&gt;)<br/></code></pre>
 
 
 
 
-<pre><code><b>pragma</b> verify_duration_estimate = 120;
-<b>include</b> <a href="stake.md#0x1_stake_ResourceRequirement">stake::ResourceRequirement</a>;
-<b>include</b> <a href="stake.md#0x1_stake_GetReconfigStartTimeRequirement">stake::GetReconfigStartTimeRequirement</a>;
-<b>include</b> <a href="genesis.md#0x1_genesis_CompareTimeRequires">CompareTimeRequires</a>;
-<b>include</b> <a href="aptos_coin.md#0x1_aptos_coin_ExistsAptosCoin">aptos_coin::ExistsAptosCoin</a>;
-</code></pre>
+<pre><code>pragma verify_duration_estimate &#61; 120;<br/>include stake::ResourceRequirement;<br/>include stake::GetReconfigStartTimeRequirement;<br/>include CompareTimeRequires;<br/>include aptos_coin::ExistsAptosCoin;<br/></code></pre>
 
 
 
@@ -1093,14 +636,12 @@ The last step of genesis.
 ### Function `create_initialize_validator`
 
 
-<pre><code><b>fun</b> <a href="genesis.md#0x1_genesis_create_initialize_validator">create_initialize_validator</a>(aptos_framework: &<a href="../../aptos-stdlib/../move-stdlib/doc/signer.md#0x1_signer">signer</a>, commission_config: &<a href="genesis.md#0x1_genesis_ValidatorConfigurationWithCommission">genesis::ValidatorConfigurationWithCommission</a>, use_staking_contract: bool)
-</code></pre>
+<pre><code>fun create_initialize_validator(aptos_framework: &amp;signer, commission_config: &amp;genesis::ValidatorConfigurationWithCommission, use_staking_contract: bool)<br/></code></pre>
 
 
 
 
-<pre><code><b>include</b> <a href="stake.md#0x1_stake_ResourceRequirement">stake::ResourceRequirement</a>;
-</code></pre>
+<pre><code>include stake::ResourceRequirement;<br/></code></pre>
 
 
 
@@ -1109,21 +650,14 @@ The last step of genesis.
 ### Function `set_genesis_end`
 
 
-<pre><code><b>fun</b> <a href="genesis.md#0x1_genesis_set_genesis_end">set_genesis_end</a>(aptos_framework: &<a href="../../aptos-stdlib/../move-stdlib/doc/signer.md#0x1_signer">signer</a>)
-</code></pre>
+<pre><code>fun set_genesis_end(aptos_framework: &amp;signer)<br/></code></pre>
 
 
 
 
-<pre><code><b>pragma</b> delegate_invariants_to_caller;
-// This enforces <a id="high-level-req-4" href="#high-level-req">high-level requirement 4</a>:
-<b>requires</b> len(<b>global</b>&lt;<a href="stake.md#0x1_stake_ValidatorSet">stake::ValidatorSet</a>&gt;(@aptos_framework).active_validators) &gt;= 1;
-// This enforces <a id="high-level-req-5" href="#high-level-req">high-level requirement 5</a>:
-<b>let</b> addr = std::signer::address_of(aptos_framework);
-<b>aborts_if</b> addr != @aptos_framework;
-<b>aborts_if</b> <b>exists</b>&lt;<a href="chain_status.md#0x1_chain_status_GenesisEndMarker">chain_status::GenesisEndMarker</a>&gt;(@aptos_framework);
-<b>ensures</b> <b>global</b>&lt;<a href="chain_status.md#0x1_chain_status_GenesisEndMarker">chain_status::GenesisEndMarker</a>&gt;(@aptos_framework) == <a href="chain_status.md#0x1_chain_status_GenesisEndMarker">chain_status::GenesisEndMarker</a> {};
-</code></pre>
+<pre><code>pragma delegate_invariants_to_caller;<br/>// This enforces <a id="high-level-req-4" href="#high-level-req">high-level requirement 4</a>:
+requires len(global&lt;stake::ValidatorSet&gt;(@aptos_framework).active_validators) &gt;&#61; 1;<br/>// This enforces <a id="high-level-req-5" href="#high-level-req">high-level requirement 5</a>:
+let addr &#61; std::signer::address_of(aptos_framework);<br/>aborts_if addr !&#61; @aptos_framework;<br/>aborts_if exists&lt;chain_status::GenesisEndMarker&gt;(@aptos_framework);<br/>ensures global&lt;chain_status::GenesisEndMarker&gt;(@aptos_framework) &#61;&#61; chain_status::GenesisEndMarker &#123;&#125;;<br/></code></pre>
 
 
 
@@ -1131,18 +665,7 @@ The last step of genesis.
 <a id="0x1_genesis_InitalizeRequires"></a>
 
 
-<pre><code><b>schema</b> <a href="genesis.md#0x1_genesis_InitalizeRequires">InitalizeRequires</a> {
-    <a href="execution_config.md#0x1_execution_config">execution_config</a>: <a href="../../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u8&gt;;
-    <b>requires</b> !<b>exists</b>&lt;<a href="account.md#0x1_account_Account">account::Account</a>&gt;(@aptos_framework);
-    <b>requires</b> <a href="chain_status.md#0x1_chain_status_is_operating">chain_status::is_operating</a>();
-    <b>requires</b> len(<a href="execution_config.md#0x1_execution_config">execution_config</a>) &gt; 0;
-    <b>requires</b> <b>exists</b>&lt;<a href="staking_config.md#0x1_staking_config_StakingRewardsConfig">staking_config::StakingRewardsConfig</a>&gt;(@aptos_framework);
-    <b>requires</b> <b>exists</b>&lt;<a href="stake.md#0x1_stake_ValidatorFees">stake::ValidatorFees</a>&gt;(@aptos_framework);
-    <b>requires</b> <b>exists</b>&lt;<a href="coin.md#0x1_coin_CoinInfo">coin::CoinInfo</a>&lt;AptosCoin&gt;&gt;(@aptos_framework);
-    <b>include</b> <a href="genesis.md#0x1_genesis_CompareTimeRequires">CompareTimeRequires</a>;
-    <b>include</b> <a href="transaction_fee.md#0x1_transaction_fee_RequiresCollectedFeesPerValueLeqBlockAptosSupply">transaction_fee::RequiresCollectedFeesPerValueLeqBlockAptosSupply</a>;
-}
-</code></pre>
+<pre><code>schema InitalizeRequires &#123;<br/>execution_config: vector&lt;u8&gt;;<br/>requires !exists&lt;account::Account&gt;(@aptos_framework);<br/>requires chain_status::is_operating();<br/>requires len(execution_config) &gt; 0;<br/>requires exists&lt;staking_config::StakingRewardsConfig&gt;(@aptos_framework);<br/>requires exists&lt;stake::ValidatorFees&gt;(@aptos_framework);<br/>requires exists&lt;coin::CoinInfo&lt;AptosCoin&gt;&gt;(@aptos_framework);<br/>include CompareTimeRequires;<br/>include transaction_fee::RequiresCollectedFeesPerValueLeqBlockAptosSupply;<br/>&#125;<br/></code></pre>
 
 
 
@@ -1150,11 +673,7 @@ The last step of genesis.
 <a id="0x1_genesis_CompareTimeRequires"></a>
 
 
-<pre><code><b>schema</b> <a href="genesis.md#0x1_genesis_CompareTimeRequires">CompareTimeRequires</a> {
-    <b>let</b> staking_rewards_config = <b>global</b>&lt;<a href="staking_config.md#0x1_staking_config_StakingRewardsConfig">staking_config::StakingRewardsConfig</a>&gt;(@aptos_framework);
-    <b>requires</b> staking_rewards_config.last_rewards_rate_period_start_in_secs &lt;= <a href="timestamp.md#0x1_timestamp_spec_now_seconds">timestamp::spec_now_seconds</a>();
-}
-</code></pre>
+<pre><code>schema CompareTimeRequires &#123;<br/>let staking_rewards_config &#61; global&lt;staking_config::StakingRewardsConfig&gt;(@aptos_framework);<br/>requires staking_rewards_config.last_rewards_rate_period_start_in_secs &lt;&#61; timestamp::spec_now_seconds();<br/>&#125;<br/></code></pre>
 
 
 
@@ -1163,16 +682,12 @@ The last step of genesis.
 ### Function `initialize_for_verification`
 
 
-<pre><code>#[verify_only]
-<b>fun</b> <a href="genesis.md#0x1_genesis_initialize_for_verification">initialize_for_verification</a>(<a href="gas_schedule.md#0x1_gas_schedule">gas_schedule</a>: <a href="../../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u8&gt;, <a href="chain_id.md#0x1_chain_id">chain_id</a>: u8, initial_version: u64, <a href="consensus_config.md#0x1_consensus_config">consensus_config</a>: <a href="../../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u8&gt;, <a href="execution_config.md#0x1_execution_config">execution_config</a>: <a href="../../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u8&gt;, epoch_interval_microsecs: u64, minimum_stake: u64, maximum_stake: u64, recurring_lockup_duration_secs: u64, allow_validator_set_change: bool, rewards_rate: u64, rewards_rate_denominator: u64, voting_power_increase_limit: u64, aptos_framework: &<a href="../../aptos-stdlib/../move-stdlib/doc/signer.md#0x1_signer">signer</a>, min_voting_threshold: u128, required_proposer_stake: u64, voting_duration_secs: u64, accounts: <a href="../../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;<a href="genesis.md#0x1_genesis_AccountMap">genesis::AccountMap</a>&gt;, employee_vesting_start: u64, employee_vesting_period_duration: u64, employees: <a href="../../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;<a href="genesis.md#0x1_genesis_EmployeeAccountMap">genesis::EmployeeAccountMap</a>&gt;, validators: <a href="../../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;<a href="genesis.md#0x1_genesis_ValidatorConfigurationWithCommission">genesis::ValidatorConfigurationWithCommission</a>&gt;)
-</code></pre>
+<pre><code>&#35;[verify_only]<br/>fun initialize_for_verification(gas_schedule: vector&lt;u8&gt;, chain_id: u8, initial_version: u64, consensus_config: vector&lt;u8&gt;, execution_config: vector&lt;u8&gt;, epoch_interval_microsecs: u64, minimum_stake: u64, maximum_stake: u64, recurring_lockup_duration_secs: u64, allow_validator_set_change: bool, rewards_rate: u64, rewards_rate_denominator: u64, voting_power_increase_limit: u64, aptos_framework: &amp;signer, min_voting_threshold: u128, required_proposer_stake: u64, voting_duration_secs: u64, accounts: vector&lt;genesis::AccountMap&gt;, employee_vesting_start: u64, employee_vesting_period_duration: u64, employees: vector&lt;genesis::EmployeeAccountMap&gt;, validators: vector&lt;genesis::ValidatorConfigurationWithCommission&gt;)<br/></code></pre>
 
 
 
 
-<pre><code><b>pragma</b> verify_duration_estimate = 120;
-<b>include</b> <a href="genesis.md#0x1_genesis_InitalizeRequires">InitalizeRequires</a>;
-</code></pre>
+<pre><code>pragma verify_duration_estimate &#61; 120;<br/>include InitalizeRequires;<br/></code></pre>
 
 
 [move-book]: https://aptos.dev/move/book/SUMMARY

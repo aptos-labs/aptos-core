@@ -59,18 +59,7 @@ have a simple layout which is easily accessible in Rust.
     -  [Function `on_new_epoch`](#@Specification_1_on_new_epoch)
 
 
-<pre><code><b>use</b> <a href="chain_status.md#0x1_chain_status">0x1::chain_status</a>;
-<b>use</b> <a href="../../aptos-stdlib/doc/comparator.md#0x1_comparator">0x1::comparator</a>;
-<b>use</b> <a href="config_buffer.md#0x1_config_buffer">0x1::config_buffer</a>;
-<b>use</b> <a href="../../aptos-stdlib/doc/copyable_any.md#0x1_copyable_any">0x1::copyable_any</a>;
-<b>use</b> <a href="../../aptos-stdlib/../move-stdlib/doc/error.md#0x1_error">0x1::error</a>;
-<b>use</b> <a href="event.md#0x1_event">0x1::event</a>;
-<b>use</b> <a href="../../aptos-stdlib/../move-stdlib/doc/option.md#0x1_option">0x1::option</a>;
-<b>use</b> <a href="reconfiguration.md#0x1_reconfiguration">0x1::reconfiguration</a>;
-<b>use</b> <a href="../../aptos-stdlib/../move-stdlib/doc/string.md#0x1_string">0x1::string</a>;
-<b>use</b> <a href="system_addresses.md#0x1_system_addresses">0x1::system_addresses</a>;
-<b>use</b> <a href="../../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector">0x1::vector</a>;
-</code></pre>
+<pre><code>use 0x1::chain_status;<br/>use 0x1::comparator;<br/>use 0x1::config_buffer;<br/>use 0x1::copyable_any;<br/>use 0x1::error;<br/>use 0x1::event;<br/>use 0x1::option;<br/>use 0x1::reconfiguration;<br/>use 0x1::string;<br/>use 0x1::system_addresses;<br/>use 0x1::vector;<br/></code></pre>
 
 
 
@@ -81,8 +70,7 @@ have a simple layout which is easily accessible in Rust.
 An OIDC provider.
 
 
-<pre><code><b>struct</b> <a href="jwks.md#0x1_jwks_OIDCProvider">OIDCProvider</a> <b>has</b> <b>copy</b>, drop, store
-</code></pre>
+<pre><code>struct OIDCProvider has copy, drop, store<br/></code></pre>
 
 
 
@@ -92,13 +80,13 @@ An OIDC provider.
 
 <dl>
 <dt>
-<code>name: <a href="../../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u8&gt;</code>
+<code>name: vector&lt;u8&gt;</code>
 </dt>
 <dd>
  The utf-8 encoded issuer string. E.g., b"https://www.facebook.com".
 </dd>
 <dt>
-<code>config_url: <a href="../../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u8&gt;</code>
+<code>config_url: vector&lt;u8&gt;</code>
 </dt>
 <dd>
  The ut8-8 encoded OpenID configuration URL of the provider.
@@ -116,8 +104,7 @@ An OIDC provider.
 A list of OIDC providers whose JWKs should be watched by validators. Maintained by governance proposals.
 
 
-<pre><code><b>struct</b> <a href="jwks.md#0x1_jwks_SupportedOIDCProviders">SupportedOIDCProviders</a> <b>has</b> <b>copy</b>, drop, store, key
-</code></pre>
+<pre><code>struct SupportedOIDCProviders has copy, drop, store, key<br/></code></pre>
 
 
 
@@ -127,7 +114,7 @@ A list of OIDC providers whose JWKs should be watched by validators. Maintained 
 
 <dl>
 <dt>
-<code>providers: <a href="../../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;<a href="jwks.md#0x1_jwks_OIDCProvider">jwks::OIDCProvider</a>&gt;</code>
+<code>providers: vector&lt;jwks::OIDCProvider&gt;</code>
 </dt>
 <dd>
 
@@ -142,11 +129,10 @@ A list of OIDC providers whose JWKs should be watched by validators. Maintained 
 ## Struct `UnsupportedJWK`
 
 An JWK variant that represents the JWKs which were observed but not yet supported by Aptos.
-Observing <code><a href="jwks.md#0x1_jwks_UnsupportedJWK">UnsupportedJWK</a></code>s means the providers adopted a new key type/format, and the system should be updated.
+Observing <code>UnsupportedJWK</code>s means the providers adopted a new key type/format, and the system should be updated.
 
 
-<pre><code><b>struct</b> <a href="jwks.md#0x1_jwks_UnsupportedJWK">UnsupportedJWK</a> <b>has</b> <b>copy</b>, drop, store
-</code></pre>
+<pre><code>struct UnsupportedJWK has copy, drop, store<br/></code></pre>
 
 
 
@@ -156,13 +142,13 @@ Observing <code><a href="jwks.md#0x1_jwks_UnsupportedJWK">UnsupportedJWK</a></co
 
 <dl>
 <dt>
-<code>id: <a href="../../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u8&gt;</code>
+<code>id: vector&lt;u8&gt;</code>
 </dt>
 <dd>
 
 </dd>
 <dt>
-<code>payload: <a href="../../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u8&gt;</code>
+<code>payload: vector&lt;u8&gt;</code>
 </dt>
 <dd>
 
@@ -179,8 +165,7 @@ Observing <code><a href="jwks.md#0x1_jwks_UnsupportedJWK">UnsupportedJWK</a></co
 A JWK variant where <code>kty</code> is <code>RSA</code>.
 
 
-<pre><code><b>struct</b> <a href="jwks.md#0x1_jwks_RSA_JWK">RSA_JWK</a> <b>has</b> <b>copy</b>, drop, store
-</code></pre>
+<pre><code>struct RSA_JWK has copy, drop, store<br/></code></pre>
 
 
 
@@ -190,31 +175,31 @@ A JWK variant where <code>kty</code> is <code>RSA</code>.
 
 <dl>
 <dt>
-<code>kid: <a href="../../aptos-stdlib/../move-stdlib/doc/string.md#0x1_string_String">string::String</a></code>
+<code>kid: string::String</code>
 </dt>
 <dd>
 
 </dd>
 <dt>
-<code>kty: <a href="../../aptos-stdlib/../move-stdlib/doc/string.md#0x1_string_String">string::String</a></code>
+<code>kty: string::String</code>
 </dt>
 <dd>
 
 </dd>
 <dt>
-<code>alg: <a href="../../aptos-stdlib/../move-stdlib/doc/string.md#0x1_string_String">string::String</a></code>
+<code>alg: string::String</code>
 </dt>
 <dd>
 
 </dd>
 <dt>
-<code>e: <a href="../../aptos-stdlib/../move-stdlib/doc/string.md#0x1_string_String">string::String</a></code>
+<code>e: string::String</code>
 </dt>
 <dd>
 
 </dd>
 <dt>
-<code>n: <a href="../../aptos-stdlib/../move-stdlib/doc/string.md#0x1_string_String">string::String</a></code>
+<code>n: string::String</code>
 </dt>
 <dd>
 
@@ -231,8 +216,7 @@ A JWK variant where <code>kty</code> is <code>RSA</code>.
 A JSON web key.
 
 
-<pre><code><b>struct</b> <a href="jwks.md#0x1_jwks_JWK">JWK</a> <b>has</b> <b>copy</b>, drop, store
-</code></pre>
+<pre><code>struct JWK has copy, drop, store<br/></code></pre>
 
 
 
@@ -242,13 +226,13 @@ A JSON web key.
 
 <dl>
 <dt>
-<code>variant: <a href="../../aptos-stdlib/doc/copyable_any.md#0x1_copyable_any_Any">copyable_any::Any</a></code>
+<code>variant: copyable_any::Any</code>
 </dt>
 <dd>
- A <code><a href="jwks.md#0x1_jwks_JWK">JWK</a></code> variant packed as an <code>Any</code>.
+ A <code>JWK</code> variant packed as an <code>Any</code>.
  Currently the variant type is one of the following.
- - <code><a href="jwks.md#0x1_jwks_RSA_JWK">RSA_JWK</a></code>
- - <code><a href="jwks.md#0x1_jwks_UnsupportedJWK">UnsupportedJWK</a></code>
+ - <code>RSA_JWK</code>
+ - <code>UnsupportedJWK</code>
 </dd>
 </dl>
 
@@ -259,11 +243,10 @@ A JSON web key.
 
 ## Struct `ProviderJWKs`
 
-A provider and its <code><a href="jwks.md#0x1_jwks_JWK">JWK</a></code>s.
+A provider and its <code>JWK</code>s.
 
 
-<pre><code><b>struct</b> <a href="jwks.md#0x1_jwks_ProviderJWKs">ProviderJWKs</a> <b>has</b> <b>copy</b>, drop, store
-</code></pre>
+<pre><code>struct ProviderJWKs has copy, drop, store<br/></code></pre>
 
 
 
@@ -273,13 +256,13 @@ A provider and its <code><a href="jwks.md#0x1_jwks_JWK">JWK</a></code>s.
 
 <dl>
 <dt>
-<code>issuer: <a href="../../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u8&gt;</code>
+<code>issuer: vector&lt;u8&gt;</code>
 </dt>
 <dd>
  The utf-8 encoding of the issuer string (e.g., "https://www.facebook.com").
 </dd>
 <dt>
-<code><a href="version.md#0x1_version">version</a>: u64</code>
+<code>version: u64</code>
 </dt>
 <dd>
  A version number is needed by JWK consensus to dedup the updates.
@@ -288,10 +271,10 @@ A provider and its <code><a href="jwks.md#0x1_jwks_JWK">JWK</a></code>s.
  The Rust authenticator only uses the latest version.
 </dd>
 <dt>
-<code><a href="jwks.md#0x1_jwks">jwks</a>: <a href="../../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;<a href="jwks.md#0x1_jwks_JWK">jwks::JWK</a>&gt;</code>
+<code>jwks: vector&lt;jwks::JWK&gt;</code>
 </dt>
 <dd>
- Vector of <code><a href="jwks.md#0x1_jwks_JWK">JWK</a></code>'s sorted by their unique ID (from <code>get_jwk_id</code>) in dictionary order.
+ Vector of <code>JWK</code>'s sorted by their unique ID (from <code>get_jwk_id</code>) in dictionary order.
 </dd>
 </dl>
 
@@ -302,11 +285,10 @@ A provider and its <code><a href="jwks.md#0x1_jwks_JWK">JWK</a></code>s.
 
 ## Struct `AllProvidersJWKs`
 
-Multiple <code><a href="jwks.md#0x1_jwks_ProviderJWKs">ProviderJWKs</a></code> objects, indexed by issuer and key ID.
+Multiple <code>ProviderJWKs</code> objects, indexed by issuer and key ID.
 
 
-<pre><code><b>struct</b> <a href="jwks.md#0x1_jwks_AllProvidersJWKs">AllProvidersJWKs</a> <b>has</b> <b>copy</b>, drop, store
-</code></pre>
+<pre><code>struct AllProvidersJWKs has copy, drop, store<br/></code></pre>
 
 
 
@@ -316,10 +298,10 @@ Multiple <code><a href="jwks.md#0x1_jwks_ProviderJWKs">ProviderJWKs</a></code> o
 
 <dl>
 <dt>
-<code>entries: <a href="../../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;<a href="jwks.md#0x1_jwks_ProviderJWKs">jwks::ProviderJWKs</a>&gt;</code>
+<code>entries: vector&lt;jwks::ProviderJWKs&gt;</code>
 </dt>
 <dd>
- Vector of <code><a href="jwks.md#0x1_jwks_ProviderJWKs">ProviderJWKs</a></code> sorted by <code>ProviderJWKs::issuer</code> in dictionary order.
+ Vector of <code>ProviderJWKs</code> sorted by <code>ProviderJWKs::issuer</code> in dictionary order.
 </dd>
 </dl>
 
@@ -330,11 +312,10 @@ Multiple <code><a href="jwks.md#0x1_jwks_ProviderJWKs">ProviderJWKs</a></code> o
 
 ## Resource `ObservedJWKs`
 
-The <code><a href="jwks.md#0x1_jwks_AllProvidersJWKs">AllProvidersJWKs</a></code> that validators observed and agreed on.
+The <code>AllProvidersJWKs</code> that validators observed and agreed on.
 
 
-<pre><code><b>struct</b> <a href="jwks.md#0x1_jwks_ObservedJWKs">ObservedJWKs</a> <b>has</b> <b>copy</b>, drop, store, key
-</code></pre>
+<pre><code>struct ObservedJWKs has copy, drop, store, key<br/></code></pre>
 
 
 
@@ -344,7 +325,7 @@ The <code><a href="jwks.md#0x1_jwks_AllProvidersJWKs">AllProvidersJWKs</a></code
 
 <dl>
 <dt>
-<code><a href="jwks.md#0x1_jwks">jwks</a>: <a href="jwks.md#0x1_jwks_AllProvidersJWKs">jwks::AllProvidersJWKs</a></code>
+<code>jwks: jwks::AllProvidersJWKs</code>
 </dt>
 <dd>
 
@@ -358,12 +339,10 @@ The <code><a href="jwks.md#0x1_jwks_AllProvidersJWKs">AllProvidersJWKs</a></code
 
 ## Struct `ObservedJWKsUpdated`
 
-When <code><a href="jwks.md#0x1_jwks_ObservedJWKs">ObservedJWKs</a></code> is updated, this event is sent to resync the JWK consensus state in all validators.
+When <code>ObservedJWKs</code> is updated, this event is sent to resync the JWK consensus state in all validators.
 
 
-<pre><code>#[<a href="event.md#0x1_event">event</a>]
-<b>struct</b> <a href="jwks.md#0x1_jwks_ObservedJWKsUpdated">ObservedJWKsUpdated</a> <b>has</b> drop, store
-</code></pre>
+<pre><code>&#35;[event]<br/>struct ObservedJWKsUpdated has drop, store<br/></code></pre>
 
 
 
@@ -379,7 +358,7 @@ When <code><a href="jwks.md#0x1_jwks_ObservedJWKs">ObservedJWKs</a></code> is up
 
 </dd>
 <dt>
-<code><a href="jwks.md#0x1_jwks">jwks</a>: <a href="jwks.md#0x1_jwks_AllProvidersJWKs">jwks::AllProvidersJWKs</a></code>
+<code>jwks: jwks::AllProvidersJWKs</code>
 </dt>
 <dd>
 
@@ -393,11 +372,10 @@ When <code><a href="jwks.md#0x1_jwks_ObservedJWKs">ObservedJWKs</a></code> is up
 
 ## Struct `Patch`
 
-A small edit or patch that is applied to a <code><a href="jwks.md#0x1_jwks_AllProvidersJWKs">AllProvidersJWKs</a></code> to obtain <code><a href="jwks.md#0x1_jwks_PatchedJWKs">PatchedJWKs</a></code>.
+A small edit or patch that is applied to a <code>AllProvidersJWKs</code> to obtain <code>PatchedJWKs</code>.
 
 
-<pre><code><b>struct</b> <a href="jwks.md#0x1_jwks_Patch">Patch</a> <b>has</b> <b>copy</b>, drop, store
-</code></pre>
+<pre><code>struct Patch has copy, drop, store<br/></code></pre>
 
 
 
@@ -407,15 +385,15 @@ A small edit or patch that is applied to a <code><a href="jwks.md#0x1_jwks_AllPr
 
 <dl>
 <dt>
-<code>variant: <a href="../../aptos-stdlib/doc/copyable_any.md#0x1_copyable_any_Any">copyable_any::Any</a></code>
+<code>variant: copyable_any::Any</code>
 </dt>
 <dd>
- A <code><a href="jwks.md#0x1_jwks_Patch">Patch</a></code> variant packed as an <code>Any</code>.
+ A <code>Patch</code> variant packed as an <code>Any</code>.
  Currently the variant type is one of the following.
- - <code><a href="jwks.md#0x1_jwks_PatchRemoveAll">PatchRemoveAll</a></code>
- - <code><a href="jwks.md#0x1_jwks_PatchRemoveIssuer">PatchRemoveIssuer</a></code>
- - <code><a href="jwks.md#0x1_jwks_PatchRemoveJWK">PatchRemoveJWK</a></code>
- - <code><a href="jwks.md#0x1_jwks_PatchUpsertJWK">PatchUpsertJWK</a></code>
+ - <code>PatchRemoveAll</code>
+ - <code>PatchRemoveIssuer</code>
+ - <code>PatchRemoveJWK</code>
+ - <code>PatchUpsertJWK</code>
 </dd>
 </dl>
 
@@ -426,11 +404,10 @@ A small edit or patch that is applied to a <code><a href="jwks.md#0x1_jwks_AllPr
 
 ## Struct `PatchRemoveAll`
 
-A <code><a href="jwks.md#0x1_jwks_Patch">Patch</a></code> variant to remove all JWKs.
+A <code>Patch</code> variant to remove all JWKs.
 
 
-<pre><code><b>struct</b> <a href="jwks.md#0x1_jwks_PatchRemoveAll">PatchRemoveAll</a> <b>has</b> <b>copy</b>, drop, store
-</code></pre>
+<pre><code>struct PatchRemoveAll has copy, drop, store<br/></code></pre>
 
 
 
@@ -454,11 +431,10 @@ A <code><a href="jwks.md#0x1_jwks_Patch">Patch</a></code> variant to remove all 
 
 ## Struct `PatchRemoveIssuer`
 
-A <code><a href="jwks.md#0x1_jwks_Patch">Patch</a></code> variant to remove an issuer and all its JWKs.
+A <code>Patch</code> variant to remove an issuer and all its JWKs.
 
 
-<pre><code><b>struct</b> <a href="jwks.md#0x1_jwks_PatchRemoveIssuer">PatchRemoveIssuer</a> <b>has</b> <b>copy</b>, drop, store
-</code></pre>
+<pre><code>struct PatchRemoveIssuer has copy, drop, store<br/></code></pre>
 
 
 
@@ -468,7 +444,7 @@ A <code><a href="jwks.md#0x1_jwks_Patch">Patch</a></code> variant to remove an i
 
 <dl>
 <dt>
-<code>issuer: <a href="../../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u8&gt;</code>
+<code>issuer: vector&lt;u8&gt;</code>
 </dt>
 <dd>
 
@@ -482,11 +458,10 @@ A <code><a href="jwks.md#0x1_jwks_Patch">Patch</a></code> variant to remove an i
 
 ## Struct `PatchRemoveJWK`
 
-A <code><a href="jwks.md#0x1_jwks_Patch">Patch</a></code> variant to remove a specific JWK of an issuer.
+A <code>Patch</code> variant to remove a specific JWK of an issuer.
 
 
-<pre><code><b>struct</b> <a href="jwks.md#0x1_jwks_PatchRemoveJWK">PatchRemoveJWK</a> <b>has</b> <b>copy</b>, drop, store
-</code></pre>
+<pre><code>struct PatchRemoveJWK has copy, drop, store<br/></code></pre>
 
 
 
@@ -496,13 +471,13 @@ A <code><a href="jwks.md#0x1_jwks_Patch">Patch</a></code> variant to remove a sp
 
 <dl>
 <dt>
-<code>issuer: <a href="../../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u8&gt;</code>
+<code>issuer: vector&lt;u8&gt;</code>
 </dt>
 <dd>
 
 </dd>
 <dt>
-<code>jwk_id: <a href="../../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u8&gt;</code>
+<code>jwk_id: vector&lt;u8&gt;</code>
 </dt>
 <dd>
 
@@ -516,11 +491,10 @@ A <code><a href="jwks.md#0x1_jwks_Patch">Patch</a></code> variant to remove a sp
 
 ## Struct `PatchUpsertJWK`
 
-A <code><a href="jwks.md#0x1_jwks_Patch">Patch</a></code> variant to upsert a JWK for an issuer.
+A <code>Patch</code> variant to upsert a JWK for an issuer.
 
 
-<pre><code><b>struct</b> <a href="jwks.md#0x1_jwks_PatchUpsertJWK">PatchUpsertJWK</a> <b>has</b> <b>copy</b>, drop, store
-</code></pre>
+<pre><code>struct PatchUpsertJWK has copy, drop, store<br/></code></pre>
 
 
 
@@ -530,13 +504,13 @@ A <code><a href="jwks.md#0x1_jwks_Patch">Patch</a></code> variant to upsert a JW
 
 <dl>
 <dt>
-<code>issuer: <a href="../../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u8&gt;</code>
+<code>issuer: vector&lt;u8&gt;</code>
 </dt>
 <dd>
 
 </dd>
 <dt>
-<code>jwk: <a href="jwks.md#0x1_jwks_JWK">jwks::JWK</a></code>
+<code>jwk: jwks::JWK</code>
 </dt>
 <dd>
 
@@ -550,13 +524,12 @@ A <code><a href="jwks.md#0x1_jwks_Patch">Patch</a></code> variant to upsert a JW
 
 ## Resource `Patches`
 
-A sequence of <code><a href="jwks.md#0x1_jwks_Patch">Patch</a></code> objects that are applied *one by one* to the <code><a href="jwks.md#0x1_jwks_ObservedJWKs">ObservedJWKs</a></code>.
+A sequence of <code>Patch</code> objects that are applied *one by one* to the <code>ObservedJWKs</code>.
 
 Maintained by governance proposals.
 
 
-<pre><code><b>struct</b> <a href="jwks.md#0x1_jwks_Patches">Patches</a> <b>has</b> key
-</code></pre>
+<pre><code>struct Patches has key<br/></code></pre>
 
 
 
@@ -566,7 +539,7 @@ Maintained by governance proposals.
 
 <dl>
 <dt>
-<code>patches: <a href="../../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;<a href="jwks.md#0x1_jwks_Patch">jwks::Patch</a>&gt;</code>
+<code>patches: vector&lt;jwks::Patch&gt;</code>
 </dt>
 <dd>
 
@@ -580,12 +553,11 @@ Maintained by governance proposals.
 
 ## Resource `PatchedJWKs`
 
-The result of applying the <code><a href="jwks.md#0x1_jwks_Patches">Patches</a></code> to the <code><a href="jwks.md#0x1_jwks_ObservedJWKs">ObservedJWKs</a></code>.
+The result of applying the <code>Patches</code> to the <code>ObservedJWKs</code>.
 This is what applications should consume.
 
 
-<pre><code><b>struct</b> <a href="jwks.md#0x1_jwks_PatchedJWKs">PatchedJWKs</a> <b>has</b> drop, key
-</code></pre>
+<pre><code>struct PatchedJWKs has drop, key<br/></code></pre>
 
 
 
@@ -595,7 +567,7 @@ This is what applications should consume.
 
 <dl>
 <dt>
-<code><a href="jwks.md#0x1_jwks">jwks</a>: <a href="jwks.md#0x1_jwks_AllProvidersJWKs">jwks::AllProvidersJWKs</a></code>
+<code>jwks: jwks::AllProvidersJWKs</code>
 </dt>
 <dd>
 
@@ -614,8 +586,7 @@ This is what applications should consume.
 
 
 
-<pre><code><b>const</b> <a href="jwks.md#0x1_jwks_EISSUER_NOT_FOUND">EISSUER_NOT_FOUND</a>: u64 = 5;
-</code></pre>
+<pre><code>const EISSUER_NOT_FOUND: u64 &#61; 5;<br/></code></pre>
 
 
 
@@ -623,8 +594,7 @@ This is what applications should consume.
 
 
 
-<pre><code><b>const</b> <a href="jwks.md#0x1_jwks_EJWK_ID_NOT_FOUND">EJWK_ID_NOT_FOUND</a>: u64 = 6;
-</code></pre>
+<pre><code>const EJWK_ID_NOT_FOUND: u64 &#61; 6;<br/></code></pre>
 
 
 
@@ -632,8 +602,7 @@ This is what applications should consume.
 
 
 
-<pre><code><b>const</b> <a href="jwks.md#0x1_jwks_ENATIVE_INCORRECT_VERSION">ENATIVE_INCORRECT_VERSION</a>: u64 = 259;
-</code></pre>
+<pre><code>const ENATIVE_INCORRECT_VERSION: u64 &#61; 259;<br/></code></pre>
 
 
 
@@ -641,8 +610,7 @@ This is what applications should consume.
 
 
 
-<pre><code><b>const</b> <a href="jwks.md#0x1_jwks_ENATIVE_MISSING_RESOURCE_OBSERVED_JWKS">ENATIVE_MISSING_RESOURCE_OBSERVED_JWKS</a>: u64 = 258;
-</code></pre>
+<pre><code>const ENATIVE_MISSING_RESOURCE_OBSERVED_JWKS: u64 &#61; 258;<br/></code></pre>
 
 
 
@@ -650,8 +618,7 @@ This is what applications should consume.
 
 
 
-<pre><code><b>const</b> <a href="jwks.md#0x1_jwks_ENATIVE_MISSING_RESOURCE_VALIDATOR_SET">ENATIVE_MISSING_RESOURCE_VALIDATOR_SET</a>: u64 = 257;
-</code></pre>
+<pre><code>const ENATIVE_MISSING_RESOURCE_VALIDATOR_SET: u64 &#61; 257;<br/></code></pre>
 
 
 
@@ -659,8 +626,7 @@ This is what applications should consume.
 
 
 
-<pre><code><b>const</b> <a href="jwks.md#0x1_jwks_ENATIVE_MULTISIG_VERIFICATION_FAILED">ENATIVE_MULTISIG_VERIFICATION_FAILED</a>: u64 = 260;
-</code></pre>
+<pre><code>const ENATIVE_MULTISIG_VERIFICATION_FAILED: u64 &#61; 260;<br/></code></pre>
 
 
 
@@ -668,8 +634,7 @@ This is what applications should consume.
 
 
 
-<pre><code><b>const</b> <a href="jwks.md#0x1_jwks_ENATIVE_NOT_ENOUGH_VOTING_POWER">ENATIVE_NOT_ENOUGH_VOTING_POWER</a>: u64 = 261;
-</code></pre>
+<pre><code>const ENATIVE_NOT_ENOUGH_VOTING_POWER: u64 &#61; 261;<br/></code></pre>
 
 
 
@@ -677,8 +642,7 @@ This is what applications should consume.
 
 
 
-<pre><code><b>const</b> <a href="jwks.md#0x1_jwks_EUNEXPECTED_EPOCH">EUNEXPECTED_EPOCH</a>: u64 = 1;
-</code></pre>
+<pre><code>const EUNEXPECTED_EPOCH: u64 &#61; 1;<br/></code></pre>
 
 
 
@@ -686,8 +650,7 @@ This is what applications should consume.
 
 
 
-<pre><code><b>const</b> <a href="jwks.md#0x1_jwks_EUNEXPECTED_VERSION">EUNEXPECTED_VERSION</a>: u64 = 2;
-</code></pre>
+<pre><code>const EUNEXPECTED_VERSION: u64 &#61; 2;<br/></code></pre>
 
 
 
@@ -695,8 +658,7 @@ This is what applications should consume.
 
 
 
-<pre><code><b>const</b> <a href="jwks.md#0x1_jwks_EUNKNOWN_JWK_VARIANT">EUNKNOWN_JWK_VARIANT</a>: u64 = 4;
-</code></pre>
+<pre><code>const EUNKNOWN_JWK_VARIANT: u64 &#61; 4;<br/></code></pre>
 
 
 
@@ -704,8 +666,7 @@ This is what applications should consume.
 
 
 
-<pre><code><b>const</b> <a href="jwks.md#0x1_jwks_EUNKNOWN_PATCH_VARIANT">EUNKNOWN_PATCH_VARIANT</a>: u64 = 3;
-</code></pre>
+<pre><code>const EUNKNOWN_PATCH_VARIANT: u64 &#61; 3;<br/></code></pre>
 
 
 
@@ -713,13 +674,12 @@ This is what applications should consume.
 
 ## Function `get_patched_jwk`
 
-Get a JWK by issuer and key ID from the <code><a href="jwks.md#0x1_jwks_PatchedJWKs">PatchedJWKs</a></code>.
+Get a JWK by issuer and key ID from the <code>PatchedJWKs</code>.
 Abort if such a JWK does not exist.
 More convenient to call from Rust, since it does not wrap the JWK in an <code>Option</code>.
 
 
-<pre><code><b>public</b> <b>fun</b> <a href="jwks.md#0x1_jwks_get_patched_jwk">get_patched_jwk</a>(issuer: <a href="../../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u8&gt;, jwk_id: <a href="../../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u8&gt;): <a href="jwks.md#0x1_jwks_JWK">jwks::JWK</a>
-</code></pre>
+<pre><code>public fun get_patched_jwk(issuer: vector&lt;u8&gt;, jwk_id: vector&lt;u8&gt;): jwks::JWK<br/></code></pre>
 
 
 
@@ -727,10 +687,7 @@ More convenient to call from Rust, since it does not wrap the JWK in an <code>Op
 <summary>Implementation</summary>
 
 
-<pre><code><b>public</b> <b>fun</b> <a href="jwks.md#0x1_jwks_get_patched_jwk">get_patched_jwk</a>(issuer: <a href="../../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u8&gt;, jwk_id: <a href="../../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u8&gt;): <a href="jwks.md#0x1_jwks_JWK">JWK</a> <b>acquires</b> <a href="jwks.md#0x1_jwks_PatchedJWKs">PatchedJWKs</a> {
-    <a href="../../aptos-stdlib/../move-stdlib/doc/option.md#0x1_option_extract">option::extract</a>(&<b>mut</b> <a href="jwks.md#0x1_jwks_try_get_patched_jwk">try_get_patched_jwk</a>(issuer, jwk_id))
-}
-</code></pre>
+<pre><code>public fun get_patched_jwk(issuer: vector&lt;u8&gt;, jwk_id: vector&lt;u8&gt;): JWK acquires PatchedJWKs &#123;<br/>    option::extract(&amp;mut try_get_patched_jwk(issuer, jwk_id))<br/>&#125;<br/></code></pre>
 
 
 
@@ -740,12 +697,11 @@ More convenient to call from Rust, since it does not wrap the JWK in an <code>Op
 
 ## Function `try_get_patched_jwk`
 
-Get a JWK by issuer and key ID from the <code><a href="jwks.md#0x1_jwks_PatchedJWKs">PatchedJWKs</a></code>, if it exists.
+Get a JWK by issuer and key ID from the <code>PatchedJWKs</code>, if it exists.
 More convenient to call from Move, since it does not abort.
 
 
-<pre><code><b>public</b> <b>fun</b> <a href="jwks.md#0x1_jwks_try_get_patched_jwk">try_get_patched_jwk</a>(issuer: <a href="../../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u8&gt;, jwk_id: <a href="../../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u8&gt;): <a href="../../aptos-stdlib/../move-stdlib/doc/option.md#0x1_option_Option">option::Option</a>&lt;<a href="jwks.md#0x1_jwks_JWK">jwks::JWK</a>&gt;
-</code></pre>
+<pre><code>public fun try_get_patched_jwk(issuer: vector&lt;u8&gt;, jwk_id: vector&lt;u8&gt;): option::Option&lt;jwks::JWK&gt;<br/></code></pre>
 
 
 
@@ -753,11 +709,7 @@ More convenient to call from Move, since it does not abort.
 <summary>Implementation</summary>
 
 
-<pre><code><b>public</b> <b>fun</b> <a href="jwks.md#0x1_jwks_try_get_patched_jwk">try_get_patched_jwk</a>(issuer: <a href="../../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u8&gt;, jwk_id: <a href="../../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u8&gt;): Option&lt;<a href="jwks.md#0x1_jwks_JWK">JWK</a>&gt; <b>acquires</b> <a href="jwks.md#0x1_jwks_PatchedJWKs">PatchedJWKs</a> {
-    <b>let</b> <a href="jwks.md#0x1_jwks">jwks</a> = &<b>borrow_global</b>&lt;<a href="jwks.md#0x1_jwks_PatchedJWKs">PatchedJWKs</a>&gt;(@aptos_framework).<a href="jwks.md#0x1_jwks">jwks</a>;
-    <a href="jwks.md#0x1_jwks_try_get_jwk_by_issuer">try_get_jwk_by_issuer</a>(<a href="jwks.md#0x1_jwks">jwks</a>, issuer, jwk_id)
-}
-</code></pre>
+<pre><code>public fun try_get_patched_jwk(issuer: vector&lt;u8&gt;, jwk_id: vector&lt;u8&gt;): Option&lt;JWK&gt; acquires PatchedJWKs &#123;<br/>    let jwks &#61; &amp;borrow_global&lt;PatchedJWKs&gt;(@aptos_framework).jwks;<br/>    try_get_jwk_by_issuer(jwks, issuer, jwk_id)<br/>&#125;<br/></code></pre>
 
 
 
@@ -767,13 +719,12 @@ More convenient to call from Move, since it does not abort.
 
 ## Function `upsert_oidc_provider`
 
-Deprecated by <code><a href="jwks.md#0x1_jwks_upsert_oidc_provider_for_next_epoch">upsert_oidc_provider_for_next_epoch</a>()</code>.
+Deprecated by <code>upsert_oidc_provider_for_next_epoch()</code>.
 
 TODO: update all the tests that reference this function, then disable this function.
 
 
-<pre><code><b>public</b> <b>fun</b> <a href="jwks.md#0x1_jwks_upsert_oidc_provider">upsert_oidc_provider</a>(fx: &<a href="../../aptos-stdlib/../move-stdlib/doc/signer.md#0x1_signer">signer</a>, name: <a href="../../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u8&gt;, config_url: <a href="../../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u8&gt;): <a href="../../aptos-stdlib/../move-stdlib/doc/option.md#0x1_option_Option">option::Option</a>&lt;<a href="../../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u8&gt;&gt;
-</code></pre>
+<pre><code>public fun upsert_oidc_provider(fx: &amp;signer, name: vector&lt;u8&gt;, config_url: vector&lt;u8&gt;): option::Option&lt;vector&lt;u8&gt;&gt;<br/></code></pre>
 
 
 
@@ -781,17 +732,7 @@ TODO: update all the tests that reference this function, then disable this funct
 <summary>Implementation</summary>
 
 
-<pre><code><b>public</b> <b>fun</b> <a href="jwks.md#0x1_jwks_upsert_oidc_provider">upsert_oidc_provider</a>(fx: &<a href="../../aptos-stdlib/../move-stdlib/doc/signer.md#0x1_signer">signer</a>, name: <a href="../../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u8&gt;, config_url: <a href="../../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u8&gt;): Option&lt;<a href="../../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u8&gt;&gt; <b>acquires</b> <a href="jwks.md#0x1_jwks_SupportedOIDCProviders">SupportedOIDCProviders</a> {
-    <a href="system_addresses.md#0x1_system_addresses_assert_aptos_framework">system_addresses::assert_aptos_framework</a>(fx);
-    <a href="chain_status.md#0x1_chain_status_assert_genesis">chain_status::assert_genesis</a>();
-
-    <b>let</b> provider_set = <b>borrow_global_mut</b>&lt;<a href="jwks.md#0x1_jwks_SupportedOIDCProviders">SupportedOIDCProviders</a>&gt;(@aptos_framework);
-
-    <b>let</b> old_config_url= <a href="jwks.md#0x1_jwks_remove_oidc_provider_internal">remove_oidc_provider_internal</a>(provider_set, name);
-    <a href="../../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector_push_back">vector::push_back</a>(&<b>mut</b> provider_set.providers, <a href="jwks.md#0x1_jwks_OIDCProvider">OIDCProvider</a> { name, config_url });
-    old_config_url
-}
-</code></pre>
+<pre><code>public fun upsert_oidc_provider(fx: &amp;signer, name: vector&lt;u8&gt;, config_url: vector&lt;u8&gt;): Option&lt;vector&lt;u8&gt;&gt; acquires SupportedOIDCProviders &#123;<br/>    system_addresses::assert_aptos_framework(fx);<br/>    chain_status::assert_genesis();<br/><br/>    let provider_set &#61; borrow_global_mut&lt;SupportedOIDCProviders&gt;(@aptos_framework);<br/><br/>    let old_config_url&#61; remove_oidc_provider_internal(provider_set, name);<br/>    vector::push_back(&amp;mut provider_set.providers, OIDCProvider &#123; name, config_url &#125;);<br/>    old_config_url<br/>&#125;<br/></code></pre>
 
 
 
@@ -813,8 +754,7 @@ aptos_framework::aptos_governance::reconfigure(&framework_signer);
 ```
 
 
-<pre><code><b>public</b> <b>fun</b> <a href="jwks.md#0x1_jwks_upsert_oidc_provider_for_next_epoch">upsert_oidc_provider_for_next_epoch</a>(fx: &<a href="../../aptos-stdlib/../move-stdlib/doc/signer.md#0x1_signer">signer</a>, name: <a href="../../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u8&gt;, config_url: <a href="../../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u8&gt;): <a href="../../aptos-stdlib/../move-stdlib/doc/option.md#0x1_option_Option">option::Option</a>&lt;<a href="../../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u8&gt;&gt;
-</code></pre>
+<pre><code>public fun upsert_oidc_provider_for_next_epoch(fx: &amp;signer, name: vector&lt;u8&gt;, config_url: vector&lt;u8&gt;): option::Option&lt;vector&lt;u8&gt;&gt;<br/></code></pre>
 
 
 
@@ -822,21 +762,7 @@ aptos_framework::aptos_governance::reconfigure(&framework_signer);
 <summary>Implementation</summary>
 
 
-<pre><code><b>public</b> <b>fun</b> <a href="jwks.md#0x1_jwks_upsert_oidc_provider_for_next_epoch">upsert_oidc_provider_for_next_epoch</a>(fx: &<a href="../../aptos-stdlib/../move-stdlib/doc/signer.md#0x1_signer">signer</a>, name: <a href="../../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u8&gt;, config_url: <a href="../../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u8&gt;): Option&lt;<a href="../../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u8&gt;&gt; <b>acquires</b> <a href="jwks.md#0x1_jwks_SupportedOIDCProviders">SupportedOIDCProviders</a> {
-    <a href="system_addresses.md#0x1_system_addresses_assert_aptos_framework">system_addresses::assert_aptos_framework</a>(fx);
-
-    <b>let</b> provider_set = <b>if</b> (<a href="config_buffer.md#0x1_config_buffer_does_exist">config_buffer::does_exist</a>&lt;<a href="jwks.md#0x1_jwks_SupportedOIDCProviders">SupportedOIDCProviders</a>&gt;()) {
-        <a href="config_buffer.md#0x1_config_buffer_extract">config_buffer::extract</a>&lt;<a href="jwks.md#0x1_jwks_SupportedOIDCProviders">SupportedOIDCProviders</a>&gt;()
-    } <b>else</b> {
-        *<b>borrow_global_mut</b>&lt;<a href="jwks.md#0x1_jwks_SupportedOIDCProviders">SupportedOIDCProviders</a>&gt;(@aptos_framework)
-    };
-
-    <b>let</b> old_config_url = <a href="jwks.md#0x1_jwks_remove_oidc_provider_internal">remove_oidc_provider_internal</a>(&<b>mut</b> provider_set, name);
-    <a href="../../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector_push_back">vector::push_back</a>(&<b>mut</b> provider_set.providers, <a href="jwks.md#0x1_jwks_OIDCProvider">OIDCProvider</a> { name, config_url });
-    <a href="config_buffer.md#0x1_config_buffer_upsert">config_buffer::upsert</a>(provider_set);
-    old_config_url
-}
-</code></pre>
+<pre><code>public fun upsert_oidc_provider_for_next_epoch(fx: &amp;signer, name: vector&lt;u8&gt;, config_url: vector&lt;u8&gt;): Option&lt;vector&lt;u8&gt;&gt; acquires SupportedOIDCProviders &#123;<br/>    system_addresses::assert_aptos_framework(fx);<br/><br/>    let provider_set &#61; if (config_buffer::does_exist&lt;SupportedOIDCProviders&gt;()) &#123;<br/>        config_buffer::extract&lt;SupportedOIDCProviders&gt;()<br/>    &#125; else &#123;<br/>        &#42;borrow_global_mut&lt;SupportedOIDCProviders&gt;(@aptos_framework)<br/>    &#125;;<br/><br/>    let old_config_url &#61; remove_oidc_provider_internal(&amp;mut provider_set, name);<br/>    vector::push_back(&amp;mut provider_set.providers, OIDCProvider &#123; name, config_url &#125;);<br/>    config_buffer::upsert(provider_set);<br/>    old_config_url<br/>&#125;<br/></code></pre>
 
 
 
@@ -846,13 +772,12 @@ aptos_framework::aptos_governance::reconfigure(&framework_signer);
 
 ## Function `remove_oidc_provider`
 
-Deprecated by <code><a href="jwks.md#0x1_jwks_remove_oidc_provider_for_next_epoch">remove_oidc_provider_for_next_epoch</a>()</code>.
+Deprecated by <code>remove_oidc_provider_for_next_epoch()</code>.
 
 TODO: update all the tests that reference this function, then disable this function.
 
 
-<pre><code><b>public</b> <b>fun</b> <a href="jwks.md#0x1_jwks_remove_oidc_provider">remove_oidc_provider</a>(fx: &<a href="../../aptos-stdlib/../move-stdlib/doc/signer.md#0x1_signer">signer</a>, name: <a href="../../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u8&gt;): <a href="../../aptos-stdlib/../move-stdlib/doc/option.md#0x1_option_Option">option::Option</a>&lt;<a href="../../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u8&gt;&gt;
-</code></pre>
+<pre><code>public fun remove_oidc_provider(fx: &amp;signer, name: vector&lt;u8&gt;): option::Option&lt;vector&lt;u8&gt;&gt;<br/></code></pre>
 
 
 
@@ -860,14 +785,7 @@ TODO: update all the tests that reference this function, then disable this funct
 <summary>Implementation</summary>
 
 
-<pre><code><b>public</b> <b>fun</b> <a href="jwks.md#0x1_jwks_remove_oidc_provider">remove_oidc_provider</a>(fx: &<a href="../../aptos-stdlib/../move-stdlib/doc/signer.md#0x1_signer">signer</a>, name: <a href="../../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u8&gt;): Option&lt;<a href="../../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u8&gt;&gt; <b>acquires</b> <a href="jwks.md#0x1_jwks_SupportedOIDCProviders">SupportedOIDCProviders</a> {
-    <a href="system_addresses.md#0x1_system_addresses_assert_aptos_framework">system_addresses::assert_aptos_framework</a>(fx);
-    <a href="chain_status.md#0x1_chain_status_assert_genesis">chain_status::assert_genesis</a>();
-
-    <b>let</b> provider_set = <b>borrow_global_mut</b>&lt;<a href="jwks.md#0x1_jwks_SupportedOIDCProviders">SupportedOIDCProviders</a>&gt;(@aptos_framework);
-    <a href="jwks.md#0x1_jwks_remove_oidc_provider_internal">remove_oidc_provider_internal</a>(provider_set, name)
-}
-</code></pre>
+<pre><code>public fun remove_oidc_provider(fx: &amp;signer, name: vector&lt;u8&gt;): Option&lt;vector&lt;u8&gt;&gt; acquires SupportedOIDCProviders &#123;<br/>    system_addresses::assert_aptos_framework(fx);<br/>    chain_status::assert_genesis();<br/><br/>    let provider_set &#61; borrow_global_mut&lt;SupportedOIDCProviders&gt;(@aptos_framework);<br/>    remove_oidc_provider_internal(provider_set, name)<br/>&#125;<br/></code></pre>
 
 
 
@@ -888,8 +806,7 @@ aptos_framework::aptos_governance::reconfigure(&framework_signer);
 ```
 
 
-<pre><code><b>public</b> <b>fun</b> <a href="jwks.md#0x1_jwks_remove_oidc_provider_for_next_epoch">remove_oidc_provider_for_next_epoch</a>(fx: &<a href="../../aptos-stdlib/../move-stdlib/doc/signer.md#0x1_signer">signer</a>, name: <a href="../../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u8&gt;): <a href="../../aptos-stdlib/../move-stdlib/doc/option.md#0x1_option_Option">option::Option</a>&lt;<a href="../../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u8&gt;&gt;
-</code></pre>
+<pre><code>public fun remove_oidc_provider_for_next_epoch(fx: &amp;signer, name: vector&lt;u8&gt;): option::Option&lt;vector&lt;u8&gt;&gt;<br/></code></pre>
 
 
 
@@ -897,19 +814,7 @@ aptos_framework::aptos_governance::reconfigure(&framework_signer);
 <summary>Implementation</summary>
 
 
-<pre><code><b>public</b> <b>fun</b> <a href="jwks.md#0x1_jwks_remove_oidc_provider_for_next_epoch">remove_oidc_provider_for_next_epoch</a>(fx: &<a href="../../aptos-stdlib/../move-stdlib/doc/signer.md#0x1_signer">signer</a>, name: <a href="../../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u8&gt;): Option&lt;<a href="../../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u8&gt;&gt; <b>acquires</b> <a href="jwks.md#0x1_jwks_SupportedOIDCProviders">SupportedOIDCProviders</a> {
-    <a href="system_addresses.md#0x1_system_addresses_assert_aptos_framework">system_addresses::assert_aptos_framework</a>(fx);
-
-    <b>let</b> provider_set = <b>if</b> (<a href="config_buffer.md#0x1_config_buffer_does_exist">config_buffer::does_exist</a>&lt;<a href="jwks.md#0x1_jwks_SupportedOIDCProviders">SupportedOIDCProviders</a>&gt;()) {
-        <a href="config_buffer.md#0x1_config_buffer_extract">config_buffer::extract</a>&lt;<a href="jwks.md#0x1_jwks_SupportedOIDCProviders">SupportedOIDCProviders</a>&gt;()
-    } <b>else</b> {
-        *<b>borrow_global_mut</b>&lt;<a href="jwks.md#0x1_jwks_SupportedOIDCProviders">SupportedOIDCProviders</a>&gt;(@aptos_framework)
-    };
-    <b>let</b> ret = <a href="jwks.md#0x1_jwks_remove_oidc_provider_internal">remove_oidc_provider_internal</a>(&<b>mut</b> provider_set, name);
-    <a href="config_buffer.md#0x1_config_buffer_upsert">config_buffer::upsert</a>(provider_set);
-    ret
-}
-</code></pre>
+<pre><code>public fun remove_oidc_provider_for_next_epoch(fx: &amp;signer, name: vector&lt;u8&gt;): Option&lt;vector&lt;u8&gt;&gt; acquires SupportedOIDCProviders &#123;<br/>    system_addresses::assert_aptos_framework(fx);<br/><br/>    let provider_set &#61; if (config_buffer::does_exist&lt;SupportedOIDCProviders&gt;()) &#123;<br/>        config_buffer::extract&lt;SupportedOIDCProviders&gt;()<br/>    &#125; else &#123;<br/>        &#42;borrow_global_mut&lt;SupportedOIDCProviders&gt;(@aptos_framework)<br/>    &#125;;<br/>    let ret &#61; remove_oidc_provider_internal(&amp;mut provider_set, name);<br/>    config_buffer::upsert(provider_set);<br/>    ret<br/>&#125;<br/></code></pre>
 
 
 
@@ -919,11 +824,10 @@ aptos_framework::aptos_governance::reconfigure(&framework_signer);
 
 ## Function `on_new_epoch`
 
-Only used in reconfigurations to apply the pending <code><a href="jwks.md#0x1_jwks_SupportedOIDCProviders">SupportedOIDCProviders</a></code>, if there is any.
+Only used in reconfigurations to apply the pending <code>SupportedOIDCProviders</code>, if there is any.
 
 
-<pre><code><b>public</b>(<b>friend</b>) <b>fun</b> <a href="jwks.md#0x1_jwks_on_new_epoch">on_new_epoch</a>(framework: &<a href="../../aptos-stdlib/../move-stdlib/doc/signer.md#0x1_signer">signer</a>)
-</code></pre>
+<pre><code>public(friend) fun on_new_epoch(framework: &amp;signer)<br/></code></pre>
 
 
 
@@ -931,18 +835,7 @@ Only used in reconfigurations to apply the pending <code><a href="jwks.md#0x1_jw
 <summary>Implementation</summary>
 
 
-<pre><code><b>public</b>(<b>friend</b>) <b>fun</b> <a href="jwks.md#0x1_jwks_on_new_epoch">on_new_epoch</a>(framework: &<a href="../../aptos-stdlib/../move-stdlib/doc/signer.md#0x1_signer">signer</a>) <b>acquires</b> <a href="jwks.md#0x1_jwks_SupportedOIDCProviders">SupportedOIDCProviders</a> {
-    <a href="system_addresses.md#0x1_system_addresses_assert_aptos_framework">system_addresses::assert_aptos_framework</a>(framework);
-    <b>if</b> (<a href="config_buffer.md#0x1_config_buffer_does_exist">config_buffer::does_exist</a>&lt;<a href="jwks.md#0x1_jwks_SupportedOIDCProviders">SupportedOIDCProviders</a>&gt;()) {
-        <b>let</b> new_config = <a href="config_buffer.md#0x1_config_buffer_extract">config_buffer::extract</a>&lt;<a href="jwks.md#0x1_jwks_SupportedOIDCProviders">SupportedOIDCProviders</a>&gt;();
-        <b>if</b> (<b>exists</b>&lt;<a href="jwks.md#0x1_jwks_SupportedOIDCProviders">SupportedOIDCProviders</a>&gt;(@aptos_framework)) {
-            *<b>borrow_global_mut</b>&lt;<a href="jwks.md#0x1_jwks_SupportedOIDCProviders">SupportedOIDCProviders</a>&gt;(@aptos_framework) = new_config;
-        } <b>else</b> {
-            <b>move_to</b>(framework, new_config);
-        }
-    }
-}
-</code></pre>
+<pre><code>public(friend) fun on_new_epoch(framework: &amp;signer) acquires SupportedOIDCProviders &#123;<br/>    system_addresses::assert_aptos_framework(framework);<br/>    if (config_buffer::does_exist&lt;SupportedOIDCProviders&gt;()) &#123;<br/>        let new_config &#61; config_buffer::extract&lt;SupportedOIDCProviders&gt;();<br/>        if (exists&lt;SupportedOIDCProviders&gt;(@aptos_framework)) &#123;<br/>            &#42;borrow_global_mut&lt;SupportedOIDCProviders&gt;(@aptos_framework) &#61; new_config;<br/>        &#125; else &#123;<br/>            move_to(framework, new_config);<br/>        &#125;<br/>    &#125;<br/>&#125;<br/></code></pre>
 
 
 
@@ -952,11 +845,10 @@ Only used in reconfigurations to apply the pending <code><a href="jwks.md#0x1_jw
 
 ## Function `set_patches`
 
-Set the <code><a href="jwks.md#0x1_jwks_Patches">Patches</a></code>. Only called in governance proposals.
+Set the <code>Patches</code>. Only called in governance proposals.
 
 
-<pre><code><b>public</b> <b>fun</b> <a href="jwks.md#0x1_jwks_set_patches">set_patches</a>(fx: &<a href="../../aptos-stdlib/../move-stdlib/doc/signer.md#0x1_signer">signer</a>, patches: <a href="../../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;<a href="jwks.md#0x1_jwks_Patch">jwks::Patch</a>&gt;)
-</code></pre>
+<pre><code>public fun set_patches(fx: &amp;signer, patches: vector&lt;jwks::Patch&gt;)<br/></code></pre>
 
 
 
@@ -964,12 +856,7 @@ Set the <code><a href="jwks.md#0x1_jwks_Patches">Patches</a></code>. Only called
 <summary>Implementation</summary>
 
 
-<pre><code><b>public</b> <b>fun</b> <a href="jwks.md#0x1_jwks_set_patches">set_patches</a>(fx: &<a href="../../aptos-stdlib/../move-stdlib/doc/signer.md#0x1_signer">signer</a>, patches: <a href="../../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;<a href="jwks.md#0x1_jwks_Patch">Patch</a>&gt;) <b>acquires</b> <a href="jwks.md#0x1_jwks_Patches">Patches</a>, <a href="jwks.md#0x1_jwks_PatchedJWKs">PatchedJWKs</a>, <a href="jwks.md#0x1_jwks_ObservedJWKs">ObservedJWKs</a> {
-    <a href="system_addresses.md#0x1_system_addresses_assert_aptos_framework">system_addresses::assert_aptos_framework</a>(fx);
-    <b>borrow_global_mut</b>&lt;<a href="jwks.md#0x1_jwks_Patches">Patches</a>&gt;(@aptos_framework).patches = patches;
-    <a href="jwks.md#0x1_jwks_regenerate_patched_jwks">regenerate_patched_jwks</a>();
-}
-</code></pre>
+<pre><code>public fun set_patches(fx: &amp;signer, patches: vector&lt;Patch&gt;) acquires Patches, PatchedJWKs, ObservedJWKs &#123;<br/>    system_addresses::assert_aptos_framework(fx);<br/>    borrow_global_mut&lt;Patches&gt;(@aptos_framework).patches &#61; patches;<br/>    regenerate_patched_jwks();<br/>&#125;<br/></code></pre>
 
 
 
@@ -979,11 +866,10 @@ Set the <code><a href="jwks.md#0x1_jwks_Patches">Patches</a></code>. Only called
 
 ## Function `new_patch_remove_all`
 
-Create a <code><a href="jwks.md#0x1_jwks_Patch">Patch</a></code> that removes all entries.
+Create a <code>Patch</code> that removes all entries.
 
 
-<pre><code><b>public</b> <b>fun</b> <a href="jwks.md#0x1_jwks_new_patch_remove_all">new_patch_remove_all</a>(): <a href="jwks.md#0x1_jwks_Patch">jwks::Patch</a>
-</code></pre>
+<pre><code>public fun new_patch_remove_all(): jwks::Patch<br/></code></pre>
 
 
 
@@ -991,12 +877,7 @@ Create a <code><a href="jwks.md#0x1_jwks_Patch">Patch</a></code> that removes al
 <summary>Implementation</summary>
 
 
-<pre><code><b>public</b> <b>fun</b> <a href="jwks.md#0x1_jwks_new_patch_remove_all">new_patch_remove_all</a>(): <a href="jwks.md#0x1_jwks_Patch">Patch</a> {
-    <a href="jwks.md#0x1_jwks_Patch">Patch</a> {
-        variant: <a href="../../aptos-stdlib/doc/copyable_any.md#0x1_copyable_any_pack">copyable_any::pack</a>(<a href="jwks.md#0x1_jwks_PatchRemoveAll">PatchRemoveAll</a> {}),
-    }
-}
-</code></pre>
+<pre><code>public fun new_patch_remove_all(): Patch &#123;<br/>    Patch &#123;<br/>        variant: copyable_any::pack(PatchRemoveAll &#123;&#125;),<br/>    &#125;<br/>&#125;<br/></code></pre>
 
 
 
@@ -1006,11 +887,10 @@ Create a <code><a href="jwks.md#0x1_jwks_Patch">Patch</a></code> that removes al
 
 ## Function `new_patch_remove_issuer`
 
-Create a <code><a href="jwks.md#0x1_jwks_Patch">Patch</a></code> that removes the entry of a given issuer, if exists.
+Create a <code>Patch</code> that removes the entry of a given issuer, if exists.
 
 
-<pre><code><b>public</b> <b>fun</b> <a href="jwks.md#0x1_jwks_new_patch_remove_issuer">new_patch_remove_issuer</a>(issuer: <a href="../../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u8&gt;): <a href="jwks.md#0x1_jwks_Patch">jwks::Patch</a>
-</code></pre>
+<pre><code>public fun new_patch_remove_issuer(issuer: vector&lt;u8&gt;): jwks::Patch<br/></code></pre>
 
 
 
@@ -1018,12 +898,7 @@ Create a <code><a href="jwks.md#0x1_jwks_Patch">Patch</a></code> that removes th
 <summary>Implementation</summary>
 
 
-<pre><code><b>public</b> <b>fun</b> <a href="jwks.md#0x1_jwks_new_patch_remove_issuer">new_patch_remove_issuer</a>(issuer: <a href="../../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u8&gt;): <a href="jwks.md#0x1_jwks_Patch">Patch</a> {
-    <a href="jwks.md#0x1_jwks_Patch">Patch</a> {
-        variant: <a href="../../aptos-stdlib/doc/copyable_any.md#0x1_copyable_any_pack">copyable_any::pack</a>(<a href="jwks.md#0x1_jwks_PatchRemoveIssuer">PatchRemoveIssuer</a> { issuer }),
-    }
-}
-</code></pre>
+<pre><code>public fun new_patch_remove_issuer(issuer: vector&lt;u8&gt;): Patch &#123;<br/>    Patch &#123;<br/>        variant: copyable_any::pack(PatchRemoveIssuer &#123; issuer &#125;),<br/>    &#125;<br/>&#125;<br/></code></pre>
 
 
 
@@ -1033,11 +908,10 @@ Create a <code><a href="jwks.md#0x1_jwks_Patch">Patch</a></code> that removes th
 
 ## Function `new_patch_remove_jwk`
 
-Create a <code><a href="jwks.md#0x1_jwks_Patch">Patch</a></code> that removes the entry of a given issuer, if exists.
+Create a <code>Patch</code> that removes the entry of a given issuer, if exists.
 
 
-<pre><code><b>public</b> <b>fun</b> <a href="jwks.md#0x1_jwks_new_patch_remove_jwk">new_patch_remove_jwk</a>(issuer: <a href="../../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u8&gt;, jwk_id: <a href="../../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u8&gt;): <a href="jwks.md#0x1_jwks_Patch">jwks::Patch</a>
-</code></pre>
+<pre><code>public fun new_patch_remove_jwk(issuer: vector&lt;u8&gt;, jwk_id: vector&lt;u8&gt;): jwks::Patch<br/></code></pre>
 
 
 
@@ -1045,12 +919,7 @@ Create a <code><a href="jwks.md#0x1_jwks_Patch">Patch</a></code> that removes th
 <summary>Implementation</summary>
 
 
-<pre><code><b>public</b> <b>fun</b> <a href="jwks.md#0x1_jwks_new_patch_remove_jwk">new_patch_remove_jwk</a>(issuer: <a href="../../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u8&gt;, jwk_id: <a href="../../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u8&gt;): <a href="jwks.md#0x1_jwks_Patch">Patch</a> {
-    <a href="jwks.md#0x1_jwks_Patch">Patch</a> {
-        variant: <a href="../../aptos-stdlib/doc/copyable_any.md#0x1_copyable_any_pack">copyable_any::pack</a>(<a href="jwks.md#0x1_jwks_PatchRemoveJWK">PatchRemoveJWK</a> { issuer, jwk_id })
-    }
-}
-</code></pre>
+<pre><code>public fun new_patch_remove_jwk(issuer: vector&lt;u8&gt;, jwk_id: vector&lt;u8&gt;): Patch &#123;<br/>    Patch &#123;<br/>        variant: copyable_any::pack(PatchRemoveJWK &#123; issuer, jwk_id &#125;)<br/>    &#125;<br/>&#125;<br/></code></pre>
 
 
 
@@ -1060,11 +929,10 @@ Create a <code><a href="jwks.md#0x1_jwks_Patch">Patch</a></code> that removes th
 
 ## Function `new_patch_upsert_jwk`
 
-Create a <code><a href="jwks.md#0x1_jwks_Patch">Patch</a></code> that upserts a JWK into an issuer's JWK set.
+Create a <code>Patch</code> that upserts a JWK into an issuer's JWK set.
 
 
-<pre><code><b>public</b> <b>fun</b> <a href="jwks.md#0x1_jwks_new_patch_upsert_jwk">new_patch_upsert_jwk</a>(issuer: <a href="../../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u8&gt;, jwk: <a href="jwks.md#0x1_jwks_JWK">jwks::JWK</a>): <a href="jwks.md#0x1_jwks_Patch">jwks::Patch</a>
-</code></pre>
+<pre><code>public fun new_patch_upsert_jwk(issuer: vector&lt;u8&gt;, jwk: jwks::JWK): jwks::Patch<br/></code></pre>
 
 
 
@@ -1072,12 +940,7 @@ Create a <code><a href="jwks.md#0x1_jwks_Patch">Patch</a></code> that upserts a 
 <summary>Implementation</summary>
 
 
-<pre><code><b>public</b> <b>fun</b> <a href="jwks.md#0x1_jwks_new_patch_upsert_jwk">new_patch_upsert_jwk</a>(issuer: <a href="../../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u8&gt;, jwk: <a href="jwks.md#0x1_jwks_JWK">JWK</a>): <a href="jwks.md#0x1_jwks_Patch">Patch</a> {
-    <a href="jwks.md#0x1_jwks_Patch">Patch</a> {
-        variant: <a href="../../aptos-stdlib/doc/copyable_any.md#0x1_copyable_any_pack">copyable_any::pack</a>(<a href="jwks.md#0x1_jwks_PatchUpsertJWK">PatchUpsertJWK</a> { issuer, jwk })
-    }
-}
-</code></pre>
+<pre><code>public fun new_patch_upsert_jwk(issuer: vector&lt;u8&gt;, jwk: JWK): Patch &#123;<br/>    Patch &#123;<br/>        variant: copyable_any::pack(PatchUpsertJWK &#123; issuer, jwk &#125;)<br/>    &#125;<br/>&#125;<br/></code></pre>
 
 
 
@@ -1087,11 +950,10 @@ Create a <code><a href="jwks.md#0x1_jwks_Patch">Patch</a></code> that upserts a 
 
 ## Function `new_rsa_jwk`
 
-Create a <code><a href="jwks.md#0x1_jwks_JWK">JWK</a></code> of variant <code><a href="jwks.md#0x1_jwks_RSA_JWK">RSA_JWK</a></code>.
+Create a <code>JWK</code> of variant <code>RSA_JWK</code>.
 
 
-<pre><code><b>public</b> <b>fun</b> <a href="jwks.md#0x1_jwks_new_rsa_jwk">new_rsa_jwk</a>(kid: <a href="../../aptos-stdlib/../move-stdlib/doc/string.md#0x1_string_String">string::String</a>, alg: <a href="../../aptos-stdlib/../move-stdlib/doc/string.md#0x1_string_String">string::String</a>, e: <a href="../../aptos-stdlib/../move-stdlib/doc/string.md#0x1_string_String">string::String</a>, n: <a href="../../aptos-stdlib/../move-stdlib/doc/string.md#0x1_string_String">string::String</a>): <a href="jwks.md#0x1_jwks_JWK">jwks::JWK</a>
-</code></pre>
+<pre><code>public fun new_rsa_jwk(kid: string::String, alg: string::String, e: string::String, n: string::String): jwks::JWK<br/></code></pre>
 
 
 
@@ -1099,18 +961,7 @@ Create a <code><a href="jwks.md#0x1_jwks_JWK">JWK</a></code> of variant <code><a
 <summary>Implementation</summary>
 
 
-<pre><code><b>public</b> <b>fun</b> <a href="jwks.md#0x1_jwks_new_rsa_jwk">new_rsa_jwk</a>(kid: String, alg: String, e: String, n: String): <a href="jwks.md#0x1_jwks_JWK">JWK</a> {
-    <a href="jwks.md#0x1_jwks_JWK">JWK</a> {
-        variant: <a href="../../aptos-stdlib/doc/copyable_any.md#0x1_copyable_any_pack">copyable_any::pack</a>(<a href="jwks.md#0x1_jwks_RSA_JWK">RSA_JWK</a> {
-            kid,
-            kty: utf8(b"RSA"),
-            e,
-            n,
-            alg,
-        }),
-    }
-}
-</code></pre>
+<pre><code>public fun new_rsa_jwk(kid: String, alg: String, e: String, n: String): JWK &#123;<br/>    JWK &#123;<br/>        variant: copyable_any::pack(RSA_JWK &#123;<br/>            kid,<br/>            kty: utf8(b&quot;RSA&quot;),<br/>            e,<br/>            n,<br/>            alg,<br/>        &#125;),<br/>    &#125;<br/>&#125;<br/></code></pre>
 
 
 
@@ -1120,11 +971,10 @@ Create a <code><a href="jwks.md#0x1_jwks_JWK">JWK</a></code> of variant <code><a
 
 ## Function `new_unsupported_jwk`
 
-Create a <code><a href="jwks.md#0x1_jwks_JWK">JWK</a></code> of variant <code><a href="jwks.md#0x1_jwks_UnsupportedJWK">UnsupportedJWK</a></code>.
+Create a <code>JWK</code> of variant <code>UnsupportedJWK</code>.
 
 
-<pre><code><b>public</b> <b>fun</b> <a href="jwks.md#0x1_jwks_new_unsupported_jwk">new_unsupported_jwk</a>(id: <a href="../../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u8&gt;, payload: <a href="../../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u8&gt;): <a href="jwks.md#0x1_jwks_JWK">jwks::JWK</a>
-</code></pre>
+<pre><code>public fun new_unsupported_jwk(id: vector&lt;u8&gt;, payload: vector&lt;u8&gt;): jwks::JWK<br/></code></pre>
 
 
 
@@ -1132,12 +982,7 @@ Create a <code><a href="jwks.md#0x1_jwks_JWK">JWK</a></code> of variant <code><a
 <summary>Implementation</summary>
 
 
-<pre><code><b>public</b> <b>fun</b> <a href="jwks.md#0x1_jwks_new_unsupported_jwk">new_unsupported_jwk</a>(id: <a href="../../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u8&gt;, payload: <a href="../../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u8&gt;): <a href="jwks.md#0x1_jwks_JWK">JWK</a> {
-    <a href="jwks.md#0x1_jwks_JWK">JWK</a> {
-        variant: <a href="../../aptos-stdlib/doc/copyable_any.md#0x1_copyable_any_pack">copyable_any::pack</a>(<a href="jwks.md#0x1_jwks_UnsupportedJWK">UnsupportedJWK</a> { id, payload })
-    }
-}
-</code></pre>
+<pre><code>public fun new_unsupported_jwk(id: vector&lt;u8&gt;, payload: vector&lt;u8&gt;): JWK &#123;<br/>    JWK &#123;<br/>        variant: copyable_any::pack(UnsupportedJWK &#123; id, payload &#125;)<br/>    &#125;<br/>&#125;<br/></code></pre>
 
 
 
@@ -1150,8 +995,7 @@ Create a <code><a href="jwks.md#0x1_jwks_JWK">JWK</a></code> of variant <code><a
 Initialize some JWK resources. Should only be invoked by genesis.
 
 
-<pre><code><b>public</b> <b>fun</b> <a href="jwks.md#0x1_jwks_initialize">initialize</a>(fx: &<a href="../../aptos-stdlib/../move-stdlib/doc/signer.md#0x1_signer">signer</a>)
-</code></pre>
+<pre><code>public fun initialize(fx: &amp;signer)<br/></code></pre>
 
 
 
@@ -1159,14 +1003,7 @@ Initialize some JWK resources. Should only be invoked by genesis.
 <summary>Implementation</summary>
 
 
-<pre><code><b>public</b> <b>fun</b> <a href="jwks.md#0x1_jwks_initialize">initialize</a>(fx: &<a href="../../aptos-stdlib/../move-stdlib/doc/signer.md#0x1_signer">signer</a>) {
-    <a href="system_addresses.md#0x1_system_addresses_assert_aptos_framework">system_addresses::assert_aptos_framework</a>(fx);
-    <b>move_to</b>(fx, <a href="jwks.md#0x1_jwks_SupportedOIDCProviders">SupportedOIDCProviders</a> { providers: <a href="../../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector">vector</a>[] });
-    <b>move_to</b>(fx, <a href="jwks.md#0x1_jwks_ObservedJWKs">ObservedJWKs</a> { <a href="jwks.md#0x1_jwks">jwks</a>: <a href="jwks.md#0x1_jwks_AllProvidersJWKs">AllProvidersJWKs</a> { entries: <a href="../../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector">vector</a>[] } });
-    <b>move_to</b>(fx, <a href="jwks.md#0x1_jwks_Patches">Patches</a> { patches: <a href="../../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector">vector</a>[] });
-    <b>move_to</b>(fx, <a href="jwks.md#0x1_jwks_PatchedJWKs">PatchedJWKs</a> { <a href="jwks.md#0x1_jwks">jwks</a>: <a href="jwks.md#0x1_jwks_AllProvidersJWKs">AllProvidersJWKs</a> { entries: <a href="../../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector">vector</a>[] } });
-}
-</code></pre>
+<pre><code>public fun initialize(fx: &amp;signer) &#123;<br/>    system_addresses::assert_aptos_framework(fx);<br/>    move_to(fx, SupportedOIDCProviders &#123; providers: vector[] &#125;);<br/>    move_to(fx, ObservedJWKs &#123; jwks: AllProvidersJWKs &#123; entries: vector[] &#125; &#125;);<br/>    move_to(fx, Patches &#123; patches: vector[] &#125;);<br/>    move_to(fx, PatchedJWKs &#123; jwks: AllProvidersJWKs &#123; entries: vector[] &#125; &#125;);<br/>&#125;<br/></code></pre>
 
 
 
@@ -1176,12 +1013,11 @@ Initialize some JWK resources. Should only be invoked by genesis.
 
 ## Function `remove_oidc_provider_internal`
 
-Helper function that removes an OIDC provider from the <code><a href="jwks.md#0x1_jwks_SupportedOIDCProviders">SupportedOIDCProviders</a></code>.
+Helper function that removes an OIDC provider from the <code>SupportedOIDCProviders</code>.
 Returns the old config URL of the provider, if any, as an <code>Option</code>.
 
 
-<pre><code><b>fun</b> <a href="jwks.md#0x1_jwks_remove_oidc_provider_internal">remove_oidc_provider_internal</a>(provider_set: &<b>mut</b> <a href="jwks.md#0x1_jwks_SupportedOIDCProviders">jwks::SupportedOIDCProviders</a>, name: <a href="../../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u8&gt;): <a href="../../aptos-stdlib/../move-stdlib/doc/option.md#0x1_option_Option">option::Option</a>&lt;<a href="../../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u8&gt;&gt;
-</code></pre>
+<pre><code>fun remove_oidc_provider_internal(provider_set: &amp;mut jwks::SupportedOIDCProviders, name: vector&lt;u8&gt;): option::Option&lt;vector&lt;u8&gt;&gt;<br/></code></pre>
 
 
 
@@ -1189,20 +1025,7 @@ Returns the old config URL of the provider, if any, as an <code>Option</code>.
 <summary>Implementation</summary>
 
 
-<pre><code><b>fun</b> <a href="jwks.md#0x1_jwks_remove_oidc_provider_internal">remove_oidc_provider_internal</a>(provider_set: &<b>mut</b> <a href="jwks.md#0x1_jwks_SupportedOIDCProviders">SupportedOIDCProviders</a>, name: <a href="../../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u8&gt;): Option&lt;<a href="../../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u8&gt;&gt; {
-    <b>let</b> (name_exists, idx) = <a href="../../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector_find">vector::find</a>(&provider_set.providers, |obj| {
-        <b>let</b> provider: &<a href="jwks.md#0x1_jwks_OIDCProvider">OIDCProvider</a> = obj;
-        provider.name == name
-    });
-
-    <b>if</b> (name_exists) {
-        <b>let</b> old_provider = <a href="../../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector_swap_remove">vector::swap_remove</a>(&<b>mut</b> provider_set.providers, idx);
-        <a href="../../aptos-stdlib/../move-stdlib/doc/option.md#0x1_option_some">option::some</a>(old_provider.config_url)
-    } <b>else</b> {
-        <a href="../../aptos-stdlib/../move-stdlib/doc/option.md#0x1_option_none">option::none</a>()
-    }
-}
-</code></pre>
+<pre><code>fun remove_oidc_provider_internal(provider_set: &amp;mut SupportedOIDCProviders, name: vector&lt;u8&gt;): Option&lt;vector&lt;u8&gt;&gt; &#123;<br/>    let (name_exists, idx) &#61; vector::find(&amp;provider_set.providers, &#124;obj&#124; &#123;<br/>        let provider: &amp;OIDCProvider &#61; obj;<br/>        provider.name &#61;&#61; name<br/>    &#125;);<br/><br/>    if (name_exists) &#123;<br/>        let old_provider &#61; vector::swap_remove(&amp;mut provider_set.providers, idx);<br/>        option::some(old_provider.config_url)<br/>    &#125; else &#123;<br/>        option::none()<br/>    &#125;<br/>&#125;<br/></code></pre>
 
 
 
@@ -1215,11 +1038,10 @@ Returns the old config URL of the provider, if any, as an <code>Option</code>.
 Only used by validators to publish their observed JWK update.
 
 NOTE: It is assumed verification has been done to ensure each update is quorum-certified,
-and its <code><a href="version.md#0x1_version">version</a></code> equals to the on-chain version + 1.
+and its <code>version</code> equals to the on-chain version + 1.
 
 
-<pre><code><b>public</b> <b>fun</b> <a href="jwks.md#0x1_jwks_upsert_into_observed_jwks">upsert_into_observed_jwks</a>(fx: &<a href="../../aptos-stdlib/../move-stdlib/doc/signer.md#0x1_signer">signer</a>, provider_jwks_vec: <a href="../../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;<a href="jwks.md#0x1_jwks_ProviderJWKs">jwks::ProviderJWKs</a>&gt;)
-</code></pre>
+<pre><code>public fun upsert_into_observed_jwks(fx: &amp;signer, provider_jwks_vec: vector&lt;jwks::ProviderJWKs&gt;)<br/></code></pre>
 
 
 
@@ -1227,19 +1049,7 @@ and its <code><a href="version.md#0x1_version">version</a></code> equals to the 
 <summary>Implementation</summary>
 
 
-<pre><code><b>public</b> <b>fun</b> <a href="jwks.md#0x1_jwks_upsert_into_observed_jwks">upsert_into_observed_jwks</a>(fx: &<a href="../../aptos-stdlib/../move-stdlib/doc/signer.md#0x1_signer">signer</a>, provider_jwks_vec: <a href="../../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;<a href="jwks.md#0x1_jwks_ProviderJWKs">ProviderJWKs</a>&gt;) <b>acquires</b> <a href="jwks.md#0x1_jwks_ObservedJWKs">ObservedJWKs</a>, <a href="jwks.md#0x1_jwks_PatchedJWKs">PatchedJWKs</a>, <a href="jwks.md#0x1_jwks_Patches">Patches</a> {
-    <a href="system_addresses.md#0x1_system_addresses_assert_aptos_framework">system_addresses::assert_aptos_framework</a>(fx);
-    <b>let</b> observed_jwks = <b>borrow_global_mut</b>&lt;<a href="jwks.md#0x1_jwks_ObservedJWKs">ObservedJWKs</a>&gt;(@aptos_framework);
-    <a href="../../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector_for_each">vector::for_each</a>(provider_jwks_vec, |obj| {
-        <b>let</b> provider_jwks: <a href="jwks.md#0x1_jwks_ProviderJWKs">ProviderJWKs</a> = obj;
-        <a href="jwks.md#0x1_jwks_upsert_provider_jwks">upsert_provider_jwks</a>(&<b>mut</b> observed_jwks.<a href="jwks.md#0x1_jwks">jwks</a>, provider_jwks);
-    });
-
-    <b>let</b> epoch = <a href="reconfiguration.md#0x1_reconfiguration_current_epoch">reconfiguration::current_epoch</a>();
-    emit(<a href="jwks.md#0x1_jwks_ObservedJWKsUpdated">ObservedJWKsUpdated</a> { epoch, <a href="jwks.md#0x1_jwks">jwks</a>: observed_jwks.<a href="jwks.md#0x1_jwks">jwks</a> });
-    <a href="jwks.md#0x1_jwks_regenerate_patched_jwks">regenerate_patched_jwks</a>();
-}
-</code></pre>
+<pre><code>public fun upsert_into_observed_jwks(fx: &amp;signer, provider_jwks_vec: vector&lt;ProviderJWKs&gt;) acquires ObservedJWKs, PatchedJWKs, Patches &#123;<br/>    system_addresses::assert_aptos_framework(fx);<br/>    let observed_jwks &#61; borrow_global_mut&lt;ObservedJWKs&gt;(@aptos_framework);<br/>    vector::for_each(provider_jwks_vec, &#124;obj&#124; &#123;<br/>        let provider_jwks: ProviderJWKs &#61; obj;<br/>        upsert_provider_jwks(&amp;mut observed_jwks.jwks, provider_jwks);<br/>    &#125;);<br/><br/>    let epoch &#61; reconfiguration::current_epoch();<br/>    emit(ObservedJWKsUpdated &#123; epoch, jwks: observed_jwks.jwks &#125;);<br/>    regenerate_patched_jwks();<br/>&#125;<br/></code></pre>
 
 
 
@@ -1249,13 +1059,12 @@ and its <code><a href="version.md#0x1_version">version</a></code> equals to the 
 
 ## Function `remove_issuer_from_observed_jwks`
 
-Only used by governance to delete an issuer from <code><a href="jwks.md#0x1_jwks_ObservedJWKs">ObservedJWKs</a></code>, if it exists.
+Only used by governance to delete an issuer from <code>ObservedJWKs</code>, if it exists.
 
-Return the potentially existing <code><a href="jwks.md#0x1_jwks_ProviderJWKs">ProviderJWKs</a></code> of the given issuer.
+Return the potentially existing <code>ProviderJWKs</code> of the given issuer.
 
 
-<pre><code><b>public</b> <b>fun</b> <a href="jwks.md#0x1_jwks_remove_issuer_from_observed_jwks">remove_issuer_from_observed_jwks</a>(fx: &<a href="../../aptos-stdlib/../move-stdlib/doc/signer.md#0x1_signer">signer</a>, issuer: <a href="../../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u8&gt;): <a href="../../aptos-stdlib/../move-stdlib/doc/option.md#0x1_option_Option">option::Option</a>&lt;<a href="jwks.md#0x1_jwks_ProviderJWKs">jwks::ProviderJWKs</a>&gt;
-</code></pre>
+<pre><code>public fun remove_issuer_from_observed_jwks(fx: &amp;signer, issuer: vector&lt;u8&gt;): option::Option&lt;jwks::ProviderJWKs&gt;<br/></code></pre>
 
 
 
@@ -1263,18 +1072,7 @@ Return the potentially existing <code><a href="jwks.md#0x1_jwks_ProviderJWKs">Pr
 <summary>Implementation</summary>
 
 
-<pre><code><b>public</b> <b>fun</b> <a href="jwks.md#0x1_jwks_remove_issuer_from_observed_jwks">remove_issuer_from_observed_jwks</a>(fx: &<a href="../../aptos-stdlib/../move-stdlib/doc/signer.md#0x1_signer">signer</a>, issuer: <a href="../../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u8&gt;): Option&lt;<a href="jwks.md#0x1_jwks_ProviderJWKs">ProviderJWKs</a>&gt; <b>acquires</b> <a href="jwks.md#0x1_jwks_ObservedJWKs">ObservedJWKs</a>, <a href="jwks.md#0x1_jwks_PatchedJWKs">PatchedJWKs</a>, <a href="jwks.md#0x1_jwks_Patches">Patches</a> {
-    <a href="system_addresses.md#0x1_system_addresses_assert_aptos_framework">system_addresses::assert_aptos_framework</a>(fx);
-    <b>let</b> observed_jwks = <b>borrow_global_mut</b>&lt;<a href="jwks.md#0x1_jwks_ObservedJWKs">ObservedJWKs</a>&gt;(@aptos_framework);
-    <b>let</b> old_value = <a href="jwks.md#0x1_jwks_remove_issuer">remove_issuer</a>(&<b>mut</b> observed_jwks.<a href="jwks.md#0x1_jwks">jwks</a>, issuer);
-
-    <b>let</b> epoch = <a href="reconfiguration.md#0x1_reconfiguration_current_epoch">reconfiguration::current_epoch</a>();
-    emit(<a href="jwks.md#0x1_jwks_ObservedJWKsUpdated">ObservedJWKsUpdated</a> { epoch, <a href="jwks.md#0x1_jwks">jwks</a>: observed_jwks.<a href="jwks.md#0x1_jwks">jwks</a> });
-    <a href="jwks.md#0x1_jwks_regenerate_patched_jwks">regenerate_patched_jwks</a>();
-
-    old_value
-}
-</code></pre>
+<pre><code>public fun remove_issuer_from_observed_jwks(fx: &amp;signer, issuer: vector&lt;u8&gt;): Option&lt;ProviderJWKs&gt; acquires ObservedJWKs, PatchedJWKs, Patches &#123;<br/>    system_addresses::assert_aptos_framework(fx);<br/>    let observed_jwks &#61; borrow_global_mut&lt;ObservedJWKs&gt;(@aptos_framework);<br/>    let old_value &#61; remove_issuer(&amp;mut observed_jwks.jwks, issuer);<br/><br/>    let epoch &#61; reconfiguration::current_epoch();<br/>    emit(ObservedJWKsUpdated &#123; epoch, jwks: observed_jwks.jwks &#125;);<br/>    regenerate_patched_jwks();<br/><br/>    old_value<br/>&#125;<br/></code></pre>
 
 
 
@@ -1284,11 +1082,10 @@ Return the potentially existing <code><a href="jwks.md#0x1_jwks_ProviderJWKs">Pr
 
 ## Function `regenerate_patched_jwks`
 
-Regenerate <code><a href="jwks.md#0x1_jwks_PatchedJWKs">PatchedJWKs</a></code> from <code><a href="jwks.md#0x1_jwks_ObservedJWKs">ObservedJWKs</a></code> and <code><a href="jwks.md#0x1_jwks_Patches">Patches</a></code> and save the result.
+Regenerate <code>PatchedJWKs</code> from <code>ObservedJWKs</code> and <code>Patches</code> and save the result.
 
 
-<pre><code><b>fun</b> <a href="jwks.md#0x1_jwks_regenerate_patched_jwks">regenerate_patched_jwks</a>()
-</code></pre>
+<pre><code>fun regenerate_patched_jwks()<br/></code></pre>
 
 
 
@@ -1296,16 +1093,7 @@ Regenerate <code><a href="jwks.md#0x1_jwks_PatchedJWKs">PatchedJWKs</a></code> f
 <summary>Implementation</summary>
 
 
-<pre><code><b>fun</b> <a href="jwks.md#0x1_jwks_regenerate_patched_jwks">regenerate_patched_jwks</a>() <b>acquires</b> <a href="jwks.md#0x1_jwks_PatchedJWKs">PatchedJWKs</a>, <a href="jwks.md#0x1_jwks_Patches">Patches</a>, <a href="jwks.md#0x1_jwks_ObservedJWKs">ObservedJWKs</a> {
-    <b>let</b> <a href="jwks.md#0x1_jwks">jwks</a> = <b>borrow_global</b>&lt;<a href="jwks.md#0x1_jwks_ObservedJWKs">ObservedJWKs</a>&gt;(@aptos_framework).<a href="jwks.md#0x1_jwks">jwks</a>;
-    <b>let</b> patches = <b>borrow_global</b>&lt;<a href="jwks.md#0x1_jwks_Patches">Patches</a>&gt;(@aptos_framework);
-    <a href="../../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector_for_each_ref">vector::for_each_ref</a>(&patches.patches, |obj|{
-        <b>let</b> patch: &<a href="jwks.md#0x1_jwks_Patch">Patch</a> = obj;
-        <a href="jwks.md#0x1_jwks_apply_patch">apply_patch</a>(&<b>mut</b> <a href="jwks.md#0x1_jwks">jwks</a>, *patch);
-    });
-    *<b>borrow_global_mut</b>&lt;<a href="jwks.md#0x1_jwks_PatchedJWKs">PatchedJWKs</a>&gt;(@aptos_framework) = <a href="jwks.md#0x1_jwks_PatchedJWKs">PatchedJWKs</a> { <a href="jwks.md#0x1_jwks">jwks</a> };
-}
-</code></pre>
+<pre><code>fun regenerate_patched_jwks() acquires PatchedJWKs, Patches, ObservedJWKs &#123;<br/>    let jwks &#61; borrow_global&lt;ObservedJWKs&gt;(@aptos_framework).jwks;<br/>    let patches &#61; borrow_global&lt;Patches&gt;(@aptos_framework);<br/>    vector::for_each_ref(&amp;patches.patches, &#124;obj&#124;&#123;<br/>        let patch: &amp;Patch &#61; obj;<br/>        apply_patch(&amp;mut jwks, &#42;patch);<br/>    &#125;);<br/>    &#42;borrow_global_mut&lt;PatchedJWKs&gt;(@aptos_framework) &#61; PatchedJWKs &#123; jwks &#125;;<br/>&#125;<br/></code></pre>
 
 
 
@@ -1315,11 +1103,10 @@ Regenerate <code><a href="jwks.md#0x1_jwks_PatchedJWKs">PatchedJWKs</a></code> f
 
 ## Function `try_get_jwk_by_issuer`
 
-Get a JWK by issuer and key ID from a <code><a href="jwks.md#0x1_jwks_AllProvidersJWKs">AllProvidersJWKs</a></code>, if it exists.
+Get a JWK by issuer and key ID from a <code>AllProvidersJWKs</code>, if it exists.
 
 
-<pre><code><b>fun</b> <a href="jwks.md#0x1_jwks_try_get_jwk_by_issuer">try_get_jwk_by_issuer</a>(<a href="jwks.md#0x1_jwks">jwks</a>: &<a href="jwks.md#0x1_jwks_AllProvidersJWKs">jwks::AllProvidersJWKs</a>, issuer: <a href="../../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u8&gt;, jwk_id: <a href="../../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u8&gt;): <a href="../../aptos-stdlib/../move-stdlib/doc/option.md#0x1_option_Option">option::Option</a>&lt;<a href="jwks.md#0x1_jwks_JWK">jwks::JWK</a>&gt;
-</code></pre>
+<pre><code>fun try_get_jwk_by_issuer(jwks: &amp;jwks::AllProvidersJWKs, issuer: vector&lt;u8&gt;, jwk_id: vector&lt;u8&gt;): option::Option&lt;jwks::JWK&gt;<br/></code></pre>
 
 
 
@@ -1327,19 +1114,7 @@ Get a JWK by issuer and key ID from a <code><a href="jwks.md#0x1_jwks_AllProvide
 <summary>Implementation</summary>
 
 
-<pre><code><b>fun</b> <a href="jwks.md#0x1_jwks_try_get_jwk_by_issuer">try_get_jwk_by_issuer</a>(<a href="jwks.md#0x1_jwks">jwks</a>: &<a href="jwks.md#0x1_jwks_AllProvidersJWKs">AllProvidersJWKs</a>, issuer: <a href="../../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u8&gt;, jwk_id: <a href="../../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u8&gt;): Option&lt;<a href="jwks.md#0x1_jwks_JWK">JWK</a>&gt; {
-    <b>let</b> (issuer_found, index) = <a href="../../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector_find">vector::find</a>(&<a href="jwks.md#0x1_jwks">jwks</a>.entries, |obj| {
-        <b>let</b> provider_jwks: &<a href="jwks.md#0x1_jwks_ProviderJWKs">ProviderJWKs</a> = obj;
-        issuer == provider_jwks.issuer
-    });
-
-    <b>if</b> (issuer_found) {
-        <a href="jwks.md#0x1_jwks_try_get_jwk_by_id">try_get_jwk_by_id</a>(<a href="../../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector_borrow">vector::borrow</a>(&<a href="jwks.md#0x1_jwks">jwks</a>.entries, index), jwk_id)
-    } <b>else</b> {
-        <a href="../../aptos-stdlib/../move-stdlib/doc/option.md#0x1_option_none">option::none</a>()
-    }
-}
-</code></pre>
+<pre><code>fun try_get_jwk_by_issuer(jwks: &amp;AllProvidersJWKs, issuer: vector&lt;u8&gt;, jwk_id: vector&lt;u8&gt;): Option&lt;JWK&gt; &#123;<br/>    let (issuer_found, index) &#61; vector::find(&amp;jwks.entries, &#124;obj&#124; &#123;<br/>        let provider_jwks: &amp;ProviderJWKs &#61; obj;<br/>        issuer &#61;&#61; provider_jwks.issuer<br/>    &#125;);<br/><br/>    if (issuer_found) &#123;<br/>        try_get_jwk_by_id(vector::borrow(&amp;jwks.entries, index), jwk_id)<br/>    &#125; else &#123;<br/>        option::none()<br/>    &#125;<br/>&#125;<br/></code></pre>
 
 
 
@@ -1349,11 +1124,10 @@ Get a JWK by issuer and key ID from a <code><a href="jwks.md#0x1_jwks_AllProvide
 
 ## Function `try_get_jwk_by_id`
 
-Get a JWK by key ID from a <code><a href="jwks.md#0x1_jwks_ProviderJWKs">ProviderJWKs</a></code>, if it exists.
+Get a JWK by key ID from a <code>ProviderJWKs</code>, if it exists.
 
 
-<pre><code><b>fun</b> <a href="jwks.md#0x1_jwks_try_get_jwk_by_id">try_get_jwk_by_id</a>(provider_jwks: &<a href="jwks.md#0x1_jwks_ProviderJWKs">jwks::ProviderJWKs</a>, jwk_id: <a href="../../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u8&gt;): <a href="../../aptos-stdlib/../move-stdlib/doc/option.md#0x1_option_Option">option::Option</a>&lt;<a href="jwks.md#0x1_jwks_JWK">jwks::JWK</a>&gt;
-</code></pre>
+<pre><code>fun try_get_jwk_by_id(provider_jwks: &amp;jwks::ProviderJWKs, jwk_id: vector&lt;u8&gt;): option::Option&lt;jwks::JWK&gt;<br/></code></pre>
 
 
 
@@ -1361,19 +1135,7 @@ Get a JWK by key ID from a <code><a href="jwks.md#0x1_jwks_ProviderJWKs">Provide
 <summary>Implementation</summary>
 
 
-<pre><code><b>fun</b> <a href="jwks.md#0x1_jwks_try_get_jwk_by_id">try_get_jwk_by_id</a>(provider_jwks: &<a href="jwks.md#0x1_jwks_ProviderJWKs">ProviderJWKs</a>, jwk_id: <a href="../../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u8&gt;): Option&lt;<a href="jwks.md#0x1_jwks_JWK">JWK</a>&gt; {
-    <b>let</b> (jwk_id_found, index) = <a href="../../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector_find">vector::find</a>(&provider_jwks.<a href="jwks.md#0x1_jwks">jwks</a>, |obj|{
-        <b>let</b> jwk: &<a href="jwks.md#0x1_jwks_JWK">JWK</a> = obj;
-        jwk_id == <a href="jwks.md#0x1_jwks_get_jwk_id">get_jwk_id</a>(jwk)
-    });
-
-    <b>if</b> (jwk_id_found) {
-        <a href="../../aptos-stdlib/../move-stdlib/doc/option.md#0x1_option_some">option::some</a>(*<a href="../../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector_borrow">vector::borrow</a>(&provider_jwks.<a href="jwks.md#0x1_jwks">jwks</a>, index))
-    } <b>else</b> {
-        <a href="../../aptos-stdlib/../move-stdlib/doc/option.md#0x1_option_none">option::none</a>()
-    }
-}
-</code></pre>
+<pre><code>fun try_get_jwk_by_id(provider_jwks: &amp;ProviderJWKs, jwk_id: vector&lt;u8&gt;): Option&lt;JWK&gt; &#123;<br/>    let (jwk_id_found, index) &#61; vector::find(&amp;provider_jwks.jwks, &#124;obj&#124;&#123;<br/>        let jwk: &amp;JWK &#61; obj;<br/>        jwk_id &#61;&#61; get_jwk_id(jwk)<br/>    &#125;);<br/><br/>    if (jwk_id_found) &#123;<br/>        option::some(&#42;vector::borrow(&amp;provider_jwks.jwks, index))<br/>    &#125; else &#123;<br/>        option::none()<br/>    &#125;<br/>&#125;<br/></code></pre>
 
 
 
@@ -1386,8 +1148,7 @@ Get a JWK by key ID from a <code><a href="jwks.md#0x1_jwks_ProviderJWKs">Provide
 Get the ID of a JWK.
 
 
-<pre><code><b>fun</b> <a href="jwks.md#0x1_jwks_get_jwk_id">get_jwk_id</a>(jwk: &<a href="jwks.md#0x1_jwks_JWK">jwks::JWK</a>): <a href="../../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u8&gt;
-</code></pre>
+<pre><code>fun get_jwk_id(jwk: &amp;jwks::JWK): vector&lt;u8&gt;<br/></code></pre>
 
 
 
@@ -1395,19 +1156,7 @@ Get the ID of a JWK.
 <summary>Implementation</summary>
 
 
-<pre><code><b>fun</b> <a href="jwks.md#0x1_jwks_get_jwk_id">get_jwk_id</a>(jwk: &<a href="jwks.md#0x1_jwks_JWK">JWK</a>): <a href="../../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u8&gt; {
-    <b>let</b> variant_type_name = *<a href="../../aptos-stdlib/../move-stdlib/doc/string.md#0x1_string_bytes">string::bytes</a>(<a href="../../aptos-stdlib/doc/copyable_any.md#0x1_copyable_any_type_name">copyable_any::type_name</a>(&jwk.variant));
-    <b>if</b> (variant_type_name == b"<a href="jwks.md#0x1_jwks_RSA_JWK">0x1::jwks::RSA_JWK</a>") {
-        <b>let</b> rsa = <a href="../../aptos-stdlib/doc/copyable_any.md#0x1_copyable_any_unpack">copyable_any::unpack</a>&lt;<a href="jwks.md#0x1_jwks_RSA_JWK">RSA_JWK</a>&gt;(jwk.variant);
-        *<a href="../../aptos-stdlib/../move-stdlib/doc/string.md#0x1_string_bytes">string::bytes</a>(&rsa.kid)
-    } <b>else</b> <b>if</b> (variant_type_name == b"<a href="jwks.md#0x1_jwks_UnsupportedJWK">0x1::jwks::UnsupportedJWK</a>") {
-        <b>let</b> unsupported = <a href="../../aptos-stdlib/doc/copyable_any.md#0x1_copyable_any_unpack">copyable_any::unpack</a>&lt;<a href="jwks.md#0x1_jwks_UnsupportedJWK">UnsupportedJWK</a>&gt;(jwk.variant);
-        unsupported.id
-    } <b>else</b> {
-        <b>abort</b>(<a href="../../aptos-stdlib/../move-stdlib/doc/error.md#0x1_error_invalid_argument">error::invalid_argument</a>(<a href="jwks.md#0x1_jwks_EUNKNOWN_JWK_VARIANT">EUNKNOWN_JWK_VARIANT</a>))
-    }
-}
-</code></pre>
+<pre><code>fun get_jwk_id(jwk: &amp;JWK): vector&lt;u8&gt; &#123;<br/>    let variant_type_name &#61; &#42;string::bytes(copyable_any::type_name(&amp;jwk.variant));<br/>    if (variant_type_name &#61;&#61; b&quot;0x1::jwks::RSA_JWK&quot;) &#123;<br/>        let rsa &#61; copyable_any::unpack&lt;RSA_JWK&gt;(jwk.variant);<br/>        &#42;string::bytes(&amp;rsa.kid)<br/>    &#125; else if (variant_type_name &#61;&#61; b&quot;0x1::jwks::UnsupportedJWK&quot;) &#123;<br/>        let unsupported &#61; copyable_any::unpack&lt;UnsupportedJWK&gt;(jwk.variant);<br/>        unsupported.id<br/>    &#125; else &#123;<br/>        abort(error::invalid_argument(EUNKNOWN_JWK_VARIANT))<br/>    &#125;<br/>&#125;<br/></code></pre>
 
 
 
@@ -1417,12 +1166,11 @@ Get the ID of a JWK.
 
 ## Function `upsert_provider_jwks`
 
-Upsert a <code><a href="jwks.md#0x1_jwks_ProviderJWKs">ProviderJWKs</a></code> into an <code><a href="jwks.md#0x1_jwks_AllProvidersJWKs">AllProvidersJWKs</a></code>. If this upsert replaced an existing entry, return it.
-Maintains the sorted-by-issuer invariant in <code><a href="jwks.md#0x1_jwks_AllProvidersJWKs">AllProvidersJWKs</a></code>.
+Upsert a <code>ProviderJWKs</code> into an <code>AllProvidersJWKs</code>. If this upsert replaced an existing entry, return it.
+Maintains the sorted-by-issuer invariant in <code>AllProvidersJWKs</code>.
 
 
-<pre><code><b>fun</b> <a href="jwks.md#0x1_jwks_upsert_provider_jwks">upsert_provider_jwks</a>(<a href="jwks.md#0x1_jwks">jwks</a>: &<b>mut</b> <a href="jwks.md#0x1_jwks_AllProvidersJWKs">jwks::AllProvidersJWKs</a>, provider_jwks: <a href="jwks.md#0x1_jwks_ProviderJWKs">jwks::ProviderJWKs</a>): <a href="../../aptos-stdlib/../move-stdlib/doc/option.md#0x1_option_Option">option::Option</a>&lt;<a href="jwks.md#0x1_jwks_ProviderJWKs">jwks::ProviderJWKs</a>&gt;
-</code></pre>
+<pre><code>fun upsert_provider_jwks(jwks: &amp;mut jwks::AllProvidersJWKs, provider_jwks: jwks::ProviderJWKs): option::Option&lt;jwks::ProviderJWKs&gt;<br/></code></pre>
 
 
 
@@ -1430,37 +1178,7 @@ Maintains the sorted-by-issuer invariant in <code><a href="jwks.md#0x1_jwks_AllP
 <summary>Implementation</summary>
 
 
-<pre><code><b>fun</b> <a href="jwks.md#0x1_jwks_upsert_provider_jwks">upsert_provider_jwks</a>(<a href="jwks.md#0x1_jwks">jwks</a>: &<b>mut</b> <a href="jwks.md#0x1_jwks_AllProvidersJWKs">AllProvidersJWKs</a>, provider_jwks: <a href="jwks.md#0x1_jwks_ProviderJWKs">ProviderJWKs</a>): Option&lt;<a href="jwks.md#0x1_jwks_ProviderJWKs">ProviderJWKs</a>&gt; {
-    // NOTE: Using a linear-time search here because we do not expect too many providers.
-    <b>let</b> found = <b>false</b>;
-    <b>let</b> index = 0;
-    <b>let</b> num_entries = <a href="../../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector_length">vector::length</a>(&<a href="jwks.md#0x1_jwks">jwks</a>.entries);
-    <b>while</b> (index &lt; num_entries) {
-        <b>let</b> cur_entry = <a href="../../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector_borrow">vector::borrow</a>(&<a href="jwks.md#0x1_jwks">jwks</a>.entries, index);
-        <b>let</b> comparison = compare_u8_vector(provider_jwks.issuer, cur_entry.issuer);
-        <b>if</b> (is_greater_than(&comparison)) {
-            index = index + 1;
-        } <b>else</b> {
-            found = is_equal(&comparison);
-            <b>break</b>
-        }
-    };
-
-    // Now <b>if</b> `found == <b>true</b>`, `index` points <b>to</b> the <a href="jwks.md#0x1_jwks_JWK">JWK</a> we want <b>to</b> <b>update</b>/remove; otherwise, `index` points <b>to</b>
-    // <b>where</b> we want <b>to</b> insert.
-    <b>let</b> ret = <b>if</b> (found) {
-        <b>let</b> entry = <a href="../../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector_borrow_mut">vector::borrow_mut</a>(&<b>mut</b> <a href="jwks.md#0x1_jwks">jwks</a>.entries, index);
-        <b>let</b> old_entry = <a href="../../aptos-stdlib/../move-stdlib/doc/option.md#0x1_option_some">option::some</a>(*entry);
-        *entry = provider_jwks;
-        old_entry
-    } <b>else</b> {
-        <a href="../../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector_insert">vector::insert</a>(&<b>mut</b> <a href="jwks.md#0x1_jwks">jwks</a>.entries, index, provider_jwks);
-        <a href="../../aptos-stdlib/../move-stdlib/doc/option.md#0x1_option_none">option::none</a>()
-    };
-
-    ret
-}
-</code></pre>
+<pre><code>fun upsert_provider_jwks(jwks: &amp;mut AllProvidersJWKs, provider_jwks: ProviderJWKs): Option&lt;ProviderJWKs&gt; &#123;<br/>    // NOTE: Using a linear&#45;time search here because we do not expect too many providers.<br/>    let found &#61; false;<br/>    let index &#61; 0;<br/>    let num_entries &#61; vector::length(&amp;jwks.entries);<br/>    while (index &lt; num_entries) &#123;<br/>        let cur_entry &#61; vector::borrow(&amp;jwks.entries, index);<br/>        let comparison &#61; compare_u8_vector(provider_jwks.issuer, cur_entry.issuer);<br/>        if (is_greater_than(&amp;comparison)) &#123;<br/>            index &#61; index &#43; 1;<br/>        &#125; else &#123;<br/>            found &#61; is_equal(&amp;comparison);<br/>            break<br/>        &#125;<br/>    &#125;;<br/><br/>    // Now if `found &#61;&#61; true`, `index` points to the JWK we want to update/remove; otherwise, `index` points to<br/>    // where we want to insert.<br/>    let ret &#61; if (found) &#123;<br/>        let entry &#61; vector::borrow_mut(&amp;mut jwks.entries, index);<br/>        let old_entry &#61; option::some(&#42;entry);<br/>        &#42;entry &#61; provider_jwks;<br/>        old_entry<br/>    &#125; else &#123;<br/>        vector::insert(&amp;mut jwks.entries, index, provider_jwks);<br/>        option::none()<br/>    &#125;;<br/><br/>    ret<br/>&#125;<br/></code></pre>
 
 
 
@@ -1470,12 +1188,11 @@ Maintains the sorted-by-issuer invariant in <code><a href="jwks.md#0x1_jwks_AllP
 
 ## Function `remove_issuer`
 
-Remove the entry of an issuer from a <code><a href="jwks.md#0x1_jwks_AllProvidersJWKs">AllProvidersJWKs</a></code> and return the entry, if exists.
-Maintains the sorted-by-issuer invariant in <code><a href="jwks.md#0x1_jwks_AllProvidersJWKs">AllProvidersJWKs</a></code>.
+Remove the entry of an issuer from a <code>AllProvidersJWKs</code> and return the entry, if exists.
+Maintains the sorted-by-issuer invariant in <code>AllProvidersJWKs</code>.
 
 
-<pre><code><b>fun</b> <a href="jwks.md#0x1_jwks_remove_issuer">remove_issuer</a>(<a href="jwks.md#0x1_jwks">jwks</a>: &<b>mut</b> <a href="jwks.md#0x1_jwks_AllProvidersJWKs">jwks::AllProvidersJWKs</a>, issuer: <a href="../../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u8&gt;): <a href="../../aptos-stdlib/../move-stdlib/doc/option.md#0x1_option_Option">option::Option</a>&lt;<a href="jwks.md#0x1_jwks_ProviderJWKs">jwks::ProviderJWKs</a>&gt;
-</code></pre>
+<pre><code>fun remove_issuer(jwks: &amp;mut jwks::AllProvidersJWKs, issuer: vector&lt;u8&gt;): option::Option&lt;jwks::ProviderJWKs&gt;<br/></code></pre>
 
 
 
@@ -1483,21 +1200,7 @@ Maintains the sorted-by-issuer invariant in <code><a href="jwks.md#0x1_jwks_AllP
 <summary>Implementation</summary>
 
 
-<pre><code><b>fun</b> <a href="jwks.md#0x1_jwks_remove_issuer">remove_issuer</a>(<a href="jwks.md#0x1_jwks">jwks</a>: &<b>mut</b> <a href="jwks.md#0x1_jwks_AllProvidersJWKs">AllProvidersJWKs</a>, issuer: <a href="../../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u8&gt;): Option&lt;<a href="jwks.md#0x1_jwks_ProviderJWKs">ProviderJWKs</a>&gt; {
-    <b>let</b> (found, index) = <a href="../../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector_find">vector::find</a>(&<a href="jwks.md#0x1_jwks">jwks</a>.entries, |obj| {
-        <b>let</b> provider_jwk_set: &<a href="jwks.md#0x1_jwks_ProviderJWKs">ProviderJWKs</a> = obj;
-        provider_jwk_set.issuer == issuer
-    });
-
-    <b>let</b> ret = <b>if</b> (found) {
-        <a href="../../aptos-stdlib/../move-stdlib/doc/option.md#0x1_option_some">option::some</a>(<a href="../../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector_remove">vector::remove</a>(&<b>mut</b> <a href="jwks.md#0x1_jwks">jwks</a>.entries, index))
-    } <b>else</b> {
-        <a href="../../aptos-stdlib/../move-stdlib/doc/option.md#0x1_option_none">option::none</a>()
-    };
-
-    ret
-}
-</code></pre>
+<pre><code>fun remove_issuer(jwks: &amp;mut AllProvidersJWKs, issuer: vector&lt;u8&gt;): Option&lt;ProviderJWKs&gt; &#123;<br/>    let (found, index) &#61; vector::find(&amp;jwks.entries, &#124;obj&#124; &#123;<br/>        let provider_jwk_set: &amp;ProviderJWKs &#61; obj;<br/>        provider_jwk_set.issuer &#61;&#61; issuer<br/>    &#125;);<br/><br/>    let ret &#61; if (found) &#123;<br/>        option::some(vector::remove(&amp;mut jwks.entries, index))<br/>    &#125; else &#123;<br/>        option::none()<br/>    &#125;;<br/><br/>    ret<br/>&#125;<br/></code></pre>
 
 
 
@@ -1507,11 +1210,10 @@ Maintains the sorted-by-issuer invariant in <code><a href="jwks.md#0x1_jwks_AllP
 
 ## Function `upsert_jwk`
 
-Upsert a <code><a href="jwks.md#0x1_jwks_JWK">JWK</a></code> into a <code><a href="jwks.md#0x1_jwks_ProviderJWKs">ProviderJWKs</a></code>. If this upsert replaced an existing entry, return it.
+Upsert a <code>JWK</code> into a <code>ProviderJWKs</code>. If this upsert replaced an existing entry, return it.
 
 
-<pre><code><b>fun</b> <a href="jwks.md#0x1_jwks_upsert_jwk">upsert_jwk</a>(set: &<b>mut</b> <a href="jwks.md#0x1_jwks_ProviderJWKs">jwks::ProviderJWKs</a>, jwk: <a href="jwks.md#0x1_jwks_JWK">jwks::JWK</a>): <a href="../../aptos-stdlib/../move-stdlib/doc/option.md#0x1_option_Option">option::Option</a>&lt;<a href="jwks.md#0x1_jwks_JWK">jwks::JWK</a>&gt;
-</code></pre>
+<pre><code>fun upsert_jwk(set: &amp;mut jwks::ProviderJWKs, jwk: jwks::JWK): option::Option&lt;jwks::JWK&gt;<br/></code></pre>
 
 
 
@@ -1519,36 +1221,7 @@ Upsert a <code><a href="jwks.md#0x1_jwks_JWK">JWK</a></code> into a <code><a hre
 <summary>Implementation</summary>
 
 
-<pre><code><b>fun</b> <a href="jwks.md#0x1_jwks_upsert_jwk">upsert_jwk</a>(set: &<b>mut</b> <a href="jwks.md#0x1_jwks_ProviderJWKs">ProviderJWKs</a>, jwk: <a href="jwks.md#0x1_jwks_JWK">JWK</a>): Option&lt;<a href="jwks.md#0x1_jwks_JWK">JWK</a>&gt; {
-    <b>let</b> found = <b>false</b>;
-    <b>let</b> index = 0;
-    <b>let</b> num_entries = <a href="../../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector_length">vector::length</a>(&set.<a href="jwks.md#0x1_jwks">jwks</a>);
-    <b>while</b> (index &lt; num_entries) {
-        <b>let</b> cur_entry = <a href="../../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector_borrow">vector::borrow</a>(&set.<a href="jwks.md#0x1_jwks">jwks</a>, index);
-        <b>let</b> comparison = compare_u8_vector(<a href="jwks.md#0x1_jwks_get_jwk_id">get_jwk_id</a>(&jwk), <a href="jwks.md#0x1_jwks_get_jwk_id">get_jwk_id</a>(cur_entry));
-        <b>if</b> (is_greater_than(&comparison)) {
-            index = index + 1;
-        } <b>else</b> {
-            found = is_equal(&comparison);
-            <b>break</b>
-        }
-    };
-
-    // Now <b>if</b> `found == <b>true</b>`, `index` points <b>to</b> the <a href="jwks.md#0x1_jwks_JWK">JWK</a> we want <b>to</b> <b>update</b>/remove; otherwise, `index` points <b>to</b>
-    // <b>where</b> we want <b>to</b> insert.
-    <b>let</b> ret = <b>if</b> (found) {
-        <b>let</b> entry = <a href="../../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector_borrow_mut">vector::borrow_mut</a>(&<b>mut</b> set.<a href="jwks.md#0x1_jwks">jwks</a>, index);
-        <b>let</b> old_entry = <a href="../../aptos-stdlib/../move-stdlib/doc/option.md#0x1_option_some">option::some</a>(*entry);
-        *entry = jwk;
-        old_entry
-    } <b>else</b> {
-        <a href="../../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector_insert">vector::insert</a>(&<b>mut</b> set.<a href="jwks.md#0x1_jwks">jwks</a>, index, jwk);
-        <a href="../../aptos-stdlib/../move-stdlib/doc/option.md#0x1_option_none">option::none</a>()
-    };
-
-    ret
-}
-</code></pre>
+<pre><code>fun upsert_jwk(set: &amp;mut ProviderJWKs, jwk: JWK): Option&lt;JWK&gt; &#123;<br/>    let found &#61; false;<br/>    let index &#61; 0;<br/>    let num_entries &#61; vector::length(&amp;set.jwks);<br/>    while (index &lt; num_entries) &#123;<br/>        let cur_entry &#61; vector::borrow(&amp;set.jwks, index);<br/>        let comparison &#61; compare_u8_vector(get_jwk_id(&amp;jwk), get_jwk_id(cur_entry));<br/>        if (is_greater_than(&amp;comparison)) &#123;<br/>            index &#61; index &#43; 1;<br/>        &#125; else &#123;<br/>            found &#61; is_equal(&amp;comparison);<br/>            break<br/>        &#125;<br/>    &#125;;<br/><br/>    // Now if `found &#61;&#61; true`, `index` points to the JWK we want to update/remove; otherwise, `index` points to<br/>    // where we want to insert.<br/>    let ret &#61; if (found) &#123;<br/>        let entry &#61; vector::borrow_mut(&amp;mut set.jwks, index);<br/>        let old_entry &#61; option::some(&#42;entry);<br/>        &#42;entry &#61; jwk;<br/>        old_entry<br/>    &#125; else &#123;<br/>        vector::insert(&amp;mut set.jwks, index, jwk);<br/>        option::none()<br/>    &#125;;<br/><br/>    ret<br/>&#125;<br/></code></pre>
 
 
 
@@ -1558,11 +1231,10 @@ Upsert a <code><a href="jwks.md#0x1_jwks_JWK">JWK</a></code> into a <code><a hre
 
 ## Function `remove_jwk`
 
-Remove the entry of a key ID from a <code><a href="jwks.md#0x1_jwks_ProviderJWKs">ProviderJWKs</a></code> and return the entry, if exists.
+Remove the entry of a key ID from a <code>ProviderJWKs</code> and return the entry, if exists.
 
 
-<pre><code><b>fun</b> <a href="jwks.md#0x1_jwks_remove_jwk">remove_jwk</a>(<a href="jwks.md#0x1_jwks">jwks</a>: &<b>mut</b> <a href="jwks.md#0x1_jwks_ProviderJWKs">jwks::ProviderJWKs</a>, jwk_id: <a href="../../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u8&gt;): <a href="../../aptos-stdlib/../move-stdlib/doc/option.md#0x1_option_Option">option::Option</a>&lt;<a href="jwks.md#0x1_jwks_JWK">jwks::JWK</a>&gt;
-</code></pre>
+<pre><code>fun remove_jwk(jwks: &amp;mut jwks::ProviderJWKs, jwk_id: vector&lt;u8&gt;): option::Option&lt;jwks::JWK&gt;<br/></code></pre>
 
 
 
@@ -1570,21 +1242,7 @@ Remove the entry of a key ID from a <code><a href="jwks.md#0x1_jwks_ProviderJWKs
 <summary>Implementation</summary>
 
 
-<pre><code><b>fun</b> <a href="jwks.md#0x1_jwks_remove_jwk">remove_jwk</a>(<a href="jwks.md#0x1_jwks">jwks</a>: &<b>mut</b> <a href="jwks.md#0x1_jwks_ProviderJWKs">ProviderJWKs</a>, jwk_id: <a href="../../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u8&gt;): Option&lt;<a href="jwks.md#0x1_jwks_JWK">JWK</a>&gt; {
-    <b>let</b> (found, index) = <a href="../../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector_find">vector::find</a>(&<a href="jwks.md#0x1_jwks">jwks</a>.<a href="jwks.md#0x1_jwks">jwks</a>, |obj| {
-        <b>let</b> jwk: &<a href="jwks.md#0x1_jwks_JWK">JWK</a> = obj;
-        jwk_id == <a href="jwks.md#0x1_jwks_get_jwk_id">get_jwk_id</a>(jwk)
-    });
-
-    <b>let</b> ret = <b>if</b> (found) {
-        <a href="../../aptos-stdlib/../move-stdlib/doc/option.md#0x1_option_some">option::some</a>(<a href="../../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector_remove">vector::remove</a>(&<b>mut</b> <a href="jwks.md#0x1_jwks">jwks</a>.<a href="jwks.md#0x1_jwks">jwks</a>, index))
-    } <b>else</b> {
-        <a href="../../aptos-stdlib/../move-stdlib/doc/option.md#0x1_option_none">option::none</a>()
-    };
-
-    ret
-}
-</code></pre>
+<pre><code>fun remove_jwk(jwks: &amp;mut ProviderJWKs, jwk_id: vector&lt;u8&gt;): Option&lt;JWK&gt; &#123;<br/>    let (found, index) &#61; vector::find(&amp;jwks.jwks, &#124;obj&#124; &#123;<br/>        let jwk: &amp;JWK &#61; obj;<br/>        jwk_id &#61;&#61; get_jwk_id(jwk)<br/>    &#125;);<br/><br/>    let ret &#61; if (found) &#123;<br/>        option::some(vector::remove(&amp;mut jwks.jwks, index))<br/>    &#125; else &#123;<br/>        option::none()<br/>    &#125;;<br/><br/>    ret<br/>&#125;<br/></code></pre>
 
 
 
@@ -1594,12 +1252,11 @@ Remove the entry of a key ID from a <code><a href="jwks.md#0x1_jwks_ProviderJWKs
 
 ## Function `apply_patch`
 
-Modify an <code><a href="jwks.md#0x1_jwks_AllProvidersJWKs">AllProvidersJWKs</a></code> object with a <code><a href="jwks.md#0x1_jwks_Patch">Patch</a></code>.
-Maintains the sorted-by-issuer invariant in <code><a href="jwks.md#0x1_jwks_AllProvidersJWKs">AllProvidersJWKs</a></code>.
+Modify an <code>AllProvidersJWKs</code> object with a <code>Patch</code>.
+Maintains the sorted-by-issuer invariant in <code>AllProvidersJWKs</code>.
 
 
-<pre><code><b>fun</b> <a href="jwks.md#0x1_jwks_apply_patch">apply_patch</a>(<a href="jwks.md#0x1_jwks">jwks</a>: &<b>mut</b> <a href="jwks.md#0x1_jwks_AllProvidersJWKs">jwks::AllProvidersJWKs</a>, patch: <a href="jwks.md#0x1_jwks_Patch">jwks::Patch</a>)
-</code></pre>
+<pre><code>fun apply_patch(jwks: &amp;mut jwks::AllProvidersJWKs, patch: jwks::Patch)<br/></code></pre>
 
 
 
@@ -1607,44 +1264,7 @@ Maintains the sorted-by-issuer invariant in <code><a href="jwks.md#0x1_jwks_AllP
 <summary>Implementation</summary>
 
 
-<pre><code><b>fun</b> <a href="jwks.md#0x1_jwks_apply_patch">apply_patch</a>(<a href="jwks.md#0x1_jwks">jwks</a>: &<b>mut</b> <a href="jwks.md#0x1_jwks_AllProvidersJWKs">AllProvidersJWKs</a>, patch: <a href="jwks.md#0x1_jwks_Patch">Patch</a>) {
-    <b>let</b> variant_type_name = *<a href="../../aptos-stdlib/../move-stdlib/doc/string.md#0x1_string_bytes">string::bytes</a>(<a href="../../aptos-stdlib/doc/copyable_any.md#0x1_copyable_any_type_name">copyable_any::type_name</a>(&patch.variant));
-    <b>if</b> (variant_type_name == b"<a href="jwks.md#0x1_jwks_PatchRemoveAll">0x1::jwks::PatchRemoveAll</a>") {
-        <a href="jwks.md#0x1_jwks">jwks</a>.entries = <a href="../../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector">vector</a>[];
-    } <b>else</b> <b>if</b> (variant_type_name == b"<a href="jwks.md#0x1_jwks_PatchRemoveIssuer">0x1::jwks::PatchRemoveIssuer</a>") {
-        <b>let</b> cmd = <a href="../../aptos-stdlib/doc/copyable_any.md#0x1_copyable_any_unpack">copyable_any::unpack</a>&lt;<a href="jwks.md#0x1_jwks_PatchRemoveIssuer">PatchRemoveIssuer</a>&gt;(patch.variant);
-        <a href="jwks.md#0x1_jwks_remove_issuer">remove_issuer</a>(<a href="jwks.md#0x1_jwks">jwks</a>, cmd.issuer);
-    } <b>else</b> <b>if</b> (variant_type_name == b"<a href="jwks.md#0x1_jwks_PatchRemoveJWK">0x1::jwks::PatchRemoveJWK</a>") {
-        <b>let</b> cmd = <a href="../../aptos-stdlib/doc/copyable_any.md#0x1_copyable_any_unpack">copyable_any::unpack</a>&lt;<a href="jwks.md#0x1_jwks_PatchRemoveJWK">PatchRemoveJWK</a>&gt;(patch.variant);
-        // TODO: This is inefficient: we remove the issuer, modify its JWKs & and reinsert the updated issuer. Why
-        // not just <b>update</b> it in place?
-        <b>let</b> existing_jwk_set = <a href="jwks.md#0x1_jwks_remove_issuer">remove_issuer</a>(<a href="jwks.md#0x1_jwks">jwks</a>, cmd.issuer);
-        <b>if</b> (<a href="../../aptos-stdlib/../move-stdlib/doc/option.md#0x1_option_is_some">option::is_some</a>(&existing_jwk_set)) {
-            <b>let</b> jwk_set = <a href="../../aptos-stdlib/../move-stdlib/doc/option.md#0x1_option_extract">option::extract</a>(&<b>mut</b> existing_jwk_set);
-            <a href="jwks.md#0x1_jwks_remove_jwk">remove_jwk</a>(&<b>mut</b> jwk_set, cmd.jwk_id);
-            <a href="jwks.md#0x1_jwks_upsert_provider_jwks">upsert_provider_jwks</a>(<a href="jwks.md#0x1_jwks">jwks</a>, jwk_set);
-        };
-    } <b>else</b> <b>if</b> (variant_type_name == b"<a href="jwks.md#0x1_jwks_PatchUpsertJWK">0x1::jwks::PatchUpsertJWK</a>") {
-        <b>let</b> cmd = <a href="../../aptos-stdlib/doc/copyable_any.md#0x1_copyable_any_unpack">copyable_any::unpack</a>&lt;<a href="jwks.md#0x1_jwks_PatchUpsertJWK">PatchUpsertJWK</a>&gt;(patch.variant);
-        // TODO: This is inefficient: we remove the issuer, modify its JWKs & and reinsert the updated issuer. Why
-        // not just <b>update</b> it in place?
-        <b>let</b> existing_jwk_set = <a href="jwks.md#0x1_jwks_remove_issuer">remove_issuer</a>(<a href="jwks.md#0x1_jwks">jwks</a>, cmd.issuer);
-        <b>let</b> jwk_set = <b>if</b> (<a href="../../aptos-stdlib/../move-stdlib/doc/option.md#0x1_option_is_some">option::is_some</a>(&existing_jwk_set)) {
-            <a href="../../aptos-stdlib/../move-stdlib/doc/option.md#0x1_option_extract">option::extract</a>(&<b>mut</b> existing_jwk_set)
-        } <b>else</b> {
-            <a href="jwks.md#0x1_jwks_ProviderJWKs">ProviderJWKs</a> {
-                <a href="version.md#0x1_version">version</a>: 0,
-                issuer: cmd.issuer,
-                <a href="jwks.md#0x1_jwks">jwks</a>: <a href="../../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector">vector</a>[],
-            }
-        };
-        <a href="jwks.md#0x1_jwks_upsert_jwk">upsert_jwk</a>(&<b>mut</b> jwk_set, cmd.jwk);
-        <a href="jwks.md#0x1_jwks_upsert_provider_jwks">upsert_provider_jwks</a>(<a href="jwks.md#0x1_jwks">jwks</a>, jwk_set);
-    } <b>else</b> {
-        <b>abort</b>(std::error::invalid_argument(<a href="jwks.md#0x1_jwks_EUNKNOWN_PATCH_VARIANT">EUNKNOWN_PATCH_VARIANT</a>))
-    }
-}
-</code></pre>
+<pre><code>fun apply_patch(jwks: &amp;mut AllProvidersJWKs, patch: Patch) &#123;<br/>    let variant_type_name &#61; &#42;string::bytes(copyable_any::type_name(&amp;patch.variant));<br/>    if (variant_type_name &#61;&#61; b&quot;0x1::jwks::PatchRemoveAll&quot;) &#123;<br/>        jwks.entries &#61; vector[];<br/>    &#125; else if (variant_type_name &#61;&#61; b&quot;0x1::jwks::PatchRemoveIssuer&quot;) &#123;<br/>        let cmd &#61; copyable_any::unpack&lt;PatchRemoveIssuer&gt;(patch.variant);<br/>        remove_issuer(jwks, cmd.issuer);<br/>    &#125; else if (variant_type_name &#61;&#61; b&quot;0x1::jwks::PatchRemoveJWK&quot;) &#123;<br/>        let cmd &#61; copyable_any::unpack&lt;PatchRemoveJWK&gt;(patch.variant);<br/>        // TODO: This is inefficient: we remove the issuer, modify its JWKs &amp; and reinsert the updated issuer. Why<br/>        // not just update it in place?<br/>        let existing_jwk_set &#61; remove_issuer(jwks, cmd.issuer);<br/>        if (option::is_some(&amp;existing_jwk_set)) &#123;<br/>            let jwk_set &#61; option::extract(&amp;mut existing_jwk_set);<br/>            remove_jwk(&amp;mut jwk_set, cmd.jwk_id);<br/>            upsert_provider_jwks(jwks, jwk_set);<br/>        &#125;;<br/>    &#125; else if (variant_type_name &#61;&#61; b&quot;0x1::jwks::PatchUpsertJWK&quot;) &#123;<br/>        let cmd &#61; copyable_any::unpack&lt;PatchUpsertJWK&gt;(patch.variant);<br/>        // TODO: This is inefficient: we remove the issuer, modify its JWKs &amp; and reinsert the updated issuer. Why<br/>        // not just update it in place?<br/>        let existing_jwk_set &#61; remove_issuer(jwks, cmd.issuer);<br/>        let jwk_set &#61; if (option::is_some(&amp;existing_jwk_set)) &#123;<br/>            option::extract(&amp;mut existing_jwk_set)<br/>        &#125; else &#123;<br/>            ProviderJWKs &#123;<br/>                version: 0,<br/>                issuer: cmd.issuer,<br/>                jwks: vector[],<br/>            &#125;<br/>        &#125;;<br/>        upsert_jwk(&amp;mut jwk_set, cmd.jwk);<br/>        upsert_provider_jwks(jwks, jwk_set);<br/>    &#125; else &#123;<br/>        abort(std::error::invalid_argument(EUNKNOWN_PATCH_VARIANT))<br/>    &#125;<br/>&#125;<br/></code></pre>
 
 
 
@@ -1660,16 +1280,12 @@ Maintains the sorted-by-issuer invariant in <code><a href="jwks.md#0x1_jwks_AllP
 ### Function `on_new_epoch`
 
 
-<pre><code><b>public</b>(<b>friend</b>) <b>fun</b> <a href="jwks.md#0x1_jwks_on_new_epoch">on_new_epoch</a>(framework: &<a href="../../aptos-stdlib/../move-stdlib/doc/signer.md#0x1_signer">signer</a>)
-</code></pre>
+<pre><code>public(friend) fun on_new_epoch(framework: &amp;signer)<br/></code></pre>
 
 
 
 
-<pre><code><b>requires</b> @aptos_framework == std::signer::address_of(framework);
-<b>include</b> <a href="config_buffer.md#0x1_config_buffer_OnNewEpochRequirement">config_buffer::OnNewEpochRequirement</a>&lt;<a href="jwks.md#0x1_jwks_SupportedOIDCProviders">SupportedOIDCProviders</a>&gt;;
-<b>aborts_if</b> <b>false</b>;
-</code></pre>
+<pre><code>requires @aptos_framework &#61;&#61; std::signer::address_of(framework);<br/>include config_buffer::OnNewEpochRequirement&lt;SupportedOIDCProviders&gt;;<br/>aborts_if false;<br/></code></pre>
 
 
 [move-book]: https://aptos.dev/move/book/SUMMARY
