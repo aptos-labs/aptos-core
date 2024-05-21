@@ -19,8 +19,8 @@ Module providing debug functionality.
     -  [Function `native_stack_trace`](#@Specification_1_native_stack_trace)
 
 
-<pre><code>use 0x1::string;
-use 0x1::string_utils;
+<pre><code><b>use</b> <a href="../../move-stdlib/doc/string.md#0x1_string">0x1::string</a>;
+<b>use</b> <a href="string_utils.md#0x1_string_utils">0x1::string_utils</a>;
 </code></pre>
 
 
@@ -34,7 +34,7 @@ use 0x1::string_utils;
 
 
 
-<pre><code>const MSG_1: vector&lt;u8&gt; &#61; [97, 98, 99, 100, 101, 102];
+<pre><code><b>const</b> <a href="debug.md#0x1_debug_MSG_1">MSG_1</a>: <a href="../../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u8&gt; = [97, 98, 99, 100, 101, 102];
 </code></pre>
 
 
@@ -43,7 +43,7 @@ use 0x1::string_utils;
 
 
 
-<pre><code>const MSG_2: vector&lt;u8&gt; &#61; [49, 50, 51, 52, 53, 54];
+<pre><code><b>const</b> <a href="debug.md#0x1_debug_MSG_2">MSG_2</a>: <a href="../../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u8&gt; = [49, 50, 51, 52, 53, 54];
 </code></pre>
 
 
@@ -54,7 +54,7 @@ use 0x1::string_utils;
 
 
 
-<pre><code>public fun print&lt;T&gt;(x: &amp;T)
+<pre><code><b>public</b> <b>fun</b> <a href="debug.md#0x1_debug_print">print</a>&lt;T&gt;(x: &T)
 </code></pre>
 
 
@@ -63,9 +63,9 @@ use 0x1::string_utils;
 <summary>Implementation</summary>
 
 
-<pre><code>public fun print&lt;T&gt;(x: &amp;T) &#123;
-    native_print(format(x));
-&#125;
+<pre><code><b>public</b> <b>fun</b> <a href="debug.md#0x1_debug_print">print</a>&lt;T&gt;(x: &T) {
+    <a href="debug.md#0x1_debug_native_print">native_print</a>(<a href="debug.md#0x1_debug_format">format</a>(x));
+}
 </code></pre>
 
 
@@ -78,7 +78,7 @@ use 0x1::string_utils;
 
 
 
-<pre><code>public fun print_stack_trace()
+<pre><code><b>public</b> <b>fun</b> <a href="debug.md#0x1_debug_print_stack_trace">print_stack_trace</a>()
 </code></pre>
 
 
@@ -87,9 +87,9 @@ use 0x1::string_utils;
 <summary>Implementation</summary>
 
 
-<pre><code>public fun print_stack_trace() &#123;
-    native_print(native_stack_trace());
-&#125;
+<pre><code><b>public</b> <b>fun</b> <a href="debug.md#0x1_debug_print_stack_trace">print_stack_trace</a>() {
+    <a href="debug.md#0x1_debug_native_print">native_print</a>(<a href="debug.md#0x1_debug_native_stack_trace">native_stack_trace</a>());
+}
 </code></pre>
 
 
@@ -102,7 +102,7 @@ use 0x1::string_utils;
 
 
 
-<pre><code>fun format&lt;T&gt;(x: &amp;T): string::String
+<pre><code><b>fun</b> <a href="debug.md#0x1_debug_format">format</a>&lt;T&gt;(x: &T): <a href="../../move-stdlib/doc/string.md#0x1_string_String">string::String</a>
 </code></pre>
 
 
@@ -111,9 +111,9 @@ use 0x1::string_utils;
 <summary>Implementation</summary>
 
 
-<pre><code>inline fun format&lt;T&gt;(x: &amp;T): String &#123;
+<pre><code>inline <b>fun</b> <a href="debug.md#0x1_debug_format">format</a>&lt;T&gt;(x: &T): String {
     aptos_std::string_utils::debug_string(x)
-&#125;
+}
 </code></pre>
 
 
@@ -126,7 +126,7 @@ use 0x1::string_utils;
 
 
 
-<pre><code>fun native_print(x: string::String)
+<pre><code><b>fun</b> <a href="debug.md#0x1_debug_native_print">native_print</a>(x: <a href="../../move-stdlib/doc/string.md#0x1_string_String">string::String</a>)
 </code></pre>
 
 
@@ -135,7 +135,7 @@ use 0x1::string_utils;
 <summary>Implementation</summary>
 
 
-<pre><code>native fun native_print(x: String);
+<pre><code><b>native</b> <b>fun</b> <a href="debug.md#0x1_debug_native_print">native_print</a>(x: String);
 </code></pre>
 
 
@@ -148,7 +148,7 @@ use 0x1::string_utils;
 
 
 
-<pre><code>fun native_stack_trace(): string::String
+<pre><code><b>fun</b> <a href="debug.md#0x1_debug_native_stack_trace">native_stack_trace</a>(): <a href="../../move-stdlib/doc/string.md#0x1_string_String">string::String</a>
 </code></pre>
 
 
@@ -157,7 +157,7 @@ use 0x1::string_utils;
 <summary>Implementation</summary>
 
 
-<pre><code>native fun native_stack_trace(): String;
+<pre><code><b>native</b> <b>fun</b> <a href="debug.md#0x1_debug_native_stack_trace">native_stack_trace</a>(): String;
 </code></pre>
 
 
@@ -174,13 +174,13 @@ use 0x1::string_utils;
 ### Function `print`
 
 
-<pre><code>public fun print&lt;T&gt;(x: &amp;T)
+<pre><code><b>public</b> <b>fun</b> <a href="debug.md#0x1_debug_print">print</a>&lt;T&gt;(x: &T)
 </code></pre>
 
 
 
 
-<pre><code>aborts_if false;
+<pre><code><b>aborts_if</b> <b>false</b>;
 </code></pre>
 
 
@@ -190,13 +190,13 @@ use 0x1::string_utils;
 ### Function `print_stack_trace`
 
 
-<pre><code>public fun print_stack_trace()
+<pre><code><b>public</b> <b>fun</b> <a href="debug.md#0x1_debug_print_stack_trace">print_stack_trace</a>()
 </code></pre>
 
 
 
 
-<pre><code>aborts_if false;
+<pre><code><b>aborts_if</b> <b>false</b>;
 </code></pre>
 
 
@@ -206,14 +206,14 @@ use 0x1::string_utils;
 ### Function `native_print`
 
 
-<pre><code>fun native_print(x: string::String)
+<pre><code><b>fun</b> <a href="debug.md#0x1_debug_native_print">native_print</a>(x: <a href="../../move-stdlib/doc/string.md#0x1_string_String">string::String</a>)
 </code></pre>
 
 
 
 
-<pre><code>pragma opaque;
-aborts_if false;
+<pre><code><b>pragma</b> opaque;
+<b>aborts_if</b> <b>false</b>;
 </code></pre>
 
 
@@ -223,14 +223,14 @@ aborts_if false;
 ### Function `native_stack_trace`
 
 
-<pre><code>fun native_stack_trace(): string::String
+<pre><code><b>fun</b> <a href="debug.md#0x1_debug_native_stack_trace">native_stack_trace</a>(): <a href="../../move-stdlib/doc/string.md#0x1_string_String">string::String</a>
 </code></pre>
 
 
 
 
-<pre><code>pragma opaque;
-aborts_if false;
+<pre><code><b>pragma</b> opaque;
+<b>aborts_if</b> <b>false</b>;
 </code></pre>
 
 

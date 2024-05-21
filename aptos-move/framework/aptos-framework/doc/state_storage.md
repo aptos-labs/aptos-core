@@ -24,8 +24,8 @@
     -  [Function `on_reconfig`](#@Specification_1_on_reconfig)
 
 
-<pre><code>use 0x1::error;
-use 0x1::system_addresses;
+<pre><code><b>use</b> <a href="../../aptos-stdlib/../move-stdlib/doc/error.md#0x1_error">0x1::error</a>;
+<b>use</b> <a href="system_addresses.md#0x1_system_addresses">0x1::system_addresses</a>;
 </code></pre>
 
 
@@ -36,7 +36,7 @@ use 0x1::system_addresses;
 
 
 
-<pre><code>struct Usage has copy, drop, store
+<pre><code><b>struct</b> <a href="state_storage.md#0x1_state_storage_Usage">Usage</a> <b>has</b> <b>copy</b>, drop, store
 </code></pre>
 
 
@@ -71,7 +71,7 @@ This is updated at the beginning of each epoch, reflecting the storage
 usage after the last txn of the previous epoch is committed.
 
 
-<pre><code>struct StateStorageUsage has store, key
+<pre><code><b>struct</b> <a href="state_storage.md#0x1_state_storage_StateStorageUsage">StateStorageUsage</a> <b>has</b> store, key
 </code></pre>
 
 
@@ -88,7 +88,7 @@ usage after the last txn of the previous epoch is committed.
 
 </dd>
 <dt>
-<code>usage: state_storage::Usage</code>
+<code>usage: <a href="state_storage.md#0x1_state_storage_Usage">state_storage::Usage</a></code>
 </dt>
 <dd>
 
@@ -104,7 +104,7 @@ usage after the last txn of the previous epoch is committed.
 
 
 
-<pre><code>struct GasParameter has store, key
+<pre><code><b>struct</b> <a href="state_storage.md#0x1_state_storage_GasParameter">GasParameter</a> <b>has</b> store, key
 </code></pre>
 
 
@@ -115,7 +115,7 @@ usage after the last txn of the previous epoch is committed.
 
 <dl>
 <dt>
-<code>usage: state_storage::Usage</code>
+<code>usage: <a href="state_storage.md#0x1_state_storage_Usage">state_storage::Usage</a></code>
 </dt>
 <dd>
 
@@ -134,7 +134,7 @@ usage after the last txn of the previous epoch is committed.
 
 
 
-<pre><code>const ESTATE_STORAGE_USAGE: u64 &#61; 0;
+<pre><code><b>const</b> <a href="state_storage.md#0x1_state_storage_ESTATE_STORAGE_USAGE">ESTATE_STORAGE_USAGE</a>: u64 = 0;
 </code></pre>
 
 
@@ -145,7 +145,7 @@ usage after the last txn of the previous epoch is committed.
 
 
 
-<pre><code>public(friend) fun initialize(aptos_framework: &amp;signer)
+<pre><code><b>public</b>(<b>friend</b>) <b>fun</b> <a href="state_storage.md#0x1_state_storage_initialize">initialize</a>(aptos_framework: &<a href="../../aptos-stdlib/../move-stdlib/doc/signer.md#0x1_signer">signer</a>)
 </code></pre>
 
 
@@ -154,20 +154,20 @@ usage after the last txn of the previous epoch is committed.
 <summary>Implementation</summary>
 
 
-<pre><code>public(friend) fun initialize(aptos_framework: &amp;signer) &#123;
-    system_addresses::assert_aptos_framework(aptos_framework);
-    assert!(
-        !exists&lt;StateStorageUsage&gt;(@aptos_framework),
-        error::already_exists(ESTATE_STORAGE_USAGE)
+<pre><code><b>public</b>(<b>friend</b>) <b>fun</b> <a href="state_storage.md#0x1_state_storage_initialize">initialize</a>(aptos_framework: &<a href="../../aptos-stdlib/../move-stdlib/doc/signer.md#0x1_signer">signer</a>) {
+    <a href="system_addresses.md#0x1_system_addresses_assert_aptos_framework">system_addresses::assert_aptos_framework</a>(aptos_framework);
+    <b>assert</b>!(
+        !<b>exists</b>&lt;<a href="state_storage.md#0x1_state_storage_StateStorageUsage">StateStorageUsage</a>&gt;(@aptos_framework),
+        <a href="../../aptos-stdlib/../move-stdlib/doc/error.md#0x1_error_already_exists">error::already_exists</a>(<a href="state_storage.md#0x1_state_storage_ESTATE_STORAGE_USAGE">ESTATE_STORAGE_USAGE</a>)
     );
-    move_to(aptos_framework, StateStorageUsage &#123;
+    <b>move_to</b>(aptos_framework, <a href="state_storage.md#0x1_state_storage_StateStorageUsage">StateStorageUsage</a> {
         epoch: 0,
-        usage: Usage &#123;
+        usage: <a href="state_storage.md#0x1_state_storage_Usage">Usage</a> {
             items: 0,
             bytes: 0,
-        &#125;
-    &#125;);
-&#125;
+        }
+    });
+}
 </code></pre>
 
 
@@ -180,7 +180,7 @@ usage after the last txn of the previous epoch is committed.
 
 
 
-<pre><code>public(friend) fun on_new_block(epoch: u64)
+<pre><code><b>public</b>(<b>friend</b>) <b>fun</b> <a href="state_storage.md#0x1_state_storage_on_new_block">on_new_block</a>(epoch: u64)
 </code></pre>
 
 
@@ -189,17 +189,17 @@ usage after the last txn of the previous epoch is committed.
 <summary>Implementation</summary>
 
 
-<pre><code>public(friend) fun on_new_block(epoch: u64) acquires StateStorageUsage &#123;
-    assert!(
-        exists&lt;StateStorageUsage&gt;(@aptos_framework),
-        error::not_found(ESTATE_STORAGE_USAGE)
+<pre><code><b>public</b>(<b>friend</b>) <b>fun</b> <a href="state_storage.md#0x1_state_storage_on_new_block">on_new_block</a>(epoch: u64) <b>acquires</b> <a href="state_storage.md#0x1_state_storage_StateStorageUsage">StateStorageUsage</a> {
+    <b>assert</b>!(
+        <b>exists</b>&lt;<a href="state_storage.md#0x1_state_storage_StateStorageUsage">StateStorageUsage</a>&gt;(@aptos_framework),
+        <a href="../../aptos-stdlib/../move-stdlib/doc/error.md#0x1_error_not_found">error::not_found</a>(<a href="state_storage.md#0x1_state_storage_ESTATE_STORAGE_USAGE">ESTATE_STORAGE_USAGE</a>)
     );
-    let usage &#61; borrow_global_mut&lt;StateStorageUsage&gt;(@aptos_framework);
-    if (epoch !&#61; usage.epoch) &#123;
-        usage.epoch &#61; epoch;
-        usage.usage &#61; get_state_storage_usage_only_at_epoch_beginning();
-    &#125;
-&#125;
+    <b>let</b> usage = <b>borrow_global_mut</b>&lt;<a href="state_storage.md#0x1_state_storage_StateStorageUsage">StateStorageUsage</a>&gt;(@aptos_framework);
+    <b>if</b> (epoch != usage.epoch) {
+        usage.epoch = epoch;
+        usage.usage = <a href="state_storage.md#0x1_state_storage_get_state_storage_usage_only_at_epoch_beginning">get_state_storage_usage_only_at_epoch_beginning</a>();
+    }
+}
 </code></pre>
 
 
@@ -212,7 +212,7 @@ usage after the last txn of the previous epoch is committed.
 
 
 
-<pre><code>public(friend) fun current_items_and_bytes(): (u64, u64)
+<pre><code><b>public</b>(<b>friend</b>) <b>fun</b> <a href="state_storage.md#0x1_state_storage_current_items_and_bytes">current_items_and_bytes</a>(): (u64, u64)
 </code></pre>
 
 
@@ -221,14 +221,14 @@ usage after the last txn of the previous epoch is committed.
 <summary>Implementation</summary>
 
 
-<pre><code>public(friend) fun current_items_and_bytes(): (u64, u64) acquires StateStorageUsage &#123;
-    assert!(
-        exists&lt;StateStorageUsage&gt;(@aptos_framework),
-        error::not_found(ESTATE_STORAGE_USAGE)
+<pre><code><b>public</b>(<b>friend</b>) <b>fun</b> <a href="state_storage.md#0x1_state_storage_current_items_and_bytes">current_items_and_bytes</a>(): (u64, u64) <b>acquires</b> <a href="state_storage.md#0x1_state_storage_StateStorageUsage">StateStorageUsage</a> {
+    <b>assert</b>!(
+        <b>exists</b>&lt;<a href="state_storage.md#0x1_state_storage_StateStorageUsage">StateStorageUsage</a>&gt;(@aptos_framework),
+        <a href="../../aptos-stdlib/../move-stdlib/doc/error.md#0x1_error_not_found">error::not_found</a>(<a href="state_storage.md#0x1_state_storage_ESTATE_STORAGE_USAGE">ESTATE_STORAGE_USAGE</a>)
     );
-    let usage &#61; borrow_global&lt;StateStorageUsage&gt;(@aptos_framework);
+    <b>let</b> usage = <b>borrow_global</b>&lt;<a href="state_storage.md#0x1_state_storage_StateStorageUsage">StateStorageUsage</a>&gt;(@aptos_framework);
     (usage.usage.items, usage.usage.bytes)
-&#125;
+}
 </code></pre>
 
 
@@ -245,7 +245,7 @@ if called from the first transaction of the block because the execution layer
 guarantees a fresh state view then.
 
 
-<pre><code>fun get_state_storage_usage_only_at_epoch_beginning(): state_storage::Usage
+<pre><code><b>fun</b> <a href="state_storage.md#0x1_state_storage_get_state_storage_usage_only_at_epoch_beginning">get_state_storage_usage_only_at_epoch_beginning</a>(): <a href="state_storage.md#0x1_state_storage_Usage">state_storage::Usage</a>
 </code></pre>
 
 
@@ -254,7 +254,7 @@ guarantees a fresh state view then.
 <summary>Implementation</summary>
 
 
-<pre><code>native fun get_state_storage_usage_only_at_epoch_beginning(): Usage;
+<pre><code><b>native</b> <b>fun</b> <a href="state_storage.md#0x1_state_storage_get_state_storage_usage_only_at_epoch_beginning">get_state_storage_usage_only_at_epoch_beginning</a>(): <a href="state_storage.md#0x1_state_storage_Usage">Usage</a>;
 </code></pre>
 
 
@@ -267,7 +267,7 @@ guarantees a fresh state view then.
 
 
 
-<pre><code>public(friend) fun on_reconfig()
+<pre><code><b>public</b>(<b>friend</b>) <b>fun</b> <a href="state_storage.md#0x1_state_storage_on_reconfig">on_reconfig</a>()
 </code></pre>
 
 
@@ -276,9 +276,9 @@ guarantees a fresh state view then.
 <summary>Implementation</summary>
 
 
-<pre><code>public(friend) fun on_reconfig() &#123;
-    abort 0
-&#125;
+<pre><code><b>public</b>(<b>friend</b>) <b>fun</b> <a href="state_storage.md#0x1_state_storage_on_reconfig">on_reconfig</a>() {
+    <b>abort</b> 0
+}
 </code></pre>
 
 
@@ -351,11 +351,11 @@ guarantees a fresh state view then.
 ### Module-level Specification
 
 
-<pre><code>pragma verify &#61; true;
-pragma aborts_if_is_strict;
+<pre><code><b>pragma</b> verify = <b>true</b>;
+<b>pragma</b> aborts_if_is_strict;
 // This enforces <a id="high-level-req-1" href="#high-level-req">high-level requirement 1</a> and <a id="high-level-req-5.3" href="#high-level-req">high-level requirement 5</a>:
-invariant [suspendable] chain_status::is_operating() &#61;&#61;&gt; exists&lt;StateStorageUsage&gt;(@aptos_framework);
-invariant [suspendable] chain_status::is_operating() &#61;&#61;&gt; exists&lt;GasParameter&gt;(@aptos_framework);
+<b>invariant</b> [suspendable] <a href="chain_status.md#0x1_chain_status_is_operating">chain_status::is_operating</a>() ==&gt; <b>exists</b>&lt;<a href="state_storage.md#0x1_state_storage_StateStorageUsage">StateStorageUsage</a>&gt;(@aptos_framework);
+<b>invariant</b> [suspendable] <a href="chain_status.md#0x1_chain_status_is_operating">chain_status::is_operating</a>() ==&gt; <b>exists</b>&lt;<a href="state_storage.md#0x1_state_storage_GasParameter">GasParameter</a>&gt;(@aptos_framework);
 </code></pre>
 
 
@@ -365,7 +365,7 @@ invariant [suspendable] chain_status::is_operating() &#61;&#61;&gt; exists&lt;Ga
 ### Function `initialize`
 
 
-<pre><code>public(friend) fun initialize(aptos_framework: &amp;signer)
+<pre><code><b>public</b>(<b>friend</b>) <b>fun</b> <a href="state_storage.md#0x1_state_storage_initialize">initialize</a>(aptos_framework: &<a href="../../aptos-stdlib/../move-stdlib/doc/signer.md#0x1_signer">signer</a>)
 </code></pre>
 
 
@@ -373,15 +373,15 @@ ensure caller is admin.
 aborts if StateStorageUsage already exists.
 
 
-<pre><code>let addr &#61; signer::address_of(aptos_framework);
+<pre><code><b>let</b> addr = <a href="../../aptos-stdlib/../move-stdlib/doc/signer.md#0x1_signer_address_of">signer::address_of</a>(aptos_framework);
 // This enforces <a id="high-level-req-4" href="#high-level-req">high-level requirement 4</a>:
-aborts_if !system_addresses::is_aptos_framework_address(addr);
+<b>aborts_if</b> !<a href="system_addresses.md#0x1_system_addresses_is_aptos_framework_address">system_addresses::is_aptos_framework_address</a>(addr);
 // This enforces <a id="high-level-req-3" href="#high-level-req">high-level requirement 3</a>:
-aborts_if exists&lt;StateStorageUsage&gt;(@aptos_framework);
-ensures exists&lt;StateStorageUsage&gt;(@aptos_framework);
-let post state_usage &#61; global&lt;StateStorageUsage&gt;(@aptos_framework);
+<b>aborts_if</b> <b>exists</b>&lt;<a href="state_storage.md#0x1_state_storage_StateStorageUsage">StateStorageUsage</a>&gt;(@aptos_framework);
+<b>ensures</b> <b>exists</b>&lt;<a href="state_storage.md#0x1_state_storage_StateStorageUsage">StateStorageUsage</a>&gt;(@aptos_framework);
+<b>let</b> <b>post</b> state_usage = <b>global</b>&lt;<a href="state_storage.md#0x1_state_storage_StateStorageUsage">StateStorageUsage</a>&gt;(@aptos_framework);
 // This enforces <a id="high-level-req-2" href="#high-level-req">high-level requirement 2</a>:
-ensures state_usage.epoch &#61;&#61; 0 &amp;&amp; state_usage.usage.bytes &#61;&#61; 0 &amp;&amp; state_usage.usage.items &#61;&#61; 0;
+<b>ensures</b> state_usage.epoch == 0 && state_usage.usage.bytes == 0 && state_usage.usage.items == 0;
 </code></pre>
 
 
@@ -391,16 +391,16 @@ ensures state_usage.epoch &#61;&#61; 0 &amp;&amp; state_usage.usage.bytes &#61;&
 ### Function `on_new_block`
 
 
-<pre><code>public(friend) fun on_new_block(epoch: u64)
+<pre><code><b>public</b>(<b>friend</b>) <b>fun</b> <a href="state_storage.md#0x1_state_storage_on_new_block">on_new_block</a>(epoch: u64)
 </code></pre>
 
 
 
 
 <pre><code>// This enforces <a id="high-level-req-5.2" href="#high-level-req">high-level requirement 5</a>:
-requires chain_status::is_operating();
-aborts_if false;
-ensures epoch &#61;&#61; global&lt;StateStorageUsage&gt;(@aptos_framework).epoch;
+<b>requires</b> <a href="chain_status.md#0x1_chain_status_is_operating">chain_status::is_operating</a>();
+<b>aborts_if</b> <b>false</b>;
+<b>ensures</b> epoch == <b>global</b>&lt;<a href="state_storage.md#0x1_state_storage_StateStorageUsage">StateStorageUsage</a>&gt;(@aptos_framework).epoch;
 </code></pre>
 
 
@@ -410,14 +410,14 @@ ensures epoch &#61;&#61; global&lt;StateStorageUsage&gt;(@aptos_framework).epoch
 ### Function `current_items_and_bytes`
 
 
-<pre><code>public(friend) fun current_items_and_bytes(): (u64, u64)
+<pre><code><b>public</b>(<b>friend</b>) <b>fun</b> <a href="state_storage.md#0x1_state_storage_current_items_and_bytes">current_items_and_bytes</a>(): (u64, u64)
 </code></pre>
 
 
 
 
 <pre><code>// This enforces <a id="high-level-req-5.1" href="#high-level-req">high-level requirement 5</a>:
-aborts_if !exists&lt;StateStorageUsage&gt;(@aptos_framework);
+<b>aborts_if</b> !<b>exists</b>&lt;<a href="state_storage.md#0x1_state_storage_StateStorageUsage">StateStorageUsage</a>&gt;(@aptos_framework);
 </code></pre>
 
 
@@ -427,13 +427,13 @@ aborts_if !exists&lt;StateStorageUsage&gt;(@aptos_framework);
 ### Function `get_state_storage_usage_only_at_epoch_beginning`
 
 
-<pre><code>fun get_state_storage_usage_only_at_epoch_beginning(): state_storage::Usage
+<pre><code><b>fun</b> <a href="state_storage.md#0x1_state_storage_get_state_storage_usage_only_at_epoch_beginning">get_state_storage_usage_only_at_epoch_beginning</a>(): <a href="state_storage.md#0x1_state_storage_Usage">state_storage::Usage</a>
 </code></pre>
 
 
 
 
-<pre><code>pragma opaque;
+<pre><code><b>pragma</b> opaque;
 </code></pre>
 
 
@@ -443,13 +443,13 @@ aborts_if !exists&lt;StateStorageUsage&gt;(@aptos_framework);
 ### Function `on_reconfig`
 
 
-<pre><code>public(friend) fun on_reconfig()
+<pre><code><b>public</b>(<b>friend</b>) <b>fun</b> <a href="state_storage.md#0x1_state_storage_on_reconfig">on_reconfig</a>()
 </code></pre>
 
 
 
 
-<pre><code>aborts_if true;
+<pre><code><b>aborts_if</b> <b>true</b>;
 </code></pre>
 
 

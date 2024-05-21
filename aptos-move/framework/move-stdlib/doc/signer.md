@@ -19,7 +19,7 @@
 ## Function `borrow_address`
 
 Borrows the address of the signer
-Conceptually, you can think of the <code>signer</code> as being a struct wrapper around an
+Conceptually, you can think of the <code><a href="signer.md#0x1_signer">signer</a></code> as being a struct wrapper around an
 address
 ```
 struct signer has drop { addr: address }
@@ -27,7 +27,7 @@ struct signer has drop { addr: address }
 <code>borrow_address</code> borrows this inner field
 
 
-<pre><code>public fun borrow_address(s: &amp;signer): &amp;address
+<pre><code><b>public</b> <b>fun</b> <a href="signer.md#0x1_signer_borrow_address">borrow_address</a>(s: &<a href="signer.md#0x1_signer">signer</a>): &<b>address</b>
 </code></pre>
 
 
@@ -36,7 +36,7 @@ struct signer has drop { addr: address }
 <summary>Implementation</summary>
 
 
-<pre><code>native public fun borrow_address(s: &amp;signer): &amp;address;
+<pre><code><b>native</b> <b>public</b> <b>fun</b> <a href="signer.md#0x1_signer_borrow_address">borrow_address</a>(s: &<a href="signer.md#0x1_signer">signer</a>): &<b>address</b>;
 </code></pre>
 
 
@@ -49,7 +49,7 @@ struct signer has drop { addr: address }
 
 
 
-<pre><code>public fun address_of(s: &amp;signer): address
+<pre><code><b>public</b> <b>fun</b> <a href="signer.md#0x1_signer_address_of">address_of</a>(s: &<a href="signer.md#0x1_signer">signer</a>): <b>address</b>
 </code></pre>
 
 
@@ -58,9 +58,9 @@ struct signer has drop { addr: address }
 <summary>Implementation</summary>
 
 
-<pre><code>public fun address_of(s: &amp;signer): address &#123;
-    &#42;borrow_address(s)
-&#125;
+<pre><code><b>public</b> <b>fun</b> <a href="signer.md#0x1_signer_address_of">address_of</a>(s: &<a href="signer.md#0x1_signer">signer</a>): <b>address</b> {
+    *<a href="signer.md#0x1_signer_borrow_address">borrow_address</a>(s)
+}
 </code></pre>
 
 
@@ -77,7 +77,7 @@ Return true only if <code>s</code> is a transaction signer. This is a spec funct
 <a id="0x1_signer_is_txn_signer"></a>
 
 
-<pre><code>native fun is_txn_signer(s: signer): bool;
+<pre><code><b>native</b> <b>fun</b> <a href="signer.md#0x1_signer_is_txn_signer">is_txn_signer</a>(s: <a href="signer.md#0x1_signer">signer</a>): bool;
 </code></pre>
 
 
@@ -87,7 +87,7 @@ Return true only if <code>a</code> is a transaction signer address. This is a sp
 <a id="0x1_signer_is_txn_signer_addr"></a>
 
 
-<pre><code>native fun is_txn_signer_addr(a: address): bool;
+<pre><code><b>native</b> <b>fun</b> <a href="signer.md#0x1_signer_is_txn_signer_addr">is_txn_signer_addr</a>(a: <b>address</b>): bool;
 </code></pre>
 
 

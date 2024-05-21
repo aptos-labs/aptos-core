@@ -28,8 +28,8 @@ Standard math utilities missing in the Move Language.
     -  [Function `sqrt`](#@Specification_1_sqrt)
 
 
-<pre><code>use 0x1::error;
-use 0x1::fixed_point32;
+<pre><code><b>use</b> <a href="../../move-stdlib/doc/error.md#0x1_error">0x1::error</a>;
+<b>use</b> <a href="../../move-stdlib/doc/fixed_point32.md#0x1_fixed_point32">0x1::fixed_point32</a>;
 </code></pre>
 
 
@@ -44,7 +44,7 @@ use 0x1::fixed_point32;
 Cannot log2 the value 0
 
 
-<pre><code>const EINVALID_ARG_FLOOR_LOG2: u64 &#61; 1;
+<pre><code><b>const</b> <a href="math64.md#0x1_math64_EINVALID_ARG_FLOOR_LOG2">EINVALID_ARG_FLOOR_LOG2</a>: u64 = 1;
 </code></pre>
 
 
@@ -56,7 +56,7 @@ Cannot log2 the value 0
 Return the largest of two numbers.
 
 
-<pre><code>public fun max(a: u64, b: u64): u64
+<pre><code><b>public</b> <b>fun</b> <a href="math64.md#0x1_math64_max">max</a>(a: u64, b: u64): u64
 </code></pre>
 
 
@@ -65,9 +65,9 @@ Return the largest of two numbers.
 <summary>Implementation</summary>
 
 
-<pre><code>public fun max(a: u64, b: u64): u64 &#123;
-    if (a &gt;&#61; b) a else b
-&#125;
+<pre><code><b>public</b> <b>fun</b> <a href="math64.md#0x1_math64_max">max</a>(a: u64, b: u64): u64 {
+    <b>if</b> (a &gt;= b) a <b>else</b> b
+}
 </code></pre>
 
 
@@ -81,7 +81,7 @@ Return the largest of two numbers.
 Return the smallest of two numbers.
 
 
-<pre><code>public fun min(a: u64, b: u64): u64
+<pre><code><b>public</b> <b>fun</b> <b>min</b>(a: u64, b: u64): u64
 </code></pre>
 
 
@@ -90,9 +90,9 @@ Return the smallest of two numbers.
 <summary>Implementation</summary>
 
 
-<pre><code>public fun min(a: u64, b: u64): u64 &#123;
-    if (a &lt; b) a else b
-&#125;
+<pre><code><b>public</b> <b>fun</b> <b>min</b>(a: u64, b: u64): u64 {
+    <b>if</b> (a &lt; b) a <b>else</b> b
+}
 </code></pre>
 
 
@@ -106,7 +106,7 @@ Return the smallest of two numbers.
 Return the average of two.
 
 
-<pre><code>public fun average(a: u64, b: u64): u64
+<pre><code><b>public</b> <b>fun</b> <a href="math64.md#0x1_math64_average">average</a>(a: u64, b: u64): u64
 </code></pre>
 
 
@@ -115,13 +115,13 @@ Return the average of two.
 <summary>Implementation</summary>
 
 
-<pre><code>public fun average(a: u64, b: u64): u64 &#123;
-    if (a &lt; b) &#123;
-        a &#43; (b &#45; a) / 2
-    &#125; else &#123;
-        b &#43; (a &#45; b) / 2
-    &#125;
-&#125;
+<pre><code><b>public</b> <b>fun</b> <a href="math64.md#0x1_math64_average">average</a>(a: u64, b: u64): u64 {
+    <b>if</b> (a &lt; b) {
+        a + (b - a) / 2
+    } <b>else</b> {
+        b + (a - b) / 2
+    }
+}
 </code></pre>
 
 
@@ -135,7 +135,7 @@ Return the average of two.
 Return greatest common divisor of <code>a</code> & <code>b</code>, via the Euclidean algorithm.
 
 
-<pre><code>public fun gcd(a: u64, b: u64): u64
+<pre><code><b>public</b> <b>fun</b> <a href="math64.md#0x1_math64_gcd">gcd</a>(a: u64, b: u64): u64
 </code></pre>
 
 
@@ -144,15 +144,15 @@ Return greatest common divisor of <code>a</code> & <code>b</code>, via the Eucli
 <summary>Implementation</summary>
 
 
-<pre><code>public inline fun gcd(a: u64, b: u64): u64 &#123;
-    let (large, small) &#61; if (a &gt; b) (a, b) else (b, a);
-    while (small !&#61; 0) &#123;
-        let tmp &#61; small;
-        small &#61; large % small;
-        large &#61; tmp;
-    &#125;;
+<pre><code><b>public</b> inline <b>fun</b> <a href="math64.md#0x1_math64_gcd">gcd</a>(a: u64, b: u64): u64 {
+    <b>let</b> (large, small) = <b>if</b> (a &gt; b) (a, b) <b>else</b> (b, a);
+    <b>while</b> (small != 0) {
+        <b>let</b> tmp = small;
+        small = large % small;
+        large = tmp;
+    };
     large
-&#125;
+}
 </code></pre>
 
 
@@ -166,7 +166,7 @@ Return greatest common divisor of <code>a</code> & <code>b</code>, via the Eucli
 Returns a * b / c going through u128 to prevent intermediate overflow
 
 
-<pre><code>public fun mul_div(a: u64, b: u64, c: u64): u64
+<pre><code><b>public</b> <b>fun</b> <a href="math64.md#0x1_math64_mul_div">mul_div</a>(a: u64, b: u64, c: u64): u64
 </code></pre>
 
 
@@ -175,11 +175,11 @@ Returns a * b / c going through u128 to prevent intermediate overflow
 <summary>Implementation</summary>
 
 
-<pre><code>public inline fun mul_div(a: u64, b: u64, c: u64): u64 &#123;
-    // Inline functions cannot take constants, as then every module using it needs the constant
-    assert!(c !&#61; 0, std::error::invalid_argument(4));
-    (((a as u128) &#42; (b as u128) / (c as u128)) as u64)
-&#125;
+<pre><code><b>public</b> inline <b>fun</b> <a href="math64.md#0x1_math64_mul_div">mul_div</a>(a: u64, b: u64, c: u64): u64 {
+    // Inline functions cannot take constants, <b>as</b> then every <b>module</b> using it needs the constant
+    <b>assert</b>!(c != 0, std::error::invalid_argument(4));
+    (((a <b>as</b> u128) * (b <b>as</b> u128) / (c <b>as</b> u128)) <b>as</b> u64)
+}
 </code></pre>
 
 
@@ -193,7 +193,7 @@ Returns a * b / c going through u128 to prevent intermediate overflow
 Return x clamped to the interval [lower, upper].
 
 
-<pre><code>public fun clamp(x: u64, lower: u64, upper: u64): u64
+<pre><code><b>public</b> <b>fun</b> <a href="math64.md#0x1_math64_clamp">clamp</a>(x: u64, lower: u64, upper: u64): u64
 </code></pre>
 
 
@@ -202,9 +202,9 @@ Return x clamped to the interval [lower, upper].
 <summary>Implementation</summary>
 
 
-<pre><code>public fun clamp(x: u64, lower: u64, upper: u64): u64 &#123;
-    min(upper, max(lower, x))
-&#125;
+<pre><code><b>public</b> <b>fun</b> <a href="math64.md#0x1_math64_clamp">clamp</a>(x: u64, lower: u64, upper: u64): u64 {
+    <b>min</b>(upper, <a href="math64.md#0x1_math64_max">max</a>(lower, x))
+}
 </code></pre>
 
 
@@ -218,7 +218,7 @@ Return x clamped to the interval [lower, upper].
 Return the value of n raised to power e
 
 
-<pre><code>public fun pow(n: u64, e: u64): u64
+<pre><code><b>public</b> <b>fun</b> <a href="math64.md#0x1_math64_pow">pow</a>(n: u64, e: u64): u64
 </code></pre>
 
 
@@ -227,21 +227,21 @@ Return the value of n raised to power e
 <summary>Implementation</summary>
 
 
-<pre><code>public fun pow(n: u64, e: u64): u64 &#123;
-    if (e &#61;&#61; 0) &#123;
+<pre><code><b>public</b> <b>fun</b> <a href="math64.md#0x1_math64_pow">pow</a>(n: u64, e: u64): u64 {
+    <b>if</b> (e == 0) {
         1
-    &#125; else &#123;
-        let p &#61; 1;
-        while (e &gt; 1) &#123;
-            if (e % 2 &#61;&#61; 1) &#123;
-                p &#61; p &#42; n;
-            &#125;;
-            e &#61; e / 2;
-            n &#61; n &#42; n;
-        &#125;;
-        p &#42; n
-    &#125;
-&#125;
+    } <b>else</b> {
+        <b>let</b> p = 1;
+        <b>while</b> (e &gt; 1) {
+            <b>if</b> (e % 2 == 1) {
+                p = p * n;
+            };
+            e = e / 2;
+            n = n * n;
+        };
+        p * n
+    }
+}
 </code></pre>
 
 
@@ -255,7 +255,7 @@ Return the value of n raised to power e
 Returns floor(lg2(x))
 
 
-<pre><code>public fun floor_log2(x: u64): u8
+<pre><code><b>public</b> <b>fun</b> <a href="math64.md#0x1_math64_floor_log2">floor_log2</a>(x: u64): u8
 </code></pre>
 
 
@@ -264,20 +264,20 @@ Returns floor(lg2(x))
 <summary>Implementation</summary>
 
 
-<pre><code>public fun floor_log2(x: u64): u8 &#123;
-    let res &#61; 0;
-    assert!(x !&#61; 0, std::error::invalid_argument(EINVALID_ARG_FLOOR_LOG2));
+<pre><code><b>public</b> <b>fun</b> <a href="math64.md#0x1_math64_floor_log2">floor_log2</a>(x: u64): u8 {
+    <b>let</b> res = 0;
+    <b>assert</b>!(x != 0, std::error::invalid_argument(<a href="math64.md#0x1_math64_EINVALID_ARG_FLOOR_LOG2">EINVALID_ARG_FLOOR_LOG2</a>));
     // Effectively the position of the most significant set bit
-    let n &#61; 32;
-    while (n &gt; 0) &#123;
-        if (x &gt;&#61; (1 &lt;&lt; n)) &#123;
-            x &#61; x &gt;&gt; n;
-            res &#61; res &#43; n;
-        &#125;;
-        n &#61; n &gt;&gt; 1;
-    &#125;;
+    <b>let</b> n = 32;
+    <b>while</b> (n &gt; 0) {
+        <b>if</b> (x &gt;= (1 &lt;&lt; n)) {
+            x = x &gt;&gt; n;
+            res = res + n;
+        };
+        n = n &gt;&gt; 1;
+    };
     res
-&#125;
+}
 </code></pre>
 
 
@@ -290,7 +290,7 @@ Returns floor(lg2(x))
 
 
 
-<pre><code>public fun log2(x: u64): fixed_point32::FixedPoint32
+<pre><code><b>public</b> <b>fun</b> <a href="math64.md#0x1_math64_log2">log2</a>(x: u64): <a href="../../move-stdlib/doc/fixed_point32.md#0x1_fixed_point32_FixedPoint32">fixed_point32::FixedPoint32</a>
 </code></pre>
 
 
@@ -299,27 +299,27 @@ Returns floor(lg2(x))
 <summary>Implementation</summary>
 
 
-<pre><code>public fun log2(x: u64): FixedPoint32 &#123;
-    let integer_part &#61; floor_log2(x);
-    // Normalize x to [1, 2) in fixed point 32.
-    let y &#61; (if (x &gt;&#61; 1 &lt;&lt; 32) &#123;
-        x &gt;&gt; (integer_part &#45; 32)
-    &#125; else &#123;
-        x &lt;&lt; (32 &#45; integer_part)
-    &#125; as u128);
-    let frac &#61; 0;
-    let delta &#61; 1 &lt;&lt; 31;
-    while (delta !&#61; 0) &#123;
-        // log x &#61; 1/2 log x^2
+<pre><code><b>public</b> <b>fun</b> <a href="math64.md#0x1_math64_log2">log2</a>(x: u64): FixedPoint32 {
+    <b>let</b> integer_part = <a href="math64.md#0x1_math64_floor_log2">floor_log2</a>(x);
+    // Normalize x <b>to</b> [1, 2) in fixed point 32.
+    <b>let</b> y = (<b>if</b> (x &gt;= 1 &lt;&lt; 32) {
+        x &gt;&gt; (integer_part - 32)
+    } <b>else</b> {
+        x &lt;&lt; (32 - integer_part)
+    } <b>as</b> u128);
+    <b>let</b> frac = 0;
+    <b>let</b> delta = 1 &lt;&lt; 31;
+    <b>while</b> (delta != 0) {
+        // log x = 1/2 log x^2
         // x in [1, 2)
-        y &#61; (y &#42; y) &gt;&gt; 32;
+        y = (y * y) &gt;&gt; 32;
         // x is now in [1, 4)
-        // if x in [2, 4) then log x &#61; 1 &#43; log (x / 2)
-        if (y &gt;&#61; (2 &lt;&lt; 32)) &#123; frac &#61; frac &#43; delta; y &#61; y &gt;&gt; 1; &#125;;
-        delta &#61; delta &gt;&gt; 1;
-    &#125;;
-    fixed_point32::create_from_raw_value (((integer_part as u64) &lt;&lt; 32) &#43; frac)
-&#125;
+        // <b>if</b> x in [2, 4) then log x = 1 + log (x / 2)
+        <b>if</b> (y &gt;= (2 &lt;&lt; 32)) { frac = frac + delta; y = y &gt;&gt; 1; };
+        delta = delta &gt;&gt; 1;
+    };
+    <a href="../../move-stdlib/doc/fixed_point32.md#0x1_fixed_point32_create_from_raw_value">fixed_point32::create_from_raw_value</a> (((integer_part <b>as</b> u64) &lt;&lt; 32) + frac)
+}
 </code></pre>
 
 
@@ -333,7 +333,7 @@ Returns floor(lg2(x))
 Returns square root of x, precisely floor(sqrt(x))
 
 
-<pre><code>public fun sqrt(x: u64): u64
+<pre><code><b>public</b> <b>fun</b> <a href="math64.md#0x1_math64_sqrt">sqrt</a>(x: u64): u64
 </code></pre>
 
 
@@ -342,23 +342,23 @@ Returns square root of x, precisely floor(sqrt(x))
 <summary>Implementation</summary>
 
 
-<pre><code>public fun sqrt(x: u64): u64 &#123;
-    if (x &#61;&#61; 0) return 0;
-    // Note the plus 1 in the expression. Let n &#61; floor_lg2(x) we have x in [2^n, 2^(n&#43;1)&gt; and thus the answer in
-    // the half&#45;open interval [2^(n/2), 2^((n&#43;1)/2)&gt;. For even n we can write this as [2^(n/2), sqrt(2) 2^(n/2)&gt;
-    // for odd n [2^((n&#43;1)/2)/sqrt(2), 2^((n&#43;1)/2&gt;. For even n the left end point is integer for odd the right
-    // end point is integer. If we choose as our first approximation the integer end point we have as maximum
-    // relative error either (sqrt(2) &#45; 1) or (1 &#45; 1/sqrt(2)) both are smaller then 1/2.
-    let res &#61; 1 &lt;&lt; ((floor_log2(x) &#43; 1) &gt;&gt; 1);
-    // We use standard newton&#45;rhapson iteration to improve the initial approximation.
-    // The error term evolves as delta_i&#43;1 &#61; delta_i^2 / 2 (quadratic convergence).
-    // It turns out that after 4 iterations the delta is smaller than 2^&#45;32 and thus below the treshold.
-    res &#61; (res &#43; x / res) &gt;&gt; 1;
-    res &#61; (res &#43; x / res) &gt;&gt; 1;
-    res &#61; (res &#43; x / res) &gt;&gt; 1;
-    res &#61; (res &#43; x / res) &gt;&gt; 1;
-    min(res, x / res)
-&#125;
+<pre><code><b>public</b> <b>fun</b> <a href="math64.md#0x1_math64_sqrt">sqrt</a>(x: u64): u64 {
+    <b>if</b> (x == 0) <b>return</b> 0;
+    // Note the plus 1 in the expression. Let n = floor_lg2(x) we have x in [2^n, 2^(n+1)&gt; and thus the answer in
+    // the half-open interval [2^(n/2), 2^((n+1)/2)&gt;. For even n we can write this <b>as</b> [2^(n/2), <a href="math64.md#0x1_math64_sqrt">sqrt</a>(2) 2^(n/2)&gt;
+    // for odd n [2^((n+1)/2)/<a href="math64.md#0x1_math64_sqrt">sqrt</a>(2), 2^((n+1)/2&gt;. For even n the left end point is integer for odd the right
+    // end point is integer. If we <b>choose</b> <b>as</b> our first approximation the integer end point we have <b>as</b> maximum
+    // relative <a href="../../move-stdlib/doc/error.md#0x1_error">error</a> either (<a href="math64.md#0x1_math64_sqrt">sqrt</a>(2) - 1) or (1 - 1/<a href="math64.md#0x1_math64_sqrt">sqrt</a>(2)) both are smaller then 1/2.
+    <b>let</b> res = 1 &lt;&lt; ((<a href="math64.md#0x1_math64_floor_log2">floor_log2</a>(x) + 1) &gt;&gt; 1);
+    // We <b>use</b> standard newton-rhapson iteration <b>to</b> improve the initial approximation.
+    // The <a href="../../move-stdlib/doc/error.md#0x1_error">error</a> term evolves <b>as</b> delta_i+1 = delta_i^2 / 2 (quadratic convergence).
+    // It turns out that after 4 iterations the delta is smaller than 2^-32 and thus below the treshold.
+    res = (res + x / res) &gt;&gt; 1;
+    res = (res + x / res) &gt;&gt; 1;
+    res = (res + x / res) &gt;&gt; 1;
+    res = (res + x / res) &gt;&gt; 1;
+    <b>min</b>(res, x / res)
+}
 </code></pre>
 
 
@@ -371,7 +371,7 @@ Returns square root of x, precisely floor(sqrt(x))
 
 
 
-<pre><code>public fun ceil_div(x: u64, y: u64): u64
+<pre><code><b>public</b> <b>fun</b> <a href="math64.md#0x1_math64_ceil_div">ceil_div</a>(x: u64, y: u64): u64
 </code></pre>
 
 
@@ -380,16 +380,16 @@ Returns square root of x, precisely floor(sqrt(x))
 <summary>Implementation</summary>
 
 
-<pre><code>public inline fun ceil_div(x: u64, y: u64): u64 &#123;
-    // ceil_div(x, y) &#61; floor((x &#43; y &#45; 1) / y) &#61; floor((x &#45; 1) / y) &#43; 1
-    // (x &#43; y &#45; 1) could spuriously overflow. so we use the later version
-    if (x &#61;&#61; 0) &#123;
-        // Inline functions cannot take constants, as then every module using it needs the constant
-        assert!(y !&#61; 0, std::error::invalid_argument(4));
+<pre><code><b>public</b> inline <b>fun</b> <a href="math64.md#0x1_math64_ceil_div">ceil_div</a>(x: u64, y: u64): u64 {
+    // <a href="math64.md#0x1_math64_ceil_div">ceil_div</a>(x, y) = floor((x + y - 1) / y) = floor((x - 1) / y) + 1
+    // (x + y - 1) could spuriously overflow. so we <b>use</b> the later version
+    <b>if</b> (x == 0) {
+        // Inline functions cannot take constants, <b>as</b> then every <b>module</b> using it needs the constant
+        <b>assert</b>!(y != 0, std::error::invalid_argument(4));
         0
-    &#125;
-    else (x &#45; 1) / y &#43; 1
-&#125;
+    }
+    <b>else</b> (x - 1) / y + 1
+}
 </code></pre>
 
 
@@ -406,15 +406,15 @@ Returns square root of x, precisely floor(sqrt(x))
 ### Function `max`
 
 
-<pre><code>public fun max(a: u64, b: u64): u64
+<pre><code><b>public</b> <b>fun</b> <a href="math64.md#0x1_math64_max">max</a>(a: u64, b: u64): u64
 </code></pre>
 
 
 
 
-<pre><code>aborts_if false;
-ensures a &gt;&#61; b &#61;&#61;&gt; result &#61;&#61; a;
-ensures a &lt; b &#61;&#61;&gt; result &#61;&#61; b;
+<pre><code><b>aborts_if</b> <b>false</b>;
+<b>ensures</b> a &gt;= b ==&gt; result == a;
+<b>ensures</b> a &lt; b ==&gt; result == b;
 </code></pre>
 
 
@@ -424,15 +424,15 @@ ensures a &lt; b &#61;&#61;&gt; result &#61;&#61; b;
 ### Function `min`
 
 
-<pre><code>public fun min(a: u64, b: u64): u64
+<pre><code><b>public</b> <b>fun</b> <b>min</b>(a: u64, b: u64): u64
 </code></pre>
 
 
 
 
-<pre><code>aborts_if false;
-ensures a &lt; b &#61;&#61;&gt; result &#61;&#61; a;
-ensures a &gt;&#61; b &#61;&#61;&gt; result &#61;&#61; b;
+<pre><code><b>aborts_if</b> <b>false</b>;
+<b>ensures</b> a &lt; b ==&gt; result == a;
+<b>ensures</b> a &gt;= b ==&gt; result == b;
 </code></pre>
 
 
@@ -442,15 +442,15 @@ ensures a &gt;&#61; b &#61;&#61;&gt; result &#61;&#61; b;
 ### Function `average`
 
 
-<pre><code>public fun average(a: u64, b: u64): u64
+<pre><code><b>public</b> <b>fun</b> <a href="math64.md#0x1_math64_average">average</a>(a: u64, b: u64): u64
 </code></pre>
 
 
 
 
-<pre><code>pragma opaque;
-aborts_if false;
-ensures result &#61;&#61; (a &#43; b) / 2;
+<pre><code><b>pragma</b> opaque;
+<b>aborts_if</b> <b>false</b>;
+<b>ensures</b> result == (a + b) / 2;
 </code></pre>
 
 
@@ -460,17 +460,17 @@ ensures result &#61;&#61; (a &#43; b) / 2;
 ### Function `clamp`
 
 
-<pre><code>public fun clamp(x: u64, lower: u64, upper: u64): u64
+<pre><code><b>public</b> <b>fun</b> <a href="math64.md#0x1_math64_clamp">clamp</a>(x: u64, lower: u64, upper: u64): u64
 </code></pre>
 
 
 
 
-<pre><code>requires (lower &lt;&#61; upper);
-aborts_if false;
-ensures (lower &lt;&#61;x &amp;&amp; x &lt;&#61; upper) &#61;&#61;&gt; result &#61;&#61; x;
-ensures (x &lt; lower) &#61;&#61;&gt; result &#61;&#61; lower;
-ensures (upper &lt; x) &#61;&#61;&gt; result &#61;&#61; upper;
+<pre><code><b>requires</b> (lower &lt;= upper);
+<b>aborts_if</b> <b>false</b>;
+<b>ensures</b> (lower &lt;=x && x &lt;= upper) ==&gt; result == x;
+<b>ensures</b> (x &lt; lower) ==&gt; result == lower;
+<b>ensures</b> (upper &lt; x) ==&gt; result == upper;
 </code></pre>
 
 
@@ -480,15 +480,15 @@ ensures (upper &lt; x) &#61;&#61;&gt; result &#61;&#61; upper;
 ### Function `pow`
 
 
-<pre><code>public fun pow(n: u64, e: u64): u64
+<pre><code><b>public</b> <b>fun</b> <a href="math64.md#0x1_math64_pow">pow</a>(n: u64, e: u64): u64
 </code></pre>
 
 
 
 
-<pre><code>pragma opaque;
-aborts_if [abstract] spec_pow(n, e) &gt; MAX_U64;
-ensures [abstract] result &#61;&#61; spec_pow(n, e);
+<pre><code><b>pragma</b> opaque;
+<b>aborts_if</b> [abstract] <a href="math64.md#0x1_math64_spec_pow">spec_pow</a>(n, e) &gt; MAX_U64;
+<b>ensures</b> [abstract] result == <a href="math64.md#0x1_math64_spec_pow">spec_pow</a>(n, e);
 </code></pre>
 
 
@@ -498,16 +498,16 @@ ensures [abstract] result &#61;&#61; spec_pow(n, e);
 ### Function `floor_log2`
 
 
-<pre><code>public fun floor_log2(x: u64): u8
+<pre><code><b>public</b> <b>fun</b> <a href="math64.md#0x1_math64_floor_log2">floor_log2</a>(x: u64): u8
 </code></pre>
 
 
 
 
-<pre><code>pragma opaque;
-aborts_if [abstract] x &#61;&#61; 0;
-ensures [abstract] spec_pow(2, result) &lt;&#61; x;
-ensures [abstract] x &lt; spec_pow(2, result&#43;1);
+<pre><code><b>pragma</b> opaque;
+<b>aborts_if</b> [abstract] x == 0;
+<b>ensures</b> [abstract] <a href="math64.md#0x1_math64_spec_pow">spec_pow</a>(2, result) &lt;= x;
+<b>ensures</b> [abstract] x &lt; <a href="math64.md#0x1_math64_spec_pow">spec_pow</a>(2, result+1);
 </code></pre>
 
 
@@ -517,16 +517,16 @@ ensures [abstract] x &lt; spec_pow(2, result&#43;1);
 ### Function `sqrt`
 
 
-<pre><code>public fun sqrt(x: u64): u64
+<pre><code><b>public</b> <b>fun</b> <a href="math64.md#0x1_math64_sqrt">sqrt</a>(x: u64): u64
 </code></pre>
 
 
 
 
-<pre><code>pragma opaque;
-aborts_if [abstract] false;
-ensures [abstract] x &gt; 0 &#61;&#61;&gt; result &#42; result &lt;&#61; x;
-ensures [abstract] x &gt; 0 &#61;&#61;&gt; x &lt; (result&#43;1) &#42; (result&#43;1);
+<pre><code><b>pragma</b> opaque;
+<b>aborts_if</b> [abstract] <b>false</b>;
+<b>ensures</b> [abstract] x &gt; 0 ==&gt; result * result &lt;= x;
+<b>ensures</b> [abstract] x &gt; 0 ==&gt; x &lt; (result+1) * (result+1);
 </code></pre>
 
 
@@ -535,14 +535,14 @@ ensures [abstract] x &gt; 0 &#61;&#61;&gt; x &lt; (result&#43;1) &#42; (result&#
 <a id="0x1_math64_spec_pow"></a>
 
 
-<pre><code>fun spec_pow(n: u64, e: u64): u64 &#123;
-   if (e &#61;&#61; 0) &#123;
+<pre><code><b>fun</b> <a href="math64.md#0x1_math64_spec_pow">spec_pow</a>(n: u64, e: u64): u64 {
+   <b>if</b> (e == 0) {
        1
-   &#125;
-   else &#123;
-       n &#42; spec_pow(n, e&#45;1)
-   &#125;
-&#125;
+   }
+   <b>else</b> {
+       n * <a href="math64.md#0x1_math64_spec_pow">spec_pow</a>(n, e-1)
+   }
+}
 </code></pre>
 
 

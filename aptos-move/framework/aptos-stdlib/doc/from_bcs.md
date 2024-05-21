@@ -4,7 +4,7 @@
 # Module `0x1::from_bcs`
 
 This module provides a number of functions to convert _primitive_ types from their representation in <code>std::bcs</code>
-to values. This is the opposite of <code>bcs::to_bytes</code>. Note that it is not safe to define a generic public <code>from_bytes</code>
+to values. This is the opposite of <code><a href="../../move-stdlib/doc/bcs.md#0x1_bcs_to_bytes">bcs::to_bytes</a></code>. Note that it is not safe to define a generic public <code>from_bytes</code>
 function because this can violate implicit struct invariants, therefore only primitive types are offerred. If
 a general conversion back-and-force is needed, consider the <code>aptos_std::Any</code> type which preserves invariants.
 
@@ -33,7 +33,7 @@ assert!(from_bcs::to_address(bcs::to_bytes(&@0xabcdef)) == @0xabcdef, 0);
     -  [Function `from_bytes`](#@Specification_1_from_bytes)
 
 
-<pre><code>use 0x1::string;
+<pre><code><b>use</b> <a href="../../move-stdlib/doc/string.md#0x1_string">0x1::string</a>;
 </code></pre>
 
 
@@ -48,7 +48,7 @@ assert!(from_bcs::to_address(bcs::to_bytes(&@0xabcdef)) == @0xabcdef, 0);
 UTF8 check failed in conversion from bytes to string
 
 
-<pre><code>const EINVALID_UTF8: u64 &#61; 1;
+<pre><code><b>const</b> <a href="from_bcs.md#0x1_from_bcs_EINVALID_UTF8">EINVALID_UTF8</a>: u64 = 1;
 </code></pre>
 
 
@@ -59,7 +59,7 @@ UTF8 check failed in conversion from bytes to string
 
 
 
-<pre><code>public fun to_bool(v: vector&lt;u8&gt;): bool
+<pre><code><b>public</b> <b>fun</b> <a href="from_bcs.md#0x1_from_bcs_to_bool">to_bool</a>(v: <a href="../../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u8&gt;): bool
 </code></pre>
 
 
@@ -68,9 +68,9 @@ UTF8 check failed in conversion from bytes to string
 <summary>Implementation</summary>
 
 
-<pre><code>public fun to_bool(v: vector&lt;u8&gt;): bool &#123;
-    from_bytes&lt;bool&gt;(v)
-&#125;
+<pre><code><b>public</b> <b>fun</b> <a href="from_bcs.md#0x1_from_bcs_to_bool">to_bool</a>(v: <a href="../../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u8&gt;): bool {
+    <a href="from_bcs.md#0x1_from_bcs_from_bytes">from_bytes</a>&lt;bool&gt;(v)
+}
 </code></pre>
 
 
@@ -83,7 +83,7 @@ UTF8 check failed in conversion from bytes to string
 
 
 
-<pre><code>public fun to_u8(v: vector&lt;u8&gt;): u8
+<pre><code><b>public</b> <b>fun</b> <a href="from_bcs.md#0x1_from_bcs_to_u8">to_u8</a>(v: <a href="../../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u8&gt;): u8
 </code></pre>
 
 
@@ -92,9 +92,9 @@ UTF8 check failed in conversion from bytes to string
 <summary>Implementation</summary>
 
 
-<pre><code>public fun to_u8(v: vector&lt;u8&gt;): u8 &#123;
-    from_bytes&lt;u8&gt;(v)
-&#125;
+<pre><code><b>public</b> <b>fun</b> <a href="from_bcs.md#0x1_from_bcs_to_u8">to_u8</a>(v: <a href="../../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u8&gt;): u8 {
+    <a href="from_bcs.md#0x1_from_bcs_from_bytes">from_bytes</a>&lt;u8&gt;(v)
+}
 </code></pre>
 
 
@@ -107,7 +107,7 @@ UTF8 check failed in conversion from bytes to string
 
 
 
-<pre><code>public fun to_u16(v: vector&lt;u8&gt;): u16
+<pre><code><b>public</b> <b>fun</b> <a href="from_bcs.md#0x1_from_bcs_to_u16">to_u16</a>(v: <a href="../../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u8&gt;): u16
 </code></pre>
 
 
@@ -116,9 +116,9 @@ UTF8 check failed in conversion from bytes to string
 <summary>Implementation</summary>
 
 
-<pre><code>public fun to_u16(v: vector&lt;u8&gt;): u16 &#123;
-    from_bytes&lt;u16&gt;(v)
-&#125;
+<pre><code><b>public</b> <b>fun</b> <a href="from_bcs.md#0x1_from_bcs_to_u16">to_u16</a>(v: <a href="../../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u8&gt;): u16 {
+    <a href="from_bcs.md#0x1_from_bcs_from_bytes">from_bytes</a>&lt;u16&gt;(v)
+}
 </code></pre>
 
 
@@ -131,7 +131,7 @@ UTF8 check failed in conversion from bytes to string
 
 
 
-<pre><code>public fun to_u32(v: vector&lt;u8&gt;): u32
+<pre><code><b>public</b> <b>fun</b> <a href="from_bcs.md#0x1_from_bcs_to_u32">to_u32</a>(v: <a href="../../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u8&gt;): u32
 </code></pre>
 
 
@@ -140,9 +140,9 @@ UTF8 check failed in conversion from bytes to string
 <summary>Implementation</summary>
 
 
-<pre><code>public fun to_u32(v: vector&lt;u8&gt;): u32 &#123;
-    from_bytes&lt;u32&gt;(v)
-&#125;
+<pre><code><b>public</b> <b>fun</b> <a href="from_bcs.md#0x1_from_bcs_to_u32">to_u32</a>(v: <a href="../../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u8&gt;): u32 {
+    <a href="from_bcs.md#0x1_from_bcs_from_bytes">from_bytes</a>&lt;u32&gt;(v)
+}
 </code></pre>
 
 
@@ -155,7 +155,7 @@ UTF8 check failed in conversion from bytes to string
 
 
 
-<pre><code>public fun to_u64(v: vector&lt;u8&gt;): u64
+<pre><code><b>public</b> <b>fun</b> <a href="from_bcs.md#0x1_from_bcs_to_u64">to_u64</a>(v: <a href="../../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u8&gt;): u64
 </code></pre>
 
 
@@ -164,9 +164,9 @@ UTF8 check failed in conversion from bytes to string
 <summary>Implementation</summary>
 
 
-<pre><code>public fun to_u64(v: vector&lt;u8&gt;): u64 &#123;
-    from_bytes&lt;u64&gt;(v)
-&#125;
+<pre><code><b>public</b> <b>fun</b> <a href="from_bcs.md#0x1_from_bcs_to_u64">to_u64</a>(v: <a href="../../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u8&gt;): u64 {
+    <a href="from_bcs.md#0x1_from_bcs_from_bytes">from_bytes</a>&lt;u64&gt;(v)
+}
 </code></pre>
 
 
@@ -179,7 +179,7 @@ UTF8 check failed in conversion from bytes to string
 
 
 
-<pre><code>public fun to_u128(v: vector&lt;u8&gt;): u128
+<pre><code><b>public</b> <b>fun</b> <a href="from_bcs.md#0x1_from_bcs_to_u128">to_u128</a>(v: <a href="../../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u8&gt;): u128
 </code></pre>
 
 
@@ -188,9 +188,9 @@ UTF8 check failed in conversion from bytes to string
 <summary>Implementation</summary>
 
 
-<pre><code>public fun to_u128(v: vector&lt;u8&gt;): u128 &#123;
-    from_bytes&lt;u128&gt;(v)
-&#125;
+<pre><code><b>public</b> <b>fun</b> <a href="from_bcs.md#0x1_from_bcs_to_u128">to_u128</a>(v: <a href="../../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u8&gt;): u128 {
+    <a href="from_bcs.md#0x1_from_bcs_from_bytes">from_bytes</a>&lt;u128&gt;(v)
+}
 </code></pre>
 
 
@@ -203,7 +203,7 @@ UTF8 check failed in conversion from bytes to string
 
 
 
-<pre><code>public fun to_u256(v: vector&lt;u8&gt;): u256
+<pre><code><b>public</b> <b>fun</b> <a href="from_bcs.md#0x1_from_bcs_to_u256">to_u256</a>(v: <a href="../../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u8&gt;): u256
 </code></pre>
 
 
@@ -212,9 +212,9 @@ UTF8 check failed in conversion from bytes to string
 <summary>Implementation</summary>
 
 
-<pre><code>public fun to_u256(v: vector&lt;u8&gt;): u256 &#123;
-    from_bytes&lt;u256&gt;(v)
-&#125;
+<pre><code><b>public</b> <b>fun</b> <a href="from_bcs.md#0x1_from_bcs_to_u256">to_u256</a>(v: <a href="../../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u8&gt;): u256 {
+    <a href="from_bcs.md#0x1_from_bcs_from_bytes">from_bytes</a>&lt;u256&gt;(v)
+}
 </code></pre>
 
 
@@ -227,7 +227,7 @@ UTF8 check failed in conversion from bytes to string
 
 
 
-<pre><code>public fun to_address(v: vector&lt;u8&gt;): address
+<pre><code><b>public</b> <b>fun</b> <a href="from_bcs.md#0x1_from_bcs_to_address">to_address</a>(v: <a href="../../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u8&gt;): <b>address</b>
 </code></pre>
 
 
@@ -236,9 +236,9 @@ UTF8 check failed in conversion from bytes to string
 <summary>Implementation</summary>
 
 
-<pre><code>public fun to_address(v: vector&lt;u8&gt;): address &#123;
-    from_bytes&lt;address&gt;(v)
-&#125;
+<pre><code><b>public</b> <b>fun</b> <a href="from_bcs.md#0x1_from_bcs_to_address">to_address</a>(v: <a href="../../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u8&gt;): <b>address</b> {
+    <a href="from_bcs.md#0x1_from_bcs_from_bytes">from_bytes</a>&lt;<b>address</b>&gt;(v)
+}
 </code></pre>
 
 
@@ -251,7 +251,7 @@ UTF8 check failed in conversion from bytes to string
 
 
 
-<pre><code>public fun to_bytes(v: vector&lt;u8&gt;): vector&lt;u8&gt;
+<pre><code><b>public</b> <b>fun</b> <a href="from_bcs.md#0x1_from_bcs_to_bytes">to_bytes</a>(v: <a href="../../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u8&gt;): <a href="../../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u8&gt;
 </code></pre>
 
 
@@ -260,9 +260,9 @@ UTF8 check failed in conversion from bytes to string
 <summary>Implementation</summary>
 
 
-<pre><code>public fun to_bytes(v: vector&lt;u8&gt;): vector&lt;u8&gt; &#123;
-    from_bytes&lt;vector&lt;u8&gt;&gt;(v)
-&#125;
+<pre><code><b>public</b> <b>fun</b> <a href="from_bcs.md#0x1_from_bcs_to_bytes">to_bytes</a>(v: <a href="../../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u8&gt;): <a href="../../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u8&gt; {
+    <a href="from_bcs.md#0x1_from_bcs_from_bytes">from_bytes</a>&lt;<a href="../../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u8&gt;&gt;(v)
+}
 </code></pre>
 
 
@@ -275,7 +275,7 @@ UTF8 check failed in conversion from bytes to string
 
 
 
-<pre><code>public fun to_string(v: vector&lt;u8&gt;): string::String
+<pre><code><b>public</b> <b>fun</b> <a href="from_bcs.md#0x1_from_bcs_to_string">to_string</a>(v: <a href="../../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u8&gt;): <a href="../../move-stdlib/doc/string.md#0x1_string_String">string::String</a>
 </code></pre>
 
 
@@ -284,12 +284,12 @@ UTF8 check failed in conversion from bytes to string
 <summary>Implementation</summary>
 
 
-<pre><code>public fun to_string(v: vector&lt;u8&gt;): String &#123;
-    // To make this safe, we need to evaluate the utf8 invariant.
-    let s &#61; from_bytes&lt;String&gt;(v);
-    assert!(string::internal_check_utf8(string::bytes(&amp;s)), EINVALID_UTF8);
+<pre><code><b>public</b> <b>fun</b> <a href="from_bcs.md#0x1_from_bcs_to_string">to_string</a>(v: <a href="../../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u8&gt;): String {
+    // To make this safe, we need <b>to</b> evaluate the utf8 <b>invariant</b>.
+    <b>let</b> s = <a href="from_bcs.md#0x1_from_bcs_from_bytes">from_bytes</a>&lt;String&gt;(v);
+    <b>assert</b>!(<a href="../../move-stdlib/doc/string.md#0x1_string_internal_check_utf8">string::internal_check_utf8</a>(<a href="../../move-stdlib/doc/string.md#0x1_string_bytes">string::bytes</a>(&s)), <a href="from_bcs.md#0x1_from_bcs_EINVALID_UTF8">EINVALID_UTF8</a>);
     s
-&#125;
+}
 </code></pre>
 
 
@@ -307,7 +307,7 @@ deserialize a linear value, its their responsibility that the data they deserial
 owned.
 
 
-<pre><code>public(friend) fun from_bytes&lt;T&gt;(bytes: vector&lt;u8&gt;): T
+<pre><code><b>public</b>(<b>friend</b>) <b>fun</b> <a href="from_bcs.md#0x1_from_bcs_from_bytes">from_bytes</a>&lt;T&gt;(bytes: <a href="../../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u8&gt;): T
 </code></pre>
 
 
@@ -316,7 +316,7 @@ owned.
 <summary>Implementation</summary>
 
 
-<pre><code>public(friend) native fun from_bytes&lt;T&gt;(bytes: vector&lt;u8&gt;): T;
+<pre><code><b>public</b>(<b>friend</b>) <b>native</b> <b>fun</b> <a href="from_bcs.md#0x1_from_bcs_from_bytes">from_bytes</a>&lt;T&gt;(bytes: <a href="../../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u8&gt;): T;
 </code></pre>
 
 
@@ -332,13 +332,13 @@ owned.
 <a id="0x1_from_bcs_deserialize"></a>
 
 
-<pre><code>fun deserialize&lt;T&gt;(bytes: vector&lt;u8&gt;): T;
+<pre><code><b>fun</b> <a href="from_bcs.md#0x1_from_bcs_deserialize">deserialize</a>&lt;T&gt;(bytes: <a href="../../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u8&gt;): T;
 <a id="0x1_from_bcs_deserializable"></a>
-fun deserializable&lt;T&gt;(bytes: vector&lt;u8&gt;): bool;
-axiom&lt;T&gt; forall b1: vector&lt;u8&gt;, b2: vector&lt;u8&gt;:
-    ( b1 &#61;&#61; b2 &#61;&#61;&gt; deserializable&lt;T&gt;(b1) &#61;&#61; deserializable&lt;T&gt;(b2) );
-axiom&lt;T&gt; forall b1: vector&lt;u8&gt;, b2: vector&lt;u8&gt;:
-    ( b1 &#61;&#61; b2 &#61;&#61;&gt; deserialize&lt;T&gt;(b1) &#61;&#61; deserialize&lt;T&gt;(b2) );
+<b>fun</b> <a href="from_bcs.md#0x1_from_bcs_deserializable">deserializable</a>&lt;T&gt;(bytes: <a href="../../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u8&gt;): bool;
+<b>axiom</b>&lt;T&gt; <b>forall</b> b1: <a href="../../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u8&gt;, b2: <a href="../../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u8&gt;:
+    ( b1 == b2 ==&gt; <a href="from_bcs.md#0x1_from_bcs_deserializable">deserializable</a>&lt;T&gt;(b1) == <a href="from_bcs.md#0x1_from_bcs_deserializable">deserializable</a>&lt;T&gt;(b2) );
+<b>axiom</b>&lt;T&gt; <b>forall</b> b1: <a href="../../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u8&gt;, b2: <a href="../../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u8&gt;:
+    ( b1 == b2 ==&gt; <a href="from_bcs.md#0x1_from_bcs_deserialize">deserialize</a>&lt;T&gt;(b1) == <a href="from_bcs.md#0x1_from_bcs_deserialize">deserialize</a>&lt;T&gt;(b2) );
 </code></pre>
 
 
@@ -348,15 +348,15 @@ axiom&lt;T&gt; forall b1: vector&lt;u8&gt;, b2: vector&lt;u8&gt;:
 ### Function `from_bytes`
 
 
-<pre><code>public(friend) fun from_bytes&lt;T&gt;(bytes: vector&lt;u8&gt;): T
+<pre><code><b>public</b>(<b>friend</b>) <b>fun</b> <a href="from_bcs.md#0x1_from_bcs_from_bytes">from_bytes</a>&lt;T&gt;(bytes: <a href="../../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u8&gt;): T
 </code></pre>
 
 
 
 
-<pre><code>pragma opaque;
-aborts_if !deserializable&lt;T&gt;(bytes);
-ensures result &#61;&#61; deserialize&lt;T&gt;(bytes);
+<pre><code><b>pragma</b> opaque;
+<b>aborts_if</b> !<a href="from_bcs.md#0x1_from_bcs_deserializable">deserializable</a>&lt;T&gt;(bytes);
+<b>ensures</b> result == <a href="from_bcs.md#0x1_from_bcs_deserialize">deserialize</a>&lt;T&gt;(bytes);
 </code></pre>
 
 

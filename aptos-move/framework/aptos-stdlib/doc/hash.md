@@ -39,9 +39,9 @@ Non-cryptograhic hashes:
     -  [Function `blake2b_256_internal`](#@Specification_1_blake2b_256_internal)
 
 
-<pre><code>use 0x1::bcs;
-use 0x1::error;
-use 0x1::features;
+<pre><code><b>use</b> <a href="../../move-stdlib/doc/bcs.md#0x1_bcs">0x1::bcs</a>;
+<b>use</b> <a href="../../move-stdlib/doc/error.md#0x1_error">0x1::error</a>;
+<b>use</b> <a href="../../move-stdlib/doc/features.md#0x1_features">0x1::features</a>;
 </code></pre>
 
 
@@ -56,7 +56,7 @@ use 0x1::features;
 A newly-added native function is not yet enabled.
 
 
-<pre><code>const E_NATIVE_FUN_NOT_AVAILABLE: u64 &#61; 1;
+<pre><code><b>const</b> <a href="hash.md#0x1_aptos_hash_E_NATIVE_FUN_NOT_AVAILABLE">E_NATIVE_FUN_NOT_AVAILABLE</a>: u64 = 1;
 </code></pre>
 
 
@@ -68,7 +68,7 @@ A newly-added native function is not yet enabled.
 Returns the (non-cryptographic) SipHash of <code>bytes</code>. See https://en.wikipedia.org/wiki/SipHash
 
 
-<pre><code>public fun sip_hash(bytes: vector&lt;u8&gt;): u64
+<pre><code><b>public</b> <b>fun</b> <a href="hash.md#0x1_aptos_hash_sip_hash">sip_hash</a>(bytes: <a href="../../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u8&gt;): u64
 </code></pre>
 
 
@@ -77,7 +77,7 @@ Returns the (non-cryptographic) SipHash of <code>bytes</code>. See https://en.wi
 <summary>Implementation</summary>
 
 
-<pre><code>native public fun sip_hash(bytes: vector&lt;u8&gt;): u64;
+<pre><code><b>native</b> <b>public</b> <b>fun</b> <a href="hash.md#0x1_aptos_hash_sip_hash">sip_hash</a>(bytes: <a href="../../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u8&gt;): u64;
 </code></pre>
 
 
@@ -91,7 +91,7 @@ Returns the (non-cryptographic) SipHash of <code>bytes</code>. See https://en.wi
 Returns the (non-cryptographic) SipHash of the BCS serialization of <code>v</code>. See https://en.wikipedia.org/wiki/SipHash
 
 
-<pre><code>public fun sip_hash_from_value&lt;MoveValue&gt;(v: &amp;MoveValue): u64
+<pre><code><b>public</b> <b>fun</b> <a href="hash.md#0x1_aptos_hash_sip_hash_from_value">sip_hash_from_value</a>&lt;MoveValue&gt;(v: &MoveValue): u64
 </code></pre>
 
 
@@ -100,11 +100,11 @@ Returns the (non-cryptographic) SipHash of the BCS serialization of <code>v</cod
 <summary>Implementation</summary>
 
 
-<pre><code>public fun sip_hash_from_value&lt;MoveValue&gt;(v: &amp;MoveValue): u64 &#123;
-    let bytes &#61; bcs::to_bytes(v);
+<pre><code><b>public</b> <b>fun</b> <a href="hash.md#0x1_aptos_hash_sip_hash_from_value">sip_hash_from_value</a>&lt;MoveValue&gt;(v: &MoveValue): u64 {
+    <b>let</b> bytes = <a href="../../move-stdlib/doc/bcs.md#0x1_bcs_to_bytes">bcs::to_bytes</a>(v);
 
-    sip_hash(bytes)
-&#125;
+    <a href="hash.md#0x1_aptos_hash_sip_hash">sip_hash</a>(bytes)
+}
 </code></pre>
 
 
@@ -118,7 +118,7 @@ Returns the (non-cryptographic) SipHash of the BCS serialization of <code>v</cod
 Returns the Keccak-256 hash of <code>bytes</code>.
 
 
-<pre><code>public fun keccak256(bytes: vector&lt;u8&gt;): vector&lt;u8&gt;
+<pre><code><b>public</b> <b>fun</b> <a href="hash.md#0x1_aptos_hash_keccak256">keccak256</a>(bytes: <a href="../../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u8&gt;): <a href="../../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u8&gt;
 </code></pre>
 
 
@@ -127,7 +127,7 @@ Returns the Keccak-256 hash of <code>bytes</code>.
 <summary>Implementation</summary>
 
 
-<pre><code>native public fun keccak256(bytes: vector&lt;u8&gt;): vector&lt;u8&gt;;
+<pre><code><b>native</b> <b>public</b> <b>fun</b> <a href="hash.md#0x1_aptos_hash_keccak256">keccak256</a>(bytes: <a href="../../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u8&gt;): <a href="../../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u8&gt;;
 </code></pre>
 
 
@@ -141,7 +141,7 @@ Returns the Keccak-256 hash of <code>bytes</code>.
 Returns the SHA2-512 hash of <code>bytes</code>.
 
 
-<pre><code>public fun sha2_512(bytes: vector&lt;u8&gt;): vector&lt;u8&gt;
+<pre><code><b>public</b> <b>fun</b> <a href="hash.md#0x1_aptos_hash_sha2_512">sha2_512</a>(bytes: <a href="../../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u8&gt;): <a href="../../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u8&gt;
 </code></pre>
 
 
@@ -150,13 +150,13 @@ Returns the SHA2-512 hash of <code>bytes</code>.
 <summary>Implementation</summary>
 
 
-<pre><code>public fun sha2_512(bytes: vector&lt;u8&gt;): vector&lt;u8&gt; &#123;
-    if(!features::sha_512_and_ripemd_160_enabled()) &#123;
-        abort(std::error::invalid_state(E_NATIVE_FUN_NOT_AVAILABLE))
-    &#125;;
+<pre><code><b>public</b> <b>fun</b> <a href="hash.md#0x1_aptos_hash_sha2_512">sha2_512</a>(bytes: <a href="../../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u8&gt;): <a href="../../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u8&gt; {
+    <b>if</b>(!<a href="../../move-stdlib/doc/features.md#0x1_features_sha_512_and_ripemd_160_enabled">features::sha_512_and_ripemd_160_enabled</a>()) {
+        <b>abort</b>(std::error::invalid_state(<a href="hash.md#0x1_aptos_hash_E_NATIVE_FUN_NOT_AVAILABLE">E_NATIVE_FUN_NOT_AVAILABLE</a>))
+    };
 
-    sha2_512_internal(bytes)
-&#125;
+    <a href="hash.md#0x1_aptos_hash_sha2_512_internal">sha2_512_internal</a>(bytes)
+}
 </code></pre>
 
 
@@ -170,7 +170,7 @@ Returns the SHA2-512 hash of <code>bytes</code>.
 Returns the SHA3-512 hash of <code>bytes</code>.
 
 
-<pre><code>public fun sha3_512(bytes: vector&lt;u8&gt;): vector&lt;u8&gt;
+<pre><code><b>public</b> <b>fun</b> <a href="hash.md#0x1_aptos_hash_sha3_512">sha3_512</a>(bytes: <a href="../../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u8&gt;): <a href="../../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u8&gt;
 </code></pre>
 
 
@@ -179,13 +179,13 @@ Returns the SHA3-512 hash of <code>bytes</code>.
 <summary>Implementation</summary>
 
 
-<pre><code>public fun sha3_512(bytes: vector&lt;u8&gt;): vector&lt;u8&gt; &#123;
-    if(!features::sha_512_and_ripemd_160_enabled()) &#123;
-        abort(std::error::invalid_state(E_NATIVE_FUN_NOT_AVAILABLE))
-    &#125;;
+<pre><code><b>public</b> <b>fun</b> <a href="hash.md#0x1_aptos_hash_sha3_512">sha3_512</a>(bytes: <a href="../../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u8&gt;): <a href="../../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u8&gt; {
+    <b>if</b>(!<a href="../../move-stdlib/doc/features.md#0x1_features_sha_512_and_ripemd_160_enabled">features::sha_512_and_ripemd_160_enabled</a>()) {
+        <b>abort</b>(std::error::invalid_state(<a href="hash.md#0x1_aptos_hash_E_NATIVE_FUN_NOT_AVAILABLE">E_NATIVE_FUN_NOT_AVAILABLE</a>))
+    };
 
-    sha3_512_internal(bytes)
-&#125;
+    <a href="hash.md#0x1_aptos_hash_sha3_512_internal">sha3_512_internal</a>(bytes)
+}
 </code></pre>
 
 
@@ -202,7 +202,7 @@ WARNING: Only 80-bit security is provided by this function. This means an advers
 hashes will, with high probability, find a collision x_1 != x_2 such that RIPEMD-160(x_1) = RIPEMD-160(x_2).
 
 
-<pre><code>public fun ripemd160(bytes: vector&lt;u8&gt;): vector&lt;u8&gt;
+<pre><code><b>public</b> <b>fun</b> <a href="hash.md#0x1_aptos_hash_ripemd160">ripemd160</a>(bytes: <a href="../../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u8&gt;): <a href="../../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u8&gt;
 </code></pre>
 
 
@@ -211,13 +211,13 @@ hashes will, with high probability, find a collision x_1 != x_2 such that RIPEMD
 <summary>Implementation</summary>
 
 
-<pre><code>public fun ripemd160(bytes: vector&lt;u8&gt;): vector&lt;u8&gt; &#123;
-    if(!features::sha_512_and_ripemd_160_enabled()) &#123;
-        abort(std::error::invalid_state(E_NATIVE_FUN_NOT_AVAILABLE))
-    &#125;;
+<pre><code><b>public</b> <b>fun</b> <a href="hash.md#0x1_aptos_hash_ripemd160">ripemd160</a>(bytes: <a href="../../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u8&gt;): <a href="../../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u8&gt; {
+    <b>if</b>(!<a href="../../move-stdlib/doc/features.md#0x1_features_sha_512_and_ripemd_160_enabled">features::sha_512_and_ripemd_160_enabled</a>()) {
+        <b>abort</b>(std::error::invalid_state(<a href="hash.md#0x1_aptos_hash_E_NATIVE_FUN_NOT_AVAILABLE">E_NATIVE_FUN_NOT_AVAILABLE</a>))
+    };
 
-    ripemd160_internal(bytes)
-&#125;
+    <a href="hash.md#0x1_aptos_hash_ripemd160_internal">ripemd160_internal</a>(bytes)
+}
 </code></pre>
 
 
@@ -231,7 +231,7 @@ hashes will, with high probability, find a collision x_1 != x_2 such that RIPEMD
 Returns the BLAKE2B-256 hash of <code>bytes</code>.
 
 
-<pre><code>public fun blake2b_256(bytes: vector&lt;u8&gt;): vector&lt;u8&gt;
+<pre><code><b>public</b> <b>fun</b> <a href="hash.md#0x1_aptos_hash_blake2b_256">blake2b_256</a>(bytes: <a href="../../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u8&gt;): <a href="../../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u8&gt;
 </code></pre>
 
 
@@ -240,13 +240,13 @@ Returns the BLAKE2B-256 hash of <code>bytes</code>.
 <summary>Implementation</summary>
 
 
-<pre><code>public fun blake2b_256(bytes: vector&lt;u8&gt;): vector&lt;u8&gt; &#123;
-    if(!features::blake2b_256_enabled()) &#123;
-        abort(std::error::invalid_state(E_NATIVE_FUN_NOT_AVAILABLE))
-    &#125;;
+<pre><code><b>public</b> <b>fun</b> <a href="hash.md#0x1_aptos_hash_blake2b_256">blake2b_256</a>(bytes: <a href="../../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u8&gt;): <a href="../../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u8&gt; {
+    <b>if</b>(!<a href="../../move-stdlib/doc/features.md#0x1_features_blake2b_256_enabled">features::blake2b_256_enabled</a>()) {
+        <b>abort</b>(std::error::invalid_state(<a href="hash.md#0x1_aptos_hash_E_NATIVE_FUN_NOT_AVAILABLE">E_NATIVE_FUN_NOT_AVAILABLE</a>))
+    };
 
-    blake2b_256_internal(bytes)
-&#125;
+    <a href="hash.md#0x1_aptos_hash_blake2b_256_internal">blake2b_256_internal</a>(bytes)
+}
 </code></pre>
 
 
@@ -260,7 +260,7 @@ Returns the BLAKE2B-256 hash of <code>bytes</code>.
 Returns the SHA2-512 hash of <code>bytes</code>.
 
 
-<pre><code>fun sha2_512_internal(bytes: vector&lt;u8&gt;): vector&lt;u8&gt;
+<pre><code><b>fun</b> <a href="hash.md#0x1_aptos_hash_sha2_512_internal">sha2_512_internal</a>(bytes: <a href="../../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u8&gt;): <a href="../../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u8&gt;
 </code></pre>
 
 
@@ -269,7 +269,7 @@ Returns the SHA2-512 hash of <code>bytes</code>.
 <summary>Implementation</summary>
 
 
-<pre><code>native fun sha2_512_internal(bytes: vector&lt;u8&gt;): vector&lt;u8&gt;;
+<pre><code><b>native</b> <b>fun</b> <a href="hash.md#0x1_aptos_hash_sha2_512_internal">sha2_512_internal</a>(bytes: <a href="../../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u8&gt;): <a href="../../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u8&gt;;
 </code></pre>
 
 
@@ -283,7 +283,7 @@ Returns the SHA2-512 hash of <code>bytes</code>.
 Returns the SHA3-512 hash of <code>bytes</code>.
 
 
-<pre><code>fun sha3_512_internal(bytes: vector&lt;u8&gt;): vector&lt;u8&gt;
+<pre><code><b>fun</b> <a href="hash.md#0x1_aptos_hash_sha3_512_internal">sha3_512_internal</a>(bytes: <a href="../../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u8&gt;): <a href="../../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u8&gt;
 </code></pre>
 
 
@@ -292,7 +292,7 @@ Returns the SHA3-512 hash of <code>bytes</code>.
 <summary>Implementation</summary>
 
 
-<pre><code>native fun sha3_512_internal(bytes: vector&lt;u8&gt;): vector&lt;u8&gt;;
+<pre><code><b>native</b> <b>fun</b> <a href="hash.md#0x1_aptos_hash_sha3_512_internal">sha3_512_internal</a>(bytes: <a href="../../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u8&gt;): <a href="../../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u8&gt;;
 </code></pre>
 
 
@@ -309,7 +309,7 @@ WARNING: Only 80-bit security is provided by this function. This means an advers
 hashes will, with high probability, find a collision x_1 != x_2 such that RIPEMD-160(x_1) = RIPEMD-160(x_2).
 
 
-<pre><code>fun ripemd160_internal(bytes: vector&lt;u8&gt;): vector&lt;u8&gt;
+<pre><code><b>fun</b> <a href="hash.md#0x1_aptos_hash_ripemd160_internal">ripemd160_internal</a>(bytes: <a href="../../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u8&gt;): <a href="../../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u8&gt;
 </code></pre>
 
 
@@ -318,7 +318,7 @@ hashes will, with high probability, find a collision x_1 != x_2 such that RIPEMD
 <summary>Implementation</summary>
 
 
-<pre><code>native fun ripemd160_internal(bytes: vector&lt;u8&gt;): vector&lt;u8&gt;;
+<pre><code><b>native</b> <b>fun</b> <a href="hash.md#0x1_aptos_hash_ripemd160_internal">ripemd160_internal</a>(bytes: <a href="../../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u8&gt;): <a href="../../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u8&gt;;
 </code></pre>
 
 
@@ -332,7 +332,7 @@ hashes will, with high probability, find a collision x_1 != x_2 such that RIPEMD
 Returns the BLAKE2B-256 hash of <code>bytes</code>.
 
 
-<pre><code>fun blake2b_256_internal(bytes: vector&lt;u8&gt;): vector&lt;u8&gt;
+<pre><code><b>fun</b> <a href="hash.md#0x1_aptos_hash_blake2b_256_internal">blake2b_256_internal</a>(bytes: <a href="../../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u8&gt;): <a href="../../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u8&gt;
 </code></pre>
 
 
@@ -341,7 +341,7 @@ Returns the BLAKE2B-256 hash of <code>bytes</code>.
 <summary>Implementation</summary>
 
 
-<pre><code>native fun blake2b_256_internal(bytes: vector&lt;u8&gt;): vector&lt;u8&gt;;
+<pre><code><b>native</b> <b>fun</b> <a href="hash.md#0x1_aptos_hash_blake2b_256_internal">blake2b_256_internal</a>(bytes: <a href="../../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u8&gt;): <a href="../../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u8&gt;;
 </code></pre>
 
 
@@ -359,7 +359,7 @@ Returns the BLAKE2B-256 hash of <code>bytes</code>.
 <a id="0x1_aptos_hash_spec_sip_hash"></a>
 
 
-<pre><code>fun spec_sip_hash(bytes: vector&lt;u8&gt;): u64;
+<pre><code><b>fun</b> <a href="hash.md#0x1_aptos_hash_spec_sip_hash">spec_sip_hash</a>(bytes: <a href="../../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u8&gt;): u64;
 </code></pre>
 
 
@@ -369,9 +369,9 @@ Returns the BLAKE2B-256 hash of <code>bytes</code>.
 <a id="0x1_aptos_hash_spec_keccak256"></a>
 
 
-<pre><code>fun spec_keccak256(bytes: vector&lt;u8&gt;): vector&lt;u8&gt;;
-axiom forall b1: vector&lt;u8&gt;, b2: vector&lt;u8&gt;:
-    (spec_keccak256(b1) &#61;&#61; spec_keccak256(b2) &#61;&#61;&gt; b1 &#61;&#61; b2);
+<pre><code><b>fun</b> <a href="hash.md#0x1_aptos_hash_spec_keccak256">spec_keccak256</a>(bytes: <a href="../../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u8&gt;): <a href="../../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u8&gt;;
+<b>axiom</b> <b>forall</b> b1: <a href="../../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u8&gt;, b2: <a href="../../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u8&gt;:
+    (<a href="hash.md#0x1_aptos_hash_spec_keccak256">spec_keccak256</a>(b1) == <a href="hash.md#0x1_aptos_hash_spec_keccak256">spec_keccak256</a>(b2) ==&gt; b1 == b2);
 </code></pre>
 
 
@@ -381,9 +381,9 @@ axiom forall b1: vector&lt;u8&gt;, b2: vector&lt;u8&gt;:
 <a id="0x1_aptos_hash_spec_sha2_512_internal"></a>
 
 
-<pre><code>fun spec_sha2_512_internal(bytes: vector&lt;u8&gt;): vector&lt;u8&gt;;
-axiom forall b1: vector&lt;u8&gt;, b2: vector&lt;u8&gt;:
-    (spec_sha2_512_internal(b1) &#61;&#61; spec_sha2_512_internal(b2) &#61;&#61;&gt; b1 &#61;&#61; b2);
+<pre><code><b>fun</b> <a href="hash.md#0x1_aptos_hash_spec_sha2_512_internal">spec_sha2_512_internal</a>(bytes: <a href="../../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u8&gt;): <a href="../../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u8&gt;;
+<b>axiom</b> <b>forall</b> b1: <a href="../../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u8&gt;, b2: <a href="../../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u8&gt;:
+    (<a href="hash.md#0x1_aptos_hash_spec_sha2_512_internal">spec_sha2_512_internal</a>(b1) == <a href="hash.md#0x1_aptos_hash_spec_sha2_512_internal">spec_sha2_512_internal</a>(b2) ==&gt; b1 == b2);
 </code></pre>
 
 
@@ -393,9 +393,9 @@ axiom forall b1: vector&lt;u8&gt;, b2: vector&lt;u8&gt;:
 <a id="0x1_aptos_hash_spec_sha3_512_internal"></a>
 
 
-<pre><code>fun spec_sha3_512_internal(bytes: vector&lt;u8&gt;): vector&lt;u8&gt;;
-axiom forall b1: vector&lt;u8&gt;, b2: vector&lt;u8&gt;:
-    (spec_sha3_512_internal(b1) &#61;&#61; spec_sha3_512_internal(b2) &#61;&#61;&gt; b1 &#61;&#61; b2);
+<pre><code><b>fun</b> <a href="hash.md#0x1_aptos_hash_spec_sha3_512_internal">spec_sha3_512_internal</a>(bytes: <a href="../../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u8&gt;): <a href="../../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u8&gt;;
+<b>axiom</b> <b>forall</b> b1: <a href="../../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u8&gt;, b2: <a href="../../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u8&gt;:
+    (<a href="hash.md#0x1_aptos_hash_spec_sha3_512_internal">spec_sha3_512_internal</a>(b1) == <a href="hash.md#0x1_aptos_hash_spec_sha3_512_internal">spec_sha3_512_internal</a>(b2) ==&gt; b1 == b2);
 </code></pre>
 
 
@@ -405,9 +405,9 @@ axiom forall b1: vector&lt;u8&gt;, b2: vector&lt;u8&gt;:
 <a id="0x1_aptos_hash_spec_ripemd160_internal"></a>
 
 
-<pre><code>fun spec_ripemd160_internal(bytes: vector&lt;u8&gt;): vector&lt;u8&gt;;
-axiom forall b1: vector&lt;u8&gt;, b2: vector&lt;u8&gt;:
-    (spec_ripemd160_internal(b1) &#61;&#61; spec_ripemd160_internal(b2) &#61;&#61;&gt; b1 &#61;&#61; b2);
+<pre><code><b>fun</b> <a href="hash.md#0x1_aptos_hash_spec_ripemd160_internal">spec_ripemd160_internal</a>(bytes: <a href="../../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u8&gt;): <a href="../../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u8&gt;;
+<b>axiom</b> <b>forall</b> b1: <a href="../../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u8&gt;, b2: <a href="../../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u8&gt;:
+    (<a href="hash.md#0x1_aptos_hash_spec_ripemd160_internal">spec_ripemd160_internal</a>(b1) == <a href="hash.md#0x1_aptos_hash_spec_ripemd160_internal">spec_ripemd160_internal</a>(b2) ==&gt; b1 == b2);
 </code></pre>
 
 
@@ -417,9 +417,9 @@ axiom forall b1: vector&lt;u8&gt;, b2: vector&lt;u8&gt;:
 <a id="0x1_aptos_hash_spec_blake2b_256_internal"></a>
 
 
-<pre><code>fun spec_blake2b_256_internal(bytes: vector&lt;u8&gt;): vector&lt;u8&gt;;
-axiom forall b1: vector&lt;u8&gt;, b2: vector&lt;u8&gt;:
-    (spec_blake2b_256_internal(b1) &#61;&#61; spec_blake2b_256_internal(b2) &#61;&#61;&gt; b1 &#61;&#61; b2);
+<pre><code><b>fun</b> <a href="hash.md#0x1_aptos_hash_spec_blake2b_256_internal">spec_blake2b_256_internal</a>(bytes: <a href="../../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u8&gt;): <a href="../../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u8&gt;;
+<b>axiom</b> <b>forall</b> b1: <a href="../../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u8&gt;, b2: <a href="../../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u8&gt;:
+    (<a href="hash.md#0x1_aptos_hash_spec_blake2b_256_internal">spec_blake2b_256_internal</a>(b1) == <a href="hash.md#0x1_aptos_hash_spec_blake2b_256_internal">spec_blake2b_256_internal</a>(b2) ==&gt; b1 == b2);
 </code></pre>
 
 
@@ -429,15 +429,15 @@ axiom forall b1: vector&lt;u8&gt;, b2: vector&lt;u8&gt;:
 ### Function `sip_hash`
 
 
-<pre><code>public fun sip_hash(bytes: vector&lt;u8&gt;): u64
+<pre><code><b>public</b> <b>fun</b> <a href="hash.md#0x1_aptos_hash_sip_hash">sip_hash</a>(bytes: <a href="../../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u8&gt;): u64
 </code></pre>
 
 
 
 
-<pre><code>pragma opaque;
-aborts_if [abstract] false;
-ensures [abstract] result &#61;&#61; spec_sip_hash(bytes);
+<pre><code><b>pragma</b> opaque;
+<b>aborts_if</b> [abstract] <b>false</b>;
+<b>ensures</b> [abstract] result == <a href="hash.md#0x1_aptos_hash_spec_sip_hash">spec_sip_hash</a>(bytes);
 </code></pre>
 
 
@@ -447,14 +447,14 @@ ensures [abstract] result &#61;&#61; spec_sip_hash(bytes);
 ### Function `sip_hash_from_value`
 
 
-<pre><code>public fun sip_hash_from_value&lt;MoveValue&gt;(v: &amp;MoveValue): u64
+<pre><code><b>public</b> <b>fun</b> <a href="hash.md#0x1_aptos_hash_sip_hash_from_value">sip_hash_from_value</a>&lt;MoveValue&gt;(v: &MoveValue): u64
 </code></pre>
 
 
 
 
-<pre><code>pragma opaque;
-ensures result &#61;&#61; spec_sip_hash(bcs::serialize(v));
+<pre><code><b>pragma</b> opaque;
+<b>ensures</b> result == <a href="hash.md#0x1_aptos_hash_spec_sip_hash">spec_sip_hash</a>(<a href="../../move-stdlib/doc/bcs.md#0x1_bcs_serialize">bcs::serialize</a>(v));
 </code></pre>
 
 
@@ -464,15 +464,15 @@ ensures result &#61;&#61; spec_sip_hash(bcs::serialize(v));
 ### Function `keccak256`
 
 
-<pre><code>public fun keccak256(bytes: vector&lt;u8&gt;): vector&lt;u8&gt;
+<pre><code><b>public</b> <b>fun</b> <a href="hash.md#0x1_aptos_hash_keccak256">keccak256</a>(bytes: <a href="../../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u8&gt;): <a href="../../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u8&gt;
 </code></pre>
 
 
 
 
-<pre><code>pragma opaque;
-aborts_if [abstract] false;
-ensures [abstract] result &#61;&#61; spec_keccak256(bytes);
+<pre><code><b>pragma</b> opaque;
+<b>aborts_if</b> [abstract] <b>false</b>;
+<b>ensures</b> [abstract] result == <a href="hash.md#0x1_aptos_hash_spec_keccak256">spec_keccak256</a>(bytes);
 </code></pre>
 
 
@@ -482,15 +482,15 @@ ensures [abstract] result &#61;&#61; spec_keccak256(bytes);
 ### Function `sha2_512`
 
 
-<pre><code>public fun sha2_512(bytes: vector&lt;u8&gt;): vector&lt;u8&gt;
+<pre><code><b>public</b> <b>fun</b> <a href="hash.md#0x1_aptos_hash_sha2_512">sha2_512</a>(bytes: <a href="../../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u8&gt;): <a href="../../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u8&gt;
 </code></pre>
 
 
 
 
-<pre><code>pragma opaque;
-aborts_if !features::spec_is_enabled(features::SHA_512_AND_RIPEMD_160_NATIVES);
-ensures result &#61;&#61; spec_sha2_512_internal(bytes);
+<pre><code><b>pragma</b> opaque;
+<b>aborts_if</b> !<a href="../../move-stdlib/doc/features.md#0x1_features_spec_is_enabled">features::spec_is_enabled</a>(<a href="../../move-stdlib/doc/features.md#0x1_features_SHA_512_AND_RIPEMD_160_NATIVES">features::SHA_512_AND_RIPEMD_160_NATIVES</a>);
+<b>ensures</b> result == <a href="hash.md#0x1_aptos_hash_spec_sha2_512_internal">spec_sha2_512_internal</a>(bytes);
 </code></pre>
 
 
@@ -500,15 +500,15 @@ ensures result &#61;&#61; spec_sha2_512_internal(bytes);
 ### Function `sha3_512`
 
 
-<pre><code>public fun sha3_512(bytes: vector&lt;u8&gt;): vector&lt;u8&gt;
+<pre><code><b>public</b> <b>fun</b> <a href="hash.md#0x1_aptos_hash_sha3_512">sha3_512</a>(bytes: <a href="../../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u8&gt;): <a href="../../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u8&gt;
 </code></pre>
 
 
 
 
-<pre><code>pragma opaque;
-aborts_if !features::spec_is_enabled(features::SHA_512_AND_RIPEMD_160_NATIVES);
-ensures result &#61;&#61; spec_sha3_512_internal(bytes);
+<pre><code><b>pragma</b> opaque;
+<b>aborts_if</b> !<a href="../../move-stdlib/doc/features.md#0x1_features_spec_is_enabled">features::spec_is_enabled</a>(<a href="../../move-stdlib/doc/features.md#0x1_features_SHA_512_AND_RIPEMD_160_NATIVES">features::SHA_512_AND_RIPEMD_160_NATIVES</a>);
+<b>ensures</b> result == <a href="hash.md#0x1_aptos_hash_spec_sha3_512_internal">spec_sha3_512_internal</a>(bytes);
 </code></pre>
 
 
@@ -518,15 +518,15 @@ ensures result &#61;&#61; spec_sha3_512_internal(bytes);
 ### Function `ripemd160`
 
 
-<pre><code>public fun ripemd160(bytes: vector&lt;u8&gt;): vector&lt;u8&gt;
+<pre><code><b>public</b> <b>fun</b> <a href="hash.md#0x1_aptos_hash_ripemd160">ripemd160</a>(bytes: <a href="../../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u8&gt;): <a href="../../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u8&gt;
 </code></pre>
 
 
 
 
-<pre><code>pragma opaque;
-aborts_if !features::spec_is_enabled(features::SHA_512_AND_RIPEMD_160_NATIVES);
-ensures result &#61;&#61; spec_ripemd160_internal(bytes);
+<pre><code><b>pragma</b> opaque;
+<b>aborts_if</b> !<a href="../../move-stdlib/doc/features.md#0x1_features_spec_is_enabled">features::spec_is_enabled</a>(<a href="../../move-stdlib/doc/features.md#0x1_features_SHA_512_AND_RIPEMD_160_NATIVES">features::SHA_512_AND_RIPEMD_160_NATIVES</a>);
+<b>ensures</b> result == <a href="hash.md#0x1_aptos_hash_spec_ripemd160_internal">spec_ripemd160_internal</a>(bytes);
 </code></pre>
 
 
@@ -536,15 +536,15 @@ ensures result &#61;&#61; spec_ripemd160_internal(bytes);
 ### Function `blake2b_256`
 
 
-<pre><code>public fun blake2b_256(bytes: vector&lt;u8&gt;): vector&lt;u8&gt;
+<pre><code><b>public</b> <b>fun</b> <a href="hash.md#0x1_aptos_hash_blake2b_256">blake2b_256</a>(bytes: <a href="../../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u8&gt;): <a href="../../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u8&gt;
 </code></pre>
 
 
 
 
-<pre><code>pragma opaque;
-aborts_if !features::spec_is_enabled(features::BLAKE2B_256_NATIVE);
-ensures result &#61;&#61; spec_blake2b_256_internal(bytes);
+<pre><code><b>pragma</b> opaque;
+<b>aborts_if</b> !<a href="../../move-stdlib/doc/features.md#0x1_features_spec_is_enabled">features::spec_is_enabled</a>(<a href="../../move-stdlib/doc/features.md#0x1_features_BLAKE2B_256_NATIVE">features::BLAKE2B_256_NATIVE</a>);
+<b>ensures</b> result == <a href="hash.md#0x1_aptos_hash_spec_blake2b_256_internal">spec_blake2b_256_internal</a>(bytes);
 </code></pre>
 
 
@@ -554,15 +554,15 @@ ensures result &#61;&#61; spec_blake2b_256_internal(bytes);
 ### Function `sha2_512_internal`
 
 
-<pre><code>fun sha2_512_internal(bytes: vector&lt;u8&gt;): vector&lt;u8&gt;
+<pre><code><b>fun</b> <a href="hash.md#0x1_aptos_hash_sha2_512_internal">sha2_512_internal</a>(bytes: <a href="../../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u8&gt;): <a href="../../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u8&gt;
 </code></pre>
 
 
 
 
-<pre><code>pragma opaque;
-aborts_if [abstract] false;
-ensures [abstract] result &#61;&#61; spec_sha2_512_internal(bytes);
+<pre><code><b>pragma</b> opaque;
+<b>aborts_if</b> [abstract] <b>false</b>;
+<b>ensures</b> [abstract] result == <a href="hash.md#0x1_aptos_hash_spec_sha2_512_internal">spec_sha2_512_internal</a>(bytes);
 </code></pre>
 
 
@@ -572,15 +572,15 @@ ensures [abstract] result &#61;&#61; spec_sha2_512_internal(bytes);
 ### Function `sha3_512_internal`
 
 
-<pre><code>fun sha3_512_internal(bytes: vector&lt;u8&gt;): vector&lt;u8&gt;
+<pre><code><b>fun</b> <a href="hash.md#0x1_aptos_hash_sha3_512_internal">sha3_512_internal</a>(bytes: <a href="../../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u8&gt;): <a href="../../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u8&gt;
 </code></pre>
 
 
 
 
-<pre><code>pragma opaque;
-aborts_if [abstract] false;
-ensures [abstract] result &#61;&#61; spec_sha3_512_internal(bytes);
+<pre><code><b>pragma</b> opaque;
+<b>aborts_if</b> [abstract] <b>false</b>;
+<b>ensures</b> [abstract] result == <a href="hash.md#0x1_aptos_hash_spec_sha3_512_internal">spec_sha3_512_internal</a>(bytes);
 </code></pre>
 
 
@@ -590,15 +590,15 @@ ensures [abstract] result &#61;&#61; spec_sha3_512_internal(bytes);
 ### Function `ripemd160_internal`
 
 
-<pre><code>fun ripemd160_internal(bytes: vector&lt;u8&gt;): vector&lt;u8&gt;
+<pre><code><b>fun</b> <a href="hash.md#0x1_aptos_hash_ripemd160_internal">ripemd160_internal</a>(bytes: <a href="../../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u8&gt;): <a href="../../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u8&gt;
 </code></pre>
 
 
 
 
-<pre><code>pragma opaque;
-aborts_if [abstract] false;
-ensures [abstract] result &#61;&#61; spec_ripemd160_internal(bytes);
+<pre><code><b>pragma</b> opaque;
+<b>aborts_if</b> [abstract] <b>false</b>;
+<b>ensures</b> [abstract] result == <a href="hash.md#0x1_aptos_hash_spec_ripemd160_internal">spec_ripemd160_internal</a>(bytes);
 </code></pre>
 
 
@@ -608,15 +608,15 @@ ensures [abstract] result &#61;&#61; spec_ripemd160_internal(bytes);
 ### Function `blake2b_256_internal`
 
 
-<pre><code>fun blake2b_256_internal(bytes: vector&lt;u8&gt;): vector&lt;u8&gt;
+<pre><code><b>fun</b> <a href="hash.md#0x1_aptos_hash_blake2b_256_internal">blake2b_256_internal</a>(bytes: <a href="../../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u8&gt;): <a href="../../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u8&gt;
 </code></pre>
 
 
 
 
-<pre><code>pragma opaque;
-aborts_if false;
-ensures result &#61;&#61; spec_blake2b_256_internal(bytes);
+<pre><code><b>pragma</b> opaque;
+<b>aborts_if</b> <b>false</b>;
+<b>ensures</b> result == <a href="hash.md#0x1_aptos_hash_spec_blake2b_256_internal">spec_blake2b_256_internal</a>(bytes);
 </code></pre>
 
 

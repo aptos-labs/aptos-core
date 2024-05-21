@@ -40,7 +40,7 @@ A module for formatting move values as strings.
     -  [Function `native_format_list`](#@Specification_2_native_format_list)
 
 
-<pre><code>use 0x1::string;
+<pre><code><b>use</b> <a href="../../move-stdlib/doc/string.md#0x1_string">0x1::string</a>;
 </code></pre>
 
 
@@ -51,7 +51,7 @@ A module for formatting move values as strings.
 
 
 
-<pre><code>struct Cons&lt;T, N&gt; has copy, drop, store
+<pre><code><b>struct</b> <a href="string_utils.md#0x1_string_utils_Cons">Cons</a>&lt;T, N&gt; <b>has</b> <b>copy</b>, drop, store
 </code></pre>
 
 
@@ -84,7 +84,7 @@ A module for formatting move values as strings.
 
 
 
-<pre><code>struct NIL has copy, drop, store
+<pre><code><b>struct</b> <a href="string_utils.md#0x1_string_utils_NIL">NIL</a> <b>has</b> <b>copy</b>, drop, store
 </code></pre>
 
 
@@ -116,7 +116,7 @@ A module for formatting move values as strings.
 
 
 
-<pre><code>struct FakeCons&lt;T, N&gt; has copy, drop, store
+<pre><code><b>struct</b> <a href="string_utils.md#0x1_string_utils_FakeCons">FakeCons</a>&lt;T, N&gt; <b>has</b> <b>copy</b>, drop, store
 </code></pre>
 
 
@@ -153,7 +153,7 @@ A module for formatting move values as strings.
 The number of values in the list does not match the number of "{}" in the format string.
 
 
-<pre><code>const EARGS_MISMATCH: u64 &#61; 1;
+<pre><code><b>const</b> <a href="string_utils.md#0x1_string_utils_EARGS_MISMATCH">EARGS_MISMATCH</a>: u64 = 1;
 </code></pre>
 
 
@@ -163,7 +163,7 @@ The number of values in the list does not match the number of "{}" in the format
 The format string is not valid.
 
 
-<pre><code>const EINVALID_FORMAT: u64 &#61; 2;
+<pre><code><b>const</b> <a href="string_utils.md#0x1_string_utils_EINVALID_FORMAT">EINVALID_FORMAT</a>: u64 = 2;
 </code></pre>
 
 
@@ -173,7 +173,7 @@ The format string is not valid.
 Formatting is not possible because the value contains delayed fields such as aggregators.
 
 
-<pre><code>const EUNABLE_TO_FORMAT_DELAYED_FIELD: u64 &#61; 3;
+<pre><code><b>const</b> <a href="string_utils.md#0x1_string_utils_EUNABLE_TO_FORMAT_DELAYED_FIELD">EUNABLE_TO_FORMAT_DELAYED_FIELD</a>: u64 = 3;
 </code></pre>
 
 
@@ -183,15 +183,15 @@ Formatting is not possible because the value contains delayed fields such as agg
 ## Function `to_string`
 
 Format a move value as a human readable string,
-eg. <code>to_string(&amp;1u64) &#61;&#61; &quot;1&quot;</code>, <code>to_string(&amp;false) &#61;&#61; &quot;false&quot;</code>, <code>to_string(&amp;@0x1) &#61;&#61; &quot;@0x1&quot;</code>.
+eg. <code><a href="string_utils.md#0x1_string_utils_to_string">to_string</a>(&1u64) == "1"</code>, <code><a href="string_utils.md#0x1_string_utils_to_string">to_string</a>(&<b>false</b>) == "<b>false</b>"</code>, <code><a href="string_utils.md#0x1_string_utils_to_string">to_string</a>(&@0x1) == "@0x1"</code>.
 For vectors and structs the format is similar to rust, eg.
-<code>to_string(&amp;cons(1,2)) &#61;&#61; &quot;Cons &#123; car: 1, cdr: 2 &#125;&quot;</code> and <code>to_string(&amp;vector[1, 2, 3]) &#61;&#61; &quot;[ 1, 2, 3 ]&quot;</code>
-For vectors of u8 the output is hex encoded, eg. <code>to_string(&amp;vector[1u8, 2u8, 3u8]) &#61;&#61; &quot;0x010203&quot;</code>
+<code><a href="string_utils.md#0x1_string_utils_to_string">to_string</a>(&<a href="string_utils.md#0x1_string_utils_cons">cons</a>(1,2)) == "<a href="string_utils.md#0x1_string_utils_Cons">Cons</a> { car: 1, cdr: 2 }"</code> and <code><a href="string_utils.md#0x1_string_utils_to_string">to_string</a>(&<a href="../../move-stdlib/doc/vector.md#0x1_vector">vector</a>[1, 2, 3]) == "[ 1, 2, 3 ]"</code>
+For vectors of u8 the output is hex encoded, eg. <code><a href="string_utils.md#0x1_string_utils_to_string">to_string</a>(&<a href="../../move-stdlib/doc/vector.md#0x1_vector">vector</a>[1u8, 2u8, 3u8]) == "0x010203"</code>
 For std::string::String the output is the string itself including quotes, eg.
-<code>to_string(&amp;std::string::utf8(b&quot;My string&quot;)) &#61;&#61; &quot;\&quot;My string\&quot;&quot;</code>
+<code><a href="string_utils.md#0x1_string_utils_to_string">to_string</a>(&std::string::utf8(b"My <a href="../../move-stdlib/doc/string.md#0x1_string">string</a>")) == "\"My <a href="../../move-stdlib/doc/string.md#0x1_string">string</a>\""</code>
 
 
-<pre><code>public fun to_string&lt;T&gt;(s: &amp;T): string::String
+<pre><code><b>public</b> <b>fun</b> <a href="string_utils.md#0x1_string_utils_to_string">to_string</a>&lt;T&gt;(s: &T): <a href="../../move-stdlib/doc/string.md#0x1_string_String">string::String</a>
 </code></pre>
 
 
@@ -200,9 +200,9 @@ For std::string::String the output is the string itself including quotes, eg.
 <summary>Implementation</summary>
 
 
-<pre><code>public fun to_string&lt;T&gt;(s: &amp;T): String &#123;
-    native_format(s, false, false, true, false)
-&#125;
+<pre><code><b>public</b> <b>fun</b> <a href="string_utils.md#0x1_string_utils_to_string">to_string</a>&lt;T&gt;(s: &T): String {
+    <a href="string_utils.md#0x1_string_utils_native_format">native_format</a>(s, <b>false</b>, <b>false</b>, <b>true</b>, <b>false</b>)
+}
 </code></pre>
 
 
@@ -216,7 +216,7 @@ For std::string::String the output is the string itself including quotes, eg.
 Format addresses as 64 zero-padded hexadecimals.
 
 
-<pre><code>public fun to_string_with_canonical_addresses&lt;T&gt;(s: &amp;T): string::String
+<pre><code><b>public</b> <b>fun</b> <a href="string_utils.md#0x1_string_utils_to_string_with_canonical_addresses">to_string_with_canonical_addresses</a>&lt;T&gt;(s: &T): <a href="../../move-stdlib/doc/string.md#0x1_string_String">string::String</a>
 </code></pre>
 
 
@@ -225,9 +225,9 @@ Format addresses as 64 zero-padded hexadecimals.
 <summary>Implementation</summary>
 
 
-<pre><code>public fun to_string_with_canonical_addresses&lt;T&gt;(s: &amp;T): String &#123;
-    native_format(s, false, true, true, false)
-&#125;
+<pre><code><b>public</b> <b>fun</b> <a href="string_utils.md#0x1_string_utils_to_string_with_canonical_addresses">to_string_with_canonical_addresses</a>&lt;T&gt;(s: &T): String {
+    <a href="string_utils.md#0x1_string_utils_native_format">native_format</a>(s, <b>false</b>, <b>true</b>, <b>true</b>, <b>false</b>)
+}
 </code></pre>
 
 
@@ -241,7 +241,7 @@ Format addresses as 64 zero-padded hexadecimals.
 Format emitting integers with types ie. 6u8 or 128u32.
 
 
-<pre><code>public fun to_string_with_integer_types&lt;T&gt;(s: &amp;T): string::String
+<pre><code><b>public</b> <b>fun</b> <a href="string_utils.md#0x1_string_utils_to_string_with_integer_types">to_string_with_integer_types</a>&lt;T&gt;(s: &T): <a href="../../move-stdlib/doc/string.md#0x1_string_String">string::String</a>
 </code></pre>
 
 
@@ -250,9 +250,9 @@ Format emitting integers with types ie. 6u8 or 128u32.
 <summary>Implementation</summary>
 
 
-<pre><code>public fun to_string_with_integer_types&lt;T&gt;(s: &amp;T): String &#123;
-    native_format(s, false, true, true, false)
-&#125;
+<pre><code><b>public</b> <b>fun</b> <a href="string_utils.md#0x1_string_utils_to_string_with_integer_types">to_string_with_integer_types</a>&lt;T&gt;(s: &T): String {
+    <a href="string_utils.md#0x1_string_utils_native_format">native_format</a>(s, <b>false</b>, <b>true</b>, <b>true</b>, <b>false</b>)
+}
 </code></pre>
 
 
@@ -266,7 +266,7 @@ Format emitting integers with types ie. 6u8 or 128u32.
 Format vectors and structs with newlines and indentation.
 
 
-<pre><code>public fun debug_string&lt;T&gt;(s: &amp;T): string::String
+<pre><code><b>public</b> <b>fun</b> <a href="string_utils.md#0x1_string_utils_debug_string">debug_string</a>&lt;T&gt;(s: &T): <a href="../../move-stdlib/doc/string.md#0x1_string_String">string::String</a>
 </code></pre>
 
 
@@ -275,9 +275,9 @@ Format vectors and structs with newlines and indentation.
 <summary>Implementation</summary>
 
 
-<pre><code>public fun debug_string&lt;T&gt;(s: &amp;T): String &#123;
-    native_format(s, true, false, false, false)
-&#125;
+<pre><code><b>public</b> <b>fun</b> <a href="string_utils.md#0x1_string_utils_debug_string">debug_string</a>&lt;T&gt;(s: &T): String {
+    <a href="string_utils.md#0x1_string_utils_native_format">native_format</a>(s, <b>true</b>, <b>false</b>, <b>false</b>, <b>false</b>)
+}
 </code></pre>
 
 
@@ -288,10 +288,10 @@ Format vectors and structs with newlines and indentation.
 
 ## Function `format1`
 
-Formatting with a rust-like format string, eg. <code>format2(&amp;b&quot;a &#61; &#123;&#125;, b &#61; &#123;&#125;&quot;, 1, 2) &#61;&#61; &quot;a &#61; 1, b &#61; 2&quot;</code>.
+Formatting with a rust-like format string, eg. <code><a href="string_utils.md#0x1_string_utils_format2">format2</a>(&b"a = {}, b = {}", 1, 2) == "a = 1, b = 2"</code>.
 
 
-<pre><code>public fun format1&lt;T0: drop&gt;(fmt: &amp;vector&lt;u8&gt;, a: T0): string::String
+<pre><code><b>public</b> <b>fun</b> <a href="string_utils.md#0x1_string_utils_format1">format1</a>&lt;T0: drop&gt;(fmt: &<a href="../../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u8&gt;, a: T0): <a href="../../move-stdlib/doc/string.md#0x1_string_String">string::String</a>
 </code></pre>
 
 
@@ -300,9 +300,9 @@ Formatting with a rust-like format string, eg. <code>format2(&amp;b&quot;a &#61;
 <summary>Implementation</summary>
 
 
-<pre><code>public fun format1&lt;T0: drop&gt;(fmt: &amp;vector&lt;u8&gt;, a: T0): String &#123;
-    native_format_list(fmt, &amp;list1(a))
-&#125;
+<pre><code><b>public</b> <b>fun</b> <a href="string_utils.md#0x1_string_utils_format1">format1</a>&lt;T0: drop&gt;(fmt: &<a href="../../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u8&gt;, a: T0): String {
+    <a href="string_utils.md#0x1_string_utils_native_format_list">native_format_list</a>(fmt, &<a href="string_utils.md#0x1_string_utils_list1">list1</a>(a))
+}
 </code></pre>
 
 
@@ -315,7 +315,7 @@ Formatting with a rust-like format string, eg. <code>format2(&amp;b&quot;a &#61;
 
 
 
-<pre><code>public fun format2&lt;T0: drop, T1: drop&gt;(fmt: &amp;vector&lt;u8&gt;, a: T0, b: T1): string::String
+<pre><code><b>public</b> <b>fun</b> <a href="string_utils.md#0x1_string_utils_format2">format2</a>&lt;T0: drop, T1: drop&gt;(fmt: &<a href="../../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u8&gt;, a: T0, b: T1): <a href="../../move-stdlib/doc/string.md#0x1_string_String">string::String</a>
 </code></pre>
 
 
@@ -324,9 +324,9 @@ Formatting with a rust-like format string, eg. <code>format2(&amp;b&quot;a &#61;
 <summary>Implementation</summary>
 
 
-<pre><code>public fun format2&lt;T0: drop, T1: drop&gt;(fmt: &amp;vector&lt;u8&gt;, a: T0, b: T1): String &#123;
-    native_format_list(fmt, &amp;list2(a, b))
-&#125;
+<pre><code><b>public</b> <b>fun</b> <a href="string_utils.md#0x1_string_utils_format2">format2</a>&lt;T0: drop, T1: drop&gt;(fmt: &<a href="../../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u8&gt;, a: T0, b: T1): String {
+    <a href="string_utils.md#0x1_string_utils_native_format_list">native_format_list</a>(fmt, &<a href="string_utils.md#0x1_string_utils_list2">list2</a>(a, b))
+}
 </code></pre>
 
 
@@ -339,7 +339,7 @@ Formatting with a rust-like format string, eg. <code>format2(&amp;b&quot;a &#61;
 
 
 
-<pre><code>public fun format3&lt;T0: drop, T1: drop, T2: drop&gt;(fmt: &amp;vector&lt;u8&gt;, a: T0, b: T1, c: T2): string::String
+<pre><code><b>public</b> <b>fun</b> <a href="string_utils.md#0x1_string_utils_format3">format3</a>&lt;T0: drop, T1: drop, T2: drop&gt;(fmt: &<a href="../../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u8&gt;, a: T0, b: T1, c: T2): <a href="../../move-stdlib/doc/string.md#0x1_string_String">string::String</a>
 </code></pre>
 
 
@@ -348,9 +348,9 @@ Formatting with a rust-like format string, eg. <code>format2(&amp;b&quot;a &#61;
 <summary>Implementation</summary>
 
 
-<pre><code>public fun format3&lt;T0: drop, T1: drop, T2: drop&gt;(fmt: &amp;vector&lt;u8&gt;, a: T0, b: T1, c: T2): String &#123;
-    native_format_list(fmt, &amp;list3(a, b, c))
-&#125;
+<pre><code><b>public</b> <b>fun</b> <a href="string_utils.md#0x1_string_utils_format3">format3</a>&lt;T0: drop, T1: drop, T2: drop&gt;(fmt: &<a href="../../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u8&gt;, a: T0, b: T1, c: T2): String {
+    <a href="string_utils.md#0x1_string_utils_native_format_list">native_format_list</a>(fmt, &<a href="string_utils.md#0x1_string_utils_list3">list3</a>(a, b, c))
+}
 </code></pre>
 
 
@@ -363,7 +363,7 @@ Formatting with a rust-like format string, eg. <code>format2(&amp;b&quot;a &#61;
 
 
 
-<pre><code>public fun format4&lt;T0: drop, T1: drop, T2: drop, T3: drop&gt;(fmt: &amp;vector&lt;u8&gt;, a: T0, b: T1, c: T2, d: T3): string::String
+<pre><code><b>public</b> <b>fun</b> <a href="string_utils.md#0x1_string_utils_format4">format4</a>&lt;T0: drop, T1: drop, T2: drop, T3: drop&gt;(fmt: &<a href="../../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u8&gt;, a: T0, b: T1, c: T2, d: T3): <a href="../../move-stdlib/doc/string.md#0x1_string_String">string::String</a>
 </code></pre>
 
 
@@ -372,9 +372,9 @@ Formatting with a rust-like format string, eg. <code>format2(&amp;b&quot;a &#61;
 <summary>Implementation</summary>
 
 
-<pre><code>public fun format4&lt;T0: drop, T1: drop, T2: drop, T3: drop&gt;(fmt: &amp;vector&lt;u8&gt;, a: T0, b: T1, c: T2, d: T3): String &#123;
-    native_format_list(fmt, &amp;list4(a, b, c, d))
-&#125;
+<pre><code><b>public</b> <b>fun</b> <a href="string_utils.md#0x1_string_utils_format4">format4</a>&lt;T0: drop, T1: drop, T2: drop, T3: drop&gt;(fmt: &<a href="../../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u8&gt;, a: T0, b: T1, c: T2, d: T3): String {
+    <a href="string_utils.md#0x1_string_utils_native_format_list">native_format_list</a>(fmt, &<a href="string_utils.md#0x1_string_utils_list4">list4</a>(a, b, c, d))
+}
 </code></pre>
 
 
@@ -387,7 +387,7 @@ Formatting with a rust-like format string, eg. <code>format2(&amp;b&quot;a &#61;
 
 
 
-<pre><code>fun cons&lt;T, N&gt;(car: T, cdr: N): string_utils::Cons&lt;T, N&gt;
+<pre><code><b>fun</b> <a href="string_utils.md#0x1_string_utils_cons">cons</a>&lt;T, N&gt;(car: T, cdr: N): <a href="string_utils.md#0x1_string_utils_Cons">string_utils::Cons</a>&lt;T, N&gt;
 </code></pre>
 
 
@@ -396,7 +396,7 @@ Formatting with a rust-like format string, eg. <code>format2(&amp;b&quot;a &#61;
 <summary>Implementation</summary>
 
 
-<pre><code>fun cons&lt;T, N&gt;(car: T, cdr: N): Cons&lt;T, N&gt; &#123; Cons &#123; car, cdr &#125; &#125;
+<pre><code><b>fun</b> <a href="string_utils.md#0x1_string_utils_cons">cons</a>&lt;T, N&gt;(car: T, cdr: N): <a href="string_utils.md#0x1_string_utils_Cons">Cons</a>&lt;T, N&gt; { <a href="string_utils.md#0x1_string_utils_Cons">Cons</a> { car, cdr } }
 </code></pre>
 
 
@@ -409,7 +409,7 @@ Formatting with a rust-like format string, eg. <code>format2(&amp;b&quot;a &#61;
 
 
 
-<pre><code>fun nil(): string_utils::NIL
+<pre><code><b>fun</b> <a href="string_utils.md#0x1_string_utils_nil">nil</a>(): <a href="string_utils.md#0x1_string_utils_NIL">string_utils::NIL</a>
 </code></pre>
 
 
@@ -418,7 +418,7 @@ Formatting with a rust-like format string, eg. <code>format2(&amp;b&quot;a &#61;
 <summary>Implementation</summary>
 
 
-<pre><code>fun nil(): NIL &#123; NIL &#123;&#125; &#125;
+<pre><code><b>fun</b> <a href="string_utils.md#0x1_string_utils_nil">nil</a>(): <a href="string_utils.md#0x1_string_utils_NIL">NIL</a> { <a href="string_utils.md#0x1_string_utils_NIL">NIL</a> {} }
 </code></pre>
 
 
@@ -431,7 +431,7 @@ Formatting with a rust-like format string, eg. <code>format2(&amp;b&quot;a &#61;
 
 
 
-<pre><code>fun list1&lt;T0&gt;(a: T0): string_utils::Cons&lt;T0, string_utils::NIL&gt;
+<pre><code><b>fun</b> <a href="string_utils.md#0x1_string_utils_list1">list1</a>&lt;T0&gt;(a: T0): <a href="string_utils.md#0x1_string_utils_Cons">string_utils::Cons</a>&lt;T0, <a href="string_utils.md#0x1_string_utils_NIL">string_utils::NIL</a>&gt;
 </code></pre>
 
 
@@ -440,7 +440,7 @@ Formatting with a rust-like format string, eg. <code>format2(&amp;b&quot;a &#61;
 <summary>Implementation</summary>
 
 
-<pre><code>inline fun list1&lt;T0&gt;(a: T0): Cons&lt;T0, NIL&gt; &#123; cons(a, nil()) &#125;
+<pre><code>inline <b>fun</b> <a href="string_utils.md#0x1_string_utils_list1">list1</a>&lt;T0&gt;(a: T0): <a href="string_utils.md#0x1_string_utils_Cons">Cons</a>&lt;T0, <a href="string_utils.md#0x1_string_utils_NIL">NIL</a>&gt; { <a href="string_utils.md#0x1_string_utils_cons">cons</a>(a, <a href="string_utils.md#0x1_string_utils_nil">nil</a>()) }
 </code></pre>
 
 
@@ -453,7 +453,7 @@ Formatting with a rust-like format string, eg. <code>format2(&amp;b&quot;a &#61;
 
 
 
-<pre><code>fun list2&lt;T0, T1&gt;(a: T0, b: T1): string_utils::Cons&lt;T0, string_utils::Cons&lt;T1, string_utils::NIL&gt;&gt;
+<pre><code><b>fun</b> <a href="string_utils.md#0x1_string_utils_list2">list2</a>&lt;T0, T1&gt;(a: T0, b: T1): <a href="string_utils.md#0x1_string_utils_Cons">string_utils::Cons</a>&lt;T0, <a href="string_utils.md#0x1_string_utils_Cons">string_utils::Cons</a>&lt;T1, <a href="string_utils.md#0x1_string_utils_NIL">string_utils::NIL</a>&gt;&gt;
 </code></pre>
 
 
@@ -462,7 +462,7 @@ Formatting with a rust-like format string, eg. <code>format2(&amp;b&quot;a &#61;
 <summary>Implementation</summary>
 
 
-<pre><code>inline fun list2&lt;T0, T1&gt;(a: T0, b: T1): Cons&lt;T0, Cons&lt;T1, NIL&gt;&gt; &#123; cons(a, list1(b)) &#125;
+<pre><code>inline <b>fun</b> <a href="string_utils.md#0x1_string_utils_list2">list2</a>&lt;T0, T1&gt;(a: T0, b: T1): <a href="string_utils.md#0x1_string_utils_Cons">Cons</a>&lt;T0, <a href="string_utils.md#0x1_string_utils_Cons">Cons</a>&lt;T1, <a href="string_utils.md#0x1_string_utils_NIL">NIL</a>&gt;&gt; { <a href="string_utils.md#0x1_string_utils_cons">cons</a>(a, <a href="string_utils.md#0x1_string_utils_list1">list1</a>(b)) }
 </code></pre>
 
 
@@ -475,7 +475,7 @@ Formatting with a rust-like format string, eg. <code>format2(&amp;b&quot;a &#61;
 
 
 
-<pre><code>fun list3&lt;T0, T1, T2&gt;(a: T0, b: T1, c: T2): string_utils::Cons&lt;T0, string_utils::Cons&lt;T1, string_utils::Cons&lt;T2, string_utils::NIL&gt;&gt;&gt;
+<pre><code><b>fun</b> <a href="string_utils.md#0x1_string_utils_list3">list3</a>&lt;T0, T1, T2&gt;(a: T0, b: T1, c: T2): <a href="string_utils.md#0x1_string_utils_Cons">string_utils::Cons</a>&lt;T0, <a href="string_utils.md#0x1_string_utils_Cons">string_utils::Cons</a>&lt;T1, <a href="string_utils.md#0x1_string_utils_Cons">string_utils::Cons</a>&lt;T2, <a href="string_utils.md#0x1_string_utils_NIL">string_utils::NIL</a>&gt;&gt;&gt;
 </code></pre>
 
 
@@ -484,7 +484,7 @@ Formatting with a rust-like format string, eg. <code>format2(&amp;b&quot;a &#61;
 <summary>Implementation</summary>
 
 
-<pre><code>inline fun list3&lt;T0, T1, T2&gt;(a: T0, b: T1, c: T2): Cons&lt;T0, Cons&lt;T1, Cons&lt;T2, NIL&gt;&gt;&gt; &#123; cons(a, list2(b, c)) &#125;
+<pre><code>inline <b>fun</b> <a href="string_utils.md#0x1_string_utils_list3">list3</a>&lt;T0, T1, T2&gt;(a: T0, b: T1, c: T2): <a href="string_utils.md#0x1_string_utils_Cons">Cons</a>&lt;T0, <a href="string_utils.md#0x1_string_utils_Cons">Cons</a>&lt;T1, <a href="string_utils.md#0x1_string_utils_Cons">Cons</a>&lt;T2, <a href="string_utils.md#0x1_string_utils_NIL">NIL</a>&gt;&gt;&gt; { <a href="string_utils.md#0x1_string_utils_cons">cons</a>(a, <a href="string_utils.md#0x1_string_utils_list2">list2</a>(b, c)) }
 </code></pre>
 
 
@@ -497,7 +497,7 @@ Formatting with a rust-like format string, eg. <code>format2(&amp;b&quot;a &#61;
 
 
 
-<pre><code>fun list4&lt;T0, T1, T2, T3&gt;(a: T0, b: T1, c: T2, d: T3): string_utils::Cons&lt;T0, string_utils::Cons&lt;T1, string_utils::Cons&lt;T2, string_utils::Cons&lt;T3, string_utils::NIL&gt;&gt;&gt;&gt;
+<pre><code><b>fun</b> <a href="string_utils.md#0x1_string_utils_list4">list4</a>&lt;T0, T1, T2, T3&gt;(a: T0, b: T1, c: T2, d: T3): <a href="string_utils.md#0x1_string_utils_Cons">string_utils::Cons</a>&lt;T0, <a href="string_utils.md#0x1_string_utils_Cons">string_utils::Cons</a>&lt;T1, <a href="string_utils.md#0x1_string_utils_Cons">string_utils::Cons</a>&lt;T2, <a href="string_utils.md#0x1_string_utils_Cons">string_utils::Cons</a>&lt;T3, <a href="string_utils.md#0x1_string_utils_NIL">string_utils::NIL</a>&gt;&gt;&gt;&gt;
 </code></pre>
 
 
@@ -506,7 +506,7 @@ Formatting with a rust-like format string, eg. <code>format2(&amp;b&quot;a &#61;
 <summary>Implementation</summary>
 
 
-<pre><code>inline fun list4&lt;T0, T1, T2, T3&gt;(a: T0, b: T1, c: T2, d: T3): Cons&lt;T0, Cons&lt;T1, Cons&lt;T2, Cons&lt;T3, NIL&gt;&gt;&gt;&gt; &#123; cons(a, list3(b, c, d)) &#125;
+<pre><code>inline <b>fun</b> <a href="string_utils.md#0x1_string_utils_list4">list4</a>&lt;T0, T1, T2, T3&gt;(a: T0, b: T1, c: T2, d: T3): <a href="string_utils.md#0x1_string_utils_Cons">Cons</a>&lt;T0, <a href="string_utils.md#0x1_string_utils_Cons">Cons</a>&lt;T1, <a href="string_utils.md#0x1_string_utils_Cons">Cons</a>&lt;T2, <a href="string_utils.md#0x1_string_utils_Cons">Cons</a>&lt;T3, <a href="string_utils.md#0x1_string_utils_NIL">NIL</a>&gt;&gt;&gt;&gt; { <a href="string_utils.md#0x1_string_utils_cons">cons</a>(a, <a href="string_utils.md#0x1_string_utils_list3">list3</a>(b, c, d)) }
 </code></pre>
 
 
@@ -519,7 +519,7 @@ Formatting with a rust-like format string, eg. <code>format2(&amp;b&quot;a &#61;
 
 
 
-<pre><code>fun native_format&lt;T&gt;(s: &amp;T, type_tag: bool, canonicalize: bool, single_line: bool, include_int_types: bool): string::String
+<pre><code><b>fun</b> <a href="string_utils.md#0x1_string_utils_native_format">native_format</a>&lt;T&gt;(s: &T, type_tag: bool, canonicalize: bool, single_line: bool, include_int_types: bool): <a href="../../move-stdlib/doc/string.md#0x1_string_String">string::String</a>
 </code></pre>
 
 
@@ -528,7 +528,7 @@ Formatting with a rust-like format string, eg. <code>format2(&amp;b&quot;a &#61;
 <summary>Implementation</summary>
 
 
-<pre><code>native fun native_format&lt;T&gt;(s: &amp;T, type_tag: bool, canonicalize: bool, single_line: bool, include_int_types: bool): String;
+<pre><code><b>native</b> <b>fun</b> <a href="string_utils.md#0x1_string_utils_native_format">native_format</a>&lt;T&gt;(s: &T, type_tag: bool, canonicalize: bool, single_line: bool, include_int_types: bool): String;
 </code></pre>
 
 
@@ -541,7 +541,7 @@ Formatting with a rust-like format string, eg. <code>format2(&amp;b&quot;a &#61;
 
 
 
-<pre><code>fun native_format_list&lt;T&gt;(fmt: &amp;vector&lt;u8&gt;, val: &amp;T): string::String
+<pre><code><b>fun</b> <a href="string_utils.md#0x1_string_utils_native_format_list">native_format_list</a>&lt;T&gt;(fmt: &<a href="../../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u8&gt;, val: &T): <a href="../../move-stdlib/doc/string.md#0x1_string_String">string::String</a>
 </code></pre>
 
 
@@ -550,7 +550,7 @@ Formatting with a rust-like format string, eg. <code>format2(&amp;b&quot;a &#61;
 <summary>Implementation</summary>
 
 
-<pre><code>native fun native_format_list&lt;T&gt;(fmt: &amp;vector&lt;u8&gt;, val: &amp;T): String;
+<pre><code><b>native</b> <b>fun</b> <a href="string_utils.md#0x1_string_utils_native_format_list">native_format_list</a>&lt;T&gt;(fmt: &<a href="../../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u8&gt;, val: &T): String;
 </code></pre>
 
 
@@ -567,14 +567,14 @@ Formatting with a rust-like format string, eg. <code>format2(&amp;b&quot;a &#61;
 ### Function `to_string`
 
 
-<pre><code>public fun to_string&lt;T&gt;(s: &amp;T): string::String
+<pre><code><b>public</b> <b>fun</b> <a href="string_utils.md#0x1_string_utils_to_string">to_string</a>&lt;T&gt;(s: &T): <a href="../../move-stdlib/doc/string.md#0x1_string_String">string::String</a>
 </code></pre>
 
 
 
 
-<pre><code>aborts_if false;
-ensures result &#61;&#61; spec_native_format(s, false, false, true, false);
+<pre><code><b>aborts_if</b> <b>false</b>;
+<b>ensures</b> result == <a href="string_utils.md#0x1_string_utils_spec_native_format">spec_native_format</a>(s, <b>false</b>, <b>false</b>, <b>true</b>, <b>false</b>);
 </code></pre>
 
 
@@ -584,14 +584,14 @@ ensures result &#61;&#61; spec_native_format(s, false, false, true, false);
 ### Function `to_string_with_canonical_addresses`
 
 
-<pre><code>public fun to_string_with_canonical_addresses&lt;T&gt;(s: &amp;T): string::String
+<pre><code><b>public</b> <b>fun</b> <a href="string_utils.md#0x1_string_utils_to_string_with_canonical_addresses">to_string_with_canonical_addresses</a>&lt;T&gt;(s: &T): <a href="../../move-stdlib/doc/string.md#0x1_string_String">string::String</a>
 </code></pre>
 
 
 
 
-<pre><code>aborts_if false;
-ensures result &#61;&#61; spec_native_format(s, false, true, true, false);
+<pre><code><b>aborts_if</b> <b>false</b>;
+<b>ensures</b> result == <a href="string_utils.md#0x1_string_utils_spec_native_format">spec_native_format</a>(s, <b>false</b>, <b>true</b>, <b>true</b>, <b>false</b>);
 </code></pre>
 
 
@@ -601,14 +601,14 @@ ensures result &#61;&#61; spec_native_format(s, false, true, true, false);
 ### Function `to_string_with_integer_types`
 
 
-<pre><code>public fun to_string_with_integer_types&lt;T&gt;(s: &amp;T): string::String
+<pre><code><b>public</b> <b>fun</b> <a href="string_utils.md#0x1_string_utils_to_string_with_integer_types">to_string_with_integer_types</a>&lt;T&gt;(s: &T): <a href="../../move-stdlib/doc/string.md#0x1_string_String">string::String</a>
 </code></pre>
 
 
 
 
-<pre><code>aborts_if false;
-ensures result &#61;&#61; spec_native_format(s, false, true, true, false);
+<pre><code><b>aborts_if</b> <b>false</b>;
+<b>ensures</b> result == <a href="string_utils.md#0x1_string_utils_spec_native_format">spec_native_format</a>(s, <b>false</b>, <b>true</b>, <b>true</b>, <b>false</b>);
 </code></pre>
 
 
@@ -618,14 +618,14 @@ ensures result &#61;&#61; spec_native_format(s, false, true, true, false);
 ### Function `debug_string`
 
 
-<pre><code>public fun debug_string&lt;T&gt;(s: &amp;T): string::String
+<pre><code><b>public</b> <b>fun</b> <a href="string_utils.md#0x1_string_utils_debug_string">debug_string</a>&lt;T&gt;(s: &T): <a href="../../move-stdlib/doc/string.md#0x1_string_String">string::String</a>
 </code></pre>
 
 
 
 
-<pre><code>aborts_if false;
-ensures result &#61;&#61; spec_native_format(s, true, false, false, false);
+<pre><code><b>aborts_if</b> <b>false</b>;
+<b>ensures</b> result == <a href="string_utils.md#0x1_string_utils_spec_native_format">spec_native_format</a>(s, <b>true</b>, <b>false</b>, <b>false</b>, <b>false</b>);
 </code></pre>
 
 
@@ -635,14 +635,14 @@ ensures result &#61;&#61; spec_native_format(s, true, false, false, false);
 ### Function `format1`
 
 
-<pre><code>public fun format1&lt;T0: drop&gt;(fmt: &amp;vector&lt;u8&gt;, a: T0): string::String
+<pre><code><b>public</b> <b>fun</b> <a href="string_utils.md#0x1_string_utils_format1">format1</a>&lt;T0: drop&gt;(fmt: &<a href="../../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u8&gt;, a: T0): <a href="../../move-stdlib/doc/string.md#0x1_string_String">string::String</a>
 </code></pre>
 
 
 
 
-<pre><code>aborts_if args_mismatch_or_invalid_format(fmt, list1(a));
-ensures result &#61;&#61; spec_native_format_list(fmt, list1(a));
+<pre><code><b>aborts_if</b> <a href="string_utils.md#0x1_string_utils_args_mismatch_or_invalid_format">args_mismatch_or_invalid_format</a>(fmt, <a href="string_utils.md#0x1_string_utils_list1">list1</a>(a));
+<b>ensures</b> result == <a href="string_utils.md#0x1_string_utils_spec_native_format_list">spec_native_format_list</a>(fmt, <a href="string_utils.md#0x1_string_utils_list1">list1</a>(a));
 </code></pre>
 
 
@@ -652,14 +652,14 @@ ensures result &#61;&#61; spec_native_format_list(fmt, list1(a));
 ### Function `format2`
 
 
-<pre><code>public fun format2&lt;T0: drop, T1: drop&gt;(fmt: &amp;vector&lt;u8&gt;, a: T0, b: T1): string::String
+<pre><code><b>public</b> <b>fun</b> <a href="string_utils.md#0x1_string_utils_format2">format2</a>&lt;T0: drop, T1: drop&gt;(fmt: &<a href="../../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u8&gt;, a: T0, b: T1): <a href="../../move-stdlib/doc/string.md#0x1_string_String">string::String</a>
 </code></pre>
 
 
 
 
-<pre><code>aborts_if args_mismatch_or_invalid_format(fmt, list2(a, b));
-ensures result &#61;&#61; spec_native_format_list(fmt, list2(a, b));
+<pre><code><b>aborts_if</b> <a href="string_utils.md#0x1_string_utils_args_mismatch_or_invalid_format">args_mismatch_or_invalid_format</a>(fmt, <a href="string_utils.md#0x1_string_utils_list2">list2</a>(a, b));
+<b>ensures</b> result == <a href="string_utils.md#0x1_string_utils_spec_native_format_list">spec_native_format_list</a>(fmt, <a href="string_utils.md#0x1_string_utils_list2">list2</a>(a, b));
 </code></pre>
 
 
@@ -669,14 +669,14 @@ ensures result &#61;&#61; spec_native_format_list(fmt, list2(a, b));
 ### Function `format3`
 
 
-<pre><code>public fun format3&lt;T0: drop, T1: drop, T2: drop&gt;(fmt: &amp;vector&lt;u8&gt;, a: T0, b: T1, c: T2): string::String
+<pre><code><b>public</b> <b>fun</b> <a href="string_utils.md#0x1_string_utils_format3">format3</a>&lt;T0: drop, T1: drop, T2: drop&gt;(fmt: &<a href="../../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u8&gt;, a: T0, b: T1, c: T2): <a href="../../move-stdlib/doc/string.md#0x1_string_String">string::String</a>
 </code></pre>
 
 
 
 
-<pre><code>aborts_if args_mismatch_or_invalid_format(fmt, list3(a, b, c));
-ensures result &#61;&#61; spec_native_format_list(fmt, list3(a, b, c));
+<pre><code><b>aborts_if</b> <a href="string_utils.md#0x1_string_utils_args_mismatch_or_invalid_format">args_mismatch_or_invalid_format</a>(fmt, <a href="string_utils.md#0x1_string_utils_list3">list3</a>(a, b, c));
+<b>ensures</b> result == <a href="string_utils.md#0x1_string_utils_spec_native_format_list">spec_native_format_list</a>(fmt, <a href="string_utils.md#0x1_string_utils_list3">list3</a>(a, b, c));
 </code></pre>
 
 
@@ -686,14 +686,14 @@ ensures result &#61;&#61; spec_native_format_list(fmt, list3(a, b, c));
 ### Function `format4`
 
 
-<pre><code>public fun format4&lt;T0: drop, T1: drop, T2: drop, T3: drop&gt;(fmt: &amp;vector&lt;u8&gt;, a: T0, b: T1, c: T2, d: T3): string::String
+<pre><code><b>public</b> <b>fun</b> <a href="string_utils.md#0x1_string_utils_format4">format4</a>&lt;T0: drop, T1: drop, T2: drop, T3: drop&gt;(fmt: &<a href="../../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u8&gt;, a: T0, b: T1, c: T2, d: T3): <a href="../../move-stdlib/doc/string.md#0x1_string_String">string::String</a>
 </code></pre>
 
 
 
 
-<pre><code>aborts_if args_mismatch_or_invalid_format(fmt, list4(a, b, c, d));
-ensures result &#61;&#61; spec_native_format_list(fmt, list4(a, b, c, d));
+<pre><code><b>aborts_if</b> <a href="string_utils.md#0x1_string_utils_args_mismatch_or_invalid_format">args_mismatch_or_invalid_format</a>(fmt, <a href="string_utils.md#0x1_string_utils_list4">list4</a>(a, b, c, d));
+<b>ensures</b> result == <a href="string_utils.md#0x1_string_utils_spec_native_format_list">spec_native_format_list</a>(fmt, <a href="string_utils.md#0x1_string_utils_list4">list4</a>(a, b, c, d));
 </code></pre>
 
 
@@ -703,15 +703,15 @@ ensures result &#61;&#61; spec_native_format_list(fmt, list4(a, b, c, d));
 ### Function `native_format`
 
 
-<pre><code>fun native_format&lt;T&gt;(s: &amp;T, type_tag: bool, canonicalize: bool, single_line: bool, include_int_types: bool): string::String
+<pre><code><b>fun</b> <a href="string_utils.md#0x1_string_utils_native_format">native_format</a>&lt;T&gt;(s: &T, type_tag: bool, canonicalize: bool, single_line: bool, include_int_types: bool): <a href="../../move-stdlib/doc/string.md#0x1_string_String">string::String</a>
 </code></pre>
 
 
 
 
-<pre><code>pragma opaque;
-aborts_if false;
-ensures result &#61;&#61; spec_native_format(s, type_tag, canonicalize, single_line, include_int_types);
+<pre><code><b>pragma</b> opaque;
+<b>aborts_if</b> <b>false</b>;
+<b>ensures</b> result == <a href="string_utils.md#0x1_string_utils_spec_native_format">spec_native_format</a>(s, type_tag, canonicalize, single_line, include_int_types);
 </code></pre>
 
 
@@ -721,15 +721,15 @@ ensures result &#61;&#61; spec_native_format(s, type_tag, canonicalize, single_l
 ### Function `native_format_list`
 
 
-<pre><code>fun native_format_list&lt;T&gt;(fmt: &amp;vector&lt;u8&gt;, val: &amp;T): string::String
+<pre><code><b>fun</b> <a href="string_utils.md#0x1_string_utils_native_format_list">native_format_list</a>&lt;T&gt;(fmt: &<a href="../../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u8&gt;, val: &T): <a href="../../move-stdlib/doc/string.md#0x1_string_String">string::String</a>
 </code></pre>
 
 
 
 
-<pre><code>pragma opaque;
-aborts_if args_mismatch_or_invalid_format(fmt, val);
-ensures result &#61;&#61; spec_native_format_list(fmt, val);
+<pre><code><b>pragma</b> opaque;
+<b>aborts_if</b> <a href="string_utils.md#0x1_string_utils_args_mismatch_or_invalid_format">args_mismatch_or_invalid_format</a>(fmt, val);
+<b>ensures</b> result == <a href="string_utils.md#0x1_string_utils_spec_native_format_list">spec_native_format_list</a>(fmt, val);
 </code></pre>
 
 
@@ -738,7 +738,7 @@ ensures result &#61;&#61; spec_native_format_list(fmt, val);
 <a id="0x1_string_utils_spec_native_format"></a>
 
 
-<pre><code>fun spec_native_format&lt;T&gt;(s: T, type_tag: bool, canonicalize: bool, single_line: bool, include_int_types: bool): String;
+<pre><code><b>fun</b> <a href="string_utils.md#0x1_string_utils_spec_native_format">spec_native_format</a>&lt;T&gt;(s: T, type_tag: bool, canonicalize: bool, single_line: bool, include_int_types: bool): String;
 </code></pre>
 
 
@@ -747,7 +747,7 @@ ensures result &#61;&#61; spec_native_format_list(fmt, val);
 <a id="0x1_string_utils_spec_native_format_list"></a>
 
 
-<pre><code>fun spec_native_format_list&lt;T&gt;(fmt: vector&lt;u8&gt;, val: T): String;
+<pre><code><b>fun</b> <a href="string_utils.md#0x1_string_utils_spec_native_format_list">spec_native_format_list</a>&lt;T&gt;(fmt: <a href="../../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u8&gt;, val: T): String;
 </code></pre>
 
 
@@ -756,7 +756,7 @@ ensures result &#61;&#61; spec_native_format_list(fmt, val);
 <a id="0x1_string_utils_args_mismatch_or_invalid_format"></a>
 
 
-<pre><code>fun args_mismatch_or_invalid_format&lt;T&gt;(fmt: vector&lt;u8&gt;, val: T): bool;
+<pre><code><b>fun</b> <a href="string_utils.md#0x1_string_utils_args_mismatch_or_invalid_format">args_mismatch_or_invalid_format</a>&lt;T&gt;(fmt: <a href="../../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u8&gt;, val: T): bool;
 </code></pre>
 
 

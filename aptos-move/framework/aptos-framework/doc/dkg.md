@@ -25,13 +25,13 @@ DKG on-chain states and helper functions.
     -  [Function `incomplete_session`](#@Specification_1_incomplete_session)
 
 
-<pre><code>use 0x1::error;
-use 0x1::event;
-use 0x1::option;
-use 0x1::randomness_config;
-use 0x1::system_addresses;
-use 0x1::timestamp;
-use 0x1::validator_consensus_info;
+<pre><code><b>use</b> <a href="../../aptos-stdlib/../move-stdlib/doc/error.md#0x1_error">0x1::error</a>;
+<b>use</b> <a href="event.md#0x1_event">0x1::event</a>;
+<b>use</b> <a href="../../aptos-stdlib/../move-stdlib/doc/option.md#0x1_option">0x1::option</a>;
+<b>use</b> <a href="randomness_config.md#0x1_randomness_config">0x1::randomness_config</a>;
+<b>use</b> <a href="system_addresses.md#0x1_system_addresses">0x1::system_addresses</a>;
+<b>use</b> <a href="timestamp.md#0x1_timestamp">0x1::timestamp</a>;
+<b>use</b> <a href="validator_consensus_info.md#0x1_validator_consensus_info">0x1::validator_consensus_info</a>;
 </code></pre>
 
 
@@ -43,7 +43,7 @@ use 0x1::validator_consensus_info;
 This can be considered as the public input of DKG.
 
 
-<pre><code>struct DKGSessionMetadata has copy, drop, store
+<pre><code><b>struct</b> <a href="dkg.md#0x1_dkg_DKGSessionMetadata">DKGSessionMetadata</a> <b>has</b> <b>copy</b>, drop, store
 </code></pre>
 
 
@@ -60,19 +60,19 @@ This can be considered as the public input of DKG.
 
 </dd>
 <dt>
-<code>randomness_config: randomness_config::RandomnessConfig</code>
+<code><a href="randomness_config.md#0x1_randomness_config">randomness_config</a>: <a href="randomness_config.md#0x1_randomness_config_RandomnessConfig">randomness_config::RandomnessConfig</a></code>
 </dt>
 <dd>
 
 </dd>
 <dt>
-<code>dealer_validator_set: vector&lt;validator_consensus_info::ValidatorConsensusInfo&gt;</code>
+<code>dealer_validator_set: <a href="../../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;<a href="validator_consensus_info.md#0x1_validator_consensus_info_ValidatorConsensusInfo">validator_consensus_info::ValidatorConsensusInfo</a>&gt;</code>
 </dt>
 <dd>
 
 </dd>
 <dt>
-<code>target_validator_set: vector&lt;validator_consensus_info::ValidatorConsensusInfo&gt;</code>
+<code>target_validator_set: <a href="../../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;<a href="validator_consensus_info.md#0x1_validator_consensus_info_ValidatorConsensusInfo">validator_consensus_info::ValidatorConsensusInfo</a>&gt;</code>
 </dt>
 <dd>
 
@@ -88,8 +88,8 @@ This can be considered as the public input of DKG.
 
 
 
-<pre><code>&#35;[event]
-struct DKGStartEvent has drop, store
+<pre><code>#[<a href="event.md#0x1_event">event</a>]
+<b>struct</b> <a href="dkg.md#0x1_dkg_DKGStartEvent">DKGStartEvent</a> <b>has</b> drop, store
 </code></pre>
 
 
@@ -100,7 +100,7 @@ struct DKGStartEvent has drop, store
 
 <dl>
 <dt>
-<code>session_metadata: dkg::DKGSessionMetadata</code>
+<code>session_metadata: <a href="dkg.md#0x1_dkg_DKGSessionMetadata">dkg::DKGSessionMetadata</a></code>
 </dt>
 <dd>
 
@@ -121,10 +121,10 @@ struct DKGStartEvent has drop, store
 ## Struct `DKGSessionState`
 
 The input and output of a DKG session.
-The validator set of epoch <code>x</code> works together for an DKG output for the target validator set of epoch <code>x&#43;1</code>.
+The validator set of epoch <code>x</code> works together for an DKG output for the target validator set of epoch <code>x+1</code>.
 
 
-<pre><code>struct DKGSessionState has copy, drop, store
+<pre><code><b>struct</b> <a href="dkg.md#0x1_dkg_DKGSessionState">DKGSessionState</a> <b>has</b> <b>copy</b>, drop, store
 </code></pre>
 
 
@@ -135,7 +135,7 @@ The validator set of epoch <code>x</code> works together for an DKG output for t
 
 <dl>
 <dt>
-<code>metadata: dkg::DKGSessionMetadata</code>
+<code>metadata: <a href="dkg.md#0x1_dkg_DKGSessionMetadata">dkg::DKGSessionMetadata</a></code>
 </dt>
 <dd>
 
@@ -147,7 +147,7 @@ The validator set of epoch <code>x</code> works together for an DKG output for t
 
 </dd>
 <dt>
-<code>transcript: vector&lt;u8&gt;</code>
+<code>transcript: <a href="../../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u8&gt;</code>
 </dt>
 <dd>
 
@@ -164,7 +164,7 @@ The validator set of epoch <code>x</code> works together for an DKG output for t
 The completed and in-progress DKG sessions.
 
 
-<pre><code>struct DKGState has key
+<pre><code><b>struct</b> <a href="dkg.md#0x1_dkg_DKGState">DKGState</a> <b>has</b> key
 </code></pre>
 
 
@@ -175,13 +175,13 @@ The completed and in-progress DKG sessions.
 
 <dl>
 <dt>
-<code>last_completed: option::Option&lt;dkg::DKGSessionState&gt;</code>
+<code>last_completed: <a href="../../aptos-stdlib/../move-stdlib/doc/option.md#0x1_option_Option">option::Option</a>&lt;<a href="dkg.md#0x1_dkg_DKGSessionState">dkg::DKGSessionState</a>&gt;</code>
 </dt>
 <dd>
 
 </dd>
 <dt>
-<code>in_progress: option::Option&lt;dkg::DKGSessionState&gt;</code>
+<code>in_progress: <a href="../../aptos-stdlib/../move-stdlib/doc/option.md#0x1_option_Option">option::Option</a>&lt;<a href="dkg.md#0x1_dkg_DKGSessionState">dkg::DKGSessionState</a>&gt;</code>
 </dt>
 <dd>
 
@@ -200,7 +200,7 @@ The completed and in-progress DKG sessions.
 
 
 
-<pre><code>const EDKG_IN_PROGRESS: u64 &#61; 1;
+<pre><code><b>const</b> <a href="dkg.md#0x1_dkg_EDKG_IN_PROGRESS">EDKG_IN_PROGRESS</a>: u64 = 1;
 </code></pre>
 
 
@@ -209,7 +209,7 @@ The completed and in-progress DKG sessions.
 
 
 
-<pre><code>const EDKG_NOT_IN_PROGRESS: u64 &#61; 2;
+<pre><code><b>const</b> <a href="dkg.md#0x1_dkg_EDKG_NOT_IN_PROGRESS">EDKG_NOT_IN_PROGRESS</a>: u64 = 2;
 </code></pre>
 
 
@@ -221,7 +221,7 @@ The completed and in-progress DKG sessions.
 Called in genesis to initialize on-chain states.
 
 
-<pre><code>public fun initialize(aptos_framework: &amp;signer)
+<pre><code><b>public</b> <b>fun</b> <a href="dkg.md#0x1_dkg_initialize">initialize</a>(aptos_framework: &<a href="../../aptos-stdlib/../move-stdlib/doc/signer.md#0x1_signer">signer</a>)
 </code></pre>
 
 
@@ -230,18 +230,18 @@ Called in genesis to initialize on-chain states.
 <summary>Implementation</summary>
 
 
-<pre><code>public fun initialize(aptos_framework: &amp;signer) &#123;
-    system_addresses::assert_aptos_framework(aptos_framework);
-    if (!exists&lt;DKGState&gt;(@aptos_framework)) &#123;
-        move_to&lt;DKGState&gt;(
+<pre><code><b>public</b> <b>fun</b> <a href="dkg.md#0x1_dkg_initialize">initialize</a>(aptos_framework: &<a href="../../aptos-stdlib/../move-stdlib/doc/signer.md#0x1_signer">signer</a>) {
+    <a href="system_addresses.md#0x1_system_addresses_assert_aptos_framework">system_addresses::assert_aptos_framework</a>(aptos_framework);
+    <b>if</b> (!<b>exists</b>&lt;<a href="dkg.md#0x1_dkg_DKGState">DKGState</a>&gt;(@aptos_framework)) {
+        <b>move_to</b>&lt;<a href="dkg.md#0x1_dkg_DKGState">DKGState</a>&gt;(
             aptos_framework,
-            DKGState &#123;
+            <a href="dkg.md#0x1_dkg_DKGState">DKGState</a> {
                 last_completed: std::option::none(),
                 in_progress: std::option::none(),
-            &#125;
+            }
         );
-    &#125;
-&#125;
+    }
+}
 </code></pre>
 
 
@@ -256,7 +256,7 @@ Mark on-chain DKG state as in-progress. Notify validators to start DKG.
 Abort if a DKG is already in progress.
 
 
-<pre><code>public(friend) fun start(dealer_epoch: u64, randomness_config: randomness_config::RandomnessConfig, dealer_validator_set: vector&lt;validator_consensus_info::ValidatorConsensusInfo&gt;, target_validator_set: vector&lt;validator_consensus_info::ValidatorConsensusInfo&gt;)
+<pre><code><b>public</b>(<b>friend</b>) <b>fun</b> <a href="dkg.md#0x1_dkg_start">start</a>(dealer_epoch: u64, <a href="randomness_config.md#0x1_randomness_config">randomness_config</a>: <a href="randomness_config.md#0x1_randomness_config_RandomnessConfig">randomness_config::RandomnessConfig</a>, dealer_validator_set: <a href="../../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;<a href="validator_consensus_info.md#0x1_validator_consensus_info_ValidatorConsensusInfo">validator_consensus_info::ValidatorConsensusInfo</a>&gt;, target_validator_set: <a href="../../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;<a href="validator_consensus_info.md#0x1_validator_consensus_info_ValidatorConsensusInfo">validator_consensus_info::ValidatorConsensusInfo</a>&gt;)
 </code></pre>
 
 
@@ -265,31 +265,31 @@ Abort if a DKG is already in progress.
 <summary>Implementation</summary>
 
 
-<pre><code>public(friend) fun start(
+<pre><code><b>public</b>(<b>friend</b>) <b>fun</b> <a href="dkg.md#0x1_dkg_start">start</a>(
     dealer_epoch: u64,
-    randomness_config: RandomnessConfig,
-    dealer_validator_set: vector&lt;ValidatorConsensusInfo&gt;,
-    target_validator_set: vector&lt;ValidatorConsensusInfo&gt;,
-) acquires DKGState &#123;
-    let dkg_state &#61; borrow_global_mut&lt;DKGState&gt;(@aptos_framework);
-    let new_session_metadata &#61; DKGSessionMetadata &#123;
+    <a href="randomness_config.md#0x1_randomness_config">randomness_config</a>: RandomnessConfig,
+    dealer_validator_set: <a href="../../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;ValidatorConsensusInfo&gt;,
+    target_validator_set: <a href="../../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;ValidatorConsensusInfo&gt;,
+) <b>acquires</b> <a href="dkg.md#0x1_dkg_DKGState">DKGState</a> {
+    <b>let</b> dkg_state = <b>borrow_global_mut</b>&lt;<a href="dkg.md#0x1_dkg_DKGState">DKGState</a>&gt;(@aptos_framework);
+    <b>let</b> new_session_metadata = <a href="dkg.md#0x1_dkg_DKGSessionMetadata">DKGSessionMetadata</a> {
         dealer_epoch,
-        randomness_config,
+        <a href="randomness_config.md#0x1_randomness_config">randomness_config</a>,
         dealer_validator_set,
         target_validator_set,
-    &#125;;
-    let start_time_us &#61; timestamp::now_microseconds();
-    dkg_state.in_progress &#61; std::option::some(DKGSessionState &#123;
+    };
+    <b>let</b> start_time_us = <a href="timestamp.md#0x1_timestamp_now_microseconds">timestamp::now_microseconds</a>();
+    dkg_state.in_progress = std::option::some(<a href="dkg.md#0x1_dkg_DKGSessionState">DKGSessionState</a> {
         metadata: new_session_metadata,
         start_time_us,
-        transcript: vector[],
-    &#125;);
+        transcript: <a href="../../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector">vector</a>[],
+    });
 
-    emit(DKGStartEvent &#123;
+    emit(<a href="dkg.md#0x1_dkg_DKGStartEvent">DKGStartEvent</a> {
         start_time_us,
         session_metadata: new_session_metadata,
-    &#125;);
-&#125;
+    });
+}
 </code></pre>
 
 
@@ -305,7 +305,7 @@ Put a transcript into the currently incomplete DKG session, then mark it complet
 Abort if DKG is not in progress.
 
 
-<pre><code>public(friend) fun finish(transcript: vector&lt;u8&gt;)
+<pre><code><b>public</b>(<b>friend</b>) <b>fun</b> <a href="dkg.md#0x1_dkg_finish">finish</a>(transcript: <a href="../../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u8&gt;)
 </code></pre>
 
 
@@ -314,14 +314,14 @@ Abort if DKG is not in progress.
 <summary>Implementation</summary>
 
 
-<pre><code>public(friend) fun finish(transcript: vector&lt;u8&gt;) acquires DKGState &#123;
-    let dkg_state &#61; borrow_global_mut&lt;DKGState&gt;(@aptos_framework);
-    assert!(option::is_some(&amp;dkg_state.in_progress), error::invalid_state(EDKG_NOT_IN_PROGRESS));
-    let session &#61; option::extract(&amp;mut dkg_state.in_progress);
-    session.transcript &#61; transcript;
-    dkg_state.last_completed &#61; option::some(session);
-    dkg_state.in_progress &#61; option::none();
-&#125;
+<pre><code><b>public</b>(<b>friend</b>) <b>fun</b> <a href="dkg.md#0x1_dkg_finish">finish</a>(transcript: <a href="../../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u8&gt;) <b>acquires</b> <a href="dkg.md#0x1_dkg_DKGState">DKGState</a> {
+    <b>let</b> dkg_state = <b>borrow_global_mut</b>&lt;<a href="dkg.md#0x1_dkg_DKGState">DKGState</a>&gt;(@aptos_framework);
+    <b>assert</b>!(<a href="../../aptos-stdlib/../move-stdlib/doc/option.md#0x1_option_is_some">option::is_some</a>(&dkg_state.in_progress), <a href="../../aptos-stdlib/../move-stdlib/doc/error.md#0x1_error_invalid_state">error::invalid_state</a>(<a href="dkg.md#0x1_dkg_EDKG_NOT_IN_PROGRESS">EDKG_NOT_IN_PROGRESS</a>));
+    <b>let</b> session = <a href="../../aptos-stdlib/../move-stdlib/doc/option.md#0x1_option_extract">option::extract</a>(&<b>mut</b> dkg_state.in_progress);
+    session.transcript = transcript;
+    dkg_state.last_completed = <a href="../../aptos-stdlib/../move-stdlib/doc/option.md#0x1_option_some">option::some</a>(session);
+    dkg_state.in_progress = <a href="../../aptos-stdlib/../move-stdlib/doc/option.md#0x1_option_none">option::none</a>();
+}
 </code></pre>
 
 
@@ -335,7 +335,7 @@ Abort if DKG is not in progress.
 Delete the currently incomplete session, if it exists.
 
 
-<pre><code>public fun try_clear_incomplete_session(fx: &amp;signer)
+<pre><code><b>public</b> <b>fun</b> <a href="dkg.md#0x1_dkg_try_clear_incomplete_session">try_clear_incomplete_session</a>(fx: &<a href="../../aptos-stdlib/../move-stdlib/doc/signer.md#0x1_signer">signer</a>)
 </code></pre>
 
 
@@ -344,13 +344,13 @@ Delete the currently incomplete session, if it exists.
 <summary>Implementation</summary>
 
 
-<pre><code>public fun try_clear_incomplete_session(fx: &amp;signer) acquires DKGState &#123;
-    system_addresses::assert_aptos_framework(fx);
-    if (exists&lt;DKGState&gt;(@aptos_framework)) &#123;
-        let dkg_state &#61; borrow_global_mut&lt;DKGState&gt;(@aptos_framework);
-        dkg_state.in_progress &#61; option::none();
-    &#125;
-&#125;
+<pre><code><b>public</b> <b>fun</b> <a href="dkg.md#0x1_dkg_try_clear_incomplete_session">try_clear_incomplete_session</a>(fx: &<a href="../../aptos-stdlib/../move-stdlib/doc/signer.md#0x1_signer">signer</a>) <b>acquires</b> <a href="dkg.md#0x1_dkg_DKGState">DKGState</a> {
+    <a href="system_addresses.md#0x1_system_addresses_assert_aptos_framework">system_addresses::assert_aptos_framework</a>(fx);
+    <b>if</b> (<b>exists</b>&lt;<a href="dkg.md#0x1_dkg_DKGState">DKGState</a>&gt;(@aptos_framework)) {
+        <b>let</b> dkg_state = <b>borrow_global_mut</b>&lt;<a href="dkg.md#0x1_dkg_DKGState">DKGState</a>&gt;(@aptos_framework);
+        dkg_state.in_progress = <a href="../../aptos-stdlib/../move-stdlib/doc/option.md#0x1_option_none">option::none</a>();
+    }
+}
 </code></pre>
 
 
@@ -364,7 +364,7 @@ Delete the currently incomplete session, if it exists.
 Return the incomplete DKG session state, if it exists.
 
 
-<pre><code>public fun incomplete_session(): option::Option&lt;dkg::DKGSessionState&gt;
+<pre><code><b>public</b> <b>fun</b> <a href="dkg.md#0x1_dkg_incomplete_session">incomplete_session</a>(): <a href="../../aptos-stdlib/../move-stdlib/doc/option.md#0x1_option_Option">option::Option</a>&lt;<a href="dkg.md#0x1_dkg_DKGSessionState">dkg::DKGSessionState</a>&gt;
 </code></pre>
 
 
@@ -373,13 +373,13 @@ Return the incomplete DKG session state, if it exists.
 <summary>Implementation</summary>
 
 
-<pre><code>public fun incomplete_session(): Option&lt;DKGSessionState&gt; acquires DKGState &#123;
-    if (exists&lt;DKGState&gt;(@aptos_framework)) &#123;
-        borrow_global&lt;DKGState&gt;(@aptos_framework).in_progress
-    &#125; else &#123;
-        option::none()
-    &#125;
-&#125;
+<pre><code><b>public</b> <b>fun</b> <a href="dkg.md#0x1_dkg_incomplete_session">incomplete_session</a>(): Option&lt;<a href="dkg.md#0x1_dkg_DKGSessionState">DKGSessionState</a>&gt; <b>acquires</b> <a href="dkg.md#0x1_dkg_DKGState">DKGState</a> {
+    <b>if</b> (<b>exists</b>&lt;<a href="dkg.md#0x1_dkg_DKGState">DKGState</a>&gt;(@aptos_framework)) {
+        <b>borrow_global</b>&lt;<a href="dkg.md#0x1_dkg_DKGState">DKGState</a>&gt;(@aptos_framework).in_progress
+    } <b>else</b> {
+        <a href="../../aptos-stdlib/../move-stdlib/doc/option.md#0x1_option_none">option::none</a>()
+    }
+}
 </code></pre>
 
 
@@ -390,10 +390,10 @@ Return the incomplete DKG session state, if it exists.
 
 ## Function `session_dealer_epoch`
 
-Return the dealer epoch of a <code>DKGSessionState</code>.
+Return the dealer epoch of a <code><a href="dkg.md#0x1_dkg_DKGSessionState">DKGSessionState</a></code>.
 
 
-<pre><code>public fun session_dealer_epoch(session: &amp;dkg::DKGSessionState): u64
+<pre><code><b>public</b> <b>fun</b> <a href="dkg.md#0x1_dkg_session_dealer_epoch">session_dealer_epoch</a>(session: &<a href="dkg.md#0x1_dkg_DKGSessionState">dkg::DKGSessionState</a>): u64
 </code></pre>
 
 
@@ -402,9 +402,9 @@ Return the dealer epoch of a <code>DKGSessionState</code>.
 <summary>Implementation</summary>
 
 
-<pre><code>public fun session_dealer_epoch(session: &amp;DKGSessionState): u64 &#123;
+<pre><code><b>public</b> <b>fun</b> <a href="dkg.md#0x1_dkg_session_dealer_epoch">session_dealer_epoch</a>(session: &<a href="dkg.md#0x1_dkg_DKGSessionState">DKGSessionState</a>): u64 {
     session.metadata.dealer_epoch
-&#125;
+}
 </code></pre>
 
 
@@ -417,7 +417,7 @@ Return the dealer epoch of a <code>DKGSessionState</code>.
 
 
 
-<pre><code>invariant [suspendable] chain_status::is_operating() &#61;&#61;&gt; exists&lt;DKGState&gt;(@aptos_framework);
+<pre><code><b>invariant</b> [suspendable] <a href="chain_status.md#0x1_chain_status_is_operating">chain_status::is_operating</a>() ==&gt; <b>exists</b>&lt;<a href="dkg.md#0x1_dkg_DKGState">DKGState</a>&gt;(@aptos_framework);
 </code></pre>
 
 
@@ -427,14 +427,14 @@ Return the dealer epoch of a <code>DKGSessionState</code>.
 ### Function `initialize`
 
 
-<pre><code>public fun initialize(aptos_framework: &amp;signer)
+<pre><code><b>public</b> <b>fun</b> <a href="dkg.md#0x1_dkg_initialize">initialize</a>(aptos_framework: &<a href="../../aptos-stdlib/../move-stdlib/doc/signer.md#0x1_signer">signer</a>)
 </code></pre>
 
 
 
 
-<pre><code>let aptos_framework_addr &#61; signer::address_of(aptos_framework);
-aborts_if aptos_framework_addr !&#61; @aptos_framework;
+<pre><code><b>let</b> aptos_framework_addr = <a href="../../aptos-stdlib/../move-stdlib/doc/signer.md#0x1_signer_address_of">signer::address_of</a>(aptos_framework);
+<b>aborts_if</b> aptos_framework_addr != @aptos_framework;
 </code></pre>
 
 
@@ -444,14 +444,14 @@ aborts_if aptos_framework_addr !&#61; @aptos_framework;
 ### Function `start`
 
 
-<pre><code>public(friend) fun start(dealer_epoch: u64, randomness_config: randomness_config::RandomnessConfig, dealer_validator_set: vector&lt;validator_consensus_info::ValidatorConsensusInfo&gt;, target_validator_set: vector&lt;validator_consensus_info::ValidatorConsensusInfo&gt;)
+<pre><code><b>public</b>(<b>friend</b>) <b>fun</b> <a href="dkg.md#0x1_dkg_start">start</a>(dealer_epoch: u64, <a href="randomness_config.md#0x1_randomness_config">randomness_config</a>: <a href="randomness_config.md#0x1_randomness_config_RandomnessConfig">randomness_config::RandomnessConfig</a>, dealer_validator_set: <a href="../../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;<a href="validator_consensus_info.md#0x1_validator_consensus_info_ValidatorConsensusInfo">validator_consensus_info::ValidatorConsensusInfo</a>&gt;, target_validator_set: <a href="../../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;<a href="validator_consensus_info.md#0x1_validator_consensus_info_ValidatorConsensusInfo">validator_consensus_info::ValidatorConsensusInfo</a>&gt;)
 </code></pre>
 
 
 
 
-<pre><code>aborts_if !exists&lt;DKGState&gt;(@aptos_framework);
-aborts_if !exists&lt;timestamp::CurrentTimeMicroseconds&gt;(@aptos_framework);
+<pre><code><b>aborts_if</b> !<b>exists</b>&lt;<a href="dkg.md#0x1_dkg_DKGState">DKGState</a>&gt;(@aptos_framework);
+<b>aborts_if</b> !<b>exists</b>&lt;<a href="timestamp.md#0x1_timestamp_CurrentTimeMicroseconds">timestamp::CurrentTimeMicroseconds</a>&gt;(@aptos_framework);
 </code></pre>
 
 
@@ -461,15 +461,15 @@ aborts_if !exists&lt;timestamp::CurrentTimeMicroseconds&gt;(@aptos_framework);
 ### Function `finish`
 
 
-<pre><code>public(friend) fun finish(transcript: vector&lt;u8&gt;)
+<pre><code><b>public</b>(<b>friend</b>) <b>fun</b> <a href="dkg.md#0x1_dkg_finish">finish</a>(transcript: <a href="../../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u8&gt;)
 </code></pre>
 
 
 
 
-<pre><code>requires exists&lt;DKGState&gt;(@aptos_framework);
-requires option::is_some(global&lt;DKGState&gt;(@aptos_framework).in_progress);
-aborts_if false;
+<pre><code><b>requires</b> <b>exists</b>&lt;<a href="dkg.md#0x1_dkg_DKGState">DKGState</a>&gt;(@aptos_framework);
+<b>requires</b> <a href="../../aptos-stdlib/../move-stdlib/doc/option.md#0x1_option_is_some">option::is_some</a>(<b>global</b>&lt;<a href="dkg.md#0x1_dkg_DKGState">DKGState</a>&gt;(@aptos_framework).in_progress);
+<b>aborts_if</b> <b>false</b>;
 </code></pre>
 
 
@@ -478,13 +478,13 @@ aborts_if false;
 <a id="0x1_dkg_has_incomplete_session"></a>
 
 
-<pre><code>fun has_incomplete_session(): bool &#123;
-   if (exists&lt;DKGState&gt;(@aptos_framework)) &#123;
-       option::spec_is_some(global&lt;DKGState&gt;(@aptos_framework).in_progress)
-   &#125; else &#123;
-       false
-   &#125;
-&#125;
+<pre><code><b>fun</b> <a href="dkg.md#0x1_dkg_has_incomplete_session">has_incomplete_session</a>(): bool {
+   <b>if</b> (<b>exists</b>&lt;<a href="dkg.md#0x1_dkg_DKGState">DKGState</a>&gt;(@aptos_framework)) {
+       <a href="../../aptos-stdlib/../move-stdlib/doc/option.md#0x1_option_spec_is_some">option::spec_is_some</a>(<b>global</b>&lt;<a href="dkg.md#0x1_dkg_DKGState">DKGState</a>&gt;(@aptos_framework).in_progress)
+   } <b>else</b> {
+       <b>false</b>
+   }
+}
 </code></pre>
 
 
@@ -494,14 +494,14 @@ aborts_if false;
 ### Function `try_clear_incomplete_session`
 
 
-<pre><code>public fun try_clear_incomplete_session(fx: &amp;signer)
+<pre><code><b>public</b> <b>fun</b> <a href="dkg.md#0x1_dkg_try_clear_incomplete_session">try_clear_incomplete_session</a>(fx: &<a href="../../aptos-stdlib/../move-stdlib/doc/signer.md#0x1_signer">signer</a>)
 </code></pre>
 
 
 
 
-<pre><code>let addr &#61; signer::address_of(fx);
-aborts_if addr !&#61; @aptos_framework;
+<pre><code><b>let</b> addr = <a href="../../aptos-stdlib/../move-stdlib/doc/signer.md#0x1_signer_address_of">signer::address_of</a>(fx);
+<b>aborts_if</b> addr != @aptos_framework;
 </code></pre>
 
 
@@ -511,13 +511,13 @@ aborts_if addr !&#61; @aptos_framework;
 ### Function `incomplete_session`
 
 
-<pre><code>public fun incomplete_session(): option::Option&lt;dkg::DKGSessionState&gt;
+<pre><code><b>public</b> <b>fun</b> <a href="dkg.md#0x1_dkg_incomplete_session">incomplete_session</a>(): <a href="../../aptos-stdlib/../move-stdlib/doc/option.md#0x1_option_Option">option::Option</a>&lt;<a href="dkg.md#0x1_dkg_DKGSessionState">dkg::DKGSessionState</a>&gt;
 </code></pre>
 
 
 
 
-<pre><code>aborts_if false;
+<pre><code><b>aborts_if</b> <b>false</b>;
 </code></pre>
 
 

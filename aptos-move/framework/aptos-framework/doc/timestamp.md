@@ -21,8 +21,8 @@ It interacts with the other modules in the following ways:
     -  [Function `update_global_time`](#@Specification_1_update_global_time)
 
 
-<pre><code>use 0x1::error;
-use 0x1::system_addresses;
+<pre><code><b>use</b> <a href="../../aptos-stdlib/../move-stdlib/doc/error.md#0x1_error">0x1::error</a>;
+<b>use</b> <a href="system_addresses.md#0x1_system_addresses">0x1::system_addresses</a>;
 </code></pre>
 
 
@@ -34,7 +34,7 @@ use 0x1::system_addresses;
 A singleton resource holding the current Unix time in microseconds
 
 
-<pre><code>struct CurrentTimeMicroseconds has key
+<pre><code><b>struct</b> <a href="timestamp.md#0x1_timestamp_CurrentTimeMicroseconds">CurrentTimeMicroseconds</a> <b>has</b> key
 </code></pre>
 
 
@@ -65,7 +65,7 @@ A singleton resource holding the current Unix time in microseconds
 The blockchain is not in an operating state yet
 
 
-<pre><code>const ENOT_OPERATING: u64 &#61; 1;
+<pre><code><b>const</b> <a href="timestamp.md#0x1_timestamp_ENOT_OPERATING">ENOT_OPERATING</a>: u64 = 1;
 </code></pre>
 
 
@@ -75,7 +75,7 @@ The blockchain is not in an operating state yet
 An invalid timestamp was provided
 
 
-<pre><code>const EINVALID_TIMESTAMP: u64 &#61; 2;
+<pre><code><b>const</b> <a href="timestamp.md#0x1_timestamp_EINVALID_TIMESTAMP">EINVALID_TIMESTAMP</a>: u64 = 2;
 </code></pre>
 
 
@@ -85,7 +85,7 @@ An invalid timestamp was provided
 Conversion factor between seconds and microseconds
 
 
-<pre><code>const MICRO_CONVERSION_FACTOR: u64 &#61; 1000000;
+<pre><code><b>const</b> <a href="timestamp.md#0x1_timestamp_MICRO_CONVERSION_FACTOR">MICRO_CONVERSION_FACTOR</a>: u64 = 1000000;
 </code></pre>
 
 
@@ -97,7 +97,7 @@ Conversion factor between seconds and microseconds
 Marks that time has started. This can only be called from genesis and with the aptos framework account.
 
 
-<pre><code>public(friend) fun set_time_has_started(aptos_framework: &amp;signer)
+<pre><code><b>public</b>(<b>friend</b>) <b>fun</b> <a href="timestamp.md#0x1_timestamp_set_time_has_started">set_time_has_started</a>(aptos_framework: &<a href="../../aptos-stdlib/../move-stdlib/doc/signer.md#0x1_signer">signer</a>)
 </code></pre>
 
 
@@ -106,11 +106,11 @@ Marks that time has started. This can only be called from genesis and with the a
 <summary>Implementation</summary>
 
 
-<pre><code>public(friend) fun set_time_has_started(aptos_framework: &amp;signer) &#123;
-    system_addresses::assert_aptos_framework(aptos_framework);
-    let timer &#61; CurrentTimeMicroseconds &#123; microseconds: 0 &#125;;
-    move_to(aptos_framework, timer);
-&#125;
+<pre><code><b>public</b>(<b>friend</b>) <b>fun</b> <a href="timestamp.md#0x1_timestamp_set_time_has_started">set_time_has_started</a>(aptos_framework: &<a href="../../aptos-stdlib/../move-stdlib/doc/signer.md#0x1_signer">signer</a>) {
+    <a href="system_addresses.md#0x1_system_addresses_assert_aptos_framework">system_addresses::assert_aptos_framework</a>(aptos_framework);
+    <b>let</b> timer = <a href="timestamp.md#0x1_timestamp_CurrentTimeMicroseconds">CurrentTimeMicroseconds</a> { microseconds: 0 };
+    <b>move_to</b>(aptos_framework, timer);
+}
 </code></pre>
 
 
@@ -124,7 +124,7 @@ Marks that time has started. This can only be called from genesis and with the a
 Updates the wall clock time by consensus. Requires VM privilege and will be invoked during block prologue.
 
 
-<pre><code>public fun update_global_time(account: &amp;signer, proposer: address, timestamp: u64)
+<pre><code><b>public</b> <b>fun</b> <a href="timestamp.md#0x1_timestamp_update_global_time">update_global_time</a>(<a href="account.md#0x1_account">account</a>: &<a href="../../aptos-stdlib/../move-stdlib/doc/signer.md#0x1_signer">signer</a>, proposer: <b>address</b>, <a href="timestamp.md#0x1_timestamp">timestamp</a>: u64)
 </code></pre>
 
 
@@ -133,25 +133,25 @@ Updates the wall clock time by consensus. Requires VM privilege and will be invo
 <summary>Implementation</summary>
 
 
-<pre><code>public fun update_global_time(
-    account: &amp;signer,
-    proposer: address,
-    timestamp: u64
-) acquires CurrentTimeMicroseconds &#123;
-    // Can only be invoked by AptosVM signer.
-    system_addresses::assert_vm(account);
+<pre><code><b>public</b> <b>fun</b> <a href="timestamp.md#0x1_timestamp_update_global_time">update_global_time</a>(
+    <a href="account.md#0x1_account">account</a>: &<a href="../../aptos-stdlib/../move-stdlib/doc/signer.md#0x1_signer">signer</a>,
+    proposer: <b>address</b>,
+    <a href="timestamp.md#0x1_timestamp">timestamp</a>: u64
+) <b>acquires</b> <a href="timestamp.md#0x1_timestamp_CurrentTimeMicroseconds">CurrentTimeMicroseconds</a> {
+    // Can only be invoked by AptosVM <a href="../../aptos-stdlib/../move-stdlib/doc/signer.md#0x1_signer">signer</a>.
+    <a href="system_addresses.md#0x1_system_addresses_assert_vm">system_addresses::assert_vm</a>(<a href="account.md#0x1_account">account</a>);
 
-    let global_timer &#61; borrow_global_mut&lt;CurrentTimeMicroseconds&gt;(@aptos_framework);
-    let now &#61; global_timer.microseconds;
-    if (proposer &#61;&#61; @vm_reserved) &#123;
-        // NIL block with null address as proposer. Timestamp must be equal.
-        assert!(now &#61;&#61; timestamp, error::invalid_argument(EINVALID_TIMESTAMP));
-    &#125; else &#123;
-        // Normal block. Time must advance
-        assert!(now &lt; timestamp, error::invalid_argument(EINVALID_TIMESTAMP));
-        global_timer.microseconds &#61; timestamp;
-    &#125;;
-&#125;
+    <b>let</b> global_timer = <b>borrow_global_mut</b>&lt;<a href="timestamp.md#0x1_timestamp_CurrentTimeMicroseconds">CurrentTimeMicroseconds</a>&gt;(@aptos_framework);
+    <b>let</b> now = global_timer.microseconds;
+    <b>if</b> (proposer == @vm_reserved) {
+        // NIL <a href="block.md#0x1_block">block</a> <b>with</b> null <b>address</b> <b>as</b> proposer. Timestamp must be equal.
+        <b>assert</b>!(now == <a href="timestamp.md#0x1_timestamp">timestamp</a>, <a href="../../aptos-stdlib/../move-stdlib/doc/error.md#0x1_error_invalid_argument">error::invalid_argument</a>(<a href="timestamp.md#0x1_timestamp_EINVALID_TIMESTAMP">EINVALID_TIMESTAMP</a>));
+    } <b>else</b> {
+        // Normal <a href="block.md#0x1_block">block</a>. Time must advance
+        <b>assert</b>!(now &lt; <a href="timestamp.md#0x1_timestamp">timestamp</a>, <a href="../../aptos-stdlib/../move-stdlib/doc/error.md#0x1_error_invalid_argument">error::invalid_argument</a>(<a href="timestamp.md#0x1_timestamp_EINVALID_TIMESTAMP">EINVALID_TIMESTAMP</a>));
+        global_timer.microseconds = <a href="timestamp.md#0x1_timestamp">timestamp</a>;
+    };
+}
 </code></pre>
 
 
@@ -165,8 +165,8 @@ Updates the wall clock time by consensus. Requires VM privilege and will be invo
 Gets the current time in microseconds.
 
 
-<pre><code>&#35;[view]
-public fun now_microseconds(): u64
+<pre><code>#[view]
+<b>public</b> <b>fun</b> <a href="timestamp.md#0x1_timestamp_now_microseconds">now_microseconds</a>(): u64
 </code></pre>
 
 
@@ -175,9 +175,9 @@ public fun now_microseconds(): u64
 <summary>Implementation</summary>
 
 
-<pre><code>public fun now_microseconds(): u64 acquires CurrentTimeMicroseconds &#123;
-    borrow_global&lt;CurrentTimeMicroseconds&gt;(@aptos_framework).microseconds
-&#125;
+<pre><code><b>public</b> <b>fun</b> <a href="timestamp.md#0x1_timestamp_now_microseconds">now_microseconds</a>(): u64 <b>acquires</b> <a href="timestamp.md#0x1_timestamp_CurrentTimeMicroseconds">CurrentTimeMicroseconds</a> {
+    <b>borrow_global</b>&lt;<a href="timestamp.md#0x1_timestamp_CurrentTimeMicroseconds">CurrentTimeMicroseconds</a>&gt;(@aptos_framework).microseconds
+}
 </code></pre>
 
 
@@ -191,8 +191,8 @@ public fun now_microseconds(): u64
 Gets the current time in seconds.
 
 
-<pre><code>&#35;[view]
-public fun now_seconds(): u64
+<pre><code>#[view]
+<b>public</b> <b>fun</b> <a href="timestamp.md#0x1_timestamp_now_seconds">now_seconds</a>(): u64
 </code></pre>
 
 
@@ -201,9 +201,9 @@ public fun now_seconds(): u64
 <summary>Implementation</summary>
 
 
-<pre><code>public fun now_seconds(): u64 acquires CurrentTimeMicroseconds &#123;
-    now_microseconds() / MICRO_CONVERSION_FACTOR
-&#125;
+<pre><code><b>public</b> <b>fun</b> <a href="timestamp.md#0x1_timestamp_now_seconds">now_seconds</a>(): u64 <b>acquires</b> <a href="timestamp.md#0x1_timestamp_CurrentTimeMicroseconds">CurrentTimeMicroseconds</a> {
+    <a href="timestamp.md#0x1_timestamp_now_microseconds">now_microseconds</a>() / <a href="timestamp.md#0x1_timestamp_MICRO_CONVERSION_FACTOR">MICRO_CONVERSION_FACTOR</a>
+}
 </code></pre>
 
 
@@ -269,7 +269,7 @@ public fun now_seconds(): u64
 
 
 <pre><code>// This enforces <a id="high-level-req-1" href="#high-level-req">high-level requirement 1</a> and <a id="high-level-req-2" href="#high-level-req">high-level requirement 2</a>:
-invariant [suspendable] chain_status::is_operating() &#61;&#61;&gt; exists&lt;CurrentTimeMicroseconds&gt;(@aptos_framework);
+<b>invariant</b> [suspendable] <a href="chain_status.md#0x1_chain_status_is_operating">chain_status::is_operating</a>() ==&gt; <b>exists</b>&lt;<a href="timestamp.md#0x1_timestamp_CurrentTimeMicroseconds">CurrentTimeMicroseconds</a>&gt;(@aptos_framework);
 </code></pre>
 
 
@@ -279,15 +279,15 @@ invariant [suspendable] chain_status::is_operating() &#61;&#61;&gt; exists&lt;Cu
 ### Function `update_global_time`
 
 
-<pre><code>public fun update_global_time(account: &amp;signer, proposer: address, timestamp: u64)
+<pre><code><b>public</b> <b>fun</b> <a href="timestamp.md#0x1_timestamp_update_global_time">update_global_time</a>(<a href="account.md#0x1_account">account</a>: &<a href="../../aptos-stdlib/../move-stdlib/doc/signer.md#0x1_signer">signer</a>, proposer: <b>address</b>, <a href="timestamp.md#0x1_timestamp">timestamp</a>: u64)
 </code></pre>
 
 
 
 
-<pre><code>requires chain_status::is_operating();
-include UpdateGlobalTimeAbortsIf;
-ensures (proposer !&#61; @vm_reserved) &#61;&#61;&gt; (spec_now_microseconds() &#61;&#61; timestamp);
+<pre><code><b>requires</b> <a href="chain_status.md#0x1_chain_status_is_operating">chain_status::is_operating</a>();
+<b>include</b> <a href="timestamp.md#0x1_timestamp_UpdateGlobalTimeAbortsIf">UpdateGlobalTimeAbortsIf</a>;
+<b>ensures</b> (proposer != @vm_reserved) ==&gt; (<a href="timestamp.md#0x1_timestamp_spec_now_microseconds">spec_now_microseconds</a>() == <a href="timestamp.md#0x1_timestamp">timestamp</a>);
 </code></pre>
 
 
@@ -296,16 +296,16 @@ ensures (proposer !&#61; @vm_reserved) &#61;&#61;&gt; (spec_now_microseconds() &
 <a id="0x1_timestamp_UpdateGlobalTimeAbortsIf"></a>
 
 
-<pre><code>schema UpdateGlobalTimeAbortsIf &#123;
-    account: signer;
-    proposer: address;
-    timestamp: u64;
+<pre><code><b>schema</b> <a href="timestamp.md#0x1_timestamp_UpdateGlobalTimeAbortsIf">UpdateGlobalTimeAbortsIf</a> {
+    <a href="account.md#0x1_account">account</a>: <a href="../../aptos-stdlib/../move-stdlib/doc/signer.md#0x1_signer">signer</a>;
+    proposer: <b>address</b>;
+    <a href="timestamp.md#0x1_timestamp">timestamp</a>: u64;
     // This enforces <a id="high-level-req-3" href="#high-level-req">high-level requirement 3</a>:
-    aborts_if !system_addresses::is_vm(account);
+    <b>aborts_if</b> !<a href="system_addresses.md#0x1_system_addresses_is_vm">system_addresses::is_vm</a>(<a href="account.md#0x1_account">account</a>);
     // This enforces <a id="high-level-req-4" href="#high-level-req">high-level requirement 4</a>:
-    aborts_if (proposer &#61;&#61; @vm_reserved) &amp;&amp; (spec_now_microseconds() !&#61; timestamp);
-    aborts_if (proposer !&#61; @vm_reserved) &amp;&amp; (spec_now_microseconds() &gt;&#61; timestamp);
-&#125;
+    <b>aborts_if</b> (proposer == @vm_reserved) && (<a href="timestamp.md#0x1_timestamp_spec_now_microseconds">spec_now_microseconds</a>() != <a href="timestamp.md#0x1_timestamp">timestamp</a>);
+    <b>aborts_if</b> (proposer != @vm_reserved) && (<a href="timestamp.md#0x1_timestamp_spec_now_microseconds">spec_now_microseconds</a>() &gt;= <a href="timestamp.md#0x1_timestamp">timestamp</a>);
+}
 </code></pre>
 
 
@@ -314,9 +314,9 @@ ensures (proposer !&#61; @vm_reserved) &#61;&#61;&gt; (spec_now_microseconds() &
 <a id="0x1_timestamp_spec_now_microseconds"></a>
 
 
-<pre><code>fun spec_now_microseconds(): u64 &#123;
-   global&lt;CurrentTimeMicroseconds&gt;(@aptos_framework).microseconds
-&#125;
+<pre><code><b>fun</b> <a href="timestamp.md#0x1_timestamp_spec_now_microseconds">spec_now_microseconds</a>(): u64 {
+   <b>global</b>&lt;<a href="timestamp.md#0x1_timestamp_CurrentTimeMicroseconds">CurrentTimeMicroseconds</a>&gt;(@aptos_framework).microseconds
+}
 </code></pre>
 
 
@@ -325,9 +325,9 @@ ensures (proposer !&#61; @vm_reserved) &#61;&#61;&gt; (spec_now_microseconds() &
 <a id="0x1_timestamp_spec_now_seconds"></a>
 
 
-<pre><code>fun spec_now_seconds(): u64 &#123;
-   spec_now_microseconds() / MICRO_CONVERSION_FACTOR
-&#125;
+<pre><code><b>fun</b> <a href="timestamp.md#0x1_timestamp_spec_now_seconds">spec_now_seconds</a>(): u64 {
+   <a href="timestamp.md#0x1_timestamp_spec_now_microseconds">spec_now_microseconds</a>() / <a href="timestamp.md#0x1_timestamp_MICRO_CONVERSION_FACTOR">MICRO_CONVERSION_FACTOR</a>
+}
 </code></pre>
 
 

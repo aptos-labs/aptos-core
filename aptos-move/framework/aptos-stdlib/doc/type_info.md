@@ -26,10 +26,10 @@
     -  [Function `verify_type_of_generic`](#@Specification_1_verify_type_of_generic)
 
 
-<pre><code>use 0x1::bcs;
-use 0x1::error;
-use 0x1::features;
-use 0x1::string;
+<pre><code><b>use</b> <a href="../../move-stdlib/doc/bcs.md#0x1_bcs">0x1::bcs</a>;
+<b>use</b> <a href="../../move-stdlib/doc/error.md#0x1_error">0x1::error</a>;
+<b>use</b> <a href="../../move-stdlib/doc/features.md#0x1_features">0x1::features</a>;
+<b>use</b> <a href="../../move-stdlib/doc/string.md#0x1_string">0x1::string</a>;
 </code></pre>
 
 
@@ -40,7 +40,7 @@ use 0x1::string;
 
 
 
-<pre><code>struct TypeInfo has copy, drop, store
+<pre><code><b>struct</b> <a href="type_info.md#0x1_type_info_TypeInfo">TypeInfo</a> <b>has</b> <b>copy</b>, drop, store
 </code></pre>
 
 
@@ -51,19 +51,19 @@ use 0x1::string;
 
 <dl>
 <dt>
-<code>account_address: address</code>
+<code>account_address: <b>address</b></code>
 </dt>
 <dd>
 
 </dd>
 <dt>
-<code>module_name: vector&lt;u8&gt;</code>
+<code>module_name: <a href="../../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u8&gt;</code>
 </dt>
 <dd>
 
 </dd>
 <dt>
-<code>struct_name: vector&lt;u8&gt;</code>
+<code>struct_name: <a href="../../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u8&gt;</code>
 </dt>
 <dd>
 
@@ -82,7 +82,7 @@ use 0x1::string;
 
 
 
-<pre><code>const E_NATIVE_FUN_NOT_AVAILABLE: u64 &#61; 1;
+<pre><code><b>const</b> <a href="type_info.md#0x1_type_info_E_NATIVE_FUN_NOT_AVAILABLE">E_NATIVE_FUN_NOT_AVAILABLE</a>: u64 = 1;
 </code></pre>
 
 
@@ -93,7 +93,7 @@ use 0x1::string;
 
 
 
-<pre><code>public fun account_address(type_info: &amp;type_info::TypeInfo): address
+<pre><code><b>public</b> <b>fun</b> <a href="type_info.md#0x1_type_info_account_address">account_address</a>(<a href="type_info.md#0x1_type_info">type_info</a>: &<a href="type_info.md#0x1_type_info_TypeInfo">type_info::TypeInfo</a>): <b>address</b>
 </code></pre>
 
 
@@ -102,9 +102,9 @@ use 0x1::string;
 <summary>Implementation</summary>
 
 
-<pre><code>public fun account_address(type_info: &amp;TypeInfo): address &#123;
-    type_info.account_address
-&#125;
+<pre><code><b>public</b> <b>fun</b> <a href="type_info.md#0x1_type_info_account_address">account_address</a>(<a href="type_info.md#0x1_type_info">type_info</a>: &<a href="type_info.md#0x1_type_info_TypeInfo">TypeInfo</a>): <b>address</b> {
+    <a href="type_info.md#0x1_type_info">type_info</a>.account_address
+}
 </code></pre>
 
 
@@ -117,7 +117,7 @@ use 0x1::string;
 
 
 
-<pre><code>public fun module_name(type_info: &amp;type_info::TypeInfo): vector&lt;u8&gt;
+<pre><code><b>public</b> <b>fun</b> <a href="type_info.md#0x1_type_info_module_name">module_name</a>(<a href="type_info.md#0x1_type_info">type_info</a>: &<a href="type_info.md#0x1_type_info_TypeInfo">type_info::TypeInfo</a>): <a href="../../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u8&gt;
 </code></pre>
 
 
@@ -126,9 +126,9 @@ use 0x1::string;
 <summary>Implementation</summary>
 
 
-<pre><code>public fun module_name(type_info: &amp;TypeInfo): vector&lt;u8&gt; &#123;
-    type_info.module_name
-&#125;
+<pre><code><b>public</b> <b>fun</b> <a href="type_info.md#0x1_type_info_module_name">module_name</a>(<a href="type_info.md#0x1_type_info">type_info</a>: &<a href="type_info.md#0x1_type_info_TypeInfo">TypeInfo</a>): <a href="../../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u8&gt; {
+    <a href="type_info.md#0x1_type_info">type_info</a>.module_name
+}
 </code></pre>
 
 
@@ -141,7 +141,7 @@ use 0x1::string;
 
 
 
-<pre><code>public fun struct_name(type_info: &amp;type_info::TypeInfo): vector&lt;u8&gt;
+<pre><code><b>public</b> <b>fun</b> <a href="type_info.md#0x1_type_info_struct_name">struct_name</a>(<a href="type_info.md#0x1_type_info">type_info</a>: &<a href="type_info.md#0x1_type_info_TypeInfo">type_info::TypeInfo</a>): <a href="../../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u8&gt;
 </code></pre>
 
 
@@ -150,9 +150,9 @@ use 0x1::string;
 <summary>Implementation</summary>
 
 
-<pre><code>public fun struct_name(type_info: &amp;TypeInfo): vector&lt;u8&gt; &#123;
-    type_info.struct_name
-&#125;
+<pre><code><b>public</b> <b>fun</b> <a href="type_info.md#0x1_type_info_struct_name">struct_name</a>(<a href="type_info.md#0x1_type_info">type_info</a>: &<a href="type_info.md#0x1_type_info_TypeInfo">TypeInfo</a>): <a href="../../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u8&gt; {
+    <a href="type_info.md#0x1_type_info">type_info</a>.struct_name
+}
 </code></pre>
 
 
@@ -163,12 +163,12 @@ use 0x1::string;
 
 ## Function `chain_id`
 
-Returns the current chain ID, mirroring what <code>aptos_framework::chain_id::get()</code> would return, except in <code>&#35;[test]</code>
+Returns the current chain ID, mirroring what <code>aptos_framework::chain_id::get()</code> would return, except in <code>#[test]</code>
 functions, where this will always return <code>4u8</code> as the chain ID, whereas <code>aptos_framework::chain_id::get()</code> will
 return whichever ID was passed to <code>aptos_framework::chain_id::initialize_for_test()</code>.
 
 
-<pre><code>public fun chain_id(): u8
+<pre><code><b>public</b> <b>fun</b> <a href="type_info.md#0x1_type_info_chain_id">chain_id</a>(): u8
 </code></pre>
 
 
@@ -177,13 +177,13 @@ return whichever ID was passed to <code>aptos_framework::chain_id::initialize_fo
 <summary>Implementation</summary>
 
 
-<pre><code>public fun chain_id(): u8 &#123;
-    if (!features::aptos_stdlib_chain_id_enabled()) &#123;
-        abort(std::error::invalid_state(E_NATIVE_FUN_NOT_AVAILABLE))
-    &#125;;
+<pre><code><b>public</b> <b>fun</b> <a href="type_info.md#0x1_type_info_chain_id">chain_id</a>(): u8 {
+    <b>if</b> (!<a href="../../move-stdlib/doc/features.md#0x1_features_aptos_stdlib_chain_id_enabled">features::aptos_stdlib_chain_id_enabled</a>()) {
+        <b>abort</b>(std::error::invalid_state(<a href="type_info.md#0x1_type_info_E_NATIVE_FUN_NOT_AVAILABLE">E_NATIVE_FUN_NOT_AVAILABLE</a>))
+    };
 
-    chain_id_internal()
-&#125;
+    <a href="type_info.md#0x1_type_info_chain_id_internal">chain_id_internal</a>()
+}
 </code></pre>
 
 
@@ -194,10 +194,10 @@ return whichever ID was passed to <code>aptos_framework::chain_id::initialize_fo
 
 ## Function `type_of`
 
-Return the <code>TypeInfo</code> struct containing  for the type <code>T</code>.
+Return the <code><a href="type_info.md#0x1_type_info_TypeInfo">TypeInfo</a></code> struct containing  for the type <code>T</code>.
 
 
-<pre><code>public fun type_of&lt;T&gt;(): type_info::TypeInfo
+<pre><code><b>public</b> <b>fun</b> <a href="type_info.md#0x1_type_info_type_of">type_of</a>&lt;T&gt;(): <a href="type_info.md#0x1_type_info_TypeInfo">type_info::TypeInfo</a>
 </code></pre>
 
 
@@ -206,7 +206,7 @@ Return the <code>TypeInfo</code> struct containing  for the type <code>T</code>.
 <summary>Implementation</summary>
 
 
-<pre><code>public native fun type_of&lt;T&gt;(): TypeInfo;
+<pre><code><b>public</b> <b>native</b> <b>fun</b> <a href="type_info.md#0x1_type_info_type_of">type_of</a>&lt;T&gt;(): <a href="type_info.md#0x1_type_info_TypeInfo">TypeInfo</a>;
 </code></pre>
 
 
@@ -222,7 +222,7 @@ Example: 0x1::coin::CoinStore<0x1::aptos_coin::AptosCoin>
 Or: 0x1::table::Table<0x1::string::String, 0x1::string::String>
 
 
-<pre><code>public fun type_name&lt;T&gt;(): string::String
+<pre><code><b>public</b> <b>fun</b> <a href="type_info.md#0x1_type_info_type_name">type_name</a>&lt;T&gt;(): <a href="../../move-stdlib/doc/string.md#0x1_string_String">string::String</a>
 </code></pre>
 
 
@@ -231,7 +231,7 @@ Or: 0x1::table::Table<0x1::string::String, 0x1::string::String>
 <summary>Implementation</summary>
 
 
-<pre><code>public native fun type_name&lt;T&gt;(): String;
+<pre><code><b>public</b> <b>native</b> <b>fun</b> <a href="type_info.md#0x1_type_info_type_name">type_name</a>&lt;T&gt;(): String;
 </code></pre>
 
 
@@ -244,7 +244,7 @@ Or: 0x1::table::Table<0x1::string::String, 0x1::string::String>
 
 
 
-<pre><code>fun chain_id_internal(): u8
+<pre><code><b>fun</b> <a href="type_info.md#0x1_type_info_chain_id_internal">chain_id_internal</a>(): u8
 </code></pre>
 
 
@@ -253,7 +253,7 @@ Or: 0x1::table::Table<0x1::string::String, 0x1::string::String>
 <summary>Implementation</summary>
 
 
-<pre><code>native fun chain_id_internal(): u8;
+<pre><code><b>native</b> <b>fun</b> <a href="type_info.md#0x1_type_info_chain_id_internal">chain_id_internal</a>(): u8;
 </code></pre>
 
 
@@ -273,7 +273,7 @@ nesting patterns, as well as <code>test_size_of_val_vectors()</code> for an
 analysis of vector size dynamism.
 
 
-<pre><code>public fun size_of_val&lt;T&gt;(val_ref: &amp;T): u64
+<pre><code><b>public</b> <b>fun</b> <a href="type_info.md#0x1_type_info_size_of_val">size_of_val</a>&lt;T&gt;(val_ref: &T): u64
 </code></pre>
 
 
@@ -282,10 +282,10 @@ analysis of vector size dynamism.
 <summary>Implementation</summary>
 
 
-<pre><code>public fun size_of_val&lt;T&gt;(val_ref: &amp;T): u64 &#123;
-    // Return vector length of vectorized BCS representation.
-    vector::length(&amp;bcs::to_bytes(val_ref))
-&#125;
+<pre><code><b>public</b> <b>fun</b> <a href="type_info.md#0x1_type_info_size_of_val">size_of_val</a>&lt;T&gt;(val_ref: &T): u64 {
+    // Return <a href="../../move-stdlib/doc/vector.md#0x1_vector">vector</a> length of vectorized BCS representation.
+    <a href="../../move-stdlib/doc/vector.md#0x1_vector_length">vector::length</a>(&<a href="../../move-stdlib/doc/bcs.md#0x1_bcs_to_bytes">bcs::to_bytes</a>(val_ref))
+}
 </code></pre>
 
 
@@ -298,8 +298,8 @@ analysis of vector size dynamism.
 
 
 
-<pre><code>&#35;[verify_only]
-fun verify_type_of()
+<pre><code>#[verify_only]
+<b>fun</b> <a href="type_info.md#0x1_type_info_verify_type_of">verify_type_of</a>()
 </code></pre>
 
 
@@ -308,17 +308,17 @@ fun verify_type_of()
 <summary>Implementation</summary>
 
 
-<pre><code>fun verify_type_of() &#123;
-    let type_info &#61; type_of&lt;TypeInfo&gt;();
-    let account_address &#61; account_address(&amp;type_info);
-    let module_name &#61; module_name(&amp;type_info);
-    let struct_name &#61; struct_name(&amp;type_info);
-    spec &#123;
-        assert account_address &#61;&#61; @aptos_std;
-        assert module_name &#61;&#61; b&quot;type_info&quot;;
-        assert struct_name &#61;&#61; b&quot;TypeInfo&quot;;
-    &#125;;
-&#125;
+<pre><code><b>fun</b> <a href="type_info.md#0x1_type_info_verify_type_of">verify_type_of</a>() {
+    <b>let</b> <a href="type_info.md#0x1_type_info">type_info</a> = <a href="type_info.md#0x1_type_info_type_of">type_of</a>&lt;<a href="type_info.md#0x1_type_info_TypeInfo">TypeInfo</a>&gt;();
+    <b>let</b> account_address = <a href="type_info.md#0x1_type_info_account_address">account_address</a>(&<a href="type_info.md#0x1_type_info">type_info</a>);
+    <b>let</b> module_name = <a href="type_info.md#0x1_type_info_module_name">module_name</a>(&<a href="type_info.md#0x1_type_info">type_info</a>);
+    <b>let</b> struct_name = <a href="type_info.md#0x1_type_info_struct_name">struct_name</a>(&<a href="type_info.md#0x1_type_info">type_info</a>);
+    <b>spec</b> {
+        <b>assert</b> account_address == @aptos_std;
+        <b>assert</b> module_name == b"<a href="type_info.md#0x1_type_info">type_info</a>";
+        <b>assert</b> struct_name == b"<a href="type_info.md#0x1_type_info_TypeInfo">TypeInfo</a>";
+    };
+}
 </code></pre>
 
 
@@ -331,8 +331,8 @@ fun verify_type_of()
 
 
 
-<pre><code>&#35;[verify_only]
-fun verify_type_of_generic&lt;T&gt;()
+<pre><code>#[verify_only]
+<b>fun</b> <a href="type_info.md#0x1_type_info_verify_type_of_generic">verify_type_of_generic</a>&lt;T&gt;()
 </code></pre>
 
 
@@ -341,17 +341,17 @@ fun verify_type_of_generic&lt;T&gt;()
 <summary>Implementation</summary>
 
 
-<pre><code>fun verify_type_of_generic&lt;T&gt;() &#123;
-    let type_info &#61; type_of&lt;T&gt;();
-    let account_address &#61; account_address(&amp;type_info);
-    let module_name &#61; module_name(&amp;type_info);
-    let struct_name &#61; struct_name(&amp;type_info);
-    spec &#123;
-        assert account_address &#61;&#61; type_of&lt;T&gt;().account_address;
-        assert module_name &#61;&#61; type_of&lt;T&gt;().module_name;
-        assert struct_name &#61;&#61; type_of&lt;T&gt;().struct_name;
-    &#125;;
-&#125;
+<pre><code><b>fun</b> <a href="type_info.md#0x1_type_info_verify_type_of_generic">verify_type_of_generic</a>&lt;T&gt;() {
+    <b>let</b> <a href="type_info.md#0x1_type_info">type_info</a> = <a href="type_info.md#0x1_type_info_type_of">type_of</a>&lt;T&gt;();
+    <b>let</b> account_address = <a href="type_info.md#0x1_type_info_account_address">account_address</a>(&<a href="type_info.md#0x1_type_info">type_info</a>);
+    <b>let</b> module_name = <a href="type_info.md#0x1_type_info_module_name">module_name</a>(&<a href="type_info.md#0x1_type_info">type_info</a>);
+    <b>let</b> struct_name = <a href="type_info.md#0x1_type_info_struct_name">struct_name</a>(&<a href="type_info.md#0x1_type_info">type_info</a>);
+    <b>spec</b> {
+        <b>assert</b> account_address == <a href="type_info.md#0x1_type_info_type_of">type_of</a>&lt;T&gt;().account_address;
+        <b>assert</b> module_name == <a href="type_info.md#0x1_type_info_type_of">type_of</a>&lt;T&gt;().module_name;
+        <b>assert</b> struct_name == <a href="type_info.md#0x1_type_info_type_of">type_of</a>&lt;T&gt;().struct_name;
+    };
+}
 </code></pre>
 
 
@@ -368,14 +368,14 @@ fun verify_type_of_generic&lt;T&gt;()
 ### Function `chain_id`
 
 
-<pre><code>public fun chain_id(): u8
+<pre><code><b>public</b> <b>fun</b> <a href="type_info.md#0x1_type_info_chain_id">chain_id</a>(): u8
 </code></pre>
 
 
 
 
-<pre><code>aborts_if !features::spec_is_enabled(features::APTOS_STD_CHAIN_ID_NATIVES);
-ensures result &#61;&#61; spec_chain_id_internal();
+<pre><code><b>aborts_if</b> !<a href="../../move-stdlib/doc/features.md#0x1_features_spec_is_enabled">features::spec_is_enabled</a>(<a href="../../move-stdlib/doc/features.md#0x1_features_APTOS_STD_CHAIN_ID_NATIVES">features::APTOS_STD_CHAIN_ID_NATIVES</a>);
+<b>ensures</b> result == <a href="type_info.md#0x1_type_info_spec_chain_id_internal">spec_chain_id_internal</a>();
 </code></pre>
 
 
@@ -385,7 +385,7 @@ ensures result &#61;&#61; spec_chain_id_internal();
 ### Function `type_of`
 
 
-<pre><code>public fun type_of&lt;T&gt;(): type_info::TypeInfo
+<pre><code><b>public</b> <b>fun</b> <a href="type_info.md#0x1_type_info_type_of">type_of</a>&lt;T&gt;(): <a href="type_info.md#0x1_type_info_TypeInfo">type_info::TypeInfo</a>
 </code></pre>
 
 
@@ -396,7 +396,7 @@ ensures result &#61;&#61; spec_chain_id_internal();
 ### Function `type_name`
 
 
-<pre><code>public fun type_name&lt;T&gt;(): string::String
+<pre><code><b>public</b> <b>fun</b> <a href="type_info.md#0x1_type_info_type_name">type_name</a>&lt;T&gt;(): <a href="../../move-stdlib/doc/string.md#0x1_string_String">string::String</a>
 </code></pre>
 
 
@@ -407,15 +407,15 @@ ensures result &#61;&#61; spec_chain_id_internal();
 ### Function `chain_id_internal`
 
 
-<pre><code>fun chain_id_internal(): u8
+<pre><code><b>fun</b> <a href="type_info.md#0x1_type_info_chain_id_internal">chain_id_internal</a>(): u8
 </code></pre>
 
 
 
 
-<pre><code>pragma opaque;
-aborts_if false;
-ensures result &#61;&#61; spec_chain_id_internal();
+<pre><code><b>pragma</b> opaque;
+<b>aborts_if</b> <b>false</b>;
+<b>ensures</b> result == <a href="type_info.md#0x1_type_info_spec_chain_id_internal">spec_chain_id_internal</a>();
 </code></pre>
 
 
@@ -424,7 +424,7 @@ ensures result &#61;&#61; spec_chain_id_internal();
 <a id="0x1_type_info_spec_chain_id_internal"></a>
 
 
-<pre><code>fun spec_chain_id_internal(): u8;
+<pre><code><b>fun</b> <a href="type_info.md#0x1_type_info_spec_chain_id_internal">spec_chain_id_internal</a>(): u8;
 </code></pre>
 
 
@@ -433,9 +433,9 @@ ensures result &#61;&#61; spec_chain_id_internal();
 <a id="0x1_type_info_spec_size_of_val"></a>
 
 
-<pre><code>fun spec_size_of_val&lt;T&gt;(val_ref: T): u64 &#123;
+<pre><code><b>fun</b> <a href="type_info.md#0x1_type_info_spec_size_of_val">spec_size_of_val</a>&lt;T&gt;(val_ref: T): u64 {
    len(std::bcs::serialize(val_ref))
-&#125;
+}
 </code></pre>
 
 
@@ -445,14 +445,14 @@ ensures result &#61;&#61; spec_chain_id_internal();
 ### Function `size_of_val`
 
 
-<pre><code>public fun size_of_val&lt;T&gt;(val_ref: &amp;T): u64
+<pre><code><b>public</b> <b>fun</b> <a href="type_info.md#0x1_type_info_size_of_val">size_of_val</a>&lt;T&gt;(val_ref: &T): u64
 </code></pre>
 
 
 
 
-<pre><code>aborts_if false;
-ensures result &#61;&#61; spec_size_of_val&lt;T&gt;(val_ref);
+<pre><code><b>aborts_if</b> <b>false</b>;
+<b>ensures</b> result == <a href="type_info.md#0x1_type_info_spec_size_of_val">spec_size_of_val</a>&lt;T&gt;(val_ref);
 </code></pre>
 
 
@@ -462,14 +462,14 @@ ensures result &#61;&#61; spec_size_of_val&lt;T&gt;(val_ref);
 ### Function `verify_type_of_generic`
 
 
-<pre><code>&#35;[verify_only]
-fun verify_type_of_generic&lt;T&gt;()
+<pre><code>#[verify_only]
+<b>fun</b> <a href="type_info.md#0x1_type_info_verify_type_of_generic">verify_type_of_generic</a>&lt;T&gt;()
 </code></pre>
 
 
 
 
-<pre><code>aborts_if !spec_is_struct&lt;T&gt;();
+<pre><code><b>aborts_if</b> !<a href="type_info.md#0x1_type_info_spec_is_struct">spec_is_struct</a>&lt;T&gt;();
 </code></pre>
 
 
@@ -478,7 +478,7 @@ fun verify_type_of_generic&lt;T&gt;()
 <a id="0x1_type_info_spec_is_struct"></a>
 
 
-<pre><code>native fun spec_is_struct&lt;T&gt;(): bool;
+<pre><code><b>native</b> <b>fun</b> <a href="type_info.md#0x1_type_info_spec_is_struct">spec_is_struct</a>&lt;T&gt;(): bool;
 </code></pre>
 
 

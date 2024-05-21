@@ -23,9 +23,9 @@ royalty.
 -  [Function `payee_address`](#0x4_royalty_payee_address)
 
 
-<pre><code>use 0x1::error;
-use 0x1::object;
-use 0x1::option;
+<pre><code><b>use</b> <a href="../../aptos-framework/../aptos-stdlib/../move-stdlib/doc/error.md#0x1_error">0x1::error</a>;
+<b>use</b> <a href="../../aptos-framework/doc/object.md#0x1_object">0x1::object</a>;
+<b>use</b> <a href="../../aptos-framework/../aptos-stdlib/../move-stdlib/doc/option.md#0x1_option">0x1::option</a>;
 </code></pre>
 
 
@@ -40,8 +40,8 @@ Royalties are optional for a collection.  Royalty percentage is calculated
 by (numerator / denominator) * 100%
 
 
-<pre><code>&#35;[resource_group_member(&#35;[group &#61; 0x1::object::ObjectGroup])]
-struct Royalty has copy, drop, key
+<pre><code>#[resource_group_member(#[group = <a href="../../aptos-framework/doc/object.md#0x1_object_ObjectGroup">0x1::object::ObjectGroup</a>])]
+<b>struct</b> <a href="royalty.md#0x4_royalty_Royalty">Royalty</a> <b>has</b> <b>copy</b>, drop, key
 </code></pre>
 
 
@@ -64,7 +64,7 @@ struct Royalty has copy, drop, key
 
 </dd>
 <dt>
-<code>payee_address: address</code>
+<code>payee_address: <b>address</b></code>
 </dt>
 <dd>
  The recipient of royalty payments. See the <code>shared_account</code> for how to handle multiple
@@ -79,10 +79,10 @@ struct Royalty has copy, drop, key
 
 ## Struct `MutatorRef`
 
-This enables creating or overwriting a <code>MutatorRef</code>.
+This enables creating or overwriting a <code><a href="royalty.md#0x4_royalty_MutatorRef">MutatorRef</a></code>.
 
 
-<pre><code>struct MutatorRef has drop, store
+<pre><code><b>struct</b> <a href="royalty.md#0x4_royalty_MutatorRef">MutatorRef</a> <b>has</b> drop, store
 </code></pre>
 
 
@@ -93,7 +93,7 @@ This enables creating or overwriting a <code>MutatorRef</code>.
 
 <dl>
 <dt>
-<code>inner: object::ExtendRef</code>
+<code>inner: <a href="../../aptos-framework/doc/object.md#0x1_object_ExtendRef">object::ExtendRef</a></code>
 </dt>
 <dd>
 
@@ -113,7 +113,7 @@ This enables creating or overwriting a <code>MutatorRef</code>.
 The royalty denominator cannot be 0
 
 
-<pre><code>const EROYALTY_DENOMINATOR_IS_ZERO: u64 &#61; 3;
+<pre><code><b>const</b> <a href="royalty.md#0x4_royalty_EROYALTY_DENOMINATOR_IS_ZERO">EROYALTY_DENOMINATOR_IS_ZERO</a>: u64 = 3;
 </code></pre>
 
 
@@ -123,7 +123,7 @@ The royalty denominator cannot be 0
 Royalty does not exist
 
 
-<pre><code>const EROYALTY_DOES_NOT_EXIST: u64 &#61; 1;
+<pre><code><b>const</b> <a href="royalty.md#0x4_royalty_EROYALTY_DOES_NOT_EXIST">EROYALTY_DOES_NOT_EXIST</a>: u64 = 1;
 </code></pre>
 
 
@@ -133,7 +133,7 @@ Royalty does not exist
 The royalty cannot be greater than 100%
 
 
-<pre><code>const EROYALTY_EXCEEDS_MAXIMUM: u64 &#61; 2;
+<pre><code><b>const</b> <a href="royalty.md#0x4_royalty_EROYALTY_EXCEEDS_MAXIMUM">EROYALTY_EXCEEDS_MAXIMUM</a>: u64 = 2;
 </code></pre>
 
 
@@ -145,7 +145,7 @@ The royalty cannot be greater than 100%
 Add a royalty, given a ConstructorRef.
 
 
-<pre><code>public fun init(ref: &amp;object::ConstructorRef, royalty: royalty::Royalty)
+<pre><code><b>public</b> <b>fun</b> <a href="royalty.md#0x4_royalty_init">init</a>(ref: &<a href="../../aptos-framework/doc/object.md#0x1_object_ConstructorRef">object::ConstructorRef</a>, <a href="royalty.md#0x4_royalty">royalty</a>: <a href="royalty.md#0x4_royalty_Royalty">royalty::Royalty</a>)
 </code></pre>
 
 
@@ -154,10 +154,10 @@ Add a royalty, given a ConstructorRef.
 <summary>Implementation</summary>
 
 
-<pre><code>public fun init(ref: &amp;ConstructorRef, royalty: Royalty) &#123;
-    let signer &#61; object::generate_signer(ref);
-    move_to(&amp;signer, royalty);
-&#125;
+<pre><code><b>public</b> <b>fun</b> <a href="royalty.md#0x4_royalty_init">init</a>(ref: &ConstructorRef, <a href="royalty.md#0x4_royalty">royalty</a>: <a href="royalty.md#0x4_royalty_Royalty">Royalty</a>) {
+    <b>let</b> <a href="../../aptos-framework/../aptos-stdlib/../move-stdlib/doc/signer.md#0x1_signer">signer</a> = <a href="../../aptos-framework/doc/object.md#0x1_object_generate_signer">object::generate_signer</a>(ref);
+    <b>move_to</b>(&<a href="../../aptos-framework/../aptos-stdlib/../move-stdlib/doc/signer.md#0x1_signer">signer</a>, <a href="royalty.md#0x4_royalty">royalty</a>);
+}
 </code></pre>
 
 
@@ -171,7 +171,7 @@ Add a royalty, given a ConstructorRef.
 Set the royalty if it does not exist, replace it otherwise.
 
 
-<pre><code>public fun update(mutator_ref: &amp;royalty::MutatorRef, royalty: royalty::Royalty)
+<pre><code><b>public</b> <b>fun</b> <b>update</b>(mutator_ref: &<a href="royalty.md#0x4_royalty_MutatorRef">royalty::MutatorRef</a>, <a href="royalty.md#0x4_royalty">royalty</a>: <a href="royalty.md#0x4_royalty_Royalty">royalty::Royalty</a>)
 </code></pre>
 
 
@@ -180,15 +180,15 @@ Set the royalty if it does not exist, replace it otherwise.
 <summary>Implementation</summary>
 
 
-<pre><code>public fun update(mutator_ref: &amp;MutatorRef, royalty: Royalty) acquires Royalty &#123;
-    let addr &#61; object::address_from_extend_ref(&amp;mutator_ref.inner);
-    if (exists&lt;Royalty&gt;(addr)) &#123;
-        move_from&lt;Royalty&gt;(addr);
-    &#125;;
+<pre><code><b>public</b> <b>fun</b> <b>update</b>(mutator_ref: &<a href="royalty.md#0x4_royalty_MutatorRef">MutatorRef</a>, <a href="royalty.md#0x4_royalty">royalty</a>: <a href="royalty.md#0x4_royalty_Royalty">Royalty</a>) <b>acquires</b> <a href="royalty.md#0x4_royalty_Royalty">Royalty</a> {
+    <b>let</b> addr = <a href="../../aptos-framework/doc/object.md#0x1_object_address_from_extend_ref">object::address_from_extend_ref</a>(&mutator_ref.inner);
+    <b>if</b> (<b>exists</b>&lt;<a href="royalty.md#0x4_royalty_Royalty">Royalty</a>&gt;(addr)) {
+        <b>move_from</b>&lt;<a href="royalty.md#0x4_royalty_Royalty">Royalty</a>&gt;(addr);
+    };
 
-    let signer &#61; object::generate_signer_for_extending(&amp;mutator_ref.inner);
-    move_to(&amp;signer, royalty);
-&#125;
+    <b>let</b> <a href="../../aptos-framework/../aptos-stdlib/../move-stdlib/doc/signer.md#0x1_signer">signer</a> = <a href="../../aptos-framework/doc/object.md#0x1_object_generate_signer_for_extending">object::generate_signer_for_extending</a>(&mutator_ref.inner);
+    <b>move_to</b>(&<a href="../../aptos-framework/../aptos-stdlib/../move-stdlib/doc/signer.md#0x1_signer">signer</a>, <a href="royalty.md#0x4_royalty">royalty</a>);
+}
 </code></pre>
 
 
@@ -202,7 +202,7 @@ Set the royalty if it does not exist, replace it otherwise.
 Creates a new royalty, verifying that it is a valid percentage
 
 
-<pre><code>public fun create(numerator: u64, denominator: u64, payee_address: address): royalty::Royalty
+<pre><code><b>public</b> <b>fun</b> <a href="royalty.md#0x4_royalty_create">create</a>(numerator: u64, denominator: u64, payee_address: <b>address</b>): <a href="royalty.md#0x4_royalty_Royalty">royalty::Royalty</a>
 </code></pre>
 
 
@@ -211,12 +211,12 @@ Creates a new royalty, verifying that it is a valid percentage
 <summary>Implementation</summary>
 
 
-<pre><code>public fun create(numerator: u64, denominator: u64, payee_address: address): Royalty &#123;
-    assert!(denominator !&#61; 0, error::out_of_range(EROYALTY_DENOMINATOR_IS_ZERO));
-    assert!(numerator &lt;&#61; denominator, error::out_of_range(EROYALTY_EXCEEDS_MAXIMUM));
+<pre><code><b>public</b> <b>fun</b> <a href="royalty.md#0x4_royalty_create">create</a>(numerator: u64, denominator: u64, payee_address: <b>address</b>): <a href="royalty.md#0x4_royalty_Royalty">Royalty</a> {
+    <b>assert</b>!(denominator != 0, <a href="../../aptos-framework/../aptos-stdlib/../move-stdlib/doc/error.md#0x1_error_out_of_range">error::out_of_range</a>(<a href="royalty.md#0x4_royalty_EROYALTY_DENOMINATOR_IS_ZERO">EROYALTY_DENOMINATOR_IS_ZERO</a>));
+    <b>assert</b>!(<a href="royalty.md#0x4_royalty_numerator">numerator</a> &lt;= denominator, <a href="../../aptos-framework/../aptos-stdlib/../move-stdlib/doc/error.md#0x1_error_out_of_range">error::out_of_range</a>(<a href="royalty.md#0x4_royalty_EROYALTY_EXCEEDS_MAXIMUM">EROYALTY_EXCEEDS_MAXIMUM</a>));
 
-    Royalty &#123; numerator, denominator, payee_address &#125;
-&#125;
+    <a href="royalty.md#0x4_royalty_Royalty">Royalty</a> { numerator, denominator, payee_address }
+}
 </code></pre>
 
 
@@ -229,7 +229,7 @@ Creates a new royalty, verifying that it is a valid percentage
 
 
 
-<pre><code>public fun generate_mutator_ref(ref: object::ExtendRef): royalty::MutatorRef
+<pre><code><b>public</b> <b>fun</b> <a href="royalty.md#0x4_royalty_generate_mutator_ref">generate_mutator_ref</a>(ref: <a href="../../aptos-framework/doc/object.md#0x1_object_ExtendRef">object::ExtendRef</a>): <a href="royalty.md#0x4_royalty_MutatorRef">royalty::MutatorRef</a>
 </code></pre>
 
 
@@ -238,9 +238,9 @@ Creates a new royalty, verifying that it is a valid percentage
 <summary>Implementation</summary>
 
 
-<pre><code>public fun generate_mutator_ref(ref: ExtendRef): MutatorRef &#123;
-    MutatorRef &#123; inner: ref &#125;
-&#125;
+<pre><code><b>public</b> <b>fun</b> <a href="royalty.md#0x4_royalty_generate_mutator_ref">generate_mutator_ref</a>(ref: ExtendRef): <a href="royalty.md#0x4_royalty_MutatorRef">MutatorRef</a> {
+    <a href="royalty.md#0x4_royalty_MutatorRef">MutatorRef</a> { inner: ref }
+}
 </code></pre>
 
 
@@ -253,7 +253,7 @@ Creates a new royalty, verifying that it is a valid percentage
 
 
 
-<pre><code>public fun exists_at(addr: address): bool
+<pre><code><b>public</b> <b>fun</b> <a href="royalty.md#0x4_royalty_exists_at">exists_at</a>(addr: <b>address</b>): bool
 </code></pre>
 
 
@@ -262,9 +262,9 @@ Creates a new royalty, verifying that it is a valid percentage
 <summary>Implementation</summary>
 
 
-<pre><code>public fun exists_at(addr: address): bool &#123;
-    exists&lt;Royalty&gt;(addr)
-&#125;
+<pre><code><b>public</b> <b>fun</b> <a href="royalty.md#0x4_royalty_exists_at">exists_at</a>(addr: <b>address</b>): bool {
+    <b>exists</b>&lt;<a href="royalty.md#0x4_royalty_Royalty">Royalty</a>&gt;(addr)
+}
 </code></pre>
 
 
@@ -277,7 +277,7 @@ Creates a new royalty, verifying that it is a valid percentage
 
 
 
-<pre><code>public(friend) fun delete(addr: address)
+<pre><code><b>public</b>(<b>friend</b>) <b>fun</b> <a href="royalty.md#0x4_royalty_delete">delete</a>(addr: <b>address</b>)
 </code></pre>
 
 
@@ -286,10 +286,10 @@ Creates a new royalty, verifying that it is a valid percentage
 <summary>Implementation</summary>
 
 
-<pre><code>public(friend) fun delete(addr: address) acquires Royalty &#123;
-    assert!(exists&lt;Royalty&gt;(addr), error::not_found(EROYALTY_DOES_NOT_EXIST));
-    move_from&lt;Royalty&gt;(addr);
-&#125;
+<pre><code><b>public</b>(<b>friend</b>) <b>fun</b> <a href="royalty.md#0x4_royalty_delete">delete</a>(addr: <b>address</b>) <b>acquires</b> <a href="royalty.md#0x4_royalty_Royalty">Royalty</a> {
+    <b>assert</b>!(<b>exists</b>&lt;<a href="royalty.md#0x4_royalty_Royalty">Royalty</a>&gt;(addr), <a href="../../aptos-framework/../aptos-stdlib/../move-stdlib/doc/error.md#0x1_error_not_found">error::not_found</a>(<a href="royalty.md#0x4_royalty_EROYALTY_DOES_NOT_EXIST">EROYALTY_DOES_NOT_EXIST</a>));
+    <b>move_from</b>&lt;<a href="royalty.md#0x4_royalty_Royalty">Royalty</a>&gt;(addr);
+}
 </code></pre>
 
 
@@ -302,7 +302,7 @@ Creates a new royalty, verifying that it is a valid percentage
 
 
 
-<pre><code>public fun get&lt;T: key&gt;(maybe_royalty: object::Object&lt;T&gt;): option::Option&lt;royalty::Royalty&gt;
+<pre><code><b>public</b> <b>fun</b> <a href="royalty.md#0x4_royalty_get">get</a>&lt;T: key&gt;(maybe_royalty: <a href="../../aptos-framework/doc/object.md#0x1_object_Object">object::Object</a>&lt;T&gt;): <a href="../../aptos-framework/../aptos-stdlib/../move-stdlib/doc/option.md#0x1_option_Option">option::Option</a>&lt;<a href="royalty.md#0x4_royalty_Royalty">royalty::Royalty</a>&gt;
 </code></pre>
 
 
@@ -311,14 +311,14 @@ Creates a new royalty, verifying that it is a valid percentage
 <summary>Implementation</summary>
 
 
-<pre><code>public fun get&lt;T: key&gt;(maybe_royalty: Object&lt;T&gt;): Option&lt;Royalty&gt; acquires Royalty &#123;
-    let obj_addr &#61; object::object_address(&amp;maybe_royalty);
-    if (exists&lt;Royalty&gt;(obj_addr)) &#123;
-        option::some(&#42;borrow_global&lt;Royalty&gt;(obj_addr))
-    &#125; else &#123;
-        option::none()
-    &#125;
-&#125;
+<pre><code><b>public</b> <b>fun</b> <a href="royalty.md#0x4_royalty_get">get</a>&lt;T: key&gt;(maybe_royalty: Object&lt;T&gt;): Option&lt;<a href="royalty.md#0x4_royalty_Royalty">Royalty</a>&gt; <b>acquires</b> <a href="royalty.md#0x4_royalty_Royalty">Royalty</a> {
+    <b>let</b> obj_addr = <a href="../../aptos-framework/doc/object.md#0x1_object_object_address">object::object_address</a>(&maybe_royalty);
+    <b>if</b> (<b>exists</b>&lt;<a href="royalty.md#0x4_royalty_Royalty">Royalty</a>&gt;(obj_addr)) {
+        <a href="../../aptos-framework/../aptos-stdlib/../move-stdlib/doc/option.md#0x1_option_some">option::some</a>(*<b>borrow_global</b>&lt;<a href="royalty.md#0x4_royalty_Royalty">Royalty</a>&gt;(obj_addr))
+    } <b>else</b> {
+        <a href="../../aptos-framework/../aptos-stdlib/../move-stdlib/doc/option.md#0x1_option_none">option::none</a>()
+    }
+}
 </code></pre>
 
 
@@ -331,7 +331,7 @@ Creates a new royalty, verifying that it is a valid percentage
 
 
 
-<pre><code>public fun denominator(royalty: &amp;royalty::Royalty): u64
+<pre><code><b>public</b> <b>fun</b> <a href="royalty.md#0x4_royalty_denominator">denominator</a>(<a href="royalty.md#0x4_royalty">royalty</a>: &<a href="royalty.md#0x4_royalty_Royalty">royalty::Royalty</a>): u64
 </code></pre>
 
 
@@ -340,9 +340,9 @@ Creates a new royalty, verifying that it is a valid percentage
 <summary>Implementation</summary>
 
 
-<pre><code>public fun denominator(royalty: &amp;Royalty): u64 &#123;
-    royalty.denominator
-&#125;
+<pre><code><b>public</b> <b>fun</b> <a href="royalty.md#0x4_royalty_denominator">denominator</a>(<a href="royalty.md#0x4_royalty">royalty</a>: &<a href="royalty.md#0x4_royalty_Royalty">Royalty</a>): u64 {
+    <a href="royalty.md#0x4_royalty">royalty</a>.denominator
+}
 </code></pre>
 
 
@@ -355,7 +355,7 @@ Creates a new royalty, verifying that it is a valid percentage
 
 
 
-<pre><code>public fun numerator(royalty: &amp;royalty::Royalty): u64
+<pre><code><b>public</b> <b>fun</b> <a href="royalty.md#0x4_royalty_numerator">numerator</a>(<a href="royalty.md#0x4_royalty">royalty</a>: &<a href="royalty.md#0x4_royalty_Royalty">royalty::Royalty</a>): u64
 </code></pre>
 
 
@@ -364,9 +364,9 @@ Creates a new royalty, verifying that it is a valid percentage
 <summary>Implementation</summary>
 
 
-<pre><code>public fun numerator(royalty: &amp;Royalty): u64 &#123;
-    royalty.numerator
-&#125;
+<pre><code><b>public</b> <b>fun</b> <a href="royalty.md#0x4_royalty_numerator">numerator</a>(<a href="royalty.md#0x4_royalty">royalty</a>: &<a href="royalty.md#0x4_royalty_Royalty">Royalty</a>): u64 {
+    <a href="royalty.md#0x4_royalty">royalty</a>.numerator
+}
 </code></pre>
 
 
@@ -379,7 +379,7 @@ Creates a new royalty, verifying that it is a valid percentage
 
 
 
-<pre><code>public fun payee_address(royalty: &amp;royalty::Royalty): address
+<pre><code><b>public</b> <b>fun</b> <a href="royalty.md#0x4_royalty_payee_address">payee_address</a>(<a href="royalty.md#0x4_royalty">royalty</a>: &<a href="royalty.md#0x4_royalty_Royalty">royalty::Royalty</a>): <b>address</b>
 </code></pre>
 
 
@@ -388,9 +388,9 @@ Creates a new royalty, verifying that it is a valid percentage
 <summary>Implementation</summary>
 
 
-<pre><code>public fun payee_address(royalty: &amp;Royalty): address &#123;
-    royalty.payee_address
-&#125;
+<pre><code><b>public</b> <b>fun</b> <a href="royalty.md#0x4_royalty_payee_address">payee_address</a>(<a href="royalty.md#0x4_royalty">royalty</a>: &<a href="royalty.md#0x4_royalty_Royalty">Royalty</a>): <b>address</b> {
+    <a href="royalty.md#0x4_royalty">royalty</a>.payee_address
+}
 </code></pre>
 
 
