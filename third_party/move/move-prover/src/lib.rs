@@ -53,12 +53,12 @@ pub fn run_move_prover<W: WriteColor>(
             paths: options.move_sources.clone(),
             named_address_map: addrs.clone(),
         }],
+        vec![],
         vec![PackagePaths {
             name: None,
             paths: options.move_deps.clone(),
             named_address_map: addrs,
         }],
-        vec![],
         options.model_builder.clone(),
         options.skip_attribute_checks,
         KnownAttribute::get_all_attribute_names(),
