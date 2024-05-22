@@ -240,13 +240,18 @@ where
     E: Pairing<ScalarField = ark_ff::Fp<MontBackend<FrConfig, 4>, 4>>, <E as Pairing>::ScalarField: From<i32>
 {
     println!("starting test");
-    let cfg = CircomConfig::<Bn254>::new(
+    /*let cfg = CircomConfig::<Bn254>::new(
     "/Users/michael/aptos-labs/aptos-core/types/src/keyless/toy-circuit-files/multiplier2_js/multiplier2.wasm",
     "/Users/michael/aptos-labs/aptos-core/types/src/keyless/toy-circuit-files/multiplier2.r1cs",
+).unwrap();*/
+    let cfg = CircomConfig::<Bn254>::new(
+    "/Users/michael/aptos-labs/aptos-core/types/src/keyless/circuit-files/keyless_main.wasm",
+    "/Users/michael/aptos-labs/aptos-core/types/src/keyless/circuit-files/keyless_main.r1cs",
 ).unwrap();
 
     let mut builder = CircomBuilder::new(cfg);
-    let mut input_file = File::open("/Users/michael/aptos-labs/aptos-core/types/src/keyless/toy-circuit-files/multiplier2_input.json").unwrap();
+    //let mut input_file = File::open("/Users/michael/aptos-labs/aptos-core/types/src/keyless/toy-circuit-files/multiplier2_input.json").unwrap();
+    let mut input_file = File::open("/Users/michael/aptos-labs/aptos-core/types/src/keyless/circuit-files/keyless_input.json").unwrap();
     let mut input_json = String::new();
     input_file.read_to_string(&mut input_json).unwrap();
     let input_map: HashMap<String, Vec<String>> = serde_json::from_str(&input_json).unwrap();
@@ -258,15 +263,15 @@ where
     }
 
     let circom = builder.setup();
-    println!("circom: {:?}", circom);
+    //println!("circom: {:?}", circom);
     let witness: Vec<<E as Pairing>::ScalarField> = builder
                  .cfg 
                  .wtns
                  .calculate_witness_element::<E, _>(builder.inputs.clone(), builder.cfg.sanity_check).unwrap(); 
-    println!("witness: {:?}", witness);
+    //println!("witness: {:?}", witness);
     let circom = builder.build().unwrap();
     let inputs = circom.get_public_inputs().unwrap();
-    println!("inputs: {:?}", inputs);
+    //println!("inputs: {:?}", inputs);
     let mut rng = ark_std::rand::rngs::StdRng::seed_from_u64(test_rng().next_u64());
 
     let (pk, vk) = Groth16Simulator::<E>::circuit_specific_setup_with_trapdoor(circom.clone(), &mut rng).unwrap();
