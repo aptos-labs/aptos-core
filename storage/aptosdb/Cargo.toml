@@ -39,8 +39,11 @@ bcs = { workspace = true }
 byteorder = { workspace = true }
 claims = { workspace = true }
 clap = { workspace = true, optional = true }
+crossbeam-channel = { workspace = true, optional = true }
 dashmap = { workspace = true }
 either = { workspace = true }
+hex = { workspace = true }
+indicatif = { workspace = true, optional = true }
 itertools = { workspace = true }
 lru = { workspace = true }
 move-core-types = { workspace = true }
@@ -70,4 +73,4 @@ rand = { workspace = true }
 default = []
 fuzzing = ["proptest", "proptest-derive", "aptos-proptest-helpers", "aptos-temppath", "aptos-crypto/fuzzing", "aptos-jellyfish-merkle/fuzzing", "aptos-types/fuzzing", "aptos-executor-types/fuzzing", "aptos-schemadb/fuzzing", "aptos-scratchpad/fuzzing"]
 consensus-only-perf-test = []
-db-debugger = ["aptos-temppath", "clap", "owo-colors"]
+db-debugger = ["aptos-temppath", "clap", "crossbeam-channel", "owo-colors", "indicatif"]

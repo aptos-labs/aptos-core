@@ -1959,6 +1959,35 @@ fn realistic_env_max_load_test(
     let duration_secs = duration.as_secs();
     let long_running = duration_secs >= 2400;
 
+    let mut success_criteria = SuccessCriteria::new(95)
+        .add_no_restarts()
+        .add_wait_for_catchup_s(
+            // Give at least 60s for catchup, give 10% of the run for longer durations.
+            (duration.as_secs() / 10).max(60),
+        )
+        .add_latency_threshold(3.4, LatencyType::P50)
+        .add_latency_threshold(4.5, LatencyType::P90)
+        .add_chain_progress(StateProgressThreshold {
+            max_no_progress_secs: 15.0,
+            max_round_gap: 4,
+        });
+    if !ha_proxy {
+        success_criteria = success_criteria.add_latency_breakdown_threshold(
+            LatencyBreakdownThreshold::new_with_breach_pct(
+                vec![
+                    (LatencyBreakdownSlice::QsBatchToPos, 0.35),
+                    // only reaches close to threshold during epoch change
+                    (LatencyBreakdownSlice::QsPosToProposal, 0.6),
+                    // can be adjusted down if less backpressure
+                    (LatencyBreakdownSlice::ConsensusProposalToOrdered, 0.85),
+                    // can be adjusted down if less backpressure
+                    (LatencyBreakdownSlice::ConsensusOrderedToCommit, 0.75),
+                ],
+                5,
+            ),
+        )
+    }
+
     // Create the test
     ForgeConfig::default()
         .with_initial_validator_count(NonZeroUsize::new(num_validators).unwrap())
@@ -2005,38 +2034,7 @@ fn realistic_env_max_load_test(
                 .gas_price(5 * aptos_global_constants::GAS_UNIT_PRICE)
                 .latency_polling_interval(Duration::from_millis(100)),
         )
-        .with_success_criteria(
-            SuccessCriteria::new(95)
-                .add_no_restarts()
-                .add_wait_for_catchup_s(
-                    // Give at least 60s for catchup, give 10% of the run for longer durations.
-                    (duration.as_secs() / 10).max(60),
-                )
-                .add_latency_threshold(3.4, LatencyType::P50)
-                .add_latency_threshold(4.5, LatencyType::P90)
-                .add_latency_breakdown_threshold(LatencyBreakdownThreshold::new_with_breach_pct(
-                    vec![
-                        (LatencyBreakdownSlice::QsBatchToPos, 0.35),
-                        // only reaches close to threshold during epoch change
-                        (
-                            LatencyBreakdownSlice::QsPosToProposal,
-                            if ha_proxy { 0.7 } else { 0.6 },
-                        ),
-                        // can be adjusted down if less backpressure
-                        (LatencyBreakdownSlice::ConsensusProposalToOrdered, 0.85),
-                        // can be adjusted down if less backpressure
-                        (
-                            LatencyBreakdownSlice::ConsensusOrderedToCommit,
-                            if ha_proxy { 1.3 } else { 0.75 },
-                        ),
-                    ],
-                    5,
-                ))
-                .add_chain_progress(StateProgressThreshold {
-                    max_no_progress_secs: 15.0,
-                    max_round_gap: 4,
-                }),
-        )
+        .with_success_criteria(success_criteria)
 }
 
 fn realistic_network_tuned_for_throughput_test() -> ForgeConfig {

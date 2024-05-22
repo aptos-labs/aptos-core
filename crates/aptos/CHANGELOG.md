@@ -4,6 +4,9 @@ All notable changes to the Aptos CLI will be captured in this file. This project
 
 ## Unreleased
 
+## [3.3.1] - 2024/05/21
+- Fixed incompatibility bug that broken local simulation and gas profiling.
+
 ## [3.3.0] - 2024/05/03
 - **Breaking Change** Update View functions to use BCS for submission.  Allows for all arguments to be supported in view functions.  Note some input arguments that were previously inputted as strings may be handled differently.
 - [Early beta release of the Move compiler v2](https://aptos.dev/move/compiler_v2/) is now accessible through the CLI. We now allow specifying the Move compiler version and the Move language version via the CLI.
