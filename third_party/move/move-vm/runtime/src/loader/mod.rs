@@ -682,7 +682,6 @@ impl Loader {
             &mut visited,
             &mut friends_discovered,
             /* allow_dependency_loading_failure */ true,
-            /* dependencies_depth */ 0,
         )?;
 
         // upward exploration of the modules's dependency graph. Similar to dependency loading, as
@@ -695,7 +694,6 @@ impl Loader {
             data_store,
             module_store,
             /* allow_friend_loading_failure */ true,
-            /* dependencies_depth */ 0,
         )?;
 
         // make sure there is no cyclic dependency
@@ -960,17 +958,6 @@ impl Loader {
         data_store: &mut TransactionDataCache,
         module_store: &ModuleStorageAdapter,
     ) -> VMResult<Arc<Module>> {
-        self.load_module_internal(id, data_store, module_store)
-    }
-
-    // Load the transitive closure of the target module first, and then verify that the modules in
-    // the closure do not have cyclic dependencies.
-    fn load_module_internal(
-        &self,
-        id: &ModuleId,
-        data_store: &mut TransactionDataCache,
-        module_store: &ModuleStorageAdapter,
-    ) -> VMResult<Arc<Module>> {
         // if the module is already in the code cache, load the cached version
         if let Some(cached) = module_store.module_at(id) {
             self.module_cache_hits.write().insert(id.clone());
@@ -985,7 +972,6 @@ impl Loader {
             data_store,
             module_store,
             /* allow_module_loading_failure */ true,
-            /* dependencies_depth */ 0,
         )?;
 
         // verify that the transitive closure does not have cycles
@@ -1043,7 +1029,6 @@ impl Loader {
         visited: &mut BTreeSet<ModuleId>,
         friends_discovered: &mut BTreeSet<ModuleId>,
         allow_module_loading_failure: bool,
-        dependencies_depth: usize,
     ) -> VMResult<Arc<Module>> {
         // dependency loading does not permit cycles
         if visited.contains(id) {
@@ -1067,7 +1052,6 @@ impl Loader {
             visited,
             friends_discovered,
             /* allow_dependency_loading_failure */ false,
-            dependencies_depth,
         )?;
 
         // if linking goes well, insert the module to the code cache
@@ -1087,7 +1071,6 @@ impl Loader {
         visited: &mut BTreeSet<ModuleId>,
         friends_discovered: &mut BTreeSet<ModuleId>,
         allow_dependency_loading_failure: bool,
-        dependencies_depth: usize,
     ) -> VMResult<()> {
         // all immediate dependencies of the module being verified should be in one of the locations
         // - the verified portion of the bundle (e.g., verified before this module)
@@ -1108,7 +1091,6 @@ impl Loader {
                         visited,
                         friends_discovered,
                         allow_dependency_loading_failure,
-                        dependencies_depth + 1,
                     )?,
                     Some(cached) => cached,
                 };
@@ -1144,7 +1126,6 @@ impl Loader {
         data_store: &mut TransactionDataCache,
         module_store: &ModuleStorageAdapter,
         allow_module_loading_failure: bool,
-        dependencies_depth: usize,
     ) -> VMResult<Arc<Module>> {
         // load the closure of the module in terms of dependency relation
         let mut visited = BTreeSet::new();
@@ -1157,7 +1138,6 @@ impl Loader {
             &mut visited,
             &mut friends_discovered,
             allow_module_loading_failure,
-            0,
         )?;
 
         // upward exploration of the module's friendship graph and expand the friendship frontier.
@@ -1170,7 +1150,6 @@ impl Loader {
             data_store,
             module_store,
             /* allow_friend_loading_failure */ false,
-            dependencies_depth,
         )?;
         Ok(module_ref)
     }
@@ -1184,7 +1163,6 @@ impl Loader {
         data_store: &mut TransactionDataCache,
         module_store: &ModuleStorageAdapter,
         allow_friend_loading_failure: bool,
-        dependencies_depth: usize,
     ) -> VMResult<()> {
         // for each new module discovered in the frontier, load them fully and expand the frontier.
         // apply three filters to the new friend modules discovered
@@ -1219,7 +1197,6 @@ impl Loader {
                 data_store,
                 module_store,
                 allow_friend_loading_failure,
-                dependencies_depth + 1,
             )?;
         }
         Ok(())
@@ -1433,15 +1410,6 @@ impl<'a> Resolver<'a> {
             }
         }
         Ok(instantiation)
-    }
-
-    #[allow(unused)]
-    pub(crate) fn type_params_count(&self, idx: FunctionInstantiationIndex) -> usize {
-        let func_inst = match &self.binary {
-            BinaryType::Module(module) => module.function_instantiation_at(idx.0),
-            BinaryType::Script(script) => script.function_instantiation_at(idx.0),
-        };
-        func_inst.instantiation.len()
     }
 
     //
