@@ -32,7 +32,9 @@ use move_command_line_common::{
 use move_compiler::{
     compiled_unit::{AnnotatedCompiledModule, AnnotatedCompiledUnit},
     diagnostics::{Diagnostics, FilesSourceText},
-    shared::NumericalAddress,
+    shared::{
+        string_map_to_symbol_map, string_vec_to_symbol_vec, Flags, NumericalAddress, PackagePaths,
+    },
     FullyCompiledProgram,
 };
 use move_core_types::{
@@ -42,7 +44,10 @@ use move_core_types::{
 };
 use move_disassembler::disassembler::{Disassembler, DisassemblerOptions};
 use move_ir_types::location::Spanned;
-use move_model::metadata::LanguageVersion;
+use move_model::{
+    metadata::LanguageVersion, model::GlobalEnv, options::ModelBuilderOptions,
+    run_model_builder_with_options_and_compilation_flags,
+};
 use move_symbol_pool::Symbol;
 use move_vm_runtime::session::SerializedReturnValues;
 use once_cell::sync::Lazy;
@@ -61,7 +66,7 @@ pub struct ProcessedModule {
 }
 
 pub struct CompiledState<'a> {
-    pre_compiled_deps_v1: Option<&'a FullyCompiledProgram>,
+    pre_compiled_deps_v1: Option<&'a (FullyCompiledProgram, Vec<PackagePaths>)>,
     pre_compiled_deps_v2: Option<&'a PrecompiledFilesModules>,
     pre_compiled_ids: BTreeSet<(AccountAddress, String)>,
     compiled_module_named_address_mapping: BTreeMap<ModuleId, Symbol>,
@@ -130,9 +135,10 @@ fn annotated_module_from_unit(unit: &AnnotatedCompiledUnit) -> Option<&Annotated
     }
 }
 
-impl PreCompiledModules for FullyCompiledProgram {
+impl PreCompiledModules for (FullyCompiledProgram, Vec<PackagePaths>) {
     fn get_pre_compiled_modules(&self) -> Vec<&AnnotatedCompiledModule> {
-        self.compiled
+        self.0
+            .compiled
             .iter()
             .filter_map(annotated_module_from_unit)
             .collect()
@@ -178,7 +184,7 @@ pub trait MoveTestAdapter<'a>: Sized {
         default_syntax: SyntaxChoice,
         comparison_mode: bool,
         run_config: TestRunConfig,
-        pre_compiled_deps_v1: Option<&'a FullyCompiledProgram>,
+        pre_compiled_deps_v1: Option<&'a (FullyCompiledProgram, Vec<PackagePaths>)>,
         pre_compiled_deps_v2: Option<&'a PrecompiledFilesModules>,
         init_data: Option<TaskInput<(InitCommand, Self::ExtraInitArgs)>>,
     ) -> (Self, Option<String>);
@@ -233,6 +239,25 @@ pub trait MoveTestAdapter<'a>: Sized {
         CompiledModule,
         Option<String>,
     )> {
+        let (data, named_addr_opt, module, _opt_model, warnings_opt) =
+            self.compile_module_default(syntax, data, start_line, command_lines_stop, false)?;
+        Ok((data, named_addr_opt, module, warnings_opt))
+    }
+
+    fn compile_module_default(
+        &mut self,
+        syntax: SyntaxChoice,
+        data: Option<NamedTempFile>,
+        start_line: usize,
+        command_lines_stop: usize,
+        need_model: bool,
+    ) -> Result<(
+        NamedTempFile,
+        Option<Symbol>,
+        CompiledModule,
+        Option<GlobalEnv>,
+        Option<String>,
+    )> {
         let data = match data {
             Some(f) => f,
             None => panic!(
@@ -243,9 +268,9 @@ pub trait MoveTestAdapter<'a>: Sized {
         let data_path = data.path().to_str().unwrap();
         let run_config = self.run_config();
         let state = self.compiled_state();
-        let (named_addr_opt, module, warnings_opt) = match syntax {
+        let (named_addr_opt, module, opt_model, warnings_opt) = match syntax {
             SyntaxChoice::Source => {
-                let (unit, warnings_opt) = match run_config {
+                let (unit, opt_model, warnings_opt) = match run_config {
                     // Run the V2 compiler if requested
                     TestRunConfig::CompilerV2 {
                         language_version,
@@ -266,6 +291,7 @@ pub trait MoveTestAdapter<'a>: Sized {
                         &state.source_files().cloned().collect::<Vec<_>>(),
                         data_path.to_owned(),
                         self.known_attributes(),
+                        need_model,
                     )?,
                 };
                 let (named_addr_opt, module) = match unit {
@@ -282,15 +308,15 @@ pub trait MoveTestAdapter<'a>: Sized {
                         start_line, command_lines_stop
                     ),
                 };
-                (named_addr_opt, module, warnings_opt)
+                (named_addr_opt, module, opt_model, warnings_opt)
             },
             SyntaxChoice::IR => {
                 let module = compile_ir_module(state.dep_modules(), data_path)?;
-                (None, module, None)
+                (None, module, None, None)
             },
         };
         self.register_temp_filename(&data);
-        Ok((data, named_addr_opt, module, warnings_opt))
+        Ok((data, named_addr_opt, module, opt_model, warnings_opt))
     }
 
     fn compile_script(
@@ -300,6 +326,19 @@ pub trait MoveTestAdapter<'a>: Sized {
         start_line: usize,
         command_lines_stop: usize,
     ) -> Result<(CompiledScript, Option<String>)> {
+        let (compiled_script, _opt_model, warnings_opt) =
+            self.compile_script_default(syntax, data, start_line, command_lines_stop, false)?;
+        Ok((compiled_script, warnings_opt))
+    }
+
+    fn compile_script_default(
+        &mut self,
+        syntax: SyntaxChoice,
+        data: Option<NamedTempFile>,
+        start_line: usize,
+        command_lines_stop: usize,
+        need_model: bool,
+    ) -> Result<(CompiledScript, Option<GlobalEnv>, Option<String>)> {
         let data = match data {
             Some(f) => f,
             None => panic!(
@@ -310,9 +349,9 @@ pub trait MoveTestAdapter<'a>: Sized {
         let data_path = data.path().to_str().unwrap();
         let run_config = self.run_config();
         let state = self.compiled_state();
-        let (script, warning_opt) = match syntax {
+        let (script, opt_model, warning_opt) = match syntax {
             SyntaxChoice::Source => {
-                let (unit, warning_opt) = match run_config {
+                let (unit, opt_model, warning_opt) = match run_config {
                     // Run the V2 compiler if requested.
                     TestRunConfig::CompilerV2 {
                         language_version,
@@ -333,19 +372,23 @@ pub trait MoveTestAdapter<'a>: Sized {
                         &state.source_files().cloned().collect::<Vec<_>>(),
                         data_path.to_owned(),
                         self.known_attributes(),
+                        need_model,
                     )?,
                 };
                 match unit {
-                    AnnotatedCompiledUnit::Script(annot_script) => (annot_script.named_script.script, warning_opt),
+                    AnnotatedCompiledUnit::Script(annot_script) => (annot_script.named_script.script, opt_model, warning_opt),
                     AnnotatedCompiledUnit::Module(_) => panic!(
                         "Expected a script text block, not a module, following 'run' starting on lines {}-{}",
                         start_line, command_lines_stop
                     ),
                 }
             },
-            SyntaxChoice::IR => (compile_ir_script(state.dep_modules(), data_path)?, None),
+            SyntaxChoice::IR => {
+                let script = compile_ir_script(state.dep_modules(), data_path)?;
+                (script, None, None)
+            },
         };
-        Ok((script, warning_opt))
+        Ok((script, opt_model, warning_opt))
     }
 
     fn handle_command(
@@ -622,7 +665,7 @@ fn display_return_values(return_values: SerializedReturnValues) -> Option<String
 impl<'a> CompiledState<'a> {
     pub fn new(
         named_address_mapping: BTreeMap<String, NumericalAddress>,
-        pre_compiled_deps_v1: Option<&'a FullyCompiledProgram>,
+        pre_compiled_deps_v1: Option<&'a (FullyCompiledProgram, Vec<PackagePaths>)>,
         pre_compiled_deps_v2: Option<&'a PrecompiledFilesModules>,
         default_named_address_mapping: Option<NumericalAddress>,
     ) -> Self {
@@ -746,7 +789,7 @@ fn compile_source_unit_v2(
     known_attributes: &BTreeSet<String>,
     language_version: LanguageVersion,
     experiments: Vec<(String, bool)>,
-) -> Result<(AnnotatedCompiledUnit, Option<String>)> {
+) -> Result<(AnnotatedCompiledUnit, Option<GlobalEnv>, Option<String>)> {
     let deps = if let Some(p) = pre_compiled_deps {
         // The v2 compiler does not really support precompiled programs, so we must include all the
         // dependent sources with their directories here.
@@ -783,7 +826,7 @@ fn compile_source_unit_v2(
     let mut error_writer = termcolor::Buffer::no_color();
     let result = move_compiler_v2::run_move_compiler(&mut error_writer, options);
     let error_str = String::from_utf8_lossy(&error_writer.into_inner()).to_string();
-    let (_, mut units) =
+    let (model, mut units) =
         result.map_err(|_| anyhow::anyhow!("compilation errors:\n {}", error_str))?;
     let unit = if units.len() != 1 {
         anyhow::bail!("expected either one script or one module")
@@ -791,9 +834,9 @@ fn compile_source_unit_v2(
         units.pop().unwrap()
     };
     if error_str.is_empty() {
-        Ok((unit, None))
+        Ok((unit, Some(model), None))
     } else {
-        Ok((unit, Some(error_str)))
+        Ok((unit, None, Some(error_str)))
     }
 }
 
@@ -809,12 +852,13 @@ fn remove_sub_dirs(dirs: &mut BTreeSet<String>) {
 }
 
 fn compile_source_unit(
-    pre_compiled_deps: Option<&FullyCompiledProgram>,
+    pre_compiled_deps: Option<&(FullyCompiledProgram, Vec<PackagePaths>)>,
     named_address_mapping: BTreeMap<String, NumericalAddress>,
     deps: &[String],
     path: String,
     known_attributes: &BTreeSet<String>,
-) -> Result<(AnnotatedCompiledUnit, Option<String>)> {
+    need_model: bool,
+) -> Result<(AnnotatedCompiledUnit, Option<GlobalEnv>, Option<String>)> {
     fn rendered_diags(files: &FilesSourceText, diags: Diagnostics) -> Option<String> {
         if diags.is_empty() {
             return None;
@@ -829,23 +873,25 @@ fn compile_source_unit(
     }
 
     use move_compiler::PASS_COMPILATION;
+    let flags = move_compiler::Flags::empty()
+        .set_sources_shadow_deps(true)
+        .set_skip_attribute_checks(false);
+
     let (mut files, comments_and_compiler_res) = move_compiler::Compiler::from_files(
-        vec![path],
+        vec![path.clone()],
         deps.to_vec(),
-        named_address_mapping,
-        move_compiler::Flags::empty()
-            .set_sources_shadow_deps(true)
-            .set_skip_attribute_checks(false), // In case of bugs in transactional test code.
+        named_address_mapping.clone(),
+        flags,
         known_attributes,
     )
-    .set_pre_compiled_lib_opt(pre_compiled_deps)
+    .set_pre_compiled_lib_opt(pre_compiled_deps.map(|(prog, _)| prog))
     .run::<PASS_COMPILATION>()?;
     let units_or_diags = comments_and_compiler_res
         .map(|(_comments, move_compiler)| move_compiler.into_compiled_units());
 
     match units_or_diags {
         Err(diags) => {
-            if let Some(pcd) = pre_compiled_deps {
+            if let Some((pcd, _paths)) = pre_compiled_deps {
                 for (file_name, text) in &pcd.files {
                     // TODO This is bad. Rethink this when errors are redone
                     if !files.contains_key(file_name) {
@@ -863,7 +909,38 @@ fn compile_source_unit(
                 panic!("Invalid input. Expected 1 compiled unit but got {}", len)
             }
             let unit = units.pop().unwrap();
-            Ok((unit, warnings))
+            let opt_model = if need_model {
+                if let Some((_fully_compiled_program, lib_paths)) = pre_compiled_deps {
+                    let symbol_map = string_map_to_symbol_map(&named_address_mapping);
+                    let move_target_package = vec![PackagePaths {
+                        name: None,
+                        paths: vec![Symbol::from(path)],
+                        named_address_map: symbol_map.clone(),
+                    }];
+                    let deps_target_package = vec![PackagePaths {
+                        name: None,
+                        paths: string_vec_to_symbol_vec(deps),
+                        named_address_map: symbol_map.clone(),
+                    }];
+                    let model_options = ModelBuilderOptions::default();
+                    // This choice of flags matches that used to build model in `CompiledPackage::build_all()`
+                    let flags = Flags::verification();
+                    let model = run_model_builder_with_options_and_compilation_flags(
+                        move_target_package,
+                        deps_target_package,
+                        lib_paths.to_vec(),
+                        model_options,
+                        flags,
+                        known_attributes,
+                    )?;
+                    Some(model)
+                } else {
+                    None
+                }
+            } else {
+                None
+            };
+            Ok((unit, opt_model, warnings))
         },
     }
 }
@@ -890,7 +967,7 @@ fn compile_ir_script<'a>(
 pub fn run_test_impl<'a, Adapter>(
     config: TestRunConfig,
     path: &Path,
-    pre_compiled_deps_v1: Option<&'a FullyCompiledProgram>,
+    pre_compiled_deps_v1: Option<&'a (FullyCompiledProgram, Vec<PackagePaths>)>,
     pre_compiled_deps_v2: Option<&'a PrecompiledFilesModules>,
     exp_suffix: &Option<String>,
 ) -> Result<(), Box<dyn std::error::Error>>
