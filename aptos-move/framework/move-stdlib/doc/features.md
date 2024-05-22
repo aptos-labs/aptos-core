@@ -241,6 +241,15 @@ Lifetime: transient
 
 
 
+<a id="0x1_features_AGGREGATOR_V2_IS_AT_LEAST_API"></a>
+
+
+
+<pre><code><b>const</b> <a href="features.md#0x1_features_AGGREGATOR_V2_IS_AT_LEAST_API">AGGREGATOR_V2_IS_AT_LEAST_API</a>: u64 = 66;
+</code></pre>
+
+
+
 <a id="0x1_features_APTOS_STD_CHAIN_ID_NATIVES"></a>
 
 Whether the new <code>aptos_stdlib::type_info::chain_id()</code> native for fetching the chain ID is enabled.
@@ -2784,9 +2793,8 @@ Lifetime: transient
 <summary>Implementation</summary>
 
 
-<pre><code><b>public</b> <b>fun</b> <a href="features.md#0x1_features_aggregator_v2_is_at_least_api_enabled">aggregator_v2_is_at_least_api_enabled</a>(): bool {
-    <b>false</b>
-    // <a href="features.md#0x1_features_is_enabled">is_enabled</a>(AGGREGATOR_V2_IS_AT_LEAST_API)
+<pre><code><b>public</b> <b>fun</b> <a href="features.md#0x1_features_aggregator_v2_is_at_least_api_enabled">aggregator_v2_is_at_least_api_enabled</a>(): bool <b>acquires</b> <a href="features.md#0x1_features_Features">Features</a> {
+    <a href="features.md#0x1_features_is_enabled">is_enabled</a>(<a href="features.md#0x1_features_AGGREGATOR_V2_IS_AT_LEAST_API">AGGREGATOR_V2_IS_AT_LEAST_API</a>)
 }
 </code></pre>
 

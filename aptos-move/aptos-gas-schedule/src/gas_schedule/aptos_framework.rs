@@ -4,8 +4,7 @@
 //! This module defines the gas parameters for Aptos Framework & Stdlib.
 
 use crate::{
-    gas_schedule::NativeGasParameters,
-    ver::gas_feature_versions::{RELEASE_V1_12, RELEASE_V1_13},
+    gas_feature_versions::{RELEASE_V1_14, RELEASE_V1_8, RELEASE_V1_9, RELEASE_V1_9_SKIPPED}, gas_schedule::NativeGasParameters, ver::gas_feature_versions::{RELEASE_V1_12, RELEASE_V1_13}
 };
 use aptos_gas_algebra::{
     InternalGas, InternalGasPerAbstractValueUnit, InternalGasPerArg, InternalGasPerByte,
@@ -297,18 +296,20 @@ crate::gas_schedule::macros::define_gas_parameters!(
         [aggregator_destroy_base: InternalGas, "aggregator.destroy.base", 1838],
         [aggregator_factory_new_aggregator_base: InternalGas, "aggregator_factory.new_aggregator.base", 1838],
 
-        [aggregator_v2_create_aggregator_base: InternalGas, {12.. => "aggregator_v2.create_aggregator.base"}, 1838],
-        [aggregator_v2_try_add_base: InternalGas, {12.. => "aggregator_v2.try_add.base"}, 1102],
-        [aggregator_v2_try_sub_base: InternalGas, {12.. => "aggregator_v2.try_sub.base"}, 1102],
-        [aggregator_v2_read_base: InternalGas, {12.. => "aggregator_v2.read.base"}, 2205],
-        [aggregator_v2_snapshot_base: InternalGas, {12.. => "aggregator_v2.snapshot.base"}, 1102],
+        [aggregator_v2_create_aggregator_base: InternalGas, {RELEASE_V1_9_SKIPPED.. => "aggregator_v2.create_aggregator.base"}, 1838],
+        [aggregator_v2_try_add_base: InternalGas, {RELEASE_V1_9_SKIPPED.. => "aggregator_v2.try_add.base"}, 1102],
+        [aggregator_v2_try_sub_base: InternalGas, {RELEASE_V1_9_SKIPPED.. => "aggregator_v2.try_sub.base"}, 1102],
+        [aggregator_v2_is_at_least_base: InternalGas, {RELEASE_V1_14.. => "aggregator_v2.is_at_least.base"}, 500],
 
-        [aggregator_v2_create_snapshot_base: InternalGas, {11.. => "aggregator_v2.create_snapshot.base"}, 1102],
-        [aggregator_v2_create_snapshot_per_byte: InternalGasPerByte, { 12.. =>"aggregator_v2.create_snapshot.per_byte" }, 3],
-        [aggregator_v2_copy_snapshot_base: InternalGas, {11.. => "aggregator_v2.copy_snapshot.base"}, 1102],
-        [aggregator_v2_read_snapshot_base: InternalGas, {11.. => "aggregator_v2.read_snapshot.base"}, 2205],
-        [aggregator_v2_string_concat_base: InternalGas, {11.. => "aggregator_v2.string_concat.base"}, 1102],
-        [aggregator_v2_string_concat_per_byte: InternalGasPerByte, { 12.. =>"aggregator_v2.string_concat.per_byte" }, 3],
+        [aggregator_v2_read_base: InternalGas, {RELEASE_V1_9_SKIPPED.. => "aggregator_v2.read.base"}, 2205],
+        [aggregator_v2_snapshot_base: InternalGas, {RELEASE_V1_9_SKIPPED.. => "aggregator_v2.snapshot.base"}, 1102],
+
+        [aggregator_v2_create_snapshot_base: InternalGas, {RELEASE_V1_8.. => "aggregator_v2.create_snapshot.base"}, 1102],
+        [aggregator_v2_create_snapshot_per_byte: InternalGasPerByte, { RELEASE_V1_9_SKIPPED.. =>"aggregator_v2.create_snapshot.per_byte" }, 3],
+        [aggregator_v2_copy_snapshot_base: InternalGas, {RELEASE_V1_8.. => "aggregator_v2.copy_snapshot.base"}, 1102],
+        [aggregator_v2_read_snapshot_base: InternalGas, {RELEASE_V1_8.. => "aggregator_v2.read_snapshot.base"}, 2205],
+        [aggregator_v2_string_concat_base: InternalGas, {RELEASE_V1_8.. => "aggregator_v2.string_concat.base"}, 1102],
+        [aggregator_v2_string_concat_per_byte: InternalGasPerByte, { RELEASE_V1_9_SKIPPED.. =>"aggregator_v2.string_concat.per_byte" }, 3],
 
         [object_exists_at_base: InternalGas, { 7.. => "object.exists_at.base" }, 919],
         // Based on SHA3-256's cost

@@ -512,9 +512,10 @@ module std::features {
         abort error::invalid_argument(EINVALID_FEATURE)
     }
 
-    public fun aggregator_v2_is_at_least_api_enabled(): bool {
-        false
-        // is_enabled(AGGREGATOR_V2_IS_AT_LEAST_API)
+    const AGGREGATOR_V2_IS_AT_LEAST_API: u64 = 66;
+
+    public fun aggregator_v2_is_at_least_api_enabled(): bool acquires Features {
+        is_enabled(AGGREGATOR_V2_IS_AT_LEAST_API)
     }
 
     /// Whether we use more efficient native implementation of computing object derived address

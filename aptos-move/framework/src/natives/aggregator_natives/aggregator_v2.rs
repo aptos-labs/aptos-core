@@ -291,7 +291,7 @@ fn native_is_at_least_impl(
 
     debug_assert_eq!(args.len(), 2);
     debug_assert_eq!(ty_args.len(), 1);
-    context.charge(AGGREGATOR_V2_TRY_SUB_BASE)?;
+    context.charge(AGGREGATOR_V2_IS_AT_LEAST_BASE)?;
 
     let aggregator_value_ty = &ty_args[0];
     let rhs = pop_value_by_type(aggregator_value_ty, &mut args, EUNSUPPORTED_AGGREGATOR_TYPE)?;
