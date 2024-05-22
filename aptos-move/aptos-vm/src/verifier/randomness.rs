@@ -8,7 +8,7 @@ use move_binary_format::errors::VMResult;
 
 pub(crate) fn get_randomness_annotation(
     resolver: &impl AptosMoveResolver,
-    session: &mut SessionExt,
+    session: &SessionExt,
     entry_fn: &EntryFunction,
 ) -> VMResult<Option<RandomnessAnnotation>> {
     let module = session

@@ -1240,6 +1240,12 @@ impl AptosVM {
         new_published_modules_loaded: &mut bool,
         txn_data: &TransactionMetadata,
     ) -> Result<(), VMStatus> {
+        if get_randomness_annotation(resolver, session, payload)?.is_some() {
+            return Err(VMStatus::error(
+                StatusCode::MULTISIG_TRANSACTION_CALLING_RANDOMNESS,
+                Some("Randomness is not allowed in multisig transactions.".to_string()),
+            ));
+        }
         // If txn args are not valid, we'd still consider the transaction as executed but
         // failed. This is primarily because it's unrecoverable at this point.
         self.validate_and_execute_entry_function(
