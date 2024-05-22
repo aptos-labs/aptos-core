@@ -59,6 +59,7 @@ impl SourcePackageLayout {
             Self::Examples => "examples",
             Self::Specifications => "specifications",
             Self::DocTemplates => "doc_templates",
+            Self::Build => "build",
         }
     }
 
@@ -69,7 +70,8 @@ impl SourcePackageLayout {
             | Self::Scripts
             | Self::Examples
             | Self::Specifications
-            | Self::DocTemplates => true,
+            | Self::DocTemplates
+            | Self::Build => true,
         }
     }
 }

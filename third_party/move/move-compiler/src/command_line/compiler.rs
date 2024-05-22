@@ -428,7 +428,10 @@ impl<'a> SteppedCompiler<'a, PASS_COMPILATION> {
 
 /// Given a set of dependencies, precompile them and save the ASTs so that they can be used again
 /// to compile against without having to recompile these dependencies
-pub fn construct_pre_compiled_lib<Paths: Into<Symbol> + Debug, NamedAddress: Into<Symbol> + Debug>(
+pub fn construct_pre_compiled_lib<
+    Paths: Into<Symbol> + Debug,
+    NamedAddress: Into<Symbol> + Debug,
+>(
     targets: Vec<PackagePaths<Paths, NamedAddress>>,
     interface_files_dir_opt: Option<String>,
     flags: Flags,
