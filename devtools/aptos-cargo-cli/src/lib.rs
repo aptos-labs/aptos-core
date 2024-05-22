@@ -26,7 +26,6 @@ const RELEVANT_FILE_PATHS_FOR_COMPILER_V2: [&str; 7] = [
     "aptos-move/framework",
     "aptos-move/move-examples",
     "third_party/move",
-    "api",
 ];
 const RELEVANT_FILE_PATHS_FOR_EXECUTION_PERFORMANCE_TESTS: [&str; 5] = [
     ".github/workflows/execution-performance.yaml",
