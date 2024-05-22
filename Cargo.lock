@@ -240,7 +240,7 @@ dependencies = [
 
 [[package]]
 name = "aptos"
-version = "3.3.0"
+version = "3.3.1"
 dependencies = [
  "anyhow",
  "aptos-api-types",
@@ -1128,8 +1128,11 @@ dependencies = [
  "byteorder",
  "claims",
  "clap 4.4.14",
+ "crossbeam-channel",
  "dashmap",
  "either",
+ "hex",
+ "indicatif 0.15.0",
  "itertools 0.12.1",
  "lru 0.7.8",
  "move-core-types",
@@ -1202,6 +1205,7 @@ dependencies = [
  "aptos-move-debugger",
  "aptos-push-metrics",
  "clap 4.4.14",
+ "jemallocator",
  "tokio",
 ]
 
@@ -2748,7 +2752,6 @@ dependencies = [
  "thiserror",
  "tokio",
  "tokio-retry",
- "tokio-stream",
  "tokio-util 0.7.10",
 ]
 
@@ -3946,6 +3949,7 @@ dependencies = [
  "aptos-vm-genesis",
  "bcs 0.1.4",
  "clap 4.4.14",
+ "codespan-reporting",
  "datatest-stable",
  "hex",
  "move-binary-format",
@@ -3955,10 +3959,12 @@ dependencies = [
  "move-compiler-v2",
  "move-core-types",
  "move-model",
+ "move-symbol-pool",
  "move-transactional-test-runner",
  "move-vm-runtime",
  "once_cell",
  "serde_json",
+ "tempfile",
 ]
 
 [[package]]
@@ -9119,9 +9125,9 @@ dependencies = [
 
 [[package]]
 name = "indicatif"
-version = "0.17.7"
+version = "0.17.8"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "fb28741c9db9a713d93deb3bb9515c20788cef5815265bee4980e87bde7e0f25"
+checksum = "763a5a8f45087d6bcea4222e7b72c291a054edf80e4ef6efd2a4979878c7bea3"
 dependencies = [
  "console",
  "instant",
@@ -14008,7 +14014,7 @@ version = "0.39.0"
 source = "git+https://github.com/banool/self_update.git?rev=8306158ad0fd5b9d4766a3c6bf967e7ef0ea5c4b#8306158ad0fd5b9d4766a3c6bf967e7ef0ea5c4b"
 dependencies = [
  "hyper",
- "indicatif 0.17.7",
+ "indicatif 0.17.8",
  "log",
  "quick-xml 0.23.1",
  "regex",
