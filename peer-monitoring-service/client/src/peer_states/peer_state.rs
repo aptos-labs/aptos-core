@@ -193,6 +193,9 @@ impl PeerState {
         let average_latency_ping_secs = latency_info_state.get_average_latency_ping_secs();
         peer_monitoring_metadata.average_ping_latency_secs = average_latency_ping_secs;
 
+        let latest_ping_latency_secs = latency_info_state.get_latest_latency_ping_secs();
+        peer_monitoring_metadata.latest_ping_latency_secs = latest_ping_latency_secs;
+
         // Get and store the detailed monitoring metadata
         let internal_client_state = self.get_internal_client_state()?;
         peer_monitoring_metadata.internal_client_state = internal_client_state;
