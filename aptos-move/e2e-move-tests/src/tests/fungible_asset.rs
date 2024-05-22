@@ -22,14 +22,14 @@ pub static FUNGIBLE_STORE_TAG: Lazy<StructTag> = Lazy::new(|| StructTag {
     address: AccountAddress::from_hex_literal("0x1").unwrap(),
     module: Identifier::new("fungible_asset").unwrap(),
     name: Identifier::new("FungibleStore").unwrap(),
-    type_params: vec![],
+    type_args: vec![],
 });
 
 pub static OBJ_GROUP_TAG: Lazy<StructTag> = Lazy::new(|| StructTag {
     address: AccountAddress::from_hex_literal("0x1").unwrap(),
     module: Identifier::new("object").unwrap(),
     name: Identifier::new("ObjectGroup").unwrap(),
-    type_params: vec![],
+    type_args: vec![],
 });
 #[test]
 fn test_basic_fungible_token() {

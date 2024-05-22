@@ -400,6 +400,7 @@ impl NetworkSender {
         self.broadcast(msg).await
     }
 
+    #[allow(dead_code)]
     pub async fn send_commit_vote(
         &self,
         commit_vote: CommitVote,
@@ -843,6 +844,9 @@ impl NetworkTask {
                     {
                         warn!(error = ?e, "aptos channel closed");
                     };
+                },
+                _ => {
+                    // Ignore `NewPeer` and `LostPeer` events
                 },
             });
         }

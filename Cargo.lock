@@ -240,7 +240,7 @@ dependencies = [
 
 [[package]]
 name = "aptos"
-version = "3.3.0"
+version = "3.3.1"
 dependencies = [
  "anyhow",
  "aptos-api-types",
@@ -414,7 +414,6 @@ dependencies = [
  "aptos-sdk",
  "aptos-storage-interface",
  "aptos-types",
- "aptos-utils",
  "aptos-vm",
  "async-trait",
  "bcs 0.1.4",
@@ -515,16 +514,17 @@ dependencies = [
  "aptos-framework",
  "aptos-logger",
  "aptos-openapi",
+ "aptos-resource-viewer",
  "aptos-storage-interface",
  "aptos-types",
  "aptos-vm",
  "async-trait",
  "bcs 0.1.4",
+ "bytes",
  "hex",
  "indoc",
  "move-binary-format",
  "move-core-types",
- "move-resource-viewer",
  "once_cell",
  "poem",
  "poem-openapi",
@@ -1115,25 +1115,27 @@ dependencies = [
  "aptos-logger",
  "aptos-metrics-core",
  "aptos-proptest-helpers",
+ "aptos-resource-viewer",
  "aptos-rocksdb-options",
  "aptos-schemadb",
  "aptos-scratchpad",
  "aptos-storage-interface",
  "aptos-temppath",
  "aptos-types",
- "aptos-vm",
  "arc-swap",
  "arr_macro",
  "bcs 0.1.4",
  "byteorder",
  "claims",
  "clap 4.4.14",
+ "crossbeam-channel",
  "dashmap",
  "either",
+ "hex",
+ "indicatif 0.15.0",
  "itertools 0.12.1",
  "lru 0.7.8",
  "move-core-types",
- "move-resource-viewer",
  "num-derive",
  "once_cell",
  "owo-colors",
@@ -1154,16 +1156,15 @@ dependencies = [
  "aptos-config",
  "aptos-logger",
  "aptos-proptest-helpers",
+ "aptos-resource-viewer",
  "aptos-rocksdb-options",
  "aptos-schemadb",
  "aptos-storage-interface",
  "aptos-types",
- "aptos-vm",
  "bcs 0.1.4",
  "bytes",
  "dashmap",
  "move-core-types",
- "move-resource-viewer",
  "proptest",
  "proptest-derive",
  "rand 0.7.3",
@@ -1204,6 +1205,7 @@ dependencies = [
  "aptos-move-debugger",
  "aptos-push-metrics",
  "clap 4.4.14",
+ "jemallocator",
  "tokio",
 ]
 
@@ -1930,7 +1932,6 @@ dependencies = [
  "aptos-runtimes",
  "aptos-storage-interface",
  "aptos-types",
- "aptos-vm",
  "async-trait",
  "bcs 0.1.4",
  "bigdecimal",
@@ -2400,7 +2401,6 @@ dependencies = [
  "aptos-gas-profiling",
  "aptos-gas-schedule",
  "aptos-keygen",
- "aptos-memory-usage-tracker",
  "aptos-proptest-helpers",
  "aptos-temppath",
  "aptos-types",
@@ -2570,10 +2570,8 @@ dependencies = [
  "anyhow",
  "aptos-consensus",
  "aptos-crypto",
- "aptos-gas-meter",
  "aptos-gas-profiling",
  "aptos-logger",
- "aptos-memory-usage-tracker",
  "aptos-rest-client",
  "aptos-types",
  "aptos-validator-interface",
@@ -2754,7 +2752,6 @@ dependencies = [
  "thiserror",
  "tokio",
  "tokio-retry",
- "tokio-stream",
  "tokio-util 0.7.10",
 ]
 
@@ -3252,6 +3249,9 @@ version = "0.1.0"
 dependencies = [
  "anyhow",
  "aptos-types",
+ "aptos-vm",
+ "move-binary-format",
+ "move-bytecode-utils",
  "move-core-types",
  "move-resource-viewer",
 ]
@@ -3942,12 +3942,14 @@ dependencies = [
  "aptos-framework",
  "aptos-gas-schedule",
  "aptos-language-e2e-tests",
+ "aptos-resource-viewer",
  "aptos-storage-interface",
  "aptos-types",
  "aptos-vm",
  "aptos-vm-genesis",
  "bcs 0.1.4",
  "clap 4.4.14",
+ "codespan-reporting",
  "datatest-stable",
  "hex",
  "move-binary-format",
@@ -3957,11 +3959,12 @@ dependencies = [
  "move-compiler-v2",
  "move-core-types",
  "move-model",
- "move-resource-viewer",
+ "move-symbol-pool",
  "move-transactional-test-runner",
  "move-vm-runtime",
  "once_cell",
  "serde_json",
+ "tempfile",
 ]
 
 [[package]]
@@ -7976,6 +7979,8 @@ version = "0.1.0"
 name = "fuzzer-fuzz"
 version = "0.0.0"
 dependencies = [
+ "aptos-cached-packages",
+ "aptos-framework",
  "aptos-language-e2e-tests",
  "aptos-types",
  "aptos-vm",
@@ -7985,8 +7990,10 @@ dependencies = [
  "move-binary-format",
  "move-bytecode-verifier",
  "move-core-types",
+ "move-vm-runtime",
  "move-vm-types",
  "once_cell",
+ "rayon",
 ]
 
 [[package]]
@@ -9116,9 +9123,9 @@ dependencies = [
 
 [[package]]
 name = "indicatif"
-version = "0.17.7"
+version = "0.17.8"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "fb28741c9db9a713d93deb3bb9515c20788cef5815265bee4980e87bde7e0f25"
+checksum = "763a5a8f45087d6bcea4222e7b72c291a054edf80e4ef6efd2a4979878c7bea3"
 dependencies = [
  "console",
  "instant",
@@ -11029,8 +11036,10 @@ dependencies = [
 name = "move-vm-test-utils"
 version = "0.1.0"
 dependencies = [
+ "anyhow",
  "bytes",
  "move-binary-format",
+ "move-bytecode-utils",
  "move-core-types",
  "move-table-extension",
  "move-vm-types",
@@ -14003,7 +14012,7 @@ version = "0.39.0"
 source = "git+https://github.com/banool/self_update.git?rev=8306158ad0fd5b9d4766a3c6bf967e7ef0ea5c4b#8306158ad0fd5b9d4766a3c6bf967e7ef0ea5c4b"
 dependencies = [
  "hyper",
- "indicatif 0.17.7",
+ "indicatif 0.17.8",
  "log",
  "quick-xml 0.23.1",
  "regex",

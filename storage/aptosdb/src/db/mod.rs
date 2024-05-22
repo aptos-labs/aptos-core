@@ -35,6 +35,7 @@ use aptos_db_indexer::Indexer;
 use aptos_experimental_runtimes::thread_manager::{optimal_min_len, THREAD_MANAGER};
 use aptos_logger::prelude::*;
 use aptos_metrics_core::TimerHelper;
+use aptos_resource_viewer::AptosValueAnnotator;
 use aptos_schemadb::{ReadOptions, SchemaBatch};
 use aptos_scratchpad::SparseMerkleTree;
 use aptos_storage_interface::{
@@ -70,8 +71,6 @@ use aptos_types::{
     },
     write_set::WriteSet,
 };
-use aptos_vm::data_cache::AsMoveResolver;
-use move_resource_viewer::MoveValueAnnotator;
 use rayon::prelude::*;
 use std::{
     cell::Cell,

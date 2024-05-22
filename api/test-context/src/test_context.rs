@@ -763,20 +763,6 @@ impl TestContext {
             .unwrap()
     }
 
-    // TODO: remove the helper function since we don't publish module directly anymore
-    pub async fn api_publish_module(&mut self, account: &mut LocalAccount, code: HexEncodedBytes) {
-        self.api_execute_txn(
-            account,
-            json!({
-                "type": "module_bundle_payload",
-                "modules" : [
-                    {"bytecode": code},
-                ],
-            }),
-        )
-        .await;
-    }
-
     pub async fn api_execute_entry_function(
         &mut self,
         account: &mut LocalAccount,

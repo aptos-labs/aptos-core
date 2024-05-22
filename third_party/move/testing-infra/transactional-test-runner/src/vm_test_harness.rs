@@ -9,12 +9,8 @@ use crate::{
 use anyhow::{anyhow, Result};
 use clap::Parser;
 use move_binary_format::{
-    compatibility::Compatibility,
-    errors::{PartialVMError, VMResult},
-    file_format::CompiledScript,
-    file_format_common,
-    file_format_common::VERSION_MAX,
-    CompiledModule,
+    compatibility::Compatibility, errors::VMResult, file_format::CompiledScript,
+    file_format_common, CompiledModule,
 };
 use move_command_line_common::{
     address::ParsedAddress,
@@ -24,7 +20,10 @@ use move_command_line_common::{
 };
 use move_compiler::{
     compiled_unit::AnnotatedCompiledUnit,
-    shared::{known_attributes::KnownAttribute, Flags, PackagePaths},
+    shared::{
+        known_attributes::KnownAttribute, string_packagepath_to_symbol_packagepath, Flags,
+        NumericalAddress, PackagePaths,
+    },
     FullyCompiledProgram,
 };
 use move_core_types::{
@@ -60,30 +59,6 @@ struct SimpleVMTestAdapter<'a> {
     default_syntax: SyntaxChoice,
     comparison_mode: bool,
     run_config: TestRunConfig,
-}
-
-pub fn view_resource_in_move_storage(
-    storage: &impl MoveResolver<PartialVMError>,
-    address: AccountAddress,
-    module: &ModuleId,
-    resource: &IdentStr,
-    type_args: Vec<TypeTag>,
-) -> Result<String> {
-    let tag = StructTag {
-        address: *module.address(),
-        module: module.name().to_owned(),
-        name: resource.to_owned(),
-        type_params: type_args,
-    };
-    // TODO
-    match storage.get_resource(&address, &tag).unwrap() {
-        None => Ok("[No Resource Exists]".to_owned()),
-        Some(data) => {
-            let annotated = MoveValueAnnotator::new_with_max_bytecode_version(storage, VERSION_MAX)
-                .view_resource(&tag, &data)?;
-            Ok(format!("{}", annotated))
-        },
-    }
 }
 
 #[derive(Debug, Parser)]
@@ -143,7 +118,7 @@ impl<'a> MoveTestAdapter<'a> for SimpleVMTestAdapter<'a> {
         default_syntax: SyntaxChoice,
         comparison_mode: bool,
         run_config: TestRunConfig,
-        pre_compiled_deps_v1: Option<&'a FullyCompiledProgram>,
+        pre_compiled_deps_v1: Option<&'a (FullyCompiledProgram, Vec<PackagePaths>)>,
         pre_compiled_deps_v2: Option<&'a PrecompiledFilesModules>,
         task_opt: Option<TaskInput<(InitCommand, EmptyCommand)>>,
     ) -> (Self, Option<String>) {
@@ -381,7 +356,20 @@ impl<'a> MoveTestAdapter<'a> for SimpleVMTestAdapter<'a> {
         resource: &IdentStr,
         type_args: Vec<TypeTag>,
     ) -> Result<String> {
-        view_resource_in_move_storage(&self.storage, address, module, resource, type_args)
+        let tag = StructTag {
+            address: *module.address(),
+            module: module.name().to_owned(),
+            name: resource.to_owned(),
+            type_args,
+        };
+        match self.storage.get_resource(&address, &tag).unwrap() {
+            None => Ok("[No Resource Exists]".to_owned()),
+            Some(data) => {
+                let annotated =
+                    MoveValueAnnotator::new(self.storage.clone()).view_resource(&tag, &data)?;
+                Ok(format!("{}", annotated))
+            },
+        }
     }
 
     fn handle_subcommand(&mut self, _: TaskInput<Self::Subcommand>) -> Result<Option<String>> {
@@ -426,29 +414,33 @@ impl<'a> SimpleVMTestAdapter<'a> {
     }
 }
 
-static PRECOMPILED_MOVE_STDLIB: Lazy<Option<FullyCompiledProgram>> = Lazy::new(|| {
-    if get_move_compiler_block_v1_from_env() {
-        return None;
-    }
-    let program_res = move_compiler::construct_pre_compiled_lib(
-        vec![PackagePaths {
+static PRECOMPILED_MOVE_STDLIB: Lazy<Option<(FullyCompiledProgram, Vec<PackagePaths>)>> =
+    Lazy::new(|| {
+        if get_move_compiler_block_v1_from_env() {
+            return None;
+        }
+        let lib_paths = PackagePaths {
             name: None,
             paths: move_stdlib::move_stdlib_files(),
             named_address_map: move_stdlib::move_stdlib_named_addresses(),
-        }],
-        None,
-        Flags::empty().set_skip_attribute_checks(true), // no point in checking.
-        KnownAttribute::get_all_attribute_names(),
-    )
-    .unwrap();
-    match program_res {
-        Ok(stdlib) => Some(stdlib),
-        Err((files, errors)) => {
-            eprintln!("!!!Standard library failed to compile!!!");
-            move_compiler::diagnostics::report_diagnostics(&files, errors)
-        },
-    }
-});
+        };
+        let lib_paths_movesym =
+            string_packagepath_to_symbol_packagepath::<NumericalAddress>(&lib_paths);
+        let program_res = move_compiler::construct_pre_compiled_lib(
+            vec![lib_paths],
+            None,
+            Flags::empty().set_skip_attribute_checks(true), // no point in checking.
+            KnownAttribute::get_all_attribute_names(),
+        )
+        .unwrap();
+        match program_res {
+            Ok(stdlib) => Some((stdlib, vec![lib_paths_movesym])),
+            Err((files, errors)) => {
+                eprintln!("!!!Standard library failed to compile!!!");
+                move_compiler::diagnostics::report_diagnostics(&files, errors)
+            },
+        }
+    });
 
 pub struct PrecompiledFilesModules(Vec<String>, Vec<AnnotatedCompiledUnit>);
 
@@ -501,7 +493,7 @@ pub fn run_test(path: &Path) -> Result<(), Box<dyn std::error::Error>> {
 
 fn precompiled_v1_stdlib_if_needed(
     config: &TestRunConfig,
-) -> Option<&'static FullyCompiledProgram> {
+) -> Option<&'static (FullyCompiledProgram, Vec<PackagePaths>)> {
     match config {
         TestRunConfig::CompilerV1 { .. } => PRECOMPILED_MOVE_STDLIB.as_ref(),
         TestRunConfig::ComparisonV1V2 { .. } => PRECOMPILED_MOVE_STDLIB.as_ref(),

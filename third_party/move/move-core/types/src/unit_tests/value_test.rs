@@ -17,7 +17,7 @@ fn struct_deserialization() {
         address: AccountAddress::ZERO,
         name: ident_str!("MyStruct").to_owned(),
         module: ident_str!("MyModule").to_owned(),
-        type_params: vec![],
+        type_args: vec![],
     };
     let values = vec![MoveValue::U64(7), MoveValue::Bool(true)];
     let fields = vec![ident_str!("f").to_owned(), ident_str!("g").to_owned()];
@@ -88,13 +88,13 @@ fn nested_typed_struct_deserialization() {
         address: AccountAddress::ZERO,
         name: ident_str!("MyStruct").to_owned(),
         module: ident_str!("MyModule").to_owned(),
-        type_params: vec![],
+        type_args: vec![],
     };
     let nested_struct_type = StructTag {
         address: AccountAddress::ZERO,
         name: ident_str!("NestedStruct").to_owned(),
         module: ident_str!("NestedModule").to_owned(),
-        type_params: vec![TypeTag::U8],
+        type_args: vec![TypeTag::U8],
     };
 
     // test each deserialization scheme

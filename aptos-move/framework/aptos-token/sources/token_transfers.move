@@ -29,6 +29,13 @@ module aptos_token::token_transfers {
     }
 
     #[event]
+    struct TokenOffer has drop, store {
+        to_address: address,
+        token_id: TokenId,
+        amount: u64,
+    }
+
+    #[event]
     struct TokenOfferEvent has drop, store {
         to_address: address,
         token_id: TokenId,
@@ -43,7 +50,21 @@ module aptos_token::token_transfers {
     }
 
     #[event]
+    struct TokenCancelOffer has drop, store {
+        to_address: address,
+        token_id: TokenId,
+        amount: u64,
+    }
+
+    #[event]
     struct TokenClaimEvent has drop, store {
+        to_address: address,
+        token_id: TokenId,
+        amount: u64,
+    }
+
+    #[event]
+    struct TokenClaim has drop, store {
         to_address: address,
         token_id: TokenId,
         amount: u64,
@@ -103,6 +124,15 @@ module aptos_token::token_transfers {
             token::merge(dst_token, token);
         };
 
+        if (std::features::module_event_migration_enabled()) {
+            event::emit(
+                TokenOffer {
+                    to_address: receiver,
+                    token_id,
+                    amount,
+                }
+            )
+        };
         event::emit_event<TokenOfferEvent>(
             &mut borrow_global_mut<PendingClaims>(sender_addr).offer_events,
             TokenOfferEvent {
@@ -139,6 +169,15 @@ module aptos_token::token_transfers {
         let amount = token::get_token_amount(&tokens);
         token::deposit_token(receiver, tokens);
 
+        if (std::features::module_event_migration_enabled()) {
+            event::emit(
+                TokenClaim {
+                    to_address: signer::address_of(receiver),
+                    token_id,
+                    amount,
+                }
+            )
+        };
         event::emit_event<TokenClaimEvent>(
             &mut borrow_global_mut<PendingClaims>(sender).claim_events,
             TokenClaimEvent {
@@ -176,6 +215,15 @@ module aptos_token::token_transfers {
         let amount = token::get_token_amount(&token);
         token::deposit_token(sender, token);
 
+        if (std::features::module_event_migration_enabled()) {
+            event::emit(
+                TokenCancelOffer {
+                    to_address: receiver,
+                    token_id,
+                    amount,
+                },
+            )
+        };
         event::emit_event<TokenCancelOfferEvent>(
             &mut borrow_global_mut<PendingClaims>(sender_addr).cancel_offer_events,
             TokenCancelOfferEvent {

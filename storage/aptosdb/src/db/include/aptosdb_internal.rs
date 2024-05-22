@@ -120,8 +120,7 @@ impl AptosDB {
             let db: Arc<dyn DbReader> = self.state_store.clone();
 
             let state_view = db.state_view_at_version(Some(ledger_next_version - 1))?;
-            let resolver = state_view.as_move_resolver();
-            let annotator = MoveValueAnnotator::new(&resolver);
+            let annotator = AptosValueAnnotator::new(&state_view);
 
             const BATCH_SIZE: Version = 10000;
             let mut next_version = indexer.next_version();
