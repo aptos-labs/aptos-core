@@ -97,7 +97,8 @@ This module provides the foundation for transferring of Tokens
 
 
 
-<pre><code><b>struct</b> <a href="token_transfers.md#0x3_token_transfers_TokenOfferId">TokenOfferId</a> <b>has</b> <b>copy</b>, drop, store
+<pre><code>#[<a href="../../aptos-framework/doc/event.md#0x1_event">event</a>]
+<b>struct</b> <a href="token_transfers.md#0x3_token_transfers_TokenOfferId">TokenOfferId</a> <b>has</b> <b>copy</b>, drop, store
 </code></pre>
 
 
@@ -170,7 +171,8 @@ This module provides the foundation for transferring of Tokens
 
 
 
-<pre><code><b>struct</b> <a href="token_transfers.md#0x3_token_transfers_TokenOfferEvent">TokenOfferEvent</a> <b>has</b> drop, store
+<pre><code>#[<a href="../../aptos-framework/doc/event.md#0x1_event">event</a>]
+<b>struct</b> <a href="token_transfers.md#0x3_token_transfers_TokenOfferEvent">TokenOfferEvent</a> <b>has</b> drop, store
 </code></pre>
 
 
@@ -209,7 +211,8 @@ This module provides the foundation for transferring of Tokens
 
 
 
-<pre><code><b>struct</b> <a href="token_transfers.md#0x3_token_transfers_TokenCancelOfferEvent">TokenCancelOfferEvent</a> <b>has</b> drop, store
+<pre><code>#[<a href="../../aptos-framework/doc/event.md#0x1_event">event</a>]
+<b>struct</b> <a href="token_transfers.md#0x3_token_transfers_TokenCancelOfferEvent">TokenCancelOfferEvent</a> <b>has</b> drop, store
 </code></pre>
 
 
@@ -288,7 +291,8 @@ This module provides the foundation for transferring of Tokens
 
 
 
-<pre><code><b>struct</b> <a href="token_transfers.md#0x3_token_transfers_TokenClaimEvent">TokenClaimEvent</a> <b>has</b> drop, store
+<pre><code>#[<a href="../../aptos-framework/doc/event.md#0x1_event">event</a>]
+<b>struct</b> <a href="token_transfers.md#0x3_token_transfers_TokenClaimEvent">TokenClaimEvent</a> <b>has</b> drop, store
 </code></pre>
 
 

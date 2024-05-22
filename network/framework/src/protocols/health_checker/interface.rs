@@ -3,10 +3,7 @@
 // SPDX-License-Identifier: Apache-2.0
 
 use crate::{
-    application::{
-        error::Error, interface::NetworkClientInterface, metadata::ConnectionState,
-        storage::PeersAndMetadata,
-    },
+    application::{error::Error, interface::NetworkClientInterface, metadata::ConnectionState},
     protocols::{
         health_checker::{HealthCheckerMsg, HealthCheckerNetworkEvents},
         network::Event,
@@ -19,7 +16,6 @@ use futures::{stream::FusedStream, Stream};
 use std::{
     collections::HashMap,
     pin::Pin,
-    sync::Arc,
     task::{Context, Poll},
 };
 
@@ -136,10 +132,6 @@ impl<NetworkClient: NetworkClientInterface<HealthCheckerMsg>>
             .read()
             .get(&peer_id)
             .map(|health_check_data| health_check_data.failures)
-    }
-
-    pub fn get_peers_and_metadata(&self) -> Arc<PeersAndMetadata> {
-        self.network_client.get_peers_and_metadata()
     }
 
     // TODO: we shouldn't need to expose this
