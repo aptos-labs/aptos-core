@@ -152,9 +152,8 @@ impl RawData for RawDataServerWrapper {
         let (tx, rx) = channel(self.data_service_response_channel_size);
         let current_version = match &request.starting_version {
             Some(version) => *version,
-            None => {
-                return Result::Err(Status::aborted("Starting version is not set"));
-            },
+            // Live mode if starting version isn't specified
+            None => (self.in_memory_cache.latest_version().await - 1).max(0), // Smallest version is 0 (genesis)
         };
 
         let file_store_operator: Box<dyn FileStoreOperator> = self.file_store_config.create();
