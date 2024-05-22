@@ -2288,7 +2288,11 @@ impl Frame {
                         self.locals.store_loc(
                             *idx as usize,
                             value_to_store,
+<<<<<<< HEAD
                             resolver.loader().vm_config.check_invariant_in_swap_loc,
+=======
+                            resolver.loader().vm_config().check_invariant_in_swap_loc,
+>>>>>>> ab5ef14417 (address comments)
                         )?;
                     },
                     Bytecode::Call(idx) => {

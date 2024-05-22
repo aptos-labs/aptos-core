@@ -302,6 +302,7 @@ pub trait AsMoveResolver<S> {
 impl<S: StateView> AsMoveResolver<S> for S {
     fn as_move_resolver(&self) -> StorageAdapter<S> {
 <<<<<<< HEAD
+<<<<<<< HEAD
         let features = Features::fetch_config(self).unwrap_or_default();
 <<<<<<< HEAD
         let deserializer_config = aptos_prod_deserializer_config(&features);
@@ -314,6 +315,12 @@ impl<S: StateView> AsMoveResolver<S> for S {
         let gas_feature_version = get_gas_feature_version(self);
         let features = Features::fetch_config(self).unwrap_or_default();
 >>>>>>> 16b25ce618 (module deserialization propagation)
+=======
+        let features = Features::fetch_config(self).unwrap_or_default();
+        let deserializer_config = aptos_prod_deserializer_config(&features);
+
+        let (_, gas_feature_version) = get_gas_config_from_storage(self);
+>>>>>>> ab5ef14417 (address comments)
         let resource_group_adapter = ResourceGroupAdapter::new(
             None,
             self,
@@ -377,6 +384,7 @@ pub(crate) mod tests {
 <<<<<<< HEAD
 
 <<<<<<< HEAD
+<<<<<<< HEAD
         let features = Features::fetch_config(state_view).unwrap_or_default();
         let deserializer_config = aptos_prod_deserializer_config(&features);
 =======
@@ -384,6 +392,10 @@ pub(crate) mod tests {
         let features = Features::fetch_config(state_view).unwrap_or_default();
         let deserializer_config = aptos_prod_deserializer_config(&features, gas_feature_version);
 >>>>>>> c98a7ea632 (use prod configs for aptos)
+=======
+        let features = Features::fetch_config(state_view).unwrap_or_default();
+        let deserializer_config = aptos_prod_deserializer_config(&features);
+>>>>>>> ab5ef14417 (address comments)
         StorageAdapter::new(state_view, deserializer_config, group_adapter)
 =======
         StorageAdapter::new(state_view, group_adapter)
