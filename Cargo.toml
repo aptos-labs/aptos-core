@@ -131,6 +131,7 @@ members = [
     "execution/executor-service",
     "execution/executor-test-helpers",
     "execution/executor-types",
+    "experimental/bulk-txn-submit",
     "experimental/execution/ptx-executor",
     "experimental/runtimes",
     "experimental/storage/layered-map",
@@ -324,6 +325,7 @@ aptos-enum-conversion-derive = { path = "crates/aptos-enum-conversion-derive" }
 aptos-executor-service = { path = "execution/executor-service" }
 aptos-executor-test-helpers = { path = "execution/executor-test-helpers" }
 aptos-executor-types = { path = "execution/executor-types" }
+aptos-experimental-bulk-txn-submit = { path = "experimental/bulk-txn-submit" }
 aptos-experimental-layered-map = { path = "experimental/storage/layered-map" }
 aptos-experimental-ptx-executor = { path = "experimental/execution/ptx-executor" }
 aptos-experimental-runtimes = { path = "experimental/runtimes" }
