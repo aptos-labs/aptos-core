@@ -240,26 +240,12 @@ where
     E: Pairing<ScalarField = ark_ff::Fp<MontBackend<FrConfig, 4>, 4>>, <E as Pairing>::ScalarField: From<i32>
 {
     println!("starting test");
-
     let cfg = CircomConfig::<Bn254>::new(
-    //"./circuit-files/keyless_main.wasm",
-    //"./proof_simulation.rs",
-    //"/Users/michael/aptos-labs/aptos-core/types/src/keyless/proof_simulation.rs",
-    //"/Users/michael/aptos-labs/aptos-core/types/src/keyless/circuit-files/keyless_main.wasm",
     "/Users/michael/aptos-labs/aptos-core/types/src/keyless/toy-circuit-files/multiplier2_js/multiplier2.wasm",
-//"/Users/michael/aptos-labs/aptos-core/types/src/keyless/toy-circuit-files/multiplier2.wtns",
-    //"./circuit-files/keyless_main.r1cs",
-    //"./proof_simulation.rs",
-    //"/Users/michael/aptos-labs/aptos-core/types/src/keyless/circuit-files/keyless_main.r1cs",
     "/Users/michael/aptos-labs/aptos-core/types/src/keyless/toy-circuit-files/multiplier2.r1cs",
 ).unwrap();
-    /*let cfg = CircomConfig::<Bn254>::new(
-    "/Users/michael/aptos-labs/aptos-core/types/src/keyless/circuit-files/keyless_main.wasm",
-    "/Users/michael/aptos-labs/aptos-core/types/src/keyless/circuit-files/keyless_main.r1cs",
-).unwrap();*/
 
     let mut builder = CircomBuilder::new(cfg);
-    //let mut input_file = File::open("/Users/michael/aptos-labs/aptos-core/types/src/keyless/circuit-files/keyless_input.json").unwrap();
     let mut input_file = File::open("/Users/michael/aptos-labs/aptos-core/types/src/keyless/toy-circuit-files/multiplier2_input.json").unwrap();
     let mut input_json = String::new();
     input_file.read_to_string(&mut input_json).unwrap();
@@ -267,14 +253,6 @@ where
     for (key, values) in input_map {
         for v in values {
             let v_bigint = BigInt::from_str(&v[..]).map_err(|_| ()).unwrap();
-            /*let v_biguint_bytes = v_biguint.to_bytes_le();
-            let mut v_biguint_bits = Vec::new();
-            for byte in v_biguint_bytes {
-                let mut v_bits = u8_to_bits(byte);
-                v_biguint_bits.append(&mut v_bits);
-            }
-            let v_bigint = ark_ff::BigInt::from_bits_le(&v_biguint_bits);*/
-            //let v_bigint = ark_ff::BigInt::try_from(v_biguint);
             builder.push_input(key.clone(), v_bigint);
         }
     }
@@ -288,10 +266,9 @@ where
     println!("witness: {:?}", witness);
     let circom = builder.build().unwrap();
     let inputs = circom.get_public_inputs().unwrap();
-    println!("{:?}", inputs);
+    println!("inputs: {:?}", inputs);
     let mut rng = ark_std::rand::rngs::StdRng::seed_from_u64(test_rng().next_u64());
 
-    //let (pk, vk) = Groth16Simulator::<E>::circuit_specific_setup_with_trapdoor(MySillyCircuit { a: None, b: None }, &mut rng).unwrap();
     let (pk, vk) = Groth16Simulator::<E>::circuit_specific_setup_with_trapdoor(circom.clone(), &mut rng).unwrap();
     let pvk = prepare_verifying_key::<E>(&vk);
 
@@ -300,16 +277,6 @@ where
         let b = E::ScalarField::from(4);//rand(&mut rng);
         let mut c = a;
         c *= b;
-
-        /*let proof = Groth16Simulator::<E>::prove_with_trapdoor(
-            &pk,
-            MySillyCircuit {
-                a: Some(a),
-                b: Some(b),
-            },
-            &mut rng,
-        )
-        .unwrap();*/
 
         let proof = Groth16Simulator::<E>::prove_with_trapdoor(
             &pk,
