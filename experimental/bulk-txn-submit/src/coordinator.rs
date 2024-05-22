@@ -178,7 +178,7 @@ pub async fn execute_submit<T: Clone, B: SignedTransactionBuilder<T>>(
         worker_accounts,
         clients,
         work,
-        args.batch_size,
+        10,
         args.batch_size,
         Duration::from_secs_f32(args.poll_interval_s),
         args.transaction_factory_args.with_params(txn_factory),
@@ -239,7 +239,7 @@ pub async fn execute_return_worker_funds(
                 .get_account_balance(account.address())
                 .await
             {
-                if balance > 0 {
+                if balance > 2 * txn_factory_ref.get_max_gas_amount() * txn_factory_ref.get_gas_unit_price() {
                     let txn = account.sign_with_transaction_builder(txn_factory_ref.payload(
                         aptos_stdlib::aptos_coin_transfer(
                             coin_source_account.address(),
@@ -255,6 +255,8 @@ pub async fn execute_return_worker_funds(
                     {
                         break;
                     }
+                } else {
+                    break;
                 }
             }
         }
@@ -474,19 +476,23 @@ struct SingleBackoffConfig {
 }
 
 impl SingleBackoffConfig {
-    fn should_backoff(&self, delay: f64) -> bool {
-        if delay > self.lower_threshold {
-            // the bigger the delay, the more likely we should wait
-            // if delay is above lower_threshold + threshold_gap, we completely pause the submission
-            if rand::thread_rng().gen_bool(
-                ((delay - self.lower_threshold) / self.threshold_gap)
+    fn backoff_multiplier(&self, delay: f64) -> f64 {
+        1.0 - ((delay - self.lower_threshold).max(0.0) / self.threshold_gap)
                     .sqrt()
-                    .min(1.0),
-            ) {
-                return true;
-            }
-        }
-        false
+                    .min(1.0)
+
+        // if delay > self.lower_threshold {
+        //     // the bigger the delay, the more likely we should wait
+        //     // if delay is above lower_threshold + threshold_gap, we completely pause the submission
+        //     if rand::thread_rng().gen_bool(
+        //         ((delay - self.lower_threshold) / self.threshold_gap)
+        //             .sqrt()
+        //             .min(1.0),
+        //     ) {
+        //         return true;
+        //     }
+        // }
+        // false
     }
 }
 
@@ -503,8 +509,8 @@ impl Default for BackoffConfig {
                 threshold_gap: 4.0,
             },
             blockchain_backoff: SingleBackoffConfig {
-                lower_threshold: 1.2,
-                threshold_gap: 1.0,
+                lower_threshold: 1.3,
+                threshold_gap: 2.0,
             },
         }
     }
@@ -533,21 +539,30 @@ async fn submit_work_txns<T, B: SignedTransactionBuilder<T>>(
 
     'outer: loop {
         let indexer_delay = indexer_delay_ref.load(std::sync::atomic::Ordering::Relaxed) as f64;
-        if backoff_config.indexer_backoff.should_backoff(indexer_delay) {
-            tokio::time::sleep(Duration::from_secs(1)).await;
+        let indexer_backoff_multiplier = backoff_config.indexer_backoff.backoff_multiplier(indexer_delay);
+        let last_blockchain_latency = tracking.get_last_latency();
+        let blockchain_backoff_multiplier = backoff_config.blockchain_backoff.backoff_multiplier(last_blockchain_latency);
+
+        if indexer_backoff_multiplier < 1.0 {
             indexer_backoffs += 1;
-            continue;
         }
 
-        let last_blockchain_latency = tracking.get_last_latency();
-        if backoff_config
-            .blockchain_backoff
-            .should_backoff(last_blockchain_latency)
-        {
-            tokio::time::sleep(Duration::from_secs(1)).await;
+        if blockchain_backoff_multiplier < 1.0 {
             blockchain_backoffs += 1;
-            continue;
         }
+
+        let cur_parallel_requests_float = parallel_requests_outstanding as f64 * blockchain_backoff_multiplier * indexer_backoff_multiplier;
+        assert!(cur_parallel_requests_float <= parallel_requests_outstanding as f64);
+        let cur_parallel_requests = if cur_parallel_requests_float < 1.0 {
+            let sleep_duration = poll_interval.div_f64(cur_parallel_requests_float.max(0.01));
+            println!("Sleeping for {:?}", sleep_duration);
+            tokio::time::sleep(sleep_duration).await;
+            1
+        } else {
+            (cur_parallel_requests_float as usize).max(1)
+        };
+        // println!("cur_parallel_requests {}", cur_parallel_requests);
+        // let cur_parallel_requests = parallel_requests_outstanding;
 
         let start_seq_num = account.sequence_number();
         let chunk_start = (start_seq_num - initial_seq_num) as usize;
@@ -555,7 +570,7 @@ async fn submit_work_txns<T, B: SignedTransactionBuilder<T>>(
             break;
         }
         let chunk =
-            &work[chunk_start..(work.len().min(chunk_start + parallel_requests_outstanding))];
+            &work[chunk_start..(work.len().min(chunk_start + cur_parallel_requests))];
 
         let txns = chunk
             .iter()
