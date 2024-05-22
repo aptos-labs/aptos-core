@@ -247,6 +247,7 @@ where
     //"/Users/michael/aptos-labs/aptos-core/types/src/keyless/proof_simulation.rs",
     //"/Users/michael/aptos-labs/aptos-core/types/src/keyless/circuit-files/keyless_main.wasm",
     "/Users/michael/aptos-labs/aptos-core/types/src/keyless/toy-circuit-files/multiplier2_js/multiplier2.wasm",
+//"/Users/michael/aptos-labs/aptos-core/types/src/keyless/toy-circuit-files/multiplier2.wtns",
     //"./circuit-files/keyless_main.r1cs",
     //"./proof_simulation.rs",
     //"/Users/michael/aptos-labs/aptos-core/types/src/keyless/circuit-files/keyless_main.r1cs",
