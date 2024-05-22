@@ -22,6 +22,7 @@ module aptos_token::token_transfers {
         claim_events: EventHandle<TokenClaimEvent>,
     }
 
+    #[event]
     struct TokenOfferId has copy, drop, store {
         to_addr: address,
         token_id: TokenId,
@@ -34,12 +35,14 @@ module aptos_token::token_transfers {
         amount: u64,
     }
 
+    #[event]
     struct TokenOfferEvent has drop, store {
         to_address: address,
         token_id: TokenId,
         amount: u64,
     }
 
+    #[event]
     struct TokenCancelOfferEvent has drop, store {
         to_address: address,
         token_id: TokenId,
@@ -53,6 +56,7 @@ module aptos_token::token_transfers {
         amount: u64,
     }
 
+    #[event]
     struct TokenClaimEvent has drop, store {
         to_address: address,
         token_id: TokenId,
