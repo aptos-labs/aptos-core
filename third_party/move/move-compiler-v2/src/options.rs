@@ -59,9 +59,16 @@ pub struct Options {
     /// A transient cache for memoization of experiment checks.
     #[clap(skip)]
     pub experiment_cache: RefCell<BTreeMap<String, bool>>,
-    /// Sources to compile (positional arg, therefore last)
+    /// Sources to compile (positional arg, therefore last) Each source should be a path to
+    /// either (1) a Move file or (2) a directory containing Move files, all of which should be
+    /// compiled (e.g., not the root directory of a package---which contains Move.toml---but a
+    /// specific subdirectorysuch as `sources`, `scripts`, and/or `tests`, depending on compilation
+    /// mode).
     pub sources: Vec<String>,
     /// Dependencies to compile but not treat as a test/docgen/warning/prover target.
+    /// Each source_dep should be a path to either (1) a Move file or (2) a directory
+    /// containing Move files, all of which should be compiled (e.g., not the root directory of a
+    /// package---which contains Move.toml---but a specific subdirectorysuch as `sources`).
     #[clap(skip)]
     pub sources_deps: Vec<String>,
     /// Show warnings about unused functions, fields, constants, etc.

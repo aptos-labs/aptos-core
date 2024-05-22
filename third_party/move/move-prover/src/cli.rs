@@ -59,10 +59,17 @@ pub struct Options {
     pub run_errmapgen: bool,
     /// Whether to run the read write set analysis instead of the prover
     pub run_read_write_set: bool,
-    /// The paths to the Move sources.
+    /// The paths to the Move sources.  Each source path should refer to
+    /// either (1) a Move file or (2) a directory containing Move files, all of which should be
+    /// compiled (e.g., not the root directory of a package---which contains Move.toml---but a
+    /// specific subdirectorysuch as `sources`, `scripts`, and/or `tests`, depending on compilation
+    /// mode).
     pub move_sources: Vec<String>,
     /// The paths to any dependencies for the Move sources. Those will not be verified but
     /// can be used by `move_sources`.
+    /// Each move_dep path should refer to either (1) a Move file or (2) a directory
+    /// containing Move files, all of which should be compiled (e.g., not the root directory of a
+    /// package---which contains Move.toml---but a specific subdirectorysuch as `sources`).
     pub move_deps: Vec<String>,
     /// The values assigned to named addresses in the Move code being verified.
     pub move_named_address_values: Vec<String>,

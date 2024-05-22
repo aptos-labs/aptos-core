@@ -76,10 +76,13 @@ pub struct PackageInfo {
     pub address_map: BTreeMap<String, NumericalAddress>,
 }
 
-/// Builds the Move model for the v2 compiler. This builds the model, compiling both code
-/// and specs from sources into typed-checked AST. No bytecode is attached to the model.
-/// This currently uses the v1 compiler as the parser (up to expansion AST), after that
-/// a new type checker.
+/// Builds the Move model for the v2 compiler. This builds the model, compiling both code and specs
+/// from sources into typed-checked AST. No bytecode is attached to the model.  This currently uses
+/// the v1 compiler as the parser (up to expansion AST), after that a new type checker.
+///
+/// Note that `source` and  `source_deps` are either Move files or package subdirectories which
+/// contain Move files, all of which should be compiled (not the root of a package, but the
+/// `sources`, `scripts`, and/or `tests`, depending on compilation mode.
 pub fn run_model_builder_in_compiler_mode(
     source: PackageInfo,
     source_deps: PackageInfo,
@@ -171,6 +174,7 @@ pub fn run_model_builder_with_options_and_compilation_flags<
                 .to_owned()
         })
         .collect();
+
     // Step 1: parse the program to get comments and a separation of targets and dependencies.
     let (files, comments_and_compiler_res) =
         Compiler::from_package_paths(move_sources, deps, flags, known_attributes)
