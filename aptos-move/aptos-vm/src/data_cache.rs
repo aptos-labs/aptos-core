@@ -81,7 +81,7 @@ impl<'e, E: ExecutorView> StorageAdapter<'e, E> {
         features: &Features,
         maybe_resource_group_view: Option<&'e dyn ResourceGroupView>,
     ) -> Self {
-        let deserializer_config = aptos_prod_deserializer_config(features, gas_feature_version);
+        let deserializer_config = aptos_prod_deserializer_config(features);
         let resource_group_adapter = ResourceGroupAdapter::new(
             maybe_resource_group_view,
             executor_view,
@@ -304,9 +304,10 @@ pub trait AsMoveResolver<S> {
 
 impl<S: StateView> AsMoveResolver<S> for S {
     fn as_move_resolver(&self) -> StorageAdapter<S> {
-        let (_, gas_feature_version) = get_gas_config_from_storage(self);
         let features = Features::fetch_config(self).unwrap_or_default();
-        let deserializer_config = aptos_prod_deserializer_config(&features, gas_feature_version);
+        let deserializer_config = aptos_prod_deserializer_config(&features);
+
+        let (_, gas_feature_version) = get_gas_config_from_storage(self);
         let resource_group_adapter = ResourceGroupAdapter::new(
             None,
             self,
@@ -351,7 +352,7 @@ pub(crate) mod tests {
         state_view: &S,
         group_size_kind: GroupSizeKind,
     ) -> StorageAdapter<S> {
-        assert!(group_size_kind != GroupSizeKind::AsSum, "not yet supported");
+        assert_ne!(group_size_kind, GroupSizeKind::AsSum, "not yet supported");
 
         let (gas_feature_version, resource_groups_split_in_vm_change_set_enabled) =
             match group_size_kind {
@@ -368,9 +369,8 @@ pub(crate) mod tests {
             resource_groups_split_in_vm_change_set_enabled,
         );
 
-        let (_, gas_feature_version) = get_gas_config_from_storage(state_view);
         let features = Features::fetch_config(state_view).unwrap_or_default();
-        let deserializer_config = aptos_prod_deserializer_config(&features, gas_feature_version);
+        let deserializer_config = aptos_prod_deserializer_config(&features);
         StorageAdapter::new(state_view, deserializer_config, group_adapter)
     }
 }

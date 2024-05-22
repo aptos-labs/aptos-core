@@ -233,8 +233,10 @@ impl StateSnapshotRestoreController {
     }
 
     fn validate_modules(blob: &[(StateKey, StateValue)]) {
-        // TODO: Use on-chain features?
-        let config = aptos_prod_verifier_config(&Features::default());
+        // TODO: Instead of using default features, fetch them from the the state.
+        let features = Features::default();
+
+        let config = aptos_prod_verifier_config(&features);
         for (key, value) in blob {
             if let StateKeyInner::AccessPath(p) = key.inner() {
                 if let Path::Code(module_id) = p.get_path() {

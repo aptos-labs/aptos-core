@@ -7,7 +7,6 @@ use aptos_types::{
     state_store::{state_key::StateKey, StateView},
     vm::configs::aptos_prod_deserializer_config,
 };
-use aptos_vm::gas::get_gas_config_from_storage;
 use move_binary_format::{deserializer::DeserializerConfig, CompiledModule};
 use move_bytecode_utils::compiled_module_viewer::CompiledModuleView;
 use move_core_types::language_storage::ModuleId;
@@ -22,8 +21,7 @@ pub struct ModuleView<'a, S> {
 impl<'a, S: StateView> ModuleView<'a, S> {
     pub fn new(state_view: &'a S) -> Self {
         let features = Features::fetch_config(state_view).unwrap_or_default();
-        let (_, gas_feature_version) = get_gas_config_from_storage(state_view);
-        let deserializer_config = aptos_prod_deserializer_config(&features, gas_feature_version);
+        let deserializer_config = aptos_prod_deserializer_config(&features);
 
         Self {
             module_cache: RefCell::new(HashMap::new()),

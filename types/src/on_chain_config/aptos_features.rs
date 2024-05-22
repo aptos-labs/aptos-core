@@ -288,13 +288,8 @@ impl Features {
         }
     }
 
-    pub fn get_max_binary_format_version(&self, gas_feature_version_opt: Option<u64>) -> u32 {
-        // For historical reasons, we support still < gas version 5, but if a new caller don't specify
-        // the gas version, we default to 5, which was introduced in late '22.
-        let gas_feature_version = gas_feature_version_opt.unwrap_or(5);
-        if gas_feature_version < 5 {
-            file_format_common::VERSION_5
-        } else if self.is_enabled(FeatureFlag::VM_BINARY_FORMAT_V7) {
+    pub fn get_max_binary_format_version(&self) -> u32 {
+        if self.is_enabled(FeatureFlag::VM_BINARY_FORMAT_V7) {
             file_format_common::VERSION_7
         } else if self.is_enabled(FeatureFlag::VM_BINARY_FORMAT_V6) {
             file_format_common::VERSION_6
@@ -320,17 +315,36 @@ pub fn aptos_test_feature_flags_genesis() -> ChangeSet {
     change_set
 }
 
-#[test]
-fn test_features_into_flag_vec() {
-    let mut features = Features { features: vec![] };
-    features.enable(FeatureFlag::BLS12_381_STRUCTURES);
-    features.enable(FeatureFlag::BN254_STRUCTURES);
-    let flag_vec = features.into_flag_vec();
-    assert_eq!(
-        vec![
-            FeatureFlag::BLS12_381_STRUCTURES,
-            FeatureFlag::BN254_STRUCTURES
-        ],
-        flag_vec
-    );
+#[cfg(test)]
+mod test {
+    use super::*;
+
+    #[test]
+    fn test_features_into_flag_vec() {
+        let mut features = Features { features: vec![] };
+        features.enable(FeatureFlag::BLS12_381_STRUCTURES);
+        features.enable(FeatureFlag::BN254_STRUCTURES);
+
+        assert_eq!(
+            vec![
+                FeatureFlag::BLS12_381_STRUCTURES,
+                FeatureFlag::BN254_STRUCTURES
+            ],
+            features.into_flag_vec()
+        );
+    }
+
+    #[test]
+    fn test_min_max_binary_format() {
+        // Ensure querying max binary format implementation is correct and checks
+        // versions 5 to 7.
+        assert_eq!(
+            file_format_common::VERSION_5,
+            file_format_common::VERSION_MIN
+        );
+        assert_eq!(
+            file_format_common::VERSION_7,
+            file_format_common::VERSION_MAX
+        );
+    }
 }

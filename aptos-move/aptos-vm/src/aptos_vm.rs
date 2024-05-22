@@ -1386,8 +1386,7 @@ impl AptosVM {
 
     /// Deserialize a module bundle.
     fn deserialize_module_bundle(&self, modules: &ModuleBundle) -> VMResult<Vec<CompiledModule>> {
-        let deserializer_config =
-            aptos_prod_deserializer_config(self.features(), self.gas_feature_version);
+        let deserializer_config = aptos_prod_deserializer_config(self.features());
 
         let mut result = vec![];
         for module_blob in modules.iter() {

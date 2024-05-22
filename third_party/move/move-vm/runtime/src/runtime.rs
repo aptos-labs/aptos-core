@@ -276,9 +276,7 @@ impl VMRuntime {
                     dummy_locals.store_loc(
                         idx,
                         self.deserialize_arg(module_store, inner_t, arg_bytes)?,
-                        self.loader
-                            .vm_config()
-                            .enable_invariant_violation_check_in_swap_loc,
+                        self.loader.vm_config().check_invariant_in_swap_loc,
                     )?;
                     dummy_locals.borrow_loc(idx)
                 },
@@ -409,12 +407,8 @@ impl VMRuntime {
             .into_iter()
             .map(|(idx, ty)| {
                 // serialize return values first in the case that a value points into this local
-                let local_val = dummy_locals.move_loc(
-                    idx,
-                    self.loader
-                        .vm_config()
-                        .enable_invariant_violation_check_in_swap_loc,
-                )?;
+                let local_val = dummy_locals
+                    .move_loc(idx, self.loader.vm_config().check_invariant_in_swap_loc)?;
                 let (bytes, layout) = self.serialize_return_value(module_store, &ty, local_val)?;
                 Ok((idx as LocalIndex, bytes, layout))
             })

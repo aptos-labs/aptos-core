@@ -62,7 +62,6 @@ impl MoveVmExt {
         let vm_config = aptos_prod_vm_config(
             &features,
             &timed_features,
-            gas_feature_version,
             aggregator_v2_type_tagging,
             paranoid_type_checks,
         );

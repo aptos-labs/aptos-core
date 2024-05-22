@@ -44,7 +44,7 @@ fn test_publish_module_with_nested_loops() {
                 move_stdlib::natives::GasParameters::zeros(),
             ),
             VMConfig {
-                verifier: VerifierConfig {
+                verifier_config: VerifierConfig {
                     max_loop_depth: Some(2),
                     ..Default::default()
                 },
@@ -67,7 +67,7 @@ fn test_publish_module_with_nested_loops() {
                 move_stdlib::natives::GasParameters::zeros(),
             ),
             VMConfig {
-                verifier: VerifierConfig {
+                verifier_config: VerifierConfig {
                     max_loop_depth: Some(1),
                     ..Default::default()
                 },
@@ -117,7 +117,7 @@ fn test_run_script_with_nested_loops() {
                 move_stdlib::natives::GasParameters::zeros(),
             ),
             VMConfig {
-                verifier: VerifierConfig {
+                verifier_config: VerifierConfig {
                     max_loop_depth: Some(2),
                     ..Default::default()
                 },
@@ -147,7 +147,7 @@ fn test_run_script_with_nested_loops() {
                 move_stdlib::natives::GasParameters::zeros(),
             ),
             VMConfig {
-                verifier: VerifierConfig {
+                verifier_config: VerifierConfig {
                     max_loop_depth: Some(1),
                     ..Default::default()
                 },

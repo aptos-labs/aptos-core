@@ -9,18 +9,9 @@ use move_binary_format::deserializer::DeserializerConfig;
 use move_bytecode_verifier::VerifierConfig;
 use move_vm_runtime::config::VMConfig;
 
-pub fn aptos_prod_deserializer_config(
-    features: &Features,
-    gas_feature_version: u64,
-) -> DeserializerConfig {
-    // Note: binary format v6 adds a few new integer types and their corresponding instructions.
-    //       Therefore, it depends on a new version of the gas schedule and cannot be allowed if
-    //       the gas schedule hasn't been updated yet.
-    let max_binary_format_version =
-        features.get_max_binary_format_version(Some(gas_feature_version));
-
+pub fn aptos_prod_deserializer_config(features: &Features) -> DeserializerConfig {
     DeserializerConfig::new(
-        max_binary_format_version,
+        features.get_max_binary_format_version(),
         features.get_max_identifier_size(),
     )
 }
@@ -55,11 +46,10 @@ pub fn aptos_prod_verifier_config(features: &Features) -> VerifierConfig {
 pub fn aptos_prod_vm_config(
     features: &Features,
     timed_features: &TimedFeatures,
-    gas_feature_version: u64,
     aggregator_v2_type_tagging: bool,
     paranoid_type_checks: bool,
 ) -> VMConfig {
-    let enable_invariant_violation_check_in_swap_loc =
+    let check_invariant_in_swap_loc =
         !timed_features.is_enabled(TimedFeatureFlag::DisableInvariantViolationCheckInSwapLoc);
 
     let mut type_max_cost = 0;
@@ -72,14 +62,14 @@ pub fn aptos_prod_vm_config(
         type_byte_cost = 1;
     }
 
-    let deserializer_config = aptos_prod_deserializer_config(features, gas_feature_version);
-    let verifier = aptos_prod_verifier_config(features);
+    let deserializer_config = aptos_prod_deserializer_config(features);
+    let verifier_config = aptos_prod_verifier_config(features);
 
     VMConfig {
-        verifier,
+        verifier_config,
         deserializer_config,
         paranoid_type_checks,
-        enable_invariant_violation_check_in_swap_loc,
+        check_invariant_in_swap_loc,
         type_size_limit: true,
         max_value_nest_depth: Some(128),
         type_max_cost,
