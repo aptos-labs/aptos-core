@@ -108,9 +108,9 @@ module aptos_framework::aggregator_v2 {
         assert!(try_sub(aggregator, value), error::out_of_range(EAGGREGATOR_UNDERFLOW));
     }
 
-    native fun is_at_least_impl<IntElement: copy + drop>(aggregator: &Aggregator<IntElement>, min_amount: IntElement): bool;
+    native fun is_at_least_impl<IntElement>(aggregator: &Aggregator<IntElement>, min_amount: IntElement): bool;
 
-    public fun is_at_least<IntElement: copy + drop>(aggregator: &Aggregator<IntElement>, min_amount: IntElement): bool {
+    public fun is_at_least<IntElement>(aggregator: &Aggregator<IntElement>, min_amount: IntElement): bool {
         assert!(features::aggregator_v2_is_at_least_api_enabled(), EAGGREGATOR_API_V2_NOT_ENABLED);
         is_at_least_impl(aggregator, min_amount)
     }
