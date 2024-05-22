@@ -42,6 +42,7 @@ use std::{
 
 pub mod analyzed_transaction;
 pub mod authenticator;
+mod batched_calls;
 mod block_output;
 mod change_set;
 mod module;
@@ -58,6 +59,7 @@ use crate::{
     fee_statement::FeeStatement, proof::accumulator::InMemoryEventAccumulator,
     validator_txn::ValidatorTransaction, write_set::TransactionWrite,
 };
+pub use batched_calls::{BatchArgument, BatchedFunctionCall};
 pub use block_output::BlockOutput;
 pub use change_set::ChangeSet;
 pub use module::{Module, ModuleBundle};
@@ -414,6 +416,7 @@ pub enum TransactionPayload {
     ModuleBundle(DeprecatedPayload),
     /// A transaction that executes an existing entry function published on-chain.
     EntryFunction(EntryFunction),
+    BatchedCalls(Vec<BatchedFunctionCall>),
     /// A multisig transaction that allows an owner of a multisig account to execute a pre-approved
     /// transaction as the multisig account.
     Multisig(Multisig),

@@ -1,0 +1,8 @@
+[package]
+name = "batched_transaction"
+version = "1.0.0"
+authors = []
+
+[dependencies]
+AptosFramework = { local = "../../../../framework/aptos-framework" }
+AptosStdlib = { local = "../../../../framework/aptos-stdlib" }

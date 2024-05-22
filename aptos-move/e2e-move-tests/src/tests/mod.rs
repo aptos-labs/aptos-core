@@ -8,6 +8,7 @@ mod aggregator_v2;
 mod aggregator_v2_events;
 mod aggregator_v2_runtime_checks;
 mod attributes;
+mod batched_transaction;
 mod chain_id;
 mod code_publishing;
 mod common;

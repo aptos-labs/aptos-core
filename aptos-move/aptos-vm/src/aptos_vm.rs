@@ -58,8 +58,8 @@ use aptos_types::{
     state_store::{StateView, TStateView},
     transaction::{
         authenticator::AnySignature, signature_verified_transaction::SignatureVerifiedTransaction,
-        BlockOutput, EntryFunction, ExecutionError, ExecutionStatus, ModuleBundle, Multisig,
-        MultisigTransactionPayload, Script, SignedTransaction, Transaction,
+        BatchedFunctionCall, BlockOutput, EntryFunction, ExecutionError, ExecutionStatus,
+        ModuleBundle, Multisig, MultisigTransactionPayload, Script, SignedTransaction, Transaction,
         TransactionAuxiliaryData, TransactionOutput, TransactionPayload, TransactionStatus,
         VMValidatorResult, ViewFunctionOutput, WriteSetPayload,
     },
@@ -83,6 +83,7 @@ use move_binary_format::{
     access::ModuleAccess,
     compatibility::Compatibility,
     errors::{Location, PartialVMError, PartialVMResult, VMError, VMResult},
+    file_format::AbilitySet,
     CompiledModule,
 };
 use move_core_types::{
@@ -99,7 +100,10 @@ use move_vm_runtime::{
     logging::expect_no_verification_errors,
     module_traversal::{TraversalContext, TraversalStorage},
 };
-use move_vm_types::gas::{GasMeter, UnmeteredGasMeter};
+use move_vm_types::{
+    gas::{GasMeter, UnmeteredGasMeter},
+    loaded_data::runtime_types::Type,
+};
 use num_cpus;
 use once_cell::sync::{Lazy, OnceCell};
 use std::{
@@ -213,6 +217,18 @@ fn is_approved_gov_script(
         },
         _ => false,
     }
+}
+
+#[derive(Debug)]
+pub(crate) struct ReturnedValue {
+    pub(crate) bytes: Vec<u8>,
+    pub(crate) ability: AbilitySet,
+    pub(crate) ty: Type,
+    pub(crate) consumed: bool,
+}
+
+pub(crate) struct BatchedExecutionResult {
+    pub(crate) return_values: Vec<Vec<ReturnedValue>>,
 }
 
 pub struct AptosVM {
@@ -848,6 +864,117 @@ impl AptosVM {
         Ok(())
     }
 
+    fn validate_and_execute_batched_calls(
+        &self,
+        resolver: &impl AptosMoveResolver,
+        session: &mut SessionExt,
+        gas_meter: &mut impl AptosGasMeter,
+        traversal_context: &mut TraversalContext,
+        senders: Vec<AccountAddress>,
+        batched_calls: &[BatchedFunctionCall],
+        txn_data: &TransactionMetadata,
+    ) -> Result<(), VMStatus> {
+        let mut batched_return_values = BatchedExecutionResult {
+            return_values: vec![],
+        };
+        for batched_call in batched_calls {
+            self.validate_and_execute_batched_call(
+                resolver,
+                session,
+                gas_meter,
+                traversal_context,
+                senders.clone(),
+                batched_call,
+                &mut batched_return_values,
+                txn_data,
+            )?;
+        }
+        for return_values in batched_return_values.return_values {
+            for value in return_values {
+                if !value.ability.has_drop() && !value.consumed {
+                    return Err(
+                        PartialVMError::new(StatusCode::INVALID_MAIN_FUNCTION_SIGNATURE)
+                            .finish(Location::Undefined)
+                            .into_vm_status(),
+                    );
+                }
+            }
+        }
+        Ok(())
+    }
+
+    fn validate_and_execute_batched_call(
+        &self,
+        _resolver: &impl AptosMoveResolver,
+        session: &mut SessionExt,
+        gas_meter: &mut impl AptosGasMeter,
+        traversal_context: &mut TraversalContext,
+        senders: Vec<AccountAddress>,
+        batched_call: &BatchedFunctionCall,
+        batched_return_values: &mut BatchedExecutionResult,
+        _txn_data: &TransactionMetadata,
+    ) -> Result<(), VMStatus> {
+        let module_id = traversal_context
+            .referenced_module_ids
+            .alloc(batched_call.module.clone());
+        session.check_dependencies_and_charge_gas(gas_meter, traversal_context, [(
+            module_id.address(),
+            module_id.name(),
+        )])?;
+
+        let (function, is_friend_or_private) = session.load_function_and_is_friend_or_private_def(
+            &batched_call.module,
+            &batched_call.function,
+            &batched_call.ty_args,
+        )?;
+
+        // Abort on calling into private/friend function.
+        if is_friend_or_private {
+            return Err(
+                PartialVMError::new(StatusCode::INVALID_MAIN_FUNCTION_SIGNATURE)
+                    .finish(Location::Undefined)
+                    .into_vm_status(),
+            );
+        }
+
+        let struct_constructors_enabled =
+            self.features().is_enabled(FeatureFlag::STRUCT_CONSTRUCTORS);
+        let args =
+            verifier::transaction_arg_validation::validate_combine_signer_and_txn_args_for_batched_calls(
+                session,
+                senders,
+                &batched_call.args,
+                &function,
+                batched_return_values,
+                struct_constructors_enabled,
+            )?;
+        let results = session.execute_function_bypass_visibility(
+            &batched_call.module,
+            &batched_call.function,
+            batched_call.ty_args.to_vec(),
+            args,
+            gas_meter,
+            traversal_context,
+        )?;
+        let mut new_return_values = vec![];
+        for ((v, _), ty) in results
+            .return_values
+            .into_iter()
+            .zip(function.return_tys.iter())
+        {
+            new_return_values.push(ReturnedValue {
+                ty: ty.clone(),
+                ability: ty
+                    .abilities()
+                    .map_err(|err| err.finish(Location::Undefined))?,
+                bytes: v,
+                consumed: false,
+            })
+        }
+        batched_return_values.return_values.push(new_return_values);
+        Ok(())
+    }
+
     fn execute_script_or_entry_function<'a, 'r, 'l>(
         &'l self,
         resolver: &'r impl AptosMoveResolver,
@@ -894,6 +1021,19 @@ impl AptosVM {
                         traversal_context,
                         txn_data.senders(),
                         entry_fn,
+                        txn_data,
+                    )
+                })?;
+            },
+            TransactionPayload::BatchedCalls(batched_calls) => {
+                session.execute(|session| {
+                    self.validate_and_execute_batched_calls(
+                        resolver,
+                        session,
+                        gas_meter,
+                        traversal_context,
+                        txn_data.senders(),
+                        batched_calls,
                         txn_data,
                     )
                 })?;
@@ -1761,7 +1901,8 @@ impl AptosVM {
         let mut new_published_modules_loaded = false;
         let result = match txn.payload() {
             payload @ TransactionPayload::Script(_)
-            | payload @ TransactionPayload::EntryFunction(_) => self
+            | payload @ TransactionPayload::EntryFunction(_)
+            | payload @ TransactionPayload::BatchedCalls(_) => self
                 .execute_script_or_entry_function(
                     resolver,
                     user_session,
@@ -2310,14 +2451,14 @@ impl AptosVM {
         )?;
 
         match payload {
-            TransactionPayload::Script(_) | TransactionPayload::EntryFunction(_) => {
-                transaction_validation::run_script_prologue(
-                    session,
-                    txn_data,
-                    log_context,
-                    traversal_context,
-                )
-            },
+            TransactionPayload::Script(_)
+            | TransactionPayload::EntryFunction(_)
+            | TransactionPayload::BatchedCalls(_) => transaction_validation::run_script_prologue(
+                session,
+                txn_data,
+                log_context,
+                traversal_context,
+            ),
             TransactionPayload::Multisig(multisig_payload) => {
                 // Still run script prologue for multisig transaction to ensure the same tx
                 // validations are still run for this multisig execution tx, which is submitted by
@@ -2525,7 +2666,8 @@ impl AptosVM {
                     Ok(None)
                 }
             },
-            TransactionPayload::Script(_)
+            TransactionPayload::BatchedCalls(_)
+            | TransactionPayload::Script(_)
             | TransactionPayload::ModuleBundle(_)
             | TransactionPayload::Multisig(_) => Ok(None),
         }

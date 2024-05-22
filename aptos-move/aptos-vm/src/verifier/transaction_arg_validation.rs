@@ -6,7 +6,8 @@
 //! TODO: we should not only validate the types but also the actual values, e.g.
 //! for strings whether they consist of correct characters.
 
-use crate::{move_vm_ext::SessionExt, VMStatus};
+use crate::{aptos_vm::BatchedExecutionResult, move_vm_ext::SessionExt, VMStatus};
+use aptos_types::transaction::BatchArgument;
 use move_binary_format::{
     errors::{Location, PartialVMError},
     file_format::FunctionDefinitionIndex,
@@ -182,6 +183,127 @@ pub fn validate_combine_signer_and_txn_args(
             .collect()
     };
     Ok(combined_args)
+}
+
+pub(crate) fn validate_combine_signer_and_txn_args_for_batched_calls(
+    session: &mut SessionExt,
+    senders: Vec<AccountAddress>,
+    args: &[BatchArgument],
+    func: &LoadedFunctionInstantiation,
+    batched_return_values: &mut BatchedExecutionResult,
+    are_struct_constructors_enabled: bool,
+) -> Result<Vec<Vec<u8>>, VMStatus> {
+    let mut signer_param_cnt = 0;
+    // find all signer params at the beginning
+    for ty in func.param_tys.iter() {
+        match ty {
+            Type::Signer => signer_param_cnt += 1,
+            Type::Reference(inner_type) => {
+                if matches!(&**inner_type, Type::Signer) {
+                    signer_param_cnt += 1;
+                }
+            },
+            _ => (),
+        }
+    }
+
+    if (signer_param_cnt + args.len()) != func.param_tys.len() {
+        return Err(VMStatus::error(
+            StatusCode::NUMBER_OF_ARGUMENTS_MISMATCH,
+            None,
+        ));
+    }
+
+    // If the invoked function expects one or more signers, we need to check that the number of
+    // signers actually passed is matching first to maintain backward compatibility before
+    // moving on to the validation of non-signer args.
+    // the number of txn senders should be the same number of signers
+    if signer_param_cnt > 0 && senders.len() != signer_param_cnt {
+        return Err(VMStatus::error(
+            StatusCode::NUMBER_OF_SIGNER_ARGUMENTS_MISMATCH,
+            None,
+        ));
+    }
+
+    let allowed_structs = get_allowed_structs(are_struct_constructors_enabled);
+
+    let mut gas_meter = UnmeteredGasMeter;
+    let mut constructed_args = vec![];
+
+    // Need to keep this here to ensure we return the historic correct error code for replay
+    for (idx, ty) in func.param_tys[signer_param_cnt..].iter().enumerate() {
+        constructed_args.push(match &args[idx] {
+            BatchArgument::Raw(arg) => {
+                let valid =
+                    is_valid_txn_arg(session, &ty.subst(&func.ty_args).unwrap(), allowed_structs);
+                if !valid {
+                    return Err(VMStatus::error(
+                        StatusCode::INVALID_MAIN_FUNCTION_SIGNATURE,
+                        None,
+                    ));
+                }
+                construct_arg(
+                    session,
+                    &ty.subst(&func.ty_args).unwrap(),
+                    allowed_structs,
+                    arg.clone(),
+                    &mut gas_meter,
+                    false,
+                )?
+            },
+            BatchArgument::PreviousResult(i, j) => {
+                if *i as usize >= batched_return_values.return_values.len() {
+                    return Err(
+                        PartialVMError::new(StatusCode::INVALID_MAIN_FUNCTION_SIGNATURE)
+                            .finish(Location::Undefined)
+                            .into_vm_status(),
+                    );
+                }
+                if *j as usize >= batched_return_values.return_values[*i as usize].len() {
+                    return Err(
+                        PartialVMError::new(StatusCode::INVALID_MAIN_FUNCTION_SIGNATURE)
+                            .finish(Location::Undefined)
+                            .into_vm_status(),
+                    );
+                }
+                let previous_return =
+                    &mut batched_return_values.return_values[*i as usize][*j as usize];
+                if &previous_return.ty != ty {
+                    return Err(
+                        PartialVMError::new(StatusCode::INVALID_MAIN_FUNCTION_SIGNATURE)
+                            .finish(Location::Undefined)
+                            .into_vm_status(),
+                    );
+                }
+                if previous_return.consumed
+                    && !previous_return
+                        .ty
+                        .abilities()
+                        .map_err(|err| err.finish(Location::Undefined).into_vm_status())?
+                        .has_copy()
+                {
+                    return Err(
+                        PartialVMError::new(StatusCode::INVALID_MAIN_FUNCTION_SIGNATURE)
+                            .finish(Location::Undefined)
+                            .into_vm_status(),
+                    );
+                }
+                previous_return.consumed = true;
+                previous_return.bytes.clone()
+            },
+        });
+    }
+
+    // Combine signer and non-signer arguments.
+    Ok(if signer_param_cnt == 0 {
+        constructed_args
+    } else {
+        senders
+            .into_iter()
+            .map(|s| MoveValue::Signer(s).simple_serialize().unwrap())
+            .chain(constructed_args)
+            .collect()
+    })
 }
 
 // Return whether the argument is valid/allowed and whether it needs construction.

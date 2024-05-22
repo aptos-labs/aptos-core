@@ -695,7 +695,9 @@ impl FakeExecutor {
             &log_context,
             |gas_meter| {
                 let gas_profiler = match txn.payload() {
-                    TransactionPayload::Script(_) => GasProfiler::new_script(gas_meter),
+                    TransactionPayload::Script(_) | TransactionPayload::BatchedCalls(_) => {
+                        GasProfiler::new_script(gas_meter)
+                    },
                     TransactionPayload::EntryFunction(entry_func) => GasProfiler::new_function(
                         gas_meter,
                         entry_func.module().clone(),
