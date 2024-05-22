@@ -2458,9 +2458,9 @@ fn pfn_const_tps(
     };
 
     ForgeConfig::default()
-        .with_initial_validator_count(NonZeroUsize::new(7).unwrap())
+        .with_initial_validator_count(NonZeroUsize::new(100).unwrap())
         .with_initial_fullnode_count(7)
-        .with_emit_job(EmitJobRequest::default().mode(EmitJobMode::ConstTps { tps: 100 }))
+        .with_emit_job(EmitJobRequest::default().mode(EmitJobMode::ConstTps { tps: 5000 }))
         .add_network_test(PFNPerformance::new(
             7,
             add_cpu_chaos,
@@ -2471,7 +2471,7 @@ fn pfn_const_tps(
             helm_values["chain"]["epoch_duration_secs"] = epoch_duration_secs.into();
         }))
         .with_success_criteria(
-            SuccessCriteria::new(95)
+            SuccessCriteria::new(4500)
                 .add_no_restarts()
                 .add_max_expired_tps(0)
                 .add_max_failed_submission_tps(0)
