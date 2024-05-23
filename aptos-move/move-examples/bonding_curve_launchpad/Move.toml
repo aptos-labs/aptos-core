@@ -6,7 +6,7 @@ upgrade_policy = "compatible"
 
 [addresses]
 owner_addr = "0x922a028b0dbd8ff206074977ae4c5f9fb003ce384242b6253c67192cd2a45ee1"
-resource_account = "0x52ddc290f7be79b2583472217af88a8500bdcb16d865e9c2bf4d3c995df0825f"
+bonding_curve_launchpad = "0x52ddc290f7be79b2583472217af88a8500bdcb16d865e9c2bf4d3c995df0825f"
 memecoin_creator_addr = "0x922a028b0dbd8ff206074977ae4c5f9fb003ce384242b6253c67192cd2a45ee1"
 deployer = "0xcafe"
 swap = "0xcafe"

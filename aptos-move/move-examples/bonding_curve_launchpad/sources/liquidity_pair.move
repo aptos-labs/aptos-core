@@ -1,4 +1,4 @@
-module resource_account::liquidity_pair {
+module bonding_curve_launchpad::liquidity_pair {
     use aptos_std::smart_table::{Self, SmartTable};
     use aptos_std::signer;
     use aptos_std::math128;
@@ -12,8 +12,8 @@ module resource_account::liquidity_pair {
     use swap::router;
     use swap::liquidity_pool;
     use swap::coin_wrapper;
-    use resource_account::resource_signer_holder;
-    use resource_account::bonding_curve_launchpad;
+    use bonding_curve_launchpad::resource_signer_holder;
+    use bonding_curve_launchpad::bonding_curve_launchpad;
     friend bonding_curve_launchpad;
 
     const FA_DECIMALS: u8 = 8;
@@ -89,7 +89,7 @@ module resource_account::liquidity_pair {
     ) acquires LiquidityPairSmartTable {
         // Only allow for creation of new APT-FA pairs.
         let liquidity_pair_smart_table =
-            borrow_global_mut<LiquidityPairSmartTable>(@resource_account);
+            borrow_global_mut<LiquidityPairSmartTable>(@bonding_curve_launchpad);
         assert!(!smart_table::contains(&liquidity_pair_smart_table.liquidity_pairs,
                 fa_object_metadata),
             ELIQUIDITY_PAIR_EXISTS_ALREADY);
@@ -127,7 +127,7 @@ module resource_account::liquidity_pair {
     ) acquires LiquidityPairSmartTable {
         // Verify the liquidity pair exists and is enabled for trading.
         let liquidity_pair_smart_table =
-            borrow_global_mut<LiquidityPairSmartTable>(@resource_account);
+            borrow_global_mut<LiquidityPairSmartTable>(@bonding_curve_launchpad);
         assert!(smart_table::contains(&liquidity_pair_smart_table.liquidity_pairs,
                 fa_object_metadata),
             ELIQUIDITY_PAIR_DOES_NOT_EXIST);
@@ -146,7 +146,7 @@ module resource_account::liquidity_pair {
         // Swapper sends FA to the liquidity pair. The liquidity pair sends APT to the swapper, in return.
         let account_address = signer::address_of(account);
         primary_fungible_store::transfer_with_ref(transfer_ref, swapper_address,
-            @resource_account, fa_given);
+            @bonding_curve_launchpad, fa_given);
         aptos_account::transfer(&resource_signer_holder::get_signer(), account_address,
             apt_gained);
         // Record state changes to the liquidity pair's reserves.
@@ -177,7 +177,7 @@ module resource_account::liquidity_pair {
     ) acquires LiquidityPairSmartTable {
         // Verify the liquidity pair exists and is enabled for trading.
         let liquidity_pair_smart_table =
-            borrow_global_mut<LiquidityPairSmartTable>(@resource_account);
+            borrow_global_mut<LiquidityPairSmartTable>(@bonding_curve_launchpad);
         assert!(smart_table::contains(&liquidity_pair_smart_table.liquidity_pairs,
                 fa_object_metadata),
             ELIQUIDITY_PAIR_DOES_NOT_EXIST);
@@ -196,8 +196,8 @@ module resource_account::liquidity_pair {
         };
         // Perform the swap.
         // Swapper sends APT to the liquidity pair. The liquidity pair sends FA to the swapper, in return.
-        aptos_account::transfer(account, @resource_account, apt_given);
-        primary_fungible_store::transfer_with_ref(transfer_ref, @resource_account,
+        aptos_account::transfer(account, @bonding_curve_launchpad, apt_given);
+        primary_fungible_store::transfer_with_ref(transfer_ref, @bonding_curve_launchpad,
             swapper_address, fa_gained);
         // Record state changes to the liquidity pair's reserves.
         let former_fa_reserves = liquidity_pair.fa_reserves;
@@ -260,7 +260,7 @@ module resource_account::liquidity_pair {
         liquidity_pool::transfer(&resource_signer_holder::get_signer(),
             liquidity_obj,
             @0xdead,
-            primary_fungible_store::balance(@resource_account, liquidity_obj));
+            primary_fungible_store::balance(@bonding_curve_launchpad, liquidity_obj));
 
         event::emit(LiquidityPairGraduated { fa_object_metadata, dex_address: @swap });
     }
@@ -325,7 +325,7 @@ module resource_account::liquidity_pair {
     #[view]
     public fun get_is_frozen_metadata(fa_object_metadata: Object<Metadata>): bool acquires LiquidityPairSmartTable {
         let liquidity_pair_smart_table =
-            borrow_global<LiquidityPairSmartTable>(@resource_account);
+            borrow_global<LiquidityPairSmartTable>(@bonding_curve_launchpad);
         assert!(smart_table::contains(&liquidity_pair_smart_table.liquidity_pairs,
                 fa_object_metadata),
             ELIQUIDITY_PAIR_DOES_NOT_EXIST);

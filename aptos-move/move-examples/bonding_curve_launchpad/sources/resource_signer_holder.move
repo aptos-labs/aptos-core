@@ -1,13 +1,13 @@
 //**
 //* This resource account is used for storing a signer var.
 //* The signer var is re-used during FA creation, to keep the FA on the smart contract platform (rather than on the creator's account).
-module resource_account::resource_signer_holder {
+module bonding_curve_launchpad::resource_signer_holder {
     use aptos_std::signer;
     use aptos_std::code;
     use aptos_framework::account;
     use aptos_framework::resource_account;
-    use resource_account::bonding_curve_launchpad;
-    use resource_account::liquidity_pair;
+    use bonding_curve_launchpad::bonding_curve_launchpad;
+    use bonding_curve_launchpad::liquidity_pair;
     friend bonding_curve_launchpad;
     friend liquidity_pair;
 
@@ -17,7 +17,7 @@ module resource_account::resource_signer_holder {
     }
 
     const OWNER: address = @owner_addr;
-    const RESOURCE_ACCOUNT: address = @resource_account;
+    const RESOURCE_ACCOUNT: address = @bonding_curve_launchpad;
 
     const ENON_OWNER_ACCOUNT: u64 = 8030000000;
 

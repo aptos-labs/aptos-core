@@ -1,5 +1,5 @@
 #[test_only]
-module resource_account::test_bonding_curve_launchpad {
+module bonding_curve_launchpad::test_bonding_curve_launchpad {
     use aptos_std::string;
     use aptos_std::signer;
     use aptos_std::vector;
@@ -9,9 +9,9 @@ module resource_account::test_bonding_curve_launchpad {
     use aptos_framework::coin;
     use aptos_framework::aptos_coin::{Self, AptosCoin};
     use aptos_framework::primary_fungible_store;
-    use resource_account::bonding_curve_launchpad;
-    use resource_account::liquidity_pair;
-    use resource_account::resource_signer_holder;
+    use bonding_curve_launchpad::bonding_curve_launchpad;
+    use bonding_curve_launchpad::liquidity_pair;
+    use bonding_curve_launchpad::resource_signer_holder;
     use swap::test_helpers;
 
 
@@ -47,7 +47,7 @@ module resource_account::test_bonding_curve_launchpad {
     }
 
     //---------------------------Unit Tests---------------------------
-    #[test(deployer = @resource_account)]
+    #[test(deployer = @bonding_curve_launchpad)]
     #[expected_failure(abort_code = 393218, location=aptos_framework::object)]
     public fun test_nonexistant_is_frozen(deployer: &signer) {
         bonding_curve_launchpad::initialize_for_test(deployer);
@@ -55,7 +55,7 @@ module resource_account::test_bonding_curve_launchpad {
         let symbol = string::utf8(b"SHEEP");
         bonding_curve_launchpad::get_is_frozen(name, symbol);
     }
-    #[test(deployer = @resource_account)]
+    #[test(deployer = @bonding_curve_launchpad)]
     #[expected_failure(abort_code = 393218, location=aptos_framework::object)]
     public fun test_nonexistant_get_metadata(deployer: &signer) {
         bonding_curve_launchpad::initialize_for_test(deployer);
