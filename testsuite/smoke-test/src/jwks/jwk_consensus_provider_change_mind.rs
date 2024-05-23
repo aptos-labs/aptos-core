@@ -15,10 +15,7 @@ use aptos_forge::{NodeExt, Swarm, SwarmExt};
 use aptos_logger::{debug, info};
 use aptos_types::{
     jwks::{
-        jwk::{JWKMoveStruct, JWK},
-        rsa::RSA_JWK,
-        unsupported::UnsupportedJWK,
-        AllProvidersJWKs, ProviderJWKs,
+        jwk::JWK, secure_test_rsa_jwk, unsupported::UnsupportedJWK, AllProvidersJWKs, ProviderJWKs,
     },
     keyless::test_utils::get_sample_iss,
     on_chain_config::{JWKConsensusConfigV1, OIDCProvider, OnChainJWKConsensusConfig},
@@ -112,7 +109,7 @@ async fn jwk_consensus_provider_change_mind() {
                 ProviderJWKs {
                     issuer: get_sample_iss().into_bytes(),
                     version: 0,
-                    jwks: vec![JWKMoveStruct::from(RSA_JWK::secure_test_jwk())],
+                    jwks: vec![secure_test_rsa_jwk().into()],
                 },
             ]
         },
