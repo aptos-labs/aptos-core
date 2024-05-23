@@ -109,13 +109,15 @@ impl ControlFlowGraphSimplifierTransformation {
 
     /// Does the first four transformations described in the module doc
     fn transform(&mut self) {
+        // eliminates the trick case where a block may contain repeated successor/predecessor blocks
         self.eliminate_branch_to_same_target();
         let cfg1 = ControlFlowGraphCodeGenerator::new(std::mem::take(&mut self.data.code));
-        let cfg2 = EmptyBlockRemover::transform(cfg1);
-        // may introduce new empty blocks
-        let cfg3 = RedundantJumpRemover::transform(cfg2);
-        let cfg4 = EmptyBlockRemover::transform(cfg3);
+        // may introduce new empty blocks, so perform before we remove empty blocks
+        let cfg2 = RedundantJumpRemover::transform(cfg1);
+        let cfg3 = EmptyBlockRemover::transform(cfg2);
         self.data.code = cfg4.gen_code(true);
+        // the above transformation may introduce branches to same target
+        // for instance, if the original CFG is BB1 -> BB2, BB1 -> BB3 -> BB2, where BB3 is an empty block
         self.eliminate_branch_to_same_target();
         self.data.annotations.clear()
     }
