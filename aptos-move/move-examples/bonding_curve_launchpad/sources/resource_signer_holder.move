@@ -6,10 +6,8 @@ module bonding_curve_launchpad::resource_signer_holder {
     use aptos_std::code;
     use aptos_framework::account;
     use aptos_framework::resource_account;
-    use bonding_curve_launchpad::bonding_curve_launchpad;
-    use bonding_curve_launchpad::liquidity_pair;
-    friend bonding_curve_launchpad;
-    friend liquidity_pair;
+    friend bonding_curve_launchpad::bonding_curve_launchpad;
+    friend bonding_curve_launchpad::liquidity_pair;
 
     struct Config has key {
         owner: address,

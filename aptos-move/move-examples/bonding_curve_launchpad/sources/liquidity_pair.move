@@ -13,8 +13,7 @@ module bonding_curve_launchpad::liquidity_pair {
     use swap::liquidity_pool;
     use swap::coin_wrapper;
     use bonding_curve_launchpad::resource_signer_holder;
-    use bonding_curve_launchpad::bonding_curve_launchpad;
-    friend bonding_curve_launchpad;
+    friend bonding_curve_launchpad::bonding_curve_launchpad;
 
     const FA_DECIMALS: u8 = 8;
     const INITIAL_VIRTUAL_APT_LIQUIDITY: u128 = 50_000_000_000;
