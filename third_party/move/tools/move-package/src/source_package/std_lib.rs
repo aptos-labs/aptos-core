@@ -73,10 +73,9 @@ pub enum StdVersion {
 }
 
 impl StdVersion {
+    const DEVNET: &'static str = "devnet";
     const MAINNET: &'static str = "mainnet";
     const TESTNET: &'static str = "testnet";
-    const DEVNET: &'static str = "devnet";
-
 
     /// Returns the rev name of the standard library version.
     pub fn rev(&self) -> &'static str {
