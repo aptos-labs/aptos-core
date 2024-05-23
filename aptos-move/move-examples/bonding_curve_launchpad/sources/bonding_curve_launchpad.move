@@ -3,7 +3,7 @@ module bonding_curve_launchpad::bonding_curve_launchpad {
     use std::option;
     use std::vector;
     use aptos_framework::object::{Self, Object};
-    use aptos_framework::fungible_asset::{Self, FungibleAsset, Metadata};
+    use aptos_framework::fungible_asset::{Self, FungibleAsset, Metadata, TransferRef};
     use aptos_framework::primary_fungible_store;
     use aptos_framework::event;
     use aptos_framework::function_info;
@@ -47,7 +47,7 @@ module bonding_curve_launchpad::bonding_curve_launchpad {
     }
 
     struct FAController has key, store {
-        transfer_ref: fungible_asset::TransferRef
+        transfer_ref: TransferRef
     }
 
     //---------------------------Init---------------------------
@@ -63,7 +63,7 @@ module bonding_curve_launchpad::bonding_curve_launchpad {
     /// - Since `transfer_ref` is only available to our permissioned/explicit actions, participants will initially only
     ///   have the capability to either: Hold the FA, Swap within the `bonding_curve_launchpad` context.
     public fun withdraw<T: key>(
-        store: Object<T>, amount: u64, transfer_ref: &fungible_asset::TransferRef
+        store: Object<T>, amount: u64, transfer_ref: &TransferRef
     ): FungibleAsset {
         let metadata = fungible_asset::transfer_ref_metadata(transfer_ref);
         assert!(!liquidity_pair::get_is_frozen_metadata(metadata), EFA_FROZEN);
