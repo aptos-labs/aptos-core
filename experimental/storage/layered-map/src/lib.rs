@@ -146,8 +146,12 @@ impl<K: ArcAsyncDrop, V: ArcAsyncDrop> MapLayer<K, V> {
         self.inner.log_layer(name)
     }
 
-    fn is_family(&self, other: &Self) -> bool {
+    pub fn is_family(&self, other: &Self) -> bool {
         self.inner.family == other.inner.family
+    }
+
+    pub fn layer(&self) -> u64 {
+        self.inner.layer
     }
 }
 

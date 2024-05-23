@@ -131,7 +131,7 @@ trait AssertNoExternalStrongRef {
 
 impl<V: ArcAsyncDrop> AssertNoExternalStrongRef for SparseMerkleTree<V> {
     fn assert_no_external_strong_ref(&self) {
-        assert_subtree_sole_strong_ref(self.inner.root());
+        unimplemented!()
     }
 }
 

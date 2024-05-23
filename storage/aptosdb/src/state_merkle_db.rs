@@ -1,6 +1,8 @@
 // Copyright © Aptos Foundation
 // SPDX-License-Identifier: Apache-2.0
 
+#![allow(dead_code)]
+
 use crate::{
     common::NUM_STATE_SHARDS,
     db_options::{gen_state_merkle_cfds, state_merkle_db_column_families},

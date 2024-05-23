@@ -18,7 +18,7 @@ use aptos_types::{
     epoch_state::EpochState,
     jwks::OBSERVED_JWK_UPDATED_MOVE_TYPE_TAG,
     ledger_info::LedgerInfoWithSignatures,
-    proof::{AccumulatorExtensionProof, SparseMerkleProofExt},
+    proof::AccumulatorExtensionProof,
     state_store::{state_key::StateKey, state_value::StateValue},
     transaction::{
         block_epilogue::{BlockEndInfo, BlockEpiloguePayload},
@@ -526,11 +526,11 @@ impl StateComputeResult {
 }
 
 pub struct ProofReader {
-    proofs: HashMap<HashValue, SparseMerkleProofExt>,
+    proofs: HashMap<HashValue, Option<HashValue>>,
 }
 
 impl ProofReader {
-    pub fn new(proofs: HashMap<HashValue, SparseMerkleProofExt>) -> Self {
+    pub fn new(proofs: HashMap<HashValue, Option<HashValue>>) -> Self {
         ProofReader { proofs }
     }
 
@@ -540,8 +540,8 @@ impl ProofReader {
 }
 
 impl ProofRead for ProofReader {
-    fn get_proof(&self, key: HashValue) -> Option<&SparseMerkleProofExt> {
-        self.proofs.get(&key)
+    fn get_proof(&self, key: HashValue) -> Option<HashValue> {
+        *self.proofs.get(&key).unwrap()
     }
 }
 

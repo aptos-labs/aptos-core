@@ -14,18 +14,25 @@ rust-version = { workspace = true }
 
 [dependencies]
 aptos-crypto = { workspace = true }
+aptos-crypto-derive = { workspace = true }
 aptos-drop-helper = { workspace = true }
+aptos-experimental-layered-map = { workspace = true }
 aptos-experimental-runtimes = { workspace = true }
 aptos-infallible = { workspace = true }
 aptos-metrics-core = { workspace = true }
 aptos-types = { workspace = true }
 bitvec = { workspace = true }
+bcs = { workspace = true }
 criterion = { workspace = true, optional = true }
 itertools = { workspace = true }
 once_cell = { workspace = true }
 proptest = { workspace = true, optional = true }
 rayon = { workspace = true }
 thiserror = { workspace = true }
+
+fastcrypto = { git = "https://github.com/MystenLabs/fastcrypto.git" }
+bincode = "1.3.3"
+serde = { version = "1.0.197", features = ["derive"] }
 
 [dev-dependencies]
 aptos-types = { workspace = true, features = ["fuzzing"] }

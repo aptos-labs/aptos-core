@@ -69,24 +69,25 @@
 #![allow(clippy::let_and_return)]
 // See https://play.rust-lang.org/?version=stable&mode=debug&edition=2018&gist=795cd4f459f1d4a0005a99650726834b
 #![allow(clippy::while_let_loop)]
+#![allow(dead_code)]
 
 pub mod ancestors;
 mod dropper;
+mod inc_hash;
 mod metrics;
 mod node;
-#[cfg(test)]
-mod sparse_merkle_test;
+// #[cfg(test)]
+// mod sparse_merkle_test;
 #[cfg(any(test, feature = "bench", feature = "fuzzing"))]
 pub mod test_utils;
-mod updater;
+// mod updater;
 pub mod utils;
 
 use crate::sparse_merkle::{
     dropper::SUBTREE_DROPPER,
-    metrics::{GENERATION, TIMER},
-    node::{NodeInner, SubTree},
-    updater::SubTreeUpdater,
-    utils::get_state_shard_id,
+    inc_hash::{AuthByIncHash, HashAsKey, Root},
+    metrics::GENERATION,
+    node::SubTree,
 };
 use aptos_crypto::{
     hash::{CryptoHash, SPARSE_MERKLE_PLACEHOLDER_HASH},
@@ -96,10 +97,11 @@ use aptos_drop_helper::ArcAsyncDrop;
 use aptos_infallible::Mutex;
 use aptos_metrics_core::IntGaugeHelper;
 use aptos_types::{
-    nibble::{nibble_path::NibblePath, Nibble},
-    proof::SparseMerkleProofExt,
+    nibble::nibble_path::NibblePath, proof::SparseMerkleLeafNode,
     state_store::state_storage_usage::StateStorageUsage,
 };
+use fastcrypto::hash::{EllipticCurveMultisetHash, MultisetHash};
+use rayon::prelude::*;
 use std::{
     collections::{BTreeMap, HashMap},
     sync::Arc,
@@ -187,9 +189,17 @@ impl<V: ArcAsyncDrop> Inner<V> {
 }
 
 /// The Sparse Merkle Tree implementation.
-#[derive(Clone, Debug)]
+#[derive(Debug)]
 pub struct SparseMerkleTree<V: ArcAsyncDrop> {
-    inner: Arc<Inner<V>>,
+    inner: Arc<AuthByIncHash<V>>,
+}
+
+impl<V: ArcAsyncDrop> Clone for SparseMerkleTree<V> {
+    fn clone(&self) -> Self {
+        Self {
+            inner: self.inner.clone(),
+        }
+    }
 }
 
 impl<V> SparseMerkleTree<V>
@@ -199,16 +209,9 @@ where
     /// Constructs a Sparse Merkle Tree with a root hash. This is often used when we restart and
     /// the scratch pad and the storage have identical state, so we use a single root hash to
     /// represent the entire state.
-    pub fn new(root_hash: HashValue, usage: StateStorageUsage) -> Self {
-        let root = if root_hash != *SPARSE_MERKLE_PLACEHOLDER_HASH {
-            SubTree::new_unknown(root_hash)
-        } else {
-            assert!(usage.is_untracked() || usage == StateStorageUsage::zero());
-            SubTree::new_empty()
-        };
-
+    pub fn new(_root_hash: HashValue, usage: StateStorageUsage) -> Self {
         Self {
-            inner: Inner::new(root, usage),
+            inner: Arc::new(AuthByIncHash::new(usage)),
         }
     }
 
@@ -218,9 +221,7 @@ where
     }
 
     pub fn new_empty() -> Self {
-        Self {
-            inner: Inner::new(SubTree::new_empty(), StateStorageUsage::zero()),
-        }
+        Self::new(*SPARSE_MERKLE_PLACEHOLDER_HASH, StateStorageUsage::zero())
     }
 
     pub fn has_same_root_hash(&self, other: &Self) -> bool {
@@ -245,14 +246,12 @@ where
     }
 
     #[cfg(test)]
-    fn new_with_root(root: SubTree<V>) -> Self {
-        Self {
-            inner: Inner::new(root, StateStorageUsage::new_untracked()),
-        }
+    fn new_with_root(_root: SubTree<V>) -> Self {
+        unimplemented!()
     }
 
     fn root_weak(&self) -> SubTree<V> {
-        self.inner.root().weak()
+        unimplemented!()
     }
 
     /// Returns the root hash of this tree.
@@ -261,7 +260,7 @@ where
     }
 
     fn generation(&self) -> u64 {
-        self.inner.generation
+        self.inner.generation()
     }
 
     pub fn is_the_same(&self, other: &Self) -> bool {
@@ -269,7 +268,7 @@ where
     }
 
     pub fn is_family(&self, other: &Self) -> bool {
-        self.inner.family == other.inner.family
+        self.inner.is_family(&other.inner)
     }
 
     pub fn usage(&self) -> StateStorageUsage {
@@ -281,107 +280,20 @@ where
     /// Assumes 16 shards in total.
     pub fn new_node_hashes_since(
         &self,
-        since_smt: &Self,
-        shard_id: u8,
+        _since_smt: &Self,
+        _shard_id: u8,
     ) -> HashMap<NibblePath, HashValue> {
-        let _timer = TIMER
-            .with_label_values(&["new_node_hashes_since"])
-            .start_timer();
-
-        assert!(since_smt.is_family(self));
-
-        let mut node_hashes = HashMap::new();
-        let mut subtree = self.root_weak();
-        let mut pos = NodePosition::with_capacity(HashValue::LENGTH_IN_BITS);
-        let since_generation = since_smt.generation() + 1;
-        // Assume 16 shards here.
-        // We check the top 4 levels first, if there is any leaf node belongs to the shard we are
-        // requesting, we collect that node and return earlier (because there is no nodes below
-        // this point).
-        // Otherwise, once we reach the 5th level (the level of the root of each shard), all nodes
-        // at or below it belongs to the requested shard.
-        for i in (0..4).rev() {
-            if let Some(node) = subtree.get_node_if_in_mem(since_generation) {
-                match node.inner() {
-                    NodeInner::Internal(internal_node) => {
-                        subtree = match (shard_id >> i) & 1 {
-                            0 => {
-                                pos.push(false);
-                                internal_node.left.weak()
-                            },
-                            1 => {
-                                pos.push(true);
-                                internal_node.right.weak()
-                            },
-                            _ => {
-                                unreachable!()
-                            },
-                        }
-                    },
-                    NodeInner::Leaf(leaf_node) => {
-                        if get_state_shard_id(leaf_node.key) == shard_id {
-                            let mut nibble_path = NibblePath::new_even(vec![]);
-                            nibble_path.push(Nibble::from(shard_id));
-                            node_hashes.insert(nibble_path, subtree.hash());
-                        }
-                        return node_hashes;
-                    },
-                }
-            } else {
-                return node_hashes;
-            }
-        }
-        Self::new_node_hashes_since_impl(
-            subtree,
-            since_smt.generation() + 1,
-            &mut pos,
-            &mut node_hashes,
-        );
-        node_hashes
+        unimplemented!()
     }
 
     /// Recursively generate the partial node update batch of jellyfish merkle
     fn new_node_hashes_since_impl(
-        subtree: SubTree<V>,
-        since_generation: u64,
-        pos: &mut NodePosition,
-        node_hashes: &mut HashMap<NibblePath, HashValue>,
+        _subtree: SubTree<V>,
+        _since_generation: u64,
+        _pos: &mut NodePosition,
+        _node_hashes: &mut HashMap<NibblePath, HashValue>,
     ) {
-        if let Some(node) = subtree.get_node_if_in_mem(since_generation) {
-            let is_nibble = if let Some(path) = Self::maybe_to_nibble_path(pos) {
-                node_hashes.insert(path, subtree.hash());
-                true
-            } else {
-                false
-            };
-            match node.inner() {
-                NodeInner::Internal(internal_node) => {
-                    let depth = pos.len();
-                    pos.push(false);
-                    Self::new_node_hashes_since_impl(
-                        internal_node.left.weak(),
-                        since_generation,
-                        pos,
-                        node_hashes,
-                    );
-                    *pos.get_mut(depth).unwrap() = true;
-                    Self::new_node_hashes_since_impl(
-                        internal_node.right.weak(),
-                        since_generation,
-                        pos,
-                        node_hashes,
-                    );
-                    pos.pop();
-                },
-                NodeInner::Leaf(leaf_node) => {
-                    let mut path = NibblePath::new_even(leaf_node.key.to_vec());
-                    if !is_nibble {
-                        path.truncate(pos.len() / BITS_IN_NIBBLE + 1);
-                        node_hashes.insert(path, subtree.hash());
-                    }
-                },
-            }
-        }
+        unimplemented!()
     }
 
     fn maybe_to_nibble_path(pos: &NodePosition) -> Option<NibblePath> {
@@ -413,17 +325,14 @@ where
 {
     pub fn batch_update(
         &self,
-        updates: Vec<(HashValue, Option<&V>)>,
-        proof_reader: &impl ProofRead,
+        _updates: Vec<(HashValue, Option<&V>)>,
+        _proof_reader: &impl ProofRead,
     ) -> Result<Self, UpdateError> {
-        self.clone()
-            .freeze(self)
-            .batch_update(updates, StateStorageUsage::Untracked, proof_reader)
-            .map(FrozenSparseMerkleTree::unfreeze)
+        unimplemented!()
     }
 
-    pub fn get(&self, key: HashValue) -> StateStoreStatus<V> {
-        self.clone().freeze(self).get(key)
+    pub fn get(&self, _key: HashValue) -> StateStoreStatus<V> {
+        unimplemented!()
     }
 }
 
@@ -467,7 +376,7 @@ impl<V> FrozenSparseMerkleTree<V>
 where
     V: Clone + CryptoHash + ArcAsyncDrop,
 {
-    fn spawn(&self, child_root: SubTree<V>, child_usage: StateStorageUsage) -> Self {
+    fn spawn(&self, child_root: Root<V>, child_usage: StateStorageUsage) -> Self {
         let smt = SparseMerkleTree {
             inner: self.smt.inner.spawn(child_root, child_usage),
         };
@@ -500,73 +409,81 @@ where
     ) -> Result<Self, UpdateError> {
         // Flatten, dedup and sort the updates with a btree map since the updates between different
         // versions may overlap on the same address in which case the latter always overwrites.
-        let kvs = updates
+        let updates = updates
             .into_iter()
             .collect::<BTreeMap<_, _>>()
             .into_iter()
+            .map(|(k, v)| (HashAsKey(k), Some(v.cloned())))
             .collect::<Vec<_>>();
 
-        if kvs.is_empty() {
+        if updates.is_empty() {
             if !usage.is_untracked() {
                 assert_eq!(self.smt.inner.usage, usage);
             }
-            Ok(self.clone())
-        } else {
-            let current_root = self.smt.root_weak();
-            let root = SubTreeUpdater::update(
-                current_root,
-                &kvs[..],
-                proof_reader,
-                self.smt.inner.generation + 1,
-            )?;
-            Ok(self.spawn(root, usage))
+            return Ok(self.clone());
         }
+
+        let inc_hash_diff = updates
+            .par_iter()
+            .fold(
+                EllipticCurveMultisetHash::default,
+                |mut inc_hash, (key, val_opt)| {
+                    if let Some(old_val) = proof_reader.get_proof(key.0) {
+                        let old_hash = SparseMerkleLeafNode::new(key.0, old_val)
+                            .hash()
+                            .into_inner();
+                        inc_hash.remove(old_hash);
+                    }
+                    if let Some(Some(new_val)) = val_opt {
+                        let new_hash = SparseMerkleLeafNode::new(key.0, new_val.hash())
+                            .hash()
+                            .into_inner();
+                        inc_hash.insert(new_hash);
+                    }
+                    inc_hash
+                },
+            )
+            .reduce(
+                EllipticCurveMultisetHash::default,
+                |mut inc_hash, other_inc_hash| {
+                    inc_hash.union(&other_inc_hash);
+                    inc_hash
+                },
+            );
+        let mut inc_hash = self.smt.inner.root().inc_hash.clone();
+        inc_hash.union(&inc_hash_diff);
+
+        let content = self
+            .smt
+            .inner
+            .root()
+            .content
+            .view_layers_since(&self.base_smt.inner.root().content)
+            .new_layer(&updates[..]);
+
+        let root = Root::new(inc_hash, content);
+
+        Ok(self.spawn(root, usage))
     }
 
     /// Queries a `key` in this `SparseMerkleTree`.
     pub fn get(&self, key: HashValue) -> StateStoreStatus<V> {
-        let mut subtree = self.smt.root_weak();
-        let mut bits = key.iter_bits();
-        let mut next_depth = 0;
+        use StateStoreStatus::*;
 
-        loop {
-            next_depth += 1;
-            match subtree {
-                SubTree::Empty => return StateStoreStatus::DoesNotExist,
-                SubTree::NonEmpty { hash, root: _ } => {
-                    match subtree.get_node_if_in_mem(self.base_generation) {
-                        None => {
-                            return StateStoreStatus::UnknownSubtreeRoot {
-                                hash,
-                                depth: next_depth - 1,
-                            }
-                        },
-                        Some(node) => match node.inner() {
-                            NodeInner::Internal(internal_node) => {
-                                subtree = if bits.next().expect("Tree is too deep.") {
-                                    internal_node.right.weak()
-                                } else {
-                                    internal_node.left.weak()
-                                };
-                                continue;
-                            }, // end NodeInner::Internal
-                            NodeInner::Leaf(leaf_node) => {
-                                return if leaf_node.key == key {
-                                    match &leaf_node.value.data.get_if_in_mem() {
-                                        Some(value) => StateStoreStatus::ExistsInScratchPad(
-                                            value.as_ref().clone(),
-                                        ),
-                                        None => StateStoreStatus::UnknownValue,
-                                    }
-                                } else {
-                                    StateStoreStatus::DoesNotExist
-                                };
-                            }, // end NodeInner::Leaf
-                        }, // end Some(node) got from mem
-                    }
-                }, // end SubTree::NonEmpty
-            }
-        } // end loop
+        match self
+            .smt
+            .inner
+            .root
+            .content
+            .view_layers_since(&self.base_smt.inner.root.content)
+            .get(&HashAsKey(key))
+        {
+            Some(val_opt) => match val_opt {
+                Some(val) => ExistsInScratchPad(val),
+                None => DoesNotExist,
+            },
+            None => UnknownValue,
+        }
     }
 
     pub fn usage(&self) -> StateStorageUsage {
@@ -577,7 +494,9 @@ where
 /// A type that implements `ProofRead` can provide proof for keys in persistent storage.
 pub trait ProofRead: Sync {
     /// Gets verified proof for this key in persistent storage.
-    fn get_proof(&self, key: HashValue) -> Option<&SparseMerkleProofExt>;
+
+    // HACK: reuse ProofRead to return value hash on base version
+    fn get_proof(&self, key: HashValue) -> Option<HashValue>;
 }
 
 /// All errors `update` can possibly return.
