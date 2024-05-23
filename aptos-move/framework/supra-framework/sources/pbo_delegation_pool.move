@@ -130,6 +130,8 @@ module supra_framework::pbo_delegation_pool {
     use supra_framework::stake::{Self, get_operator};
     use supra_framework::staking_config;
     use supra_framework::timestamp;
+    #[test_only]
+    use aptos_std::fixed_point64;
 
     const MODULE_SALT: vector<u8> = b"supra_framework::pbo_delegation_pool";
 
@@ -1845,6 +1847,8 @@ module supra_framework::pbo_delegation_pool {
     use supra_framework::reconfiguration;
     #[test_only]
     use supra_framework::stake::fast_forward_to_unlock;
+    #[test_only]
+    use supra_framework::timestamp::fast_forward_seconds;
 
     #[test_only]
     const CONSENSUS_KEY_1: vector<u8> = x"1a";
@@ -2271,7 +2275,7 @@ module supra_framework::pbo_delegation_pool {
 
         fast_forward_seconds(one_year_in_secs);
     }
-    
+
     #[test(supra_framework = @supra_framework, validator = @0x123, delegator = @0x010)]
     public entry fun test_never_create_pending_withdrawal_if_no_shares_bought(
         supra_framework: &signer,
