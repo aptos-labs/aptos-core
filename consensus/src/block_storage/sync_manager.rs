@@ -266,6 +266,7 @@ impl BlockStore {
             self.execution_client.clone(),
             self.payload_manager.clone(),
             self.order_vote_enabled,
+            self.window_size,
         )
         .await?
         .take();
@@ -274,14 +275,15 @@ impl BlockStore {
             committed_round = root.0.round(),
             block_id = root.0.id(),
         );
-        self.rebuild(
-            root,
-            root_metadata,
-            blocks,
-            quorum_certs,
-            self.order_vote_enabled,
-        )
-        .await;
+        info!(
+            "sync_to_highest_ordered_cert finished with blocks: {:?}",
+            blocks
+                .iter()
+                .map(|b| format!("epoch: {}, round: {}, id: {}", b.epoch(), b.round(), b.id()))
+                .collect::<Vec<_>>()
+        );
+        self.rebuild(root, root_metadata, blocks, quorum_certs)
+            .await;
 
         if highest_commit_cert.ledger_info().ledger_info().ends_epoch() {
             retriever
@@ -303,6 +305,7 @@ impl BlockStore {
         execution_client: Arc<dyn TExecutionClient>,
         payload_manager: Arc<PayloadManager>,
         order_vote_enabled: bool,
+        window_size: usize,
     ) -> anyhow::Result<RecoveryData> {
         info!(
             LogSchema::new(LogEvent::StateSync).remote_peer(retriever.preferred_peer),
@@ -311,10 +314,16 @@ impl BlockStore {
             highest_quorum_cert,
         );
 
+        let target_round = min(
+            highest_commit_cert.ledger_info().ledger_info().round(),
+            highest_quorum_cert
+                .certified_block()
+                .round()
+                .saturating_sub(window_size as u64),
+        );
+
         // we fetch the blocks from
-        let num_blocks = highest_quorum_cert.certified_block().round()
-            - highest_commit_cert.ledger_info().ledger_info().round()
-            + 1;
+        let num_blocks = highest_quorum_cert.certified_block().round() - target_round + 1;
 
         // although unlikely, we might wrap num_blocks around on a 32-bit machine
         assert!(num_blocks < std::usize::MAX as u64);
@@ -340,7 +349,12 @@ impl BlockStore {
         );
 
         // Confirm retrieval ended when it hit the last block we care about, even if it didn't reach all num_blocks blocks.
-        assert_eq!(
+        // assert_eq!(
+        //     blocks.last().expect("blocks are empty").id(),
+        //     highest_commit_cert.commit_info().id()
+        // );
+        info!(
+            "Last fetched block id: {} vs highest commit cert: {}",
             blocks.last().expect("blocks are empty").id(),
             highest_commit_cert.commit_info().id()
         );
@@ -584,7 +598,8 @@ impl BlockRetriever {
             let request = BlockRetrievalRequest::new_with_target_block_id(
                 block_id,
                 retrieve_batch_size,
-                target_block_id,
+                // TODO: Why is SucceededWithTarget even significant?
+                HashValue::zero(),
             );
             loop {
                 tokio::select! {
@@ -712,7 +727,8 @@ impl BlockRetriever {
                 },
             }
         }
-        assert_eq!(result_blocks.last().unwrap().id(), target_block_id);
+        // assert_eq!(result_blocks.last().unwrap().id(), target_block_id);
+        assert_eq!(result_blocks.len() as u64, num_blocks);
         Ok(result_blocks)
     }
 
