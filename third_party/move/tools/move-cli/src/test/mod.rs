@@ -1,8 +1,8 @@
-// Copyright (c) The Diem Core Contributors
 // Copyright (c) The Move Contributors
 // SPDX-License-Identifier: Apache-2.0
 
-use crate::{sandbox::utils::module, DEFAULT_BUILD_DIR, DEFAULT_STORAGE_DIR};
+use crate::{DEFAULT_BUILD_DIR, DEFAULT_STORAGE_DIR};
+use move_binary_format::CompiledModule;
 use move_command_line_common::{
     env::{read_bool_env_var, NO_COLOR_MODE_ENV_VAR},
     files::{find_filenames, path_to_string},
@@ -10,7 +10,10 @@ use move_command_line_common::{
         add_update_baseline_fix, format_diff, get_compiler_exp_extension, read_env_update_baseline,
     },
 };
-use move_compiler::command_line::COLOR_MODE_ENV_VAR;
+use move_compiler::{
+    command_line::COLOR_MODE_ENV_VAR,
+    compiled_unit::{CompiledUnit, NamedCompiledModule},
+};
 use move_coverage::coverage_map::{CoverageMap, ExecCoverageMapWithModules};
 use move_package::{
     compilation::{compiled_package::OnDiskCompiledPackage, package_layout::CompiledPackageLayout},
@@ -22,8 +25,10 @@ use std::{
     collections::{BTreeMap, HashMap},
     env,
     fmt::Write as FmtWrite,
-    fs::{self, File},
-    io::{self, BufRead, Write},
+    fs,
+    fs::File,
+    io,
+    io::{BufRead, Write},
     path::{Path, PathBuf},
     process::Command,
 };
@@ -57,6 +62,13 @@ const MOVE_VM_TRACING_FLUSH_ENV_VAR_NAME: &str = "MOVE_VM_TRACE_FLUSH";
 /// if --track-cov is set. If --track-cov is not set, then no trace file will
 /// be produced.
 const DEFAULT_TRACE_FILE: &str = "trace";
+
+pub(crate) fn module(unit: &CompiledUnit) -> anyhow::Result<&CompiledModule> {
+    match unit {
+        CompiledUnit::Module(NamedCompiledModule { module, .. }) => Ok(module),
+        _ => anyhow::bail!("Found script in modules -- this shouldn't happen"),
+    }
+}
 
 fn collect_coverage(
     trace_file: &Path,

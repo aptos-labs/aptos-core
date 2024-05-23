@@ -45,7 +45,6 @@ move-package = { path = "../move-package" }
 move-prover = { path = "../../move-prover" }
 move-resource-viewer = { path = "../move-resource-viewer" }
 move-stdlib = { path = "../../move-stdlib" }
-# move-symbol-pool = { path = "../../move-symbol-pool" }
 move-unit-test = { path = "../move-unit-test" }
 move-vm-runtime = { path = "../../move-vm/runtime", features = ["debugging"] }
 move-vm-test-utils = { path = "../../move-vm/test-utils" }
@@ -57,10 +56,6 @@ httpmock = { workspace = true }
 [[bin]]
 name = "move"
 path = "src/main.rs"
-
-[[test]]
-name = "sandbox_testsuite"
-harness = false
 
 [[test]]
 name = "move_unit_tests_move_vm_and_stackless_vm"
