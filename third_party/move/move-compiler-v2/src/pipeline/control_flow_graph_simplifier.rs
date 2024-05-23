@@ -524,6 +524,7 @@ impl RedundantJumpRemover {
     fn can_remove_edge(&self, from: BlockId, to: BlockId) -> bool {
         debug_assert!(!self.0.is_trivial_block(from));
         debug_assert!(!self.0.is_trivial_block(to));
+        debug_assert!(self.0.succs(from).contains(&to));
         self.0.succs(from).len() == 1 && self.0.preds(to).len() == 1
     }
 
