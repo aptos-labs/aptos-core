@@ -12,7 +12,10 @@ use crate::{
     transaction_shuffler::TransactionShuffler,
 };
 use anyhow::Result;
-use aptos_consensus_types::{block::Block, pipelined_block::PipelinedBlock};
+use aptos_consensus_types::{
+    block::Block,
+    pipelined_block::{OrderedBlockWindow, PipelinedBlock},
+};
 use aptos_crypto::HashValue;
 use aptos_executor_types::{ExecutorError, ExecutorResult, StateComputeResult};
 use aptos_logger::debug;
@@ -39,6 +42,7 @@ impl StateComputer for EmptyStateComputer {
     async fn compute(
         &self,
         _block: &Block,
+        _block_window: &OrderedBlockWindow,
         _parent_block_id: HashValue,
         _randomness: Option<Randomness>,
     ) -> ExecutorResult<PipelineExecutionResult> {
@@ -118,6 +122,7 @@ impl StateComputer for RandomComputeResultStateComputer {
     async fn schedule_compute(
         &self,
         _block: &Block,
+        _block_window: &OrderedBlockWindow,
         parent_block_id: HashValue,
         _randomness: Option<Randomness>,
     ) -> StateComputeResultFut {
