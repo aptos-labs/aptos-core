@@ -499,13 +499,13 @@ impl RedundantJumpRemover {
             if self.0.is_trivial_block(block) || !self.0.predecessors.contains_key(&block) {
                 continue;
             }
-            self.transform_edges_from(block)
+            self.remove_redundant_edges_from(block)
         }
     }
 
     /// Removes all redundant edges from `block`
     /// Requires: `block` still in the cfg, `block` is not entry/exit
-    fn transform_edges_from(&mut self, block: BlockId) {
+    fn remove_redundant_edges_from(&mut self, block: BlockId) {
         for suc in self.0.successors.get(&block).expect("successors").clone() {
             if !self.0.is_trivial_block(suc) && self.remove_jump_if_possible(block, suc) {
                 // successors of `block` changes
@@ -515,7 +515,7 @@ impl RedundantJumpRemover {
                 // L0: goto L2; L2: goto L3;
                 // suc L0: L2
                 // we continue to merge block L3 into block L0
-                self.transform_edges_from(block);
+                self.remove_redundant_edges_from(block);
             }
         }
     }
