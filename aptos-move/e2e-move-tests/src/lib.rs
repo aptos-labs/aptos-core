@@ -29,9 +29,9 @@ impl PackageHooks for AptosPackageHooks {
     fn custom_package_info_fields(&self) -> Vec<String> {
         vec![UPGRADE_POLICY_CUSTOM_FIELD.to_string()]
     }
-
+// sbjoshi changed
     fn custom_dependency_key(&self) -> Option<String> {
-        Some("aptos".to_string())
+        Some("supra".to_string())
     }
 
     fn resolve_custom_dependency(

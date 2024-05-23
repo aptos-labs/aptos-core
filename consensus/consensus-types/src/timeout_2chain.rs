@@ -4,7 +4,7 @@
 
 use crate::{common::Author, quorum_cert::QuorumCert};
 use anyhow::ensure;
-use aptos_crypto::{bls12381, CryptoMaterialError};
+use aptos_crypto::{ed25519, CryptoMaterialError};
 use aptos_crypto_derive::{BCSCryptoHash, CryptoHasher};
 use aptos_types::{
     account_address::AccountAddress,
@@ -60,7 +60,7 @@ impl TwoChainTimeout {
     pub fn sign(
         &self,
         signer: &ValidatorSigner,
-    ) -> Result<bls12381::Signature, CryptoMaterialError> {
+    ) -> Result<ed25519::Signature, CryptoMaterialError> {
         signer.sign(&self.signing_format())
     }
 
@@ -234,12 +234,7 @@ impl TwoChainTimeoutWithPartialSignatures {
     }
 
     /// Add a new timeout message from author, the timeout should already be verified in upper layer.
-    pub fn add(
-        &mut self,
-        author: Author,
-        timeout: TwoChainTimeout,
-        signature: bls12381::Signature,
-    ) {
+    pub fn add(&mut self, author: Author, timeout: TwoChainTimeout, signature: ed25519::Signature) {
         debug_assert_eq!(
             self.timeout.epoch(),
             timeout.epoch(),
@@ -281,11 +276,11 @@ impl TwoChainTimeoutWithPartialSignatures {
 /// timeout aggregation.
 #[derive(Debug, Clone, Eq, PartialEq)]
 pub struct PartialSignaturesWithRound {
-    signatures: BTreeMap<AccountAddress, (Round, bls12381::Signature)>,
+    signatures: BTreeMap<AccountAddress, (Round, ed25519::Signature)>,
 }
 
 impl PartialSignaturesWithRound {
-    pub fn new(signatures: BTreeMap<AccountAddress, (Round, bls12381::Signature)>) -> Self {
+    pub fn new(signatures: BTreeMap<AccountAddress, (Round, ed25519::Signature)>) -> Self {
         Self { signatures }
     }
 
@@ -293,7 +288,7 @@ impl PartialSignaturesWithRound {
         Self::new(BTreeMap::new())
     }
 
-    pub fn signatures(&self) -> &BTreeMap<AccountAddress, (Round, bls12381::Signature)> {
+    pub fn signatures(&self) -> &BTreeMap<AccountAddress, (Round, ed25519::Signature)> {
         &self.signatures
     }
 
@@ -302,7 +297,7 @@ impl PartialSignaturesWithRound {
         &mut self,
         validator: AccountAddress,
         round: Round,
-        signature: bls12381::Signature,
+        signature: ed25519::Signature,
     ) {
         self.signatures.insert(validator, (round, signature));
     }
@@ -316,7 +311,7 @@ impl PartialSignaturesWithRound {
         &mut self,
         validator: AccountAddress,
         round: Round,
-        signature: bls12381::Signature,
+        signature: ed25519::Signature,
     ) {
         self.signatures
             .entry(validator)
@@ -397,7 +392,7 @@ mod tests {
         quorum_cert::QuorumCert,
         timeout_2chain::{TwoChainTimeout, TwoChainTimeoutWithPartialSignatures},
     };
-    use aptos_crypto::bls12381;
+    use aptos_crypto::ed25519;
 
     #[test]
     fn test_2chain_timeout_certificate() {
@@ -465,7 +460,7 @@ mod tests {
         invalid_timeout_cert.signatures.replace_signature(
             signers[0].author(),
             0,
-            bls12381::Signature::dummy_signature(),
+            ed25519::Signature::dummy_signature(),
         );
 
         let invalid_tc_with_sig = invalid_timeout_cert

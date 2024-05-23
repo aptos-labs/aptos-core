@@ -2,7 +2,7 @@
 // SPDX-License-Identifier: Apache-2.0
 
 use aptos_config::config::HANDSHAKE_VERSION;
-use aptos_crypto::{bls12381, ed25519::Ed25519PublicKey, x25519};
+use aptos_crypto::{ed25519, ed25519::Ed25519PublicKey, x25519};
 use aptos_types::{
     account_address::{AccountAddress, AccountAddressWithChecks},
     chain_id::ChainId,
@@ -130,10 +130,7 @@ pub struct ValidatorConfiguration {
     pub voter_account_public_key: Ed25519PublicKey,
     /// Key used for signing in consensus
     #[serde(skip_serializing_if = "Option::is_none")]
-    pub consensus_public_key: Option<bls12381::PublicKey>,
-    /// Corresponding proof of possession of consensus public key
-    #[serde(skip_serializing_if = "Option::is_none")]
-    pub proof_of_possession: Option<bls12381::ProofOfPossession>,
+    pub consensus_public_key: Option<ed25519::PublicKey>,
     /// Public key used for validator network identity (same as account address)
     #[serde(skip_serializing_if = "Option::is_none")]
     pub validator_network_public_key: Option<x25519::PublicKey>,
@@ -237,18 +234,12 @@ impl TryFrom<ValidatorConfiguration> for Validator {
         } else {
             vec![]
         };
-        let proof_of_possession = if let Some(pop) = config.proof_of_possession {
-            pop.to_bytes().to_vec()
-        } else {
-            vec![]
-        };
 
         Ok(Validator {
             owner_address,
             operator_address,
             voter_address,
             consensus_pubkey,
-            proof_of_possession,
             network_addresses: bcs::to_bytes(&validator_addresses).unwrap(),
             full_node_network_addresses: bcs::to_bytes(&full_node_addresses).unwrap(),
             stake_amount: config.stake_amount,
@@ -345,8 +336,7 @@ pub struct OwnerConfiguration {
 pub struct OperatorConfiguration {
     pub operator_account_address: AccountAddressWithChecks,
     pub operator_account_public_key: Ed25519PublicKey,
-    pub consensus_public_key: bls12381::PublicKey,
-    pub consensus_proof_of_possession: bls12381::ProofOfPossession,
+    pub consensus_public_key: ed25519::PublicKey,
     pub validator_network_public_key: x25519::PublicKey,
     pub validator_host: HostAndPort,
     pub full_node_network_public_key: Option<x25519::PublicKey>,
@@ -584,9 +574,6 @@ impl TryFrom<EmployeePoolMap> for Vec<EmployeePool> {
             if pool.validator.join_during_genesis {
                 if pool.validator.consensus_public_key.is_none() {
                     errors.push(anyhow::anyhow!("Employee pool #{} is setup to join during genesis but missing a consensus public key", i));
-                }
-                if pool.validator.proof_of_possession.is_none() {
-                    errors.push(anyhow::anyhow!("Employee pool #{} is setup to join during genesis but missing a proof of possession", i));
                 }
                 if pool.validator.validator_host.is_none() {
                     errors.push(anyhow::anyhow!(

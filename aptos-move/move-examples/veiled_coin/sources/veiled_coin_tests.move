@@ -22,9 +22,9 @@ module veiled_coin::veiled_coin_tests {
     use aptos_std::ristretto255_pedersen as pedersen;
 
     #[test_only]
-    use aptos_framework::account;
+    use supra_framework::account;
     #[test_only]
-    use aptos_framework::coin;
+    use supra_framework::coin;
 
     #[test_only]
     use veiled_coin::veiled_coin;
@@ -76,7 +76,7 @@ module veiled_coin::veiled_coin_tests {
             &aptos_fx,
             sender,
             veiled_coin::cast_u32_to_u64_amount(sender_amount + recipient_amount));
-        println(b"Created fake money inside @aptos_framework");
+        println(b"Created fake money inside @supra_framework");
 
         // Transfer some coins from the framework to the sender
         coin::transfer<coin::FakeMoney>(
@@ -117,7 +117,7 @@ module veiled_coin::veiled_coin_tests {
     // Tests
     //
 
-    #[test(veiled_coin = @veiled_coin, aptos_fx = @aptos_framework, sender = @0xc0ffee, recipient = @0x1337)]
+    #[test(veiled_coin = @veiled_coin, aptos_fx = @supra_framework, sender = @0xc0ffee, recipient = @0x1337)]
     fun veil_test(
         veiled_coin: signer,
         aptos_fx: signer,
@@ -127,8 +127,8 @@ module veiled_coin::veiled_coin_tests {
         println(b"Starting veil_test()...");
         println(b"@veiled_coin:");
         print(&@veiled_coin);
-        println(b"@aptos_framework:");
-        print(&@aptos_framework);
+        println(b"@supra_framework:");
+        print(&@supra_framework);
 
         // Split 500 and 500 between `sender` and `recipient`
         set_up_for_veiled_coin_test(
@@ -191,7 +191,7 @@ module veiled_coin::veiled_coin_tests {
             signer::address_of(&recipient), 100u32, &ristretto255::scalar_zero(), &recipient_pk), 1);
     }
 
-    #[test(veiled_coin = @veiled_coin, aptos_fx = @aptos_framework, sender = @0x1337)]
+    #[test(veiled_coin = @veiled_coin, aptos_fx = @supra_framework, sender = @0x1337)]
     fun unveil_test(
         veiled_coin: signer,
         aptos_fx: signer,
@@ -200,8 +200,8 @@ module veiled_coin::veiled_coin_tests {
         println(b"Starting unveil_test()...");
         println(b"@veiled_coin:");
         print(&@veiled_coin);
-        println(b"@aptos_framework:");
-        print(&@aptos_framework);
+        println(b"@supra_framework:");
+        print(&@supra_framework);
 
         // Create a `sender` account with 500 `FakeCoin`'s
         set_up_for_veiled_coin_test(
@@ -270,7 +270,7 @@ module veiled_coin::veiled_coin_tests {
         assert!(remaining_public_balance == veiled_coin::cast_u32_to_u64_amount(400), 3);
     }
 
-    #[test(veiled_coin = @veiled_coin, aptos_fx = @aptos_framework, sender = @0xc0ffee, recipient = @0x1337)]
+    #[test(veiled_coin = @veiled_coin, aptos_fx = @supra_framework, sender = @0xc0ffee, recipient = @0x1337)]
     fun basic_viability_test(
         veiled_coin: signer,
         aptos_fx: signer,

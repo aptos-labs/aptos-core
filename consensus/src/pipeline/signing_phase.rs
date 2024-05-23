@@ -3,7 +3,7 @@
 // SPDX-License-Identifier: Apache-2.0
 
 use crate::pipeline::pipeline_phase::StatelessPipeline;
-use aptos_crypto::bls12381;
+use aptos_crypto::ed25519;
 use aptos_safety_rules::Error;
 use aptos_types::ledger_info::{LedgerInfo, LedgerInfoWithSignatures};
 use async_trait::async_trait;
@@ -43,11 +43,11 @@ pub trait CommitSignerProvider: Send + Sync {
         &self,
         ledger_info: LedgerInfoWithSignatures,
         new_ledger_info: LedgerInfo,
-    ) -> Result<bls12381::Signature, Error>;
+    ) -> Result<ed25519::Signature, Error>;
 }
 
 pub struct SigningResponse {
-    pub signature_result: Result<bls12381::Signature, Error>,
+    pub signature_result: Result<ed25519::Signature, Error>,
     pub commit_ledger_info: LedgerInfo,
 }
 

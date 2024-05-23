@@ -5,7 +5,7 @@
 #[cfg(any(test, feature = "fuzzing"))]
 use crate::network_address::NetworkAddress;
 use crate::{account_address::AccountAddress, validator_config::ValidatorConfig};
-use aptos_crypto::bls12381;
+use aptos_crypto::ed25519;
 #[cfg(any(test, feature = "fuzzing"))]
 use proptest_derive::Arbitrary;
 use serde::{Deserialize, Serialize};
@@ -55,7 +55,7 @@ impl ValidatorInfo {
     #[cfg(any(test, feature = "fuzzing"))]
     pub fn new_with_test_network_keys(
         account_address: AccountAddress,
-        consensus_public_key: bls12381::PublicKey,
+        consensus_public_key: ed25519::PublicKey,
         consensus_voting_power: u64,
         validator_index: u64,
     ) -> Self {
@@ -81,7 +81,7 @@ impl ValidatorInfo {
     }
 
     /// Returns the key for validating signed messages from this validator
-    pub fn consensus_public_key(&self) -> &bls12381::PublicKey {
+    pub fn consensus_public_key(&self) -> &ed25519::PublicKey {
         &self.config.consensus_public_key
     }
 

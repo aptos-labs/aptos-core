@@ -8,7 +8,7 @@ use crate::{
     DKGMessage,
 };
 use aptos_crypto::{
-    bls12381::{PrivateKey, PublicKey},
+    ed25519::{PrivateKey, PublicKey},
     Uniform,
 };
 use aptos_infallible::RwLock;

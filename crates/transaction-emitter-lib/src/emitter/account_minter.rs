@@ -288,7 +288,7 @@ impl<'t> AccountMinter<'t> {
         let txn = self
             .source_account
             .sign_with_transaction_builder(self.txn_factory.payload(
-                aptos_stdlib::aptos_coin_mint(self.source_account.address(), amount),
+                aptos_stdlib::supra_coin_mint(self.source_account.address(), amount),
             ));
 
         if let Err(e) = txn_executor.execute_transactions(&[txn]).await {

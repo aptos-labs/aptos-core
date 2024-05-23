@@ -1,9 +1,9 @@
 /// A coin example using managed_fungible_asset to create a fungible "coin" and helper functions to only interact with
 /// primary fungible stores only.
 module example_addr::coin_example {
-    use aptos_framework::object;
-    use aptos_framework::fungible_asset::{Self, Metadata, FungibleAsset};
-    use aptos_framework::object::Object;
+    use supra_framework::object;
+    use supra_framework::fungible_asset::{Self, Metadata, FungibleAsset};
+    use supra_framework::object::Object;
     use example_addr::managed_fungible_asset;
     use std::string::utf8;
 
@@ -80,7 +80,7 @@ module example_addr::coin_example {
     }
 
     #[test_only]
-    use aptos_framework::primary_fungible_store;
+    use supra_framework::primary_fungible_store;
     #[test_only]
     use std::signer;
 

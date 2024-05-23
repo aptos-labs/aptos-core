@@ -1,12 +1,12 @@
 #[test_only]
 module rewards_pool::test_helpers {
-    use aptos_framework::account;
-    use aptos_framework::aptos_governance;
-    use aptos_framework::coin::{Self, Coin};
-    use aptos_framework::fungible_asset::{Self, FungibleAsset};
-    use aptos_framework::object;
-    use aptos_framework::primary_fungible_store;
-    use aptos_framework::timestamp;
+    use supra_framework::account;
+    use supra_framework::aptos_governance;
+    use supra_framework::coin::{Self, Coin};
+    use supra_framework::fungible_asset::{Self, FungibleAsset};
+    use supra_framework::object;
+    use supra_framework::primary_fungible_store;
+    use supra_framework::timestamp;
 
     use rewards_pool::epoch;
 

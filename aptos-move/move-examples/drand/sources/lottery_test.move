@@ -2,17 +2,17 @@ module drand::lottery_test {
     #[test_only]
     use drand::lottery;
     #[test_only]
-    use aptos_framework::timestamp;
+    use supra_framework::timestamp;
     #[test_only]
     use std::signer;
     #[test_only]
-    use aptos_framework::account;
+    use supra_framework::account;
     #[test_only]
-    use aptos_framework::coin;
+    use supra_framework::coin;
     #[test_only]
-    use aptos_framework::aptos_coin::{Self, AptosCoin};
+    use supra_framework::supra_coin::{Self, SupraCoin};
     #[test_only]
-    use aptos_framework::coin::MintCapability;
+    use supra_framework::coin::MintCapability;
     #[test_only]
     use std::vector;
     #[test_only]
@@ -23,18 +23,18 @@ module drand::lottery_test {
     use aptos_std::crypto_algebra::enable_cryptography_algebra_natives;
 
     #[test_only]
-    fun give_coins(mint_cap: &MintCapability<AptosCoin>, to: &signer) {
+    fun give_coins(mint_cap: &MintCapability<SupraCoin>, to: &signer) {
         let to_addr = signer::address_of(to);
         if (!account::exists_at(to_addr)) {
             account::create_account_for_test(to_addr);
         };
-        coin::register<AptosCoin>(to);
+        coin::register<SupraCoin>(to);
 
         let coins = coin::mint(lottery::get_ticket_price(), mint_cap);
         coin::deposit(to_addr, coins);
     }
 
-    #[test(myself = @drand, fx = @aptos_framework, u1 = @0xA001, u2 = @0xA002, u3 = @0xA003, u4 = @0xA004)]
+    #[test(myself = @drand, fx = @supra_framework, u1 = @0xA001, u2 = @0xA002, u3 = @0xA003, u4 = @0xA004)]
     fun test_lottery(
         myself: signer, fx: signer,
         u1: signer, u2: signer, u3: signer, u4: signer,
@@ -46,7 +46,7 @@ module drand::lottery_test {
         lottery::init_module_for_testing(&myself);
 
         // Needed to mint coins out of thin air for testing
-        let (burn_cap, mint_cap) = aptos_coin::initialize_for_test(&fx);
+        let (burn_cap, mint_cap) = supra_coin::initialize_for_test(&fx);
 
         // We simulate different runs of the lottery to demonstrate the uniformity of the outcomes
         let vec_signed_bytes = vector::empty<vector<u8>>();
@@ -68,7 +68,7 @@ module drand::lottery_test {
         while(!vector::is_empty(&vec_signed_bytes)) {
             let signed_bytes = vector::pop_back(&mut vec_signed_bytes);
 
-            // Create fake coins for users participating in lottery & initialize aptos_framework
+            // Create fake coins for users participating in lottery & initialize supra_framework
             give_coins(&mint_cap, &u1);
             give_coins(&mint_cap, &u2);
             give_coins(&mint_cap, &u3);
@@ -89,8 +89,8 @@ module drand::lottery_test {
         };
 
         // Clean up
-        coin::destroy_burn_cap<AptosCoin>(burn_cap);
-        coin::destroy_mint_cap<AptosCoin>(mint_cap);
+        coin::destroy_burn_cap<SupraCoin>(burn_cap);
+        coin::destroy_mint_cap<SupraCoin>(mint_cap);
     }
 
     #[test_only]

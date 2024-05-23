@@ -4,4 +4,4 @@ version = "0.0.0"
 upgrade_policy = "immutable"
 
 [dependencies]
-AptosFramework = { local = "../../../../../framework/aptos-framework" }
+SupraFramework = { local = "../../../../../framework/supra-framework" }

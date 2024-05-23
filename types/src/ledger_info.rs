@@ -12,7 +12,7 @@ use crate::{
     transaction::Version,
     validator_verifier::{ValidatorVerifier, VerifyError},
 };
-use aptos_crypto::{bls12381, hash::HashValue};
+use aptos_crypto::{ed25519, hash::HashValue};
 use aptos_crypto_derive::{BCSCryptoHash, CryptoHasher};
 #[cfg(any(test, feature = "fuzzing"))]
 use proptest_derive::Arbitrary;
@@ -336,11 +336,11 @@ impl LedgerInfoWithPartialSignatures {
         self.partial_sigs.remove_signature(validator);
     }
 
-    pub fn add_signature(&mut self, validator: AccountAddress, signature: bls12381::Signature) {
+    pub fn add_signature(&mut self, validator: AccountAddress, signature: ed25519::Signature) {
         self.partial_sigs.add_signature(validator, signature);
     }
 
-    pub fn signatures(&self) -> &BTreeMap<AccountAddress, bls12381::Signature> {
+    pub fn signatures(&self) -> &BTreeMap<AccountAddress, ed25519::Signature> {
         self.partial_sigs.signatures()
     }
 
@@ -384,7 +384,7 @@ impl Arbitrary for LedgerInfoWithV0 {
     type Strategy = BoxedStrategy<Self>;
 
     fn arbitrary_with(_args: Self::Parameters) -> Self::Strategy {
-        let dummy_signature = bls12381::Signature::dummy_signature();
+        let dummy_signature = ed25519::Signature::dummy_signature();
         (any::<LedgerInfo>(), (1usize..100))
             .prop_map(move |(ledger_info, num_validators)| {
                 let (signers, verifier) = random_validator_verifier(num_validators, None, true);

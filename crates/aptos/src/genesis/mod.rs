@@ -19,7 +19,7 @@ use crate::{
     CliCommand, CliResult,
 };
 use aptos_crypto::{
-    bls12381, ed25519::ED25519_PUBLIC_KEY_LENGTH, x25519, ValidCryptoMaterial,
+    ed25519, ed25519::ED25519_PUBLIC_KEY_LENGTH, x25519, ValidCryptoMaterial,
     ValidCryptoMaterialStringExt,
 };
 use aptos_genesis::{
@@ -198,7 +198,6 @@ pub fn fetch_mainnet_genesis_info(git_options: GitOptions) -> CliTypedResult<Mai
     let mut unique_accounts = BTreeSet::new();
     let mut unique_network_keys = HashSet::new();
     let mut unique_consensus_keys = HashSet::new();
-    let mut unique_consensus_pop = HashSet::new();
     let mut unique_hosts = HashSet::new();
 
     validate_employee_accounts(
@@ -215,7 +214,6 @@ pub fn fetch_mainnet_genesis_info(git_options: GitOptions) -> CliTypedResult<Mai
         &mut unique_accounts,
         &mut unique_network_keys,
         &mut unique_consensus_keys,
-        &mut unique_consensus_pop,
         &mut unique_hosts,
         &mut seen_owners,
         true,
@@ -227,7 +225,6 @@ pub fn fetch_mainnet_genesis_info(git_options: GitOptions) -> CliTypedResult<Mai
         &mut unique_accounts,
         &mut unique_network_keys,
         &mut unique_consensus_keys,
-        &mut unique_consensus_pop,
         &mut unique_hosts,
         &mut seen_owners,
         false,
@@ -428,7 +425,6 @@ fn get_config(
             voter_account_address: voter_account_address.into(),
             voter_account_public_key,
             consensus_public_key: None,
-            proof_of_possession: None,
             validator_network_public_key: None,
             validator_host: None,
             full_node_network_public_key: None,
@@ -461,13 +457,7 @@ fn get_config(
         &operator_config.consensus_public_key,
         operator_file,
         "consensus_public_key",
-        |str| parse_key(bls12381::PublicKey::LENGTH, str),
-    )?;
-    let consensus_proof_of_possession = parse_required_option(
-        &operator_config.consensus_proof_of_possession,
-        operator_file,
-        "consensus_proof_of_possession",
-        |str| parse_key(bls12381::ProofOfPossession::LENGTH, str),
+        |str| parse_key(ed25519::PublicKey::LENGTH, str),
     )?;
     let validator_network_public_key = parse_required_option(
         &operator_config.validator_network_public_key,
@@ -513,7 +503,6 @@ fn get_config(
         voter_account_address: voter_account_address.into(),
         voter_account_public_key,
         consensus_public_key: Some(consensus_public_key),
-        proof_of_possession: Some(consensus_proof_of_possession),
         validator_network_public_key: Some(validator_network_public_key),
         validator_host: Some(operator_config.validator_host),
         full_node_network_public_key,
@@ -613,8 +602,7 @@ fn validate_validators(
     initialized_accounts: &BTreeMap<AccountAddress, u64>,
     unique_accounts: &mut BTreeSet<AccountAddress>,
     unique_network_keys: &mut HashSet<x25519::PublicKey>,
-    unique_consensus_keys: &mut HashSet<bls12381::PublicKey>,
-    unique_consensus_pops: &mut HashSet<bls12381::ProofOfPossession>,
+    unique_consensus_keys: &mut HashSet<ed25519::PublicKey>,
     unique_hosts: &mut HashSet<HostAndPort>,
     seen_owners: &mut BTreeMap<AccountAddress, usize>,
     is_pooled_validator: bool,
@@ -747,22 +735,6 @@ fn validate_validators(
                 )));
             }
 
-            if validator.proof_of_possession.is_none() {
-                errors.push(CliError::UnexpectedError(format!(
-                    "Validator {} does not have a consensus proof of possession, though it's joining during genesis",
-                    name
-                )));
-            }
-            if !unique_consensus_pops
-                .insert(validator.proof_of_possession.as_ref().unwrap().clone())
-            {
-                errors.push(CliError::UnexpectedError(format!(
-                    "Validator {} has a repeated a consensus proof of possessions {}",
-                    name,
-                    validator.proof_of_possession.as_ref().unwrap()
-                )));
-            }
-
             match (
                 validator.full_node_host.as_ref(),
                 validator.full_node_network_public_key.as_ref(),
@@ -829,12 +801,6 @@ fn validate_validators(
             if validator.consensus_public_key.is_some() {
                 errors.push(CliError::UnexpectedError(format!(
                     "Validator {} has a consensus public key, but it is *NOT* joining during genesis",
-                    name
-                )));
-            }
-            if validator.proof_of_possession.is_some() {
-                errors.push(CliError::UnexpectedError(format!(
-                    "Validator {} has a consensus proof of possession, but it is *NOT* joining during genesis",
                     name
                 )));
             }

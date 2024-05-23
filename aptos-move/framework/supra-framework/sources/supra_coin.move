@@ -16,6 +16,7 @@ module supra_framework::supra_coin {
 
 	/// Max supply of Supra Coin to be 100 billion with 8 decimal places fraction
 	const MAX_SUPRA_COIN_SUPPLY: u128 = 100_000_000_000_00_000_000u128;
+	//const MAX_SUPRA_COIN_SUPPLY: u128 = 340282366920938463463374607431768211455u128; 
     /// Account does not have mint capability
     const ENO_CAPABILITIES: u64 = 1;
     /// Mint capability has already been delegated to this specified address
@@ -84,7 +85,7 @@ module supra_framework::supra_coin {
         // Mint the core resource account SupraCoin for gas so it can execute system transactions.
         coin::register<SupraCoin>(core_resources);
         let coins = coin::mint<SupraCoin>(
-            18446744073709551615,
+            ((MAX_SUPRA_COIN_SUPPLY)/10 as u64),
             &mint_cap,
         );
         coin::deposit<SupraCoin>(signer::address_of(core_resources), coins);

@@ -6,5 +6,5 @@ version = "0.0.0"
 hero = "_"
 
 [dependencies]
-AptosFramework = { local = "../../../framework/aptos-framework" }
+SupraFramework = { local = "../../../framework/supra-framework" }
 AptosTokenObjects = { local = "../../../framework/aptos-token-objects" }

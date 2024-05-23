@@ -48,8 +48,8 @@ pub fn initialize_enabled_disabled_comparison(
     txns: usize,
     allow_block_executor_fallback: bool,
 ) -> AggV2TestHarness {
-    let (mut harness_base, account_base) = initialize_harness(mode, false, path.clone());
     let (mut harness_comp, _account_comp) = initialize_harness(mode, true, path.clone());
+    let (mut harness_base, account_base) = initialize_harness(mode, false, path.clone());
     if !allow_block_executor_fallback {
         harness_base.executor.disable_block_executor_fallback();
         harness_comp.executor.disable_block_executor_fallback();

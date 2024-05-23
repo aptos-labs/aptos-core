@@ -1,9 +1,9 @@
 /// This module implements the the food tokens (fungible token). When the module initializes,
 /// it creates the collection and two fungible tokens such as Corn and Meat.
 module knight::food {
-    use aptos_framework::fungible_asset::{Self, Metadata};
-    use aptos_framework::object::{Self, Object};
-    use aptos_framework::primary_fungible_store;
+    use supra_framework::fungible_asset::{Self, Metadata};
+    use supra_framework::object::{Self, Object};
+    use supra_framework::primary_fungible_store;
     use aptos_token_objects::collection;
     use aptos_token_objects::property_map;
     use aptos_token_objects::token;
@@ -55,7 +55,7 @@ module knight::food {
     const CONDITION_HUNGRY: vector<u8> = b"Hungry";
     const CONDITION_GOOD: vector<u8> = b"Good";
 
-    #[resource_group_member(group = aptos_framework::object::ObjectGroup)]
+    #[resource_group_member(group = supra_framework::object::ObjectGroup)]
     // Food Token
     struct FoodToken has key {
         /// Used to mutate properties
@@ -66,7 +66,7 @@ module knight::food {
         fungible_asset_burn_ref: fungible_asset::BurnRef,
     }
 
-    #[resource_group_member(group = aptos_framework::object::ObjectGroup)]
+    #[resource_group_member(group = supra_framework::object::ObjectGroup)]
     /// Restoration value of the food. An attribute of a food token.
     struct RestorationValue has key {
         value: u64,

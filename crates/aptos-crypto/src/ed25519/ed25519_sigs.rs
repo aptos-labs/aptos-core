@@ -83,6 +83,20 @@ impl Ed25519Signature {
         // As this stage S == L which implies a non canonical S.
         false
     }
+
+    /// TODO
+    pub fn aggregate(_sigs: Vec<Ed25519Signature>) -> anyhow::Result<Self> {
+        todo!()
+    }
+
+    /// TODO
+    pub fn verify_aggregate<T: CryptoHash + Serialize>(
+        &self,
+        _messages: &[&T],
+        _x: &[&Ed25519PublicKey],
+    ) -> anyhow::Result<()> {
+        todo!()
+    }
 }
 
 //////////////////////

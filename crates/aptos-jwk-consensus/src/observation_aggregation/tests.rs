@@ -4,7 +4,7 @@ use crate::{
     observation_aggregation::ObservationAggregationState,
     types::{ObservedUpdate, ObservedUpdateResponse},
 };
-use aptos_crypto::{bls12381, SigningKey, Uniform};
+use aptos_crypto::{ed25519, SigningKey, Uniform};
 use aptos_reliable_broadcast::BroadcastStatus;
 use aptos_types::{
     epoch_state::EpochState,
@@ -25,11 +25,11 @@ fn test_observation_aggregation_state() {
     let addrs: Vec<AccountAddress> = (0..num_validators)
         .map(|_| AccountAddress::random())
         .collect();
-    let private_keys: Vec<bls12381::PrivateKey> = (0..num_validators)
-        .map(|_| bls12381::PrivateKey::generate_for_testing())
+    let private_keys: Vec<ed25519::PrivateKey> = (0..num_validators)
+        .map(|_| ed25519::PrivateKey::generate_for_testing())
         .collect();
-    let public_keys: Vec<bls12381::PublicKey> = (0..num_validators)
-        .map(|i| bls12381::PublicKey::from(&private_keys[i]))
+    let public_keys: Vec<ed25519::PublicKey> = (0..num_validators)
+        .map(|i| ed25519::PublicKey::from(&private_keys[i]))
         .collect();
     let voting_powers = [1, 1, 1, 6, 6]; // total voting power: 15, default threshold: 11
     let validator_infos: Vec<ValidatorConsensusInfo> = (0..num_validators)

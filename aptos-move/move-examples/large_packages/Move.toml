@@ -4,7 +4,7 @@ version = "1.0.0"
 upgrade_policy = "compatible"
 
 [dependencies]
-AptosFramework = { local = "../../framework/aptos-framework" }
+SupraFramework = { local = "../../framework/supra-framework" }
 
 [addresses]
 large_packages = "_"

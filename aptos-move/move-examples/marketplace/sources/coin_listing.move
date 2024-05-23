@@ -15,14 +15,14 @@ module coin_listing {
     use std::string::{Self, String};
     use aptos_std::math64;
 
-    use aptos_framework::coin::{Self, Coin};
-    use aptos_framework::object::{Self, ConstructorRef, Object, ObjectCore};
-    use aptos_framework::timestamp;
+    use supra_framework::coin::{Self, Coin};
+    use supra_framework::object::{Self, ConstructorRef, Object, ObjectCore};
+    use supra_framework::timestamp;
 
     use marketplace::events;
     use marketplace::fee_schedule::{Self, FeeSchedule};
     use marketplace::listing::{Self, Listing};
-    use aptos_framework::aptos_account;
+    use supra_framework::aptos_account;
 
     #[test_only]
     friend marketplace::listing_tests;
@@ -44,14 +44,14 @@ module coin_listing {
     const FIXED_PRICE_TYPE: vector<u8> = b"fixed price";
     const AUCTION_TYPE: vector<u8> = b"auction";
 
-    #[resource_group_member(group = aptos_framework::object::ObjectGroup)]
+    #[resource_group_member(group = supra_framework::object::ObjectGroup)]
     /// Fixed-price market place listing.
     struct FixedPriceListing<phantom CoinType> has key {
         /// The price to purchase the item up for listing.
         price: u64,
     }
 
-    #[resource_group_member(group = aptos_framework::object::ObjectGroup)]
+    #[resource_group_member(group = supra_framework::object::ObjectGroup)]
     /// An auction-based listing with optional buy it now semantics.
     struct AuctionListing<phantom CoinType> has key {
         /// Starting bid price.
@@ -622,10 +622,10 @@ module coin_listing {
 module listing_tests {
     use std::option;
 
-    use aptos_framework::aptos_coin::AptosCoin;
-    use aptos_framework::coin;
-    use aptos_framework::object::{Self, Object};
-    use aptos_framework::timestamp;
+    use supra_framework::supra_coin::SupraCoin;
+    use supra_framework::coin;
+    use supra_framework::object::{Self, Object};
+    use supra_framework::timestamp;
 
     use aptos_token::token as tokenv1;
 
@@ -638,219 +638,219 @@ module listing_tests {
     use marketplace::test_utils;
 
     fun test_fixed_price(
-        aptos_framework: &signer,
+        supra_framework: &signer,
         marketplace: &signer,
         seller: &signer,
         purchaser: &signer,
     ) {
         let (marketplace_addr, seller_addr, purchaser_addr) =
-            test_utils::setup(aptos_framework, marketplace, seller, purchaser);
+            test_utils::setup(supra_framework, marketplace, seller, purchaser);
 
         let (token, fee_schedule, listing) = fixed_price_listing(marketplace, seller);
 
-        assert!(coin::balance<AptosCoin>(marketplace_addr) == 1, 0);
-        assert!(coin::balance<AptosCoin>(seller_addr) == 9999, 0);
+        assert!(coin::balance<SupraCoin>(marketplace_addr) == 1, 0);
+        assert!(coin::balance<SupraCoin>(seller_addr) == 9999, 0);
         assert!(listing::listed_object(listing) == object::convert(token), 0);
         assert!(listing::fee_schedule(listing) == fee_schedule, 0);
-        assert!(coin_listing::price<AptosCoin>(listing) == option::some(500), 0);
-        assert!(!coin_listing::is_auction<AptosCoin>(listing), 0);
+        assert!(coin_listing::price<SupraCoin>(listing) == option::some(500), 0);
+        assert!(!coin_listing::is_auction<SupraCoin>(listing), 0);
 
-        coin_listing::purchase<AptosCoin>(purchaser, listing);
+        coin_listing::purchase<SupraCoin>(purchaser, listing);
 
         assert!(object::owner(token) == purchaser_addr, 0);
-        assert!(coin::balance<AptosCoin>(marketplace_addr) == 6, 0);
-        assert!(coin::balance<AptosCoin>(seller_addr) == 10494, 0);
-        assert!(coin::balance<AptosCoin>(purchaser_addr) == 9500, 0);
+        assert!(coin::balance<SupraCoin>(marketplace_addr) == 6, 0);
+        assert!(coin::balance<SupraCoin>(seller_addr) == 10494, 0);
+        assert!(coin::balance<SupraCoin>(purchaser_addr) == 9500, 0);
     }
 
-    #[test(aptos_framework = @0x1, marketplace = @0x111, seller = @0x222, purchaser = @0x333)]
+    #[test(supra_framework = @0x1, marketplace = @0x111, seller = @0x222, purchaser = @0x333)]
     fun test_fixed_price_high_royalty(
-        aptos_framework: &signer,
+        supra_framework: &signer,
         marketplace: &signer,
         seller: &signer,
         purchaser: &signer,
     ) {
         let (marketplace_addr, seller_addr, purchaser_addr) =
-            test_utils::setup(aptos_framework, marketplace, seller, purchaser);
+            test_utils::setup(supra_framework, marketplace, seller, purchaser);
         // TODO: add test that separates seller and creator
         let (_collection, additional_token) = mint_tokenv2_with_collection_royalty(seller, 100, 100);
         let (token, fee_schedule, listing) = fixed_price_listing_with_token(marketplace, seller, additional_token);
 
-        assert!(coin::balance<AptosCoin>(marketplace_addr) == 1, 0);
-        assert!(coin::balance<AptosCoin>(seller_addr) == 9999, 0);
+        assert!(coin::balance<SupraCoin>(marketplace_addr) == 1, 0);
+        assert!(coin::balance<SupraCoin>(seller_addr) == 9999, 0);
         assert!(listing::listed_object(listing) == object::convert(token), 0);
         assert!(listing::fee_schedule(listing) == fee_schedule, 0);
-        assert!(coin_listing::price<AptosCoin>(listing) == option::some(500), 0);
-        assert!(!coin_listing::is_auction<AptosCoin>(listing), 0);
+        assert!(coin_listing::price<SupraCoin>(listing) == option::some(500), 0);
+        assert!(!coin_listing::is_auction<SupraCoin>(listing), 0);
 
-        coin_listing::purchase<AptosCoin>(purchaser, listing);
+        coin_listing::purchase<SupraCoin>(purchaser, listing);
 
         assert!(object::owner(token) == purchaser_addr, 0);
         // Because royalty is 100, no commission is taken just the listing fee
-        assert!(coin::balance<AptosCoin>(marketplace_addr) == 1, 0);
-        assert!(coin::balance<AptosCoin>(seller_addr) == 10499, 0);
-        assert!(coin::balance<AptosCoin>(purchaser_addr) == 9500, 0);
+        assert!(coin::balance<SupraCoin>(marketplace_addr) == 1, 0);
+        assert!(coin::balance<SupraCoin>(seller_addr) == 10499, 0);
+        assert!(coin::balance<SupraCoin>(purchaser_addr) == 9500, 0);
     }
 
-    #[test(aptos_framework = @0x1, marketplace = @0x111, seller = @0x222, purchaser = @0x333)]
+    #[test(supra_framework = @0x1, marketplace = @0x111, seller = @0x222, purchaser = @0x333)]
     fun test_fixed_price_end(
-        aptos_framework: &signer,
+        supra_framework: &signer,
         marketplace: &signer,
         seller: &signer,
         purchaser: &signer,
     ) {
         let (marketplace_addr, seller_addr, _purchaser_addr) =
-            test_utils::setup(aptos_framework, marketplace, seller, purchaser);
+            test_utils::setup(supra_framework, marketplace, seller, purchaser);
 
         let (token, _fee_schedule, listing) = fixed_price_listing(marketplace, seller);
 
-        assert!(coin::balance<AptosCoin>(marketplace_addr) == 1, 0);
-        coin_listing::end_fixed_price<AptosCoin>(seller, listing);
-        assert!(coin::balance<AptosCoin>(marketplace_addr) == 1, 0);
-        assert!(coin::balance<AptosCoin>(seller_addr) == 9999, 0);
+        assert!(coin::balance<SupraCoin>(marketplace_addr) == 1, 0);
+        coin_listing::end_fixed_price<SupraCoin>(seller, listing);
+        assert!(coin::balance<SupraCoin>(marketplace_addr) == 1, 0);
+        assert!(coin::balance<SupraCoin>(seller_addr) == 9999, 0);
         assert!(object::owner(token) == seller_addr, 0);
     }
 
-    #[test(aptos_framework = @0x1, marketplace = @0x111, seller = @0x222, purchaser = @0x333)]
+    #[test(supra_framework = @0x1, marketplace = @0x111, seller = @0x222, purchaser = @0x333)]
     fun test_auction_purchase(
-        aptos_framework: &signer,
+        supra_framework: &signer,
         marketplace: &signer,
         seller: &signer,
         purchaser: &signer,
     ) {
         let (marketplace_addr, seller_addr, purchaser_addr) =
-            test_utils::setup(aptos_framework, marketplace, seller, purchaser);
+            test_utils::setup(supra_framework, marketplace, seller, purchaser);
 
         let (token, fee_schedule, listing) = auction_listing(marketplace, seller);
-        assert!(coin::balance<AptosCoin>(marketplace_addr) == 1, 0);
-        assert!(coin::balance<AptosCoin>(seller_addr) == 9999, 0);
+        assert!(coin::balance<SupraCoin>(marketplace_addr) == 1, 0);
+        assert!(coin::balance<SupraCoin>(seller_addr) == 9999, 0);
         assert!(listing::listed_object(listing) == object::convert(token), 0);
         assert!(listing::fee_schedule(listing) == fee_schedule, 0);
-        assert!(coin_listing::price<AptosCoin>(listing) == option::some(500), 0);
-        assert!(coin_listing::is_auction<AptosCoin>(listing), 0);
-        assert!(coin_listing::starting_bid<AptosCoin>(listing) == 100, 0);
-        assert!(coin_listing::bid_increment<AptosCoin>(listing) == 50, 0);
-        assert!(coin_listing::auction_end_time<AptosCoin>(listing) == timestamp::now_seconds() + 200, 0);
-        assert!(coin_listing::minimum_bid_time_before_end<AptosCoin>(listing) == 150, 0);
-        assert!(coin_listing::current_amount<AptosCoin>(listing) == option::none(), 0);
-        assert!(coin_listing::current_bidder<AptosCoin>(listing) == option::none(), 0);
+        assert!(coin_listing::price<SupraCoin>(listing) == option::some(500), 0);
+        assert!(coin_listing::is_auction<SupraCoin>(listing), 0);
+        assert!(coin_listing::starting_bid<SupraCoin>(listing) == 100, 0);
+        assert!(coin_listing::bid_increment<SupraCoin>(listing) == 50, 0);
+        assert!(coin_listing::auction_end_time<SupraCoin>(listing) == timestamp::now_seconds() + 200, 0);
+        assert!(coin_listing::minimum_bid_time_before_end<SupraCoin>(listing) == 150, 0);
+        assert!(coin_listing::current_amount<SupraCoin>(listing) == option::none(), 0);
+        assert!(coin_listing::current_bidder<SupraCoin>(listing) == option::none(), 0);
 
-        coin_listing::purchase<AptosCoin>(purchaser, listing);
+        coin_listing::purchase<SupraCoin>(purchaser, listing);
 
         assert!(object::owner(token) == purchaser_addr, 0);
-        assert!(coin::balance<AptosCoin>(marketplace_addr) == 6, 0);
-        assert!(coin::balance<AptosCoin>(seller_addr) == 10494, 0);
-        assert!(coin::balance<AptosCoin>(purchaser_addr) == 9500, 0);
+        assert!(coin::balance<SupraCoin>(marketplace_addr) == 6, 0);
+        assert!(coin::balance<SupraCoin>(seller_addr) == 10494, 0);
+        assert!(coin::balance<SupraCoin>(purchaser_addr) == 9500, 0);
     }
 
-    #[test(aptos_framework = @0x1, marketplace = @0x111, seller = @0x222, purchaser = @0x333)]
+    #[test(supra_framework = @0x1, marketplace = @0x111, seller = @0x222, purchaser = @0x333)]
     fun test_auction_bid_then_purchase(
-        aptos_framework: &signer,
+        supra_framework: &signer,
         marketplace: &signer,
         seller: &signer,
         purchaser: &signer,
     ) {
         let (marketplace_addr, seller_addr, purchaser_addr) =
-            test_utils::setup(aptos_framework, marketplace, seller, purchaser);
+            test_utils::setup(supra_framework, marketplace, seller, purchaser);
 
         let (token, _fee_schedule, listing) = auction_listing(marketplace, seller);
-        assert!(coin::balance<AptosCoin>(marketplace_addr) == 1, 0);
-        assert!(coin::balance<AptosCoin>(seller_addr) == 9999, 0);
+        assert!(coin::balance<SupraCoin>(marketplace_addr) == 1, 0);
+        assert!(coin::balance<SupraCoin>(seller_addr) == 9999, 0);
 
-        coin_listing::bid<AptosCoin>(seller, listing, 100);
-        assert!(coin_listing::current_amount<AptosCoin>(listing) == option::some(100), 0);
-        assert!(coin_listing::current_bidder<AptosCoin>(listing) == option::some(seller_addr), 0);
-        assert!(coin::balance<AptosCoin>(marketplace_addr) == 3, 0);
-        assert!(coin::balance<AptosCoin>(seller_addr) == 9897, 0);
+        coin_listing::bid<SupraCoin>(seller, listing, 100);
+        assert!(coin_listing::current_amount<SupraCoin>(listing) == option::some(100), 0);
+        assert!(coin_listing::current_bidder<SupraCoin>(listing) == option::some(seller_addr), 0);
+        assert!(coin::balance<SupraCoin>(marketplace_addr) == 3, 0);
+        assert!(coin::balance<SupraCoin>(seller_addr) == 9897, 0);
 
         // Return the bid and insert a new bid
-        coin_listing::bid<AptosCoin>(purchaser, listing, 150);
-        assert!(coin_listing::current_amount<AptosCoin>(listing) == option::some(150), 0);
-        assert!(coin_listing::current_bidder<AptosCoin>(listing) == option::some(purchaser_addr), 0);
-        assert!(coin::balance<AptosCoin>(marketplace_addr) == 5, 0);
-        assert!(coin::balance<AptosCoin>(seller_addr) == 9997, 0);
-        assert!(coin::balance<AptosCoin>(purchaser_addr) == 9848, 0);
+        coin_listing::bid<SupraCoin>(purchaser, listing, 150);
+        assert!(coin_listing::current_amount<SupraCoin>(listing) == option::some(150), 0);
+        assert!(coin_listing::current_bidder<SupraCoin>(listing) == option::some(purchaser_addr), 0);
+        assert!(coin::balance<SupraCoin>(marketplace_addr) == 5, 0);
+        assert!(coin::balance<SupraCoin>(seller_addr) == 9997, 0);
+        assert!(coin::balance<SupraCoin>(purchaser_addr) == 9848, 0);
 
         // Return the bid and replace with a purchase
-        coin_listing::purchase<AptosCoin>(purchaser, listing);
+        coin_listing::purchase<SupraCoin>(purchaser, listing);
         assert!(object::owner(token) == purchaser_addr, 0);
-        assert!(coin::balance<AptosCoin>(marketplace_addr) == 10, 0);
-        assert!(coin::balance<AptosCoin>(purchaser_addr) == 9498, 0);
+        assert!(coin::balance<SupraCoin>(marketplace_addr) == 10, 0);
+        assert!(coin::balance<SupraCoin>(purchaser_addr) == 9498, 0);
     }
 
-    #[test(aptos_framework = @0x1, marketplace = @0x111, seller = @0x222, purchaser = @0x333)]
+    #[test(supra_framework = @0x1, marketplace = @0x111, seller = @0x222, purchaser = @0x333)]
     fun test_auction_bidding(
-        aptos_framework: &signer,
+        supra_framework: &signer,
         marketplace: &signer,
         seller: &signer,
         purchaser: &signer,
     ) {
         let (marketplace_addr, seller_addr, purchaser_addr) =
-            test_utils::setup(aptos_framework, marketplace, seller, purchaser);
+            test_utils::setup(supra_framework, marketplace, seller, purchaser);
 
         let (token, _fee_schedule, listing) = auction_listing(marketplace, seller);
-        assert!(coin::balance<AptosCoin>(marketplace_addr) == 1, 0);
-        assert!(coin::balance<AptosCoin>(seller_addr) == 9999, 0);
+        assert!(coin::balance<SupraCoin>(marketplace_addr) == 1, 0);
+        assert!(coin::balance<SupraCoin>(seller_addr) == 9999, 0);
         let end_time = timestamp::now_seconds() + 200;
-        assert!(coin_listing::auction_end_time<AptosCoin>(listing) == end_time, 0);
+        assert!(coin_listing::auction_end_time<SupraCoin>(listing) == end_time, 0);
 
         // Bid but do not affect end timing
-        coin_listing::bid<AptosCoin>(seller, listing, 100);
-        assert!(coin::balance<AptosCoin>(marketplace_addr) == 3, 0);
-        assert!(coin::balance<AptosCoin>(seller_addr) == 9897, 0);
-        assert!(coin_listing::auction_end_time<AptosCoin>(listing) == end_time, 0);
+        coin_listing::bid<SupraCoin>(seller, listing, 100);
+        assert!(coin::balance<SupraCoin>(marketplace_addr) == 3, 0);
+        assert!(coin::balance<SupraCoin>(seller_addr) == 9897, 0);
+        assert!(coin_listing::auction_end_time<SupraCoin>(listing) == end_time, 0);
 
         // Return the bid and insert a new bid and affect end timing
         test_utils::increment_timestamp(150);
-        coin_listing::bid<AptosCoin>(purchaser, listing, 150);
-        assert!(coin::balance<AptosCoin>(marketplace_addr) == 5, 0);
-        assert!(coin::balance<AptosCoin>(seller_addr) == 9997, 0);
-        assert!(coin::balance<AptosCoin>(purchaser_addr) == 9848, 0);
-        assert!(coin_listing::auction_end_time<AptosCoin>(listing) != end_time, 0);
+        coin_listing::bid<SupraCoin>(purchaser, listing, 150);
+        assert!(coin::balance<SupraCoin>(marketplace_addr) == 5, 0);
+        assert!(coin::balance<SupraCoin>(seller_addr) == 9997, 0);
+        assert!(coin::balance<SupraCoin>(purchaser_addr) == 9848, 0);
+        assert!(coin_listing::auction_end_time<SupraCoin>(listing) != end_time, 0);
 
         // End the auction as out of time
         test_utils::increment_timestamp(150);
-        coin_listing::complete_auction<AptosCoin>(aptos_framework, listing);
+        coin_listing::complete_auction<SupraCoin>(supra_framework, listing);
         assert!(object::owner(token) == purchaser_addr, 0);
-        assert!(coin::balance<AptosCoin>(marketplace_addr) == 6, 0);
-        assert!(coin::balance<AptosCoin>(seller_addr) == 10146, 0);
+        assert!(coin::balance<SupraCoin>(marketplace_addr) == 6, 0);
+        assert!(coin::balance<SupraCoin>(seller_addr) == 10146, 0);
     }
 
-    #[test(aptos_framework = @0x1, marketplace = @0x111, seller = @0x222, purchaser = @0x333)]
+    #[test(supra_framework = @0x1, marketplace = @0x111, seller = @0x222, purchaser = @0x333)]
     fun test_ended_auction_no_bid(
-        aptos_framework: &signer,
+        supra_framework: &signer,
         marketplace: &signer,
         seller: &signer,
         purchaser: &signer,
     ) {
         let (marketplace_addr, seller_addr, _purchaser_addr) =
-            test_utils::setup(aptos_framework, marketplace, seller, purchaser);
+            test_utils::setup(supra_framework, marketplace, seller, purchaser);
 
         let (token, _fee_schedule, listing) = auction_listing(marketplace, seller);
-        assert!(coin::balance<AptosCoin>(marketplace_addr) == 1, 0);
-        assert!(coin::balance<AptosCoin>(seller_addr) == 9999, 0);
+        assert!(coin::balance<SupraCoin>(marketplace_addr) == 1, 0);
+        assert!(coin::balance<SupraCoin>(seller_addr) == 9999, 0);
 
         test_utils::increment_timestamp(200);
-        coin_listing::complete_auction<AptosCoin>(aptos_framework, listing);
+        coin_listing::complete_auction<SupraCoin>(supra_framework, listing);
 
         assert!(object::owner(token) == seller_addr, 0);
-        assert!(coin::balance<AptosCoin>(marketplace_addr) == 1, 0);
-        assert!(coin::balance<AptosCoin>(seller_addr) == 9999, 0);
+        assert!(coin::balance<SupraCoin>(marketplace_addr) == 1, 0);
+        assert!(coin::balance<SupraCoin>(seller_addr) == 9999, 0);
     }
 
-    #[test(aptos_framework = @0x1, marketplace = @0x111, seller = @0x222, purchaser = @0x333)]
+    #[test(supra_framework = @0x1, marketplace = @0x111, seller = @0x222, purchaser = @0x333)]
     #[expected_failure(abort_code = 0x30002, location = marketplace::listing)]
     fun test_not_started_fixed_price(
-        aptos_framework: &signer,
+        supra_framework: &signer,
         marketplace: &signer,
         seller: &signer,
         purchaser: &signer,
     ) {
-        test_utils::setup(aptos_framework, marketplace, seller, purchaser);
+        test_utils::setup(supra_framework, marketplace, seller, purchaser);
 
         let token = test_utils::mint_tokenv2(seller);
         let fee_schedule = test_utils::fee_schedule(marketplace);
-        let listing = coin_listing::init_fixed_price_internal<AptosCoin>(
+        let listing = coin_listing::init_fixed_price_internal<SupraCoin>(
             seller,
             object::convert(token),
             fee_schedule,
@@ -858,22 +858,22 @@ module listing_tests {
             500,
         );
 
-        coin_listing::purchase<AptosCoin>(purchaser, listing);
+        coin_listing::purchase<SupraCoin>(purchaser, listing);
     }
 
-    #[test(aptos_framework = @0x1, marketplace = @0x111, seller = @0x222, purchaser = @0x333)]
+    #[test(supra_framework = @0x1, marketplace = @0x111, seller = @0x222, purchaser = @0x333)]
     #[expected_failure(abort_code = 0x30002, location = marketplace::listing)]
     fun test_not_started_auction(
-        aptos_framework: &signer,
+        supra_framework: &signer,
         marketplace: &signer,
         seller: &signer,
         purchaser: &signer,
     ) {
-        test_utils::setup(aptos_framework, marketplace, seller, purchaser);
+        test_utils::setup(supra_framework, marketplace, seller, purchaser);
 
         let token = test_utils::mint_tokenv2(seller);
         let fee_schedule = test_utils::fee_schedule(marketplace);
-        let listing = coin_listing::init_auction_internal<AptosCoin>(
+        let listing = coin_listing::init_auction_internal<SupraCoin>(
             seller,
             object::convert(token),
             fee_schedule,
@@ -885,52 +885,52 @@ module listing_tests {
             option::some(500),
         );
 
-        coin_listing::bid<AptosCoin>(purchaser, listing, 1000);
+        coin_listing::bid<SupraCoin>(purchaser, listing, 1000);
     }
 
-    #[test(aptos_framework = @0x1, marketplace = @0x111, seller = @0x222, purchaser = @0x333)]
+    #[test(supra_framework = @0x1, marketplace = @0x111, seller = @0x222, purchaser = @0x333)]
     #[expected_failure(abort_code = 0x30005, location = marketplace::coin_listing)]
     fun test_ended_auction_bid(
-        aptos_framework: &signer,
+        supra_framework: &signer,
         marketplace: &signer,
         seller: &signer,
         purchaser: &signer,
     ) {
-        test_utils::setup(aptos_framework, marketplace, seller, purchaser);
+        test_utils::setup(supra_framework, marketplace, seller, purchaser);
 
         let (_token, _fee_schedule, listing) = auction_listing(marketplace, seller);
         test_utils::increment_timestamp(200);
-        coin_listing::bid<AptosCoin>(purchaser, listing, 1000);
+        coin_listing::bid<SupraCoin>(purchaser, listing, 1000);
     }
 
-    #[test(aptos_framework = @0x1, marketplace = @0x111, seller = @0x222, purchaser = @0x333)]
+    #[test(supra_framework = @0x1, marketplace = @0x111, seller = @0x222, purchaser = @0x333)]
     #[expected_failure(abort_code = 0x30005, location = marketplace::coin_listing)]
     fun test_ended_auction_purchase(
-        aptos_framework: &signer,
+        supra_framework: &signer,
         marketplace: &signer,
         seller: &signer,
         purchaser: &signer,
     ) {
-        test_utils::setup(aptos_framework, marketplace, seller, purchaser);
+        test_utils::setup(supra_framework, marketplace, seller, purchaser);
 
         let (_token, _fee_schedule, listing) = auction_listing(marketplace, seller);
         test_utils::increment_timestamp(200);
-        coin_listing::purchase<AptosCoin>(purchaser, listing);
+        coin_listing::purchase<SupraCoin>(purchaser, listing);
     }
 
-    #[test(aptos_framework = @0x1, marketplace = @0x111, seller = @0x222, purchaser = @0x333)]
-    #[expected_failure(abort_code = 0x10006, location = aptos_framework::coin)]
+    #[test(supra_framework = @0x1, marketplace = @0x111, seller = @0x222, purchaser = @0x333)]
+    #[expected_failure(abort_code = 0x10006, location = supra_framework::coin)]
     fun test_not_enough_coin_fixed_price(
-        aptos_framework: &signer,
+        supra_framework: &signer,
         marketplace: &signer,
         seller: &signer,
         purchaser: &signer,
     ) {
-        test_utils::setup(aptos_framework, marketplace, seller, purchaser);
+        test_utils::setup(supra_framework, marketplace, seller, purchaser);
 
         let token = test_utils::mint_tokenv2(seller);
         let fee_schedule = test_utils::fee_schedule(marketplace);
-        let listing = coin_listing::init_fixed_price_internal<AptosCoin>(
+        let listing = coin_listing::init_fixed_price_internal<SupraCoin>(
             seller,
             object::convert(token),
             fee_schedule,
@@ -938,51 +938,51 @@ module listing_tests {
             100000,
         );
 
-        coin_listing::purchase<AptosCoin>(purchaser, listing);
+        coin_listing::purchase<SupraCoin>(purchaser, listing);
     }
 
-    #[test(aptos_framework = @0x1, marketplace = @0x111, seller = @0x222, purchaser = @0x333)]
-    #[expected_failure(abort_code = 0x10006, location = aptos_framework::coin)]
+    #[test(supra_framework = @0x1, marketplace = @0x111, seller = @0x222, purchaser = @0x333)]
+    #[expected_failure(abort_code = 0x10006, location = supra_framework::coin)]
     fun test_not_enough_coin_auction_bid(
-        aptos_framework: &signer,
+        supra_framework: &signer,
         marketplace: &signer,
         seller: &signer,
         purchaser: &signer,
     ) {
-        test_utils::setup(aptos_framework, marketplace, seller, purchaser);
+        test_utils::setup(supra_framework, marketplace, seller, purchaser);
 
         let (_token, _fee_schedule, listing) = auction_listing(marketplace, seller);
-        coin_listing::bid<AptosCoin>(purchaser, listing, 100000);
+        coin_listing::bid<SupraCoin>(purchaser, listing, 100000);
     }
 
-    #[test(aptos_framework = @0x1, marketplace = @0x111, seller = @0x222, purchaser = @0x333)]
+    #[test(supra_framework = @0x1, marketplace = @0x111, seller = @0x222, purchaser = @0x333)]
     #[expected_failure(abort_code = 0x10003, location = marketplace::coin_listing)]
     fun test_bid_too_low(
-        aptos_framework: &signer,
+        supra_framework: &signer,
         marketplace: &signer,
         seller: &signer,
         purchaser: &signer,
     ) {
-        test_utils::setup(aptos_framework, marketplace, seller, purchaser);
+        test_utils::setup(supra_framework, marketplace, seller, purchaser);
 
         let (_token, _fee_schedule, listing) = auction_listing(marketplace, seller);
-        coin_listing::bid<AptosCoin>(purchaser, listing, 100);
-        coin_listing::bid<AptosCoin>(purchaser, listing, 125);
+        coin_listing::bid<SupraCoin>(purchaser, listing, 100);
+        coin_listing::bid<SupraCoin>(purchaser, listing, 125);
     }
 
-    #[test(aptos_framework = @0x1, marketplace = @0x111, seller = @0x222, purchaser = @0x333)]
-    #[expected_failure(abort_code = 0x10006, location = aptos_framework::coin)]
+    #[test(supra_framework = @0x1, marketplace = @0x111, seller = @0x222, purchaser = @0x333)]
+    #[expected_failure(abort_code = 0x10006, location = supra_framework::coin)]
     fun test_not_enough_coin_auction_purchase(
-        aptos_framework: &signer,
+        supra_framework: &signer,
         marketplace: &signer,
         seller: &signer,
         purchaser: &signer,
     ) {
-        test_utils::setup(aptos_framework, marketplace, seller, purchaser);
+        test_utils::setup(supra_framework, marketplace, seller, purchaser);
 
         let token = test_utils::mint_tokenv2(seller);
         let fee_schedule = test_utils::fee_schedule(marketplace);
-        let listing = coin_listing::init_auction_internal<AptosCoin>(
+        let listing = coin_listing::init_auction_internal<SupraCoin>(
             seller,
             object::convert(token),
             fee_schedule,
@@ -994,36 +994,36 @@ module listing_tests {
             option::some(50000),
         );
 
-        coin_listing::purchase<AptosCoin>(purchaser, listing);
+        coin_listing::purchase<SupraCoin>(purchaser, listing);
     }
 
-    #[test(aptos_framework = @0x1, marketplace = @0x111, seller = @0x222, purchaser = @0x333)]
+    #[test(supra_framework = @0x1, marketplace = @0x111, seller = @0x222, purchaser = @0x333)]
     #[expected_failure(abort_code = 0x60001, location = marketplace::coin_listing)]
     fun test_auction_view_on_fixed_price(
-        aptos_framework: &signer,
+        supra_framework: &signer,
         marketplace: &signer,
         seller: &signer,
         purchaser: &signer,
     ) {
-        test_utils::setup(aptos_framework, marketplace, seller, purchaser);
+        test_utils::setup(supra_framework, marketplace, seller, purchaser);
 
         let (_token, _fee_schedule, listing) = fixed_price_listing(marketplace, seller);
-        coin_listing::auction_end_time<AptosCoin>(listing);
+        coin_listing::auction_end_time<SupraCoin>(listing);
     }
 
-    #[test(aptos_framework = @0x1, marketplace = @0x111, seller = @0x222, purchaser = @0x333)]
+    #[test(supra_framework = @0x1, marketplace = @0x111, seller = @0x222, purchaser = @0x333)]
     #[expected_failure(abort_code = 0x10002, location = marketplace::coin_listing)]
     fun test_purchase_on_auction_without_buy_it_now(
-        aptos_framework: &signer,
+        supra_framework: &signer,
         marketplace: &signer,
         seller: &signer,
         purchaser: &signer,
     ) {
-        test_utils::setup(aptos_framework, marketplace, seller, purchaser);
+        test_utils::setup(supra_framework, marketplace, seller, purchaser);
 
         let token = test_utils::mint_tokenv2(seller);
         let fee_schedule = test_utils::fee_schedule(marketplace);
-        let listing = coin_listing::init_auction_internal<AptosCoin>(
+        let listing = coin_listing::init_auction_internal<SupraCoin>(
             seller,
             object::convert(token),
             fee_schedule,
@@ -1035,21 +1035,21 @@ module listing_tests {
             option::none(),
         );
 
-        coin_listing::purchase<AptosCoin>(purchaser, listing);
+        coin_listing::purchase<SupraCoin>(purchaser, listing);
     }
 
-    #[test(aptos_framework = @0x1, marketplace = @0x111, seller = @0x222, purchaser = @0x333)]
+    #[test(supra_framework = @0x1, marketplace = @0x111, seller = @0x222, purchaser = @0x333)]
     #[expected_failure(abort_code = 0x50006, location = marketplace::coin_listing)]
     fun test_bad_fixed_price_end(
-        aptos_framework: &signer,
+        supra_framework: &signer,
         marketplace: &signer,
         seller: &signer,
         purchaser: &signer,
     ) {
-        test_utils::setup(aptos_framework, marketplace, seller, purchaser);
+        test_utils::setup(supra_framework, marketplace, seller, purchaser);
 
         let (_token, _fee_schedule, listing) = fixed_price_listing(marketplace, seller);
-        coin_listing::end_fixed_price<AptosCoin>(purchaser, listing);
+        coin_listing::end_fixed_price<SupraCoin>(purchaser, listing);
     }
 
     // Objects and TokenV2 stuff
@@ -1068,7 +1068,7 @@ module listing_tests {
         token: Object<Token>
     ): (Object<Token>, Object<FeeSchedule>, Object<Listing>) {
         let fee_schedule = test_utils::fee_schedule(marketplace);
-        let listing = coin_listing::init_fixed_price_internal<AptosCoin>(
+        let listing = coin_listing::init_fixed_price_internal<SupraCoin>(
             seller,
             object::convert(token),
             fee_schedule,
@@ -1085,7 +1085,7 @@ module listing_tests {
     ): (Object<Token>, Object<FeeSchedule>, Object<Listing>) {
         let token = test_utils::mint_tokenv2(seller);
         let fee_schedule = test_utils::fee_schedule(marketplace);
-        let listing = coin_listing::init_auction_internal<AptosCoin>(
+        let listing = coin_listing::init_auction_internal<SupraCoin>(
             seller,
             object::convert(token),
             fee_schedule,
@@ -1101,107 +1101,107 @@ module listing_tests {
 
     // TokenV1
 
-    #[test(aptos_framework = @0x1, marketplace = @0x111, seller = @0x222, purchaser = @0x333)]
+    #[test(supra_framework = @0x1, marketplace = @0x111, seller = @0x222, purchaser = @0x333)]
     fun test_fixed_price_for_token_v1(
-        aptos_framework: &signer,
+        supra_framework: &signer,
         marketplace: &signer,
         seller: &signer,
         purchaser: &signer,
     ) {
         let (_marketplace_addr, _seller_addr, purchaser_addr) =
-            test_utils::setup(aptos_framework, marketplace, seller, purchaser);
+            test_utils::setup(supra_framework, marketplace, seller, purchaser);
         tokenv1::opt_in_direct_transfer(purchaser, true);
 
         let (token_id, _fee_schedule, listing) = fixed_price_listing_for_tokenv1(marketplace, seller);
-        coin_listing::purchase<AptosCoin>(purchaser, listing);
+        coin_listing::purchase<SupraCoin>(purchaser, listing);
         assert!(tokenv1::balance_of(purchaser_addr, token_id) == 1, 0);
     }
 
-    #[test(aptos_framework = @0x1, marketplace = @0x111, seller = @0x222, purchaser = @0x333)]
+    #[test(supra_framework = @0x1, marketplace = @0x111, seller = @0x222, purchaser = @0x333)]
     fun test_fixed_price_for_token_v1_high_royalty(
-        aptos_framework: &signer,
+        supra_framework: &signer,
         marketplace: &signer,
         seller: &signer,
         purchaser: &signer,
     ) {
         let (_marketplace_addr, _seller_addr, purchaser_addr) =
-            test_utils::setup(aptos_framework, marketplace, seller, purchaser);
+            test_utils::setup(supra_framework, marketplace, seller, purchaser);
         tokenv1::opt_in_direct_transfer(purchaser, true);
         let _token = mint_tokenv1(seller);
         let token_id = mint_tokenv1_additional_royalty(seller, 100, 100);
 
         let (_fee_schedule, listing) = fixed_price_listing_for_tokenv1_with_token(marketplace, seller, &token_id);
-        coin_listing::purchase<AptosCoin>(purchaser, listing);
+        coin_listing::purchase<SupraCoin>(purchaser, listing);
         assert!(tokenv1::balance_of(purchaser_addr, token_id) == 1, 0);
         // TODO balance checks
     }
 
-    #[test(aptos_framework = @0x1, marketplace = @0x111, seller = @0x222, purchaser = @0x333)]
+    #[test(supra_framework = @0x1, marketplace = @0x111, seller = @0x222, purchaser = @0x333)]
     fun test_fixed_price_for_token_v1_bad_royalty(
-        aptos_framework: &signer,
+        supra_framework: &signer,
         marketplace: &signer,
         seller: &signer,
         purchaser: &signer,
     ) {
         let (_marketplace_addr, _seller_addr, purchaser_addr) =
-            test_utils::setup(aptos_framework, marketplace, seller, purchaser);
+            test_utils::setup(supra_framework, marketplace, seller, purchaser);
         tokenv1::opt_in_direct_transfer(purchaser, true);
         let _token = mint_tokenv1(seller);
         let token_id = mint_tokenv1_additional_royalty(seller, 0, 0);
 
         let (_fee_schedule, listing) = fixed_price_listing_for_tokenv1_with_token(marketplace, seller, &token_id);
         // This should not fail, and no royalty is taken
-        coin_listing::purchase<AptosCoin>(purchaser, listing);
+        coin_listing::purchase<SupraCoin>(purchaser, listing);
         assert!(tokenv1::balance_of(purchaser_addr, token_id) == 1, 0);
         // TODO balance checks
     }
 
-    #[test(aptos_framework = @0x1, marketplace = @0x111, seller = @0x222, purchaser = @0x333)]
+    #[test(supra_framework = @0x1, marketplace = @0x111, seller = @0x222, purchaser = @0x333)]
     fun test_auction_purchase_for_tokenv1(
-        aptos_framework: &signer,
+        supra_framework: &signer,
         marketplace: &signer,
         seller: &signer,
         purchaser: &signer,
     ) {
         let (_marketplace_addr, _seller_addr, purchaser_addr) =
-            test_utils::setup(aptos_framework, marketplace, seller, purchaser);
+            test_utils::setup(supra_framework, marketplace, seller, purchaser);
         tokenv1::opt_in_direct_transfer(purchaser, true);
 
         let (token_id, _fee_schedule, listing) = auction_listing_for_tokenv1(marketplace, seller);
-        coin_listing::purchase<AptosCoin>(purchaser, listing);
+        coin_listing::purchase<SupraCoin>(purchaser, listing);
         assert!(tokenv1::balance_of(purchaser_addr, token_id) == 1, 0);
     }
 
-    #[test(aptos_framework = @0x1, marketplace = @0x111, seller = @0x222, purchaser = @0x333)]
+    #[test(supra_framework = @0x1, marketplace = @0x111, seller = @0x222, purchaser = @0x333)]
     fun test_auction_purchase_for_tokenv1_without_direct_transfer(
-        aptos_framework: &signer,
+        supra_framework: &signer,
         marketplace: &signer,
         seller: &signer,
         purchaser: &signer,
     ) {
         let (_marketplace_addr, _seller_addr, purchaser_addr) =
-            test_utils::setup(aptos_framework, marketplace, seller, purchaser);
+            test_utils::setup(supra_framework, marketplace, seller, purchaser);
 
         let (token_id, _fee_schedule, listing) = auction_listing_for_tokenv1(marketplace, seller);
-        coin_listing::purchase<AptosCoin>(purchaser, listing);
+        coin_listing::purchase<SupraCoin>(purchaser, listing);
         assert!(tokenv1::balance_of(purchaser_addr, token_id) == 1, 0);
     }
 
-    #[test(aptos_framework = @0x1, marketplace = @0x111, seller = @0x222, purchaser = @0x333)]
+    #[test(supra_framework = @0x1, marketplace = @0x111, seller = @0x222, purchaser = @0x333)]
     fun test_auction_win_for_tokenv1_without_direct_transfer_and_non_winner_completer(
-        aptos_framework: &signer,
+        supra_framework: &signer,
         marketplace: &signer,
         seller: &signer,
         purchaser: &signer,
     ) {
         let (_marketplace_addr, _seller_addr, purchaser_addr) =
-            test_utils::setup(aptos_framework, marketplace, seller, purchaser);
+            test_utils::setup(supra_framework, marketplace, seller, purchaser);
 
         let (token_id, _fee_schedule, listing) = auction_listing_for_tokenv1(marketplace, seller);
-        coin_listing::bid<AptosCoin>(purchaser, listing, 100);
+        coin_listing::bid<SupraCoin>(purchaser, listing, 100);
         test_utils::increment_timestamp(1000);
         let token_object = listing::listed_object(listing);
-        coin_listing::complete_auction<AptosCoin>(aptos_framework, listing);
+        coin_listing::complete_auction<SupraCoin>(supra_framework, listing);
         listing::extract_tokenv1(purchaser, object::convert(token_object));
         assert!(tokenv1::balance_of(purchaser_addr, token_id) == 1, 0);
     }
@@ -1223,7 +1223,7 @@ module listing_tests {
         let (creator_addr, collection_name, token_name, property_version) =
             tokenv1::get_token_id_fields(token_id);
         let fee_schedule = test_utils::fee_schedule(marketplace);
-        let listing = coin_listing::init_fixed_price_for_tokenv1_internal<AptosCoin>(
+        let listing = coin_listing::init_fixed_price_for_tokenv1_internal<SupraCoin>(
             seller,
             creator_addr,
             collection_name,
@@ -1244,7 +1244,7 @@ module listing_tests {
         let (creator_addr, collection_name, token_name, property_version) =
             tokenv1::get_token_id_fields(&token_id);
         let fee_schedule = test_utils::fee_schedule(marketplace);
-        let listing = coin_listing::init_auction_for_tokenv1_internal<AptosCoin>(
+        let listing = coin_listing::init_auction_for_tokenv1_internal<SupraCoin>(
             seller,
             creator_addr,
             collection_name,

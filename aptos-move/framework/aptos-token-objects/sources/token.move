@@ -11,15 +11,15 @@ module aptos_token_objects::token {
     use std::string::{Self, String};
     use std::signer;
     use std::vector;
-    use aptos_framework::aggregator_v2::{Self, AggregatorSnapshot, DerivedStringSnapshot};
-    use aptos_framework::event;
-    use aptos_framework::object::{Self, ConstructorRef, Object};
+    use supra_framework::aggregator_v2::{Self, AggregatorSnapshot, DerivedStringSnapshot};
+    use supra_framework::event;
+    use supra_framework::object::{Self, ConstructorRef, Object};
     use aptos_std::string_utils::{to_string};
     use aptos_token_objects::collection::{Self, Collection};
     use aptos_token_objects::royalty::{Self, Royalty};
 
     #[test_only]
-    use aptos_framework::object::ExtendRef;
+    use supra_framework::object::ExtendRef;
 
     /// The token does not exist
     const ETOKEN_DOES_NOT_EXIST: u64 = 1;
@@ -38,7 +38,7 @@ module aptos_token_objects::token {
     const MAX_URI_LENGTH: u64 = 512;
     const MAX_DESCRIPTION_LENGTH: u64 = 2048;
 
-    #[resource_group_member(group = aptos_framework::object::ObjectGroup)]
+    #[resource_group_member(group = supra_framework::object::ObjectGroup)]
     /// Represents the common fields to all tokens.
     struct Token has key {
         /// The collection from which this token resides.
@@ -63,7 +63,7 @@ module aptos_token_objects::token {
         mutation_events: event::EventHandle<MutationEvent>,
     }
 
-    #[resource_group_member(group = aptos_framework::object::ObjectGroup)]
+    #[resource_group_member(group = supra_framework::object::ObjectGroup)]
     /// Represents first addition to the common fields for all tokens
     /// Starts being populated once aggregator_v2_api_enabled is enabled.
     struct TokenIdentifiers has key {
@@ -76,7 +76,7 @@ module aptos_token_objects::token {
 
     // DEPRECATED, NEVER USED
     #[deprecated]
-    #[resource_group_member(group = aptos_framework::object::ObjectGroup)]
+    #[resource_group_member(group = supra_framework::object::ObjectGroup)]
     struct ConcurrentTokenIdentifiers has key {
         index: AggregatorSnapshot<u64>,
         name: AggregatorSnapshot<String>,
@@ -612,7 +612,7 @@ module aptos_token_objects::token {
     }
 
     #[test(creator = @0x123)]
-    #[expected_failure(abort_code = 0x80001, location = aptos_framework::object)]
+    #[expected_failure(abort_code = 0x80001, location = supra_framework::object)]
     fun test_duplicate_tokens(creator: &signer) {
         let collection_name = string::utf8(b"collection name");
         let token_name = string::utf8(b"token name");
@@ -722,7 +722,7 @@ module aptos_token_objects::token {
 
     #[test(creator = @0x123)]
     fun test_create_from_account_burn_and_delete(creator: &signer) acquires Token, TokenIdentifiers {
-        use aptos_framework::account;
+        use supra_framework::account;
 
         let collection_name = string::utf8(b"collection name");
         let token_name = string::utf8(b"token name");
@@ -747,7 +747,7 @@ module aptos_token_objects::token {
 
     #[test(creator = @0x123,fx = @std)]
     fun test_create_burn_and_delete(creator: &signer, fx: signer) acquires Token, TokenIdentifiers {
-        use aptos_framework::account;
+        use supra_framework::account;
         use std::features;
 
         let feature = features::get_auids();
@@ -774,7 +774,7 @@ module aptos_token_objects::token {
         assert!(!object::is_object(token_addr), 2);
     }
 
-    #[test(fx = @aptos_framework, creator = @0x123)]
+    #[test(fx = @supra_framework, creator = @0x123)]
     fun test_upgrade_to_concurrent_and_numbered_tokens(fx: &signer, creator: &signer) acquires Token, TokenIdentifiers {
         use std::debug;
 

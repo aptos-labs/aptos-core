@@ -7,7 +7,7 @@ use anyhow::anyhow;
 use aptos_consensus_types::{
     common::Author, executed_block::ExecutedBlock, pipeline::commit_vote::CommitVote,
 };
-use aptos_crypto::{bls12381, HashValue};
+use aptos_crypto::{ed25519, HashValue};
 use aptos_executor_types::ExecutorResult;
 use aptos_logger::prelude::*;
 use aptos_reliable_broadcast::DropGuard;
@@ -228,7 +228,7 @@ impl BufferItem {
         }
     }
 
-    pub fn advance_to_signed(self, author: Author, signature: bls12381::Signature) -> Self {
+    pub fn advance_to_signed(self, author: Author, signature: ed25519::Signature) -> Self {
         match self {
             Self::Executed(executed_item) => {
                 let ExecutedItem {

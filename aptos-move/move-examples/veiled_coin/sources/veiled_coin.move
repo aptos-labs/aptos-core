@@ -6,7 +6,7 @@
 ///
 /// ## How to use veiled coins
 ///
-/// This module allows users to "register" a veiled account for any pre-existing `aptos_framework::Coin` type `T` via
+/// This module allows users to "register" a veiled account for any pre-existing `supra_framework::Coin` type `T` via
 /// the `register` entry function. For this, an encryption public key will need to be given as input, under which
 /// the registered user's veiled balance will be encrypted.
 ///
@@ -82,8 +82,8 @@
 /// [ 31 - 0 ]
 /// ```
 ///
-/// Recall that: A coin has a *decimal precision* $d$ (e.g., for `AptosCoin`, $d = 8$; see `initialize` in
-/// `aptos_coin.move`). This precision $d$ is used when displaying a `u64` amount, by dividing the amount by $10^d$.
+/// Recall that: A coin has a *decimal precision* $d$ (e.g., for `SupraCoin`, $d = 8$; see `initialize` in
+/// `supra_coin.move`). This precision $d$ is used when displaying a `u64` amount, by dividing the amount by $10^d$.
 /// For example, if the precision $d = 2$, then a `u64` amount of 505 coins displays as 5.05 coins.
 ///
 /// For veiled coins, we can easily display a `u32` `Coin<T>` amount $v$ by:
@@ -118,9 +118,9 @@ module veiled_coin::veiled_coin {
     #[test_only]
     use aptos_std::ristretto255::Scalar;
 
-    use aptos_framework::account;
-    use aptos_framework::coin::{Self, Coin};
-    use aptos_framework::event;
+    use supra_framework::account;
+    use supra_framework::coin::{Self, Coin};
+    use supra_framework::event;
 
     use veiled_coin::helpers;
     use veiled_coin::sigma_protos;
@@ -474,7 +474,7 @@ module veiled_coin::veiled_coin {
     }
 
     /// Returns the maximum # of bits used to represent a veiled coin amount. Might differ than the 64 bits used to
-    /// represent normal `aptos_framework::coin::Coin` values.
+    /// represent normal `supra_framework::coin::Coin` values.
     public fun get_max_bits_in_veiled_coin_value(): u64 {
         MAX_BITS_IN_VEILED_COIN_VALUE
     }

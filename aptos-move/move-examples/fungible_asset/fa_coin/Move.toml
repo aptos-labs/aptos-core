@@ -7,4 +7,4 @@ aptos_framework = "0x1"
 FACoin = "_"
 
 [dependencies]
-AptosFramework = { local = "../../../framework/aptos-framework" }
+SupraFramework = { local = "../../../framework/supra-framework" }

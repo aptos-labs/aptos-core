@@ -1,7 +1,7 @@
 module example_addr::multisig_managed_coin {
-    use aptos_framework::multisig_account;
-    use aptos_framework::object;
-    use aptos_framework::object::ObjectCore;
+    use supra_framework::multisig_account;
+    use supra_framework::object;
+    use supra_framework::object::ObjectCore;
     use std::signer;
     use std::string::{Self, String};
     use example_addr::managed_fungible_asset;

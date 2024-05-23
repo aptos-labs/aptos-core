@@ -532,7 +532,7 @@ impl<'a> AptosTestAdapter<'a> {
         let txn = RawTransaction::new(
             aptos_test_root_address(),
             parameters.sequence_number + 1,
-            aptos_cached_packages::aptos_stdlib::aptos_coin_mint(account_addr, amount),
+            aptos_cached_packages::aptos_stdlib::supra_coin_mint(account_addr, amount),
             parameters.max_gas_amount,
             parameters.gas_unit_price,
             parameters.expiration_timestamp_secs,

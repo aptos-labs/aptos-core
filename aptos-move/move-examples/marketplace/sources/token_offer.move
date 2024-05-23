@@ -11,9 +11,9 @@ module token_offer {
     use std::signer;
     use std::string::String;
 
-    use aptos_framework::coin::{Self, Coin};
-    use aptos_framework::object::{Self, DeleteRef, Object};
-    use aptos_framework::timestamp;
+    use supra_framework::coin::{Self, Coin};
+    use supra_framework::object::{Self, DeleteRef, Object};
+    use supra_framework::timestamp;
 
     use aptos_token::token as tokenv1;
 
@@ -24,7 +24,7 @@ module token_offer {
     use marketplace::fee_schedule::{Self, FeeSchedule};
     use marketplace::listing::{Self, TokenV1Container};
     use aptos_token::token::TokenId;
-    use aptos_framework::aptos_account;
+    use supra_framework::aptos_account;
 
     /// No token offer defined.
     const ENO_TOKEN_OFFER: u64 = 1;
@@ -39,7 +39,7 @@ module token_offer {
 
     // Core data structures
 
-    #[resource_group_member(group = aptos_framework::object::ObjectGroup)]
+    #[resource_group_member(group = supra_framework::object::ObjectGroup)]
     /// Create a timed offer to buy a token. The token and
     /// assets used to buy are stored in other resources within the object.
     struct TokenOffer has key {
@@ -49,13 +49,13 @@ module token_offer {
         delete_ref: DeleteRef,
     }
 
-    #[resource_group_member(group = aptos_framework::object::ObjectGroup)]
+    #[resource_group_member(group = supra_framework::object::ObjectGroup)]
     /// Stores coins for a token offer.
     struct CoinOffer<phantom CoinType> has key {
         coins: Coin<CoinType>,
     }
 
-    #[resource_group_member(group = aptos_framework::object::ObjectGroup)]
+    #[resource_group_member(group = supra_framework::object::ObjectGroup)]
     /// Stores the metadata associated with a tokenv1 token offer.
     struct TokenOfferTokenV1 has copy, drop, key {
         creator_address: address,
@@ -64,7 +64,7 @@ module token_offer {
         property_version: u64,
     }
 
-    #[resource_group_member(group = aptos_framework::object::ObjectGroup)]
+    #[resource_group_member(group = supra_framework::object::ObjectGroup)]
     /// Stores the metadata associated with a tokenv2 token offer.
     struct TokenOfferTokenV2 has copy, drop, key {
         token: Object<TokenV2>,
@@ -510,10 +510,10 @@ module token_offer {
 
 #[test_only]
 module token_offer_tests {
-    use aptos_framework::aptos_coin::AptosCoin;
-    use aptos_framework::coin;
-    use aptos_framework::object;
-    use aptos_framework::timestamp;
+    use supra_framework::supra_coin::SupraCoin;
+    use supra_framework::coin;
+    use supra_framework::object;
+    use supra_framework::timestamp;
 
     use aptos_token::token as tokenv1;
 
@@ -522,18 +522,18 @@ module token_offer_tests {
     use marketplace::test_utils;
     use std::option;
 
-    #[test(aptos_framework = @0x1, marketplace = @0x111, seller = @0x222, purchaser = @0x333)]
+    #[test(supra_framework = @0x1, marketplace = @0x111, seller = @0x222, purchaser = @0x333)]
     fun test_token_v2(
-        aptos_framework: &signer,
+        supra_framework: &signer,
         marketplace: &signer,
         seller: &signer,
         purchaser: &signer,
     ) {
         let (marketplace_addr, seller_addr, purchaser_addr) =
-            test_utils::setup(aptos_framework, marketplace, seller, purchaser);
+            test_utils::setup(supra_framework, marketplace, seller, purchaser);
         let token = test_utils::mint_tokenv2(seller);
         assert!(object::is_owner(token, seller_addr), 0);
-        let token_offer = token_offer::init_for_tokenv2<AptosCoin>(
+        let token_offer = token_offer::init_for_tokenv2<SupraCoin>(
             purchaser,
             token,
             test_utils::fee_schedule(marketplace),
@@ -544,26 +544,26 @@ module token_offer_tests {
         assert!(token_offer::expiration_time(token_offer) == timestamp::now_seconds() + 200, 0);
         assert!(token_offer::price(token_offer) == 500, 0);
 
-        assert!(coin::balance<AptosCoin>(marketplace_addr) == 1, 0);
-        assert!(coin::balance<AptosCoin>(purchaser_addr) == 9499, 0);
-        assert!(coin::balance<AptosCoin>(seller_addr) == 10000, 0);
+        assert!(coin::balance<SupraCoin>(marketplace_addr) == 1, 0);
+        assert!(coin::balance<SupraCoin>(purchaser_addr) == 9499, 0);
+        assert!(coin::balance<SupraCoin>(seller_addr) == 10000, 0);
 
-        token_offer::sell_tokenv2<AptosCoin>(seller, token_offer);
-        assert!(coin::balance<AptosCoin>(marketplace_addr) == 6, 0);
-        assert!(coin::balance<AptosCoin>(purchaser_addr) == 9499, 0);
-        assert!(coin::balance<AptosCoin>(seller_addr) == 10495, 0);
+        token_offer::sell_tokenv2<SupraCoin>(seller, token_offer);
+        assert!(coin::balance<SupraCoin>(marketplace_addr) == 6, 0);
+        assert!(coin::balance<SupraCoin>(purchaser_addr) == 9499, 0);
+        assert!(coin::balance<SupraCoin>(seller_addr) == 10495, 0);
         assert!(object::is_owner(token, purchaser_addr), 0);
     }
 
-    #[test(aptos_framework = @0x1, marketplace = @0x111, seller = @0x222, purchaser = @0x333)]
+    #[test(supra_framework = @0x1, marketplace = @0x111, seller = @0x222, purchaser = @0x333)]
     fun test_token_v1_direct_deposit(
-        aptos_framework: &signer,
+        supra_framework: &signer,
         marketplace: &signer,
         seller: &signer,
         purchaser: &signer,
     ) {
         let (marketplace_addr, seller_addr, purchaser_addr) =
-            test_utils::setup(aptos_framework, marketplace, seller, purchaser);
+            test_utils::setup(supra_framework, marketplace, seller, purchaser);
         tokenv1::opt_in_direct_transfer(purchaser, true);
         tokenv1::opt_in_direct_transfer(seller, true);
 
@@ -573,7 +573,7 @@ module token_offer_tests {
         let (creator_addr, collection_name, token_name, property_version) =
             tokenv1::get_token_id_fields(&token_id);
 
-        let token_offer = token_offer::init_for_tokenv1<AptosCoin>(
+        let token_offer = token_offer::init_for_tokenv1<SupraCoin>(
             purchaser,
             creator_addr,
             collection_name,
@@ -583,28 +583,28 @@ module token_offer_tests {
             500,
             timestamp::now_seconds() + 200,
         );
-        assert!(coin::balance<AptosCoin>(marketplace_addr) == 1, 0);
-        assert!(coin::balance<AptosCoin>(purchaser_addr) == 9499, 0);
-        assert!(coin::balance<AptosCoin>(seller_addr) == 10000, 0);
+        assert!(coin::balance<SupraCoin>(marketplace_addr) == 1, 0);
+        assert!(coin::balance<SupraCoin>(purchaser_addr) == 9499, 0);
+        assert!(coin::balance<SupraCoin>(seller_addr) == 10000, 0);
 
-        token_offer::sell_tokenv1<AptosCoin>(seller, token_offer, token_name, property_version);
-        assert!(coin::balance<AptosCoin>(marketplace_addr) == 6, 0);
-        assert!(coin::balance<AptosCoin>(purchaser_addr) == 9499, 0);
-        assert!(coin::balance<AptosCoin>(seller_addr) == 10495, 0);
+        token_offer::sell_tokenv1<SupraCoin>(seller, token_offer, token_name, property_version);
+        assert!(coin::balance<SupraCoin>(marketplace_addr) == 6, 0);
+        assert!(coin::balance<SupraCoin>(purchaser_addr) == 9499, 0);
+        assert!(coin::balance<SupraCoin>(seller_addr) == 10495, 0);
         assert!(tokenv1::balance_of(purchaser_addr, token_id) == 1, 0);
 
         assert!(!token_offer::exists_at(token_offer), 0);
     }
 
-    #[test(aptos_framework = @0x1, marketplace = @0x111, seller = @0x222, purchaser = @0x333)]
+    #[test(supra_framework = @0x1, marketplace = @0x111, seller = @0x222, purchaser = @0x333)]
     fun test_token_v1_indirect(
-        aptos_framework: &signer,
+        supra_framework: &signer,
         marketplace: &signer,
         seller: &signer,
         purchaser: &signer,
     ) {
         let (_marketplace_addr, seller_addr, purchaser_addr) =
-            test_utils::setup(aptos_framework, marketplace, seller, purchaser);
+            test_utils::setup(supra_framework, marketplace, seller, purchaser);
 
         let token_id = test_utils::mint_tokenv1(seller);
         assert!(tokenv1::balance_of(seller_addr, token_id) == 1, 0);
@@ -612,7 +612,7 @@ module token_offer_tests {
         let (creator_addr, collection_name, token_name, property_version) =
             tokenv1::get_token_id_fields(&token_id);
 
-        let token_offer = token_offer::init_for_tokenv1<AptosCoin>(
+        let token_offer = token_offer::init_for_tokenv1<SupraCoin>(
             purchaser,
             creator_addr,
             collection_name,
@@ -623,7 +623,7 @@ module token_offer_tests {
             timestamp::now_seconds() + 200,
         );
 
-        let token_container = token_offer::sell_tokenv1<AptosCoin>(
+        let token_container = token_offer::sell_tokenv1<SupraCoin>(
             seller,
             token_offer,
             token_name,
@@ -634,40 +634,40 @@ module token_offer_tests {
         assert!(!token_offer::exists_at(token_offer), 0);
     }
 
-    #[test(aptos_framework = @0x1, marketplace = @0x111, seller = @0x222, purchaser = @0x333)]
+    #[test(supra_framework = @0x1, marketplace = @0x111, seller = @0x222, purchaser = @0x333)]
     #[expected_failure(abort_code = 0x50003, location = marketplace::token_offer)]
     fun test_token_v2_has_none(
-        aptos_framework: &signer,
+        supra_framework: &signer,
         marketplace: &signer,
         seller: &signer,
         purchaser: &signer,
     ) {
-        test_utils::setup(aptos_framework, marketplace, seller, purchaser);
+        test_utils::setup(supra_framework, marketplace, seller, purchaser);
         let token = test_utils::mint_tokenv2(seller);
-        let token_offer = token_offer::init_for_tokenv2<AptosCoin>(
+        let token_offer = token_offer::init_for_tokenv2<SupraCoin>(
             purchaser,
             token,
             test_utils::fee_schedule(marketplace),
             500,
             timestamp::now_seconds() + 200,
         );
-        token_offer::sell_tokenv2<AptosCoin>(marketplace, token_offer);
+        token_offer::sell_tokenv2<SupraCoin>(marketplace, token_offer);
     }
 
-    #[test(aptos_framework = @0x1, marketplace = @0x111, seller = @0x222, purchaser = @0x333)]
+    #[test(supra_framework = @0x1, marketplace = @0x111, seller = @0x222, purchaser = @0x333)]
     #[expected_failure(abort_code = 0x10005, location = aptos_token::token)]
     fun test_token_v1_has_none(
-        aptos_framework: &signer,
+        supra_framework: &signer,
         marketplace: &signer,
         seller: &signer,
         purchaser: &signer,
     ) {
-        test_utils::setup(aptos_framework, marketplace, seller, purchaser);
+        test_utils::setup(supra_framework, marketplace, seller, purchaser);
         let token_id = test_utils::mint_tokenv1(seller);
         let (creator_addr, collection_name, token_name, property_version) =
             tokenv1::get_token_id_fields(&token_id);
 
-        let token_offer = token_offer::init_for_tokenv1<AptosCoin>(
+        let token_offer = token_offer::init_for_tokenv1<SupraCoin>(
             purchaser,
             creator_addr,
             collection_name,
@@ -678,7 +678,7 @@ module token_offer_tests {
             timestamp::now_seconds() + 200,
         );
 
-        token_offer::sell_tokenv1<AptosCoin>(
+        token_offer::sell_tokenv1<SupraCoin>(
             marketplace,
             token_offer,
             token_name,
@@ -686,17 +686,17 @@ module token_offer_tests {
         );
     }
 
-    #[test(aptos_framework = @0x1, marketplace = @0x111, seller = @0x222, purchaser = @0x333)]
+    #[test(supra_framework = @0x1, marketplace = @0x111, seller = @0x222, purchaser = @0x333)]
     #[expected_failure(abort_code = 0x30006, location = marketplace::token_offer)]
     fun test_token_v2_expired(
-        aptos_framework: &signer,
+        supra_framework: &signer,
         marketplace: &signer,
         seller: &signer,
         purchaser: &signer,
     ) {
-        test_utils::setup(aptos_framework, marketplace, seller, purchaser);
+        test_utils::setup(supra_framework, marketplace, seller, purchaser);
         let token = test_utils::mint_tokenv2(seller);
-        let token_offer = token_offer::init_for_tokenv2<AptosCoin>(
+        let token_offer = token_offer::init_for_tokenv2<SupraCoin>(
             purchaser,
             token,
             test_utils::fee_schedule(marketplace),
@@ -704,62 +704,62 @@ module token_offer_tests {
             timestamp::now_seconds() + 200,
         );
         test_utils::increment_timestamp(200);
-        token_offer::sell_tokenv2<AptosCoin>(seller, token_offer);
+        token_offer::sell_tokenv2<SupraCoin>(seller, token_offer);
     }
 
-    #[test(aptos_framework = @0x1, marketplace = @0x111, seller = @0x222, purchaser = @0x333)]
+    #[test(supra_framework = @0x1, marketplace = @0x111, seller = @0x222, purchaser = @0x333)]
     #[expected_failure(abort_code = 0x60001, location = marketplace::token_offer)]
     fun test_token_v2_exhausted(
-        aptos_framework: &signer,
+        supra_framework: &signer,
         marketplace: &signer,
         seller: &signer,
         purchaser: &signer,
     ) {
-        test_utils::setup(aptos_framework, marketplace, seller, purchaser);
+        test_utils::setup(supra_framework, marketplace, seller, purchaser);
         let token = test_utils::mint_tokenv2(seller);
-        let token_offer = token_offer::init_for_tokenv2<AptosCoin>(
+        let token_offer = token_offer::init_for_tokenv2<SupraCoin>(
             purchaser,
             token,
             test_utils::fee_schedule(marketplace),
             500,
             timestamp::now_seconds() + 200,
         );
-        token_offer::sell_tokenv2<AptosCoin>(seller, token_offer);
-        token_offer::sell_tokenv2<AptosCoin>(purchaser, token_offer);
+        token_offer::sell_tokenv2<SupraCoin>(seller, token_offer);
+        token_offer::sell_tokenv2<SupraCoin>(purchaser, token_offer);
     }
 
-    #[test(aptos_framework = @0x1, marketplace = @0x111, seller = @0x222, purchaser = @0x333)]
+    #[test(supra_framework = @0x1, marketplace = @0x111, seller = @0x222, purchaser = @0x333)]
     #[expected_failure(abort_code = 0x50003, location = marketplace::token_offer)]
     fun test_token_v2_other_token(
-        aptos_framework: &signer,
+        supra_framework: &signer,
         marketplace: &signer,
         seller: &signer,
         purchaser: &signer,
     ) {
-        test_utils::setup(aptos_framework, marketplace, seller, purchaser);
+        test_utils::setup(supra_framework, marketplace, seller, purchaser);
         let _token = test_utils::mint_tokenv2(seller);
         let token_2 = test_utils::mint_tokenv2_additional(seller);
 
-        let token_offer = token_offer::init_for_tokenv2<AptosCoin>(
+        let token_offer = token_offer::init_for_tokenv2<SupraCoin>(
             purchaser,
             token_2,
             test_utils::fee_schedule(marketplace),
             500,
             timestamp::now_seconds() + 200,
         );
-        token_offer::sell_tokenv2<AptosCoin>(marketplace, token_offer);
+        token_offer::sell_tokenv2<SupraCoin>(marketplace, token_offer);
     }
 
-    #[test(aptos_framework = @0x1, marketplace = @0x111, seller = @0x222, purchaser = @0x333)]
+    #[test(supra_framework = @0x1, marketplace = @0x111, seller = @0x222, purchaser = @0x333)]
     #[expected_failure(abort_code = 0x10005, location = aptos_token::token)]
     fun test_token_v1_other_token(
-        aptos_framework: &signer,
+        supra_framework: &signer,
         marketplace: &signer,
         seller: &signer,
         purchaser: &signer,
     ) {
         let (_marketplace_addr, _seller_addr, purchaser_addr) =
-            test_utils::setup(aptos_framework, marketplace, seller, purchaser);
+            test_utils::setup(supra_framework, marketplace, seller, purchaser);
 
         let token_id_1 = test_utils::mint_tokenv1(seller);
         let (_creator_addr, _collection_name, token_name_1, property_version_1) =
@@ -768,7 +768,7 @@ module token_offer_tests {
         let token_id_2 = test_utils::mint_tokenv1_additional(seller);
         let (_creator_addr, collection_name, token_name_2, property_version_2) =
             tokenv1::get_token_id_fields(&token_id_2);
-        let token_offer = token_offer::init_for_tokenv1<AptosCoin>(
+        let token_offer = token_offer::init_for_tokenv1<SupraCoin>(
             purchaser,
             purchaser_addr,
             collection_name,
@@ -778,7 +778,7 @@ module token_offer_tests {
             500,
             timestamp::now_seconds() + 200,
         );
-        token_offer::sell_tokenv1<AptosCoin>(
+        token_offer::sell_tokenv1<SupraCoin>(
             marketplace,
             token_offer,
             token_name_2,

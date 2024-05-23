@@ -5,8 +5,8 @@ module 0xCAFE::test {
     use std::fixed_point32::FixedPoint32;
     use aptos_std::fixed_point64::FixedPoint64;
     use aptos_std::object::Object;
-    use aptos_framework::object::{create_object_from_account, generate_signer};
-    use aptos_framework::object;
+    use supra_framework::object::{create_object_from_account, generate_signer};
+    use supra_framework::object;
 
     struct ModuleData has key, store {
         state: String,

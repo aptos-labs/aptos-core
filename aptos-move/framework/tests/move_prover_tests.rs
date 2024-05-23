@@ -67,7 +67,7 @@ pub fn run_prover_for_pkg(path_to_pkg: impl Into<String>) {
 
 #[test]
 fn move_framework_prover_tests() {
-    run_prover_for_pkg("aptos-framework");
+    run_prover_for_pkg("supra-framework");
 }
 
 #[test]

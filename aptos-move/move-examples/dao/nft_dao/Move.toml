@@ -8,5 +8,5 @@ dao_platform = "_"
 aptos_framework = "0x1"
 
 [dependencies]
-AptosFramework = { local = "../../../framework/aptos-framework" }
+SupraFramework = { local = "../../../framework/supra-framework" }
 AptosToken = { local = "../../../framework/aptos-token" }

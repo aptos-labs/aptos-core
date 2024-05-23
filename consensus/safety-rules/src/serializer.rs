@@ -9,7 +9,7 @@ use aptos_consensus_types::{
     vote::Vote,
     vote_proposal::VoteProposal,
 };
-use aptos_crypto::bls12381;
+use aptos_crypto::ed25519;
 use aptos_infallible::RwLock;
 use aptos_types::{
     epoch_change::EpochChangeProof,
@@ -107,7 +107,7 @@ impl TSafetyRules for SerializerClient {
         serde_json::from_slice(&response)?
     }
 
-    fn sign_proposal(&mut self, block_data: &BlockData) -> Result<bls12381::Signature, Error> {
+    fn sign_proposal(&mut self, block_data: &BlockData) -> Result<ed25519::Signature, Error> {
         let _timer = counters::start_timer("external", LogEntry::SignProposal.as_str());
         let response =
             self.request(SafetyRulesInput::SignProposal(Box::new(block_data.clone())))?;
@@ -118,7 +118,7 @@ impl TSafetyRules for SerializerClient {
         &mut self,
         timeout: &TwoChainTimeout,
         timeout_cert: Option<&TwoChainTimeoutCertificate>,
-    ) -> Result<bls12381::Signature, Error> {
+    ) -> Result<ed25519::Signature, Error> {
         let _timer = counters::start_timer("external", LogEntry::SignTimeoutWithQC.as_str());
         let response = self.request(SafetyRulesInput::SignTimeoutWithQC(
             Box::new(timeout.clone()),
@@ -145,7 +145,7 @@ impl TSafetyRules for SerializerClient {
         &mut self,
         ledger_info: LedgerInfoWithSignatures,
         new_ledger_info: LedgerInfo,
-    ) -> Result<bls12381::Signature, Error> {
+    ) -> Result<ed25519::Signature, Error> {
         let _timer = counters::start_timer("external", LogEntry::SignCommitVote.as_str());
         let response = self.request(SafetyRulesInput::SignCommitVote(
             Box::new(ledger_info),

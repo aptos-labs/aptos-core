@@ -2,8 +2,8 @@
 module aptos_token::token_event_store {
     use std::string::String;
     use std::signer;
-    use aptos_framework::event::{Self, EventHandle};
-    use aptos_framework::account;
+    use supra_framework::event::{Self, EventHandle};
+    use supra_framework::account;
     use std::option::Option;
     use aptos_std::any::Any;
     use std::option;

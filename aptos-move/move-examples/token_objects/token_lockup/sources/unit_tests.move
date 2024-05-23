@@ -1,8 +1,8 @@
 #[test_only]
 module token_lockup::unit_tests {
-   use aptos_framework::object;
-   use aptos_framework::account;
-   use aptos_framework::timestamp;
+   use supra_framework::object;
+   use supra_framework::account;
+   use supra_framework::timestamp;
    use aptos_token_objects::token::{Token};
    use std::signer;
    use std::string::{Self};
@@ -16,10 +16,10 @@ module token_lockup::unit_tests {
        creator: &signer,
        owner_1: &signer,
        owner_2: &signer,
-       aptos_framework: &signer,
+       supra_framework: &signer,
        start_time: u64,
    ) {
-         timestamp::set_time_has_started_for_testing(aptos_framework);
+         timestamp::set_time_has_started_for_testing(supra_framework);
          timestamp::update_global_time_for_test_secs(start_time);
          account::create_account_for_test(signer::address_of(creator));
          account::create_account_for_test(signer::address_of(owner_1));
@@ -31,15 +31,15 @@ module token_lockup::unit_tests {
       timestamp::update_global_time_for_test_secs(timestamp::now_seconds() + seconds);
    }
 
-   #[test(creator = @0xFA, owner_1 = @0xA, owner_2 = @0xB, aptos_framework = @0x1)]
+   #[test(creator = @0xFA, owner_1 = @0xA, owner_2 = @0xB, supra_framework = @0x1)]
    /// Tests transferring multiple tokens to different owners with slightly different initial lockup times
    fun test_happy_path(
       creator: &signer,
       owner_1: &signer,
       owner_2: &signer,
-      aptos_framework: &signer,
+      supra_framework: &signer,
    ) {
-      setup_test(creator, owner_1, owner_2, aptos_framework, TEST_START_TIME);
+      setup_test(creator, owner_1, owner_2, supra_framework, TEST_START_TIME);
 
       let owner_1_addr = signer::address_of(owner_1);
       let owner_2_addr = signer::address_of(owner_2);
@@ -82,15 +82,15 @@ module token_lockup::unit_tests {
       assert!(object::is_owner(token_3_obj, owner_2_addr), 8);
    }
 
-   #[test(creator = @0xFA, owner_1 = @0xA, owner_2 = @0xB, aptos_framework = @0x1)]
-   #[expected_failure(abort_code = 0x50003, location = aptos_framework::object)]
+   #[test(creator = @0xFA, owner_1 = @0xA, owner_2 = @0xB, supra_framework = @0x1)]
+   #[expected_failure(abort_code = 0x50003, location = supra_framework::object)]
    fun transfer_raw_fail(
       creator: &signer,
       owner_1: &signer,
       owner_2: &signer,
-      aptos_framework: &signer,
+      supra_framework: &signer,
    ) {
-      setup_test(creator, owner_1, owner_2, aptos_framework, TEST_START_TIME);
+      setup_test(creator, owner_1, owner_2, supra_framework, TEST_START_TIME);
 
       let token_1_constructor_ref = token_lockup::mint_to(creator, string::utf8(b"Token #1"), signer::address_of(owner_1));
       object::transfer_raw(
@@ -100,15 +100,15 @@ module token_lockup::unit_tests {
       );
    }
 
-   #[test(creator = @0xFA, owner_1 = @0xA, owner_2 = @0xB, aptos_framework = @0x1)]
+   #[test(creator = @0xFA, owner_1 = @0xA, owner_2 = @0xB, supra_framework = @0x1)]
    #[expected_failure(abort_code = 0x50000, location = token_lockup::token_lockup)]
    fun transfer_too_early(
       creator: &signer,
       owner_1: &signer,
       owner_2: &signer,
-      aptos_framework: &signer,
+      supra_framework: &signer,
    ) {
-      setup_test(creator, owner_1, owner_2, aptos_framework, TEST_START_TIME);
+      setup_test(creator, owner_1, owner_2, supra_framework, TEST_START_TIME);
 
       let token_1_constructor_ref = token_lockup::mint_to(creator, string::utf8(b"Token #1"), signer::address_of(owner_1));
       let token_1_obj = object::object_from_constructor_ref(&token_1_constructor_ref);
@@ -118,15 +118,15 @@ module token_lockup::unit_tests {
       token_lockup::transfer(owner_1, token_1_obj, signer::address_of(owner_2));
    }
 
-   #[test(creator = @0xFA, owner_1 = @0xA, owner_2 = @0xB, aptos_framework = @0x1)]
+   #[test(creator = @0xFA, owner_1 = @0xA, owner_2 = @0xB, supra_framework = @0x1)]
    #[expected_failure(abort_code = 0x50001, location = token_lockup::token_lockup)]
    fun transfer_wrong_owner(
       creator: &signer,
       owner_1: &signer,
       owner_2: &signer,
-      aptos_framework: &signer,
+      supra_framework: &signer,
    ) {
-      setup_test(creator, owner_1, owner_2, aptos_framework, TEST_START_TIME);
+      setup_test(creator, owner_1, owner_2, supra_framework, TEST_START_TIME);
 
       let token_1_constructor_ref = token_lockup::mint_to(creator, string::utf8(b"Token #1"), signer::address_of(owner_1));
       let token_1_obj = object::object_from_constructor_ref<Token>(&token_1_constructor_ref);

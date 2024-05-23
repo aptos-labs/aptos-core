@@ -1126,8 +1126,8 @@ module supra_framework::vesting {
         stake::assert_stake_pool(stake_pool_address, GRANT_AMOUNT, 0, 0, 0);
 
         // The stake pool is still in pending active stake, so unlock_rewards and vest shouldn't do anything.
-        let (_sk, pk, pop) = stake::generate_identity();
-        stake::join_validator_set_for_test(&pk, &pop, admin, stake_pool_address, false);
+        let (_sk, pk) = stake::generate_identity();
+        stake::join_validator_set_for_test(&pk, admin, stake_pool_address, false);
         assert!(stake::get_validator_state(stake_pool_address) == VALIDATOR_STATUS_PENDING_ACTIVE, 1);
         unlock_rewards(contract_address);
         vest(contract_address);
@@ -1332,8 +1332,8 @@ module supra_framework::vesting {
 
         // Operator needs to join the validator set for the stake pool to earn rewards.
         let stake_pool_address = stake_pool_address(contract_address);
-        let (_sk, pk, pop) = stake::generate_identity();
-        stake::join_validator_set_for_test(&pk, &pop, admin, stake_pool_address, true);
+        let (_sk, pk) = stake::generate_identity();
+        stake::join_validator_set_for_test(&pk, admin, stake_pool_address, true);
 
         // Fast forward to the end of the first period. vest() should now unlock 3/48 of the tokens.
         timestamp::update_global_time_for_test_secs(vesting_start_secs(contract_address) + VESTING_PERIOD);
@@ -1363,8 +1363,8 @@ module supra_framework::vesting {
 
         // Operator needs to join the validator set for the stake pool to earn rewards.
         let stake_pool_address = stake_pool_address(contract_address);
-        let (_sk, pk, pop) = stake::generate_identity();
-        stake::join_validator_set_for_test(&pk, &pop, admin, stake_pool_address, true);
+        let (_sk, pk) = stake::generate_identity();
+        stake::join_validator_set_for_test(&pk, admin, stake_pool_address, true);
 
         // Stake pool earns some rewards. unlock_rewards should unlock the right amount.
         stake::end_epoch();
@@ -1399,8 +1399,8 @@ module supra_framework::vesting {
 
         // Operator needs to join the validator set for the stake pool to earn rewards.
         let stake_pool_address = stake_pool_address(contract_address);
-        let (_sk, pk, pop) = stake::generate_identity();
-        stake::join_validator_set_for_test(&pk, &pop, operator, stake_pool_address, true);
+        let (_sk, pk) = stake::generate_identity();
+        stake::join_validator_set_for_test(&pk, operator, stake_pool_address, true);
 
         // Stake pool earns some rewards. unlock_rewards should unlock the right amount.
         stake::end_epoch();
@@ -1445,8 +1445,8 @@ module supra_framework::vesting {
 
         // Operator needs to join the validator set for the stake pool to earn rewards.
         let stake_pool_address = stake_pool_address(contract_address);
-        let (_sk, pk, pop) = stake::generate_identity();
-        stake::join_validator_set_for_test(&pk, &pop, operator, stake_pool_address, true);
+        let (_sk, pk) = stake::generate_identity();
+        stake::join_validator_set_for_test(&pk, operator, stake_pool_address, true);
 
         // Stake pool earns some rewards.
         stake::end_epoch();
@@ -1511,8 +1511,8 @@ module supra_framework::vesting {
         update_operator(admin, contract_address, operator_address, 10);
 
         // Operator needs to join the validator set for the stake pool to earn rewards.
-        let (_sk, pk, pop) = stake::generate_identity();
-        stake::join_validator_set_for_test(&pk, &pop, operator, stake_pool_address, true);
+        let (_sk, pk) = stake::generate_identity();
+        stake::join_validator_set_for_test(&pk, operator, stake_pool_address, true);
         stake::assert_stake_pool(stake_pool_address, GRANT_AMOUNT, 0, 0, 0);
         assert!(get_accumulated_rewards(contract_address) == 0, 0);
         assert!(remaining_grant(contract_address) == GRANT_AMOUNT, 0);
@@ -1576,8 +1576,8 @@ module supra_framework::vesting {
         assert!(staking_contract::beneficiary_for_operator(operator_address1) == beneficiary_address, 0);
 
         // Operator needs to join the validator set for the stake pool to earn rewards.
-        let (_sk, pk, pop) = stake::generate_identity();
-        stake::join_validator_set_for_test(&pk, &pop, operator1, stake_pool_address, true);
+        let (_sk, pk) = stake::generate_identity();
+        stake::join_validator_set_for_test(&pk, operator1, stake_pool_address, true);
         stake::assert_stake_pool(stake_pool_address, GRANT_AMOUNT, 0, 0, 0);
         assert!(get_accumulated_rewards(contract_address) == 0, 0);
         assert!(remaining_grant(contract_address) == GRANT_AMOUNT, 0);

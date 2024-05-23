@@ -4,7 +4,7 @@
 #[macro_use]
 extern crate criterion;
 
-use aptos_crypto::{bls12381::DST_BLS_SIG_IN_G2_WITH_POP, test_utils::random_bytes};
+use aptos_crypto::test_utils::random_bytes;
 use blake2::{
     digest::{Update, VariableOutput},
     Blake2bVar,
@@ -41,8 +41,6 @@ fn bench_group(c: &mut Criterion) {
         sha2_256(&mut group, n);
         sha2_512(&mut group, n);
         sha3_256(&mut group, n);
-        hash_to_g1(&mut group, n, DST_BLS_SIG_IN_G2_WITH_POP);
-        hash_to_g2(&mut group, n, DST_BLS_SIG_IN_G2_WITH_POP);
         keccak256(&mut group, n);
         blake2_blake2b_256(&mut group, n);
         blake2_rfc_blake2b_256(&mut group, n);

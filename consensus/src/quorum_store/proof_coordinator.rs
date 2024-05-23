@@ -12,7 +12,7 @@ use crate::{
 use aptos_consensus_types::proof_of_store::{
     BatchInfo, ProofOfStore, SignedBatchInfo, SignedBatchInfoError, SignedBatchInfoMsg,
 };
-use aptos_crypto::{bls12381, HashValue};
+use aptos_crypto::{ed25519, HashValue};
 use aptos_logger::prelude::*;
 use aptos_types::{
     aggregate_signature::PartialSignatures, validator_verifier::ValidatorVerifier, PeerId,
@@ -36,7 +36,7 @@ pub(crate) enum ProofCoordinatorCommand {
 
 struct IncrementalProofState {
     info: BatchInfo,
-    aggregated_signature: BTreeMap<PeerId, bls12381::Signature>,
+    aggregated_signature: BTreeMap<PeerId, ed25519::Signature>,
     aggregated_voting_power: u128,
     self_voted: bool,
     completed: bool,

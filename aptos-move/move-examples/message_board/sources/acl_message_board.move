@@ -13,7 +13,7 @@ module message_board::acl_based_mb {
     use std::acl::Self;
     use std::signer;
     use std::vector;
-    use aptos_framework::event;
+    use supra_framework::event;
 
     // Error map
     const EACCOUNT_NOT_IN_ACL: u64 = 1;
@@ -153,8 +153,8 @@ module message_board::MessageBoardTests {
     fun create_two_signers(): (signer, signer) {
         let signers = &mut unit_test::create_signers_for_testing(2);
         let (alice, bob) = (vector::pop_back(signers), vector::pop_back(signers));
-        aptos_framework::account::create_account_for_test(signer::address_of(&alice));
-        aptos_framework::account::create_account_for_test(signer::address_of(&bob));
+        supra_framework::account::create_account_for_test(signer::address_of(&alice));
+        supra_framework::account::create_account_for_test(signer::address_of(&bob));
         (alice, bob)
     }
 }

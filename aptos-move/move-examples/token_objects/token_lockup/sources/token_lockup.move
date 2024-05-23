@@ -9,7 +9,7 @@ module token_lockup::token_lockup {
    use aptos_token_objects::token::{Self, Token};
    use aptos_token_objects::collection;
 
-   #[resource_group_member(group = aptos_framework::object::ObjectGroup)]
+   #[resource_group_member(group = supra_framework::object::ObjectGroup)]
    struct LockupConfig has key {
       last_transfer: u64,
       transfer_ref: TransferRef,

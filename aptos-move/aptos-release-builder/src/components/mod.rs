@@ -2,7 +2,7 @@
 // SPDX-License-Identifier: Apache-2.0
 
 use self::framework::FrameworkReleaseConfig;
-use crate::{aptos_core_path, aptos_framework_path, components::feature_flags::Features};
+use crate::{aptos_core_path, supra_framework_path, components::feature_flags::Features};
 use anyhow::{anyhow, bail, Context, Result};
 use aptos::governance::GenerateExecutionHash;
 use aptos_rest_client::Client;
@@ -635,7 +635,7 @@ pub fn get_execution_hash(result: &Vec<(String, String)>) -> Vec<u8> {
 
         let (_, hash) = GenerateExecutionHash {
             script_path: Option::from(move_script_path),
-            framework_local_dir: Some(aptos_framework_path()),
+            framework_local_dir: Some(supra_framework_path()),
         }
         .generate_hash()
         .unwrap();
@@ -660,7 +660,7 @@ fn append_script_hash(raw_script: String) -> String {
 
     let (_, hash) = GenerateExecutionHash {
         script_path: Option::from(move_script_path),
-        framework_local_dir: Some(aptos_framework_path()),
+        framework_local_dir: Some(supra_framework_path()),
     }
     .generate_hash()
     .unwrap();

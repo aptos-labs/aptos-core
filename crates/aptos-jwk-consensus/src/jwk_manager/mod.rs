@@ -8,7 +8,7 @@ use crate::{
 };
 use anyhow::{anyhow, bail, Result};
 use aptos_channels::{aptos_channel, message_queues::QueueStyle};
-use aptos_crypto::{bls12381::PrivateKey, SigningKey};
+use aptos_crypto::{ed25519::PrivateKey, SigningKey};
 use aptos_logger::{debug, error, info};
 use aptos_types::{
     account_address::AccountAddress,

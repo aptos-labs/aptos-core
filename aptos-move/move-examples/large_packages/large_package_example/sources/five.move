@@ -171,7 +171,7 @@
 ///
 /// Aptos has a standard [Coin type](https://github.com/aptos-labs/aptos-core/blob/main/aptos-move/framework/aptos-framework/sources/coin.move). Different types of coins can be represented in this type through the use of distinct structs that represent the type parameter or generic for `Coin<T>`.
 ///
-/// Coins are stored within an account under the resource `CoinStore<T>`. At account creation, each user has the resource `CoinStore<0x1::aptos_coin::AptosCoin>` or `CoinStore<AptosCoin>`, for short. Within this resource is the Aptos coin: `Coin<AptosCoin>`.
+/// Coins are stored within an account under the resource `CoinStore<T>`. At account creation, each user has the resource `CoinStore<0x1::supra_coin::SupraCoin>` or `CoinStore<SupraCoin>`, for short. Within this resource is the Aptos coin: `Coin<SupraCoin>`.
 ///
 /// ### Transferring coins between users
 ///
@@ -183,11 +183,11 @@
 ///
 /// ### Current balance for a coin
 ///
-/// The current balance for a `Coin<T>` where `T` is the Aptos coin is available at the account resources URL: `https://{rest_api_server}/accounts/{address}/resource/0x1::coin::CoinStore<0x1::aptos_coin::AptosCoin>`. The balance is stored within `coin::amount`. The resource also contains the total number of deposit and withdraw events, and the `counter` value within `deposit_events` and `withdraw_events`, respectively.
+/// The current balance for a `Coin<T>` where `T` is the Aptos coin is available at the account resources URL: `https://{rest_api_server}/accounts/{address}/resource/0x1::coin::CoinStore<0x1::supra_coin::SupraCoin>`. The balance is stored within `coin::amount`. The resource also contains the total number of deposit and withdraw events, and the `counter` value within `deposit_events` and `withdraw_events`, respectively.
 ///
 /// ```
 /// {
-///   "type": "0x1::coin::CoinStore<0x1::aptos_coin::AptosCoin>",
+///   "type": "0x1::coin::CoinStore<0x1::supra_coin::SupraCoin>",
 ///   "data": {
 ///     "coin": {
 ///       "value": "3927"
@@ -232,7 +232,7 @@
 ///     {
 ///       "address": "0xb258b91eee04111039320a85b0c24a2dd433909e14a6b5c32ee722e0fdecfddc",
 ///       "data": {
-///         "type": "0x1::coin::CoinStore<0x1::aptos_coin::AptosCoin>",
+///         "type": "0x1::coin::CoinStore<0x1::supra_coin::SupraCoin>",
 ///         "data": {
 ///           "coin": {
 ///             "value": "1000"
@@ -261,7 +261,7 @@
 ///   "payload": {
 ///     "function": "0x1::coin::transfer",
 ///     "type_arguments": [
-///       "0x1::aptos_coin::AptosCoin"
+///       "0x1::supra_coin::SupraCoin"
 ///     ],
 ///     "arguments": [
 ///       "0x5098df8e7969b58ab3bd2d440c6203f64c60a1fd5c08b9d4abe6ae4216246c3e",
@@ -332,7 +332,7 @@
 ///
 /// Aptos provides clear and canonical events for all withdraw and deposit of coins. This can be used in coordination with the associated transactions to present to a user the change of their account balance over time, when that happened, and what caused it. With some amount of additional parsing, metadata such as the transaction type and the other parties involved can also be shared.
 ///
-/// Query events by handle URL: `https://{rest_api_server}/accounts/{address}/events/0x1::coin::CoinStore<0x1::aptos_coin::AptosCoin>/withdraw_events`
+/// Query events by handle URL: `https://{rest_api_server}/accounts/{address}/events/0x1::coin::CoinStore<0x1::supra_coin::SupraCoin>/withdraw_events`
 ///
 /// ```
 /// [
@@ -359,7 +359,7 @@
 ///
 /// :::tip
 ///
-/// When tracking full movement of coins, normally events are sufficient. `0x1::aptos_coin::AptosCoin`, however, requires considering `gas_used` for each transaction sent from the given account since it represents gas in Aptos. To reduce unnecessary overhead, extracting gas fees due to transactions does not emit an event. All transactions for an account can be retrieved from this API: `https://{rest_server_api}/accounts/{address}/transactions`
+/// When tracking full movement of coins, normally events are sufficient. `0x1::supra_coin::SupraCoin`, however, requires considering `gas_used` for each transaction sent from the given account since it represents gas in Aptos. To reduce unnecessary overhead, extracting gas fees due to transactions does not emit an event. All transactions for an account can be retrieved from this API: `https://{rest_server_api}/accounts/{address}/transactions`
 ///
 /// :::
 ///
@@ -453,7 +453,7 @@
 /// There are three balance changes in this transaction:
 /// 1. A withdrawal of `1000` of `0x1337::my_coin::MyCoin` from the transaction sending account `0x810026ca8291dd88b5b30a1d3ca2edd683d33d06c4a7f7c451d96f6d47bc5e8b`
 /// 2. A deposit of `1000` of `0x1337::my_coin::MyCoin` to receiving account `0x5098df8e7969b58ab3bd2d440c6203f64c60a1fd5c08b9d4abe6ae4216246c3e`
-/// 3. A gas fee `2200` of `0x1::aptos_coin::AptosCoin` from the sending account `0x810026ca8291dd88b5b30a1d3ca2edd683d33d06c4a7f7c451d96f6d47bc5e8b`
+/// 3. A gas fee `2200` of `0x1::supra_coin::SupraCoin` from the sending account `0x810026ca8291dd88b5b30a1d3ca2edd683d33d06c4a7f7c451d96f6d47bc5e8b`
 ///
 /// To retrieve the withdrawal information:
 /// 1. Scan the `changes` for `0x1::coin::CoinStore<CoinType>`.  Note the `CoinType` is a generic signifying which coin is stored in the store.  In this example, the `CoinType` is `0x1337::my_coin::MyCoin`.
@@ -468,7 +468,7 @@
 ///
 /// To retrieve the gas fee:
 /// 1. The `gas_used` field must be multiplied times the `gas_unit_price`.  In this example, `gas_used=20` and `gas_unit_price=110` so the total gas coins withdrawn is `2200`.
-/// 2. Gas is always: `0x1::aptos_coin::AptosCoin`
+/// 2. Gas is always: `0x1::supra_coin::SupraCoin`
 ///
 /// To retrieve information about the number of decimals of the coin:
 /// 1. You can retrieve the number of decimals for a coin via its: `0x1::coin::CoinInfo<CoinType>`

@@ -41,7 +41,7 @@ spec aptos_token::property_map {
     }
 
     spec add(map: &mut PropertyMap, key: String, value: PropertyValue) {
-        use aptos_framework::simple_map;
+        use supra_framework::simple_map;
 
         aborts_if !(string::length(key) <= MAX_PROPERTY_NAME_LENGTH);
         aborts_if !(!simple_map::spec_contains_key(map.map, key));
@@ -65,7 +65,7 @@ spec aptos_token::property_map {
     }
 
     spec borrow(map: &PropertyMap, key: &String): &PropertyValue {
-        use aptos_framework::simple_map;
+        use supra_framework::simple_map;
         aborts_if !simple_map::spec_contains_key(map.map, key);
     }
 
@@ -73,7 +73,7 @@ spec aptos_token::property_map {
     /// to `prop.type`
     spec read_string(map: &PropertyMap, key: &String): String {
         use std::string;
-        use aptos_framework::simple_map;
+        use supra_framework::simple_map;
         pragma aborts_if_is_partial;
 
         // TODO: Unable to handle abort from `from_bcs::to_string` because there is a function call at assert.
@@ -90,7 +90,7 @@ spec aptos_token::property_map {
 
     spec read_u8(map: &PropertyMap, key: &String): u8 {
         use std::string;
-        use aptos_framework::simple_map;
+        use supra_framework::simple_map;
 
         let str = b"u8";
         aborts_if !simple_map::spec_contains_key(map.map, key);
@@ -102,7 +102,7 @@ spec aptos_token::property_map {
 
     spec read_u64(map: &PropertyMap, key: &String): u64 {
         use std::string;
-        use aptos_framework::simple_map;
+        use supra_framework::simple_map;
 
         let str = b"u64";
         aborts_if !simple_map::spec_contains_key(map.map, key);
@@ -114,7 +114,7 @@ spec aptos_token::property_map {
 
     spec read_address(map: &PropertyMap, key: &String): address {
         use std::string;
-        use aptos_framework::simple_map;
+        use supra_framework::simple_map;
 
         let str = b"address";
         aborts_if !simple_map::spec_contains_key(map.map, key);
@@ -126,7 +126,7 @@ spec aptos_token::property_map {
 
     spec read_u128(map: &PropertyMap, key: &String): u128 {
         use std::string;
-        use aptos_framework::simple_map;
+        use supra_framework::simple_map;
 
         let str = b"u128";
         aborts_if !simple_map::spec_contains_key(map.map, key);
@@ -138,7 +138,7 @@ spec aptos_token::property_map {
 
     spec read_bool(map: &PropertyMap, key: &String): bool {
         use std::string;
-        use aptos_framework::simple_map;
+        use supra_framework::simple_map;
 
         let str = b"bool";
         aborts_if !simple_map::spec_contains_key(map.map, key);

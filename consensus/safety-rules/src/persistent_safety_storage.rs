@@ -8,7 +8,7 @@ use crate::{
     Error,
 };
 use aptos_consensus_types::{common::Author, safety_data::SafetyData};
-use aptos_crypto::{bls12381, PrivateKey};
+use aptos_crypto::{ed25519, PrivateKey};
 use aptos_global_constants::{CONSENSUS_KEY, OWNER_ACCOUNT, SAFETY_DATA, WAYPOINT};
 use aptos_logger::prelude::*;
 use aptos_secure_storage::{KVStorage, Storage};
@@ -34,7 +34,7 @@ impl PersistentSafetyStorage {
     pub fn initialize(
         mut internal_store: Storage,
         author: Author,
-        consensus_private_key: bls12381::PrivateKey,
+        consensus_private_key: ed25519::PrivateKey,
         waypoint: Waypoint,
         enable_cached_safety_data: bool,
     ) -> Self {
@@ -64,7 +64,7 @@ impl PersistentSafetyStorage {
     fn initialize_keys_and_accounts(
         internal_store: &mut Storage,
         author: Author,
-        consensus_private_key: bls12381::PrivateKey,
+        consensus_private_key: ed25519::PrivateKey,
     ) -> Result<(), Error> {
         let result = internal_store.set(CONSENSUS_KEY, consensus_private_key);
         // Attempting to re-initialize existing storage. This can happen in environments like
@@ -98,10 +98,10 @@ impl PersistentSafetyStorage {
 
     pub fn consensus_key_for_version(
         &self,
-        version: bls12381::PublicKey,
-    ) -> Result<bls12381::PrivateKey, Error> {
+        version: ed25519::PublicKey,
+    ) -> Result<ed25519::PrivateKey, Error> {
         let _timer = counters::start_timer("get", CONSENSUS_KEY);
-        let key: bls12381::PrivateKey = self.internal_store.get(CONSENSUS_KEY).map(|v| v.value)?;
+        let key: ed25519::PrivateKey = self.internal_store.get(CONSENSUS_KEY).map(|v| v.value)?;
         if key.public_key() != version {
             return Err(Error::SecureStorageMissingDataError(format!(
                 "PrivateKey for {:?} not found",

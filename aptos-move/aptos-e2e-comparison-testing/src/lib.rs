@@ -40,7 +40,7 @@ use move_package::{
 };
 
 const APTOS_PACKAGES_DIR_NAMES: [&str; 5] = [
-    "aptos-framework",
+    "supra-framework",
     "move-stdlib",
     "aptos-stdlib",
     "aptos-token",

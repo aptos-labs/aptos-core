@@ -125,6 +125,11 @@ impl Ed25519PublicKey {
             .ok_or(CryptoMaterialError::DeserializationError)?;
         Ed25519PublicKey::try_from(&ed_point.compress().as_bytes()[..])
     }
+
+    /// TODO
+    pub fn aggregate(_pub_keys: Vec<&Ed25519PublicKey>) -> anyhow::Result<Self> {
+        todo!()
+    }
 }
 
 ///////////////////////

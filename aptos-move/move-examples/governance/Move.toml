@@ -6,4 +6,4 @@ version = "0.0.0"
 aptos_framework = "0x1"
 
 [dependencies]
-AptosFramework = { local = "../../framework/aptos-framework" }
+SupraFramework = { local = "../../framework/supra-framework" }

@@ -24,11 +24,11 @@
 /// 1. The DAO creator can call `reclaim_signer_capability` to remove their DAO from the platform and get back her
 /// resource account's signercapability
 module dao_platform::nft_dao {
-    use aptos_framework::account::{SignerCapability, create_signer_with_capability};
-    use aptos_framework::account;
-    use aptos_framework::aptos_coin::AptosCoin;
-    use aptos_framework::coin;
-    use aptos_framework::timestamp;
+    use supra_framework::account::{SignerCapability, create_signer_with_capability};
+    use supra_framework::account;
+    use supra_framework::supra_coin::SupraCoin;
+    use supra_framework::coin;
+    use supra_framework::timestamp;
     use aptos_std::table::Table;
     use aptos_std::table;
     use aptos_token::property_map::PropertyMap;
@@ -255,7 +255,7 @@ module dao_platform::nft_dao {
         let src_addr = signer::address_of(admin);
 
         // register aptos coin
-        coin::register<AptosCoin>(&res_signer);
+        coin::register<SupraCoin>(&res_signer);
         // initalize token store and opt-in direct NFT transfer for easy of operation
         token::initialize_token_store(&res_signer);
         token::opt_in_direct_transfer(&res_signer, true);
@@ -675,7 +675,7 @@ module dao_platform::nft_dao {
     /////////////////////////// Private functions //////////////////////////////////
     /// Transfer coin from the DAO account to the destination account
     fun transfer_fund(res_acct: &signer, dst: address, amount: u64) {
-        coin::transfer<AptosCoin>(res_acct, dst, amount);
+        coin::transfer<SupraCoin>(res_acct, dst, amount);
     }
 
     /// offer one NFT from DAO to the DST address. The DST address should
@@ -818,9 +818,9 @@ module dao_platform::nft_dao {
     #[test_only]
     use aptos_token::token::create_token_script;
     #[test_only]
-    use aptos_framework::aptos_account::transfer_coins;
+    use supra_framework::aptos_account::transfer_coins;
     #[test_only]
-    use aptos_framework::aptos_coin;
+    use supra_framework::supra_coin;
     use aptos_token::token_transfers;
 
     #[test_only]
@@ -856,9 +856,9 @@ module dao_platform::nft_dao {
         token::direct_transfer(creator, voter, token_id_3, 1);
     }
 
-    #[test(aptos_framework = @0x1, creator = @0xdeaf, voter = @0xaf)]
-    public fun test_e2e_scenario(aptos_framework: &signer, creator: &signer, voter: &signer) acquires DAO, Proposals, ProposalVotingStatistics {
-        timestamp::set_time_has_started_for_testing(aptos_framework);
+    #[test(supra_framework = @0x1, creator = @0xdeaf, voter = @0xaf)]
+    public fun test_e2e_scenario(supra_framework: &signer, creator: &signer, voter: &signer) acquires DAO, Proposals, ProposalVotingStatistics {
+        timestamp::set_time_has_started_for_testing(supra_framework);
         account::create_account_for_test(@0x1);
         account::create_account_for_test(@0xdeaf);
         account::create_account_for_test(@0xaf);
@@ -914,16 +914,16 @@ module dao_platform::nft_dao {
         //
 
         // intialize with some fund in the DAO resource account
-        let (burn_cap, mint_cap) = aptos_coin::initialize_for_test(aptos_framework);
+        let (burn_cap, mint_cap) = supra_coin::initialize_for_test(supra_framework);
         let coins = coin::mint(100, &mint_cap);
-        coin::register<AptosCoin>(creator);
-        coin::register<AptosCoin>(voter);
+        coin::register<SupraCoin>(creator);
+        coin::register<SupraCoin>(voter);
         coin::deposit(creator_addr, coins);
         coin::destroy_burn_cap(burn_cap);
         coin::destroy_mint_cap(mint_cap);
 
         // now resource account has a fund pool of 90 coins
-        transfer_coins<AptosCoin>(creator, res_acc, 90);
+        transfer_coins<SupraCoin>(creator, res_acc, 90);
 
         // creator a proposal to transfer 45 coins to voter's account
         create_proposal(
@@ -952,13 +952,13 @@ module dao_platform::nft_dao {
         resolve(2, res_acc);
         assert!(get_proposal_resolution(1, res_acc) == PROPOSAL_RESOLVED_PASSED, 1);
         // voter gets 45 coin transferred to her account after resolving
-        assert!(coin::balance<AptosCoin>(signer::address_of(voter)) == 45, 1);
+        assert!(coin::balance<SupraCoin>(signer::address_of(voter)) == 45, 1);
     }
 
-    #[test(aptos_framework = @0x1, admin = @0xdeaf, new_admin = @0xaf)]
-    public fun test_dao_offer_and_claim(aptos_framework: &signer, admin: &signer, new_admin: &signer) acquires DAO {
+    #[test(supra_framework = @0x1, admin = @0xdeaf, new_admin = @0xaf)]
+    public fun test_dao_offer_and_claim(supra_framework: &signer, admin: &signer, new_admin: &signer) acquires DAO {
         // admin creates a dao
-        timestamp::set_time_has_started_for_testing(aptos_framework);
+        timestamp::set_time_has_started_for_testing(supra_framework);
         let new_addr = signer::address_of(new_admin);
         let old_addr = signer::address_of(admin);
         account::create_account_for_test(@0x1);
@@ -982,10 +982,10 @@ module dao_platform::nft_dao {
         assert!(borrow_global_mut<DAO>(dao).admin == new_addr, 1);
     }
 
-    #[test(aptos_framework = @0x1, admin = @0xdeaf)]
-    public fun test_transferring_ownership_to_zero_address(aptos_framework: &signer, admin: &signer) acquires DAO {
+    #[test(supra_framework = @0x1, admin = @0xdeaf)]
+    public fun test_transferring_ownership_to_zero_address(supra_framework: &signer, admin: &signer) acquires DAO {
         // admin creates a dao
-        timestamp::set_time_has_started_for_testing(aptos_framework);
+        timestamp::set_time_has_started_for_testing(supra_framework);
         let old_addr = signer::address_of(admin);
         account::create_account_for_test(@0x1);
         account::create_account_for_test(old_addr);
@@ -1006,10 +1006,10 @@ module dao_platform::nft_dao {
         assert!(borrow_global_mut<DAO>(dao).admin == @0x0, 1);
     }
 
-    #[test(aptos_framework = @0x1, creator = @0xdeaf, voter = @0xaf)]
+    #[test(supra_framework = @0x1, creator = @0xdeaf, voter = @0xaf)]
     #[expected_failure(abort_code = 65547, location = Self)]
-    public fun test_double_vote(aptos_framework: &signer, creator: &signer, voter: &signer) acquires DAO, Proposals, ProposalVotingStatistics {
-        timestamp::set_time_has_started_for_testing(aptos_framework);
+    public fun test_double_vote(supra_framework: &signer, creator: &signer, voter: &signer) acquires DAO, Proposals, ProposalVotingStatistics {
+        timestamp::set_time_has_started_for_testing(supra_framework);
         account::create_account_for_test(@0x1);
         account::create_account_for_test(@0xdeaf);
         account::create_account_for_test(@0xaf);
@@ -1052,9 +1052,9 @@ module dao_platform::nft_dao {
         );
     }
 
-    #[test(aptos_framework = @0x1, creator = @0xdeaf, voter = @0xaf)]
-    public fun test_resolve_with_no_sufficient_votes(aptos_framework: &signer, creator: &signer, voter: &signer) acquires DAO, Proposals, ProposalVotingStatistics {
-        timestamp::set_time_has_started_for_testing(aptos_framework);
+    #[test(supra_framework = @0x1, creator = @0xdeaf, voter = @0xaf)]
+    public fun test_resolve_with_no_sufficient_votes(supra_framework: &signer, creator: &signer, voter: &signer) acquires DAO, Proposals, ProposalVotingStatistics {
+        timestamp::set_time_has_started_for_testing(supra_framework);
         account::create_account_for_test(@0x1);
         account::create_account_for_test(@0xdeaf);
         account::create_account_for_test(@0xaf);
@@ -1103,10 +1103,10 @@ module dao_platform::nft_dao {
         assert!(get_proposal_resolution(1, res_acc) == PROPOSAL_RESOLVED_NOT_PASSED, 1);
     }
 
-    #[test(aptos_framework = @0x1, creator = @0xdeaf, voter = @0xaf)]
+    #[test(supra_framework = @0x1, creator = @0xdeaf, voter = @0xaf)]
     #[expected_failure(abort_code = 65544, location = Self)]
-    public fun test_resolve_earlier_than_ending_time(aptos_framework: &signer, creator: &signer, voter: &signer) acquires DAO, Proposals, ProposalVotingStatistics {
-        timestamp::set_time_has_started_for_testing(aptos_framework);
+    public fun test_resolve_earlier_than_ending_time(supra_framework: &signer, creator: &signer, voter: &signer) acquires DAO, Proposals, ProposalVotingStatistics {
+        timestamp::set_time_has_started_for_testing(supra_framework);
         account::create_account_for_test(@0x1);
         account::create_account_for_test(@0xdeaf);
         account::create_account_for_test(@0xaf);
@@ -1152,9 +1152,9 @@ module dao_platform::nft_dao {
         resolve(1, res_acc);
     }
 
-    #[test(aptos_framework = @0x1, creator = @0xdeaf, voter = @0xaf)]
-    public fun test_admin_execute_proposal(aptos_framework: &signer, creator: &signer, voter: &signer)acquires DAO, Proposals, ProposalVotingStatistics {
-        timestamp::set_time_has_started_for_testing(aptos_framework);
+    #[test(supra_framework = @0x1, creator = @0xdeaf, voter = @0xaf)]
+    public fun test_admin_execute_proposal(supra_framework: &signer, creator: &signer, voter: &signer)acquires DAO, Proposals, ProposalVotingStatistics {
+        timestamp::set_time_has_started_for_testing(supra_framework);
         account::create_account_for_test(@0x1);
         account::create_account_for_test(@0xdeaf);
         account::create_account_for_test(@0xaf);
@@ -1192,9 +1192,9 @@ module dao_platform::nft_dao {
         assert!(get_proposal_resolution(1, res_acc) == PROPOSAL_RESOLVED_BY_ADMIN, 1);
     }
 
-    #[test(aptos_framework = @0x1, creator = @0xdeaf, voter = @0xaf)]
-    public fun test_admin_veto_a_proposal(aptos_framework: &signer, creator: &signer, voter: &signer)acquires DAO, Proposals, ProposalVotingStatistics {
-        timestamp::set_time_has_started_for_testing(aptos_framework);
+    #[test(supra_framework = @0x1, creator = @0xdeaf, voter = @0xaf)]
+    public fun test_admin_veto_a_proposal(supra_framework: &signer, creator: &signer, voter: &signer)acquires DAO, Proposals, ProposalVotingStatistics {
+        timestamp::set_time_has_started_for_testing(supra_framework);
         account::create_account_for_test(@0x1);
         account::create_account_for_test(@0xdeaf);
         account::create_account_for_test(@0xaf);
@@ -1241,9 +1241,9 @@ module dao_platform::nft_dao {
         assert!(get_proposal_resolution(1, res_acc) == PROPOSAL_VETOED_BY_ADMIN, 1);
     }
 
-    #[test(aptos_framework = @0x1, creator = @0xdeaf, voter = @0xaf)]
-    public fun test_set_dao_config(aptos_framework: &signer, creator: &signer, voter: &signer) acquires DAO {
-        timestamp::set_time_has_started_for_testing(aptos_framework);
+    #[test(supra_framework = @0x1, creator = @0xdeaf, voter = @0xaf)]
+    public fun test_set_dao_config(supra_framework: &signer, creator: &signer, voter: &signer) acquires DAO {
+        timestamp::set_time_has_started_for_testing(supra_framework);
         account::create_account_for_test(@0x1);
         account::create_account_for_test(@0xdeaf);
         account::create_account_for_test(@0xaf);
@@ -1284,10 +1284,10 @@ module dao_platform::nft_dao {
         assert!(voting_duration == 12, 1);
     }
 
-    #[test(aptos_framework = @0x1, admin = @0xdeaf, new_admin = @0xaf)]
-    public fun test_admin_create_proposal_without_token(aptos_framework: &signer, admin: &signer, new_admin: &signer) acquires DAO, Proposals {
+    #[test(supra_framework = @0x1, admin = @0xdeaf, new_admin = @0xaf)]
+    public fun test_admin_create_proposal_without_token(supra_framework: &signer, admin: &signer, new_admin: &signer) acquires DAO, Proposals {
         // admin creates a dao
-        timestamp::set_time_has_started_for_testing(aptos_framework);
+        timestamp::set_time_has_started_for_testing(supra_framework);
         let new_addr = signer::address_of(new_admin);
         let old_addr = signer::address_of(admin);
         account::create_account_for_test(@0x1);
@@ -1320,9 +1320,9 @@ module dao_platform::nft_dao {
         );
     }
 
-    #[test(aptos_framework = @0x1, creator = @0xdeaf, voter = @0xaf)]
-    public fun test_transfer_multiple_nfts(aptos_framework: &signer, creator: &signer, voter: &signer) acquires DAO, Proposals, ProposalVotingStatistics {
-        timestamp::set_time_has_started_for_testing(aptos_framework);
+    #[test(supra_framework = @0x1, creator = @0xdeaf, voter = @0xaf)]
+    public fun test_transfer_multiple_nfts(supra_framework: &signer, creator: &signer, voter: &signer) acquires DAO, Proposals, ProposalVotingStatistics {
+        timestamp::set_time_has_started_for_testing(supra_framework);
         account::create_account_for_test(@0x1);
         account::create_account_for_test(@0xdeaf);
         account::create_account_for_test(@0xaf);

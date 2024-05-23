@@ -16,7 +16,7 @@ fn test_metadata_tracking() {
         microseconds: 7200000001,
     };
 
-    let coin_store = parse_struct_tag("0x1::coin::CoinStore<0x1::aptos_coin::AptosCoin>").unwrap();
+    let coin_store = parse_struct_tag("0x1::coin::CoinStore<0x1::supra_coin::SupraCoin>").unwrap();
 
     let address1 = AccountAddress::from_hex_literal("0x100").unwrap();
     let address2 = AccountAddress::from_hex_literal("0x200").unwrap();

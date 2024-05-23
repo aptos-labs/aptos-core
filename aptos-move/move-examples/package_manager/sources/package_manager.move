@@ -19,8 +19,8 @@
 /// Other modules can store and obtain stored addreses by calling add_address or get_address. This is useful for
 /// storing addresses of other modules in the same package or system addresses such as the NFT collection.
 module package::package_manager {
-    use aptos_framework::account::{Self, SignerCapability};
-    use aptos_framework::resource_account;
+    use supra_framework::account::{Self, SignerCapability};
+    use supra_framework::resource_account;
     use aptos_std::smart_table::{Self, SmartTable};
     use std::string::String;
 
@@ -71,7 +71,7 @@ module package::package_manager {
     public fun initialize_for_test(deployer: &signer) {
         let deployer_addr = std::signer::address_of(deployer);
         if (!exists<PermissionConfig>(deployer_addr)) {
-            aptos_framework::timestamp::set_time_has_started_for_testing(&account::create_signer_for_test(@0x1));
+            supra_framework::timestamp::set_time_has_started_for_testing(&account::create_signer_for_test(@0x1));
 
             account::create_account_for_test(deployer_addr);
             move_to(deployer, PermissionConfig {

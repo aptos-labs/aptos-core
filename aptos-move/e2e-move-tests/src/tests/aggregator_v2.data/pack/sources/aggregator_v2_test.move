@@ -1,5 +1,5 @@
 module 0x1::aggregator_v2_test {
-    use aptos_framework::aggregator_v2::{Self, Aggregator, AggregatorSnapshot, DerivedStringSnapshot};
+    use supra_framework::aggregator_v2::{Self, Aggregator, AggregatorSnapshot, DerivedStringSnapshot};
     use aptos_std::debug;
     use aptos_std::table::{Self, Table};
     use std::vector;

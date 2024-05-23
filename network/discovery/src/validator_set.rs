@@ -156,7 +156,7 @@ mod tests {
     use crate::DiscoveryChangeListener;
     use aptos_channels::{aptos_channel, message_queues::QueueStyle};
     use aptos_config::config::HANDSHAKE_VERSION;
-    use aptos_crypto::{bls12381, x25519::PrivateKey, PrivateKey as PK, Uniform};
+    use aptos_crypto::{ed25519, x25519::PrivateKey, PrivateKey as PK, Uniform};
     use aptos_event_notifications::ReconfigNotification;
     use aptos_types::{
         network_address::NetworkAddress,
@@ -177,7 +177,7 @@ mod tests {
     fn metric_if_key_mismatch() {
         aptos_logger::Logger::init_for_testing();
         let runtime = Runtime::new().unwrap();
-        let consensus_private_key = bls12381::PrivateKey::generate_for_testing();
+        let consensus_private_key = ed25519::PrivateKey::generate_for_testing();
         let consensus_pubkey = consensus_private_key.public_key();
         let pubkey = test_pubkey([0u8; 32]);
         let different_pubkey = test_pubkey([1u8; 32]);
@@ -237,7 +237,7 @@ mod tests {
 
     fn send_pubkey_update(
         peer_id: PeerId,
-        consensus_pubkey: bls12381::PublicKey,
+        consensus_pubkey: ed25519::PublicKey,
         pubkey: x25519::PublicKey,
         reconfig_tx: &mut aptos_channels::aptos_channel::Sender<
             (),

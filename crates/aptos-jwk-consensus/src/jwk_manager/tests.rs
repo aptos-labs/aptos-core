@@ -9,7 +9,7 @@ use crate::{
 use aptos_bitvec::BitVec;
 use aptos_channels::aptos_channel;
 use aptos_crypto::{
-    bls12381::{PrivateKey, PublicKey, Signature},
+    ed25519::{PrivateKey, PublicKey, Signature},
     hash::CryptoHash,
     SigningKey, Uniform,
 };

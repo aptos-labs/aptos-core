@@ -2,9 +2,9 @@
 /// deployer will be creating a new managed fungible asset with the hardcoded supply config, name, symbol, and decimals.
 /// The address of the asset can be obtained via get_metadata(). As a simple version, it only deals with primary stores.
 module FACoin::fa_coin {
-    use aptos_framework::fungible_asset::{Self, MintRef, TransferRef, BurnRef, Metadata, FungibleAsset};
-    use aptos_framework::object::{Self, Object};
-    use aptos_framework::primary_fungible_store;
+    use supra_framework::fungible_asset::{Self, MintRef, TransferRef, BurnRef, Metadata, FungibleAsset};
+    use supra_framework::object::{Self, Object};
+    use supra_framework::primary_fungible_store;
     use std::error;
     use std::signer;
     use std::string::utf8;
@@ -15,7 +15,7 @@ module FACoin::fa_coin {
 
     const ASSET_SYMBOL: vector<u8> = b"FA";
 
-    #[resource_group_member(group = aptos_framework::object::ObjectGroup)]
+    #[resource_group_member(group = supra_framework::object::ObjectGroup)]
     /// Hold refs to control the minting, transfer and burning of fungible assets.
     struct ManagedFungibleAsset has key {
         mint_ref: MintRef,

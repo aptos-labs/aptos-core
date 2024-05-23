@@ -13,13 +13,13 @@
 /// required so that fees are correctly updated for LPs. fungible_asset::transfer and primary_fungible_store::transfer
 /// are not supported
 module swap::liquidity_pool {
-    use aptos_framework::event;
-    use aptos_framework::fungible_asset::{
+    use supra_framework::event;
+    use supra_framework::fungible_asset::{
         Self, FungibleAsset, FungibleStore, Metadata,
         BurnRef, MintRef, TransferRef,
     };
-    use aptos_framework::object::{Self, ConstructorRef, Object};
-    use aptos_framework::primary_fungible_store;
+    use supra_framework::object::{Self, ConstructorRef, Object};
+    use supra_framework::primary_fungible_store;
     use aptos_std::comparator;
     use aptos_std::math128;
     use aptos_std::math64;
@@ -77,7 +77,7 @@ module swap::liquidity_pool {
         volatile_fee_bps: u64,
     }
 
-    #[resource_group_member(group = aptos_framework::object::ObjectGroup)]
+    #[resource_group_member(group = supra_framework::object::ObjectGroup)]
     struct LiquidityPool has key {
         token_store_1: Object<FungibleStore>,
         token_store_2: Object<FungibleStore>,
@@ -88,7 +88,7 @@ module swap::liquidity_pool {
         is_stable: bool,
     }
 
-    #[resource_group_member(group = aptos_framework::object::ObjectGroup)]
+    #[resource_group_member(group = supra_framework::object::ObjectGroup)]
     struct FeesAccounting has key {
         total_fees_1: u128,
         total_fees_2: u128,

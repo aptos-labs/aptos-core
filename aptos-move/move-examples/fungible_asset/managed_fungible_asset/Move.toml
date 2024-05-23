@@ -8,5 +8,5 @@ aptos_token_objects = "0x4"
 example_addr = "_"
 
 [dependencies]
-AptosFramework = { local = "../../../framework/aptos-framework" }
+SupraFramework = { local = "../../../framework/supra-framework" }
 AptosTokenObjects = { local = "../../../framework/aptos-token-objects" }

@@ -1,8 +1,8 @@
 module 0x1::events_with_aggregators {
     use std::signer;
-    use aptos_framework::account;
-    use aptos_framework::aggregator_v2::{Self, Aggregator, AggregatorSnapshot};
-    use aptos_framework::event;
+    use supra_framework::account;
+    use supra_framework::aggregator_v2::{Self, Aggregator, AggregatorSnapshot};
+    use supra_framework::event;
 
     const E_COUNTER_ALREADY_EXISTS: u64 = 0;
     const E_COUNTER_DOES_NOT_EXIST: u64 = 1;

@@ -1,7 +1,7 @@
 // Copyright © Aptos Foundation
 // SPDX-License-Identifier: Apache-2.0
 
-use crate::{aptos_framework_path, components::ProposalMetadata, ExecutionMode, ReleaseConfig};
+use crate::{supra_framework_path, components::ProposalMetadata, ExecutionMode, ReleaseConfig};
 use anyhow::Result;
 use aptos::{
     common::types::CliCommand,
@@ -162,7 +162,7 @@ impl NetworkConfig {
             self.endpoint.as_str(),
         ];
         let rev = self.framework_git_rev.clone();
-        let framework_path = aptos_framework_path();
+        let framework_path = supra_framework_path();
         if let Some(rev) = &rev {
             args.push("--framework-git-rev");
             args.push(rev.as_str());
@@ -217,7 +217,7 @@ impl NetworkConfig {
         }
 
         let rev_string = self.framework_git_rev.clone();
-        let framework_path = aptos_framework_path();
+        let framework_path = supra_framework_path();
         if let Some(rev) = &rev_string {
             args.push("--framework-git-rev");
             args.push(rev.as_str());
@@ -352,7 +352,7 @@ impl NetworkConfig {
         ];
 
         let rev = self.framework_git_rev.clone();
-        let framework_path = aptos_framework_path();
+        let framework_path = supra_framework_path();
         if let Some(rev) = &rev {
             args.push("--framework-git-rev");
             args.push(rev.as_str());
@@ -452,7 +452,7 @@ async fn execute_release(
                     ];
 
                     let rev = network_config.framework_git_rev.clone();
-                    let framework_path = aptos_framework_path();
+                    let framework_path = supra_framework_path();
                     if let Some(rev) = &rev {
                         args.push("--framework-git-rev");
                         args.push(rev.as_str());

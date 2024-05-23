@@ -17,7 +17,7 @@ use move_core_types::{ident_str, language_storage::ModuleId};
 
 pub fn aptos_coin_transfer(to: AccountAddress, amount: u64) -> TransactionPayload {
     coin_transfer(
-        aptos_types::utility_coin::APTOS_COIN_TYPE.clone(),
+        aptos_types::utility_coin::SUPRA_COIN_TYPE.clone(),
         to,
         amount,
     )

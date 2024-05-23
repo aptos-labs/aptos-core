@@ -16,7 +16,7 @@ use aptos_consensus_types::{
     vote_proposal::VoteProposal,
 };
 use aptos_crypto::{
-    bls12381,
+    ed25519,
     hash::{HashValue, TransactionAccumulatorHasher},
     test_utils::TEST_SEED,
     traits::{SigningKey, Uniform},
@@ -68,7 +68,7 @@ prop_compose! {
     ) -> Block {
         let signature = if include_signature {
             let mut rng = StdRng::from_seed(TEST_SEED);
-            let private_key = bls12381::PrivateKey::generate(&mut rng);
+            let private_key = ed25519::PrivateKey::generate(&mut rng);
             let signature = private_key.sign(&block_data).unwrap();
             Some(signature)
         } else {
@@ -243,7 +243,7 @@ pub mod fuzzing {
         block_data::BlockData, timeout_2chain::TwoChainTimeout, vote::Vote,
         vote_proposal::VoteProposal,
     };
-    use aptos_crypto::bls12381;
+    use aptos_crypto::ed25519;
     use aptos_types::epoch_change::EpochChangeProof;
 
     pub fn fuzz_initialize(proof: EpochChangeProof) -> Result<(), Error> {
@@ -272,14 +272,14 @@ pub mod fuzzing {
         }
     }
 
-    pub fn fuzz_sign_proposal(block_data: &BlockData) -> Result<bls12381::Signature, Error> {
+    pub fn fuzz_sign_proposal(block_data: &BlockData) -> Result<ed25519::Signature, Error> {
         let mut safety_rules = test_utils::test_safety_rules();
         safety_rules.sign_proposal(block_data)
     }
 
     pub fn fuzz_sign_timeout_with_qc(
         timeout: TwoChainTimeout,
-    ) -> Result<bls12381::Signature, Error> {
+    ) -> Result<ed25519::Signature, Error> {
         let mut safety_rules = test_utils::test_safety_rules();
         safety_rules.sign_timeout_with_qc(&timeout, None)
     }

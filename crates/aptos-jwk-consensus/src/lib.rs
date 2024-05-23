@@ -4,7 +4,7 @@ use crate::{
     epoch_manager::EpochManager, network::NetworkTask,
     network_interface::JWKConsensusNetworkClient, types::JWKConsensusMsg,
 };
-use aptos_crypto::bls12381::PrivateKey;
+use aptos_crypto::ed25519::PrivateKey;
 use aptos_event_notifications::{
     DbBackedOnChainConfig, EventNotificationListener, ReconfigNotificationListener,
 };

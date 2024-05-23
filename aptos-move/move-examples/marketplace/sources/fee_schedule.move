@@ -10,8 +10,8 @@ module marketplace::fee_schedule {
 
     use aptos_std::type_info;
 
-    use aptos_framework::event;
-    use aptos_framework::object::{Self, ConstructorRef, ExtendRef, Object};
+    use supra_framework::event;
+    use supra_framework::object::{Self, ConstructorRef, ExtendRef, Object};
 
     /// FeeSchedule does not exist.
     const ENO_FEE_SCHEDULE: u64 = 1;
@@ -22,7 +22,7 @@ module marketplace::fee_schedule {
     /// The passed in signer is not the owner of the marketplace.
     const ENOT_OWNER: u64 = 4;
 
-    #[resource_group_member(group = aptos_framework::object::ObjectGroup)]
+    #[resource_group_member(group = supra_framework::object::ObjectGroup)]
     /// Defines marketplace fees
     struct FeeSchedule has key {
         /// Address to send fees to
@@ -31,28 +31,28 @@ module marketplace::fee_schedule {
         extend_ref: ExtendRef,
     }
 
-    #[resource_group_member(group = aptos_framework::object::ObjectGroup)]
+    #[resource_group_member(group = supra_framework::object::ObjectGroup)]
     /// Fixed rate for bidding
     struct FixedRateBiddingFee has drop, key {
         /// Fixed rate for bidding
         bidding_fee: u64,
     }
 
-    #[resource_group_member(group = aptos_framework::object::ObjectGroup)]
+    #[resource_group_member(group = supra_framework::object::ObjectGroup)]
     /// Fixed rate for listing
     struct FixedRateListingFee has drop, key {
         /// Fixed rate for listing
         listing_fee: u64,
     }
 
-    #[resource_group_member(group = aptos_framework::object::ObjectGroup)]
+    #[resource_group_member(group = supra_framework::object::ObjectGroup)]
     /// Fixed rate for commission
     struct FixedRateCommission has drop, key {
         /// Fixed rate for commission
         commission: u64,
     }
 
-    #[resource_group_member(group = aptos_framework::object::ObjectGroup)]
+    #[resource_group_member(group = supra_framework::object::ObjectGroup)]
     /// Percentage-based rate for commission
     struct PercentageRateCommission has drop, key {
         /// Denominator for the commission rate
@@ -329,7 +329,7 @@ module marketplace::fee_schedule {
     // Tests
 
     #[test_only]
-    use aptos_framework::account;
+    use supra_framework::account;
 
     #[test(creator = @0x123)]
     fun test_init(

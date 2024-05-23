@@ -3,7 +3,7 @@ name = "CommonAccount"
 version = "1.0.0"
 
 [dependencies]
-AptosFramework = { local = "../../framework/aptos-framework" }
+SupraFramework = { local = "../../framework/supra-framework" }
 
 [addresses]
 common_account = "_"

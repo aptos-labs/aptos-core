@@ -7,5 +7,5 @@ version = '1.0.0'
 ambassador = "0xCAFE"
 
 [dependencies]
-AptosFramework = { local = "../../../framework/aptos-framework" }
+SupraFramework = { local = "../../../framework/supra-framework" }
 AptosTokenObjects = { local = "../../../framework/aptos-token-objects" }

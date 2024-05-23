@@ -61,7 +61,7 @@ impl ReleaseTarget {
             ("move-stdlib", None),
             ("aptos-stdlib", None),
             (
-                "aptos-framework",
+                "supra-framework",
                 Some("cached-packages/src/aptos_framework_sdk_builder.rs"),
             ),
             (
