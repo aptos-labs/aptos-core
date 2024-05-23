@@ -92,6 +92,7 @@ pub fn build_empty_tree() -> Arc<BlockStore> {
         10,
         Arc::from(PayloadManager::DirectMempool),
         false,
+        0,
         Arc::new(Mutex::new(PendingBlocks::new())),
     ))
 }
