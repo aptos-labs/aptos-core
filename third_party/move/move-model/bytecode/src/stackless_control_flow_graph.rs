@@ -271,8 +271,8 @@ pub struct DFSLeft<'a> {
 }
 
 impl<'a> DFSLeft<'a> {
-    /// Iterates over all blocks in DFS order (and always choosing the left-most child to visit) starting from the entry block
-    /// `visit_all`: whether to visit all blocks or just blocks reachable from the entry block
+    /// Create DFSLeft iterator starting from a specified start block
+    /// `visit_all`: whether to visit all blocks or just blocks reachable from the start block
     pub fn new(
         successors: &'a BTreeMap<BlockId, Vec<BlockId>>,
         start: BlockId,
