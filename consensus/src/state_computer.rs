@@ -18,7 +18,11 @@ use crate::{
 };
 use anyhow::Result;
 use aptos_consensus_notifications::ConsensusNotificationSender;
-use aptos_consensus_types::{block::Block, common::Round, pipelined_block::PipelinedBlock};
+use aptos_consensus_types::{
+    block::Block,
+    common::Round,
+    pipelined_block::{OrderedBlockWindow, PipelinedBlock},
+};
 use aptos_crypto::HashValue;
 use aptos_executor_types::{BlockExecutorTrait, ExecutorResult, StateComputeResult};
 use aptos_infallible::RwLock;
@@ -164,6 +168,7 @@ impl StateComputer for ExecutionProxy {
         &self,
         // The block to be executed.
         block: &Block,
+        block_window: &OrderedBlockWindow,
         // The parent block id.
         parent_block_id: HashValue,
         randomness: Option<Randomness>,
@@ -209,6 +214,7 @@ impl StateComputer for ExecutionProxy {
             .execution_pipeline
             .queue(
                 block.clone(),
+                block_window.clone(),
                 metadata,
                 parent_block_id,
                 transaction_generator,

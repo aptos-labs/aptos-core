@@ -224,7 +224,7 @@ impl BlockTree {
 
     pub(super) fn insert_block(
         &mut self,
-        mut block: PipelinedBlock,
+        block: PipelinedBlock,
     ) -> anyhow::Result<Arc<PipelinedBlock>> {
         let block_id = block.id();
         if let Some(existing_block) = self.get_block(&block_id) {
@@ -240,7 +240,7 @@ impl BlockTree {
                     parent_block.add_child(block_id);
                     // TODO: is there some placeholder for a root block that needs to be ignored?
                     // TODO: for now this is just hardcoded for window size 2 (current and parent)
-                    block.set_block_window(OrderedBlockWindow::new(vec![parent_block
+                    let block = block.set_block_window(OrderedBlockWindow::new(vec![parent_block
                         .executed_block
                         .block()
                         .clone()]));

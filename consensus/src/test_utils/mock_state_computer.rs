@@ -39,6 +39,7 @@ impl StateComputer for EmptyStateComputer {
     async fn compute(
         &self,
         _block: &Block,
+        _block_window: &OrderedBlocks,
         _parent_block_id: HashValue,
         _randomness: Option<Randomness>,
     ) -> ExecutorResult<PipelineExecutionResult> {
@@ -118,6 +119,7 @@ impl StateComputer for RandomComputeResultStateComputer {
     async fn schedule_compute(
         &self,
         _block: &Block,
+        _block_window: &OrderedBlocks,
         parent_block_id: HashValue,
         _randomness: Option<Randomness>,
     ) -> StateComputeResultFut {

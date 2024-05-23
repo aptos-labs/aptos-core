@@ -8,7 +8,7 @@ use crate::{
     transaction_filter::TransactionFilter,
     transaction_shuffler::TransactionShuffler,
 };
-use aptos_consensus_types::block::Block;
+use aptos_consensus_types::{block::Block, pipelined_block::OrderedBlockWindow};
 use aptos_executor_types::ExecutorResult;
 use aptos_types::transaction::SignedTransaction;
 use std::sync::Arc;
@@ -35,8 +35,18 @@ impl BlockPreparer {
         }
     }
 
-    pub async fn prepare_block(&self, block: &Block) -> ExecutorResult<Vec<SignedTransaction>> {
-        let (txns, max_txns_from_block_to_execute) =
+    pub async fn prepare_block(
+        &self,
+        block: &Block,
+        block_window: &OrderedBlockWindow,
+    ) -> ExecutorResult<Vec<SignedTransaction>> {
+        let mut txns = vec![];
+        for block in block_window.blocks() {
+            let (block_txns, _) = self.payload_manager.get_transactions(block).await?;
+            txns.extend(block_txns);
+        }
+        // We take the ordered block's max_txns
+        let (_, max_txns_from_block_to_execute) =
             self.payload_manager.get_transactions(block).await?;
         let txn_filter = self.txn_filter.clone();
         let txn_deduper = self.txn_deduper.clone();

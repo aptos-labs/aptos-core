@@ -21,19 +21,23 @@ use std::{
     time::{Duration, Instant},
 };
 
-#[derive(Clone, Eq, PartialEq)]
+#[derive(Clone, Eq, PartialEq, Serialize, Deserialize)]
 pub struct OrderedBlockWindow {
-    transactions: Vec<Block>,
+    blocks: Vec<Block>,
 }
 // TODO: how to create a block window from a BlockStore/BlockTree?
 
 impl OrderedBlockWindow {
-    pub fn new(transactions: Vec<Block>) -> Self {
-        Self { transactions }
+    pub fn new(blocks: Vec<Block>) -> Self {
+        Self { blocks }
     }
 
     pub fn is_valid(&self) -> bool {
-        !self.transactions.is_empty()
+        !self.blocks.is_empty()
+    }
+
+    pub fn blocks(&self) -> &Vec<Block> {
+        &self.blocks
     }
 }
 
@@ -65,6 +69,7 @@ impl Serialize for PipelinedBlock {
         #[serde(rename = "PipelineBlock")]
         struct SerializedBlock<'a> {
             block: &'a Block,
+            block_window: &'a OrderedBlockWindow,
             input_transactions: &'a Vec<SignedTransaction>,
             state_compute_result: &'a StateComputeResult,
             randomness: Option<&'a Randomness>,
@@ -72,6 +77,7 @@ impl Serialize for PipelinedBlock {
 
         let serialized = SerializedBlock {
             block: &self.block,
+            block_window: &self.block_window,
             input_transactions: &self.input_transactions,
             state_compute_result: &self.state_compute_result,
             randomness: self.randomness.get(),
@@ -89,6 +95,7 @@ impl<'de> Deserialize<'de> for PipelinedBlock {
         #[serde(rename = "PipelineBlock")]
         struct SerializedBlock {
             block: Block,
+            block_window: OrderedBlockWindow,
             input_transactions: Vec<SignedTransaction>,
             state_compute_result: StateComputeResult,
             randomness: Option<Randomness>,
@@ -96,6 +103,7 @@ impl<'de> Deserialize<'de> for PipelinedBlock {
 
         let SerializedBlock {
             block,
+            block_window,
             input_transactions,
             state_compute_result,
             randomness,
@@ -103,6 +111,7 @@ impl<'de> Deserialize<'de> for PipelinedBlock {
 
         let block = PipelinedBlock {
             block,
+            block_window,
             input_transactions,
             state_compute_result,
             randomness: OnceCell::new(),
@@ -126,8 +135,9 @@ impl PipelinedBlock {
         self
     }
 
-    pub fn set_block_window(mut self, block_window: OrderedBlockWindow) {
+    pub fn set_block_window(mut self, block_window: OrderedBlockWindow) -> Self {
         self.block_window = block_window;
+        self
     }
 
     pub fn set_randomness(&self, randomness: Randomness) {
@@ -159,6 +169,7 @@ impl PipelinedBlock {
     ) -> Self {
         Self {
             block,
+            block_window: OrderedBlockWindow::new(vec![]),
             input_transactions,
             state_compute_result,
             randomness: OnceCell::new(),
@@ -169,9 +180,7 @@ impl PipelinedBlock {
     pub fn new_ordered(block: Block) -> Self {
         Self {
             block,
-            block_window: OrderedBlockWindow {
-                transactions: vec![],
-            },
+            block_window: OrderedBlockWindow::new(vec![]),
             input_transactions: vec![],
             state_compute_result: StateComputeResult::new_dummy(),
             randomness: OnceCell::new(),
@@ -181,6 +190,10 @@ impl PipelinedBlock {
 
     pub fn block(&self) -> &Block {
         &self.block
+    }
+
+    pub fn block_window(&self) -> &OrderedBlockWindow {
+        &self.block_window
     }
 
     pub fn id(&self) -> HashValue {
