@@ -2,12 +2,17 @@
 // SPDX-License-Identifier: Apache-2.0
 
 use crate::on_chain_config::OnChainConfig;
+use move_binary_format::{
+    file_format_common,
+    file_format_common::{IDENTIFIER_SIZE_MAX, LEGACY_IDENTIFIER_SIZE_MAX},
+};
 use move_core_types::{
     effects::{ChangeSet, Op},
     language_storage::CORE_CODE_ADDRESS,
 };
 use serde::{Deserialize, Serialize};
 use strum_macros::FromRepr;
+
 /// The feature flags define in the Move source. This must stay aligned with the constants there.
 #[derive(Clone, Copy, Debug, PartialEq, Eq, PartialOrd, Ord, FromRepr)]
 #[allow(non_camel_case_types)]
@@ -274,6 +279,24 @@ impl Features {
     pub fn is_refundable_bytes_enabled(&self) -> bool {
         self.is_enabled(FeatureFlag::REFUNDABLE_BYTES)
     }
+
+    pub fn get_max_identifier_size(&self) -> u64 {
+        if self.is_enabled(FeatureFlag::LIMIT_MAX_IDENTIFIER_LENGTH) {
+            IDENTIFIER_SIZE_MAX
+        } else {
+            LEGACY_IDENTIFIER_SIZE_MAX
+        }
+    }
+
+    pub fn get_max_binary_format_version(&self) -> u32 {
+        if self.is_enabled(FeatureFlag::VM_BINARY_FORMAT_V7) {
+            file_format_common::VERSION_7
+        } else if self.is_enabled(FeatureFlag::VM_BINARY_FORMAT_V6) {
+            file_format_common::VERSION_6
+        } else {
+            file_format_common::VERSION_5
+        }
+    }
 }
 
 pub fn aptos_test_feature_flags_genesis() -> ChangeSet {
@@ -292,17 +315,36 @@ pub fn aptos_test_feature_flags_genesis() -> ChangeSet {
     change_set
 }
 
-#[test]
-fn test_features_into_flag_vec() {
-    let mut features = Features { features: vec![] };
-    features.enable(FeatureFlag::BLS12_381_STRUCTURES);
-    features.enable(FeatureFlag::BN254_STRUCTURES);
-    let flag_vec = features.into_flag_vec();
-    assert_eq!(
-        vec![
-            FeatureFlag::BLS12_381_STRUCTURES,
-            FeatureFlag::BN254_STRUCTURES
-        ],
-        flag_vec
-    );
+#[cfg(test)]
+mod test {
+    use super::*;
+
+    #[test]
+    fn test_features_into_flag_vec() {
+        let mut features = Features { features: vec![] };
+        features.enable(FeatureFlag::BLS12_381_STRUCTURES);
+        features.enable(FeatureFlag::BN254_STRUCTURES);
+
+        assert_eq!(
+            vec![
+                FeatureFlag::BLS12_381_STRUCTURES,
+                FeatureFlag::BN254_STRUCTURES
+            ],
+            features.into_flag_vec()
+        );
+    }
+
+    #[test]
+    fn test_min_max_binary_format() {
+        // Ensure querying max binary format implementation is correct and checks
+        // versions 5 to 7.
+        assert_eq!(
+            file_format_common::VERSION_5,
+            file_format_common::VERSION_MIN
+        );
+        assert_eq!(
+            file_format_common::VERSION_7,
+            file_format_common::VERSION_MAX
+        );
+    }
 }

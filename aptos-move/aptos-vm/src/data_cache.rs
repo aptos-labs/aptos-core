@@ -6,8 +6,8 @@
 use crate::{
     gas::get_gas_config_from_storage,
     move_vm_ext::{
-        get_max_binary_format_version, get_max_identifier_size, resource_state_key,
-        AptosMoveResolver, AsExecutorView, AsResourceGroupView, ResourceGroupResolver,
+        resource_state_key, AptosMoveResolver, AsExecutorView, AsResourceGroupView,
+        ResourceGroupResolver,
     },
 };
 use aptos_aggregator::{
@@ -26,6 +26,7 @@ use aptos_types::{
         state_value::{StateValue, StateValueMetadata},
         StateView, StateViewId,
     },
+    vm::configs::aptos_prod_deserializer_config,
 };
 use aptos_vm_types::{
     resolver::{
@@ -80,8 +81,7 @@ impl<'e, E: ExecutorView> StorageAdapter<'e, E> {
         features: &Features,
         maybe_resource_group_view: Option<&'e dyn ResourceGroupView>,
     ) -> Self {
-        let max_binary_version = get_max_binary_format_version(features, Some(gas_feature_version));
-        let max_identifier_size = get_max_identifier_size(features);
+        let deserializer_config = aptos_prod_deserializer_config(features);
         let resource_group_adapter = ResourceGroupAdapter::new(
             maybe_resource_group_view,
             executor_view,
@@ -89,26 +89,17 @@ impl<'e, E: ExecutorView> StorageAdapter<'e, E> {
             features.is_resource_groups_split_in_vm_change_set_enabled(),
         );
 
-        Self::new(
-            executor_view,
-            max_binary_version,
-            max_identifier_size,
-            resource_group_adapter,
-        )
+        Self::new(executor_view, deserializer_config, resource_group_adapter)
     }
 
     fn new(
         executor_view: &'e E,
-        max_binary_format_version: u32,
-        max_identifier_size: u64,
+        deserializer_config: DeserializerConfig,
         resource_group_view: ResourceGroupAdapter<'e>,
     ) -> Self {
         Self {
             executor_view,
-            deserializer_config: DeserializerConfig::new(
-                max_binary_format_version,
-                max_identifier_size,
-            ),
+            deserializer_config,
             resource_group_view,
             accessed_groups: RefCell::new(HashSet::new()),
         }
@@ -313,23 +304,17 @@ pub trait AsMoveResolver<S> {
 
 impl<S: StateView> AsMoveResolver<S> for S {
     fn as_move_resolver(&self) -> StorageAdapter<S> {
-        let (_, gas_feature_version) = get_gas_config_from_storage(self);
         let features = Features::fetch_config(self).unwrap_or_default();
-        let max_binary_version =
-            get_max_binary_format_version(&features, Some(gas_feature_version));
+        let deserializer_config = aptos_prod_deserializer_config(&features);
+
+        let (_, gas_feature_version) = get_gas_config_from_storage(self);
         let resource_group_adapter = ResourceGroupAdapter::new(
             None,
             self,
             gas_feature_version,
             features.is_resource_groups_split_in_vm_change_set_enabled(),
         );
-        let max_identifier_size = get_max_identifier_size(&features);
-        StorageAdapter::new(
-            self,
-            max_binary_version,
-            max_identifier_size,
-            resource_group_adapter,
-        )
+        StorageAdapter::new(self, deserializer_config, resource_group_adapter)
     }
 }
 
@@ -367,7 +352,7 @@ pub(crate) mod tests {
         state_view: &S,
         group_size_kind: GroupSizeKind,
     ) -> StorageAdapter<S> {
-        assert!(group_size_kind != GroupSizeKind::AsSum, "not yet supported");
+        assert_ne!(group_size_kind, GroupSizeKind::AsSum, "not yet supported");
 
         let (gas_feature_version, resource_groups_split_in_vm_change_set_enabled) =
             match group_size_kind {
@@ -383,6 +368,9 @@ pub(crate) mod tests {
             gas_feature_version,
             resource_groups_split_in_vm_change_set_enabled,
         );
-        StorageAdapter::new(state_view, 0, 0, group_adapter)
+
+        let features = Features::fetch_config(state_view).unwrap_or_default();
+        let deserializer_config = aptos_prod_deserializer_config(&features);
+        StorageAdapter::new(state_view, deserializer_config, group_adapter)
     }
 }
