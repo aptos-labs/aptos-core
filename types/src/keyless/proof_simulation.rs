@@ -42,10 +42,6 @@ impl<ConstraintF: Field> ConstraintSynthesizer<ConstraintF> for MySillyCircuit<C
     }
 }
 
-//use ark_crypto_primitives::snark::*;
-//use ark_ec::pairing::Pairing;
-//use ark_relations::r1cs::{ConstraintSynthesizer, SynthesisError};
-//use ark_std::rand::RngCore;
 use ark_std::{marker::PhantomData, vec::Vec};
 use ark_groth16::r1cs_to_qap::{LibsnarkReduction, R1CSToQAP};
 use ark_groth16::data_structures::{ProvingKey, VerifyingKey, Proof};
@@ -91,7 +87,7 @@ impl<E: Pairing, QAP: R1CSToQAP> Groth16Simulator<E, QAP> {
         Ok((pk, vk))
     }
 
-/// Generates a random common reference string for
+    /// Generates a random common reference string for
     /// a circuit using the provided R1CS-to-QAP reduction.
     #[inline]
     pub fn generate_random_parameters_and_trapdoor_with_reduction<C>(
@@ -132,8 +128,7 @@ impl<E: Pairing, QAP: R1CSToQAP> Groth16Simulator<E, QAP> {
         })
     }
 
-
-pub fn prove_with_trapdoor<C: ConstraintSynthesizer<E::ScalarField>, R: RngCore>(
+    pub fn prove_with_trapdoor<C: ConstraintSynthesizer<E::ScalarField>, R: RngCore>(
         pk: &ProvingKeyWithTrapdoor<E>,
         circuit: C,
         rng: &mut R,
@@ -162,17 +157,8 @@ pub fn prove_with_trapdoor<C: ConstraintSynthesizer<E::ScalarField>, R: RngCore>
         cs.set_optimization_goal(OptimizationGoal::Constraints);
 
         // Synthesize the circuit.
-        //let synthesis_time = start_timer!(|| "Constraint synthesis");
         circuit.generate_constraints(cs.clone())?;
-        debug_assert!(cs.is_satisfied().unwrap());
-        //end_timer!(synthesis_time);
-
-        //let lc_time = start_timer!(|| "Inlining LCs");
         cs.finalize();
-        //end_timer!(lc_time);
-
-        //let witness_map_time = start_timer!(|| "R1CS to QAP witness map");
-        //end_timer!(witness_map_time);
 
         let prover = cs.borrow().unwrap();
 
@@ -180,6 +166,7 @@ pub fn prove_with_trapdoor<C: ConstraintSynthesizer<E::ScalarField>, R: RngCore>
     }
 
     /// Creates proof using the trapdoor
+    #[cfg(test)]
     pub fn create_proof_with_trapdoor(
         pk: &ProvingKeyWithTrapdoor<E>,
         a: E::ScalarField,
@@ -216,41 +203,23 @@ pub fn prove_with_trapdoor<C: ConstraintSynthesizer<E::ScalarField>, R: RngCore>
 use ark_circom::CircomConfig;
 use ark_circom::CircomBuilder;
 use std::fs::File;
-use std::io::prelude::*;
 use std::collections::HashMap;
 use std::str::FromStr;
-//use ark_ff::{BigInt,BigInteger};
-//use num_bigint::{BigInt,BigUint};
 use num_bigint::BigInt;
 use ark_ff::MontBackend;
 use ark_bn254::FrConfig;
 
-fn u8_to_bits(x: u8) -> Vec<bool> {
-    let mut result = Vec::new();
-    for i in 0..8 {
-        let mask = 1 << x;
-        let bit_is_set = (mask & x) > 0;
-        result.push(bit_is_set);
-    }
-    result
-}
-
+#[cfg(test)]
 fn test_prove_and_verify<E>(n_iters: usize)
 where
     E: Pairing<ScalarField = ark_ff::Fp<MontBackend<FrConfig, 4>, 4>>, <E as Pairing>::ScalarField: From<i32>
 {
-    println!("starting test");
-    /*let cfg = CircomConfig::<Bn254>::new(
-    "/Users/michael/aptos-labs/aptos-core/types/src/keyless/toy-circuit-files/multiplier2_js/multiplier2.wasm",
-    "/Users/michael/aptos-labs/aptos-core/types/src/keyless/toy-circuit-files/multiplier2.r1cs",
-).unwrap();*/
     let cfg = CircomConfig::<Bn254>::new(
     "/Users/michael/aptos-labs/aptos-core/types/src/keyless/circuit-files/keyless_main.wasm",
     "/Users/michael/aptos-labs/aptos-core/types/src/keyless/circuit-files/keyless_main.r1cs",
 ).unwrap();
 
     let mut builder = CircomBuilder::new(cfg);
-    //let mut input_file = File::open("/Users/michael/aptos-labs/aptos-core/types/src/keyless/toy-circuit-files/multiplier2_input.json").unwrap();
     let mut input_file = File::open("/Users/michael/aptos-labs/aptos-core/types/src/keyless/circuit-files/keyless_input.json").unwrap();
     let mut input_json = String::new();
     input_file.read_to_string(&mut input_json).unwrap();
@@ -262,16 +231,8 @@ where
         }
     }
 
-    let circom = builder.setup();
-    //println!("circom: {:?}", circom);
-    let witness: Vec<<E as Pairing>::ScalarField> = builder
-                 .cfg 
-                 .wtns
-                 .calculate_witness_element::<E, _>(builder.inputs.clone(), builder.cfg.sanity_check).unwrap(); 
-    //println!("witness: {:?}", witness);
     let circom = builder.build().unwrap();
     let inputs = circom.get_public_inputs().unwrap();
-    //println!("inputs: {:?}", inputs);
     let mut rng = ark_std::rand::rngs::StdRng::seed_from_u64(test_rng().next_u64());
 
     let (pk, vk) = Groth16Simulator::<E>::circuit_specific_setup_with_trapdoor(circom.clone(), &mut rng).unwrap();
@@ -290,7 +251,7 @@ where
         )
         .unwrap();
 
-        assert!(Groth16::<E>::verify_with_processed_vk(&pvk, &[c], &proof).unwrap());
+        assert!(Groth16::<E>::verify_with_processed_vk(&pvk, &inputs, &proof).unwrap());
         assert!(!Groth16::<E>::verify_with_processed_vk(&pvk, &[a], &proof).unwrap());
     }
 }
