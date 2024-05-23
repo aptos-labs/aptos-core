@@ -4,7 +4,6 @@
 //! This file defines the state snapshot committer running in background thread within StateStore.
 
 use crate::{
-    metrics::OTHER_TIMERS_SECONDS,
     state_store::{
         buffered_state::CommitMessage,
         state_merkle_batch_committer::{StateMerkleBatch, StateMerkleBatchCommitter},
@@ -12,12 +11,10 @@ use crate::{
     },
     versioned_node_cache::VersionedNodeCache,
 };
-use aptos_experimental_runtimes::thread_manager::THREAD_MANAGER;
 use aptos_logger::trace;
 use aptos_scratchpad::SmtAncestors;
-use aptos_storage_interface::{jmt_update_refs, jmt_updates, state_delta::StateDelta, Result};
+use aptos_storage_interface::state_delta::StateDelta;
 use aptos_types::state_store::state_value::StateValue;
-use rayon::prelude::*;
 use static_assertions::const_assert;
 use std::{
     sync::{
@@ -29,6 +26,7 @@ use std::{
 };
 
 pub(crate) struct StateSnapshotCommitter {
+    #[allow(dead_code)]
     state_db: Arc<StateDb>,
     state_snapshot_commit_receiver: Receiver<CommitMessage<Arc<StateDelta>>>,
     state_merkle_batch_commit_sender: SyncSender<CommitMessage<StateMerkleBatch>>,
@@ -74,6 +72,7 @@ impl StateSnapshotCommitter {
         while let Ok(msg) = self.state_snapshot_commit_receiver.recv() {
             match msg {
                 CommitMessage::Data(delta_to_commit) => {
+                    /*
                     let version = delta_to_commit.current_version.expect("Cannot be empty");
                     let base_version = delta_to_commit.base_version;
                     let previous_epoch_ending_version = self
@@ -138,12 +137,13 @@ impl StateSnapshotCommitter {
                             )
                             .expect("Error calculating StateMerkleBatch for top levels.")
                     };
+                     */
 
                     self.state_merkle_batch_commit_sender
                         .send(CommitMessage::Data(StateMerkleBatch {
-                            top_levels_batch,
-                            batches_for_shards,
-                            root_hash,
+                            // top_levels_batch,
+                            // batches_for_shards,
+                            root_hash: delta_to_commit.current.root_hash(),
                             state_delta: delta_to_commit,
                         }))
                         .unwrap();

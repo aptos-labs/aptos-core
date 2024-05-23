@@ -5,8 +5,8 @@
 
 use crate::{
     metrics::{LATEST_SNAPSHOT_VERSION, OTHER_TIMERS_SECONDS},
-    pruner::PrunerManager,
     schema::jellyfish_merkle_node::JellyfishMerkleNodeSchema,
+    state_merkle_db::Node,
     state_store::{buffered_state::CommitMessage, StateDb},
 };
 use anyhow::{anyhow, ensure, Result};
@@ -14,15 +14,14 @@ use aptos_crypto::HashValue;
 use aptos_jellyfish_merkle::node_type::NodeKey;
 use aptos_logger::{info, trace};
 use aptos_metrics_core::TimerHelper;
-use aptos_schemadb::SchemaBatch;
 use aptos_scratchpad::SmtAncestors;
 use aptos_storage_interface::state_delta::StateDelta;
-use aptos_types::state_store::state_value::StateValue;
+use aptos_types::state_store::{state_key::StateKey, state_value::StateValue};
 use std::sync::{mpsc::Receiver, Arc};
 
 pub struct StateMerkleBatch {
-    pub top_levels_batch: SchemaBatch,
-    pub batches_for_shards: Vec<SchemaBatch>,
+    // pub top_levels_batch: SchemaBatch,
+    // pub batches_for_shards: Vec<SchemaBatch>,
     pub root_hash: HashValue,
     pub state_delta: Arc<StateDelta>,
 }
@@ -52,8 +51,8 @@ impl StateMerkleBatchCommitter {
             match msg {
                 CommitMessage::Data(state_merkle_batch) => {
                     let StateMerkleBatch {
-                        top_levels_batch,
-                        batches_for_shards,
+                        // top_levels_batch,
+                        // batches_for_shards,
                         root_hash,
                         state_delta,
                     } = state_merkle_batch;
@@ -62,10 +61,25 @@ impl StateMerkleBatchCommitter {
                         .current_version
                         .expect("Current version should not be None");
 
-                    // commit jellyfish merkle nodes
                     let _timer = OTHER_TIMERS_SECONDS
                         .with_label_values(&["commit_jellyfish_merkle_nodes"])
                         .start_timer();
+
+                    self.state_db
+                        .state_merkle_db
+                        .metadata_db()
+                        .put::<JellyfishMerkleNodeSchema>(
+                            &NodeKey::new_empty_path(current_version),
+                            &Node::new_leaf(
+                                root_hash,
+                                root_hash,
+                                (StateKey::raw(b"root"), current_version),
+                            ),
+                        )
+                        .unwrap();
+
+                    /*
+                    // commit jellyfish merkle nodes
                     self.state_db
                         .state_merkle_db
                         .commit(current_version, top_levels_batch, batches_for_shards)
@@ -79,6 +93,7 @@ impl StateMerkleBatchCommitter {
                                 cache.maybe_evict_version(self.state_db.state_merkle_db.lru_cache())
                             });
                     }
+                     */
                     info!(
                         version = current_version,
                         base_version = state_delta.base_version,
@@ -86,12 +101,14 @@ impl StateMerkleBatchCommitter {
                         "State snapshot committed."
                     );
                     LATEST_SNAPSHOT_VERSION.set(current_version as i64);
+                    /*
                     self.state_db
                         .state_merkle_pruner
                         .maybe_set_pruner_target_db_version(current_version);
                     self.state_db
                         .epoch_snapshot_pruner
                         .maybe_set_pruner_target_db_version(current_version);
+                     */
 
                     self.check_usage_consistency(&state_delta).unwrap();
 
@@ -117,6 +134,7 @@ impl StateMerkleBatchCommitter {
             .ok_or_else(|| anyhow!("Committing without version."))?;
 
         let usage_from_ledger_db = self.state_db.ledger_db.metadata_db().get_usage(version)?;
+        /*
         let leaf_count_from_jmt = self
             .state_db
             .state_merkle_db
@@ -131,6 +149,7 @@ impl StateMerkleBatchCommitter {
             usage_from_ledger_db.items(),
             leaf_count_from_jmt,
         );
+         */
 
         let usage_from_smt = state_delta.current.usage();
         if !usage_from_smt.is_untracked() {

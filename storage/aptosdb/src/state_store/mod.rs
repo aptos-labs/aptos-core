@@ -46,7 +46,6 @@ use aptos_logger::info;
 use aptos_schemadb::SchemaBatch;
 use aptos_scratchpad::{SmtAncestors, SparseMerkleTree};
 use aptos_storage_interface::{
-    async_proof_fetcher::AsyncProofFetcher,
     cached_state_view::{CachedStateView, ShardedStateCache},
     db_ensure as ensure,
     state_delta::StateDelta,
@@ -503,7 +502,7 @@ impl StateStore {
                 StateViewId::Miscellaneous,
                 snapshot,
                 speculative_state,
-                Arc::new(AsyncProofFetcher::new(state_db.clone())),
+                state_db.clone(),
             );
             let write_sets = state_db
                 .ledger_db

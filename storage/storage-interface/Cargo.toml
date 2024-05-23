@@ -24,7 +24,7 @@ aptos-types = { workspace = true }
 aptos-vm = { workspace = true }
 bcs = { workspace = true }
 crossbeam-channel = { workspace = true }
-dashmap = { workspace = true }
+dashmap = { workspace = true, features = ["rayon"] }
 once_cell = { workspace = true }
 parking_lot = { workspace = true }
 proptest = { workspace = true }

@@ -37,6 +37,7 @@ aptos-types = { workspace = true }
 arc-swap = { workspace = true }
 arr_macro = { workspace = true }
 bcs = { workspace = true }
+bitvec = { workspace = true }
 byteorder = { workspace = true }
 claims = { workspace = true }
 clap = { workspace = true, optional = true }

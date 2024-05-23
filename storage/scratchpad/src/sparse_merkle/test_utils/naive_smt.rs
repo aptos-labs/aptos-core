@@ -7,9 +7,7 @@ use aptos_crypto::{
     hash::{CryptoHash, SPARSE_MERKLE_PLACEHOLDER_HASH},
     HashValue,
 };
-use aptos_types::proof::{
-    definition::NodeInProof, SparseMerkleInternalNode, SparseMerkleLeafNode, SparseMerkleProofExt,
-};
+use aptos_types::proof::{definition::NodeInProof, SparseMerkleInternalNode, SparseMerkleLeafNode};
 use bitvec::prelude::*;
 use std::collections::{BTreeMap, HashMap};
 
@@ -148,14 +146,8 @@ impl NaiveSmt {
         }
     }
 
-    pub fn get_proof(&mut self, key: &HashValue) -> SparseMerkleProofExt {
-        let root = NaiveSubTree {
-            leaves: &self.leaves,
-            depth: 0,
-        };
-
-        let (leaf, siblings) = root.get_proof(key, &mut self.cache);
-        SparseMerkleProofExt::new(leaf, siblings)
+    pub fn get_proof(&mut self, _key: &HashValue) -> Option<HashValue> {
+        unimplemented!()
     }
 
     pub fn get_root_hash(&mut self) -> HashValue {
