@@ -558,7 +558,7 @@ impl RedundantJumpRemover {
     }
 }
 
-/// Computes the map from a blcok to its predecessors
+/// Computes the map from a block to its predecessors
 fn pred_map(cfg: &StacklessControlFlowGraph) -> BTreeMap<BlockId, Vec<BlockId>> {
     let mut pred_map = BTreeMap::new();
     let blocks = cfg.blocks();
