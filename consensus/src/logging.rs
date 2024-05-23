@@ -28,6 +28,7 @@ pub enum LogEvent {
     NewRound,
     ProofOfStoreInit,
     ProofOfStoreReady,
+    ProofOfStoreCommit,
     Propose,
     ReceiveBatchRetrieval,
     ReceiveBlockRetrieval,

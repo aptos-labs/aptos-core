@@ -23,7 +23,7 @@ use aptos_types::{
     contract_event::{ContractEvent, ContractEventV1},
     jwks::{
         patch::{PatchJWKMoveStruct, PatchUpsertJWK},
-        rsa::RSA_JWK,
+        secure_test_rsa_jwk,
     },
     keyless::{
         self, test_utils::get_sample_iss, Groth16VerificationKey, DEVNET_VERIFICATION_KEY,
@@ -31,6 +31,7 @@ use aptos_types::{
     },
     move_utils::as_move_value::AsMoveValue,
     on_chain_config::{
+        randomness_api_v0_config::{AllowCustomMaxGasFlag, RequiredGasDeposit},
         FeatureFlag, Features, GasScheduleV2, OnChainConsensusConfig, OnChainExecutionConfig,
         OnChainJWKConsensusConfig, OnChainRandomnessConfig, RandomnessConfigMoveStruct,
         TimedFeaturesBuilder, APTOS_MAX_KNOWN_VERSION,
@@ -66,6 +67,7 @@ const JWK_CONSENSUS_CONFIG_MODULE_NAME: &str = "jwk_consensus_config";
 const JWKS_MODULE_NAME: &str = "jwks";
 const CONFIG_BUFFER_MODULE_NAME: &str = "config_buffer";
 const DKG_MODULE_NAME: &str = "dkg";
+const RANDOMNESS_API_V0_CONFIG_MODULE_NAME: &str = "randomness_api_v0_config";
 const RANDOMNESS_CONFIG_SEQNUM_MODULE_NAME: &str = "randomness_config_seqnum";
 const RANDOMNESS_CONFIG_MODULE_NAME: &str = "randomness_config";
 const RANDOMNESS_MODULE_NAME: &str = "randomness";
@@ -287,6 +289,7 @@ pub fn encode_genesis_change_set(
         .randomness_config_override
         .clone()
         .unwrap_or_else(OnChainRandomnessConfig::default_for_genesis);
+    initialize_randomness_api_v0_config(&mut session);
     initialize_randomness_config_seqnum(&mut session);
     initialize_randomness_config(&mut session, randomness_config);
     initialize_randomness_resources(&mut session);
@@ -520,6 +523,20 @@ fn initialize_randomness_config_seqnum(session: &mut SessionExt) {
     );
 }
 
+fn initialize_randomness_api_v0_config(session: &mut SessionExt) {
+    exec_function(
+        session,
+        RANDOMNESS_API_V0_CONFIG_MODULE_NAME,
+        "initialize",
+        vec![],
+        serialize_values(&vec![
+            MoveValue::Signer(CORE_CODE_ADDRESS),
+            RequiredGasDeposit::default_for_genesis().as_move_value(),
+            AllowCustomMaxGasFlag::default_for_genesis().as_move_value(),
+        ]),
+    );
+}
+
 fn initialize_randomness_config(
     session: &mut SessionExt,
     randomness_config: OnChainRandomnessConfig,
@@ -652,7 +669,7 @@ fn initialize_keyless_accounts(session: &mut SessionExt, chain_id: ChainId) {
 
         let patch: PatchJWKMoveStruct = PatchUpsertJWK {
             issuer: get_sample_iss(),
-            jwk: RSA_JWK::secure_test_jwk().into(),
+            jwk: secure_test_rsa_jwk().into(),
         }
         .into();
         exec_function(

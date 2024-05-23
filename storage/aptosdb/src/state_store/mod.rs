@@ -54,8 +54,7 @@ use aptos_types::{
     proof::{definition::LeafCount, SparseMerkleProofExt, SparseMerkleRangeProof},
     state_store::{
         create_empty_sharded_state_updates,
-        state_key::StateKey,
-        state_key_prefix::StateKeyPrefix,
+        state_key::{prefix::StateKeyPrefix, StateKey},
         state_storage_usage::StateStorageUsage,
         state_value::{StaleStateValueIndex, StateValue, StateValueChunkWithProof},
         ShardedStateUpdates, StateViewId,
@@ -166,10 +165,11 @@ impl DbReader for StateDb {
         &self,
         state_key: &StateKey,
         version: Version,
+        root_depth: usize,
     ) -> Result<SparseMerkleProofExt> {
         let (_, proof) = self
             .state_merkle_db
-            .get_with_proof_ext(state_key, version)?;
+            .get_with_proof_ext(state_key, version, root_depth)?;
         Ok(proof)
     }
 
@@ -178,10 +178,11 @@ impl DbReader for StateDb {
         &self,
         state_key: &StateKey,
         version: Version,
+        root_depth: usize,
     ) -> Result<(Option<StateValue>, SparseMerkleProofExt)> {
         let (leaf_data, proof) = self
             .state_merkle_db
-            .get_with_proof_ext(state_key, version)?;
+            .get_with_proof_ext(state_key, version, root_depth)?;
         Ok((
             match leaf_data {
                 Some((_, (key, version))) => Some(self.expect_value_by_version(&key, version)?),
@@ -244,9 +245,10 @@ impl DbReader for StateStore {
         &self,
         state_key: &StateKey,
         version: Version,
+        root_depth: usize,
     ) -> Result<SparseMerkleProofExt> {
         self.deref()
-            .get_state_proof_by_version_ext(state_key, version)
+            .get_state_proof_by_version_ext(state_key, version, root_depth)
     }
 
     /// Get the state value with proof extension given the state key and version
@@ -254,9 +256,10 @@ impl DbReader for StateStore {
         &self,
         state_key: &StateKey,
         version: Version,
+        root_depth: usize,
     ) -> Result<(Option<StateValue>, SparseMerkleProofExt)> {
         self.deref()
-            .get_state_value_with_proof_by_version_ext(state_key, version)
+            .get_state_value_with_proof_by_version_ext(state_key, version, root_depth)
     }
 }
 
@@ -384,7 +387,7 @@ impl StateStore {
                 &state_kv_db,
                 state_kv_commit_progress,
                 overall_commit_progress,
-                difference as usize,
+                std::cmp::max(difference as usize, 1), /* batch_size */
             )
             .expect("Failed to truncate state K/V db.");
         } else {

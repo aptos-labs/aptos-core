@@ -1,7 +1,7 @@
 [package]
 name = "aptos"
 description = "Aptos tool for management of nodes and interacting with the blockchain"
-version = "3.1.0"
+version = "3.3.1"
 
 # Workspace inherited keys
 authors = { workspace = true }
@@ -79,7 +79,6 @@ move-package = { workspace = true }
 move-symbol-pool = { workspace = true }
 move-unit-test = { workspace = true, features = ["debugging"] }
 move-vm-runtime = { workspace = true, features = ["testing"] }
-once_cell = { workspace = true }
 pathsearch = { workspace = true }
 poem = { workspace = true }
 # We set default-features to false so we don't onboard the libpq dep. See more here:

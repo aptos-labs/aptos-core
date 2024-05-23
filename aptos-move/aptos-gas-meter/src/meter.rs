@@ -3,7 +3,10 @@
 
 use crate::traits::{AptosGasMeter, GasAlgebra};
 use aptos_gas_algebra::{Fee, FeePerGasUnit, NumTypeNodes};
-use aptos_gas_schedule::gas_params::{instr::*, txn::*};
+use aptos_gas_schedule::{
+    gas_feature_versions::*,
+    gas_params::{instr::*, txn::*},
+};
 use aptos_types::{
     contract_event::ContractEvent, state_store::state_key::StateKey, write_set::WriteOpSize,
 };
@@ -556,6 +559,10 @@ where
     }
 
     fn charge_keyless(&mut self) -> VMResult<()> {
+        if self.feature_version() < RELEASE_V1_12 {
+            return Ok(());
+        }
+
         self.algebra
             .charge_execution(KEYLESS_BASE_COST)
             .map_err(|e| e.finish(Location::Undefined))

@@ -1666,6 +1666,8 @@ collection's address when calling <code>create_collection_address</code>.
 Once the collection has been created, the collection address should be saved for reference and
 <code>create_collection_address</code> should not be used to derive the collection's address.
 
+After changing the collection's name, to create tokens - only call functions that accept the collection object as an argument.
+
 
 <pre><code><b>public</b> <b>fun</b> <a href="collection.md#0x4_collection_set_name">set_name</a>(mutator_ref: &<a href="collection.md#0x4_collection_MutatorRef">collection::MutatorRef</a>, name: <a href="../../aptos-framework/../aptos-stdlib/../move-stdlib/doc/string.md#0x1_string_String">string::String</a>)
 </code></pre>

@@ -4,7 +4,10 @@
 //! This module defines all the gas parameters for transactions, along with their initial values
 //! in the genesis and a mapping between the Rust representation and the on-chain gas schedule.
 
-use crate::gas_schedule::VMGasParameters;
+use crate::{
+    gas_schedule::VMGasParameters,
+    ver::gas_feature_versions::{RELEASE_V1_11, RELEASE_V1_12, RELEASE_V1_13},
+};
 use aptos_gas_algebra::{
     AbstractValueSize, Fee, FeePerByte, FeePerGasUnit, FeePerSlot, Gas, GasExpression,
     GasScalingFactor, GasUnit, NumModules, NumSlots,
@@ -66,7 +69,12 @@ crate::gas_schedule::macros::define_gas_parameters!(
         [
             max_transaction_size_in_bytes: NumBytes,
             "max_transaction_size_in_bytes",
-            512 * 1024
+            64 * 1024
+        ],
+        [
+            max_transaction_size_in_bytes_gov: NumBytes,
+            { RELEASE_V1_13.. => "max_transaction_size_in_bytes.gov" },
+            1024 * 1024
         ],
         [
             gas_unit_scaling_factor: GasScalingFactor,
@@ -120,12 +128,12 @@ crate::gas_schedule::macros::define_gas_parameters!(
         ],
         [
             storage_io_per_event_byte_write: InternalGasPerByte,
-            { 16.. => "storage_io_per_event_byte_write" },
+            { RELEASE_V1_11.. => "storage_io_per_event_byte_write" },
             89,
         ],
         [
             storage_io_per_transaction_byte_write: InternalGasPerByte,
-            { 16.. => "storage_io_per_transaction_byte_write" },
+            { RELEASE_V1_11.. => "storage_io_per_transaction_byte_write" },
             89,
         ],
         [memory_quota: AbstractValueSize, { 1.. => "memory_quota" }, 10_000_000],
@@ -202,14 +210,29 @@ crate::gas_schedule::macros::define_gas_parameters!(
             920_000_000, // 92ms of execution at 10k gas per ms
         ],
         [
+            max_execution_gas_gov: InternalGas,
+            { RELEASE_V1_13.. => "max_execution_gas.gov" },
+            4_000_000_000,
+        ],
+        [
             max_io_gas: InternalGas,
             { 7.. => "max_io_gas" },
             1_000_000_000, // 100ms of IO at 10k gas per ms
         ],
         [
+            max_io_gas_gov: InternalGas,
+            { RELEASE_V1_13.. => "max_io_gas.gov" },
+            2_000_000_000,
+        ],
+        [
             max_storage_fee: Fee,
             { 7.. => "max_storage_fee" },
             2_0000_0000, // 2 APT
+        ],
+        [
+            max_storage_fee_gov: Fee,
+            { RELEASE_V1_13.. => "max_storage_fee.gov" },
+            2_0000_0000,
         ],
         [
             dependency_per_module: InternalGas,
@@ -233,8 +256,8 @@ crate::gas_schedule::macros::define_gas_parameters!(
         ],
         [
             keyless_base_cost: InternalGas,
-            { 17.. => "keyless.base" },
-            414_000_000,
+            { RELEASE_V1_12.. => "keyless.base" },
+            138_000_000,
         ]
     ]
 );

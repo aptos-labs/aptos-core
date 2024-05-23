@@ -689,7 +689,8 @@ impl LifetimeState {
     fn release_ref(&mut self, temp: TempIndex) {
         if let Some(label) = self.temp_to_label_map.remove(&temp) {
             if self.is_leaf(&label) {
-                // We can drop the underlying node, as there are no borrows out.
+                // We can drop the underlying node, as there are no borrows out, and
+                // it is not mapped from another temp.
                 let in_use = self.leaves().keys().cloned().collect();
                 let mut indirectly_removed = BTreeSet::new();
                 self.drop_leaf_node(&label, &in_use, &mut indirectly_removed);
@@ -1021,6 +1022,24 @@ impl<'env, 'state> LifetimeAnalysisStep<'env, 'state> {
                     .into_iter()
                     .chain(self.usage_info(label, |t| t != &local)),
             )
+        }
+    }
+
+    /// Marks in the borrow state that the inputs of an instruction have been consumed. At
+    /// this point all references which are not alive after this program point can be
+    /// released. Notice that this must be called before a check_write_local can be
+    /// performed. This function is idempotent for a given program step.
+    fn release_refs_not_alive_after(&mut self) {
+        for temp in self
+            .state
+            .temp_to_label_map
+            .keys()
+            .cloned()
+            .collect::<Vec<_>>()
+        {
+            if self.is_ref(temp) && !self.alive.after.contains_key(&temp) {
+                self.state.release_ref(temp)
+            }
         }
     }
 
@@ -1433,6 +1452,7 @@ impl<'env, 'state> LifetimeAnalysisStep<'env, 'state> {
             }
         } else {
             self.check_read_local(src, mode);
+            self.release_refs_not_alive_after();
             self.check_write_local(dest);
         }
     }
@@ -1477,13 +1497,37 @@ impl<'env, 'state> LifetimeAnalysisStep<'env, 'state> {
         let child = self.state.replace_ref(dest, self.code_offset, 1);
         self.state.mark_derived_from(child, src);
         let loc = self.cur_loc();
-        let is_mut = self.ty(dest).is_mutable_reference();
         let struct_env = self.global_env().get_struct(struct_.to_qualified_id());
         let field_id = struct_env.get_field_by_offset(*field_offs).get_id();
+        let is_mut = self.ty(dest).is_mutable_reference();
         self.state.add_edge(
             label,
             BorrowEdge::new(BorrowEdgeKind::BorrowField(is_mut, field_id), loc, child),
         );
+        // In v1, borrow safety is enforced even when `dest` is not used after this
+        // program point, AND when `label` has an outgoing call edge. However, our
+        // `check_borrow_safety` implementation will (correctly) not trigger an error since
+        // the borrowed reference is never used. To simulate v1 behavior, we check for those
+        // conditions and produce an error ad-hoc.
+        if is_mut
+            && !self.alive.after.contains_key(&dest)
+            && self
+                .state
+                .children(&label)
+                .any(|e| matches!(&e.kind, BorrowEdgeKind::Call(..)))
+        {
+            self.error_with_hints(
+                self.cur_loc(),
+                format!(
+                    "cannot mutably borrow field of {} since references derived from a call exist",
+                    self.display(src),
+                ),
+                "mutable borrow attempted here",
+                self.borrow_info(&label, |_| true)
+                    .into_iter()
+                    .chain(self.usage_info(&label, |_| true)),
+            )
+        }
     }
 
     /// Process a function call. For now we implement standard Move semantics, where
@@ -1496,10 +1540,6 @@ impl<'env, 'state> LifetimeAnalysisStep<'env, 'state> {
         // Check validness of arguments
         for src in srcs {
             self.check_read_local(*src, ReadMode::Argument);
-        }
-        // Next check whether we can assign to the destinations.
-        for dest in dests {
-            self.check_write_local(*dest)
         }
         // Now draw edges
         // 1) from all reference sources to all immutable reference destinations.
@@ -1548,6 +1588,11 @@ impl<'env, 'state> LifetimeAnalysisStep<'env, 'state> {
                     }
                 }
             }
+        }
+        // Check whether destinations can be written.
+        self.release_refs_not_alive_after();
+        for dest in dests {
+            self.check_write_local(*dest)
         }
     }
 
@@ -1688,6 +1733,7 @@ impl<'env, 'state> LifetimeAnalysisStep<'env, 'state> {
     /// Process a MoveFrom instruction.
     fn move_from(&mut self, dest: TempIndex, resource: &QualifiedInstId<StructId>, src: TempIndex) {
         self.check_read_local(src, ReadMode::Argument);
+        self.release_refs_not_alive_after();
         self.check_write_local(dest);
         if let Some(label) = self.state.label_for_global_with_children(resource) {
             self.error_with_hints(
@@ -1746,6 +1792,7 @@ impl<'env, 'state> LifetimeAnalysisStep<'env, 'state> {
     /// Process a ReadRef instruction.
     fn read_ref(&mut self, dest: TempIndex, src: TempIndex) {
         debug_assert!(self.is_ref(src));
+        self.release_refs_not_alive_after();
         self.check_write_local(dest);
         self.check_read_local(src, ReadMode::Argument);
     }
@@ -1782,26 +1829,11 @@ impl<'env> TransferFunctions for LifeTimeAnalysis<'env> {
         // Construct step context
         let mut step = self.new_step(code_offset, instr.get_attr_id(), state);
 
-        // Preprocessing: release all temps in the label map which are no longer alive at this point.
-        step.state.debug_print("before enter release");
-        let alive_temps = step.alive.before_set();
-        for temp in step
-            .state
-            .temp_to_label_map
-            .keys()
-            .cloned()
-            .collect::<Vec<_>>()
-        {
-            if !alive_temps.contains(&temp) && step.is_ref(temp) {
-                step.state.release_ref(temp)
-            }
-        }
-
-        // Preprocessing: check borrow safety of the currently active borrow graph for read ref,
-        // write ref, and function calls.
+        // Preprocessing: check borrow safety of the currently active borrow graph for
+        // selected instructions.
         #[allow(clippy::single_match)]
         match instr {
-            // Only handle operations which can take references
+            // Call operations which can take references
             Call(_, _, oper, srcs, ..) => match oper {
                 Operation::ReadRef
                 | Operation::WriteRef
@@ -1868,21 +1900,10 @@ impl<'env> TransferFunctions for LifeTimeAnalysis<'env> {
             },
             _ => {},
         }
-        // After processing, release any temporaries which are dying at this program point.
-        // Variables which are introduced in this step but not alive after need to be released as well, as they
-        // are not in the before set.
-        step.state.debug_print("before exit release");
-        let after_set = step.alive.after_set();
-        for released in step.alive.before.keys().chain(
-            instr
-                .dests()
-                .iter()
-                .filter(|t| !step.alive.before.contains_key(t)),
-        ) {
-            if !after_set.contains(released) && step.is_ref(*released) {
-                step.state.release_ref(*released)
-            }
-        }
+
+        // Some instructions may not have released inputs, do so now. The operation
+        // is idempotent.
+        step.release_refs_not_alive_after()
     }
 }
 

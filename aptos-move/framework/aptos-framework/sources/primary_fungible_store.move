@@ -93,8 +93,7 @@ module aptos_framework::primary_fungible_store {
     /// Get the address of the primary store for the given account.
     public fun primary_store_address<T: key>(owner: address, metadata: Object<T>): address {
         let metadata_addr = object::object_address(&metadata);
-        if (metadata_addr == @aptos_fungible_asset && features::primary_apt_fungible_store_at_user_address_enabled(
-        )) {
+        if (metadata_addr == @aptos_fungible_asset && features::primary_apt_fungible_store_at_user_address_enabled()) {
             owner
         } else {
             object::create_user_derived_object_address(owner, metadata_addr)
@@ -192,7 +191,13 @@ module aptos_framework::primary_fungible_store {
         // Check if the sender store object has been burnt or not. If so, unburn it first.
         may_be_unburn(sender, sender_store);
         let recipient_store = ensure_primary_store_exists(recipient, metadata);
-        dispatchable_fungible_asset::transfer_assert_minimum_deposit(sender, sender_store, recipient_store, amount, expected);
+        dispatchable_fungible_asset::transfer_assert_minimum_deposit(
+            sender,
+            sender_store,
+            recipient_store,
+            amount,
+            expected
+        );
     }
 
     /// Mint to the primary store of `owner`.
@@ -329,7 +334,7 @@ module aptos_framework::primary_fungible_store {
         aaron: &signer,
     ) acquires DeriveRefPod {
         let (creator_ref, metadata) = create_test_token(creator);
-        let (mint_ref, transfer_ref, _) = init_test_metadata_with_primary_store_enabled(&creator_ref);
+        let (mint_ref, _transfer_ref, _) = init_test_metadata_with_primary_store_enabled(&creator_ref);
         let creator_address = signer::address_of(creator);
         let aaron_address = signer::address_of(aaron);
         assert!(balance(creator_address, metadata) == 0, 1);

@@ -38,10 +38,16 @@ jobs:
         with:
           tool: nextest,cargo-llvm-cov
       - run: docker run --detach -p 5432:5432 cimg/postgres:14.2
-      - run: cargo llvm-cov --ignore-run-fail --workspace --exclude smoke-test --exclude aptos-testcases --lcov --jobs 32 --output-path lcov_unit.info -vv
+      - run: cargo llvm-cov nextest --ignore-run-fail --workspace --exclude smoke-test --exclude aptos-testcases --lcov --jobs 32 --output-path lcov_unit.info -vv
         env:
           INDEXER_DATABASE_URL: postgresql://postgres@localhost/postgres
-          RUST_MIN_STACK: 8388608
+          RUST_MIN_STACK: 33554432 # 32 MB of stack
+          MVP_TEST_ON_CI: true
+          SOLC_EXE: /home/runner/bin/solc
+          Z3_EXE: /home/runner/bin/z3
+          CVC5_EXE: /home/runner/bin/cvc5
+          DOTNET_ROOT: /home/runner/.dotnet
+          BOOGIE_EXE: /home/runner/.dotnet/tools/boogie
       - uses: actions/upload-artifact@v3
         with:
           name: lcov_unit
@@ -51,7 +57,7 @@ jobs:
     if: |
       contains(github.event.pull_request.labels.*.name, 'CICD:run-coverage') ||
       (github.event_name == 'schedule' && github.ref_name == 'main')
-    timeout-minutes: 240
+    timeout-minutes: 720 # incremented from 240 due to execution time limit hit in cron
     runs-on: high-perf-docker
     steps:
       - uses: actions/checkout@v3
@@ -63,10 +69,16 @@ jobs:
         with:
           tool: nextest,cargo-llvm-cov
       - run: docker run --detach -p 5432:5432 cimg/postgres:14.2
-      - run: cargo llvm-cov --ignore-run-fail --package smoke-test --lcov --output-path lcov_smoke.info -vv
+      - run: cargo llvm-cov nextest --ignore-run-fail --package smoke-test --lcov --output-path lcov_smoke.info -vv
         env:
           INDEXER_DATABASE_URL: postgresql://postgres@localhost/postgres
-          RUST_MIN_STACK: 8388608
+          RUST_MIN_STACK: 33554432
+          MVP_TEST_ON_CI: true
+          SOLC_EXE: /home/runner/bin/solc
+          Z3_EXE: /home/runner/bin/z3
+          CVC5_EXE: /home/runner/bin/cvc5
+          DOTNET_ROOT: /home/runner/.dotnet
+          BOOGIE_EXE: /home/runner/.dotnet/tools/boogie
       - uses: actions/upload-artifact@v3
         with:
           name: lcov_smoke

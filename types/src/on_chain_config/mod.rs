@@ -29,6 +29,7 @@ mod consensus_config;
 mod execution_config;
 mod gas_schedule;
 mod jwk_consensus_config;
+pub mod randomness_api_v0_config;
 mod randomness_config;
 mod timed_features;
 mod timestamp;
@@ -216,7 +217,7 @@ pub fn struct_tag_for_config(config_id: ConfigID) -> StructTag {
         address: CORE_CODE_ADDRESS,
         module: Identifier::new(config_id.1).expect("fail to make identifier"),
         name: Identifier::new(config_id.2).expect("fail to make identifier"),
-        type_params: vec![],
+        type_args: vec![],
     }
 }
 

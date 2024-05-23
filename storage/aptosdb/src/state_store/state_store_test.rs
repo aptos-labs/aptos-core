@@ -22,7 +22,7 @@ use aptos_types::{
     account_address::AccountAddress,
     account_config::{AccountResource, ChainIdResource, CoinInfoResource, CoinStoreResource},
     nibble::nibble_path::NibblePath,
-    state_store::state_key::StateKeyTag,
+    state_store::state_key::inner::StateKeyTag,
 };
 use arr_macro::arr;
 use proptest::{collection::hash_map, prelude::*};

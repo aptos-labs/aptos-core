@@ -353,6 +353,9 @@ pub fn program(
     prog: E::Program,
 ) -> N::Program {
     let mut context = Context::new(compilation_env, pre_compiled_lib, &prog);
+    if context.env.flags().get_block_v1_compiler() {
+        panic!("V1 compiler not expected");
+    }
     let E::Program {
         modules: emodules,
         scripts: escripts,

@@ -4,10 +4,7 @@
 use crate::log::{FrameName, WriteOpType};
 use aptos_types::{
     access_path::Path,
-    state_store::{
-        state_key::{StateKey, StateKeyInner},
-        table::TableHandle,
-    },
+    state_store::{state_key::StateKey, table::TableHandle},
 };
 use move_core_types::{
     account_address::AccountAddress,
@@ -103,7 +100,7 @@ impl<'a> Display for TableKey<'a> {
 
 impl<'a> Display for Render<'a, StateKey> {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        use StateKeyInner::*;
+        use aptos_types::state_store::state_key::inner::StateKeyInner::*;
 
         match self.0.inner() {
             AccessPath(ap) => {

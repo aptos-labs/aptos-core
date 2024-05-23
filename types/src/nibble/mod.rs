@@ -20,6 +20,12 @@ pub const ROOT_NIBBLE_HEIGHT: usize = HashValue::LENGTH * 2;
 #[derive(Clone, Copy, Debug, Hash, Eq, PartialEq, Ord, PartialOrd, Serialize, Deserialize)]
 pub struct Nibble(u8);
 
+impl Nibble {
+    pub fn as_usize(&self) -> usize {
+        self.0 as usize
+    }
+}
+
 impl From<u8> for Nibble {
     fn from(nibble: u8) -> Self {
         assert!(nibble < 16, "Nibble out of range: {}", nibble);
@@ -46,5 +52,15 @@ impl Arbitrary for Nibble {
 
     fn arbitrary_with(_args: Self::Parameters) -> Self::Strategy {
         (0..16u8).prop_map(Self::from).boxed()
+    }
+}
+
+pub trait ExpectNibble {
+    fn expect_nibble(&self) -> Nibble;
+}
+
+impl ExpectNibble for usize {
+    fn expect_nibble(&self) -> Nibble {
+        Nibble(*self as u8)
     }
 }

@@ -167,6 +167,14 @@
                   "format": "uint64"
                 }
               },
+              "X-APTOS-GAS-USED": {
+                "description": "The cost of the call in terms of gas",
+                "deprecated": false,
+                "schema": {
+                  "type": "integer",
+                  "format": "uint64"
+                }
+              },
               "X-APTOS-CURSOR": {
                 "description": "Cursor to be used for endpoints that support cursor-based\npagination. Pass this to the `start` field of the endpoint\non the next call to get the next page of results.",
                 "deprecated": false,
@@ -241,6 +249,14 @@
                   "type": "integer",
                   "format": "uint64"
                 }
+              },
+              "X-APTOS-GAS-USED": {
+                "description": "The cost of the call in terms of gas",
+                "deprecated": false,
+                "schema": {
+                  "type": "integer",
+                  "format": "uint64"
+                }
               }
             }
           },
@@ -304,6 +320,14 @@
               },
               "X-APTOS-OLDEST-BLOCK-HEIGHT": {
                 "description": "Oldest non-pruned block height of the chain",
+                "deprecated": false,
+                "schema": {
+                  "type": "integer",
+                  "format": "uint64"
+                }
+              },
+              "X-APTOS-GAS-USED": {
+                "description": "The cost of the call in terms of gas",
                 "deprecated": false,
                 "schema": {
                   "type": "integer",
@@ -377,6 +401,14 @@
                   "type": "integer",
                   "format": "uint64"
                 }
+              },
+              "X-APTOS-GAS-USED": {
+                "description": "The cost of the call in terms of gas",
+                "deprecated": false,
+                "schema": {
+                  "type": "integer",
+                  "format": "uint64"
+                }
               }
             }
           },
@@ -440,6 +472,14 @@
               },
               "X-APTOS-OLDEST-BLOCK-HEIGHT": {
                 "description": "Oldest non-pruned block height of the chain",
+                "deprecated": false,
+                "schema": {
+                  "type": "integer",
+                  "format": "uint64"
+                }
+              },
+              "X-APTOS-GAS-USED": {
+                "description": "The cost of the call in terms of gas",
                 "deprecated": false,
                 "schema": {
                   "type": "integer",
@@ -513,6 +553,14 @@
                   "type": "integer",
                   "format": "uint64"
                 }
+              },
+              "X-APTOS-GAS-USED": {
+                "description": "The cost of the call in terms of gas",
+                "deprecated": false,
+                "schema": {
+                  "type": "integer",
+                  "format": "uint64"
+                }
               }
             }
           },
@@ -576,6 +624,14 @@
               },
               "X-APTOS-OLDEST-BLOCK-HEIGHT": {
                 "description": "Oldest non-pruned block height of the chain",
+                "deprecated": false,
+                "schema": {
+                  "type": "integer",
+                  "format": "uint64"
+                }
+              },
+              "X-APTOS-GAS-USED": {
+                "description": "The cost of the call in terms of gas",
                 "deprecated": false,
                 "schema": {
                   "type": "integer",
@@ -728,6 +784,14 @@
                   "format": "uint64"
                 }
               },
+              "X-APTOS-GAS-USED": {
+                "description": "The cost of the call in terms of gas",
+                "deprecated": false,
+                "schema": {
+                  "type": "integer",
+                  "format": "uint64"
+                }
+              },
               "X-APTOS-CURSOR": {
                 "description": "Cursor to be used for endpoints that support cursor-based\npagination. Pass this to the `start` field of the endpoint\non the next call to get the next page of results.",
                 "deprecated": false,
@@ -802,6 +866,14 @@
                   "type": "integer",
                   "format": "uint64"
                 }
+              },
+              "X-APTOS-GAS-USED": {
+                "description": "The cost of the call in terms of gas",
+                "deprecated": false,
+                "schema": {
+                  "type": "integer",
+                  "format": "uint64"
+                }
               }
             }
           },
@@ -865,6 +937,14 @@
               },
               "X-APTOS-OLDEST-BLOCK-HEIGHT": {
                 "description": "Oldest non-pruned block height of the chain",
+                "deprecated": false,
+                "schema": {
+                  "type": "integer",
+                  "format": "uint64"
+                }
+              },
+              "X-APTOS-GAS-USED": {
+                "description": "The cost of the call in terms of gas",
                 "deprecated": false,
                 "schema": {
                   "type": "integer",
@@ -938,6 +1018,14 @@
                   "type": "integer",
                   "format": "uint64"
                 }
+              },
+              "X-APTOS-GAS-USED": {
+                "description": "The cost of the call in terms of gas",
+                "deprecated": false,
+                "schema": {
+                  "type": "integer",
+                  "format": "uint64"
+                }
               }
             }
           },
@@ -1001,6 +1089,14 @@
               },
               "X-APTOS-OLDEST-BLOCK-HEIGHT": {
                 "description": "Oldest non-pruned block height of the chain",
+                "deprecated": false,
+                "schema": {
+                  "type": "integer",
+                  "format": "uint64"
+                }
+              },
+              "X-APTOS-GAS-USED": {
+                "description": "The cost of the call in terms of gas",
                 "deprecated": false,
                 "schema": {
                   "type": "integer",
@@ -1074,6 +1170,14 @@
                   "type": "integer",
                   "format": "uint64"
                 }
+              },
+              "X-APTOS-GAS-USED": {
+                "description": "The cost of the call in terms of gas",
+                "deprecated": false,
+                "schema": {
+                  "type": "integer",
+                  "format": "uint64"
+                }
               }
             }
           },
@@ -1137,6 +1241,14 @@
               },
               "X-APTOS-OLDEST-BLOCK-HEIGHT": {
                 "description": "Oldest non-pruned block height of the chain",
+                "deprecated": false,
+                "schema": {
+                  "type": "integer",
+                  "format": "uint64"
+                }
+              },
+              "X-APTOS-GAS-USED": {
+                "description": "The cost of the call in terms of gas",
                 "deprecated": false,
                 "schema": {
                   "type": "integer",
@@ -1289,6 +1401,14 @@
                   "format": "uint64"
                 }
               },
+              "X-APTOS-GAS-USED": {
+                "description": "The cost of the call in terms of gas",
+                "deprecated": false,
+                "schema": {
+                  "type": "integer",
+                  "format": "uint64"
+                }
+              },
               "X-APTOS-CURSOR": {
                 "description": "Cursor to be used for endpoints that support cursor-based\npagination. Pass this to the `start` field of the endpoint\non the next call to get the next page of results.",
                 "deprecated": false,
@@ -1363,6 +1483,14 @@
                   "type": "integer",
                   "format": "uint64"
                 }
+              },
+              "X-APTOS-GAS-USED": {
+                "description": "The cost of the call in terms of gas",
+                "deprecated": false,
+                "schema": {
+                  "type": "integer",
+                  "format": "uint64"
+                }
               }
             }
           },
@@ -1426,6 +1554,14 @@
               },
               "X-APTOS-OLDEST-BLOCK-HEIGHT": {
                 "description": "Oldest non-pruned block height of the chain",
+                "deprecated": false,
+                "schema": {
+                  "type": "integer",
+                  "format": "uint64"
+                }
+              },
+              "X-APTOS-GAS-USED": {
+                "description": "The cost of the call in terms of gas",
                 "deprecated": false,
                 "schema": {
                   "type": "integer",
@@ -1499,6 +1635,14 @@
                   "type": "integer",
                   "format": "uint64"
                 }
+              },
+              "X-APTOS-GAS-USED": {
+                "description": "The cost of the call in terms of gas",
+                "deprecated": false,
+                "schema": {
+                  "type": "integer",
+                  "format": "uint64"
+                }
               }
             }
           },
@@ -1562,6 +1706,14 @@
               },
               "X-APTOS-OLDEST-BLOCK-HEIGHT": {
                 "description": "Oldest non-pruned block height of the chain",
+                "deprecated": false,
+                "schema": {
+                  "type": "integer",
+                  "format": "uint64"
+                }
+              },
+              "X-APTOS-GAS-USED": {
+                "description": "The cost of the call in terms of gas",
                 "deprecated": false,
                 "schema": {
                   "type": "integer",
@@ -1635,6 +1787,14 @@
                   "type": "integer",
                   "format": "uint64"
                 }
+              },
+              "X-APTOS-GAS-USED": {
+                "description": "The cost of the call in terms of gas",
+                "deprecated": false,
+                "schema": {
+                  "type": "integer",
+                  "format": "uint64"
+                }
               }
             }
           },
@@ -1698,6 +1858,14 @@
               },
               "X-APTOS-OLDEST-BLOCK-HEIGHT": {
                 "description": "Oldest non-pruned block height of the chain",
+                "deprecated": false,
+                "schema": {
+                  "type": "integer",
+                  "format": "uint64"
+                }
+              },
+              "X-APTOS-GAS-USED": {
+                "description": "The cost of the call in terms of gas",
                 "deprecated": false,
                 "schema": {
                   "type": "integer",
@@ -1836,6 +2004,14 @@
                   "format": "uint64"
                 }
               },
+              "X-APTOS-GAS-USED": {
+                "description": "The cost of the call in terms of gas",
+                "deprecated": false,
+                "schema": {
+                  "type": "integer",
+                  "format": "uint64"
+                }
+              },
               "X-APTOS-CURSOR": {
                 "description": "Cursor to be used for endpoints that support cursor-based\npagination. Pass this to the `start` field of the endpoint\non the next call to get the next page of results.",
                 "deprecated": false,
@@ -1910,6 +2086,14 @@
                   "type": "integer",
                   "format": "uint64"
                 }
+              },
+              "X-APTOS-GAS-USED": {
+                "description": "The cost of the call in terms of gas",
+                "deprecated": false,
+                "schema": {
+                  "type": "integer",
+                  "format": "uint64"
+                }
               }
             }
           },
@@ -1973,6 +2157,14 @@
               },
               "X-APTOS-OLDEST-BLOCK-HEIGHT": {
                 "description": "Oldest non-pruned block height of the chain",
+                "deprecated": false,
+                "schema": {
+                  "type": "integer",
+                  "format": "uint64"
+                }
+              },
+              "X-APTOS-GAS-USED": {
+                "description": "The cost of the call in terms of gas",
                 "deprecated": false,
                 "schema": {
                   "type": "integer",
@@ -2100,6 +2292,14 @@
                   "format": "uint64"
                 }
               },
+              "X-APTOS-GAS-USED": {
+                "description": "The cost of the call in terms of gas",
+                "deprecated": false,
+                "schema": {
+                  "type": "integer",
+                  "format": "uint64"
+                }
+              },
               "X-APTOS-CURSOR": {
                 "description": "Cursor to be used for endpoints that support cursor-based\npagination. Pass this to the `start` field of the endpoint\non the next call to get the next page of results.",
                 "deprecated": false,
@@ -2174,6 +2374,14 @@
                   "type": "integer",
                   "format": "uint64"
                 }
+              },
+              "X-APTOS-GAS-USED": {
+                "description": "The cost of the call in terms of gas",
+                "deprecated": false,
+                "schema": {
+                  "type": "integer",
+                  "format": "uint64"
+                }
               }
             }
           },
@@ -2237,6 +2445,14 @@
               },
               "X-APTOS-OLDEST-BLOCK-HEIGHT": {
                 "description": "Oldest non-pruned block height of the chain",
+                "deprecated": false,
+                "schema": {
+                  "type": "integer",
+                  "format": "uint64"
+                }
+              },
+              "X-APTOS-GAS-USED": {
+                "description": "The cost of the call in terms of gas",
                 "deprecated": false,
                 "schema": {
                   "type": "integer",
@@ -2310,6 +2526,14 @@
                   "type": "integer",
                   "format": "uint64"
                 }
+              },
+              "X-APTOS-GAS-USED": {
+                "description": "The cost of the call in terms of gas",
+                "deprecated": false,
+                "schema": {
+                  "type": "integer",
+                  "format": "uint64"
+                }
               }
             }
           },
@@ -2373,6 +2597,14 @@
               },
               "X-APTOS-OLDEST-BLOCK-HEIGHT": {
                 "description": "Oldest non-pruned block height of the chain",
+                "deprecated": false,
+                "schema": {
+                  "type": "integer",
+                  "format": "uint64"
+                }
+              },
+              "X-APTOS-GAS-USED": {
+                "description": "The cost of the call in terms of gas",
                 "deprecated": false,
                 "schema": {
                   "type": "integer",
@@ -2446,6 +2678,14 @@
                   "type": "integer",
                   "format": "uint64"
                 }
+              },
+              "X-APTOS-GAS-USED": {
+                "description": "The cost of the call in terms of gas",
+                "deprecated": false,
+                "schema": {
+                  "type": "integer",
+                  "format": "uint64"
+                }
               }
             }
           },
@@ -2509,6 +2749,14 @@
               },
               "X-APTOS-OLDEST-BLOCK-HEIGHT": {
                 "description": "Oldest non-pruned block height of the chain",
+                "deprecated": false,
+                "schema": {
+                  "type": "integer",
+                  "format": "uint64"
+                }
+              },
+              "X-APTOS-GAS-USED": {
+                "description": "The cost of the call in terms of gas",
                 "deprecated": false,
                 "schema": {
                   "type": "integer",
@@ -2636,6 +2884,14 @@
                   "format": "uint64"
                 }
               },
+              "X-APTOS-GAS-USED": {
+                "description": "The cost of the call in terms of gas",
+                "deprecated": false,
+                "schema": {
+                  "type": "integer",
+                  "format": "uint64"
+                }
+              },
               "X-APTOS-CURSOR": {
                 "description": "Cursor to be used for endpoints that support cursor-based\npagination. Pass this to the `start` field of the endpoint\non the next call to get the next page of results.",
                 "deprecated": false,
@@ -2710,6 +2966,14 @@
                   "type": "integer",
                   "format": "uint64"
                 }
+              },
+              "X-APTOS-GAS-USED": {
+                "description": "The cost of the call in terms of gas",
+                "deprecated": false,
+                "schema": {
+                  "type": "integer",
+                  "format": "uint64"
+                }
               }
             }
           },
@@ -2773,6 +3037,14 @@
               },
               "X-APTOS-OLDEST-BLOCK-HEIGHT": {
                 "description": "Oldest non-pruned block height of the chain",
+                "deprecated": false,
+                "schema": {
+                  "type": "integer",
+                  "format": "uint64"
+                }
+              },
+              "X-APTOS-GAS-USED": {
+                "description": "The cost of the call in terms of gas",
                 "deprecated": false,
                 "schema": {
                   "type": "integer",
@@ -2846,6 +3118,14 @@
                   "type": "integer",
                   "format": "uint64"
                 }
+              },
+              "X-APTOS-GAS-USED": {
+                "description": "The cost of the call in terms of gas",
+                "deprecated": false,
+                "schema": {
+                  "type": "integer",
+                  "format": "uint64"
+                }
               }
             }
           },
@@ -2909,6 +3189,14 @@
               },
               "X-APTOS-OLDEST-BLOCK-HEIGHT": {
                 "description": "Oldest non-pruned block height of the chain",
+                "deprecated": false,
+                "schema": {
+                  "type": "integer",
+                  "format": "uint64"
+                }
+              },
+              "X-APTOS-GAS-USED": {
+                "description": "The cost of the call in terms of gas",
                 "deprecated": false,
                 "schema": {
                   "type": "integer",
@@ -2982,6 +3270,14 @@
                   "type": "integer",
                   "format": "uint64"
                 }
+              },
+              "X-APTOS-GAS-USED": {
+                "description": "The cost of the call in terms of gas",
+                "deprecated": false,
+                "schema": {
+                  "type": "integer",
+                  "format": "uint64"
+                }
               }
             }
           },
@@ -3045,6 +3341,14 @@
               },
               "X-APTOS-OLDEST-BLOCK-HEIGHT": {
                 "description": "Oldest non-pruned block height of the chain",
+                "deprecated": false,
+                "schema": {
+                  "type": "integer",
+                  "format": "uint64"
+                }
+              },
+              "X-APTOS-GAS-USED": {
+                "description": "The cost of the call in terms of gas",
                 "deprecated": false,
                 "schema": {
                   "type": "integer",
@@ -3197,6 +3501,14 @@
                   "format": "uint64"
                 }
               },
+              "X-APTOS-GAS-USED": {
+                "description": "The cost of the call in terms of gas",
+                "deprecated": false,
+                "schema": {
+                  "type": "integer",
+                  "format": "uint64"
+                }
+              },
               "X-APTOS-CURSOR": {
                 "description": "Cursor to be used for endpoints that support cursor-based\npagination. Pass this to the `start` field of the endpoint\non the next call to get the next page of results.",
                 "deprecated": false,
@@ -3271,6 +3583,14 @@
                   "type": "integer",
                   "format": "uint64"
                 }
+              },
+              "X-APTOS-GAS-USED": {
+                "description": "The cost of the call in terms of gas",
+                "deprecated": false,
+                "schema": {
+                  "type": "integer",
+                  "format": "uint64"
+                }
               }
             }
           },
@@ -3334,6 +3654,14 @@
               },
               "X-APTOS-OLDEST-BLOCK-HEIGHT": {
                 "description": "Oldest non-pruned block height of the chain",
+                "deprecated": false,
+                "schema": {
+                  "type": "integer",
+                  "format": "uint64"
+                }
+              },
+              "X-APTOS-GAS-USED": {
+                "description": "The cost of the call in terms of gas",
                 "deprecated": false,
                 "schema": {
                   "type": "integer",
@@ -3407,6 +3735,14 @@
                   "type": "integer",
                   "format": "uint64"
                 }
+              },
+              "X-APTOS-GAS-USED": {
+                "description": "The cost of the call in terms of gas",
+                "deprecated": false,
+                "schema": {
+                  "type": "integer",
+                  "format": "uint64"
+                }
               }
             }
           },
@@ -3470,6 +3806,14 @@
               },
               "X-APTOS-OLDEST-BLOCK-HEIGHT": {
                 "description": "Oldest non-pruned block height of the chain",
+                "deprecated": false,
+                "schema": {
+                  "type": "integer",
+                  "format": "uint64"
+                }
+              },
+              "X-APTOS-GAS-USED": {
+                "description": "The cost of the call in terms of gas",
                 "deprecated": false,
                 "schema": {
                   "type": "integer",
@@ -3543,6 +3887,14 @@
                   "type": "integer",
                   "format": "uint64"
                 }
+              },
+              "X-APTOS-GAS-USED": {
+                "description": "The cost of the call in terms of gas",
+                "deprecated": false,
+                "schema": {
+                  "type": "integer",
+                  "format": "uint64"
+                }
               }
             }
           },
@@ -3606,6 +3958,14 @@
               },
               "X-APTOS-OLDEST-BLOCK-HEIGHT": {
                 "description": "Oldest non-pruned block height of the chain",
+                "deprecated": false,
+                "schema": {
+                  "type": "integer",
+                  "format": "uint64"
+                }
+              },
+              "X-APTOS-GAS-USED": {
+                "description": "The cost of the call in terms of gas",
                 "deprecated": false,
                 "schema": {
                   "type": "integer",
@@ -3769,6 +4129,14 @@
                   "format": "uint64"
                 }
               },
+              "X-APTOS-GAS-USED": {
+                "description": "The cost of the call in terms of gas",
+                "deprecated": false,
+                "schema": {
+                  "type": "integer",
+                  "format": "uint64"
+                }
+              },
               "X-APTOS-CURSOR": {
                 "description": "Cursor to be used for endpoints that support cursor-based\npagination. Pass this to the `start` field of the endpoint\non the next call to get the next page of results.",
                 "deprecated": false,
@@ -3843,6 +4211,14 @@
                   "type": "integer",
                   "format": "uint64"
                 }
+              },
+              "X-APTOS-GAS-USED": {
+                "description": "The cost of the call in terms of gas",
+                "deprecated": false,
+                "schema": {
+                  "type": "integer",
+                  "format": "uint64"
+                }
               }
             }
           },
@@ -3906,6 +4282,14 @@
               },
               "X-APTOS-OLDEST-BLOCK-HEIGHT": {
                 "description": "Oldest non-pruned block height of the chain",
+                "deprecated": false,
+                "schema": {
+                  "type": "integer",
+                  "format": "uint64"
+                }
+              },
+              "X-APTOS-GAS-USED": {
+                "description": "The cost of the call in terms of gas",
                 "deprecated": false,
                 "schema": {
                   "type": "integer",
@@ -3979,6 +4363,14 @@
                   "type": "integer",
                   "format": "uint64"
                 }
+              },
+              "X-APTOS-GAS-USED": {
+                "description": "The cost of the call in terms of gas",
+                "deprecated": false,
+                "schema": {
+                  "type": "integer",
+                  "format": "uint64"
+                }
               }
             }
           },
@@ -4042,6 +4434,14 @@
               },
               "X-APTOS-OLDEST-BLOCK-HEIGHT": {
                 "description": "Oldest non-pruned block height of the chain",
+                "deprecated": false,
+                "schema": {
+                  "type": "integer",
+                  "format": "uint64"
+                }
+              },
+              "X-APTOS-GAS-USED": {
+                "description": "The cost of the call in terms of gas",
                 "deprecated": false,
                 "schema": {
                   "type": "integer",
@@ -4115,6 +4515,14 @@
                   "type": "integer",
                   "format": "uint64"
                 }
+              },
+              "X-APTOS-GAS-USED": {
+                "description": "The cost of the call in terms of gas",
+                "deprecated": false,
+                "schema": {
+                  "type": "integer",
+                  "format": "uint64"
+                }
               }
             }
           },
@@ -4178,6 +4586,14 @@
               },
               "X-APTOS-OLDEST-BLOCK-HEIGHT": {
                 "description": "Oldest non-pruned block height of the chain",
+                "deprecated": false,
+                "schema": {
+                  "type": "integer",
+                  "format": "uint64"
+                }
+              },
+              "X-APTOS-GAS-USED": {
+                "description": "The cost of the call in terms of gas",
                 "deprecated": false,
                 "schema": {
                   "type": "integer",
@@ -4280,6 +4696,14 @@
                   "format": "uint64"
                 }
               },
+              "X-APTOS-GAS-USED": {
+                "description": "The cost of the call in terms of gas",
+                "deprecated": false,
+                "schema": {
+                  "type": "integer",
+                  "format": "uint64"
+                }
+              },
               "X-APTOS-CURSOR": {
                 "description": "Cursor to be used for endpoints that support cursor-based\npagination. Pass this to the `start` field of the endpoint\non the next call to get the next page of results.",
                 "deprecated": false,
@@ -4354,6 +4778,14 @@
                   "type": "integer",
                   "format": "uint64"
                 }
+              },
+              "X-APTOS-GAS-USED": {
+                "description": "The cost of the call in terms of gas",
+                "deprecated": false,
+                "schema": {
+                  "type": "integer",
+                  "format": "uint64"
+                }
               }
             }
           },
@@ -4417,6 +4849,14 @@
               },
               "X-APTOS-OLDEST-BLOCK-HEIGHT": {
                 "description": "Oldest non-pruned block height of the chain",
+                "deprecated": false,
+                "schema": {
+                  "type": "integer",
+                  "format": "uint64"
+                }
+              },
+              "X-APTOS-GAS-USED": {
+                "description": "The cost of the call in terms of gas",
                 "deprecated": false,
                 "schema": {
                   "type": "integer",
@@ -4490,6 +4930,14 @@
                   "type": "integer",
                   "format": "uint64"
                 }
+              },
+              "X-APTOS-GAS-USED": {
+                "description": "The cost of the call in terms of gas",
+                "deprecated": false,
+                "schema": {
+                  "type": "integer",
+                  "format": "uint64"
+                }
               }
             }
           },
@@ -4553,6 +5001,14 @@
               },
               "X-APTOS-OLDEST-BLOCK-HEIGHT": {
                 "description": "Oldest non-pruned block height of the chain",
+                "deprecated": false,
+                "schema": {
+                  "type": "integer",
+                  "format": "uint64"
+                }
+              },
+              "X-APTOS-GAS-USED": {
+                "description": "The cost of the call in terms of gas",
                 "deprecated": false,
                 "schema": {
                   "type": "integer",
@@ -4690,6 +5146,14 @@
                   "format": "uint64"
                 }
               },
+              "X-APTOS-GAS-USED": {
+                "description": "The cost of the call in terms of gas",
+                "deprecated": false,
+                "schema": {
+                  "type": "integer",
+                  "format": "uint64"
+                }
+              },
               "X-APTOS-CURSOR": {
                 "description": "Cursor to be used for endpoints that support cursor-based\npagination. Pass this to the `start` field of the endpoint\non the next call to get the next page of results.",
                 "deprecated": false,
@@ -4764,6 +5228,14 @@
                   "type": "integer",
                   "format": "uint64"
                 }
+              },
+              "X-APTOS-GAS-USED": {
+                "description": "The cost of the call in terms of gas",
+                "deprecated": false,
+                "schema": {
+                  "type": "integer",
+                  "format": "uint64"
+                }
               }
             }
           },
@@ -4827,6 +5299,14 @@
               },
               "X-APTOS-OLDEST-BLOCK-HEIGHT": {
                 "description": "Oldest non-pruned block height of the chain",
+                "deprecated": false,
+                "schema": {
+                  "type": "integer",
+                  "format": "uint64"
+                }
+              },
+              "X-APTOS-GAS-USED": {
+                "description": "The cost of the call in terms of gas",
                 "deprecated": false,
                 "schema": {
                   "type": "integer",
@@ -4900,6 +5380,14 @@
                   "type": "integer",
                   "format": "uint64"
                 }
+              },
+              "X-APTOS-GAS-USED": {
+                "description": "The cost of the call in terms of gas",
+                "deprecated": false,
+                "schema": {
+                  "type": "integer",
+                  "format": "uint64"
+                }
               }
             }
           },
@@ -4963,6 +5451,14 @@
               },
               "X-APTOS-OLDEST-BLOCK-HEIGHT": {
                 "description": "Oldest non-pruned block height of the chain",
+                "deprecated": false,
+                "schema": {
+                  "type": "integer",
+                  "format": "uint64"
+                }
+              },
+              "X-APTOS-GAS-USED": {
+                "description": "The cost of the call in terms of gas",
                 "deprecated": false,
                 "schema": {
                   "type": "integer",
@@ -5036,6 +5532,14 @@
                   "type": "integer",
                   "format": "uint64"
                 }
+              },
+              "X-APTOS-GAS-USED": {
+                "description": "The cost of the call in terms of gas",
+                "deprecated": false,
+                "schema": {
+                  "type": "integer",
+                  "format": "uint64"
+                }
               }
             }
           },
@@ -5099,6 +5603,14 @@
               },
               "X-APTOS-OLDEST-BLOCK-HEIGHT": {
                 "description": "Oldest non-pruned block height of the chain",
+                "deprecated": false,
+                "schema": {
+                  "type": "integer",
+                  "format": "uint64"
+                }
+              },
+              "X-APTOS-GAS-USED": {
+                "description": "The cost of the call in terms of gas",
                 "deprecated": false,
                 "schema": {
                   "type": "integer",
@@ -5236,6 +5748,14 @@
                   "format": "uint64"
                 }
               },
+              "X-APTOS-GAS-USED": {
+                "description": "The cost of the call in terms of gas",
+                "deprecated": false,
+                "schema": {
+                  "type": "integer",
+                  "format": "uint64"
+                }
+              },
               "X-APTOS-CURSOR": {
                 "description": "Cursor to be used for endpoints that support cursor-based\npagination. Pass this to the `start` field of the endpoint\non the next call to get the next page of results.",
                 "deprecated": false,
@@ -5310,6 +5830,14 @@
                   "type": "integer",
                   "format": "uint64"
                 }
+              },
+              "X-APTOS-GAS-USED": {
+                "description": "The cost of the call in terms of gas",
+                "deprecated": false,
+                "schema": {
+                  "type": "integer",
+                  "format": "uint64"
+                }
               }
             }
           },
@@ -5373,6 +5901,14 @@
               },
               "X-APTOS-OLDEST-BLOCK-HEIGHT": {
                 "description": "Oldest non-pruned block height of the chain",
+                "deprecated": false,
+                "schema": {
+                  "type": "integer",
+                  "format": "uint64"
+                }
+              },
+              "X-APTOS-GAS-USED": {
+                "description": "The cost of the call in terms of gas",
                 "deprecated": false,
                 "schema": {
                   "type": "integer",
@@ -5446,6 +5982,14 @@
                   "type": "integer",
                   "format": "uint64"
                 }
+              },
+              "X-APTOS-GAS-USED": {
+                "description": "The cost of the call in terms of gas",
+                "deprecated": false,
+                "schema": {
+                  "type": "integer",
+                  "format": "uint64"
+                }
               }
             }
           },
@@ -5509,6 +6053,14 @@
               },
               "X-APTOS-OLDEST-BLOCK-HEIGHT": {
                 "description": "Oldest non-pruned block height of the chain",
+                "deprecated": false,
+                "schema": {
+                  "type": "integer",
+                  "format": "uint64"
+                }
+              },
+              "X-APTOS-GAS-USED": {
+                "description": "The cost of the call in terms of gas",
                 "deprecated": false,
                 "schema": {
                   "type": "integer",
@@ -5582,6 +6134,14 @@
                   "type": "integer",
                   "format": "uint64"
                 }
+              },
+              "X-APTOS-GAS-USED": {
+                "description": "The cost of the call in terms of gas",
+                "deprecated": false,
+                "schema": {
+                  "type": "integer",
+                  "format": "uint64"
+                }
               }
             }
           },
@@ -5645,6 +6205,14 @@
               },
               "X-APTOS-OLDEST-BLOCK-HEIGHT": {
                 "description": "Oldest non-pruned block height of the chain",
+                "deprecated": false,
+                "schema": {
+                  "type": "integer",
+                  "format": "uint64"
+                }
+              },
+              "X-APTOS-GAS-USED": {
+                "description": "The cost of the call in terms of gas",
                 "deprecated": false,
                 "schema": {
                   "type": "integer",
@@ -5781,6 +6349,14 @@
                   "format": "uint64"
                 }
               },
+              "X-APTOS-GAS-USED": {
+                "description": "The cost of the call in terms of gas",
+                "deprecated": false,
+                "schema": {
+                  "type": "integer",
+                  "format": "uint64"
+                }
+              },
               "X-APTOS-CURSOR": {
                 "description": "Cursor to be used for endpoints that support cursor-based\npagination. Pass this to the `start` field of the endpoint\non the next call to get the next page of results.",
                 "deprecated": false,
@@ -5855,6 +6431,14 @@
                   "type": "integer",
                   "format": "uint64"
                 }
+              },
+              "X-APTOS-GAS-USED": {
+                "description": "The cost of the call in terms of gas",
+                "deprecated": false,
+                "schema": {
+                  "type": "integer",
+                  "format": "uint64"
+                }
               }
             }
           },
@@ -5918,6 +6502,14 @@
               },
               "X-APTOS-OLDEST-BLOCK-HEIGHT": {
                 "description": "Oldest non-pruned block height of the chain",
+                "deprecated": false,
+                "schema": {
+                  "type": "integer",
+                  "format": "uint64"
+                }
+              },
+              "X-APTOS-GAS-USED": {
+                "description": "The cost of the call in terms of gas",
                 "deprecated": false,
                 "schema": {
                   "type": "integer",
@@ -5991,6 +6583,14 @@
                   "type": "integer",
                   "format": "uint64"
                 }
+              },
+              "X-APTOS-GAS-USED": {
+                "description": "The cost of the call in terms of gas",
+                "deprecated": false,
+                "schema": {
+                  "type": "integer",
+                  "format": "uint64"
+                }
               }
             }
           },
@@ -6054,6 +6654,14 @@
               },
               "X-APTOS-OLDEST-BLOCK-HEIGHT": {
                 "description": "Oldest non-pruned block height of the chain",
+                "deprecated": false,
+                "schema": {
+                  "type": "integer",
+                  "format": "uint64"
+                }
+              },
+              "X-APTOS-GAS-USED": {
+                "description": "The cost of the call in terms of gas",
                 "deprecated": false,
                 "schema": {
                   "type": "integer",
@@ -6127,6 +6735,14 @@
                   "type": "integer",
                   "format": "uint64"
                 }
+              },
+              "X-APTOS-GAS-USED": {
+                "description": "The cost of the call in terms of gas",
+                "deprecated": false,
+                "schema": {
+                  "type": "integer",
+                  "format": "uint64"
+                }
               }
             }
           },
@@ -6190,6 +6806,14 @@
               },
               "X-APTOS-OLDEST-BLOCK-HEIGHT": {
                 "description": "Oldest non-pruned block height of the chain",
+                "deprecated": false,
+                "schema": {
+                  "type": "integer",
+                  "format": "uint64"
+                }
+              },
+              "X-APTOS-GAS-USED": {
+                "description": "The cost of the call in terms of gas",
                 "deprecated": false,
                 "schema": {
                   "type": "integer",
@@ -6326,6 +6950,14 @@
                   "format": "uint64"
                 }
               },
+              "X-APTOS-GAS-USED": {
+                "description": "The cost of the call in terms of gas",
+                "deprecated": false,
+                "schema": {
+                  "type": "integer",
+                  "format": "uint64"
+                }
+              },
               "X-APTOS-CURSOR": {
                 "description": "Cursor to be used for endpoints that support cursor-based\npagination. Pass this to the `start` field of the endpoint\non the next call to get the next page of results.",
                 "deprecated": false,
@@ -6400,6 +7032,14 @@
                   "type": "integer",
                   "format": "uint64"
                 }
+              },
+              "X-APTOS-GAS-USED": {
+                "description": "The cost of the call in terms of gas",
+                "deprecated": false,
+                "schema": {
+                  "type": "integer",
+                  "format": "uint64"
+                }
               }
             }
           },
@@ -6463,6 +7103,14 @@
               },
               "X-APTOS-OLDEST-BLOCK-HEIGHT": {
                 "description": "Oldest non-pruned block height of the chain",
+                "deprecated": false,
+                "schema": {
+                  "type": "integer",
+                  "format": "uint64"
+                }
+              },
+              "X-APTOS-GAS-USED": {
+                "description": "The cost of the call in terms of gas",
                 "deprecated": false,
                 "schema": {
                   "type": "integer",
@@ -6536,6 +7184,14 @@
                   "type": "integer",
                   "format": "uint64"
                 }
+              },
+              "X-APTOS-GAS-USED": {
+                "description": "The cost of the call in terms of gas",
+                "deprecated": false,
+                "schema": {
+                  "type": "integer",
+                  "format": "uint64"
+                }
               }
             }
           },
@@ -6599,6 +7255,14 @@
               },
               "X-APTOS-OLDEST-BLOCK-HEIGHT": {
                 "description": "Oldest non-pruned block height of the chain",
+                "deprecated": false,
+                "schema": {
+                  "type": "integer",
+                  "format": "uint64"
+                }
+              },
+              "X-APTOS-GAS-USED": {
+                "description": "The cost of the call in terms of gas",
                 "deprecated": false,
                 "schema": {
                   "type": "integer",
@@ -6672,6 +7336,14 @@
                   "type": "integer",
                   "format": "uint64"
                 }
+              },
+              "X-APTOS-GAS-USED": {
+                "description": "The cost of the call in terms of gas",
+                "deprecated": false,
+                "schema": {
+                  "type": "integer",
+                  "format": "uint64"
+                }
               }
             }
           },
@@ -6735,6 +7407,14 @@
               },
               "X-APTOS-OLDEST-BLOCK-HEIGHT": {
                 "description": "Oldest non-pruned block height of the chain",
+                "deprecated": false,
+                "schema": {
+                  "type": "integer",
+                  "format": "uint64"
+                }
+              },
+              "X-APTOS-GAS-USED": {
+                "description": "The cost of the call in terms of gas",
                 "deprecated": false,
                 "schema": {
                   "type": "integer",
@@ -6865,6 +7545,14 @@
                   "format": "uint64"
                 }
               },
+              "X-APTOS-GAS-USED": {
+                "description": "The cost of the call in terms of gas",
+                "deprecated": false,
+                "schema": {
+                  "type": "integer",
+                  "format": "uint64"
+                }
+              },
               "X-APTOS-CURSOR": {
                 "description": "Cursor to be used for endpoints that support cursor-based\npagination. Pass this to the `start` field of the endpoint\non the next call to get the next page of results.",
                 "deprecated": false,
@@ -6939,6 +7627,14 @@
                   "type": "integer",
                   "format": "uint64"
                 }
+              },
+              "X-APTOS-GAS-USED": {
+                "description": "The cost of the call in terms of gas",
+                "deprecated": false,
+                "schema": {
+                  "type": "integer",
+                  "format": "uint64"
+                }
               }
             }
           },
@@ -7002,6 +7698,14 @@
               },
               "X-APTOS-OLDEST-BLOCK-HEIGHT": {
                 "description": "Oldest non-pruned block height of the chain",
+                "deprecated": false,
+                "schema": {
+                  "type": "integer",
+                  "format": "uint64"
+                }
+              },
+              "X-APTOS-GAS-USED": {
+                "description": "The cost of the call in terms of gas",
                 "deprecated": false,
                 "schema": {
                   "type": "integer",
@@ -7075,6 +7779,14 @@
                   "type": "integer",
                   "format": "uint64"
                 }
+              },
+              "X-APTOS-GAS-USED": {
+                "description": "The cost of the call in terms of gas",
+                "deprecated": false,
+                "schema": {
+                  "type": "integer",
+                  "format": "uint64"
+                }
               }
             }
           },
@@ -7138,6 +7850,14 @@
               },
               "X-APTOS-OLDEST-BLOCK-HEIGHT": {
                 "description": "Oldest non-pruned block height of the chain",
+                "deprecated": false,
+                "schema": {
+                  "type": "integer",
+                  "format": "uint64"
+                }
+              },
+              "X-APTOS-GAS-USED": {
+                "description": "The cost of the call in terms of gas",
                 "deprecated": false,
                 "schema": {
                   "type": "integer",
@@ -7211,6 +7931,14 @@
                   "type": "integer",
                   "format": "uint64"
                 }
+              },
+              "X-APTOS-GAS-USED": {
+                "description": "The cost of the call in terms of gas",
+                "deprecated": false,
+                "schema": {
+                  "type": "integer",
+                  "format": "uint64"
+                }
               }
             }
           },
@@ -7274,6 +8002,14 @@
               },
               "X-APTOS-OLDEST-BLOCK-HEIGHT": {
                 "description": "Oldest non-pruned block height of the chain",
+                "deprecated": false,
+                "schema": {
+                  "type": "integer",
+                  "format": "uint64"
+                }
+              },
+              "X-APTOS-GAS-USED": {
+                "description": "The cost of the call in terms of gas",
                 "deprecated": false,
                 "schema": {
                   "type": "integer",
@@ -7393,6 +8129,14 @@
                   "format": "uint64"
                 }
               },
+              "X-APTOS-GAS-USED": {
+                "description": "The cost of the call in terms of gas",
+                "deprecated": false,
+                "schema": {
+                  "type": "integer",
+                  "format": "uint64"
+                }
+              },
               "X-APTOS-CURSOR": {
                 "description": "Cursor to be used for endpoints that support cursor-based\npagination. Pass this to the `start` field of the endpoint\non the next call to get the next page of results.",
                 "deprecated": false,
@@ -7467,6 +8211,14 @@
                   "type": "integer",
                   "format": "uint64"
                 }
+              },
+              "X-APTOS-GAS-USED": {
+                "description": "The cost of the call in terms of gas",
+                "deprecated": false,
+                "schema": {
+                  "type": "integer",
+                  "format": "uint64"
+                }
               }
             }
           },
@@ -7530,6 +8282,14 @@
               },
               "X-APTOS-OLDEST-BLOCK-HEIGHT": {
                 "description": "Oldest non-pruned block height of the chain",
+                "deprecated": false,
+                "schema": {
+                  "type": "integer",
+                  "format": "uint64"
+                }
+              },
+              "X-APTOS-GAS-USED": {
+                "description": "The cost of the call in terms of gas",
                 "deprecated": false,
                 "schema": {
                   "type": "integer",
@@ -7603,6 +8363,14 @@
                   "type": "integer",
                   "format": "uint64"
                 }
+              },
+              "X-APTOS-GAS-USED": {
+                "description": "The cost of the call in terms of gas",
+                "deprecated": false,
+                "schema": {
+                  "type": "integer",
+                  "format": "uint64"
+                }
               }
             }
           },
@@ -7666,6 +8434,14 @@
               },
               "X-APTOS-OLDEST-BLOCK-HEIGHT": {
                 "description": "Oldest non-pruned block height of the chain",
+                "deprecated": false,
+                "schema": {
+                  "type": "integer",
+                  "format": "uint64"
+                }
+              },
+              "X-APTOS-GAS-USED": {
+                "description": "The cost of the call in terms of gas",
                 "deprecated": false,
                 "schema": {
                   "type": "integer",
@@ -7739,6 +8515,14 @@
                   "type": "integer",
                   "format": "uint64"
                 }
+              },
+              "X-APTOS-GAS-USED": {
+                "description": "The cost of the call in terms of gas",
+                "deprecated": false,
+                "schema": {
+                  "type": "integer",
+                  "format": "uint64"
+                }
               }
             }
           },
@@ -7807,6 +8591,14 @@
                   "type": "integer",
                   "format": "uint64"
                 }
+              },
+              "X-APTOS-GAS-USED": {
+                "description": "The cost of the call in terms of gas",
+                "deprecated": false,
+                "schema": {
+                  "type": "integer",
+                  "format": "uint64"
+                }
               }
             }
           },
@@ -7870,6 +8662,14 @@
               },
               "X-APTOS-OLDEST-BLOCK-HEIGHT": {
                 "description": "Oldest non-pruned block height of the chain",
+                "deprecated": false,
+                "schema": {
+                  "type": "integer",
+                  "format": "uint64"
+                }
+              },
+              "X-APTOS-GAS-USED": {
+                "description": "The cost of the call in terms of gas",
                 "deprecated": false,
                 "schema": {
                   "type": "integer",
@@ -7985,6 +8785,14 @@
                   "format": "uint64"
                 }
               },
+              "X-APTOS-GAS-USED": {
+                "description": "The cost of the call in terms of gas",
+                "deprecated": false,
+                "schema": {
+                  "type": "integer",
+                  "format": "uint64"
+                }
+              },
               "X-APTOS-CURSOR": {
                 "description": "Cursor to be used for endpoints that support cursor-based\npagination. Pass this to the `start` field of the endpoint\non the next call to get the next page of results.",
                 "deprecated": false,
@@ -8059,6 +8867,14 @@
                   "type": "integer",
                   "format": "uint64"
                 }
+              },
+              "X-APTOS-GAS-USED": {
+                "description": "The cost of the call in terms of gas",
+                "deprecated": false,
+                "schema": {
+                  "type": "integer",
+                  "format": "uint64"
+                }
               }
             }
           },
@@ -8122,6 +8938,14 @@
               },
               "X-APTOS-OLDEST-BLOCK-HEIGHT": {
                 "description": "Oldest non-pruned block height of the chain",
+                "deprecated": false,
+                "schema": {
+                  "type": "integer",
+                  "format": "uint64"
+                }
+              },
+              "X-APTOS-GAS-USED": {
+                "description": "The cost of the call in terms of gas",
                 "deprecated": false,
                 "schema": {
                   "type": "integer",
@@ -8195,6 +9019,14 @@
                   "type": "integer",
                   "format": "uint64"
                 }
+              },
+              "X-APTOS-GAS-USED": {
+                "description": "The cost of the call in terms of gas",
+                "deprecated": false,
+                "schema": {
+                  "type": "integer",
+                  "format": "uint64"
+                }
               }
             }
           },
@@ -8258,6 +9090,14 @@
               },
               "X-APTOS-OLDEST-BLOCK-HEIGHT": {
                 "description": "Oldest non-pruned block height of the chain",
+                "deprecated": false,
+                "schema": {
+                  "type": "integer",
+                  "format": "uint64"
+                }
+              },
+              "X-APTOS-GAS-USED": {
+                "description": "The cost of the call in terms of gas",
                 "deprecated": false,
                 "schema": {
                   "type": "integer",
@@ -8331,6 +9171,14 @@
                   "type": "integer",
                   "format": "uint64"
                 }
+              },
+              "X-APTOS-GAS-USED": {
+                "description": "The cost of the call in terms of gas",
+                "deprecated": false,
+                "schema": {
+                  "type": "integer",
+                  "format": "uint64"
+                }
               }
             }
           },
@@ -8394,6 +9242,14 @@
               },
               "X-APTOS-OLDEST-BLOCK-HEIGHT": {
                 "description": "Oldest non-pruned block height of the chain",
+                "deprecated": false,
+                "schema": {
+                  "type": "integer",
+                  "format": "uint64"
+                }
+              },
+              "X-APTOS-GAS-USED": {
+                "description": "The cost of the call in terms of gas",
                 "deprecated": false,
                 "schema": {
                   "type": "integer",
@@ -8509,6 +9365,14 @@
                   "format": "uint64"
                 }
               },
+              "X-APTOS-GAS-USED": {
+                "description": "The cost of the call in terms of gas",
+                "deprecated": false,
+                "schema": {
+                  "type": "integer",
+                  "format": "uint64"
+                }
+              },
               "X-APTOS-CURSOR": {
                 "description": "Cursor to be used for endpoints that support cursor-based\npagination. Pass this to the `start` field of the endpoint\non the next call to get the next page of results.",
                 "deprecated": false,
@@ -8583,6 +9447,14 @@
                   "type": "integer",
                   "format": "uint64"
                 }
+              },
+              "X-APTOS-GAS-USED": {
+                "description": "The cost of the call in terms of gas",
+                "deprecated": false,
+                "schema": {
+                  "type": "integer",
+                  "format": "uint64"
+                }
               }
             }
           },
@@ -8646,6 +9518,14 @@
               },
               "X-APTOS-OLDEST-BLOCK-HEIGHT": {
                 "description": "Oldest non-pruned block height of the chain",
+                "deprecated": false,
+                "schema": {
+                  "type": "integer",
+                  "format": "uint64"
+                }
+              },
+              "X-APTOS-GAS-USED": {
+                "description": "The cost of the call in terms of gas",
                 "deprecated": false,
                 "schema": {
                   "type": "integer",
@@ -8719,6 +9599,14 @@
                   "type": "integer",
                   "format": "uint64"
                 }
+              },
+              "X-APTOS-GAS-USED": {
+                "description": "The cost of the call in terms of gas",
+                "deprecated": false,
+                "schema": {
+                  "type": "integer",
+                  "format": "uint64"
+                }
               }
             }
           },
@@ -8782,6 +9670,14 @@
               },
               "X-APTOS-OLDEST-BLOCK-HEIGHT": {
                 "description": "Oldest non-pruned block height of the chain",
+                "deprecated": false,
+                "schema": {
+                  "type": "integer",
+                  "format": "uint64"
+                }
+              },
+              "X-APTOS-GAS-USED": {
+                "description": "The cost of the call in terms of gas",
                 "deprecated": false,
                 "schema": {
                   "type": "integer",
@@ -8855,6 +9751,14 @@
                   "type": "integer",
                   "format": "uint64"
                 }
+              },
+              "X-APTOS-GAS-USED": {
+                "description": "The cost of the call in terms of gas",
+                "deprecated": false,
+                "schema": {
+                  "type": "integer",
+                  "format": "uint64"
+                }
               }
             }
           },
@@ -8918,6 +9822,14 @@
               },
               "X-APTOS-OLDEST-BLOCK-HEIGHT": {
                 "description": "Oldest non-pruned block height of the chain",
+                "deprecated": false,
+                "schema": {
+                  "type": "integer",
+                  "format": "uint64"
+                }
+              },
+              "X-APTOS-GAS-USED": {
+                "description": "The cost of the call in terms of gas",
                 "deprecated": false,
                 "schema": {
                   "type": "integer",
@@ -9033,6 +9945,14 @@
                   "format": "uint64"
                 }
               },
+              "X-APTOS-GAS-USED": {
+                "description": "The cost of the call in terms of gas",
+                "deprecated": false,
+                "schema": {
+                  "type": "integer",
+                  "format": "uint64"
+                }
+              },
               "X-APTOS-CURSOR": {
                 "description": "Cursor to be used for endpoints that support cursor-based\npagination. Pass this to the `start` field of the endpoint\non the next call to get the next page of results.",
                 "deprecated": false,
@@ -9107,6 +10027,14 @@
                   "type": "integer",
                   "format": "uint64"
                 }
+              },
+              "X-APTOS-GAS-USED": {
+                "description": "The cost of the call in terms of gas",
+                "deprecated": false,
+                "schema": {
+                  "type": "integer",
+                  "format": "uint64"
+                }
               }
             }
           },
@@ -9170,6 +10098,14 @@
               },
               "X-APTOS-OLDEST-BLOCK-HEIGHT": {
                 "description": "Oldest non-pruned block height of the chain",
+                "deprecated": false,
+                "schema": {
+                  "type": "integer",
+                  "format": "uint64"
+                }
+              },
+              "X-APTOS-GAS-USED": {
+                "description": "The cost of the call in terms of gas",
                 "deprecated": false,
                 "schema": {
                   "type": "integer",
@@ -9243,6 +10179,14 @@
                   "type": "integer",
                   "format": "uint64"
                 }
+              },
+              "X-APTOS-GAS-USED": {
+                "description": "The cost of the call in terms of gas",
+                "deprecated": false,
+                "schema": {
+                  "type": "integer",
+                  "format": "uint64"
+                }
               }
             }
           },
@@ -9306,6 +10250,14 @@
               },
               "X-APTOS-OLDEST-BLOCK-HEIGHT": {
                 "description": "Oldest non-pruned block height of the chain",
+                "deprecated": false,
+                "schema": {
+                  "type": "integer",
+                  "format": "uint64"
+                }
+              },
+              "X-APTOS-GAS-USED": {
+                "description": "The cost of the call in terms of gas",
                 "deprecated": false,
                 "schema": {
                   "type": "integer",
@@ -9379,6 +10331,14 @@
                   "type": "integer",
                   "format": "uint64"
                 }
+              },
+              "X-APTOS-GAS-USED": {
+                "description": "The cost of the call in terms of gas",
+                "deprecated": false,
+                "schema": {
+                  "type": "integer",
+                  "format": "uint64"
+                }
               }
             }
           },
@@ -9442,6 +10402,14 @@
               },
               "X-APTOS-OLDEST-BLOCK-HEIGHT": {
                 "description": "Oldest non-pruned block height of the chain",
+                "deprecated": false,
+                "schema": {
+                  "type": "integer",
+                  "format": "uint64"
+                }
+              },
+              "X-APTOS-GAS-USED": {
+                "description": "The cost of the call in terms of gas",
                 "deprecated": false,
                 "schema": {
                   "type": "integer",
@@ -9583,6 +10551,14 @@
                   "format": "uint64"
                 }
               },
+              "X-APTOS-GAS-USED": {
+                "description": "The cost of the call in terms of gas",
+                "deprecated": false,
+                "schema": {
+                  "type": "integer",
+                  "format": "uint64"
+                }
+              },
               "X-APTOS-CURSOR": {
                 "description": "Cursor to be used for endpoints that support cursor-based\npagination. Pass this to the `start` field of the endpoint\non the next call to get the next page of results.",
                 "deprecated": false,
@@ -9657,6 +10633,14 @@
                   "type": "integer",
                   "format": "uint64"
                 }
+              },
+              "X-APTOS-GAS-USED": {
+                "description": "The cost of the call in terms of gas",
+                "deprecated": false,
+                "schema": {
+                  "type": "integer",
+                  "format": "uint64"
+                }
               }
             }
           },
@@ -9720,6 +10704,14 @@
               },
               "X-APTOS-OLDEST-BLOCK-HEIGHT": {
                 "description": "Oldest non-pruned block height of the chain",
+                "deprecated": false,
+                "schema": {
+                  "type": "integer",
+                  "format": "uint64"
+                }
+              },
+              "X-APTOS-GAS-USED": {
+                "description": "The cost of the call in terms of gas",
                 "deprecated": false,
                 "schema": {
                   "type": "integer",
@@ -9793,6 +10785,14 @@
                   "type": "integer",
                   "format": "uint64"
                 }
+              },
+              "X-APTOS-GAS-USED": {
+                "description": "The cost of the call in terms of gas",
+                "deprecated": false,
+                "schema": {
+                  "type": "integer",
+                  "format": "uint64"
+                }
               }
             }
           },
@@ -9856,6 +10856,14 @@
               },
               "X-APTOS-OLDEST-BLOCK-HEIGHT": {
                 "description": "Oldest non-pruned block height of the chain",
+                "deprecated": false,
+                "schema": {
+                  "type": "integer",
+                  "format": "uint64"
+                }
+              },
+              "X-APTOS-GAS-USED": {
+                "description": "The cost of the call in terms of gas",
                 "deprecated": false,
                 "schema": {
                   "type": "integer",
@@ -9929,6 +10937,14 @@
                   "type": "integer",
                   "format": "uint64"
                 }
+              },
+              "X-APTOS-GAS-USED": {
+                "description": "The cost of the call in terms of gas",
+                "deprecated": false,
+                "schema": {
+                  "type": "integer",
+                  "format": "uint64"
+                }
               }
             }
           },
@@ -9992,6 +11008,14 @@
               },
               "X-APTOS-OLDEST-BLOCK-HEIGHT": {
                 "description": "Oldest non-pruned block height of the chain",
+                "deprecated": false,
+                "schema": {
+                  "type": "integer",
+                  "format": "uint64"
+                }
+              },
+              "X-APTOS-GAS-USED": {
+                "description": "The cost of the call in terms of gas",
                 "deprecated": false,
                 "schema": {
                   "type": "integer",
@@ -10116,6 +11140,14 @@
                   "format": "uint64"
                 }
               },
+              "X-APTOS-GAS-USED": {
+                "description": "The cost of the call in terms of gas",
+                "deprecated": false,
+                "schema": {
+                  "type": "integer",
+                  "format": "uint64"
+                }
+              },
               "X-APTOS-CURSOR": {
                 "description": "Cursor to be used for endpoints that support cursor-based\npagination. Pass this to the `start` field of the endpoint\non the next call to get the next page of results.",
                 "deprecated": false,
@@ -10207,6 +11239,14 @@
                   "format": "uint64"
                 }
               },
+              "X-APTOS-GAS-USED": {
+                "description": "The cost of the call in terms of gas",
+                "deprecated": false,
+                "schema": {
+                  "type": "integer",
+                  "format": "uint64"
+                }
+              },
               "X-APTOS-CURSOR": {
                 "description": "Cursor to be used for endpoints that support cursor-based\npagination. Pass this to the `start` field of the endpoint\non the next call to get the next page of results.",
                 "deprecated": false,
@@ -10281,6 +11321,14 @@
                   "type": "integer",
                   "format": "uint64"
                 }
+              },
+              "X-APTOS-GAS-USED": {
+                "description": "The cost of the call in terms of gas",
+                "deprecated": false,
+                "schema": {
+                  "type": "integer",
+                  "format": "uint64"
+                }
               }
             }
           },
@@ -10344,6 +11392,14 @@
               },
               "X-APTOS-OLDEST-BLOCK-HEIGHT": {
                 "description": "Oldest non-pruned block height of the chain",
+                "deprecated": false,
+                "schema": {
+                  "type": "integer",
+                  "format": "uint64"
+                }
+              },
+              "X-APTOS-GAS-USED": {
+                "description": "The cost of the call in terms of gas",
                 "deprecated": false,
                 "schema": {
                   "type": "integer",
@@ -10417,6 +11473,14 @@
                   "type": "integer",
                   "format": "uint64"
                 }
+              },
+              "X-APTOS-GAS-USED": {
+                "description": "The cost of the call in terms of gas",
+                "deprecated": false,
+                "schema": {
+                  "type": "integer",
+                  "format": "uint64"
+                }
               }
             }
           },
@@ -10480,6 +11544,14 @@
               },
               "X-APTOS-OLDEST-BLOCK-HEIGHT": {
                 "description": "Oldest non-pruned block height of the chain",
+                "deprecated": false,
+                "schema": {
+                  "type": "integer",
+                  "format": "uint64"
+                }
+              },
+              "X-APTOS-GAS-USED": {
+                "description": "The cost of the call in terms of gas",
                 "deprecated": false,
                 "schema": {
                   "type": "integer",
@@ -10553,6 +11625,14 @@
                   "type": "integer",
                   "format": "uint64"
                 }
+              },
+              "X-APTOS-GAS-USED": {
+                "description": "The cost of the call in terms of gas",
+                "deprecated": false,
+                "schema": {
+                  "type": "integer",
+                  "format": "uint64"
+                }
               }
             }
           },
@@ -10621,6 +11701,14 @@
                   "type": "integer",
                   "format": "uint64"
                 }
+              },
+              "X-APTOS-GAS-USED": {
+                "description": "The cost of the call in terms of gas",
+                "deprecated": false,
+                "schema": {
+                  "type": "integer",
+                  "format": "uint64"
+                }
               }
             }
           },
@@ -10684,6 +11772,14 @@
               },
               "X-APTOS-OLDEST-BLOCK-HEIGHT": {
                 "description": "Oldest non-pruned block height of the chain",
+                "deprecated": false,
+                "schema": {
+                  "type": "integer",
+                  "format": "uint64"
+                }
+              },
+              "X-APTOS-GAS-USED": {
+                "description": "The cost of the call in terms of gas",
                 "deprecated": false,
                 "schema": {
                   "type": "integer",
@@ -10843,6 +11939,14 @@
                   "format": "uint64"
                 }
               },
+              "X-APTOS-GAS-USED": {
+                "description": "The cost of the call in terms of gas",
+                "deprecated": false,
+                "schema": {
+                  "type": "integer",
+                  "format": "uint64"
+                }
+              },
               "X-APTOS-CURSOR": {
                 "description": "Cursor to be used for endpoints that support cursor-based\npagination. Pass this to the `start` field of the endpoint\non the next call to get the next page of results.",
                 "deprecated": false,
@@ -10917,6 +12021,14 @@
                   "type": "integer",
                   "format": "uint64"
                 }
+              },
+              "X-APTOS-GAS-USED": {
+                "description": "The cost of the call in terms of gas",
+                "deprecated": false,
+                "schema": {
+                  "type": "integer",
+                  "format": "uint64"
+                }
               }
             }
           },
@@ -10980,6 +12092,14 @@
               },
               "X-APTOS-OLDEST-BLOCK-HEIGHT": {
                 "description": "Oldest non-pruned block height of the chain",
+                "deprecated": false,
+                "schema": {
+                  "type": "integer",
+                  "format": "uint64"
+                }
+              },
+              "X-APTOS-GAS-USED": {
+                "description": "The cost of the call in terms of gas",
                 "deprecated": false,
                 "schema": {
                   "type": "integer",
@@ -11053,6 +12173,14 @@
                   "type": "integer",
                   "format": "uint64"
                 }
+              },
+              "X-APTOS-GAS-USED": {
+                "description": "The cost of the call in terms of gas",
+                "deprecated": false,
+                "schema": {
+                  "type": "integer",
+                  "format": "uint64"
+                }
               }
             }
           },
@@ -11116,6 +12244,14 @@
               },
               "X-APTOS-OLDEST-BLOCK-HEIGHT": {
                 "description": "Oldest non-pruned block height of the chain",
+                "deprecated": false,
+                "schema": {
+                  "type": "integer",
+                  "format": "uint64"
+                }
+              },
+              "X-APTOS-GAS-USED": {
+                "description": "The cost of the call in terms of gas",
                 "deprecated": false,
                 "schema": {
                   "type": "integer",
@@ -11189,6 +12325,14 @@
                   "type": "integer",
                   "format": "uint64"
                 }
+              },
+              "X-APTOS-GAS-USED": {
+                "description": "The cost of the call in terms of gas",
+                "deprecated": false,
+                "schema": {
+                  "type": "integer",
+                  "format": "uint64"
+                }
               }
             }
           },
@@ -11257,6 +12401,14 @@
                   "type": "integer",
                   "format": "uint64"
                 }
+              },
+              "X-APTOS-GAS-USED": {
+                "description": "The cost of the call in terms of gas",
+                "deprecated": false,
+                "schema": {
+                  "type": "integer",
+                  "format": "uint64"
+                }
               }
             }
           },
@@ -11320,6 +12472,14 @@
               },
               "X-APTOS-OLDEST-BLOCK-HEIGHT": {
                 "description": "Oldest non-pruned block height of the chain",
+                "deprecated": false,
+                "schema": {
+                  "type": "integer",
+                  "format": "uint64"
+                }
+              },
+              "X-APTOS-GAS-USED": {
+                "description": "The cost of the call in terms of gas",
                 "deprecated": false,
                 "schema": {
                   "type": "integer",
@@ -11432,6 +12592,14 @@
                   "format": "uint64"
                 }
               },
+              "X-APTOS-GAS-USED": {
+                "description": "The cost of the call in terms of gas",
+                "deprecated": false,
+                "schema": {
+                  "type": "integer",
+                  "format": "uint64"
+                }
+              },
               "X-APTOS-CURSOR": {
                 "description": "Cursor to be used for endpoints that support cursor-based\npagination. Pass this to the `start` field of the endpoint\non the next call to get the next page of results.",
                 "deprecated": false,
@@ -11506,6 +12674,14 @@
                   "type": "integer",
                   "format": "uint64"
                 }
+              },
+              "X-APTOS-GAS-USED": {
+                "description": "The cost of the call in terms of gas",
+                "deprecated": false,
+                "schema": {
+                  "type": "integer",
+                  "format": "uint64"
+                }
               }
             }
           },
@@ -11569,6 +12745,14 @@
               },
               "X-APTOS-OLDEST-BLOCK-HEIGHT": {
                 "description": "Oldest non-pruned block height of the chain",
+                "deprecated": false,
+                "schema": {
+                  "type": "integer",
+                  "format": "uint64"
+                }
+              },
+              "X-APTOS-GAS-USED": {
+                "description": "The cost of the call in terms of gas",
                 "deprecated": false,
                 "schema": {
                   "type": "integer",
@@ -11642,6 +12826,14 @@
                   "type": "integer",
                   "format": "uint64"
                 }
+              },
+              "X-APTOS-GAS-USED": {
+                "description": "The cost of the call in terms of gas",
+                "deprecated": false,
+                "schema": {
+                  "type": "integer",
+                  "format": "uint64"
+                }
               }
             }
           },
@@ -11705,6 +12897,14 @@
               },
               "X-APTOS-OLDEST-BLOCK-HEIGHT": {
                 "description": "Oldest non-pruned block height of the chain",
+                "deprecated": false,
+                "schema": {
+                  "type": "integer",
+                  "format": "uint64"
+                }
+              },
+              "X-APTOS-GAS-USED": {
+                "description": "The cost of the call in terms of gas",
                 "deprecated": false,
                 "schema": {
                   "type": "integer",
@@ -11807,6 +13007,14 @@
                   "format": "uint64"
                 }
               },
+              "X-APTOS-GAS-USED": {
+                "description": "The cost of the call in terms of gas",
+                "deprecated": false,
+                "schema": {
+                  "type": "integer",
+                  "format": "uint64"
+                }
+              },
               "X-APTOS-CURSOR": {
                 "description": "Cursor to be used for endpoints that support cursor-based\npagination. Pass this to the `start` field of the endpoint\non the next call to get the next page of results.",
                 "deprecated": false,
@@ -11881,6 +13089,14 @@
                   "type": "integer",
                   "format": "uint64"
                 }
+              },
+              "X-APTOS-GAS-USED": {
+                "description": "The cost of the call in terms of gas",
+                "deprecated": false,
+                "schema": {
+                  "type": "integer",
+                  "format": "uint64"
+                }
               }
             }
           },
@@ -11944,6 +13160,14 @@
               },
               "X-APTOS-OLDEST-BLOCK-HEIGHT": {
                 "description": "Oldest non-pruned block height of the chain",
+                "deprecated": false,
+                "schema": {
+                  "type": "integer",
+                  "format": "uint64"
+                }
+              },
+              "X-APTOS-GAS-USED": {
+                "description": "The cost of the call in terms of gas",
                 "deprecated": false,
                 "schema": {
                   "type": "integer",
@@ -12017,6 +13241,14 @@
                   "type": "integer",
                   "format": "uint64"
                 }
+              },
+              "X-APTOS-GAS-USED": {
+                "description": "The cost of the call in terms of gas",
+                "deprecated": false,
+                "schema": {
+                  "type": "integer",
+                  "format": "uint64"
+                }
               }
             }
           },
@@ -12080,6 +13312,14 @@
               },
               "X-APTOS-OLDEST-BLOCK-HEIGHT": {
                 "description": "Oldest non-pruned block height of the chain",
+                "deprecated": false,
+                "schema": {
+                  "type": "integer",
+                  "format": "uint64"
+                }
+              },
+              "X-APTOS-GAS-USED": {
+                "description": "The cost of the call in terms of gas",
                 "deprecated": false,
                 "schema": {
                   "type": "integer",
@@ -12217,6 +13457,14 @@
                   "format": "uint64"
                 }
               },
+              "X-APTOS-GAS-USED": {
+                "description": "The cost of the call in terms of gas",
+                "deprecated": false,
+                "schema": {
+                  "type": "integer",
+                  "format": "uint64"
+                }
+              },
               "X-APTOS-CURSOR": {
                 "description": "Cursor to be used for endpoints that support cursor-based\npagination. Pass this to the `start` field of the endpoint\non the next call to get the next page of results.",
                 "deprecated": false,
@@ -12291,6 +13539,14 @@
                   "type": "integer",
                   "format": "uint64"
                 }
+              },
+              "X-APTOS-GAS-USED": {
+                "description": "The cost of the call in terms of gas",
+                "deprecated": false,
+                "schema": {
+                  "type": "integer",
+                  "format": "uint64"
+                }
               }
             }
           },
@@ -12354,6 +13610,14 @@
               },
               "X-APTOS-OLDEST-BLOCK-HEIGHT": {
                 "description": "Oldest non-pruned block height of the chain",
+                "deprecated": false,
+                "schema": {
+                  "type": "integer",
+                  "format": "uint64"
+                }
+              },
+              "X-APTOS-GAS-USED": {
+                "description": "The cost of the call in terms of gas",
                 "deprecated": false,
                 "schema": {
                   "type": "integer",
@@ -12427,6 +13691,14 @@
                   "type": "integer",
                   "format": "uint64"
                 }
+              },
+              "X-APTOS-GAS-USED": {
+                "description": "The cost of the call in terms of gas",
+                "deprecated": false,
+                "schema": {
+                  "type": "integer",
+                  "format": "uint64"
+                }
               }
             }
           },
@@ -12490,6 +13762,14 @@
               },
               "X-APTOS-OLDEST-BLOCK-HEIGHT": {
                 "description": "Oldest non-pruned block height of the chain",
+                "deprecated": false,
+                "schema": {
+                  "type": "integer",
+                  "format": "uint64"
+                }
+              },
+              "X-APTOS-GAS-USED": {
+                "description": "The cost of the call in terms of gas",
                 "deprecated": false,
                 "schema": {
                   "type": "integer",
@@ -12563,6 +13843,14 @@
                   "type": "integer",
                   "format": "uint64"
                 }
+              },
+              "X-APTOS-GAS-USED": {
+                "description": "The cost of the call in terms of gas",
+                "deprecated": false,
+                "schema": {
+                  "type": "integer",
+                  "format": "uint64"
+                }
               }
             }
           },
@@ -12626,6 +13914,14 @@
               },
               "X-APTOS-OLDEST-BLOCK-HEIGHT": {
                 "description": "Oldest non-pruned block height of the chain",
+                "deprecated": false,
+                "schema": {
+                  "type": "integer",
+                  "format": "uint64"
+                }
+              },
+              "X-APTOS-GAS-USED": {
+                "description": "The cost of the call in terms of gas",
                 "deprecated": false,
                 "schema": {
                   "type": "integer",

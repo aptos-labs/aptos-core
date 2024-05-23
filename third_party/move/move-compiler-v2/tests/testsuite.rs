@@ -558,8 +558,8 @@ fn run_test(path: &Path, config: TestConfig) -> datatest_stable::Result<()> {
     let path_str = path.display().to_string();
     let mut options = config.options.clone();
     options.warn_unused = path_str.contains("/unused/");
-    options.sources = extract_test_directives(path, "// dep:")?;
-    options.sources.push(path_str.clone());
+    options.sources_deps = extract_test_directives(path, "// dep:")?;
+    options.sources = vec![path_str.clone()];
     options.dependencies = if extract_test_directives(path, "// no-stdlib")?.is_empty() {
         vec![path_from_crate_root("../move-stdlib/sources")]
     } else {
@@ -678,7 +678,7 @@ fn run_test(path: &Path, config: TestConfig) -> datatest_stable::Result<()> {
                 },
             );
             if *ok.borrow() && config.stop_after == StopAfter::FileFormat {
-                let units = run_file_format_gen(&env, &targets);
+                let units = run_file_format_gen(&mut env, &targets);
                 let out = &mut test_output.borrow_mut();
                 update_diags(ok.borrow_mut(), out, &env);
                 if *ok.borrow() {
