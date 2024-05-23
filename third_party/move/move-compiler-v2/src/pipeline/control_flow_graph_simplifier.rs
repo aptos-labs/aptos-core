@@ -110,19 +110,12 @@ impl ControlFlowGraphSimplifierTransformation {
     /// Does the first four transformations described in the module doc
     fn transform(&mut self) {
         self.eliminate_branch_to_same_target();
-        let cfg_code_generator =
-            ControlFlowGraphCodeGenerator::new(std::mem::take(&mut self.data.code));
-        let mut empty_blocks_remover = EmptyBlockRemover::new(cfg_code_generator);
-        empty_blocks_remover.transform();
-        let mut redundant_jump_remover = RedundantJumpRemover::new(empty_blocks_remover.0);
-        redundant_jump_remover.transform();
-        self.data.code = redundant_jump_remover.0.gen_code(true);
+        let cfg1 = ControlFlowGraphCodeGenerator::new(std::mem::take(&mut self.data.code));
+        let cfg2 = EmptyBlockRemover::transform(cfg1);
         // may introduce new empty blocks
-        let mut empty_blocks_remover = EmptyBlockRemover::new(ControlFlowGraphCodeGenerator::new(
-            std::mem::take(&mut self.data.code),
-        ));
-        empty_blocks_remover.transform();
-        self.data.code = empty_blocks_remover.0.gen_code(true);
+        let cfg3 = RedundantJumpRemover::transform(cfg2);
+        let cfg4 = EmptyBlockRemover::transform(cfg3);
+        self.data.code = cfg4.gen_code(true);
         self.eliminate_branch_to_same_target();
         self.data.annotations.clear()
     }
@@ -146,6 +139,7 @@ impl ControlFlowGraphSimplifierTransformation {
 /// 1. construct a `ControlFlowGraphCodeGenerator` from the code,
 /// 2. perform the transformation on the `ControlFlowGraphCodeGenerator`
 /// 3. generate the code back from the `ControlFlowGraphCodeGenerator`
+#[derive(Debug)]
 struct ControlFlowGraphCodeGenerator {
     /// The control flow graph.
     /// `BlockContent` is invalidated during transformations
@@ -392,13 +386,20 @@ impl ControlFlowGraphCodeGenerator {
 struct EmptyBlockRemover(ControlFlowGraphCodeGenerator);
 
 impl EmptyBlockRemover {
+    /// Performs the transformation 1 described in the module doc
+    pub fn transform(generator: ControlFlowGraphCodeGenerator) -> ControlFlowGraphCodeGenerator {
+        let mut processer = Self::new(generator);
+        processer.process();
+        processer.0
+    }
+
     /// Wrapper
-    pub fn new(generator: ControlFlowGraphCodeGenerator) -> Self {
+    fn new(generator: ControlFlowGraphCodeGenerator) -> Self {
         Self(generator)
     }
 
-    /// Performas the transformation 1 described in the module doc
-    pub fn transform(&mut self) {
+    /// Performs the transformation 1 described in the module doc
+    fn process(&mut self) {
         for block in self.0.blocks() {
             if self.is_empty_block(block) {
                 let succ_block = self.0.get_the_non_trivial_successor(block);
@@ -418,6 +419,7 @@ impl EmptyBlockRemover {
                 block_instrs.last().expect("instruction"),
                 Bytecode::Jump(..)
             )
+            || block_instrs.len() == 1 && matches!(block_instrs[0], Bytecode::Label(..))
     }
 
     /// Removes the block `block_to_remove` and redirects all jumps to it to `redirect_to`
@@ -476,13 +478,20 @@ impl EmptyBlockRemover {
 struct RedundantJumpRemover(pub ControlFlowGraphCodeGenerator);
 
 impl RedundantJumpRemover {
+    /// Performs the transformation 2 described in the module doc
+    pub fn transform(generator: ControlFlowGraphCodeGenerator) -> ControlFlowGraphCodeGenerator {
+        let mut processor = Self::new(generator);
+        processor.process();
+        processor.0
+    }
+
     /// Wrapper
-    pub fn new(cfg_generator: ControlFlowGraphCodeGenerator) -> Self {
+    fn new(cfg_generator: ControlFlowGraphCodeGenerator) -> Self {
         Self(cfg_generator)
     }
 
     /// Performs the transformation 2 described in the module doc
-    pub fn transform(&mut self) {
+    fn process(&mut self) {
         for block in self.0.blocks() {
             // the later condition says that `block` is unreachable or has been removed
             if self.0.is_trivial_block(block) || !self.0.predecessors.contains_key(&block) {
@@ -519,10 +528,7 @@ impl RedundantJumpRemover {
     /// If possible, append the code of block `to` to the back of block `from` and remove the `to` block
     /// Returns true if the edge is removed
     fn remove_jump_if_possible(&mut self, from: BlockId, to: BlockId) -> bool {
-        debug_assert!(self
-            .0
-            .succs(from)
-            .contains(&to));
+        debug_assert!(self.0.succs(from).contains(&to));
         debug_assert!(!self.0.is_trivial_block(from));
         debug_assert!(!self.0.is_trivial_block(to));
 
@@ -542,9 +548,7 @@ impl RedundantJumpRemover {
 
                     *this.succs_mut(pred) = this.succs(to).to_vec();
                 },
-                |this, succ| {
-                    this.replace_preds(succ, to, from)
-                },
+                |this, succ| this.replace_preds(succ, to, from),
             );
             true
         }
@@ -576,10 +580,7 @@ fn subst_label(label: &mut Label, from: Label, to: Label) {
 
 /// If the tail of `code` is a jump, removes it
 fn remove_tail_jump(code: &mut Vec<Bytecode>) {
-    if matches!(
-        code.last().expect("last instruction"),
-        Bytecode::Jump(..)
-    ) {
+    if matches!(code.last().expect("last instruction"), Bytecode::Jump(..)) {
         code.pop();
     }
 }
