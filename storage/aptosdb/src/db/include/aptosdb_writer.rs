@@ -147,7 +147,7 @@ impl DbWriter for AptosDB {
                 &transaction_infos,
                 &events,
                 wsets,
-                Option::Some((
+                Some((
                     &mut ledger_db_batch,
                     &mut sharded_kv_batch,
                     &state_kv_metadata_batch,

@@ -284,6 +284,11 @@ impl HashValue {
         hash[Self::LENGTH - bytes.len()..].copy_from_slice(&bytes[..]);
         Self::new(hash)
     }
+
+    /// hack
+    pub fn into_inner(self) -> [u8; Self::LENGTH] {
+        self.hash
+    }
 }
 
 impl ser::Serialize for HashValue {
