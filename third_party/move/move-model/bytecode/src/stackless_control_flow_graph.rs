@@ -308,6 +308,9 @@ impl<'a> DFSLeft<'a> {
     fn get_next_unvisited(&mut self) -> Option<BlockId> {
         let next_to_visit = self.get_next_to_visit()?;
         if self.visited.contains(&next_to_visit) {
+            // we won't run into a infinite loop
+            // because eventually we will run out of scheduled blocks or unvisited blocks
+            // by calling `get_next_to_visit`
             self.get_next_unvisited()
         } else {
             Some(next_to_visit)
