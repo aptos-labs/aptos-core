@@ -108,6 +108,7 @@ pub fn run_benchmark<V>(
     pruner_config: PrunerConfig,
     enable_storage_sharding: bool,
     pipeline_config: PipelineConfig,
+
 ) where
     V: TransactionBlockExecutor + 'static,
 {
@@ -123,6 +124,7 @@ pub fn run_benchmark<V>(
     config.storage.rocksdb_configs.enable_storage_sharding = enable_storage_sharding;
 
     let (db, executor) = init_db_and_executor::<V>(&config);
+
     let mut root_account = TransactionGenerator::read_root_account(genesis_key, &db);
     let transaction_generators = transaction_mix.clone().map(|transaction_mix| {
         let num_existing_accounts = TransactionGenerator::read_meta(&source_dir);

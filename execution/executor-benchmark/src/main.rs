@@ -32,6 +32,8 @@ use std::{
     time::{SystemTime, UNIX_EPOCH},
 };
 
+use aptos_types::on_chain_config::FeatureFlag;
+
 #[cfg(unix)]
 #[global_allocator]
 static ALLOC: jemallocator::Jemalloc = jemallocator::Jemalloc;
@@ -324,6 +326,20 @@ enum Command {
 
         #[clap(long, value_parser)]
         checkpoint_dir: PathBuf,
+
+        #[clap(
+            long,
+            num_args=1..,
+            value_delimiter = ' ',
+            help = "Custom enabling/disabling of the feature flags in the Move source. Disabling is stronger than enabling")]
+        enable_feature: Vec<FeatureFlag>,
+
+        #[clap(
+            long,
+            num_args=1..,
+            value_delimiter = ' ',
+            help = "Custom enabling/disabling of the feature flags in the Move source. Disabling is stronger than enabling")]
+        disable_feature: Vec<FeatureFlag>,
     },
     AddAccounts {
         #[clap(long, value_parser)]
@@ -371,7 +387,13 @@ where
             use_sender_account_pool,
             data_dir,
             checkpoint_dir,
+            enable_feature,
+            disable_feature,
         } => {
+            // setting custom feature flags
+            aptos_types::on_chain_config::enable_features(enable_feature);
+            aptos_types::on_chain_config::disable_features(disable_feature);
+
             let transaction_mix = if transaction_type.is_empty() {
                 None
             } else {
@@ -389,7 +411,7 @@ where
 
             if let Some(hotspot_probability) = opt.hotspot_probability {
                 if !(0.5..1.0).contains(&hotspot_probability) {
-                    panic!("Parameter hotspot-probability has to a decimal number in [0.5, 1.0).");
+                    panic!("Parameter hotspot-probability has to be a decimal number in [0.5, 1.0).");
                 }
             }
 
