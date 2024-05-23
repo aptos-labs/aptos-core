@@ -1,6 +1,7 @@
 // Copyright © Aptos Foundation
 // SPDX-License-Identifier: Apache-2.0
 
+use once_cell::sync::OnceCell;
 use crate::on_chain_config::OnChainConfig;
 use move_binary_format::{
     file_format_common,
@@ -12,9 +13,10 @@ use move_core_types::{
 };
 use serde::{Deserialize, Serialize};
 use strum_macros::FromRepr;
+use strum_macros::EnumString;
 
 /// The feature flags define in the Move source. This must stay aligned with the constants there.
-#[derive(Clone, Copy, Debug, PartialEq, Eq, PartialOrd, Ord, FromRepr)]
+#[derive(Clone, Copy, Debug, PartialEq, Eq, PartialOrd, Ord, FromRepr, EnumString)]
 #[allow(non_camel_case_types)]
 pub enum FeatureFlag {
     CODE_DEPENDENCY_CHECK = 1,
@@ -146,6 +148,15 @@ impl FeatureFlag {
     }
 }
 
+static ENABLED_FEATURES: OnceCell<Vec<FeatureFlag>> = OnceCell::new();
+pub fn enable_features(enable_features: Vec<FeatureFlag>) {
+    ENABLED_FEATURES.set(enable_features).ok();
+}
+static DISABLED_FEATURES: OnceCell<Vec<FeatureFlag>> = OnceCell::new();
+pub fn disable_features(disable_features: Vec<FeatureFlag>) {
+    ENABLED_FEATURES.set(disable_features).ok();
+}
+
 /// Representation of features on chain as a bitset.
 #[derive(Clone, Debug, Deserialize, PartialEq, Eq, PartialOrd, Ord, Serialize)]
 pub struct Features {
@@ -161,6 +172,22 @@ impl Default for Features {
 
         for feature in FeatureFlag::default_features() {
             features.enable(feature);
+        }
+        match ENABLED_FEATURES.get() {
+            Some(enabled_features) => {
+                for feature in enabled_features.iter() {
+                    features.enable(*feature);
+                }
+            }
+            None => (),
+        }
+        match DISABLED_FEATURES.get() {
+            Some(disabled_features) => {
+                for feature in disabled_features.iter() {
+                    features.disable(*feature);
+                }
+            }
+            None => (),
         }
         features
     }
