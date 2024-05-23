@@ -4129,7 +4129,6 @@ dependencies = [
  "futures",
  "hex",
  "move-binary-format",
- "move-bytecode-verifier",
  "move-core-types",
  "move-unit-test",
  "move-vm-runtime",
