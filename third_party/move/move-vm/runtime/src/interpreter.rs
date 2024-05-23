@@ -136,13 +136,7 @@ impl Interpreter {
         let mut locals = Locals::new(function.local_count());
         for (i, value) in args.into_iter().enumerate() {
             locals
-                .store_loc(
-                    i,
-                    value,
-                    loader
-                        .vm_config()
-                        .enable_invariant_violation_check_in_swap_loc,
-                )
+                .store_loc(i, value, loader.vm_config().check_invariant_in_swap_loc)
                 .map_err(|e| self.set_location(e))?;
         }
 
@@ -379,9 +373,7 @@ impl Interpreter {
             locals.store_loc(
                 param_count - i - 1,
                 self.operand_stack.pop()?,
-                loader
-                    .vm_config()
-                    .enable_invariant_violation_check_in_swap_loc,
+                loader.vm_config().check_invariant_in_swap_loc,
             )?;
 
             if self.paranoid_type_checks {
@@ -2284,10 +2276,7 @@ impl Frame {
                     Bytecode::MoveLoc(idx) => {
                         let local = self.locals.move_loc(
                             *idx as usize,
-                            resolver
-                                .loader()
-                                .vm_config()
-                                .enable_invariant_violation_check_in_swap_loc,
+                            resolver.loader().vm_config().check_invariant_in_swap_loc,
                         )?;
                         gas_meter.charge_move_loc(&local)?;
 
@@ -2299,10 +2288,7 @@ impl Frame {
                         self.locals.store_loc(
                             *idx as usize,
                             value_to_store,
-                            resolver
-                                .loader()
-                                .vm_config()
-                                .enable_invariant_violation_check_in_swap_loc,
+                            resolver.loader().vm_config().check_invariant_in_swap_loc,
                         )?;
                     },
                     Bytecode::Call(idx) => {
