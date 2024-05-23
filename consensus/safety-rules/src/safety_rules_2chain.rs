@@ -113,6 +113,7 @@ impl SafetyRules {
             LedgerInfo::new(order_vote_proposal.block_info().clone(), HashValue::zero());
         let signature = self.sign(&ledger_info)?;
         let order_vote = OrderVote::new_with_signature(author, ledger_info.clone(), signature);
+        self.persistent_storage.set_safety_data(safety_data)?;
         Ok(order_vote)
     }
 
