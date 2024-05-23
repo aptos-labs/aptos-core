@@ -69,25 +69,30 @@ impl StdLib {
 pub enum StdVersion {
     Mainnet,
     Testnet,
-    Dev,
+    Devnet,
 }
 
 impl StdVersion {
+    const MAINNET: &'static str = "mainnet";
+    const TESTNET: &'static str = "testnet";
+    const DEVNET: &'static str = "devnet";
+
+
     /// Returns the rev name of the standard library version.
     pub fn rev(&self) -> &'static str {
         match self {
-            StdVersion::Mainnet => "mainnet",
-            StdVersion::Testnet => "testnet",
-            StdVersion::Dev => "dev",
+            StdVersion::Mainnet => StdVersion::MAINNET,
+            StdVersion::Testnet => StdVersion::TESTNET,
+            StdVersion::Devnet => StdVersion::DEVNET,
         }
     }
 
     /// Returns the standard library version from the given rev name, or `None` if the string is not a standard library version.
     pub fn from_rev(version: &str) -> Option<StdVersion> {
         match version {
-            "mainnet" => Some(Self::Mainnet),
-            "testnet" => Some(Self::Testnet),
-            "dev" => Some(Self::Dev),
+            StdVersion::MAINNET => Some(Self::Mainnet),
+            StdVersion::TESTNET => Some(Self::Testnet),
+            StdVersion::DEVNET => Some(Self::Devnet),
             _ => None,
         }
     }
