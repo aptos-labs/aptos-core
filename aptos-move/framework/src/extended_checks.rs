@@ -113,7 +113,7 @@ impl<'a> ExtendedChecker<'a> {
 
     fn run(&mut self) {
         for ref module in self.env.get_modules() {
-            if module.is_target() {
+            if module.is_primary_target() {
                 self.check_and_record_resource_groups(module);
                 self.check_and_record_resource_group_members(module);
                 self.check_and_record_view_functions(module);

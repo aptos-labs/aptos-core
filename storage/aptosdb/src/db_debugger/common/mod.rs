@@ -1,7 +1,10 @@
 // Copyright © Aptos Foundation
 // SPDX-License-Identifier: Apache-2.0
 
-use crate::{db_debugger::ShardingConfig, ledger_db::LedgerDb, state_merkle_db::StateMerkleDb};
+use crate::{
+    db_debugger::ShardingConfig, ledger_db::LedgerDb, state_kv_db::StateKvDb,
+    state_merkle_db::StateMerkleDb,
+};
 use aptos_config::config::{RocksdbConfigs, StorageDirPaths};
 use aptos_storage_interface::Result;
 use aptos_types::nibble::{nibble_path::NibblePath, Nibble};
@@ -31,6 +34,19 @@ impl DbDir {
             },
             false,
             0,
+        )
+    }
+
+    pub fn open_state_kv_db(&self) -> Result<StateKvDb> {
+        let leger_db = self.open_ledger_db()?;
+        StateKvDb::new(
+            &StorageDirPaths::from_path(&self.db_dir),
+            RocksdbConfigs {
+                enable_storage_sharding: self.sharding_config.enable_storage_sharding,
+                ..Default::default()
+            },
+            true,
+            leger_db.metadata_db_arc(),
         )
     }
 
