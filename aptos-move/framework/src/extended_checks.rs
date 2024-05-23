@@ -144,8 +144,10 @@ impl<'a> ExtendedChecker<'a> {
         let init_module_sym = self.env.symbol_pool().make(INIT_MODULE_FUN);
         if let Some(ref fun) = module.find_function(init_module_sym) {
             if fun.visibility() != Visibility::Private {
-                self.env
-                    .error(&fun.get_id_loc(), "`init_module` function must be private")
+                self.env.error(
+                    &fun.get_id_loc(),
+                    &format!("`{}` function must be private", INIT_MODULE_FUN),
+                )
             }
             for Parameter(_, ty, _) in fun.get_parameters() {
                 let ok = match ty {
@@ -156,14 +158,15 @@ impl<'a> ExtendedChecker<'a> {
                 if !ok {
                     self.env.error(
                         &fun.get_id_loc(),
-                        "`init_module` function can only take `signer` values and immutable references as parameters",
+                        &format!("`{}` function can only take values of type `signer` or `&signer` as parameters",
+                                 INIT_MODULE_FUN),
                     );
                 }
             }
             if fun.get_return_count() > 0 {
                 self.env.error(
                     &fun.get_id_loc(),
-                    "`init_module` function cannot return values",
+                    &format!("`{}` function cannot return values", INIT_MODULE_FUN),
                 )
             }
         }
@@ -222,7 +225,7 @@ impl<'a> ExtendedChecker<'a> {
                 self.env.error(
                     loc,
                     &format!(
-                        "type `{}` is not supported as an transaction parameter type",
+                        "type `{}` is not supported as a transaction parameter type",
                         ty.display(&self.env.get_type_display_ctx())
                     ),
                 );
@@ -672,6 +675,9 @@ impl<'a> ExtendedChecker<'a> {
                         Type::Reference(mutability, inner) => {
                             if let Type::Primitive(inner) = inner.as_ref() {
                                 if inner == &PrimitiveType::Signer
+                                // Avoid a redundant error message for `&mut signer`, which is
+                                // always disallowed for transaction entries, not just for
+                                // `#[view]`.
                                     && mutability == &ReferenceKind::Immutable
                                 {
                                     self.env.error(
